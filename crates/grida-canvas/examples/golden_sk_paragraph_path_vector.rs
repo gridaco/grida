@@ -203,11 +203,13 @@ fn scenario_geist(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             let painter = VNPainter::new(canvas);
             let fill = Paint::from(color);
             let stroke = StrokeOptions {
-                width: 1.5,
-                align: StrokeAlign::Center,
+                stroke_width: 1.5,
+                stroke_align: StrokeAlign::Center,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 100))]),
                 width_profile: None,
-                dash_array: None,
+                stroke_dash_array: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
@@ -291,11 +293,13 @@ fn scenario_roboto_flex(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             let painter = VNPainter::new(canvas);
             let fill = Paint::from(color);
             let stroke = StrokeOptions {
-                width: 1.5,
-                align: StrokeAlign::Center,
+                stroke_width: 1.5,
+                stroke_align: StrokeAlign::Center,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 100))]),
                 width_profile: None,
-                dash_array: None,
+                stroke_dash_array: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
@@ -396,11 +400,13 @@ fn scenario_multiscript(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             let painter = VNPainter::new(canvas);
             let fill = Paint::from(color);
             let stroke = StrokeOptions {
-                width: 1.0,
-                align: StrokeAlign::Center,
+                stroke_width: 1.0,
+                stroke_align: StrokeAlign::Center,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 80))]),
                 width_profile: None,
-                dash_array: None,
+                stroke_dash_array: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }
@@ -473,11 +479,13 @@ fn scenario_variable_fonts(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             let painter = VNPainter::new(canvas);
             let fill = Paint::from(color);
             let stroke = StrokeOptions {
-                width: 1.2,
-                align: StrokeAlign::Center,
+                stroke_width: 1.2,
+                stroke_align: StrokeAlign::Center,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 paints: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 120))]),
                 width_profile: None,
-                dash_array: None,
+                stroke_dash_array: None,
             };
             painter.draw(&vn, &[fill], Some(&stroke), 0.0);
         }

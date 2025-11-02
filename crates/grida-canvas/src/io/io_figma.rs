@@ -787,6 +787,8 @@ impl FigmaConverter {
                         .map(|a| serde_json::to_string(a).unwrap_or_default())
                         .unwrap_or_else(|| "CENTER".to_string()),
                 ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: component
                     .stroke_dashes
                     .clone()
@@ -908,6 +910,8 @@ impl FigmaConverter {
                         .map(|a| serde_json::to_string(a).unwrap_or_default())
                         .unwrap_or_else(|| "CENTER".to_string()),
                 ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: instance
                     .stroke_dashes
                     .clone()
@@ -977,6 +981,8 @@ impl FigmaConverter {
                 strokes: Paints::default(),
                 stroke_style: StrokeStyle {
                     stroke_align: StrokeAlign::Inside,
+                    stroke_cap: StrokeCap::default(),
+                    stroke_join: StrokeJoin::default(),
                     stroke_dash_array: None,
                 },
                 stroke_width: StrokeWidth::None,
@@ -1133,6 +1139,8 @@ impl FigmaConverter {
                         .map(|a| serde_json::to_string(a).unwrap_or_default())
                         .unwrap_or_else(|| "CENTER".to_string()),
                 ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1324,6 +1332,8 @@ impl FigmaConverter {
                     strokes: Paints::default(),
                     stroke_style: StrokeStyle {
                         stroke_align: StrokeAlign::Inside,
+                        stroke_cap: StrokeCap::default(),
+                        stroke_join: StrokeJoin::default(),
                         stroke_dash_array: None,
                     },
                     stroke_width: SingularStrokeWidth(None),
@@ -1349,6 +1359,8 @@ impl FigmaConverter {
                     strokes: self.convert_strokes(Some(&origin.strokes)),
                     stroke_style: StrokeStyle {
                         stroke_align: StrokeAlign::Inside,
+                        stroke_cap: StrokeCap::default(),
+                        stroke_join: StrokeJoin::default(),
                         stroke_dash_array: None,
                     },
                     stroke_width: SingularStrokeWidth(None),
@@ -1374,6 +1386,8 @@ impl FigmaConverter {
                 strokes: Paints::default(),
                 stroke_style: StrokeStyle {
                     stroke_align: StrokeAlign::Inside,
+                    stroke_cap: StrokeCap::default(),
+                    stroke_join: StrokeJoin::default(),
                     stroke_dash_array: None,
                 },
                 stroke_width: StrokeWidth::None,
@@ -1464,6 +1478,8 @@ impl FigmaConverter {
                         .map(|a| serde_json::to_string(a).unwrap_or_default())
                         .unwrap_or_else(|| "CENTER".to_string()),
                 ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1499,6 +1515,8 @@ impl FigmaConverter {
                         .map(|a| serde_json::to_string(a).unwrap_or_default())
                         .unwrap_or_else(|| "CENTER".to_string()),
                 ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1534,6 +1552,7 @@ impl FigmaConverter {
                 .into_iter()
                 .collect(),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
+            stroke_cap: StrokeCap::default(),
             _data_stroke_align: Self::convert_stroke_align(
                 origin
                     .stroke_align
@@ -1582,6 +1601,8 @@ impl FigmaConverter {
                         .map(|a| serde_json::to_string(a).unwrap_or_default())
                         .unwrap_or_else(|| "CENTER".to_string()),
                 ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1632,6 +1653,8 @@ impl FigmaConverter {
                         .map(|a| serde_json::to_string(a).unwrap_or_default())
                         .unwrap_or_else(|| "CENTER".to_string()),
                 ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()
@@ -1676,6 +1699,8 @@ impl FigmaConverter {
                         .map(|a| serde_json::to_string(a).unwrap_or_default())
                         .unwrap_or_else(|| "CENTER".to_string()),
                 ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: origin
                     .stroke_dashes
                     .clone()

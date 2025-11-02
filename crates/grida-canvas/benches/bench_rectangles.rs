@@ -28,6 +28,8 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 strokes: Paints::default(),
                 stroke_style: StrokeStyle {
                     stroke_align: StrokeAlign::Inside,
+                    stroke_cap: StrokeCap::default(),
+                    stroke_join: StrokeJoin::default(),
                     stroke_dash_array: None,
                 },
                 stroke_width: 1.0.into(),

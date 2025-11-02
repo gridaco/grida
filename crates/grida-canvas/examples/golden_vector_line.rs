@@ -49,11 +49,13 @@ fn main() {
         };
 
         let stroke_options = StrokeOptions {
-            width: 2.0,
-            align: cg::cg::types::StrokeAlign::Center,
+            stroke_width: 2.0,
+            stroke_align: cg::cg::types::StrokeAlign::Center,
+            stroke_cap: StrokeCap::Round,
+            stroke_join: StrokeJoin::Round,
             paints: Paints::new([Paint::from(color)]),
             width_profile: None,
-            dash_array,
+            stroke_dash_array: dash_array,
         };
 
         // Use VNPainter to render the line

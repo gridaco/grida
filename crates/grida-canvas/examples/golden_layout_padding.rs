@@ -35,6 +35,8 @@ fn create_container_with_padding(
         strokes: Default::default(),
         stroke_style: StrokeStyle {
             stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
             stroke_dash_array: None,
         },
         stroke_width: Default::default(),

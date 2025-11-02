@@ -22,13 +22,22 @@ fn test_horizontal_line_dashed_vs_solid_stroke_width() {
     let path = create_horizontal_line(0.0, 0.0, 100.0, 0.0);
     let stroke_width = 5.0;
 
-    let solid = stroke_geometry(&path, stroke_width, StrokeAlign::Center, None);
+    let solid = stroke_geometry(
+        &path,
+        stroke_width,
+        StrokeAlign::Center,
+        StrokeCap::default(),
+        StrokeJoin::default(),
+        None,
+    );
     let solid_bounds = solid.compute_tight_bounds();
 
     let dashed = stroke_geometry(
         &path,
         stroke_width,
         StrokeAlign::Center,
+        StrokeCap::default(),
+        StrokeJoin::default(),
         Some(&StrokeDashArray::from(vec![10.0, 5.0])),
     );
     let dashed_bounds = dashed.compute_tight_bounds();
@@ -49,13 +58,22 @@ fn test_vertical_line_dashed_vs_solid_stroke_width() {
     let path = create_vertical_line(50.0, 0.0, 50.0, 100.0);
     let stroke_width = 5.0;
 
-    let solid = stroke_geometry(&path, stroke_width, StrokeAlign::Center, None);
+    let solid = stroke_geometry(
+        &path,
+        stroke_width,
+        StrokeAlign::Center,
+        StrokeCap::default(),
+        StrokeJoin::default(),
+        None,
+    );
     let solid_bounds = solid.compute_tight_bounds();
 
     let dashed = stroke_geometry(
         &path,
         stroke_width,
         StrokeAlign::Center,
+        StrokeCap::default(),
+        StrokeJoin::default(),
         Some(&StrokeDashArray::from(vec![10.0, 5.0])),
     );
     let dashed_bounds = dashed.compute_tight_bounds();
@@ -78,13 +96,22 @@ fn test_multiple_stroke_widths() {
     for width in widths {
         let path = create_horizontal_line(0.0, 0.0, 100.0, 0.0);
 
-        let solid = stroke_geometry(&path, width, StrokeAlign::Center, None);
+        let solid = stroke_geometry(
+            &path,
+            width,
+            StrokeAlign::Center,
+            StrokeCap::default(),
+            StrokeJoin::default(),
+            None,
+        );
         let solid_height = solid.compute_tight_bounds().height();
 
         let dashed = stroke_geometry(
             &path,
             width,
             StrokeAlign::Center,
+            StrokeCap::default(),
+            StrokeJoin::default(),
             Some(&StrokeDashArray::from(vec![10.0, 5.0])),
         );
         let dashed_height = dashed.compute_tight_bounds().height();

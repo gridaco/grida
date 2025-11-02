@@ -77,16 +77,17 @@ impl Default for LayerEffects {
 #[derive(Debug, Clone)]
 pub struct StrokeStyle {
     pub stroke_align: StrokeAlign,
-    // pub stroke_cap: StrokeCap,
+    pub stroke_cap: StrokeCap,
+    pub stroke_join: StrokeJoin,
     pub stroke_dash_array: Option<StrokeDashArray>,
 }
 
 impl Default for StrokeStyle {
     fn default() -> Self {
         Self {
-            // stroke_width: 0.0,
             stroke_align: StrokeAlign::default(),
-            // stroke_cap: StrokeCap::default(),
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
             stroke_dash_array: None,
         }
     }
@@ -101,9 +102,13 @@ impl StrokeStyle {
         self.stroke_align = align;
     }
 
-    // pub fn set_cap(&mut self, cap: StrokeCap) {
-    //     self.stroke_cap = cap;
-    // }
+    pub fn set_cap(&mut self, cap: StrokeCap) {
+        self.stroke_cap = cap;
+    }
+
+    pub fn set_join(&mut self, join: StrokeJoin) {
+        self.stroke_join = join;
+    }
 
     pub fn set_dash_array(&mut self, dash_array: Option<impl Into<StrokeDashArray>>) {
         self.stroke_dash_array = dash_array.map(|d| d.into());
@@ -1102,6 +1107,7 @@ pub struct LineNodeRec {
     pub size: Size, // height is always 0 (ignored)
     pub strokes: Paints,
     pub stroke_width: f32,
+    pub stroke_cap: StrokeCap,
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub _data_stroke_align: StrokeAlign,
 
@@ -1395,6 +1401,8 @@ pub struct VectorNodeRec {
     /// Requested stroke alignment. For open paths, `Inside` and `Outside`
     /// alignments are treated as `Center`.
     pub stroke_align: StrokeAlign,
+    pub stroke_cap: StrokeCap,
+    pub stroke_join: StrokeJoin,
     pub stroke_dash_array: Option<StrokeDashArray>,
 
     /// Layout style for this node when it is a child of a layout container.

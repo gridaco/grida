@@ -331,9 +331,7 @@ impl LayoutEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cg::types::{
-        Axis, CGPoint, CrossAxisAlignment, LayoutGap, LayoutMode, LayoutWrap, MainAxisAlignment,
-    };
+    use crate::cg::prelude::*;
     use crate::node::factory::NodeFactory;
     use crate::node::scene_graph::{Parent, SceneGraph};
     use crate::node::schema::*;
@@ -963,8 +961,6 @@ mod tests {
     fn test_absolute_positioned_child_not_in_flex_flow() {
         // Verify that absolutely positioned children don't affect flex layout flow
         // but still get positioned by Taffy
-        use crate::cg::types::LayoutPositioning;
-        use crate::node::schema::LayoutChildStyle;
 
         let nf = NodeFactory::new();
         let mut graph = SceneGraph::new();
@@ -1093,8 +1089,6 @@ mod tests {
     fn test_root_node_always_gets_layout_even_if_marked_absolute() {
         // Verify that root nodes always participate in layout,
         // even if they somehow have layout_child with Absolute positioning
-        use crate::cg::types::LayoutPositioning;
-        use crate::node::schema::LayoutChildStyle;
 
         let nf = NodeFactory::new();
         let mut graph = SceneGraph::new();
@@ -1140,8 +1134,6 @@ mod tests {
     #[test]
     fn test_mixed_absolute_and_relative_children() {
         // Complex scenario: flex container with mix of absolute and relative children
-        use crate::cg::types::LayoutPositioning;
-        use crate::node::schema::LayoutChildStyle;
 
         let nf = NodeFactory::new();
         let mut graph = SceneGraph::new();
@@ -1383,15 +1375,14 @@ mod tests {
     #[test]
     fn test_vector_positioning() {
         // Verify that Vector nodes without layout_child are positioned using their transform
-        use crate::node::schema::{LayerEffects, VectorNodeRec};
-        use crate::vectornetwork::{VectorNetwork, VectorNetworkSegment};
+        use crate::vectornetwork::*;
         let mut graph = SceneGraph::new();
 
         // Create a Vector node with transform coordinates
         let vector_node = VectorNodeRec {
             active: true,
             opacity: 1.0,
-            blend_mode: crate::cg::types::LayerBlendMode::default(),
+            blend_mode: LayerBlendMode::default(),
             mask: None,
             effects: LayerEffects::default(),
             transform: AffineTransform::new(300.0, 250.0, 0.0),
@@ -1406,11 +1397,13 @@ mod tests {
                 regions: vec![],
             },
             corner_radius: 0.0,
-            fills: crate::cg::types::Paints::default(),
-            strokes: crate::cg::types::Paints::default(),
+            fills: Paints::default(),
+            strokes: Paints::default(),
             stroke_width: 0.0,
             stroke_width_profile: None,
-            stroke_align: crate::cg::types::StrokeAlign::Inside,
+            stroke_align: StrokeAlign::Inside,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
             stroke_dash_array: None,
             layout_child: None,
         };

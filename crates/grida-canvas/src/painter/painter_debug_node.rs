@@ -43,6 +43,8 @@ impl<'a> NodePainter<'a> {
                                 &node.strokes,
                                 stroke_width,
                                 node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_cap,
+                                node.stroke_style.stroke_join,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
@@ -74,6 +76,8 @@ impl<'a> NodePainter<'a> {
                                     &node.strokes,
                                     stroke_width,
                                     node.stroke_style.stroke_align,
+                                    node.stroke_style.stroke_cap,
+                                    node.stroke_style.stroke_join,
                                     node.stroke_style.stroke_dash_array.as_ref(),
                                 );
                             }
@@ -99,6 +103,8 @@ impl<'a> NodePainter<'a> {
                                 &node.strokes,
                                 node.stroke_width.value_or_zero(),
                                 node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_cap,
+                                node.stroke_style.stroke_join,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
@@ -120,6 +126,8 @@ impl<'a> NodePainter<'a> {
                         &node.strokes,
                         node.stroke_width,
                         node.get_stroke_align(),
+                        node.stroke_cap,
+                        StrokeJoin::default(), // Join not applicable for single line
                         node.stroke_dash_array.as_ref(),
                     );
                 });
@@ -144,6 +152,8 @@ impl<'a> NodePainter<'a> {
                                 &node.strokes,
                                 node.stroke_width,
                                 stroke_align,
+                                node.stroke_cap,
+                                node.stroke_join,
                                 node.stroke_dash_array.as_ref(),
                             );
                         });
@@ -172,6 +182,8 @@ impl<'a> NodePainter<'a> {
                                     &node.strokes,
                                     node.stroke_width.value_or_zero(),
                                     node.stroke_style.stroke_align,
+                                    node.stroke_style.stroke_cap,
+                                    node.stroke_style.stroke_join,
                                     node.stroke_style.stroke_dash_array.as_ref(),
                                 );
                             }
@@ -196,6 +208,8 @@ impl<'a> NodePainter<'a> {
                                 &node.strokes,
                                 node.stroke_width.value_or_zero(),
                                 node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_cap,
+                                node.stroke_style.stroke_join,
                                 node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
@@ -305,6 +319,8 @@ impl<'a> NodePainter<'a> {
                     std::slice::from_ref(&stroke),
                     1.0,
                     StrokeAlign::Inside,
+                    StrokeCap::default(),
+                    StrokeJoin::default(),
                     None,
                 );
             });
@@ -354,6 +370,8 @@ impl<'a> NodePainter<'a> {
                                         &node.strokes,
                                         node.stroke_width.value_or_zero(),
                                         node.stroke_style.stroke_align,
+                                        node.stroke_style.stroke_cap,
+                                        node.stroke_style.stroke_join,
                                         node.stroke_style.stroke_dash_array.as_ref(),
                                     );
                                 }
@@ -459,6 +477,8 @@ impl<'a> NodePainter<'a> {
                                         &n.strokes,
                                         stroke_width,
                                         n.stroke_style.stroke_align,
+                                        n.stroke_style.stroke_cap,
+                                        n.stroke_style.stroke_join,
                                         n.stroke_style.stroke_dash_array.as_ref(),
                                     );
                                 });

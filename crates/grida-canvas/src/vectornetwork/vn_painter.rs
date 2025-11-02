@@ -11,11 +11,13 @@ use super::vn::{PiecewiseVectorNetworkGeometry, VectorNetwork};
 
 #[derive(Debug, Clone)]
 pub struct StrokeOptions {
-    pub width: f32,
-    pub align: StrokeAlign,
     pub paints: Paints,
     pub width_profile: Option<VarWidthProfile>,
-    pub dash_array: Option<StrokeDashArray>,
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_cap: StrokeCap,
+    pub stroke_join: StrokeJoin,
+    pub stroke_dash_array: Option<StrokeDashArray>,
 }
 
 /// Painter for [`VectorNetwork`]s that renders region-specific fills.
@@ -120,16 +122,18 @@ impl<'a> VNPainter<'a> {
     ) {
         use StrokeAlign::*;
 
-        match stroke_opts.align {
+        match stroke_opts.stroke_align {
             Outside => {
                 // For outside alignment, use the unioned path as the base
                 let merged = vn.to_union_path();
                 let merged = self.path_with_corner(&merged, corner_radius);
                 let stroke_path = stroke_geometry(
                     merged.as_ref(),
-                    stroke_opts.width,
-                    stroke_opts.align,
-                    stroke_opts.dash_array.as_ref(),
+                    stroke_opts.stroke_width,
+                    stroke_opts.stroke_align,
+                    stroke_opts.stroke_cap,
+                    stroke_opts.stroke_join,
+                    stroke_opts.stroke_dash_array.as_ref(),
                 );
                 self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
             }
@@ -140,9 +144,11 @@ impl<'a> VNPainter<'a> {
                     let path = self.path_with_corner(path, corner_radius);
                     let stroke_path = stroke_geometry(
                         path.as_ref(),
-                        stroke_opts.width,
-                        stroke_opts.align,
-                        stroke_opts.dash_array.as_ref(),
+                        stroke_opts.stroke_width,
+                        stroke_opts.stroke_align,
+                        stroke_opts.stroke_cap,
+                        stroke_opts.stroke_join,
+                        stroke_opts.stroke_dash_array.as_ref(),
                     );
                     self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
                 }
@@ -179,9 +185,11 @@ impl<'a> VNPainter<'a> {
                     Err(_) => {
                         let stroke_path = stroke_geometry(
                             &rounded_path,
-                            stroke_opts.width,
-                            stroke_opts.align,
-                            stroke_opts.dash_array.as_ref(),
+                            stroke_opts.stroke_width,
+                            stroke_opts.stroke_align,
+                            stroke_opts.stroke_cap,
+                            stroke_opts.stroke_join,
+                            stroke_opts.stroke_dash_array.as_ref(),
                         );
                         self.draw_stroke_path(&stroke_path, &stroke_opts.paints);
                     }
@@ -390,8 +398,10 @@ mod tests {
 
         let painter = VNPainter::new_with_images(canvas, &repo);
         let stroke = StrokeOptions {
-            width: 4.0,
-            align: StrokeAlign::Center,
+            stroke_width: 4.0,
+            stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
             paints: Paints::new([Paint::Image(ImagePaint {
                 image: ResourceRef::RID("stroke_img".to_string()),
                 quarter_turns: 0,
@@ -403,7 +413,7 @@ mod tests {
                 active: true,
             })]),
             width_profile: None,
-            dash_array: None,
+            stroke_dash_array: None,
         };
         painter.draw(&vn, &[], Some(&stroke), 0.0);
 

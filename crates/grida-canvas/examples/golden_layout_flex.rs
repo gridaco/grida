@@ -33,6 +33,8 @@ fn create_container_with_gap(id: &str, width: f32, height: f32, gap: f32) -> Con
         strokes: Default::default(),
         stroke_style: StrokeStyle {
             stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
             stroke_dash_array: None,
         },
         stroke_width: Default::default(),

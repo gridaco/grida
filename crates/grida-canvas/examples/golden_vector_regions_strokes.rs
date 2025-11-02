@@ -59,11 +59,13 @@ fn main() {
         canvas.save();
         canvas.translate((0.0, (i as f32) * 400.0));
         let options = StrokeOptions {
-            width: stroke_width,
-            align: *align,
+            stroke_width,
+            stroke_align: *align,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
             paints: Paints::new([Paint::from(stroke_color)]),
             width_profile: None,
-            dash_array: None,
+            stroke_dash_array: None,
         };
         painter.draw(&network, &[], Some(&options), 0.0);
         canvas.restore();

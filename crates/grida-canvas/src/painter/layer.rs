@@ -187,6 +187,8 @@ pub struct PainterPictureVectorLayer {
     pub vector: VectorNetwork,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
+    pub stroke_cap: StrokeCap,
+    pub stroke_join: StrokeJoin,
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub corner_radius: f32,
@@ -254,6 +256,8 @@ impl LayerList {
                         &shape.to_path(),
                         *width,
                         stroke_style.stroke_align,
+                        stroke_style.stroke_cap,
+                        stroke_style.stroke_join,
                         stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -409,6 +413,8 @@ impl LayerList {
                             &shape.to_path(),
                             stroke_width,
                             n.stroke_style.stroke_align,
+                            n.stroke_style.stroke_cap,
+                            n.stroke_style.stroke_join,
                             n.stroke_style.stroke_dash_array.as_ref(),
                         ))
                     } else {
@@ -500,6 +506,8 @@ impl LayerList {
                         &shape.to_path(),
                         stroke_width,
                         n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -541,6 +549,8 @@ impl LayerList {
                         &shape.to_path(),
                         stroke_width,
                         n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -582,6 +592,8 @@ impl LayerList {
                         &shape.to_path(),
                         stroke_width,
                         n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -623,6 +635,8 @@ impl LayerList {
                         &shape.to_path(),
                         stroke_width,
                         n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -663,6 +677,8 @@ impl LayerList {
                         &shape.to_path(),
                         n.stroke_width,
                         n.get_stroke_align(),
+                        n.stroke_cap,
+                        StrokeJoin::default(), // Join not applicable for single line
                         n.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -768,6 +784,8 @@ impl LayerList {
                         &shape.to_path(),
                         stroke_width,
                         n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -819,6 +837,8 @@ impl LayerList {
                     vector: n.network.clone(),
                     stroke_width: n.stroke_width,
                     stroke_align: n.get_stroke_align(),
+                    stroke_cap: n.stroke_cap,
+                    stroke_join: n.stroke_join,
                     stroke_width_profile: n.stroke_width_profile.clone(),
                     stroke_dash_array: n.stroke_dash_array.clone(),
                     corner_radius: n.corner_radius,
@@ -844,6 +864,8 @@ impl LayerList {
                         &shape.to_path(),
                         stroke_width,
                         n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
                         n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {

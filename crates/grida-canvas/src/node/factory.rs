@@ -64,6 +64,8 @@ impl NodeFactory {
             strokes: Paints::default(),
             stroke_style: StrokeStyle {
                 stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: None,
             },
             stroke_width: StrokeWidth::Uniform(Self::DEFAULT_STROKE_WIDTH),
@@ -89,6 +91,8 @@ impl NodeFactory {
             strokes: Paints::default(),
             stroke_style: StrokeStyle {
                 stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: None,
             },
             stroke_width: SingularStrokeWidth(Some(Self::DEFAULT_STROKE_WIDTH)),
@@ -112,6 +116,7 @@ impl NodeFactory {
             },
             strokes: Paints::new([Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR)]),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_cap: StrokeCap::default(),
             _data_stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
             layout_child: None,
@@ -169,6 +174,8 @@ impl NodeFactory {
             strokes: Default::default(),
             stroke_style: StrokeStyle {
                 stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: None,
             },
             stroke_width: StrokeWidth::Uniform(Self::DEFAULT_STROKE_WIDTH),
@@ -227,6 +234,8 @@ impl NodeFactory {
             strokes: Paints::default(),
             stroke_style: StrokeStyle {
                 stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: None,
             },
             stroke_width: SingularStrokeWidth(Some(Self::DEFAULT_STROKE_WIDTH)),
@@ -250,6 +259,8 @@ impl NodeFactory {
             strokes: Paints::default(),
             stroke_style: StrokeStyle {
                 stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: None,
             },
             stroke_width: SingularStrokeWidth(Some(Self::DEFAULT_STROKE_WIDTH)),
@@ -273,6 +284,8 @@ impl NodeFactory {
             strokes: Paints::default(),
             stroke_style: StrokeStyle {
                 stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: None,
             },
             stroke_width: SingularStrokeWidth(Some(Self::DEFAULT_STROKE_WIDTH)),
@@ -294,6 +307,8 @@ impl NodeFactory {
             strokes: Paints::default(),
             stroke_style: StrokeStyle {
                 stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: None,
             },
             stroke_width: SingularStrokeWidth(Some(Self::DEFAULT_STROKE_WIDTH)),
@@ -317,6 +332,8 @@ impl NodeFactory {
             strokes: Paints::new([Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR)]),
             stroke_style: StrokeStyle {
                 stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
                 stroke_dash_array: None,
             },
             stroke_width: StrokeWidth::Uniform(Self::DEFAULT_STROKE_WIDTH),
