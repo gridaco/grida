@@ -2992,6 +2992,10 @@ export namespace editor.api {
       node_id: NodeID,
       strokeJoin: cg.StrokeJoin
     ): void;
+    changeNodePropertyStrokeMiterLimit(
+      node_id: NodeID,
+      strokeMiterLimit: number
+    ): void;
     changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
 
     addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;

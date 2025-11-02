@@ -10,6 +10,7 @@ import {
 import { StrokeAlignControl } from "../controls/stroke-align";
 import { StrokeCapControl } from "../controls/stroke-cap";
 import { StrokeJoinControl } from "../controls/stroke-join";
+import { StrokeMiterLimitControl } from "../controls/stroke-miter-limit";
 import { StrokeClassControl, StrokeClass } from "../controls/stroke-class";
 import { StrokeDashArrayControl } from "../controls/stroke-dasharray";
 import {
@@ -46,6 +47,7 @@ export function SectionStrokes({
     strokeAlign,
     strokeCap,
     strokeJoin,
+    strokeMiterLimit,
     strokeDashArray,
     type,
   } = useNodeState(node_id, (node) => ({
@@ -59,6 +61,7 @@ export function SectionStrokes({
     strokeAlign: node.strokeAlign,
     strokeCap: node.strokeCap,
     strokeJoin: node.strokeJoin,
+    strokeMiterLimit: node.strokeMiterLimit,
     strokeDashArray: node.strokeDashArray,
     type: node.type,
   }));
@@ -214,6 +217,15 @@ export function SectionStrokes({
         <StrokeJoinControl
           value={strokeJoin}
           onValueChange={actions.strokeJoin}
+        />
+      </PropertyLine>
+      <PropertyLine
+        hidden={config.stroke_join === "off" || strokeJoin !== "miter"}
+      >
+        <PropertyLineLabel>Miter</PropertyLineLabel>
+        <StrokeMiterLimitControl
+          value={strokeMiterLimit}
+          onValueChange={actions.strokeMiterLimit}
         />
       </PropertyLine>
       <PropertyLine>

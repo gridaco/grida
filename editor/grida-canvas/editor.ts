@@ -1674,6 +1674,17 @@ class EditorDocumentStore
     });
   }
 
+  changeNodePropertyStrokeMiterLimit(
+    node_id: string,
+    strokeMiterLimit: number
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeMiterLimit,
+    });
+  }
+
   changeNodePropertyStrokeDashArray(
     node_id: string,
     strokeDashArray: number[] | undefined

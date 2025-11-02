@@ -1662,6 +1662,12 @@ export namespace grida.program.nodes {
        * @default "miter"
        */
       strokeJoin: cg.StrokeJoin;
+
+      /**
+       * stroke miter limit - 0 or greater
+       * @default 4
+       */
+      strokeMiterLimit?: number;
     }
 
     /**

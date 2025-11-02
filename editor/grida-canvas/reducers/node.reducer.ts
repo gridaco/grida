@@ -463,6 +463,11 @@ const safe_properties: Partial<
       (draft as UN).strokeJoin = value;
     },
   }),
+  strokeMiterLimit: defineNodeProperty<"strokeMiterLimit">({
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeMiterLimit = value;
+    },
+  }),
   strokeDashArray: defineNodeProperty<"strokeDashArray">({
     assert: (node) =>
       node.type === "vector" ||
