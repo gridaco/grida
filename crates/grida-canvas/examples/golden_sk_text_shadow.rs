@@ -19,7 +19,7 @@
 //! - Text with colored shadow
 //! - Text with multiple shadows
 
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use skia_safe::{self as sk, surfaces, Color, Font, Paint as SkPaint, Point};
 
 thread_local! {

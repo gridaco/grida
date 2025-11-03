@@ -1,4 +1,5 @@
 pub mod alignment;
+pub mod fe;
 pub mod prelude;
 pub mod stroke_dasharray;
 pub mod stroke_width;

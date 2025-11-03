@@ -1,4 +1,4 @@
-use cg::cg::{alignment::Alignment, types::*};
+use cg::cg::prelude::*;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;

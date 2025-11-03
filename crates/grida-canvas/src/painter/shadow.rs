@@ -1,5 +1,5 @@
 use super::geometry::PainterShape;
-use crate::cg::types::FeShadow;
+use crate::cg::prelude::*;
 use skia_safe::{self as sk, color_filters, image_filters, BlendMode, ColorMatrix, Paint};
 
 /// Create an image filter for drop shadow effects. (for any paint)

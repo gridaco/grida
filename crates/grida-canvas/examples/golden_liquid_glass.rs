@@ -7,7 +7,7 @@
  * seamlessly with both GPU and CPU backends without manual snapshots.
  */
 
-use cg::cg::types::FeLiquidGlass;
+use cg::cg::prelude::*;
 use cg::painter::effects;
 use skia_safe::{canvas::SaveLayerRec, surfaces, Data, EncodedImageFormat, Image, Paint, Rect};
 
