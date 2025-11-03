@@ -20,6 +20,8 @@ pub struct LayerEffects {
     pub shadows: Vec<FilterShadowEffect>,
     /// single liquid glass effect is supported per layer (only fully supported with rectangular shapes)
     pub glass: Option<FeLiquidGlass>,
+    /// multiple noise effects are supported per layer
+    pub noises: Vec<NoiseEffect>,
 }
 
 impl LayerEffects {
@@ -38,6 +40,7 @@ impl LayerEffects {
                 FilterEffect::InnerShadow(shadow) => layer_effects
                     .shadows
                     .push(FilterShadowEffect::InnerShadow(shadow)),
+                FilterEffect::Noise(noise) => layer_effects.noises.push(noise),
             }
         }
         layer_effects
@@ -65,6 +68,7 @@ impl Default for LayerEffects {
             backdrop_blur: None,
             shadows: vec![],
             glass: None,
+            noises: vec![],
         }
     }
 }

@@ -22,6 +22,9 @@ pub enum FilterEffect {
     /// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
     BackdropBlur(FeBlur),
 
+    /// Noise effect
+    Noise(NoiseEffect),
+
     /// Liquid glass effect
     LiquidGlass(FeLiquidGlass),
 }
@@ -308,4 +311,95 @@ pub struct FeProgressiveBlur {
 
     /// Blur radius at gradient end point (pixels)
     pub radius2: f32,
+}
+
+/// Coloring strategy for noise effects.
+///
+/// All types use the same underlying Perlin noise pattern controlled by
+/// `noise_size` and `density`, differing only in how colors are applied.
+#[derive(Debug, Clone, Copy)]
+pub enum NoiseEffectColors {
+    /// Single-color noise pattern.
+    ///
+    /// Renders noise pixels in the specified color with alpha blending.
+    /// The `density` parameter controls how much of the noise is visible.
+    ///
+    /// # Example
+    /// ```ignore
+    /// Mono { color: CGColor(0, 0, 0, 64) } // 25% opacity black noise
+    /// ```
+    Mono {
+        /// Color of the noise pixels (includes alpha)
+        color: CGColor,
+    },
+
+    /// Dual-color noise with distinct background and pattern colors.
+    ///
+    /// Renders `color2` as a base layer, then applies `color1` noise pattern on top.
+    /// The `density` parameter controls the pattern coverage.
+    ///
+    /// # Example
+    /// ```ignore
+    /// Duo {
+    ///     color1: CGColor(255, 0, 0, 255),  // red pattern
+    ///     color2: CGColor(255, 255, 255, 128) // semi-transparent white base
+    /// }
+    /// ```
+    Duo {
+        /// Pattern color (applied where noise is visible)
+        color1: CGColor,
+        /// Background color (base layer)
+        color2: CGColor,
+    },
+
+    /// Multi-color RGB noise using the raw Perlin output.
+    ///
+    /// Renders the RGB colors directly from the noise shader, controlled by
+    /// both `density` (pattern visibility) and `opacity` (overall transparency).
+    ///
+    /// # Example
+    /// ```ignore
+    /// Multi { opacity: 0.5 } // 50% opacity RGB noise
+    /// ```
+    Multi {
+        /// Overall transparency (0..1)
+        opacity: f32,
+    },
+}
+
+/// Procedural noise effect with configurable pattern and coloring.
+///
+/// # Noise Generation
+///
+/// Uses Skia's fractal Perlin noise with the following pipeline:
+/// 1. Generate base noise at specified frequency and octaves
+/// 2. Convert to alpha mask via luminance-to-alpha color filter
+/// 3. Apply density-based LUT cutoff to control visibility
+/// 4. Apply type-specific coloring (Mono/Duo/Multi)
+///
+/// # Parameters
+///
+/// - **`noise_size`**: Controls grain size (smaller = finer grains)
+/// - **`density`**: Controls pattern visibility (0 = sparse, 1 = dense)
+/// - **`num_octaves`**: Fractal detail level (more = finer detail)
+/// - **`seed`**: Random seed for reproducibility
+///
+/// # SVG Equivalents
+///
+/// - Noise generation: `<feTurbulence type="fractalNoise">`
+/// - Alpha conversion: `<feColorMatrix type="luminanceToAlpha">`
+/// - Density control: `<feComponentTransfer>` with table values
+/// - Color application: `<feFlood>` + `<feComposite operator="in">`
+#[derive(Debug, Clone, Copy)]
+pub struct NoiseEffect {
+    /// Controls noise grain size (lower = finer grains)
+    pub noise_size: f32,
+    /// Controls pattern visibility via LUT cutoff (0..1)
+    pub density: f32,
+    /// Number of octaves for fractal detail
+    pub num_octaves: i32,
+    /// Random seed for reproducibility
+    pub seed: f32,
+    /// Coloring strategy
+    pub coloring: NoiseEffectColors,
 }

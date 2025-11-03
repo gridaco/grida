@@ -612,8 +612,9 @@ fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -
             // Use 3x sigma for proper Gaussian blur coverage
             inflate_rect(rect, shadow.blur * 3.0)
         }
-        // no inflation for inner shadow
-        FilterEffect::InnerShadow(_shadow) => bounds,
+        // no inflation
+        FilterEffect::Noise(_) => bounds,
+        FilterEffect::InnerShadow(_) => bounds,
     }
 }
 
