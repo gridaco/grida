@@ -3038,11 +3038,8 @@ export namespace editor.api {
 
     changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
     changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
-    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeBlur): void;
-    changeNodeFeBackdropBlur(
-      node_id: NodeID,
-      effect?: cg.IFeGaussianBlur
-    ): void;
+    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeLayerBlur): void;
+    changeNodeFeBackdropBlur(node_id: NodeID, effect?: cg.FeBackdropBlur): void;
     changeNodeFeNoises(node_id: NodeID, effects?: cg.FeNoise[]): void;
 
     // ==============================================================

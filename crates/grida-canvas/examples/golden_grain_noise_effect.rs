@@ -74,6 +74,7 @@ fn main() {
         coloring: NoiseEffectColors::Mono {
             color: CGColor(0, 0, 0, 100),
         },
+        active: true,
     });
 
     graph.append_children(

@@ -30,6 +30,7 @@ import {
 import { RGBAColorControl } from "./color";
 import { editor } from "@/grida-canvas";
 import { Button } from "@/components/ui-editor/button";
+import { Checkbox } from "@/components/ui-editor/checkbox";
 import { mergeDefinedProperties } from "./utils/merge";
 import {
   FeNoiseIcon,
@@ -176,11 +177,25 @@ export function FeControl({
   constraints?: FeTypeConstraints;
 }) {
   const Icon = getIcon(value);
+  const isActive = value.active ?? true;
+
+  const handleToggleActive = (checked: boolean) => {
+    onValueChange?.({ ...value, active: checked });
+  };
+
   return (
     <Popover modal={false}>
       <div className="flex items-center w-full gap-2">
-        <PopoverTrigger>
-          <Icon />
+        <Checkbox
+          checked={isActive}
+          onCheckedChange={(checked) => {
+            handleToggleActive(Boolean(checked));
+          }}
+        />
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <Icon />
+          </Button>
         </PopoverTrigger>
         <div className="flex items-center flex-1/2">
           <FeTypeSelect
@@ -190,6 +205,7 @@ export function FeControl({
                 case "shadow": {
                   onValueChange?.({
                     ...editor.config.DEFAULT_FE_SHADOW,
+                    active: true,
                     type,
                   });
                   break;
@@ -202,6 +218,7 @@ export function FeControl({
                       ...editor.config.DEFAULT_FE_GAUSSIAN_BLUR,
                     },
                     type,
+                    active: true,
                   });
                   break;
                 }
@@ -209,6 +226,7 @@ export function FeControl({
                   onValueChange?.({
                     ...editor.config.DEFAULT_FE_LIQUID_GLASS,
                     type,
+                    active: true,
                   });
                   break;
                 }
@@ -219,6 +237,7 @@ export function FeControl({
                     noiseSize: 2.0,
                     density: 0.5,
                     color: { r: 0, g: 0, b: 0, a: 0.15 },
+                    active: true,
                   });
                   break;
                 }
@@ -275,7 +294,10 @@ function FeProperties({
         <FeBlurProperties
           value={value.blur}
           onValueChange={(b) => {
-            onValueChange?.({ ...value, blur: b });
+            onValueChange?.({
+              ...value,
+              blur: b,
+            } as Omit<cg.FeLayerBlur | cg.FeBackdropBlur, "type">);
           }}
         />
       );

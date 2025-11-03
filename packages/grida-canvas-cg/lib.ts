@@ -1046,6 +1046,12 @@ export namespace cg {
     spread: number;
 
     color: RGBA8888;
+
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
     //
   }
 
@@ -1107,11 +1113,21 @@ export namespace cg {
   export type FeLayerBlur = {
     type: "filter-blur";
     blur: FeBlur;
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
   };
 
   export type FeBackdropBlur = {
     type: "backdrop-filter-blur";
     blur: FeBlur;
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
   };
 
   /**
@@ -1180,6 +1196,12 @@ export namespace cg {
      * @default 4.0
      */
     radius: number;
+
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
   };
 
   /**
@@ -1290,6 +1312,12 @@ export namespace cg {
      * @default 1.0
      */
     opacity?: number;
+
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
   };
 
   /**

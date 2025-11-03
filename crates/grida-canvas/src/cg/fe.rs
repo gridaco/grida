@@ -16,11 +16,11 @@ pub enum FilterEffect {
     InnerShadow(FeShadow),
 
     /// Layer blur filter
-    LayerBlur(FeBlur),
+    LayerBlur(FeLayerBlur),
 
     /// Background blur filter
     /// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
-    BackdropBlur(FeBlur),
+    BackdropBlur(FeBackdropBlur),
 
     /// Noise effect
     Noise(NoiseEffect),
@@ -29,10 +29,34 @@ pub enum FilterEffect {
     LiquidGlass(FeLiquidGlass),
 }
 
+impl FilterEffect {
+    /// Returns whether this effect is active
+    pub fn active(&self) -> bool {
+        match self {
+            FilterEffect::DropShadow(s) => s.active,
+            FilterEffect::InnerShadow(s) => s.active,
+            FilterEffect::LayerBlur(b) => b.active,
+            FilterEffect::BackdropBlur(b) => b.active,
+            FilterEffect::Noise(n) => n.active,
+            FilterEffect::LiquidGlass(g) => g.active,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum FilterShadowEffect {
     DropShadow(FeShadow),
     InnerShadow(FeShadow),
+}
+
+impl FilterShadowEffect {
+    /// Returns whether this shadow effect is active
+    pub fn active(&self) -> bool {
+        match self {
+            FilterShadowEffect::DropShadow(s) => s.active,
+            FilterShadowEffect::InnerShadow(s) => s.active,
+        }
+    }
 }
 
 impl Into<FilterEffect> for FilterShadowEffect {
@@ -74,6 +98,9 @@ pub struct FeShadow {
 
     /// Shadow color (includes alpha)
     pub color: CGColor,
+
+    /// Whether this effect is active
+    pub active: bool,
 }
 
 /// Liquid glass effect parameters
@@ -125,6 +152,9 @@ pub struct FeLiquidGlass {
     /// Blur radius for frosted glass effect [0.0+] in pixels
     /// Applied via Skia's native blur before refraction shader
     pub blur_radius: f32,
+
+    /// Whether this effect is active
+    pub active: bool,
 }
 
 impl Default for FeLiquidGlass {
@@ -136,6 +166,7 @@ impl Default for FeLiquidGlass {
             depth: 20.0,      // Absolute pixels [1.0+], typical values: 20-100
             dispersion: 0.5,  // Chromatic aberration strength [0.0-1.0]
             blur_radius: 4.0, // Blur radius in pixels
+            active: true,
         }
     }
 }
@@ -144,6 +175,20 @@ impl Default for FeLiquidGlass {
 pub enum FeBlur {
     Gaussian(FeGaussianBlur),
     Progressive(FeProgressiveBlur),
+}
+
+/// Layer blur effect wrapper with active flag
+#[derive(Debug, Clone)]
+pub struct FeLayerBlur {
+    pub blur: FeBlur,
+    pub active: bool,
+}
+
+/// Backdrop blur effect wrapper with active flag
+#[derive(Debug, Clone)]
+pub struct FeBackdropBlur {
+    pub blur: FeBlur,
+    pub active: bool,
 }
 
 /// A standalone blur filter effect (`<feGaussianBlur>`)
@@ -313,6 +358,115 @@ pub struct FeProgressiveBlur {
     pub radius2: f32,
 }
 
+// ============================================================================
+// Conversions for cleaner effect construction
+// ============================================================================
+
+/// Convert f32 radius to FeGaussianBlur
+impl From<f32> for FeGaussianBlur {
+    fn from(radius: f32) -> Self {
+        Self { radius }
+    }
+}
+
+/// Wrap FeGaussianBlur in FeBlur enum
+impl From<FeGaussianBlur> for FeBlur {
+    fn from(blur: FeGaussianBlur) -> Self {
+        FeBlur::Gaussian(blur)
+    }
+}
+
+/// Convert f32 radius to FeBlur
+/// Convenience for: radius → FeGaussianBlur → FeBlur
+impl From<f32> for FeBlur {
+    fn from(radius: f32) -> Self {
+        FeBlur::from(FeGaussianBlur::from(radius))
+    }
+}
+
+/// Wrap FeProgressiveBlur in FeBlur enum
+impl From<FeProgressiveBlur> for FeBlur {
+    fn from(blur: FeProgressiveBlur) -> Self {
+        FeBlur::Progressive(blur)
+    }
+}
+
+/// Wrap FeBlur in FeLayerBlur with default active=true
+impl From<FeBlur> for FeLayerBlur {
+    fn from(blur: FeBlur) -> Self {
+        Self { blur, active: true }
+    }
+}
+
+/// Convert f32 radius directly to FeLayerBlur
+/// Convenience for: radius → FeGaussianBlur → FeBlur → FeLayerBlur
+impl From<f32> for FeLayerBlur {
+    fn from(radius: f32) -> Self {
+        FeLayerBlur::from(FeBlur::from(FeGaussianBlur::from(radius)))
+    }
+}
+
+/// Wrap FeBlur in FeBackdropBlur with default active=true
+impl From<FeBlur> for FeBackdropBlur {
+    fn from(blur: FeBlur) -> Self {
+        Self { blur, active: true }
+    }
+}
+
+/// Convert f32 radius directly to FeBackdropBlur
+/// Convenience for: radius → FeGaussianBlur → FeBlur → FeBackdropBlur
+impl From<f32> for FeBackdropBlur {
+    fn from(radius: f32) -> Self {
+        FeBackdropBlur::from(FeBlur::from(FeGaussianBlur::from(radius)))
+    }
+}
+
+/// Wrap FeLayerBlur in FilterEffect
+impl From<FeLayerBlur> for FilterEffect {
+    fn from(blur: FeLayerBlur) -> Self {
+        FilterEffect::LayerBlur(blur)
+    }
+}
+
+/// Wrap FeBackdropBlur in FilterEffect
+impl From<FeBackdropBlur> for FilterEffect {
+    fn from(blur: FeBackdropBlur) -> Self {
+        FilterEffect::BackdropBlur(blur)
+    }
+}
+
+/// Wrap FeShadow in FilterEffect as DropShadow
+impl From<FeShadow> for FilterEffect {
+    fn from(shadow: FeShadow) -> Self {
+        FilterEffect::DropShadow(shadow)
+    }
+}
+
+/// Wrap NoiseEffect in FilterEffect
+impl From<NoiseEffect> for FilterEffect {
+    fn from(noise: NoiseEffect) -> Self {
+        FilterEffect::Noise(noise)
+    }
+}
+
+/// Wrap FeLiquidGlass in FilterEffect
+impl From<FeLiquidGlass> for FilterEffect {
+    fn from(glass: FeLiquidGlass) -> Self {
+        FilterEffect::LiquidGlass(glass)
+    }
+}
+
+/// Convert f32 radius directly to FilterEffect::LayerBlur
+/// Convenience for: radius → FeGaussianBlur → FeBlur → FeLayerBlur → FilterEffect
+impl From<f32> for FilterEffect {
+    fn from(radius: f32) -> Self {
+        let gaussian = FeGaussianBlur::from(radius);
+        let blur = FeBlur::from(gaussian);
+        let layer_blur = FeLayerBlur::from(blur);
+        FilterEffect::LayerBlur(layer_blur)
+    }
+}
+
 /// Coloring strategy for noise effects.
 ///
 /// All types use the same underlying Perlin noise pattern controlled by
@@ -402,4 +556,6 @@ pub struct NoiseEffect {
     pub seed: f32,
     /// Coloring strategy
     pub coloring: NoiseEffectColors,
+    /// Whether this effect is active
+    pub active: bool,
 }

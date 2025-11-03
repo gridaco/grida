@@ -504,6 +504,7 @@ const safe_properties: Partial<
     apply: (draft, value, prev) => {
       (draft as UN).feShadows = value?.map((s) => ({
         ...s,
+        active: s.active ?? true,
         dx: ranged(
           -editor.config.DEFAULT_MAX_SHADOW_OFFSET,
           s.dx,
@@ -526,73 +527,71 @@ const safe_properties: Partial<
   feBlur: defineNodeProperty<"feBlur">({
     apply: (draft, value, prev) => {
       if (value) {
-        switch (value.type) {
-          case "blur": {
-            value = {
-              ...value,
-              radius: ranged(
-                0,
-                value.radius,
-                editor.config.DEFAULT_MAX_BLUR_RADIUS
-              ),
-            };
-            break;
-          }
-          case "progressive-blur": {
-            value = {
-              ...value,
-              radius: ranged(
-                0,
-                value.radius,
-                editor.config.DEFAULT_MAX_BLUR_RADIUS
-              ),
-              radius2: ranged(
-                0,
-                value.radius2,
-                editor.config.DEFAULT_MAX_BLUR_RADIUS
-              ),
-            } as cg.FeProgressiveBlur;
-            break;
-          }
-        }
+        (draft as UN).feBlur = {
+          ...value,
+          blur: {
+            ...value.blur,
+            ...(value.blur.type === "blur"
+              ? {
+                  radius: ranged(
+                    0,
+                    value.blur.radius,
+                    editor.config.DEFAULT_MAX_BLUR_RADIUS
+                  ),
+                }
+              : {
+                  radius: ranged(
+                    0,
+                    value.blur.radius,
+                    editor.config.DEFAULT_MAX_BLUR_RADIUS
+                  ),
+                  radius2: ranged(
+                    0,
+                    value.blur.radius2,
+                    editor.config.DEFAULT_MAX_BLUR_RADIUS
+                  ),
+                }),
+          },
+          active: value.active ?? true,
+        };
+      } else {
+        (draft as UN).feBlur = undefined;
       }
-      (draft as UN).feBlur = value;
     },
   }),
   feBackdropBlur: defineNodeProperty<"feBackdropBlur">({
     apply: (draft, value, prev) => {
       if (value) {
-        switch (value.type) {
-          case "blur": {
-            value = {
-              ...value,
-              radius: ranged(
-                0,
-                value.radius,
-                editor.config.DEFAULT_MAX_BLUR_RADIUS
-              ),
-            };
-            break;
-          }
-          case "progressive-blur": {
-            value = {
-              ...value,
-              radius: ranged(
-                0,
-                value.radius,
-                editor.config.DEFAULT_MAX_BLUR_RADIUS
-              ),
-              radius2: ranged(
-                0,
-                value.radius2,
-                editor.config.DEFAULT_MAX_BLUR_RADIUS
-              ),
-            } as cg.FeProgressiveBlur;
-            break;
-          }
-        }
+        (draft as UN).feBackdropBlur = {
+          ...value,
+          blur: {
+            ...value.blur,
+            ...(value.blur.type === "blur"
+              ? {
+                  radius: ranged(
+                    0,
+                    value.blur.radius,
+                    editor.config.DEFAULT_MAX_BLUR_RADIUS
+                  ),
+                }
+              : {
+                  radius: ranged(
+                    0,
+                    value.blur.radius,
+                    editor.config.DEFAULT_MAX_BLUR_RADIUS
+                  ),
+                  radius2: ranged(
+                    0,
+                    value.blur.radius2,
+                    editor.config.DEFAULT_MAX_BLUR_RADIUS
+                  ),
+                }),
+          },
+          active: value.active ?? true,
+        };
+      } else {
+        (draft as UN).feBackdropBlur = undefined;
       }
-      (draft as UN).feBackdropBlur = value;
     },
   }),
   feLiquidGlass: defineNodeProperty<"feLiquidGlass">({
@@ -600,6 +599,7 @@ const safe_properties: Partial<
       if (value) {
         value = {
           ...value,
+          active: value.active ?? true,
           lightIntensity: cmath.clamp(value.lightIntensity, 0, 1),
           lightAngle: value.lightAngle,
           // refraction is now normalized 0-1, maps to IOR 1.0-2.0
@@ -625,6 +625,7 @@ const safe_properties: Partial<
     apply: (draft, value, prev) => {
       (draft as UN).feNoises = value?.map((n) => ({
         ...n,
+        active: n.active ?? true,
         noiseSize: Math.max(0.001, n.noiseSize),
         density: cmath.clamp(n.density, 0, 1),
         numOctaves: Math.max(1, n.numOctaves ?? 3),

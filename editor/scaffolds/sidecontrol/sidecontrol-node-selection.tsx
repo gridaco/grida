@@ -1738,16 +1738,10 @@ function SectionEffects({ node_id }: { node_id: string }) {
       effects.push(...feShadows);
     }
     if (feBlur) {
-      effects.push({
-        type: "filter-blur",
-        blur: feBlur,
-      });
+      effects.push(feBlur);
     }
     if (feBackdropBlur) {
-      effects.push({
-        type: "backdrop-filter-blur",
-        blur: feBackdropBlur,
-      });
+      effects.push(feBackdropBlur);
     }
     if (feLiquidGlass) {
       effects.push(feLiquidGlass);

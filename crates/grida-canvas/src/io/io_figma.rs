@@ -681,47 +681,48 @@ impl FigmaConverter {
         let shadows: Vec<FilterShadowEffect> = effects
             .iter()
             .filter_map(|effect| match effect {
-                Effect::DropShadow(drop_shadow) => {
-                    drop_shadow
-                        .visible
-                        .then_some(FilterShadowEffect::DropShadow(FeShadow {
-                            dx: drop_shadow.offset.x as f32,
-                            dy: drop_shadow.offset.y as f32,
-                            blur: drop_shadow.radius as f32,
-                            color: Self::convert_color(&drop_shadow.color),
-                            spread: drop_shadow.spread.unwrap_or(0.0) as f32,
-                        }))
-                }
+                Effect::DropShadow(drop_shadow) => Some(FilterShadowEffect::DropShadow(FeShadow {
+                    dx: drop_shadow.offset.x as f32,
+                    dy: drop_shadow.offset.y as f32,
+                    blur: drop_shadow.radius as f32,
+                    color: Self::convert_color(&drop_shadow.color),
+                    spread: drop_shadow.spread.unwrap_or(0.0) as f32,
+                    active: drop_shadow.visible,
+                })),
                 Effect::InnerShadow(inner_shadow) => {
-                    inner_shadow
-                        .visible
-                        .then_some(FilterShadowEffect::InnerShadow(FeShadow {
-                            dx: inner_shadow.offset.x as f32,
-                            dy: inner_shadow.offset.y as f32,
-                            blur: inner_shadow.radius as f32,
-                            color: Self::convert_color(&inner_shadow.color),
-                            spread: inner_shadow.spread.unwrap_or(0.0) as f32,
-                        }))
+                    Some(FilterShadowEffect::InnerShadow(FeShadow {
+                        dx: inner_shadow.offset.x as f32,
+                        dy: inner_shadow.offset.y as f32,
+                        blur: inner_shadow.radius as f32,
+                        color: Self::convert_color(&inner_shadow.color),
+                        spread: inner_shadow.spread.unwrap_or(0.0) as f32,
+                        active: inner_shadow.visible,
+                    }))
                 }
                 _ => None,
             })
             .collect();
 
-        let layer_blur: Option<FeBlur> = effects.iter().find_map(|effect| match effect {
-            Effect::LayerBlur(blur) => blur.visible.then_some(FeBlur::Gaussian(FeGaussianBlur {
-                radius: blur.radius as f32,
-            })),
+        let layer_blur: Option<FeLayerBlur> = effects.iter().find_map(|effect| match effect {
+            Effect::LayerBlur(blur) => Some(FeLayerBlur {
+                blur: FeBlur::Gaussian(FeGaussianBlur {
+                    radius: blur.radius as f32,
+                }),
+                active: blur.visible,
+            }),
             _ => None,
         });
 
-        let backdrop_blur: Option<FeBlur> = effects.iter().find_map(|effect| match effect {
-            Effect::BackgroundBlur(blur) => {
-                blur.visible.then_some(FeBlur::Gaussian(FeGaussianBlur {
-                    radius: blur.radius as f32,
-                }))
-            }
-            _ => None,
-        });
+        let backdrop_blur: Option<FeBackdropBlur> =
+            effects.iter().find_map(|effect| match effect {
+                Effect::BackgroundBlur(blur) => Some(FeBackdropBlur {
+                    blur: FeBlur::Gaussian(FeGaussianBlur {
+                        radius: blur.radius as f32,
+                    }),
+                    active: blur.visible,
+                }),
+                _ => None,
+            });
 
         layer_effects.shadows = shadows;
         layer_effects.blur = layer_blur;

@@ -265,6 +265,8 @@ pub struct JSONFeShadow {
     pub spread: f32,
     #[serde(default)]
     pub inset: bool,
+    #[serde(default = "default_true")]
+    pub active: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -279,6 +281,8 @@ pub struct JSONFeLiquidGlass {
     pub dispersion: f32,
     #[serde(rename = "radius")]
     pub blur_radius: f32,
+    #[serde(default = "default_true")]
+    pub active: bool,
 }
 
 impl Default for JSONFeLiquidGlass {
@@ -291,18 +295,41 @@ impl Default for JSONFeLiquidGlass {
             depth: defaults.depth,
             dispersion: defaults.dispersion,
             blur_radius: defaults.blur_radius,
+            active: defaults.active,
         }
     }
 }
 
-/// JSON representation of blur effects with proper type tags
+/// JSON representation of inner blur types (without wrapper)
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
-pub enum JSONFeBlur {
+pub enum JSONFeBlurInner {
     #[serde(rename = "blur")]
     Gaussian { radius: f32 },
     #[serde(rename = "progressive-blur")]
     Progressive(JSONFeProgressiveBlur),
+}
+
+/// JSON representation of layer blur wrapper (matches TypeScript FeLayerBlur)
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename = "filter-blur")]
+pub struct JSONFeLayerBlur {
+    pub blur: JSONFeBlurInner,
+    #[serde(default = "default_true")]
+    pub active: bool,
+}
+
+/// JSON representation of backdrop blur wrapper (matches TypeScript FeBackdropBlur)
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename = "backdrop-filter-blur")]
+pub struct JSONFeBackdropBlur {
+    pub blur: JSONFeBlurInner,
+    #[serde(default = "default_true")]
+    pub active: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// JSON representation of progressive blur with Alignment coordinates (x1, y1, x2, y2)
@@ -321,11 +348,11 @@ pub struct JSONFeProgressiveBlur {
     pub radius2: f32,
 }
 
-impl From<JSONFeBlur> for FeBlur {
-    fn from(json_blur: JSONFeBlur) -> Self {
+impl From<JSONFeBlurInner> for FeBlur {
+    fn from(json_blur: JSONFeBlurInner) -> Self {
         match json_blur {
-            JSONFeBlur::Gaussian { radius } => FeBlur::Gaussian(FeGaussianBlur { radius }),
-            JSONFeBlur::Progressive(json_progressive) => {
+            JSONFeBlurInner::Gaussian { radius } => FeBlur::Gaussian(FeGaussianBlur { radius }),
+            JSONFeBlurInner::Progressive(json_progressive) => {
                 FeBlur::Progressive(json_progressive.into())
             }
         }
@@ -359,6 +386,7 @@ impl From<JSONFeShadow> for FeShadow {
             blur: box_shadow.blur,
             spread: box_shadow.spread,
             color: box_shadow.color.into(),
+            active: box_shadow.active,
         }
     }
 }
@@ -372,6 +400,7 @@ impl From<JSONFeLiquidGlass> for FeLiquidGlass {
             depth: glass.depth,
             dispersion: glass.dispersion,
             blur_radius: glass.blur_radius,
+            active: glass.active,
         }
     }
 }
@@ -397,6 +426,8 @@ pub struct JSONFeNoise {
     pub seed: f32,
     #[serde(flatten)]
     pub coloring: JSONFeNoiseColors,
+    #[serde(default = "default_true")]
+    pub active: bool,
 }
 
 fn default_num_octaves() -> i32 {
@@ -426,6 +457,7 @@ impl From<JSONFeNoise> for NoiseEffect {
             num_octaves: json.num_octaves,
             seed: json.seed,
             coloring: json.coloring.into(),
+            active: json.active,
         }
     }
 }
@@ -852,9 +884,9 @@ pub struct JSONUnknownNodeProperties {
     #[serde(rename = "feShadows")]
     pub fe_shadows: Option<Vec<JSONFeShadow>>,
     #[serde(rename = "feBlur")]
-    pub fe_blur: Option<JSONFeBlur>,
+    pub fe_blur: Option<JSONFeLayerBlur>,
     #[serde(rename = "feBackdropBlur")]
-    pub fe_backdrop_blur: Option<JSONFeBlur>,
+    pub fe_backdrop_blur: Option<JSONFeBackdropBlur>,
     #[serde(rename = "feLiquidGlass")]
     pub fe_liquid_glass: Option<JSONFeLiquidGlass>,
     #[serde(rename = "feNoises")]
@@ -2303,17 +2335,23 @@ mod padding_tests {
 
 fn merge_effects(
     fe_shadows: Option<Vec<JSONFeShadow>>,
-    fe_blur: Option<JSONFeBlur>,
-    fe_backdrop_blur: Option<JSONFeBlur>,
+    fe_blur: Option<JSONFeLayerBlur>,
+    fe_backdrop_blur: Option<JSONFeBackdropBlur>,
     fe_liquid_glass: Option<JSONFeLiquidGlass>,
     fe_noises: Option<Vec<JSONFeNoise>>,
 ) -> LayerEffects {
     let mut effects = LayerEffects::default();
-    if let Some(filter_blur) = fe_blur {
-        effects.blur = Some(filter_blur.into());
+    if let Some(layer_blur) = fe_blur {
+        effects.blur = Some(FeLayerBlur {
+            blur: layer_blur.blur.into(),
+            active: layer_blur.active,
+        });
     }
-    if let Some(filter_backdrop_blur) = fe_backdrop_blur {
-        effects.backdrop_blur = Some(filter_backdrop_blur.into());
+    if let Some(backdrop_blur) = fe_backdrop_blur {
+        effects.backdrop_blur = Some(FeBackdropBlur {
+            blur: backdrop_blur.blur.into(),
+            active: backdrop_blur.active,
+        });
     }
     if let Some(liquid_glass) = fe_liquid_glass {
         effects.glass = Some(liquid_glass.into());
@@ -3418,11 +3456,11 @@ mod tests {
             "radius": 10.0
         }"#;
 
-        let blur: JSONFeBlur =
+        let blur: JSONFeBlurInner =
             serde_json::from_str(json).expect("failed to deserialize gaussian blur");
 
         match blur {
-            JSONFeBlur::Gaussian { radius } => {
+            JSONFeBlurInner::Gaussian { radius } => {
                 assert_eq!(radius, 10.0);
             }
             _ => panic!("Expected Gaussian blur variant"),
@@ -3450,11 +3488,11 @@ mod tests {
             "radius2": 40.0
         }"#;
 
-        let blur: JSONFeBlur =
+        let blur: JSONFeBlurInner =
             serde_json::from_str(json).expect("failed to deserialize progressive blur");
 
         match blur {
-            JSONFeBlur::Progressive(progressive) => {
+            JSONFeBlurInner::Progressive(progressive) => {
                 assert_eq!(progressive.x1, 0.0);
                 assert_eq!(progressive.y1, -1.0);
                 assert_eq!(progressive.x2, 0.0);
@@ -3492,8 +3530,11 @@ mod tests {
             "width": 200.0,
             "height": 200.0,
             "feBlur": {
-                "type": "blur",
-                "radius": 5.0
+                "type": "filter-blur",
+                "blur": {
+                    "type": "blur",
+                    "radius": 5.0
+                }
             }
         }"#;
 
@@ -3505,7 +3546,7 @@ mod tests {
                 let converted: Node = rect.into();
                 if let Node::Rectangle(rect_rec) = converted {
                     assert!(rect_rec.effects.blur.is_some());
-                    match rect_rec.effects.blur.unwrap() {
+                    match &rect_rec.effects.blur.as_ref().unwrap().blur {
                         FeBlur::Gaussian(gaussian) => {
                             assert_eq!(gaussian.radius, 5.0);
                         }
@@ -3530,13 +3571,16 @@ mod tests {
             "width": 200.0,
             "height": 400.0,
             "feBlur": {
-                "type": "progressive-blur",
-                "x1": 0.0,
-                "y1": -1.0,
-                "x2": 0.0,
-                "y2": 1.0,
-                "radius": 0.0,
-                "radius2": 30.0
+                "type": "filter-blur",
+                "blur": {
+                    "type": "progressive-blur",
+                    "x1": 0.0,
+                    "y1": -1.0,
+                    "x2": 0.0,
+                    "y2": 1.0,
+                    "radius": 0.0,
+                    "radius2": 30.0
+                }
             }
         }"#;
 
@@ -3548,7 +3592,7 @@ mod tests {
                 let converted: Node = rect.into();
                 if let Node::Rectangle(rect_rec) = converted {
                     assert!(rect_rec.effects.blur.is_some());
-                    match rect_rec.effects.blur.unwrap() {
+                    match &rect_rec.effects.blur.as_ref().unwrap().blur {
                         FeBlur::Progressive(progressive) => {
                             // Values are used directly as Alignment coordinates
                             assert_eq!(progressive.start.x(), 0.0); // center
@@ -3579,8 +3623,11 @@ mod tests {
             "width": 200.0,
             "height": 200.0,
             "feBackdropBlur": {
-                "type": "blur",
-                "radius": 15.0
+                "type": "backdrop-filter-blur",
+                "blur": {
+                    "type": "blur",
+                    "radius": 15.0
+                }
             }
         }"#;
 
@@ -3592,7 +3639,7 @@ mod tests {
                 let converted: Node = rect.into();
                 if let Node::Rectangle(rect_rec) = converted {
                     assert!(rect_rec.effects.backdrop_blur.is_some());
-                    match rect_rec.effects.backdrop_blur.unwrap() {
+                    match &rect_rec.effects.backdrop_blur.as_ref().unwrap().blur {
                         FeBlur::Gaussian(gaussian) => {
                             assert_eq!(gaussian.radius, 15.0);
                         }
@@ -3617,13 +3664,16 @@ mod tests {
             "width": 200.0,
             "height": 300.0,
             "feBackdropBlur": {
-                "type": "progressive-blur",
-                "x1": -1.0,
-                "y1": -1.0,
-                "x2": 1.0,
-                "y2": 1.0,
-                "radius": 0.0,
-                "radius2": 50.0
+                "type": "backdrop-filter-blur",
+                "blur": {
+                    "type": "progressive-blur",
+                    "x1": -1.0,
+                    "y1": -1.0,
+                    "x2": 1.0,
+                    "y2": 1.0,
+                    "radius": 0.0,
+                    "radius2": 50.0
+                }
             }
         }"#;
 
@@ -3635,7 +3685,7 @@ mod tests {
                 let converted: Node = rect.into();
                 if let Node::Rectangle(rect_rec) = converted {
                     assert!(rect_rec.effects.backdrop_blur.is_some());
-                    match rect_rec.effects.backdrop_blur.unwrap() {
+                    match &rect_rec.effects.backdrop_blur.as_ref().unwrap().blur {
                         FeBlur::Progressive(progressive) => {
                             // Verify diagonal gradient - values used directly
                             assert_eq!(progressive.start.x(), -1.0); // left
@@ -3667,8 +3717,11 @@ mod tests {
             "width": 200.0,
             "height": "auto",
             "feBlur": {
-                "type": "blur",
-                "radius": 8.0
+                "type": "filter-blur",
+                "blur": {
+                    "type": "blur",
+                    "radius": 8.0
+                }
             }
         }"#;
 
@@ -3679,7 +3732,7 @@ mod tests {
             JSONNode::Text(text) => {
                 let converted: TextSpanNodeRec = text.into();
                 assert!(converted.effects.blur.is_some());
-                match converted.effects.blur.unwrap() {
+                match &converted.effects.blur.as_ref().unwrap().blur {
                     FeBlur::Gaussian(gaussian) => {
                         assert_eq!(gaussian.radius, 8.0);
                     }
@@ -3766,17 +3819,23 @@ mod tests {
             "width": 300.0,
             "height": 400.0,
             "feBlur": {
-                "type": "progressive-blur",
-                "x1": 0.0,
-                "y1": -1.0,
-                "x2": 0.0,
-                "y2": 1.0,
-                "radius": 0.0,
-                "radius2": 35.0
+                "type": "filter-blur",
+                "blur": {
+                    "type": "progressive-blur",
+                    "x1": 0.0,
+                    "y1": -1.0,
+                    "x2": 0.0,
+                    "y2": 1.0,
+                    "radius": 0.0,
+                    "radius2": 35.0
+                }
             },
             "feBackdropBlur": {
-                "type": "blur",
-                "radius": 12.0
+                "type": "backdrop-filter-blur",
+                "blur": {
+                    "type": "blur",
+                    "radius": 12.0
+                }
             }
         }"#;
 
@@ -3789,7 +3848,7 @@ mod tests {
 
                 // Verify layer blur is progressive
                 assert!(converted.effects.blur.is_some());
-                match converted.effects.blur.unwrap() {
+                match &converted.effects.blur.as_ref().unwrap().blur {
                     FeBlur::Progressive(progressive) => {
                         assert_eq!(progressive.start.x(), 0.0);
                         assert_eq!(progressive.start.y(), -1.0);
@@ -3802,7 +3861,7 @@ mod tests {
 
                 // Verify backdrop blur is gaussian
                 assert!(converted.effects.backdrop_blur.is_some());
-                match converted.effects.backdrop_blur.unwrap() {
+                match &converted.effects.backdrop_blur.as_ref().unwrap().blur {
                     FeBlur::Gaussian(gaussian) => {
                         assert_eq!(gaussian.radius, 12.0);
                     }

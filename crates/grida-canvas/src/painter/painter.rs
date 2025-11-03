@@ -559,7 +559,7 @@ impl<'a> Painter<'a> {
             if let Some(glass) = &effects.glass {
                 self.draw_glass_effect(shape, glass);
             } else if let Some(blur) = &effects.backdrop_blur {
-                self.draw_backdrop_blur(shape, blur);
+                self.draw_backdrop_blur(shape, &blur.blur);
             }
 
             // 3. Content (fills/strokes)
@@ -575,7 +575,7 @@ impl<'a> Painter<'a> {
 
         // 5. Layer blur (wraps everything)
         if let Some(layer_blur) = &effects.blur {
-            self.with_layer_blur(layer_blur, shape.rect, apply_effects);
+            self.with_layer_blur(&layer_blur.blur, shape.rect, apply_effects);
         } else {
             apply_effects();
         }
@@ -789,7 +789,7 @@ impl<'a> Painter<'a> {
 
                         let apply_effects = || {
                             if let Some(blur) = &effects.backdrop_blur {
-                                self.draw_text_backdrop_blur(&paragraph, blur, y_offset);
+                                self.draw_text_backdrop_blur(&paragraph, &blur.blur, y_offset);
                             }
 
                             for shadow in &effects.shadows {
@@ -811,7 +811,7 @@ impl<'a> Painter<'a> {
                             if let Some(layer_blur) = &effects.blur {
                                 let text_bounds =
                                     Rect::from_xywh(0.0, y_offset, layout_size.0, container_height);
-                                self.with_layer_blur(layer_blur, text_bounds, apply_effects);
+                                self.with_layer_blur(&layer_blur.blur, text_bounds, apply_effects);
                             } else {
                                 apply_effects();
                             }

@@ -1,6 +1,6 @@
 use cg::cg::prelude::*;
-use cg::painter::geometry::PainterShape;
 use cg::painter::effects_noise;
+use cg::painter::geometry::PainterShape;
 use skia_safe::{self as sk, surfaces, Color, Paint, Rect};
 
 fn main() {
@@ -18,6 +18,7 @@ fn main() {
                 coloring: NoiseEffectColors::Mono {
                     color: CGColor(0, 0, 0, 64), // 25% opacity black
                 },
+                active: true,
             },
             "mono",
         ),
@@ -31,6 +32,7 @@ fn main() {
                     color1: CGColor(255, 0, 4, 255),    // red pattern
                     color2: CGColor(255, 255, 255, 64), // 25% opacity white base
                 },
+                active: true,
             },
             "duo",
         ),
@@ -41,6 +43,7 @@ fn main() {
                 num_octaves: 3,
                 seed: 8539.0,
                 coloring: NoiseEffectColors::Multi { opacity: 1.0 },
+                active: true,
             },
             "multi",
         ),
