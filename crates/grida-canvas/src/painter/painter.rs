@@ -4,7 +4,7 @@ use super::paint;
 use super::shadow;
 use super::text_stroke;
 use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::schema::*;
 use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;
@@ -449,7 +449,10 @@ impl<'a> Painter<'a> {
         strokes: &[Paint],
         stroke_width: f32,
         stroke_align: StrokeAlign,
-        stroke_dash_array: Option<&Vec<f32>>,
+        stroke_cap: StrokeCap,
+        stroke_join: StrokeJoin,
+        stroke_miter_limit: StrokeMiterLimit,
+        stroke_dash_array: Option<&StrokeDashArray>,
     ) {
         if stroke_width <= 0.0 || strokes.is_empty() {
             return;
@@ -458,6 +461,9 @@ impl<'a> Painter<'a> {
             &shape.to_path(),
             stroke_width,
             stroke_align,
+            stroke_cap,
+            stroke_join,
+            stroke_miter_limit,
             stroke_dash_array,
         );
         self.draw_stroke_path(shape, &stroke_path, strokes);
@@ -785,10 +791,14 @@ impl<'a> Painter<'a> {
                                 // Convert strokes to StrokeOptions for VNPainter
                                 let stroke_options = if !vector_layer.strokes.is_empty() {
                                     Some(StrokeOptions {
-                                        width: vector_layer.stroke_width,
-                                        align: vector_layer.stroke_align,
+                                        stroke_width: vector_layer.stroke_width,
+                                        stroke_align: vector_layer.stroke_align,
+                                        stroke_cap: vector_layer.stroke_cap,
+                                        stroke_join: vector_layer.stroke_join,
+                                        stroke_miter_limit: vector_layer.stroke_miter_limit,
                                         paints: vector_layer.strokes.clone(),
                                         width_profile: vector_layer.stroke_width_profile.clone(),
+                                        stroke_dash_array: vector_layer.stroke_dash_array.clone(),
                                     })
                                 } else {
                                     None

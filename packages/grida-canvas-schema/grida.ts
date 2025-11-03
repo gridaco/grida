@@ -1641,9 +1641,55 @@ export namespace grida.program.nodes {
       strokeAlign?: cg.StrokeAlign;
 
       /**
+       * stroke dash pattern - array of dash and gap lengths
+       *
+       * The pattern defines alternating lengths of dashes and gaps.
+       * - Even indices (0, 2, 4, ...): dash lengths
+       * - Odd indices (1, 3, 5, ...): gap lengths
+       *
+       * @example [5, 5] - 5px dash, 5px gap
+       * @example [10, 5, 2, 5] - 10px dash, 5px gap, 2px dot, 5px gap
+       * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray
+       */
+      strokeDashArray?: number[];
+
+      /**
        * @default "butt"
        */
       strokeCap: cg.StrokeCap;
+
+      /**
+       * @default "miter"
+       */
+      strokeJoin: cg.StrokeJoin;
+
+      /**
+       * stroke miter limit - 0 or greater
+       * @default 4
+       */
+      strokeMiterLimit?: number;
+    }
+
+    /**
+     * Rectangular node (rectangle, image, video, container) specific stroke width properties
+     */
+    export interface IRectangularStrokeWidth {
+      /**
+       * sets or overrides the top stroke width
+       */
+      strokeTopWidth?: number;
+      /**
+       * sets or overrides the right stroke width
+       */
+      strokeRightWidth?: number;
+      /**
+       * sets or overrides the bottom stroke width
+       */
+      strokeBottomWidth?: number;
+      /**
+       * sets or overrides the left stroke width
+       */
+      strokeLeftWidth?: number;
     }
 
     /**
@@ -2048,6 +2094,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
+      i.IRectangularStrokeWidth,
       i.ISourceValue {
     readonly type: "image";
     alt?: string;
@@ -2095,6 +2142,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
+      i.IRectangularStrokeWidth,
       i.ISourceValue {
     readonly type: "video";
 
@@ -2122,6 +2170,7 @@ export namespace grida.program.nodes {
       i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
+      i.IRectangularStrokeWidth,
       i.IPadding,
       i.IFlexContainer {
     readonly type: "container";
@@ -2338,6 +2387,7 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke,
+      i.IRectangularStrokeWidth,
       i.IEffects,
       i.ICornerRadius,
       i.IRectangularCornerRadius {
@@ -2524,6 +2574,7 @@ export namespace grida.program.nodes {
             cornerRadiusBottomRight: 0,
             strokeWidth: 0,
             strokeCap: "butt",
+            strokeJoin: "miter",
             ...prototype,
             id: id,
           } satisfies RectangleNode;

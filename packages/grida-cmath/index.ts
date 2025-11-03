@@ -5691,6 +5691,43 @@ namespace cmath {
     }
   }
 
+  /**
+   * @namespace miter
+   * Geometric utilities for computing the relationship between join angle
+   * and corner extension ratio (1 / sin(θ/2)).
+   *
+   * Used to determine how sharply two stroke segments can meet before
+   * transitioning from a pointed to a beveled corner.
+   *
+   * Provides pure math functions for stroke join geometry — not tied to
+   * any rendering engine or UI concept.
+   */
+  export namespace miter {
+    /**
+     * Returns the geometric corner extension ratio (1 / sin(θ/2))
+     * for a given interior angle.
+     *
+     * @param angleDeg - The interior join angle in degrees (e.g., 30)
+     * @returns Ratio of corner extension (e.g., 3.86 for 30°)
+     */
+    export function ratio(angleDeg: number): number {
+      const halfRad = (angleDeg * Math.PI) / 360;
+      return 1 / Math.sin(halfRad);
+    }
+
+    /**
+     * Returns the interior angle (in degrees) for a given corner extension ratio.
+     * This is the inverse of `ratio()`.
+     *
+     * @param ratio - The corner extension ratio (e.g., 4)
+     * @returns The equivalent join angle in degrees (e.g., 28.96°)
+     */
+    export function angle(ratio: number): number {
+      if (ratio <= 1) return 180;
+      return (2 * Math.asin(1 / ratio) * 180) / Math.PI;
+    }
+  }
+
   export namespace color {
     /**
      * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.

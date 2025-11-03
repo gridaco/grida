@@ -1,5 +1,5 @@
 use cg::cache::geometry::GeometryCache;
-use cg::cg::{alignment::Alignment, types::*};
+use cg::cg::prelude::*;
 use cg::node::{
     factory::NodeFactory,
     scene_graph::{Parent, SceneGraph},
@@ -15,8 +15,13 @@ fn stroke_affects_render_bounds() {
     let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.stroke_width = 10.0;
-    rect.stroke_align = StrokeAlign::Outside;
+    rect.stroke_width = 10.0.into();
+    rect.stroke_style.stroke_align = StrokeAlign::Outside;
+    rect.strokes = Paints::new([Paint::Solid(SolidPaint {
+        active: true,
+        color: CGColor(0, 0, 0, 255),
+        blend_mode: BlendMode::Normal,
+    })]);
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 

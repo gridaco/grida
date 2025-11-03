@@ -39,6 +39,15 @@ export namespace iofigma {
         WASHI_TAPE_6: undefined,
       };
 
+      export const strokeJoinMap: Record<
+        NonNullable<LineNode["strokeJoin"]>,
+        cg.StrokeJoin
+      > = {
+        MITER: "miter",
+        ROUND: "round",
+        BEVEL: "bevel",
+      };
+
       export const strokeAlignMap: Record<
         NonNullable<LineNode["strokeAlign"]>,
         cg.StrokeAlign | undefined
@@ -629,8 +638,14 @@ export namespace iofigma {
             };
           }
           case "RECTANGLE": {
-            const { fills, strokes, strokeDashes, strokeWeight, strokeCap } =
-              node;
+            const {
+              fills,
+              strokes,
+              strokeDashes,
+              strokeWeight,
+              strokeCap,
+              strokeJoin,
+            } = node;
 
             const visible_fills = visible_paints(fills);
             const visible_strokes = strokes ? visible_paints(strokes) : [];
@@ -707,12 +722,16 @@ export namespace iofigma {
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
+              strokeJoin: strokeJoin
+                ? (map.strokeJoinMap[strokeJoin] ?? "miter")
+                : "miter",
               cornerRadius: node.cornerRadius ?? 0,
               ...rectangleCornerRadius(node.rectangleCornerRadii),
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {
-            const { fills, strokes, strokeWeight, strokeCap } = node;
+            const { fills, strokes, strokeWeight, strokeCap, strokeJoin } =
+              node;
 
             const visible_fills = visible_paints(fills);
             const visible_strokes = strokes ? visible_paints(strokes) : [];
@@ -747,7 +766,9 @@ export namespace iofigma {
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-
+              strokeJoin: strokeJoin
+                ? (map.strokeJoinMap[strokeJoin] ?? "miter")
+                : "miter",
               // arc data
               innerRadius: node.arcData.innerRadius,
               angleOffset: cmath.rad2deg(node.arcData.startingAngle),
@@ -759,8 +780,14 @@ export namespace iofigma {
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
-            const { fills, strokes, strokeWeight, strokeCap, strokeAlign } =
-              node;
+            const {
+              fills,
+              strokes,
+              strokeWeight,
+              strokeCap,
+              strokeAlign,
+              strokeJoin,
+            } = node;
             const visible_strokes = strokes ? visible_paints(strokes) : [];
             const first_visible_stroke = first_visible(strokes ?? []);
 
@@ -790,6 +817,9 @@ export namespace iofigma {
               strokeCap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
+              strokeJoin: strokeJoin
+                ? (map.strokeJoinMap[strokeJoin] ?? "miter")
+                : "miter",
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],
               width: node.size!.x,

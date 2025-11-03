@@ -1,5 +1,4 @@
-use crate::cg::varwidth::{VarWidthProfile, WidthStop};
-use crate::cg::{types::*, Alignment};
+use crate::cg::prelude::*;
 use crate::io::io_css::*;
 use crate::node::schema::*;
 use crate::vectornetwork::*;
@@ -773,10 +772,24 @@ pub struct JSONUnknownNodeProperties {
     pub stroke_width: f32,
     #[serde(rename = "strokeWidthProfile")]
     pub stroke_width_profile: Option<JSONVariableWidthProfile>,
+    #[serde(rename = "strokeLeftWidth")]
+    pub stroke_left_width: Option<f32>,
+    #[serde(rename = "strokeTopWidth")]
+    pub stroke_top_width: Option<f32>,
+    #[serde(rename = "strokeRightWidth")]
+    pub stroke_right_width: Option<f32>,
+    #[serde(rename = "strokeBottomWidth")]
+    pub stroke_bottom_width: Option<f32>,
     #[serde(rename = "strokeAlign")]
     pub stroke_align: Option<StrokeAlign>,
     #[serde(rename = "strokeCap")]
-    pub stroke_cap: Option<String>,
+    pub stroke_cap: Option<StrokeCap>,
+    #[serde(rename = "strokeJoin")]
+    pub stroke_join: Option<StrokeJoin>,
+    #[serde(rename = "strokeMiterLimit")]
+    pub stroke_miter_limit: Option<StrokeMiterLimit>,
+    #[serde(rename = "strokeDashArray", alias = "strokeDasharray")]
+    pub stroke_dash_array: Option<Vec<f32>>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
     #[serde(rename = "strokes")]
@@ -1209,6 +1222,9 @@ impl From<JSONGroupNode> for GroupNodeRec {
 
 impl From<JSONContainerNode> for ContainerNodeRec {
     fn from(node: JSONContainerNode) -> Self {
+        // Build stroke width early before any moves
+        let stroke_width: StrokeWidth = build_unknown_stroke_width(&node.base).into();
+
         // For containers, preserve Auto vs explicit size distinction
         let width = match node.base.width {
             CSSDimension::Auto => None,
@@ -1238,9 +1254,14 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
             blend_mode: node.base.blend_mode.into(),
             opacity: node.base.opacity,
             effects: merge_effects(
@@ -1383,6 +1404,9 @@ impl From<JSONTextNode> for TextSpanNodeRec {
 
 impl From<JSONEllipseNode> for Node {
     fn from(node: JSONEllipseNode) -> Self {
+        // Build stroke width early before any moves
+        let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
+
         let transform = AffineTransform::from_box_center(
             node.base.left.unwrap_or(0.0),
             node.base.top.unwrap_or(0.0),
@@ -1409,10 +1433,14 @@ impl From<JSONEllipseNode> for Node {
             },
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
-
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
             inner_radius: node.inner_radius,
             start_angle: node.angle_offset.unwrap_or(0.0),
             angle: node.angle,
@@ -1434,6 +1462,9 @@ impl From<JSONEllipseNode> for Node {
 
 impl From<JSONRectangleNode> for Node {
     fn from(node: JSONRectangleNode) -> Self {
+        // Build stroke width early before any moves
+        let stroke_width: StrokeWidth = build_unknown_stroke_width(&node.base).into();
+
         let transform = AffineTransform::from_box_center(
             node.base.left.unwrap_or(0.0),
             node.base.top.unwrap_or(0.0),
@@ -1462,9 +1493,14 @@ impl From<JSONRectangleNode> for Node {
             corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1485,6 +1521,9 @@ impl From<JSONRectangleNode> for Node {
 
 impl From<JSONImageNode> for Node {
     fn from(node: JSONImageNode) -> Self {
+        // Build stroke width early before any moves
+        let stroke_width: StrokeWidth = build_unknown_stroke_width(&node.base).into();
+
         let transform = AffineTransform::from_box_center(
             node.base.left.unwrap_or(0.0),
             node.base.top.unwrap_or(0.0),
@@ -1560,9 +1599,14 @@ impl From<JSONImageNode> for Node {
             corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
             fill: fill.clone(),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
             image: fill.image.clone(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
@@ -1578,6 +1622,9 @@ impl From<JSONImageNode> for Node {
 
 impl From<JSONRegularPolygonNode> for Node {
     fn from(node: JSONRegularPolygonNode) -> Self {
+        // Build stroke width early before any moves
+        let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
+
         let transform = AffineTransform::from_box_center(
             node.base.left.unwrap_or(0.0),
             node.base.top.unwrap_or(0.0),
@@ -1609,9 +1656,14 @@ impl From<JSONRegularPolygonNode> for Node {
                 .unwrap_or(0.0),
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
             point_count: node.point_count,
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
@@ -1627,6 +1679,9 @@ impl From<JSONRegularPolygonNode> for Node {
 
 impl From<JSONRegularStarPolygonNode> for Node {
     fn from(node: JSONRegularStarPolygonNode) -> Self {
+        // Build stroke width early before any moves
+        let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
+
         let transform = AffineTransform::from_box_center(
             node.base.left.unwrap_or(0.0),
             node.base.top.unwrap_or(0.0),
@@ -1659,9 +1714,14 @@ impl From<JSONRegularStarPolygonNode> for Node {
             inner_radius: node.inner_radius,
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
             point_count: node.point_count,
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
@@ -1677,6 +1737,9 @@ impl From<JSONRegularStarPolygonNode> for Node {
 
 impl From<JSONSVGPathNode> for Node {
     fn from(node: JSONSVGPathNode) -> Self {
+        // Build stroke width early before any moves
+        let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
+
         let transform = AffineTransform::from_box_center(
             node.base.left.unwrap_or(0.0),
             node.base.top.unwrap_or(0.0),
@@ -1707,9 +1770,14 @@ impl From<JSONSVGPathNode> for Node {
                     .join(" ")
             }),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
-            stroke_width: 0.0,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1750,8 +1818,10 @@ impl From<JSONLineNode> for Node {
             },
             strokes: merge_paints(node.base.stroke, node.base.strokes),
             stroke_width: node.base.stroke_width,
+            stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+            stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
-            stroke_dash_array: None,
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1803,7 +1873,10 @@ impl From<JSONVectorNode> for Node {
             stroke_width: node.base.stroke_width,
             stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+            stroke_join: node.base.stroke_join.unwrap_or_default(),
+            stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+            stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1818,6 +1891,9 @@ impl From<JSONVectorNode> for Node {
 
 impl From<JSONBooleanOperationNode> for Node {
     fn from(node: JSONBooleanOperationNode) -> Self {
+        // Build stroke width early before any moves
+        let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
+
         // TODO: boolean operation's transform should be handled differently
         let transform = AffineTransform::from_box_center(
             node.base.left.unwrap_or(0.0),
@@ -1847,9 +1923,14 @@ impl From<JSONBooleanOperationNode> for Node {
             // Children populated from links after conversion
             fills: merge_paints(node.base.fill, node.base.fills),
             strokes: merge_paints(node.base.stroke, node.base.strokes),
-            stroke_width: node.base.stroke_width,
-            stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-            stroke_dash_array: None,
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
         })
     }
 }
@@ -1972,6 +2053,17 @@ fn merge_corner_radius(
         r.bl = corner_radius_bottom_left;
     }
     r
+}
+
+/// Helper function to build UnknownStrokeWidth from JSON node properties
+fn build_unknown_stroke_width(base: &JSONUnknownNodeProperties) -> UnknownStrokeWidth {
+    UnknownStrokeWidth {
+        stroke_width: Some(base.stroke_width),
+        stroke_top_width: base.stroke_top_width,
+        stroke_right_width: base.stroke_right_width,
+        stroke_bottom_width: base.stroke_bottom_width,
+        stroke_left_width: base.stroke_left_width,
+    }
 }
 
 #[cfg(test)]

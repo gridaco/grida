@@ -1,4 +1,4 @@
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::{
     factory::NodeFactory,
     scene_graph::{Parent, SceneGraph},

@@ -1,4 +1,4 @@
-use crate::cg::{types::*, Alignment};
+use crate::cg::prelude::*;
 use crate::helpers::webfont_helper;
 use crate::node::repository::NodeRepository;
 use crate::node::scene_graph::SceneGraph;
@@ -441,6 +441,19 @@ impl FigmaConverter {
         })
     }
 
+    /// Helper to build UnknownStrokeWidth from Figma's stroke_weight.
+    ///
+    /// Figma's stroke_weight is always uniform. Per-side stroke weights are not supported yet.
+    fn build_unknown_stroke_width_from_figma(stroke_weight: Option<f64>) -> UnknownStrokeWidth {
+        UnknownStrokeWidth {
+            stroke_width: stroke_weight.map(|w| w as f32),
+            stroke_top_width: None,
+            stroke_right_width: None,
+            stroke_bottom_width: None,
+            stroke_left_width: None,
+        }
+    }
+
     /// Convert Figma's RGBA color to our Color
     fn convert_color(color: &Rgba) -> CGColor {
         color.into()
@@ -766,18 +779,24 @@ impl FigmaConverter {
             corner_smoothing: CornerSmoothing::new(component.corner_smoothing.unwrap_or(0.0) as f32),
             fills: self.convert_fills(Some(&component.fills.as_ref())),
             strokes: self.convert_strokes(Some(&component.strokes)),
-            stroke_width: component.stroke_weight.unwrap_or(0.0) as f32,
-            stroke_align: Self::convert_stroke_align(
-                component
-                    .stroke_align
-                    .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap_or_default())
-                    .unwrap_or_else(|| "CENTER".to_string()),
-            ),
-            stroke_dash_array: component
-                .stroke_dashes
-                .clone()
-                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            stroke_style: StrokeStyle {
+                stroke_align: Self::convert_stroke_align(
+                    component
+                        .stroke_align
+                        .as_ref()
+                        .map(|a| serde_json::to_string(a).unwrap_or_default())
+                        .unwrap_or_else(|| "CENTER".to_string()),
+                ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: component
+                    .stroke_dashes
+                    .clone()
+                    .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            },
+            stroke_width: Self::build_unknown_stroke_width_from_figma(component.stroke_weight)
+                .into(),
             effects: Self::convert_effects(&component.effects),
             clip: component.clips_content,
             position: CGPoint::new(transform.x(), transform.y()).into(),
@@ -884,18 +903,24 @@ impl FigmaConverter {
             corner_smoothing: CornerSmoothing::new(instance.corner_smoothing.unwrap_or(0.0) as f32),
             fills: self.convert_fills(Some(&instance.fills.as_ref())),
             strokes: self.convert_strokes(Some(&instance.strokes)),
-            stroke_width: instance.stroke_weight.unwrap_or(0.0) as f32,
-            stroke_align: Self::convert_stroke_align(
-                instance
-                    .stroke_align
-                    .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap_or_default())
-                    .unwrap_or_else(|| "CENTER".to_string()),
-            ),
-            stroke_dash_array: instance
-                .stroke_dashes
-                .clone()
-                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            stroke_style: StrokeStyle {
+                stroke_align: Self::convert_stroke_align(
+                    instance
+                        .stroke_align
+                        .as_ref()
+                        .map(|a| serde_json::to_string(a).unwrap_or_default())
+                        .unwrap_or_else(|| "CENTER".to_string()),
+                ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: instance
+                    .stroke_dashes
+                    .clone()
+                    .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            },
+            stroke_width: Self::build_unknown_stroke_width_from_figma(instance.stroke_weight)
+                .into(),
             effects: Self::convert_effects(&instance.effects),
             clip: instance.clips_content,
             position: CGPoint::new(transform.x(), transform.y()).into(),
@@ -956,9 +981,14 @@ impl FigmaConverter {
                 corner_smoothing: Default::default(),
                 fills: self.convert_fills(Some(&section.fills.as_ref())),
                 strokes: Paints::default(),
-                stroke_width: 0.0,
-                stroke_align: StrokeAlign::Inside,
-                stroke_dash_array: None,
+                stroke_style: StrokeStyle {
+                    stroke_align: StrokeAlign::Inside,
+                    stroke_cap: StrokeCap::default(),
+                    stroke_join: StrokeJoin::default(),
+                    stroke_miter_limit: StrokeMiterLimit::default(),
+                    stroke_dash_array: None,
+                },
+                stroke_width: StrokeWidth::None,
                 effects: LayerEffects::default(),
                 clip: false,
                 position: CGPoint::new(transform.x(), transform.y()).into(),
@@ -1104,18 +1134,23 @@ impl FigmaConverter {
             corner_smoothing: CornerSmoothing::new(origin.corner_smoothing.unwrap_or(0.0) as f32),
             fills: self.convert_fills(Some(&origin.fills.as_ref())),
             strokes: self.convert_strokes(Some(&origin.strokes)),
-            stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
-            stroke_align: Self::convert_stroke_align(
-                origin
-                    .stroke_align
-                    .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap_or_default())
-                    .unwrap_or_else(|| "CENTER".to_string()),
-            ),
-            stroke_dash_array: origin
-                .stroke_dashes
-                .clone()
-                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            stroke_style: StrokeStyle {
+                stroke_align: Self::convert_stroke_align(
+                    origin
+                        .stroke_align
+                        .as_ref()
+                        .map(|a| serde_json::to_string(a).unwrap_or_default())
+                        .unwrap_or_else(|| "CENTER".to_string()),
+                ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: origin
+                    .stroke_dashes
+                    .clone()
+                    .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            },
+            stroke_width: Self::build_unknown_stroke_width_from_figma(origin.stroke_weight).into(),
             effects: Self::convert_effects(&origin.effects),
             clip: origin.clips_content,
             position: CGPoint::new(transform.x(), transform.y()).into(),
@@ -1299,9 +1334,14 @@ impl FigmaConverter {
                     fills: self.convert_fills(Some(&origin.fills)),
                     data: geometry.path.clone(),
                     strokes: Paints::default(),
-                    stroke_width: 0.0,
-                    stroke_align: StrokeAlign::Inside,
-                    stroke_dash_array: None,
+                    stroke_style: StrokeStyle {
+                        stroke_align: StrokeAlign::Inside,
+                        stroke_cap: StrokeCap::default(),
+                        stroke_join: StrokeJoin::default(),
+                        stroke_miter_limit: StrokeMiterLimit::default(),
+                        stroke_dash_array: None,
+                    },
+                    stroke_width: SingularStrokeWidth(None),
                     layout_child: None,
                 });
                 children.push(self.repository.insert(path_node));
@@ -1322,9 +1362,14 @@ impl FigmaConverter {
                     fills: Paints::default(),
                     data: geometry.path.clone(),
                     strokes: self.convert_strokes(Some(&origin.strokes)),
-                    stroke_width: 0.0,
-                    stroke_align: StrokeAlign::Inside,
-                    stroke_dash_array: None,
+                    stroke_style: StrokeStyle {
+                        stroke_align: StrokeAlign::Inside,
+                        stroke_cap: StrokeCap::default(),
+                        stroke_join: StrokeJoin::default(),
+                        stroke_miter_limit: StrokeMiterLimit::default(),
+                        stroke_dash_array: None,
+                    },
+                    stroke_width: SingularStrokeWidth(None),
                     layout_child: None,
                 });
                 children.push(self.repository.insert(path_node));
@@ -1345,9 +1390,14 @@ impl FigmaConverter {
                 corner_smoothing: Default::default(),
                 fills: Paints::new([TRANSPARENT]),
                 strokes: Paints::default(),
-                stroke_width: 0.0,
-                stroke_align: StrokeAlign::Inside,
-                stroke_dash_array: None,
+                stroke_style: StrokeStyle {
+                    stroke_align: StrokeAlign::Inside,
+                    stroke_cap: StrokeCap::default(),
+                    stroke_join: StrokeJoin::default(),
+                    stroke_miter_limit: StrokeMiterLimit::default(),
+                    stroke_dash_array: None,
+                },
+                stroke_width: StrokeWidth::None,
                 effects: LayerEffects::default(),
                 clip: false,
                 position: CGPoint::new(transform.x(), transform.y()).into(),
@@ -1427,18 +1477,23 @@ impl FigmaConverter {
             corner_radius: None,
             fills: self.convert_fills(Some(&origin.fills)),
             strokes: self.convert_strokes(Some(&origin.strokes)),
-            stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
-            stroke_align: Self::convert_stroke_align(
-                origin
-                    .stroke_align
-                    .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap_or_default())
-                    .unwrap_or_else(|| "CENTER".to_string()),
-            ),
-            stroke_dash_array: origin
-                .stroke_dashes
-                .clone()
-                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            stroke_style: StrokeStyle {
+                stroke_align: Self::convert_stroke_align(
+                    origin
+                        .stroke_align
+                        .as_ref()
+                        .map(|a| serde_json::to_string(a).unwrap_or_default())
+                        .unwrap_or_else(|| "CENTER".to_string()),
+                ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: origin
+                    .stroke_dashes
+                    .clone()
+                    .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            },
+            stroke_width: Self::build_unknown_stroke_width_from_figma(origin.stroke_weight).into(),
         }))
     }
 
@@ -1460,18 +1515,23 @@ impl FigmaConverter {
             corner_radius: 0.0, // Figma stars don't have corner radius
             fills: self.convert_fills(Some(&origin.fills)),
             strokes: self.convert_strokes(Some(&origin.strokes)),
-            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
-            stroke_align: Self::convert_stroke_align(
-                origin
-                    .stroke_align
-                    .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap_or_default())
-                    .unwrap_or_else(|| "CENTER".to_string()),
-            ),
-            stroke_dash_array: origin
-                .stroke_dashes
-                .clone()
-                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            stroke_style: StrokeStyle {
+                stroke_align: Self::convert_stroke_align(
+                    origin
+                        .stroke_align
+                        .as_ref()
+                        .map(|a| serde_json::to_string(a).unwrap_or_default())
+                        .unwrap_or_else(|| "CENTER".to_string()),
+                ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: origin
+                    .stroke_dashes
+                    .clone()
+                    .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            },
+            stroke_width: Self::build_unknown_stroke_width_from_figma(origin.stroke_weight).into(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: origin
                     .layout_positioning
@@ -1501,6 +1561,8 @@ impl FigmaConverter {
                 .into_iter()
                 .collect(),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
+            stroke_cap: StrokeCap::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
             _data_stroke_align: Self::convert_stroke_align(
                 origin
                     .stroke_align
@@ -1541,20 +1603,23 @@ impl FigmaConverter {
             size,
             fills: self.convert_fills(Some(&origin.fills)),
             strokes: self.convert_strokes(Some(&origin.strokes)),
-            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
-            stroke_align: Self::convert_stroke_align(
-                origin
-                    .stroke_align
-                    .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap_or_default())
-                    .unwrap_or_else(|| "CENTER".to_string()),
-            ),
-            stroke_dash_array: origin
-                .stroke_dashes
-                .clone()
-                .map(|v| v.into_iter().map(|x| x as f32).collect()),
-
-            // arc data
+            stroke_style: StrokeStyle {
+                stroke_align: Self::convert_stroke_align(
+                    origin
+                        .stroke_align
+                        .as_ref()
+                        .map(|a| serde_json::to_string(a).unwrap_or_default())
+                        .unwrap_or_else(|| "CENTER".to_string()),
+                ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: origin
+                    .stroke_dashes
+                    .clone()
+                    .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            },
+            stroke_width: origin.stroke_weight.into(),
             inner_radius: Some(origin.arc_data.inner_radius as f32),
             angle: Some(
                 (origin.arc_data.ending_angle - origin.arc_data.starting_angle).to_degrees() as f32,
@@ -1591,18 +1656,23 @@ impl FigmaConverter {
             corner_radius: origin.corner_radius.unwrap_or(0.0) as f32,
             fills: self.convert_fills(Some(&origin.fills)),
             strokes: self.convert_strokes(Some(&origin.strokes)),
-            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
-            stroke_align: Self::convert_stroke_align(
-                origin
-                    .stroke_align
-                    .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap_or_default())
-                    .unwrap_or_else(|| "CENTER".to_string()),
-            ),
-            stroke_dash_array: origin
-                .stroke_dashes
-                .clone()
-                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            stroke_style: StrokeStyle {
+                stroke_align: Self::convert_stroke_align(
+                    origin
+                        .stroke_align
+                        .as_ref()
+                        .map(|a| serde_json::to_string(a).unwrap_or_default())
+                        .unwrap_or_else(|| "CENTER".to_string()),
+                ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: origin
+                    .stroke_dashes
+                    .clone()
+                    .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            },
+            stroke_width: Self::build_unknown_stroke_width_from_figma(origin.stroke_weight).into(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: origin
                     .layout_positioning
@@ -1633,18 +1703,23 @@ impl FigmaConverter {
             corner_smoothing: CornerSmoothing::new(origin.corner_smoothing.unwrap_or(0.0) as f32),
             fills: self.convert_fills(Some(&origin.fills)),
             strokes: self.convert_strokes(Some(&origin.strokes)),
-            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
-            stroke_align: Self::convert_stroke_align(
-                origin
-                    .stroke_align
-                    .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap_or_default())
-                    .unwrap_or_else(|| "CENTER".to_string()),
-            ),
-            stroke_dash_array: origin
-                .stroke_dashes
-                .clone()
-                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            stroke_style: StrokeStyle {
+                stroke_align: Self::convert_stroke_align(
+                    origin
+                        .stroke_align
+                        .as_ref()
+                        .map(|a| serde_json::to_string(a).unwrap_or_default())
+                        .unwrap_or_else(|| "CENTER".to_string()),
+                ),
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: origin
+                    .stroke_dashes
+                    .clone()
+                    .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            },
+            stroke_width: Self::build_unknown_stroke_width_from_figma(origin.stroke_weight).into(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: origin
                     .layout_positioning

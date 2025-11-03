@@ -2963,10 +2963,38 @@ export namespace editor.api {
       node_id: NodeID,
       strokeWidth: editor.api.NumberChange
     ): void;
-    changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodePropertyStrokeTopWidth(
+      node_id: NodeID,
+      strokeTopWidth: number
+    ): void;
+    changeNodePropertyStrokeRightWidth(
+      node_id: NodeID,
+      strokeRightWidth: number
+    ): void;
+    changeNodePropertyStrokeBottomWidth(
+      node_id: NodeID,
+      strokeBottomWidth: number
+    ): void;
+    changeNodePropertyStrokeLeftWidth(
+      node_id: NodeID,
+      strokeLeftWidth: number
+    ): void;
     changeNodePropertyStrokeAlign(
       node_id: NodeID,
       strokeAlign: cg.StrokeAlign
+    ): void;
+    changeNodePropertyStrokeDashArray(
+      node_id: NodeID,
+      strokeDashArray: number[] | undefined
+    ): void;
+    changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodePropertyStrokeJoin(
+      node_id: NodeID,
+      strokeJoin: cg.StrokeJoin
+    ): void;
+    changeNodePropertyStrokeMiterLimit(
+      node_id: NodeID,
+      strokeMiterLimit: number
     ): void;
     changeNodePropertyFit(node_id: NodeID, fit: cg.BoxFit): void;
 

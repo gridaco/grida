@@ -418,6 +418,46 @@ const safe_properties: Partial<
       );
     },
   }),
+  strokeTopWidth: defineNodeProperty<"strokeTopWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeTopWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
+    },
+  }),
+  strokeRightWidth: defineNodeProperty<"strokeRightWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeRightWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
+    },
+  }),
+  strokeBottomWidth: defineNodeProperty<"strokeBottomWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeBottomWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
+    },
+  }),
+  strokeLeftWidth: defineNodeProperty<"strokeLeftWidth">({
+    assert: (node) => node.type === "rectangle",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeLeftWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
+    },
+  }),
   strokeAlign: defineNodeProperty<"strokeAlign">({
     assert: (node) =>
       node.type === "vector" ||
@@ -432,6 +472,32 @@ const safe_properties: Partial<
   strokeCap: defineNodeProperty<"strokeCap">({
     apply: (draft, value, prev) => {
       (draft as UN).strokeCap = value;
+    },
+  }),
+  strokeJoin: defineNodeProperty<"strokeJoin">({
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeJoin = value;
+    },
+  }),
+  strokeMiterLimit: defineNodeProperty<"strokeMiterLimit">({
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeMiterLimit = value;
+    },
+  }),
+  strokeDashArray: defineNodeProperty<"strokeDashArray">({
+    assert: (node) =>
+      node.type === "vector" ||
+      node.type === "line" ||
+      node.type === "rectangle" ||
+      node.type === "ellipse" ||
+      node.type === "polygon" ||
+      node.type === "star" ||
+      node.type === "svgpath" ||
+      node.type === "image" ||
+      node.type === "container" ||
+      node.type === "boolean",
+    apply: (draft, value, prev) => {
+      (draft as UN).strokeDashArray = value;
     },
   }),
   feShadows: defineNodeProperty<"feShadows">({

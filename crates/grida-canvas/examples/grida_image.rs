@@ -43,7 +43,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         filters: ImageFilters::default(),
     }));
     rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
-    rect1.stroke_width = 2.0;
+    rect1.stroke_width = 2.0.into();
 
     let mut graph = SceneGraph::new();
 

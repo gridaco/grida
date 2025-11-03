@@ -70,7 +70,7 @@
 //! // paragraph.paint(canvas, point); // Use with actual canvas and point
 //! ```
 
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::schema::NodeId;
 use crate::painter::paint;
 use crate::runtime::font_repository::FontRepository;

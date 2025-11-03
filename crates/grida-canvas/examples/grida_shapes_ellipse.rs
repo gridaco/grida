@@ -122,7 +122,7 @@ async fn demo_ellipses() -> Scene {
             50 + (i * 25) as u8,
             255,
         ))]); // Red gradient stroke
-        stroke_ellipse.stroke_width = 3.0 + (i as f32 * 2.0); // 3 to 17 stroke weight
+        stroke_ellipse.stroke_width = (3.0 + (i as f32 * 2.0)).into(); // 3 to 17 stroke weight
         graph.append_child(
             Node::Ellipse(stroke_ellipse),
             Parent::NodeId(root_container_id.clone()),

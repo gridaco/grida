@@ -37,7 +37,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         filters: ImageFilters::default(),
     }));
     rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
-    rect1.stroke_width = 2.0;
+    rect1.stroke_width = 2.0.into();
 
     // Second example: Rectangle with ImagePaint fill and stroke
     let mut rect2 = nf.create_rectangle_node();
@@ -66,7 +66,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     })]);
-    rect2.stroke_width = 10.0;
+    rect2.stroke_width = 10.0.into();
 
     // Third example: Rectangle with ImagePaint stroke only
     let mut rect3 = nf.create_rectangle_node();
@@ -87,7 +87,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     })]);
-    rect3.stroke_width = 10.0;
+    rect3.stroke_width = 10.0.into();
 
     // Fourth example: Rectangle with ImagePaint fill using a custom transform
     let mut rect4 = nf.create_rectangle_node();
@@ -121,7 +121,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         filters: ImageFilters::default(),
     }));
     rect4.strokes = Paints::new([Paint::from(CGColor(0, 0, 255, 255))]);
-    rect4.stroke_width = 2.0;
+    rect4.stroke_width = 2.0.into();
 
     // Fifth example: Rectangle demonstrating repeating image tiles
     let mut rect5 = nf.create_rectangle_node();
@@ -180,7 +180,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         filters: ImageFilters::default(),
     }));
     rect7.strokes = Paints::new([Paint::from(CGColor(0, 255, 0, 255))]);
-    rect7.stroke_width = 2.0;
+    rect7.stroke_width = 2.0.into();
 
     // Eighth example: Rectangle with CENTER alignment
     let mut rect8 = nf.create_rectangle_node();
@@ -200,7 +200,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         filters: ImageFilters::default(),
     }));
     rect8.strokes = Paints::new([Paint::from(CGColor(255, 165, 0, 255))]);
-    rect8.stroke_width = 2.0;
+    rect8.stroke_width = 2.0.into();
 
     // Ninth example: Rectangle with RIGHT alignment
     let mut rect9 = nf.create_rectangle_node();
@@ -220,7 +220,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         filters: ImageFilters::default(),
     }));
     rect9.strokes = Paints::new([Paint::from(CGColor(128, 0, 128, 255))]);
-    rect9.stroke_width = 2.0;
+    rect9.stroke_width = 2.0.into();
 
     let mut graph = SceneGraph::new();
 

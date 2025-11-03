@@ -147,10 +147,24 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.addNodeStroke(node_id, stroke, at),
       strokeWidth: (change: editor.api.NumberChange) =>
         instance.commands.changeNodePropertyStrokeWidth(node_id, change),
+      strokeTopWidth: (value: number) =>
+        instance.commands.changeNodePropertyStrokeTopWidth(node_id, value),
+      strokeRightWidth: (value: number) =>
+        instance.commands.changeNodePropertyStrokeRightWidth(node_id, value),
+      strokeBottomWidth: (value: number) =>
+        instance.commands.changeNodePropertyStrokeBottomWidth(node_id, value),
+      strokeLeftWidth: (value: number) =>
+        instance.commands.changeNodePropertyStrokeLeftWidth(node_id, value),
       strokeAlign: (value: cg.StrokeAlign) =>
         instance.commands.changeNodePropertyStrokeAlign(node_id, value),
       strokeCap: (value: cg.StrokeCap) =>
         instance.commands.changeNodePropertyStrokeCap(node_id, value),
+      strokeJoin: (value: cg.StrokeJoin) =>
+        instance.commands.changeNodePropertyStrokeJoin(node_id, value),
+      strokeMiterLimit: (value: number) =>
+        instance.commands.changeNodePropertyStrokeMiterLimit(node_id, value),
+      strokeDashArray: (value: number[] | undefined) =>
+        instance.commands.changeNodePropertyStrokeDashArray(node_id, value),
       fit: (value: cg.BoxFit) =>
         instance.commands.changeNodePropertyFit(node_id, value),
       // stylable

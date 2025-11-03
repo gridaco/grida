@@ -10,6 +10,7 @@ pub mod regular_star;
 pub mod rrect;
 pub mod srrect_orthogonal;
 pub mod stroke;
+pub mod stroke_rect;
 pub mod stroke_varwidth;
 pub mod vector;
 
@@ -25,6 +26,7 @@ pub use regular_star::*;
 pub use rrect::*;
 pub use srrect_orthogonal::*;
 pub use stroke::*;
+pub use stroke_rect::*;
 pub use stroke_varwidth::*;
 pub use vector::*;
 

@@ -358,6 +358,289 @@ impl Default for FillRule {
     }
 }
 
+/// Defines the shape of stroke endpoints (line caps).
+///
+/// `StrokeCap` determines how the ends of open paths are rendered when stroked.
+/// This only applies to open paths - closed paths join their endpoints seamlessly
+/// and do not use line caps.
+///
+/// # Variants
+///
+/// ## Butt
+/// The stroke ends exactly at the path endpoint with a flat edge perpendicular
+/// to the path direction. This is the default and most common cap style.
+///
+/// ```text
+/// ──────────
+/// ```
+///
+/// ## Round
+/// The stroke extends beyond the endpoint by half the stroke width, forming
+/// a semicircular cap. This creates smooth, rounded line endings.
+///
+/// ```text
+/// ──────────)
+/// ```
+///
+/// ## Square
+/// The stroke extends beyond the endpoint by half the stroke width with a
+/// rectangular cap. Similar to round but with square corners.
+///
+/// ```text
+/// ──────────┐
+/// ```
+///
+/// # Visual Comparison
+///
+/// For a horizontal line with 10px stroke width:
+/// - **Butt**: Line ends exactly at endpoint
+/// - **Round**: Line extends 5px beyond endpoint with semicircle
+/// - **Square**: Line extends 5px beyond endpoint with rectangle
+///
+/// # Common Use Cases
+///
+/// - **Butt**: Default for most graphics, clean joins with adjacent segments
+/// - **Round**: Smooth, friendly appearance for UI elements and illustrations
+/// - **Square**: Technical drawings, diagrams requiring precise rectangular caps
+///
+/// # Cross-Platform Equivalents
+///
+/// - **SVG**: [`stroke-linecap`](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linecap) attribute
+/// - **Canvas API**: [`CanvasRenderingContext2D.lineCap`](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineCap)
+/// - **Skia**: [`SkPaint::Cap`](https://api.skia.org/classSkPaint.html#a0f78de8559b795defba93171f6cb6333)
+/// - **Flutter**: [`StrokeCap`](https://api.flutter.dev/flutter/dart-ui/StrokeCap.html)
+/// - **Figma**: [`strokeCap`](https://www.figma.com/plugin-docs/api/properties/nodes-strokecap/)
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::StrokeCap;
+///
+/// // Default cap style
+/// let default_cap = StrokeCap::default();
+/// assert_eq!(default_cap, StrokeCap::Butt);
+///
+/// // Round caps for smooth appearance
+/// let smooth = StrokeCap::Round;
+/// ```
+///
+/// # Implementation Notes
+///
+/// - Only affects **open paths** (lines, polylines, arcs)
+/// - Has **no effect** on closed paths (rectangles, ellipses, closed polygons)
+/// - Applied during stroke geometry computation or direct Skia rendering
+///
+/// # See Also
+///
+/// - [`StrokeAlign`] - Controls stroke positioning relative to path
+/// - [`StrokeDashArray`] - Defines dash patterns for strokes
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+pub enum StrokeCap {
+    /// Flat edge perpendicular to the stroke direction (default)
+    #[serde(rename = "butt", alias = "none")]
+    Butt,
+    /// Semicircular cap extending beyond the endpoint
+    #[serde(rename = "round")]
+    Round,
+    /// Rectangular cap extending beyond the endpoint
+    #[serde(rename = "square")]
+    Square,
+}
+
+impl Default for StrokeCap {
+    fn default() -> Self {
+        StrokeCap::Butt
+    }
+}
+
+/// Defines how corners (path segment joins) are rendered when stroked.
+///
+/// `StrokeJoin` determines the appearance of corners where two path segments meet.
+/// This applies to all path types (open and closed) wherever segments join at an angle.
+///
+/// # Variants
+///
+/// ## Miter
+/// Extends the outer edges of the stroke until they meet at a point, creating a sharp corner.
+/// The extension is limited by the miter limit to prevent excessive spikes on acute angles.
+///
+/// [Video](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/miter_4_join.mp4)
+///
+/// When the miter limit is exceeded (very acute angles), the join automatically falls back
+/// to a bevel join to prevent the spike from extending too far.
+///
+/// ## Round
+/// Joins path segments with a circular arc, creating smooth, rounded corners.
+/// The radius of the arc is equal to half the stroke width.
+///
+/// [Video](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/round_join.mp4)
+///
+/// ## Bevel
+/// Joins path segments with a straight line connecting the outer corners, creating
+/// a flattened or chamfered corner.
+///
+/// [Video](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/bevel_join.mp4)
+///
+/// # Visual Comparison
+///
+/// For two path segments meeting at 90°:
+/// - **Miter**: Sharp pointed corner extending beyond the join point
+/// - **Round**: Smooth circular arc connecting the segments
+/// - **Bevel**: Straight diagonal line connecting the outer edges
+///
+/// # Common Use Cases
+///
+/// - **Miter**: Technical drawings, architectural diagrams, sharp geometric shapes
+/// - **Round**: Smooth UI elements, organic shapes, friendly illustrations
+/// - **Bevel**: Chamfered corners, industrial designs, beveled frames
+///
+/// # Miter Limit Behavior
+///
+/// The **miter limit** controls when a miter join falls back to a bevel join.
+/// It's defined as the ratio of miter length to stroke width:
+///
+/// ```text
+/// miter_limit = miter_length / stroke_width
+/// ```
+///
+/// When this ratio exceeds the limit, the join becomes a bevel. Common default is 4.0.
+/// Very acute angles (< ~29° for limit=4.0) will automatically bevel.
+///
+/// # Cross-Platform Equivalents
+///
+/// - **SVG**: [`stroke-linejoin`](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin) attribute
+/// - **Canvas API**: [`CanvasRenderingContext2D.lineJoin`](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineJoin)
+/// - **Skia**: [`SkPaint::Join`](https://api.skia.org/classSkPaint.html#ac582b0cbf59909c9056de34a6b977cca)
+/// - **Flutter**: [`StrokeJoin`](https://api.flutter.dev/flutter/dart-ui/StrokeJoin.html)
+/// - **Figma**: [`strokeJoin`](https://www.figma.com/plugin-docs/api/properties/nodes-strokejoin/)
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::StrokeJoin;
+///
+/// // Default join style
+/// let default_join = StrokeJoin::default();
+/// assert_eq!(default_join, StrokeJoin::Miter);
+///
+/// // Round joins for smooth appearance
+/// let smooth = StrokeJoin::Round;
+///
+/// // Bevel joins for chamfered corners
+/// let chamfered = StrokeJoin::Bevel;
+/// ```
+///
+/// # Implementation Notes
+///
+/// - Applies to **all path types** where segments join (open and closed paths)
+/// - Miter joins require a **miter limit** parameter (typically 4.0) to prevent excessive spikes
+/// - Round joins may affect performance on complex paths with many segments
+/// - The join style interacts with stroke width - wider strokes make joins more prominent
+///
+/// # See Also
+///
+/// - [`StrokeCap`] - Controls stroke endpoints for open paths
+/// - [`StrokeAlign`] - Controls stroke positioning relative to path
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum StrokeJoin {
+    /// Sharp pointed corner with miter limit fallback (default)
+    #[serde(rename = "miter")]
+    Miter,
+    /// Circular arc connecting path segments
+    #[serde(rename = "round")]
+    Round,
+    /// Straight diagonal line connecting outer edges
+    #[serde(rename = "bevel")]
+    Bevel,
+}
+
+impl Default for StrokeJoin {
+    fn default() -> Self {
+        StrokeJoin::Miter
+    }
+}
+
+/// Miter limit for stroke joins.
+///
+/// Controls when a miter join falls back to a bevel join based on the ratio
+/// of miter length to stroke width. Common default is 4.0 (standard across
+/// Skia, SVG, Canvas API).
+///
+/// Only affects `StrokeJoin::Miter` joins. When two path segments meet at a sharp
+/// angle, the miter join extends the outer edges until they meet. The miter limit
+/// prevents excessively long spikes by switching to a bevel join when:
+///
+/// ```text
+/// miter_length / stroke_width > miter_limit
+/// ```
+///
+/// # Default Value
+///
+/// The default miter limit is **4.0**, which is the standard across:
+/// - Skia: Default miter limit
+/// - SVG: Default `stroke-miterlimit` attribute
+/// - Canvas API: Default `miterLimit` property
+/// - PDF: Default miter limit
+///
+/// A limit of 4.0 means angles less than approximately 29° will bevel.
+///
+/// # Common Values
+///
+/// - **1.0**: Only very obtuse angles remain mitered (> ~90°)
+/// - **4.0**: Standard default, bevels acute angles (< ~29°)
+/// - **10.0**: Allows sharper miters, bevels very acute angles (< ~11°)
+///
+/// # Example
+///
+/// ```rust
+/// use cg::cg::types::StrokeMiterLimit;
+///
+/// let default_limit = StrokeMiterLimit::default();
+/// assert_eq!(default_limit.value(), 4.0);
+///
+/// let custom_limit = StrokeMiterLimit::new(10.0);
+/// assert_eq!(custom_limit.value(), 10.0);
+/// ```
+///
+/// # See Also
+///
+/// - [`StrokeJoin`] - The join style that miter limit applies to
+/// - [MDN miterLimit](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/miterLimit)
+/// - [SVG stroke-miterlimit](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-miterlimit)
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub struct StrokeMiterLimit(#[serde(default = "StrokeMiterLimit::default_value")] pub f32);
+
+impl StrokeMiterLimit {
+    pub const DEFAULT_VALUE: f32 = 4.0;
+
+    /// Creates a new miter limit with the specified value.
+    pub const fn new(limit: f32) -> Self {
+        Self(limit)
+    }
+
+    /// Returns the default miter limit value (4.0).
+    fn default_value() -> f32 {
+        Self::DEFAULT_VALUE
+    }
+
+    /// Returns the miter limit value.
+    pub fn value(&self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for StrokeMiterLimit {
+    fn default() -> Self {
+        Self(4.0)
+    }
+}
+
+impl From<f32> for StrokeMiterLimit {
+    fn from(value: f32) -> Self {
+        Self(value)
+    }
+}
+
 /// Stroke alignment.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
@@ -1698,6 +1981,10 @@ impl Paints {
     /// Returns `true` when there are no paints in the collection.
     pub fn is_empty(&self) -> bool {
         self.paints.is_empty()
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.paints.iter().any(|paint| paint.visible())
     }
 
     /// Number of paints in the stack.

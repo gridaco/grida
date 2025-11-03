@@ -1,4 +1,4 @@
-use crate::cg::types::{Paint, StrokeAlign};
+use crate::cg::types::{Paint, StrokeAlign, StrokeCap, StrokeJoin, StrokeMiterLimit};
 use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
 use crate::shape::stroke::stroke_geometry;
@@ -37,7 +37,15 @@ pub fn draw_text_stroke(
     }
 
     // Compute stroke geometry using the vector network's stroke_align model.
-    let stroke_path = stroke_geometry(&path, stroke_width, stroke_align, None);
+    let stroke_path = stroke_geometry(
+        &path,
+        stroke_width,
+        stroke_align,
+        StrokeCap::default(),
+        StrokeJoin::default(),
+        StrokeMiterLimit::default(),
+        None,
+    );
     if stroke_path.is_empty() {
         return;
     }

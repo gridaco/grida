@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::vectornetwork::vn_painter::*;
 use cg::vectornetwork::*;
 use skia_safe::{surfaces, Color};
@@ -41,11 +41,22 @@ fn main() {
         let color = CGColor(red, green, blue, 255);
 
         // Create stroke options for VNPainter
+        // Every 2nd line gets a dash pattern
+        let dash_array = if i % 2 == 1 {
+            Some(StrokeDashArray::from(vec![10.0, 5.0]))
+        } else {
+            None
+        };
+
         let stroke_options = StrokeOptions {
-            width: 5.0, // Increased stroke width for visibility
-            align: cg::cg::types::StrokeAlign::Center,
+            stroke_width: 2.0,
+            stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::Round,
+            stroke_join: StrokeJoin::Round,
+            stroke_miter_limit: StrokeMiterLimit::default(),
             paints: Paints::new([Paint::from(color)]),
             width_profile: None,
+            stroke_dash_array: dash_array,
         };
 
         // Use VNPainter to render the line

@@ -1,5 +1,5 @@
 use super::vn::{VectorNetwork, VectorNetworkSegment};
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use math2::KAPPA;
 
 pub struct RRectShape {

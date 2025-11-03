@@ -61,6 +61,9 @@ fn make_node(corner_radius: f32) -> VectorNodeRec {
         stroke_width: 0.0,
         stroke_width_profile: None,
         stroke_align: StrokeAlign::Inside,
+        stroke_cap: StrokeCap::default(),
+        stroke_join: StrokeJoin::default(),
+        stroke_miter_limit: StrokeMiterLimit::default(),
         stroke_dash_array: None,
     }
 }

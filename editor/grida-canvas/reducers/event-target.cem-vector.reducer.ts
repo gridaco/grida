@@ -375,8 +375,9 @@ export function create_new_vector_node(
     rotation: 0,
     zIndex: 0,
     stroke: { type: "solid", color: black, active: true },
-    strokeCap: "butt",
     strokeWidth: 1,
+    strokeCap: "butt",
+    strokeJoin: "miter",
     vectorNetwork: {
       vertices: [cmath.vector2.zero],
       segments: [],
@@ -709,6 +710,7 @@ export function on_draw_pointer_down(
         type: "vector",
         name: "vector",
         strokeWidth: 3,
+        strokeJoin: "miter",
         vectorNetwork: vn.polyline([cmath.vector2.zero]),
       } satisfies grida.program.nodes.VectorNode;
       break;
@@ -725,6 +727,7 @@ export function on_draw_pointer_down(
         type: "vector",
         name: "line",
         strokeWidth: 1,
+        strokeJoin: "miter",
         vectorNetwork: vn.polyline([cmath.vector2.zero]),
       } satisfies grida.program.nodes.VectorNode;
       break;

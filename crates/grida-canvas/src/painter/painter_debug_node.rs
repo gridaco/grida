@@ -1,6 +1,6 @@
 use super::geometry::*;
 use crate::cache::geometry::GeometryCache;
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use math2::rect::Rectangle;
@@ -37,12 +37,16 @@ impl<'a> NodePainter<'a> {
                     self.painter.with_opacity(node.opacity, || {
                         self.painter.with_blendmode(node.blend_mode, || {
                             self.painter.draw_fills(&shape, &node.fills);
+                            let stroke_width = node.render_bounds_stroke_width();
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
+                                stroke_width,
+                                node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_cap,
+                                node.stroke_style.stroke_join,
+                                node.stroke_style.stroke_miter_limit,
+                                node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
                     });
@@ -67,12 +71,16 @@ impl<'a> NodePainter<'a> {
                             self.painter
                                 .draw_fills(&shape, std::slice::from_ref(&image_paint));
                             if !node.strokes.is_empty() {
+                                let stroke_width = node.render_bounds_stroke_width();
                                 self.painter.draw_strokes(
                                     &shape,
                                     &node.strokes,
-                                    node.stroke_width,
-                                    node.stroke_align,
-                                    node.stroke_dash_array.as_ref(),
+                                    stroke_width,
+                                    node.stroke_style.stroke_align,
+                                    node.stroke_style.stroke_cap,
+                                    node.stroke_style.stroke_join,
+                                    node.stroke_style.stroke_miter_limit,
+                                    node.stroke_style.stroke_dash_array.as_ref(),
                                 );
                             }
                         });
@@ -95,9 +103,12 @@ impl<'a> NodePainter<'a> {
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
+                                node.stroke_width.value_or_zero(),
+                                node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_cap,
+                                node.stroke_style.stroke_join,
+                                node.stroke_style.stroke_miter_limit,
+                                node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
                     });
@@ -118,6 +129,9 @@ impl<'a> NodePainter<'a> {
                         &node.strokes,
                         node.stroke_width,
                         node.get_stroke_align(),
+                        node.stroke_cap,
+                        StrokeJoin::default(), // Join not applicable for single line
+                        node.stroke_miter_limit,
                         node.stroke_dash_array.as_ref(),
                     );
                 });
@@ -142,6 +156,9 @@ impl<'a> NodePainter<'a> {
                                 &node.strokes,
                                 node.stroke_width,
                                 stroke_align,
+                                node.stroke_cap,
+                                node.stroke_join,
+                                node.stroke_miter_limit,
                                 node.stroke_dash_array.as_ref(),
                             );
                         });
@@ -168,9 +185,12 @@ impl<'a> NodePainter<'a> {
                                 self.painter.draw_strokes(
                                     &shape,
                                     &node.strokes,
-                                    node.stroke_width,
-                                    node.stroke_align,
-                                    node.stroke_dash_array.as_ref(),
+                                    node.stroke_width.value_or_zero(),
+                                    node.stroke_style.stroke_align,
+                                    node.stroke_style.stroke_cap,
+                                    node.stroke_style.stroke_join,
+                                    node.stroke_style.stroke_miter_limit,
+                                    node.stroke_style.stroke_dash_array.as_ref(),
                                 );
                             }
                         });
@@ -192,9 +212,12 @@ impl<'a> NodePainter<'a> {
                             self.painter.draw_strokes(
                                 &shape,
                                 &node.strokes,
-                                node.stroke_width,
-                                node.stroke_align,
-                                node.stroke_dash_array.as_ref(),
+                                node.stroke_width.value_or_zero(),
+                                node.stroke_style.stroke_align,
+                                node.stroke_style.stroke_cap,
+                                node.stroke_style.stroke_join,
+                                node.stroke_style.stroke_miter_limit,
+                                node.stroke_style.stroke_dash_array.as_ref(),
                             );
                         });
                     });
@@ -216,10 +239,9 @@ impl<'a> NodePainter<'a> {
             corner_radius: node.corner_radius,
             fills: node.fills.clone(),
             strokes: node.strokes.clone(),
-            stroke_width: node.stroke_width,
-            stroke_align: node.stroke_align,
+            stroke_style: node.stroke_style.clone(),
+            stroke_width: node.stroke_width.clone(),
             effects: node.effects.clone(),
-            stroke_dash_array: node.stroke_dash_array.clone(),
             layout_child: node.layout_child.clone(),
         };
 
@@ -240,10 +262,9 @@ impl<'a> NodePainter<'a> {
             corner_radius: node.corner_radius,
             fills: node.fills.clone(),
             strokes: node.strokes.clone(),
-            stroke_width: node.stroke_width,
-            stroke_align: node.stroke_align,
+            stroke_style: node.stroke_style.clone(),
+            stroke_width: node.stroke_width.clone(),
             effects: node.effects.clone(),
-            stroke_dash_array: node.stroke_dash_array.clone(),
             layout_child: node.layout_child.clone(),
         };
 
@@ -305,6 +326,9 @@ impl<'a> NodePainter<'a> {
                     std::slice::from_ref(&stroke),
                     1.0,
                     StrokeAlign::Inside,
+                    StrokeCap::default(),
+                    StrokeJoin::default(),
+                    StrokeMiterLimit::default(),
                     None,
                 );
             });
@@ -352,9 +376,12 @@ impl<'a> NodePainter<'a> {
                                     self.painter.draw_strokes(
                                         &shape,
                                         &node.strokes,
-                                        node.stroke_width,
-                                        node.stroke_align,
-                                        node.stroke_dash_array.as_ref(),
+                                        node.stroke_width.value_or_zero(),
+                                        node.stroke_style.stroke_align,
+                                        node.stroke_style.stroke_cap,
+                                        node.stroke_style.stroke_join,
+                                        node.stroke_style.stroke_miter_limit,
+                                        node.stroke_style.stroke_dash_array.as_ref(),
                                     );
                                 }
                             });
@@ -453,12 +480,16 @@ impl<'a> NodePainter<'a> {
                                     }
 
                                     // Finally paint the stroke
+                                    let stroke_width = n.render_bounds_stroke_width();
                                     self.painter.draw_strokes(
                                         &shape,
                                         &n.strokes,
-                                        n.stroke_width,
-                                        n.stroke_align,
-                                        n.stroke_dash_array.as_ref(),
+                                        stroke_width,
+                                        n.stroke_style.stroke_align,
+                                        n.stroke_style.stroke_cap,
+                                        n.stroke_style.stroke_join,
+                                        n.stroke_style.stroke_miter_limit,
+                                        n.stroke_style.stroke_dash_array.as_ref(),
                                     );
                                 });
                             });

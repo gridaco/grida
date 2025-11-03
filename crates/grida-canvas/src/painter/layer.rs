@@ -2,7 +2,7 @@ use super::geometry::{
     boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes, PainterShape,
 };
 use crate::cache::scene::SceneCache;
-use crate::cg::types::*;
+use crate::cg::prelude::*;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::shape::*;
@@ -187,7 +187,11 @@ pub struct PainterPictureVectorLayer {
     pub vector: VectorNetwork,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
+    pub stroke_cap: StrokeCap,
+    pub stroke_join: StrokeJoin,
+    pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
+    pub stroke_dash_array: Option<StrokeDashArray>,
     pub corner_radius: f32,
 }
 
@@ -219,6 +223,63 @@ impl LayerList {
                 .cloned()
                 .collect::<Vec<_>>(),
         )
+    }
+
+    /// Computes stroke geometry for rectangular shapes with support for per-side widths.
+    ///
+    /// This handles both uniform and per-side stroke widths for rectangular shapes.
+    /// Per-side strokes are rendered as filled ring geometry (outer - inner rectangles).
+    /// Falls back to uniform stroke rendering when corners are rounded.
+    ///
+    /// # Parameters
+    ///
+    /// - `stroke_width`: The resolved stroke width (uniform, rectangular, or none)
+    /// - `corner_radius`: Corner radius configuration (per-side strokes need zero radius)
+    /// - `stroke_style`: Stroke style (alignment, dash pattern, etc.)
+    /// - `size`: The size of the rectangular shape
+    /// - `shape`: The painter shape (used for uniform stroke fallback)
+    ///
+    /// # Returns
+    ///
+    /// A `Path` representing the stroke geometry, or `None` if there's no stroke.
+    fn compute_rectangular_stroke_path(
+        stroke_width: &StrokeWidth,
+        corner_radius: &RectangularCornerRadius,
+        stroke_style: &StrokeStyle,
+        size: &Size,
+        shape: &PainterShape,
+    ) -> Option<Path> {
+        match stroke_width {
+            StrokeWidth::None => None,
+            StrokeWidth::Uniform(width) => {
+                if *width > 0.0 {
+                    Some(stroke_geometry(
+                        &shape.to_path(),
+                        *width,
+                        stroke_style.stroke_align,
+                        stroke_style.stroke_cap,
+                        stroke_style.stroke_join,
+                        stroke_style.stroke_miter_limit,
+                        stroke_style.stroke_dash_array.as_ref(),
+                    ))
+                } else {
+                    None
+                }
+            }
+            StrokeWidth::Rectangular(rect_stroke) => {
+                // Per-side strokes support all alignments and corner radii
+                // Use local-space rect (0, 0) since transform is already applied by painter
+                let rect = skia_safe::Rect::from_xywh(0.0, 0.0, size.width, size.height);
+                Some(stroke_geometry_rectangular(
+                    rect,
+                    rect_stroke,
+                    corner_radius,
+                    stroke_style.stroke_align,
+                    stroke_style.stroke_miter_limit,
+                    stroke_style.stroke_dash_array.as_ref(),
+                ))
+            }
+        }
     }
 
     /// Flatten an entire scene into a layer list using the provided scene cache.
@@ -292,16 +353,17 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
-                    Some(stroke_geometry(
-                        &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
-                    ))
-                } else {
-                    None
+                let size = Size {
+                    width: bounds.width,
+                    height: bounds.height,
                 };
+                let stroke_path = Self::compute_rectangular_stroke_path(
+                    &n.stroke_width,
+                    &n.corner_radius,
+                    &n.stroke_style,
+                    &size,
+                    &shape,
+                );
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -348,12 +410,16 @@ impl LayerList {
             Node::BooleanOperation(n) => {
                 let opacity = parent_opacity * n.opacity;
                 if let Some(shape) = boolean_operation_shape(id, n, graph, scene_cache.geometry()) {
-                    let stroke_path = if !n.strokes.is_empty() && n.stroke_width > 0.0 {
+                    let stroke_width = n.stroke_width.value_or_zero();
+                    let stroke_path = if !n.strokes.is_empty() && stroke_width > 0.0 {
                         Some(stroke_geometry(
                             &shape.to_path(),
-                            n.stroke_width,
-                            n.stroke_align,
-                            n.stroke_dash_array.as_ref(),
+                            stroke_width,
+                            n.stroke_style.stroke_align,
+                            n.stroke_style.stroke_cap,
+                            n.stroke_style.stroke_join,
+                            n.stroke_style.stroke_miter_limit,
+                            n.stroke_style.stroke_dash_array.as_ref(),
                         ))
                     } else {
                         None
@@ -401,16 +467,13 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
-                    Some(stroke_geometry(
-                        &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
-                    ))
-                } else {
-                    None
-                };
+                let stroke_path = Self::compute_rectangular_stroke_path(
+                    &n.stroke_width,
+                    &n.corner_radius,
+                    &n.stroke_style,
+                    &n.size,
+                    &shape,
+                );
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -441,12 +504,16 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_width = n.render_bounds_stroke_width();
+                let stroke_path = if stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -481,12 +548,16 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_width = n.render_bounds_stroke_width();
+                let stroke_path = if stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -521,12 +592,16 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_width = n.render_bounds_stroke_width();
+                let stroke_path = if stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -561,12 +636,16 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_width = n.render_bounds_stroke_width();
+                let stroke_path = if stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -606,6 +685,9 @@ impl LayerList {
                         &shape.to_path(),
                         n.stroke_width,
                         n.get_stroke_align(),
+                        n.stroke_cap,
+                        StrokeJoin::default(), // Join not applicable for single line
+                        n.stroke_miter_limit,
                         n.stroke_dash_array.as_ref(),
                     ))
                 } else {
@@ -705,12 +787,16 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_width = n.stroke_width.value_or_zero();
+                let stroke_path = if stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
@@ -761,7 +847,11 @@ impl LayerList {
                     vector: n.network.clone(),
                     stroke_width: n.stroke_width,
                     stroke_align: n.get_stroke_align(),
+                    stroke_cap: n.stroke_cap,
+                    stroke_join: n.stroke_join,
+                    stroke_miter_limit: n.stroke_miter_limit,
                     stroke_width_profile: n.stroke_width_profile.clone(),
+                    stroke_dash_array: n.stroke_dash_array.clone(),
                     corner_radius: n.corner_radius,
                 });
                 out.push(LayerEntry {
@@ -779,12 +869,16 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
-                let stroke_path = if n.stroke_width > 0.0 {
+                let stroke_width = n.render_bounds_stroke_width();
+                let stroke_path = if stroke_width > 0.0 {
                     Some(stroke_geometry(
                         &shape.to_path(),
-                        n.stroke_width,
-                        n.stroke_align,
-                        n.stroke_dash_array.as_ref(),
+                        stroke_width,
+                        n.stroke_style.stroke_align,
+                        n.stroke_style.stroke_cap,
+                        n.stroke_style.stroke_join,
+                        n.stroke_style.stroke_miter_limit,
+                        n.stroke_style.stroke_dash_array.as_ref(),
                     ))
                 } else {
                     None
