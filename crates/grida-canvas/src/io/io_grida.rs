@@ -376,6 +376,60 @@ impl From<JSONFeLiquidGlass> for FeLiquidGlass {
     }
 }
 
+/// JSON representation of noise effect coloring strategies
+#[derive(Debug, Deserialize)]
+#[serde(tag = "mode", rename_all = "lowercase")]
+pub enum JSONFeNoiseColors {
+    Mono { color: JSONRGBA },
+    Duo { color1: JSONRGBA, color2: JSONRGBA },
+    Multi { opacity: f32 },
+}
+
+/// JSON representation of noise effect
+#[derive(Debug, Deserialize)]
+pub struct JSONFeNoise {
+    #[serde(rename = "noiseSize")]
+    pub noise_size: f32,
+    pub density: f32,
+    #[serde(rename = "numOctaves", default = "default_num_octaves")]
+    pub num_octaves: i32,
+    #[serde(default)]
+    pub seed: f32,
+    #[serde(flatten)]
+    pub coloring: JSONFeNoiseColors,
+}
+
+fn default_num_octaves() -> i32 {
+    3
+}
+
+impl From<JSONFeNoiseColors> for NoiseEffectColors {
+    fn from(json: JSONFeNoiseColors) -> Self {
+        match json {
+            JSONFeNoiseColors::Mono { color } => NoiseEffectColors::Mono {
+                color: color.into(),
+            },
+            JSONFeNoiseColors::Duo { color1, color2 } => NoiseEffectColors::Duo {
+                color1: color1.into(),
+                color2: color2.into(),
+            },
+            JSONFeNoiseColors::Multi { opacity } => NoiseEffectColors::Multi { opacity },
+        }
+    }
+}
+
+impl From<JSONFeNoise> for NoiseEffect {
+    fn from(json: JSONFeNoise) -> Self {
+        NoiseEffect {
+            noise_size: json.noise_size,
+            density: json.density,
+            num_octaves: json.num_octaves,
+            seed: json.seed,
+            coloring: json.coloring.into(),
+        }
+    }
+}
+
 impl From<Option<JSONPaint>> for Paint {
     fn from(fill: Option<JSONPaint>) -> Self {
         match fill {
@@ -803,6 +857,8 @@ pub struct JSONUnknownNodeProperties {
     pub fe_backdrop_blur: Option<JSONFeBlur>,
     #[serde(rename = "feLiquidGlass")]
     pub fe_liquid_glass: Option<JSONFeLiquidGlass>,
+    #[serde(rename = "feNoises")]
+    pub fe_noises: Option<Vec<JSONFeNoise>>,
     // vector
     #[serde(rename = "vectorNetwork")]
     pub vector_network: Option<JSONVectorNetwork>,
@@ -1269,6 +1325,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             // Children populated from links after conversion
             clip: true,
@@ -1397,6 +1454,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
         }
     }
@@ -1425,6 +1483,7 @@ impl From<JSONEllipseNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             transform,
             size: Size {
@@ -1514,6 +1573,7 @@ impl From<JSONRectangleNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
         })
     }
@@ -1583,6 +1643,7 @@ impl From<JSONImageNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             transform,
             size: Size {
@@ -1643,6 +1704,7 @@ impl From<JSONRegularPolygonNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             transform,
             size: Size {
@@ -1700,6 +1762,7 @@ impl From<JSONRegularStarPolygonNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             transform,
             size: Size {
@@ -1759,6 +1822,7 @@ impl From<JSONSVGPathNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             transform,
             fills: merge_paints(node.base.fill, node.base.fills),
@@ -1810,6 +1874,7 @@ impl From<JSONLineNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             transform,
             size: Size {
@@ -1860,6 +1925,7 @@ impl From<JSONVectorNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             transform,
             network,
@@ -1913,6 +1979,7 @@ impl From<JSONBooleanOperationNode> for Node {
                 node.base.fe_blur,
                 node.base.fe_backdrop_blur,
                 node.base.fe_liquid_glass,
+                node.base.fe_noises,
             ),
             transform: Some(transform),
             op: node.op,
@@ -2239,6 +2306,7 @@ fn merge_effects(
     fe_blur: Option<JSONFeBlur>,
     fe_backdrop_blur: Option<JSONFeBlur>,
     fe_liquid_glass: Option<JSONFeLiquidGlass>,
+    fe_noises: Option<Vec<JSONFeNoise>>,
 ) -> LayerEffects {
     let mut effects = LayerEffects::default();
     if let Some(filter_blur) = fe_blur {
@@ -2262,6 +2330,9 @@ fn merge_effects(
                     .push(FilterShadowEffect::DropShadow(shadow.into()));
             }
         }
+    }
+    if let Some(noises) = fe_noises {
+        effects.noises = noises.into_iter().map(|n| n.into()).collect();
     }
     effects
 }
