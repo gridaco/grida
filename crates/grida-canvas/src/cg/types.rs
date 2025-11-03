@@ -1984,7 +1984,7 @@ impl Paints {
     }
 
     pub fn is_visible(&self) -> bool {
-        self.paints.iter().any(|paint| paint.opacity() > 0.0)
+        self.paints.iter().any(|paint| paint.visible())
     }
 
     /// Number of paints in the stack.

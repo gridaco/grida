@@ -421,25 +421,41 @@ const safe_properties: Partial<
   strokeTopWidth: defineNodeProperty<"strokeTopWidth">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeTopWidth = value;
+      (draft as UN).strokeTopWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
     },
   }),
   strokeRightWidth: defineNodeProperty<"strokeRightWidth">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeRightWidth = value;
+      (draft as UN).strokeRightWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
     },
   }),
   strokeBottomWidth: defineNodeProperty<"strokeBottomWidth">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeBottomWidth = value;
+      (draft as UN).strokeBottomWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
     },
   }),
   strokeLeftWidth: defineNodeProperty<"strokeLeftWidth">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeLeftWidth = value;
+      (draft as UN).strokeLeftWidth = ranged(
+        0,
+        value,
+        editor.config.DEFAULT_MAX_STROKE_WIDTH
+      );
     },
   }),
   strokeAlign: defineNodeProperty<"strokeAlign">({

@@ -327,12 +327,21 @@ impl GeometryCache {
                 let world_transform = parent_world.compose(&local_transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
                 let mut union_world_bounds = world_bounds;
-                let render_bounds = compute_render_bounds_from_style(
-                    world_bounds,
-                    n.render_bounds_stroke_width(),
-                    n.stroke_style.stroke_align,
-                    &n.effects,
-                );
+                let render_bounds = if let Some(rect_stroke) = n.rectangular_stroke_width() {
+                    compute_render_bounds_with_rectangular_stroke(
+                        world_bounds,
+                        &rect_stroke,
+                        n.stroke_style.stroke_align,
+                        &n.effects,
+                    )
+                } else {
+                    compute_render_bounds_from_style(
+                        world_bounds,
+                        n.render_bounds_stroke_width(),
+                        n.stroke_style.stroke_align,
+                        &n.effects,
+                    )
+                };
 
                 if let Some(children) = graph.get_children(id) {
                     for child_id in children {
