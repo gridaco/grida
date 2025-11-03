@@ -177,7 +177,7 @@ pub struct FeGaussianBlur {
 /// **In production (node effects)**: Coordinates are **node-local** and automatically scaled
 /// to the node's dimensions. A vertical blur from top to bottom is simply:
 /// ```rust
-/// use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+/// use cg::cg::prelude::*;
 ///
 /// let blur = FeProgressiveBlur {
 ///     start: Alignment(0.0, -1.0),  // Top center (node-local)
@@ -192,7 +192,7 @@ pub struct FeGaussianBlur {
 /// canvas without a node (as in `golden_progressive_blur.rs`), you must manually calculate
 /// and convert canvas-space pixel coordinates to normalized coordinates:
 /// ```rust
-/// # use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+/// use cg::cg::prelude::*;
 /// // For a 150×300 rectangle at canvas position (125, 50):
 /// // Node bounds: x=125..275, y=50..350
 /// // Node center: (200, 200)
@@ -210,7 +210,7 @@ pub struct FeGaussianBlur {
 /// ### Example: Vertical Gradient Blur
 ///
 /// ```rust
-/// use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+/// use cg::cg::prelude::*;
 ///
 /// // Blur from sharp at top to maximum at bottom (works for any node size)
 /// let blur = FeProgressiveBlur {
@@ -224,7 +224,7 @@ pub struct FeGaussianBlur {
 /// ### Example: Diagonal Gradient Blur
 ///
 /// ```rust
-/// # use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+/// use cg::cg::prelude::*;
 /// // Blur from top-left to bottom-right
 /// let blur = FeProgressiveBlur {
 ///     start: Alignment(-1.0, -1.0),  // Top-left corner (sharp)
@@ -237,7 +237,7 @@ pub struct FeGaussianBlur {
 /// ### Example: Horizontal Gradient Blur
 ///
 /// ```rust
-/// # use cg::cg::{types::FeProgressiveBlur, alignment::Alignment};
+/// use cg::cg::prelude::*;
 /// // Blur from left edge to right edge
 /// let blur = FeProgressiveBlur {
 ///     start: Alignment(-1.0, 0.0),  // Left edge center (sharp)
