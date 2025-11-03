@@ -621,6 +621,16 @@ const safe_properties: Partial<
       (draft as UN).feLiquidGlass = value;
     },
   }),
+  feNoises: defineNodeProperty<"feNoises">({
+    apply: (draft, value, prev) => {
+      (draft as UN).feNoises = value?.map((n) => ({
+        ...n,
+        noiseSize: Math.max(0.001, n.noiseSize),
+        density: cmath.clamp(n.density, 0, 1),
+        numOctaves: Math.max(1, n.numOctaves ?? 3),
+      }));
+    },
+  }),
   zIndex: defineNodeProperty<"zIndex">({
     assert: (node) => typeof node.zIndex === "number",
     apply: (draft, value, prev) => {

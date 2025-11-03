@@ -1254,12 +1254,13 @@ export namespace cg {
     density: number;
     /**
      * Number of fractal octaves for detail level
-     * Range: 1 - 8
+     * Range: 1+
      * More octaves = finer detail but more computation
+     * UI limit: 8
      *
      * @default 3
      */
-    numOctaves: number;
+    numOctaves?: number;
     /**
      * Random seed for reproducibility
      * Different seeds produce different noise patterns

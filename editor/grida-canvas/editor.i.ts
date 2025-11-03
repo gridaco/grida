@@ -3043,6 +3043,7 @@ export namespace editor.api {
       node_id: NodeID,
       effect?: cg.IFeGaussianBlur
     ): void;
+    changeNodeFeNoises(node_id: NodeID, effects?: cg.FeNoise[]): void;
 
     // ==============================================================
     // TextNode

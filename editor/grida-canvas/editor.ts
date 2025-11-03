@@ -2120,12 +2120,16 @@ class EditorDocumentStore
     const feLiquidGlass = effects?.find((effect) => effect.type === "glass") as
       | cg.FeLiquidGlass
       | undefined;
+    const feNoises = effects?.filter((effect) => effect.type === "noise") as
+      | cg.FeNoise[]
+      | undefined;
 
     const i: grida.program.nodes.i.IEffects = {
       feBackdropBlur: feBackdropBlur,
       feBlur: feBlur,
       feShadows: feShadows,
       feLiquidGlass: feLiquidGlass,
+      feNoises: feNoises,
     };
 
     this.dispatch({
@@ -2156,6 +2160,14 @@ class EditorDocumentStore
       type: "node/change/*",
       node_id: node_id,
       feBackdropBlur: effect,
+    });
+  }
+
+  changeNodeFeNoises(node_id: editor.NodeID, effects?: cg.FeNoise[]): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feNoises: effects,
     });
   }
 
