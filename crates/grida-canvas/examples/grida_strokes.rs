@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
@@ -168,13 +168,10 @@ async fn demo_strokes() -> Scene {
                 blur: 4.0,
                 spread: 0.0,
                 color: CGColor(0, 0, 0, 128),
+                active: true,
             })]),
-            1 => LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeBlur::Gaussian(
-                FeGaussianBlur { radius: 2.0 },
-            ))]),
-            2 => LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeBlur::Gaussian(
-                FeGaussianBlur { radius: 4.0 },
-            ))]),
+            1 => LayerEffects::new().blur(2.0f32),
+            2 => LayerEffects::new().backdrop_blur(4.0f32),
             _ => unreachable!(),
         };
 

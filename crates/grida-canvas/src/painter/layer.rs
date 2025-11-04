@@ -225,6 +225,40 @@ impl LayerList {
         )
     }
 
+    fn filter_active_noises(noises: &[FeNoiseEffect]) -> Vec<FeNoiseEffect> {
+        noises.iter().filter(|n| n.active).cloned().collect()
+    }
+
+    fn filter_active_shadows(shadows: &[FilterShadowEffect]) -> Vec<FilterShadowEffect> {
+        shadows.iter().filter(|s| s.active()).cloned().collect()
+    }
+
+    fn filter_active_layer_blur(blur: &Option<FeLayerBlur>) -> Option<FeLayerBlur> {
+        blur.as_ref()
+            .and_then(|b| if b.active { Some(b.clone()) } else { None })
+    }
+
+    fn filter_active_backdrop_blur(blur: &Option<FeBackdropBlur>) -> Option<FeBackdropBlur> {
+        blur.as_ref()
+            .and_then(|b| if b.active { Some(b.clone()) } else { None })
+    }
+
+    fn filter_active_glass(glass: &Option<FeLiquidGlass>) -> Option<FeLiquidGlass> {
+        glass
+            .as_ref()
+            .and_then(|g| if g.active { Some(*g) } else { None })
+    }
+
+    fn filter_active_effects(effects: &LayerEffects) -> LayerEffects {
+        LayerEffects {
+            shadows: Self::filter_active_shadows(&effects.shadows),
+            blur: Self::filter_active_layer_blur(&effects.blur),
+            backdrop_blur: Self::filter_active_backdrop_blur(&effects.backdrop_blur),
+            glass: Self::filter_active_glass(&effects.glass),
+            noises: Self::filter_active_noises(&effects.noises),
+        }
+    }
+
     /// Computes stroke geometry for rectangular shapes with support for per-side widths.
     ///
     /// This handles both uniform and per-side stroke widths for rectangular shapes.
@@ -374,7 +408,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
@@ -434,7 +468,7 @@ impl LayerList {
                             clip_path: Self::compute_clip_path(id, graph, scene_cache),
                         },
                         shape,
-                        effects: n.effects.clone(),
+                        effects: Self::filter_active_effects(&n.effects),
                         strokes: Self::filter_visible_paints(&n.strokes),
                         fills: Self::filter_visible_paints(&n.fills),
                         stroke_path,
@@ -484,7 +518,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
@@ -528,7 +562,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
@@ -572,7 +606,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
@@ -616,7 +650,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
@@ -660,7 +694,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
@@ -703,7 +737,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: n.strokes.clone(),
                     fills: Paints::default(),
                     stroke_path,
@@ -759,7 +793,7 @@ impl LayerList {
                     height: n.height,
                     max_lines: n.max_lines,
                     ellipsis: n.ellipsis.clone(),
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_width: n.stroke_width,
@@ -811,7 +845,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
@@ -841,7 +875,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     vector: n.network.clone(),
@@ -893,7 +927,7 @@ impl LayerList {
                         clip_path: Self::compute_clip_path(id, graph, scene_cache),
                     },
                     shape,
-                    effects: n.effects.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&Paints::new([Paint::Image(
                         n.fill.clone(),

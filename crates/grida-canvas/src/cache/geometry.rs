@@ -563,7 +563,7 @@ fn stroke_outset(align: StrokeAlign, width: f32) -> f32 {
 fn compute_render_bounds_from_effects(bounds: Rectangle, effects: &LayerEffects) -> Rectangle {
     let mut bounds = bounds;
     if let Some(blur) = &effects.blur {
-        bounds = match blur {
+        bounds = match &blur.blur {
             FeBlur::Gaussian(gaussian) => {
                 // Use 3x sigma for 99.7% Gaussian coverage
                 inflate_rect(bounds, gaussian.radius * 3.0)
@@ -586,14 +586,14 @@ fn compute_render_bounds_from_effects(bounds: Rectangle, effects: &LayerEffects)
 fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -> Rectangle {
     match effect {
         FilterEffect::LiquidGlass(glass) => inflate_rect(bounds, glass.blur_radius * 3.0),
-        FilterEffect::LayerBlur(blur) => match blur {
+        FilterEffect::LayerBlur(blur) => match &blur.blur {
             FeBlur::Gaussian(gaussian) => inflate_rect(bounds, gaussian.radius * 3.0),
             FeBlur::Progressive(progressive) => {
                 let max_radius = progressive.radius.max(progressive.radius2);
                 inflate_rect(bounds, max_radius * 3.0)
             }
         },
-        FilterEffect::BackdropBlur(blur) => match blur {
+        FilterEffect::BackdropBlur(blur) => match &blur.blur {
             FeBlur::Gaussian(gaussian) => inflate_rect(bounds, gaussian.radius * 3.0),
             FeBlur::Progressive(progressive) => {
                 let max_radius = progressive.radius.max(progressive.radius2);
@@ -612,8 +612,9 @@ fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -
             // Use 3x sigma for proper Gaussian blur coverage
             inflate_rect(rect, shadow.blur * 3.0)
         }
-        // no inflation for inner shadow
-        FilterEffect::InnerShadow(_shadow) => bounds,
+        // no inflation
+        FilterEffect::Noise(_) => bounds,
+        FilterEffect::InnerShadow(_) => bounds,
     }
 }
 

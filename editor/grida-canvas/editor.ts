@@ -2110,22 +2110,28 @@ class EditorDocumentStore
     node_id: editor.NodeID,
     effects?: cg.FilterEffect[]
   ): void {
-    const feBlur = effects?.find(
-      (effect) => effect.type === "filter-blur"
-    )?.blur;
+    const feBlur = effects?.find((effect) => effect.type === "filter-blur") as
+      | cg.FeLayerBlur
+      | undefined;
     const feBackdropBlur = effects?.find(
       (effect) => effect.type === "backdrop-filter-blur"
-    )?.blur;
-    const feShadows = effects?.filter((effect) => effect.type === "shadow");
+    ) as cg.FeBackdropBlur | undefined;
+    const feShadows = effects?.filter(
+      (e): e is cg.FeShadow => e.type === "shadow"
+    );
     const feLiquidGlass = effects?.find((effect) => effect.type === "glass") as
       | cg.FeLiquidGlass
       | undefined;
+    const feNoises = effects?.filter(
+      (e): e is cg.FeNoise => e.type === "noise"
+    );
 
     const i: grida.program.nodes.i.IEffects = {
       feBackdropBlur: feBackdropBlur,
       feBlur: feBlur,
       feShadows: feShadows,
       feLiquidGlass: feLiquidGlass,
+      feNoises: feNoises,
     };
 
     this.dispatch({
@@ -2143,7 +2149,7 @@ class EditorDocumentStore
     });
   }
 
-  changeNodeFeBlur(node_id: string, effect?: cg.FeBlur) {
+  changeNodeFeBlur(node_id: string, effect?: cg.FeLayerBlur) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
@@ -2151,11 +2157,22 @@ class EditorDocumentStore
     });
   }
 
-  changeNodeFeBackdropBlur(node_id: editor.NodeID, effect?: cg.FeBlur): void {
+  changeNodeFeBackdropBlur(
+    node_id: editor.NodeID,
+    effect?: cg.FeBackdropBlur
+  ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
       feBackdropBlur: effect,
+    });
+  }
+
+  changeNodeFeNoises(node_id: editor.NodeID, effects?: cg.FeNoise[]): void {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      feNoises: effects,
     });
   }
 

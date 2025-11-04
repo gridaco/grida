@@ -1046,6 +1046,12 @@ export namespace cg {
     spread: number;
 
     color: RGBA8888;
+
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
     //
   }
 
@@ -1094,7 +1100,8 @@ export namespace cg {
     | FeShadow
     | FeLayerBlur
     | FeBackdropBlur
-    | FeLiquidGlass;
+    | FeLiquidGlass
+    | FeNoise;
 
   export type FeShadow = IFeShadow & {
     type: "shadow";
@@ -1106,11 +1113,21 @@ export namespace cg {
   export type FeLayerBlur = {
     type: "filter-blur";
     blur: FeBlur;
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
   };
 
   export type FeBackdropBlur = {
     type: "backdrop-filter-blur";
     blur: FeBlur;
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
   };
 
   /**
@@ -1179,6 +1196,134 @@ export namespace cg {
      * @default 4.0
      */
     radius: number;
+
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
+  };
+
+  /**
+   * Procedural Noise Effect
+   *
+   * Generates Perlin noise patterns with configurable grain size, density, and coloring.
+   * Supports three coloring modes: single-color (mono), dual-color (duo), and multi-color (multi).
+   *
+   * Uses fractal Perlin noise for natural-looking texture with configurable detail through octaves.
+   *
+   * @example
+   * ```typescript
+   * // Black film grain overlay
+   * const grain: FeNoise = {
+   *   type: "noise",
+   *   mode: "mono",
+   *   noiseSize: 0.3,
+   *   density: 0.8,
+   *   numOctaves: 6,
+   *   seed: 42,
+   *   color: { r: 0, g: 0, b: 0, a: 0.15 }
+   * };
+   *
+   * // Red noise pattern on white background
+   * const duo: FeNoise = {
+   *   type: "noise",
+   *   mode: "duo",
+   *   noiseSize: 2.0,
+   *   density: 0.5,
+   *   numOctaves: 3,
+   *   seed: 8539,
+   *   color1: { r: 255, g: 0, b: 0, a: 1 },
+   *   color2: { r: 255, g: 255, b: 255, a: 0.25 }
+   * };
+   *
+   * // Colorful noise with full opacity
+   * const multi: FeNoise = {
+   *   type: "noise",
+   *   mode: "multi",
+   *   noiseSize: 1.5,
+   *   density: 0.7,
+   *   numOctaves: 4,
+   *   seed: 1234,
+   *   opacity: 1.0
+   * };
+   * ```
+   */
+  export type FeNoise = {
+    type: "noise";
+    /**
+     * Noise coloring mode
+     * - `"mono"`: Single-color noise pattern
+     * - `"duo"`: Dual-color with background and pattern colors
+     * - `"multi"`: Multi-color noise (uses noise RGB directly)
+     */
+    mode: "mono" | "duo" | "multi";
+    /**
+     * Controls noise grain size (smaller = finer grains)
+     * Range: 0.001+
+     * Typical values: 0.3 for fine grain, 2.0 for coarse grain
+     * UI limit: 100
+     *
+     * @default 0.5
+     */
+    noiseSize: number;
+    /**
+     * Controls pattern visibility (0 = sparse, 1 = dense)
+     * Range: 0.0 - 1.0
+     *
+     * @default 0.5
+     */
+    density: number;
+    /**
+     * Number of fractal octaves for detail level
+     * Range: 1+
+     * More octaves = finer detail but more computation
+     * UI limit: 8
+     *
+     * @default 3
+     */
+    numOctaves?: number;
+    /**
+     * Random seed for reproducibility
+     * Different seeds produce different noise patterns
+     *
+     * @default 0
+     */
+    seed?: number;
+    /**
+     * Blend mode for compositing noise with fill
+     *
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode?: cg.BlendMode;
+    /**
+     * Color of noise pixels (mono mode only)
+     * Includes alpha for opacity control
+     */
+    color?: RGBA8888;
+    /**
+     * Pattern color (duo mode only)
+     * Applied where noise is visible
+     */
+    color1?: RGBA8888;
+    /**
+     * Background color (duo mode only)
+     * Base layer behind the noise pattern
+     */
+    color2?: RGBA8888;
+    /**
+     * Overall opacity (multi mode only)
+     * Range: 0.0 - 1.0
+     *
+     * @default 1.0
+     */
+    opacity?: number;
+
+    /**
+     * Whether this effect is active
+     * @default true
+     */
+    active?: boolean;
   };
 
   /**

@@ -241,9 +241,9 @@ export function useNodeActions(node_id: string | undefined) {
       //   changeNodeStyle(node_id, "margin", value),
       feShadows: (value?: cg.FeShadow[]) =>
         instance.commands.changeNodeFeShadows(node_id, value),
-      feBlur: (value?: cg.FeBlur) =>
+      feBlur: (value?: cg.FeLayerBlur) =>
         instance.commands.changeNodeFeBlur(node_id, value),
-      feBackdropBlur: (value?: cg.FeBlur) =>
+      feBackdropBlur: (value?: cg.FeBackdropBlur) =>
         instance.commands.changeNodeFeBackdropBlur(node_id, value),
 
       // layout

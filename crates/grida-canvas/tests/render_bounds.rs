@@ -47,9 +47,7 @@ fn gaussian_blur_expands_render_bounds() {
     let mut graph = SceneGraph::new();
 
     let mut rect = nf.create_rectangle_node();
-    rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeBlur::Gaussian(
-        FeGaussianBlur { radius: 5.0 },
-    ))]);
+    rect.effects = LayerEffects::new().blur(5.0f32);
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
@@ -82,6 +80,7 @@ fn drop_shadow_expands_render_bounds() {
         blur: 10.0,
         spread: 0.0,
         color: CGColor(0, 0, 0, 255),
+        active: true,
     })]);
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
@@ -116,6 +115,7 @@ fn drop_shadow_spread_expands_render_bounds() {
         blur: 0.0,
         spread: 10.0,
         color: CGColor(0, 0, 0, 255),
+        active: true,
     })]);
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
@@ -143,14 +143,13 @@ fn progressive_blur_expands_render_bounds_increasing() {
 
     let mut rect = nf.create_rectangle_node();
     // Progressive blur from 0 to 20 pixels (increasing)
-    rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeBlur::Progressive(
-        FeProgressiveBlur {
-            start: Alignment(0.0, -1.0), // Top edge
-            end: Alignment(0.0, 1.0),    // Bottom edge
-            radius: 0.0,                 // No blur at start
-            radius2: 20.0,               // Max blur at end
-        },
-    ))]);
+    let progressive = FeProgressiveBlur {
+        start: Alignment(0.0, -1.0), // Top edge
+        end: Alignment(0.0, 1.0),    // Bottom edge
+        radius: 0.0,                 // No blur at start
+        radius2: 20.0,               // Max blur at end
+    };
+    rect.effects = LayerEffects::new().blur(progressive);
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
@@ -179,14 +178,13 @@ fn progressive_blur_expands_render_bounds_decreasing() {
 
     let mut rect = nf.create_rectangle_node();
     // Progressive blur from 30 to 5 pixels (decreasing)
-    rect.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(FeBlur::Progressive(
-        FeProgressiveBlur {
-            start: Alignment(0.0, -1.0), // Top edge
-            end: Alignment(0.0, 1.0),    // Bottom edge
-            radius: 30.0,                // Max blur at start
-            radius2: 5.0,                // Min blur at end
-        },
-    ))]);
+    let progressive = FeProgressiveBlur {
+        start: Alignment(0.0, -1.0), // Top edge
+        end: Alignment(0.0, 1.0),    // Bottom edge
+        radius: 30.0,                // Max blur at start
+        radius2: 5.0,                // Min blur at end
+    };
+    rect.effects = LayerEffects::new().blur(progressive);
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
@@ -215,14 +213,13 @@ fn progressive_backdrop_blur_does_not_expand_render_bounds() {
 
     let mut rect = nf.create_rectangle_node();
     // Progressive backdrop blur - blurs content behind, not the shape itself
-    rect.effects = LayerEffects::from_array(vec![FilterEffect::BackdropBlur(FeBlur::Progressive(
-        FeProgressiveBlur {
-            start: Alignment(-1.0, -1.0), // Top-left corner
-            end: Alignment(1.0, 1.0),     // Bottom-right corner
-            radius: 10.0,
-            radius2: 40.0,
-        },
-    ))]);
+    let progressive = FeProgressiveBlur {
+        start: Alignment(-1.0, -1.0), // Top-left corner
+        end: Alignment(1.0, 1.0),     // Bottom-right corner
+        radius: 10.0,
+        radius2: 40.0,
+    };
+    rect.effects = LayerEffects::new().backdrop_blur(progressive);
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 

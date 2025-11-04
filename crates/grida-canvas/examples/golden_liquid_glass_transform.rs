@@ -9,7 +9,7 @@
  * - Row 3: -45° rotation + mixed, Asymmetric corners, Asymmetric corners
  */
 
-use cg::cg::types::FeLiquidGlass;
+use cg::cg::prelude::*;
 use cg::painter::effects;
 use skia_safe::{
     canvas::SaveLayerRec, surfaces, Color, Data, EncodedImageFormat, Font, FontMgr, Image, Paint,

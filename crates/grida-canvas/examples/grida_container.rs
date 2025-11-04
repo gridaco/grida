@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
@@ -23,6 +23,7 @@ async fn demo_clip() -> Scene {
         blur: 10.0,
         spread: 0.0,
         color: CGColor(0, 0, 0, 255),
+        active: true,
     })]);
     container.clip = true;
     container.stroke_width = 2.0.into();

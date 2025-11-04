@@ -13,16 +13,83 @@ pub use crate::node::id::{NodeId, NodeIdGenerator, UserNodeId};
 pub struct LayerEffects {
     /// single layer blur is supported per layer
     /// layer blur is applied after all other effects
-    pub blur: Option<FeBlur>,
+    pub blur: Option<FeLayerBlur>,
     /// single backdrop blur is supported per layer
-    pub backdrop_blur: Option<FeBlur>,
+    pub backdrop_blur: Option<FeBackdropBlur>,
     /// multiple shadows are supported per layer (drop shadow, inner shadow)
     pub shadows: Vec<FilterShadowEffect>,
     /// single liquid glass effect is supported per layer (only fully supported with rectangular shapes)
     pub glass: Option<FeLiquidGlass>,
+    /// multiple noise effects are supported per layer
+    pub noises: Vec<FeNoiseEffect>,
 }
 
 impl LayerEffects {
+    /// Create a new LayerEffects (alias for default)
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set layer blur effect
+    pub fn blur(mut self, blur: impl Into<FeBlur>) -> Self {
+        self.blur = Some(FeLayerBlur::from(blur.into()));
+        self
+    }
+
+    /// Set backdrop blur effect
+    pub fn backdrop_blur(mut self, blur: impl Into<FeBlur>) -> Self {
+        self.backdrop_blur = Some(FeBackdropBlur::from(blur.into()));
+        self
+    }
+
+    /// Add a drop shadow effect
+    pub fn drop_shadow(mut self, shadow: impl Into<FeShadow>) -> Self {
+        self.shadows
+            .push(FilterShadowEffect::DropShadow(shadow.into()));
+        self
+    }
+
+    /// Add multiple drop shadow effects
+    pub fn drop_shadows(mut self, shadows: Vec<FeShadow>) -> Self {
+        for shadow in shadows {
+            self.shadows.push(FilterShadowEffect::DropShadow(shadow));
+        }
+        self
+    }
+
+    /// Add an inner shadow effect
+    pub fn inner_shadow(mut self, shadow: impl Into<FeShadow>) -> Self {
+        self.shadows
+            .push(FilterShadowEffect::InnerShadow(shadow.into()));
+        self
+    }
+
+    /// Add multiple inner shadow effects
+    pub fn inner_shadows(mut self, shadows: Vec<FeShadow>) -> Self {
+        for shadow in shadows {
+            self.shadows.push(FilterShadowEffect::InnerShadow(shadow));
+        }
+        self
+    }
+
+    /// Add a noise effect
+    pub fn noise(mut self, noise: impl Into<FeNoiseEffect>) -> Self {
+        self.noises.push(noise.into());
+        self
+    }
+
+    /// Add multiple noise effects
+    pub fn noises(mut self, noises: Vec<FeNoiseEffect>) -> Self {
+        self.noises.extend(noises);
+        self
+    }
+
+    /// Set liquid glass effect
+    pub fn glass(mut self, glass: impl Into<FeLiquidGlass>) -> Self {
+        self.glass = Some(glass.into());
+        self
+    }
+
     /// Convert a list of filter effects into a layer effects object.
     /// if multiple effects that is not supported, the last effect will be used.
     pub fn from_array(effects: Vec<FilterEffect>) -> Self {
@@ -38,6 +105,7 @@ impl LayerEffects {
                 FilterEffect::InnerShadow(shadow) => layer_effects
                     .shadows
                     .push(FilterShadowEffect::InnerShadow(shadow)),
+                FilterEffect::Noise(noise) => layer_effects.noises.push(noise),
             }
         }
         layer_effects
@@ -65,6 +133,7 @@ impl Default for LayerEffects {
             backdrop_blur: None,
             shadows: vec![],
             glass: None,
+            noises: vec![],
         }
     }
 }

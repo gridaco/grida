@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
@@ -98,13 +98,15 @@ async fn demo_scene() -> Scene {
     }));
     rect_gradient.stroke_width = 3.0.into();
     rect_gradient.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
-    rect_gradient.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
+    rect_gradient.effects = LayerEffects::from_array(vec![FeShadow {
         dx: 5.0,
         dy: 5.0,
         blur: 10.0,
         spread: 0.0,
         color: CGColor(0, 0, 0, 100),
-    })]);
+        active: true,
+    }
+    .into()]);
 
     // Ellipse with radial gradient
     let mut ellipse_radial = nf.create_ellipse_node();
@@ -159,6 +161,7 @@ async fn demo_scene() -> Scene {
         blur: 8.0,
         spread: 0.0,
         color: CGColor(0, 0, 0, 150),
+        active: true,
     })]);
 
     // Star polygon

@@ -1,6 +1,7 @@
 mod painter;
 pub use painter::*;
 pub mod effects;
+pub mod effects_noise;
 pub mod geometry;
 pub mod gradient;
 pub mod image;

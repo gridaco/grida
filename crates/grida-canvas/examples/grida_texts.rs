@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
@@ -93,9 +93,7 @@ async fn demo_texts() -> Scene {
     blurry_text_node.text_align = TextAlign::Left;
     blurry_text_node.text_align_vertical = TextAlignVertical::Top;
     blurry_text_node.fills = Paints::new([Paint::from(CGColor(100, 100, 100, 255))]);
-    blurry_text_node.effects = LayerEffects::from_array(vec![FilterEffect::LayerBlur(
-        FeBlur::Gaussian(FeGaussianBlur { radius: 4.0 }),
-    )]);
+    blurry_text_node.effects = LayerEffects::new().blur(4.0f32);
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();

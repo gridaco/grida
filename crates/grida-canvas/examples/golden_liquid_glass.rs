@@ -7,7 +7,7 @@
  * seamlessly with both GPU and CPU backends without manual snapshots.
  */
 
-use cg::cg::types::FeLiquidGlass;
+use cg::cg::prelude::*;
 use cg::painter::effects;
 use skia_safe::{canvas::SaveLayerRec, surfaces, Data, EncodedImageFormat, Image, Paint, Rect};
 
@@ -34,6 +34,7 @@ fn main() {
         depth: 100.0,     // Glass thickness in pixels (minimum 1.0)
         dispersion: 1.0,  // Chromatic aberration strength
         blur_radius: 0.0, // No blur to see pure refraction effect
+        active: true,
     };
 
     // Create surface for final composition

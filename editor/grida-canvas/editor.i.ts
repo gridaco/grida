@@ -448,6 +448,14 @@ export namespace editor.config {
     radius: 4.0, // Renamed from radius, in pixels
   };
 
+  export const DEFAULT_FE_NOISE: Omit<cg.FeNoise, "type"> = {
+    mode: "mono",
+    noiseSize: 0.5,
+    density: 0.5,
+    color: { r: 0, g: 0, b: 0, a: 0.15 },
+    blendMode: "normal",
+  };
+
   export const DEFAULT_MAX_STROKE_WIDTH = 1000;
   export const DEFAULT_MAX_BLUR_RADIUS = 250;
   export const DEFAULT_MAX_SHADOW_OFFSET = 10000;
@@ -3038,11 +3046,9 @@ export namespace editor.api {
 
     changeNodeFilterEffects(node_id: NodeID, effects?: cg.FilterEffect[]): void;
     changeNodeFeShadows(node_id: NodeID, effect?: cg.FeShadow[]): void;
-    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeBlur): void;
-    changeNodeFeBackdropBlur(
-      node_id: NodeID,
-      effect?: cg.IFeGaussianBlur
-    ): void;
+    changeNodeFeBlur(node_id: NodeID, effect?: cg.FeLayerBlur): void;
+    changeNodeFeBackdropBlur(node_id: NodeID, effect?: cg.FeBackdropBlur): void;
+    changeNodeFeNoises(node_id: NodeID, effects?: cg.FeNoise[]): void;
 
     // ==============================================================
     // TextNode

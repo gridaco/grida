@@ -19,7 +19,7 @@
 //! - Text with colored shadow
 //! - Text with multiple shadows
 
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use skia_safe::{self as sk, surfaces, Color, Font, Paint as SkPaint, Point};
 
 thread_local! {
@@ -40,6 +40,7 @@ fn main() {
         blur: 4.0,
         spread: 0.0,
         color: CGColor(0, 0, 0, 255), // Black
+        active: true,
     };
     draw_text_with_shadow(canvas, "Hello Grida", 50.0, 100.0, &shadow1, Color::BLUE);
 
@@ -50,6 +51,7 @@ fn main() {
         blur: 6.0,
         spread: 0.0,
         color: CGColor(255, 100, 100, 255), // Red shadow
+        active: true,
     };
     draw_text_with_shadow(canvas, "Canvas Text", 50.0, 200.0, &shadow2, Color::GREEN);
 
@@ -60,6 +62,7 @@ fn main() {
         blur: 8.0,
         spread: 0.0,
         color: CGColor(0, 0, 0, 128), // Semi-transparent black
+        active: true,
     };
     draw_text_with_shadow(
         canvas,

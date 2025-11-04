@@ -115,7 +115,7 @@ impl<'a> VNPainter<'a> {
     /// and the base path used for rendering:
     /// - `Outside`: Uses the unioned path as the base
     /// - `Center` and `Inside`: Uses individual paths as the base
-    fn draw_stroke_regular(
+    pub fn draw_stroke_regular(
         &self,
         vn: &VectorNetwork,
         stroke_opts: &StrokeOptions,
@@ -159,7 +159,7 @@ impl<'a> VNPainter<'a> {
         }
     }
 
-    fn draw_variable_width_with_corner(
+    pub fn draw_variable_width_with_corner(
         &self,
         vn: &VectorNetwork,
         stroke_opts: &StrokeOptions,

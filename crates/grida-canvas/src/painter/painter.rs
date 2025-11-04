@@ -1,3 +1,4 @@
+use super::effects_noise;
 use super::geometry::*;
 use super::layer::{Layer, LayerList, PainterMaskGroup, PainterPictureLayer, PainterRenderCommand};
 use super::paint;
@@ -10,6 +11,7 @@ use crate::runtime::{font_repository::FontRepository, image_repository::ImageRep
 use crate::shape::*;
 use crate::sk;
 use crate::vectornetwork::vn_painter::StrokeOptions;
+use crate::vectornetwork::VectorNetwork;
 use math2::transform::AffineTransform;
 use skia_safe::{
     canvas::SaveLayerRec, path::AddPathMode, textlayout, Paint as SkPaint, Path, Point, Rect,
@@ -192,6 +194,46 @@ impl<'a> Painter<'a> {
     /// Draw an inner shadow clipped to the given shape.
     fn draw_inner_shadow(&self, shape: &PainterShape, shadow: &FeShadow) {
         shadow::draw_inner_shadow(self.canvas, shape, shadow);
+    }
+
+    /// Draw noise effects on top of fills.
+    ///
+    /// Noise effects only render when called after fills have been drawn.
+    /// They appear as textured overlays on filled regions, before strokes are applied.
+    ///
+    /// Supported for:
+    /// - Shape nodes (Rectangle, Ellipse, Polygon, Star, etc.)
+    /// - Vector network nodes
+    ///
+    /// # Note
+    ///
+    /// Text noise rendering would require special handling for glyph positioning.
+    fn draw_noise_effects(&self, shape: &PainterShape, noises: &[FeNoiseEffect]) {
+        for noise in noises {
+            effects_noise::render_noise_effect(noise, self.canvas, shape);
+        }
+    }
+
+    /// Draw strokes for a vector network using VNPainter.
+    ///
+    /// This is called after fills and noise effects have been applied.
+    fn draw_vector_strokes(
+        &self,
+        vn_painter: &crate::vectornetwork::vn_painter::VNPainter,
+        vn: &VectorNetwork,
+        stroke_opts: &StrokeOptions,
+        corner_radius: f32,
+    ) {
+        if let Some(var_width_profile) = &stroke_opts.width_profile {
+            vn_painter.draw_variable_width_with_corner(
+                vn,
+                stroke_opts,
+                var_width_profile,
+                corner_radius,
+            );
+        } else {
+            vn_painter.draw_stroke_regular(vn, stroke_opts, corner_radius);
+        }
     }
 
     /// Draw a text drop shadow using a paragraph as the source.
@@ -492,7 +534,10 @@ impl<'a> Painter<'a> {
     /// Effect ordering (as per specification):
     /// 1. Drop shadows (before everything)
     /// 2. Glass or Backdrop Blur (mutually exclusive - glass takes precedence if both present)
-    /// 3. Content (fills/strokes)
+    /// 3. Content:
+    ///    a. Fills
+    ///    b. Noise (only if fills are visible)
+    ///    c. Strokes
     /// 4. Inner shadows (after content)
     /// 5. Layer blur (wraps everything)
     pub fn draw_shape_with_effects<F: Fn()>(
@@ -514,7 +559,7 @@ impl<'a> Painter<'a> {
             if let Some(glass) = &effects.glass {
                 self.draw_glass_effect(shape, glass);
             } else if let Some(blur) = &effects.backdrop_blur {
-                self.draw_backdrop_blur(shape, blur);
+                self.draw_backdrop_blur(shape, &blur.blur);
             }
 
             // 3. Content (fills/strokes)
@@ -530,7 +575,7 @@ impl<'a> Painter<'a> {
 
         // 5. Layer blur (wraps everything)
         if let Some(layer_blur) = &effects.blur {
-            self.with_layer_blur(layer_blur, shape.rect, apply_effects);
+            self.with_layer_blur(&layer_blur.blur, shape.rect, apply_effects);
         } else {
             apply_effects();
         }
@@ -664,9 +709,19 @@ impl<'a> Painter<'a> {
                         let clip_path = &shape_layer.base.clip_path;
                         let draw_content = || {
                             self.with_opacity(shape_layer.base.opacity, || {
+                                // 1. Fills
                                 if shape.is_closed() {
                                     self.draw_fills(shape, &shape_layer.fills);
+
+                                    // 2. Noise (only if fills are visible)
+                                    if !shape_layer.fills.is_empty()
+                                        && !effect_ref.noises.is_empty()
+                                    {
+                                        self.draw_noise_effects(shape, &effect_ref.noises);
+                                    }
                                 }
+
+                                // 3. Strokes
                                 if let Some(path) = &shape_layer.stroke_path {
                                     self.draw_stroke_path(shape, path, &shape_layer.strokes);
                                 }
@@ -734,7 +789,7 @@ impl<'a> Painter<'a> {
 
                         let apply_effects = || {
                             if let Some(blur) = &effects.backdrop_blur {
-                                self.draw_text_backdrop_blur(&paragraph, blur, y_offset);
+                                self.draw_text_backdrop_blur(&paragraph, &blur.blur, y_offset);
                             }
 
                             for shadow in &effects.shadows {
@@ -756,7 +811,7 @@ impl<'a> Painter<'a> {
                             if let Some(layer_blur) = &effects.blur {
                                 let text_bounds =
                                     Rect::from_xywh(0.0, y_offset, layout_size.0, container_height);
-                                self.with_layer_blur(layer_blur, text_bounds, apply_effects);
+                                self.with_layer_blur(&layer_blur.blur, text_bounds, apply_effects);
                             } else {
                                 apply_effects();
                             }
@@ -788,9 +843,22 @@ impl<'a> Painter<'a> {
                                         self.images,
                                     );
 
-                                // Convert strokes to StrokeOptions for VNPainter
-                                let stroke_options = if !vector_layer.strokes.is_empty() {
-                                    Some(StrokeOptions {
+                                // 1. Render fills only (pass None for strokes)
+                                vn_painter.draw(
+                                    &vector_layer.vector,
+                                    &vector_layer.fills,
+                                    None,
+                                    vector_layer.corner_radius,
+                                );
+
+                                // 2. Apply noise effects (only if fills are visible)
+                                if !vector_layer.fills.is_empty() && !effect_ref.noises.is_empty() {
+                                    self.draw_noise_effects(shape, &effect_ref.noises);
+                                }
+
+                                // 3. Render strokes separately
+                                if !vector_layer.strokes.is_empty() {
+                                    let stroke_options = StrokeOptions {
                                         stroke_width: vector_layer.stroke_width,
                                         stroke_align: vector_layer.stroke_align,
                                         stroke_cap: vector_layer.stroke_cap,
@@ -799,17 +867,14 @@ impl<'a> Painter<'a> {
                                         paints: vector_layer.strokes.clone(),
                                         width_profile: vector_layer.stroke_width_profile.clone(),
                                         stroke_dash_array: vector_layer.stroke_dash_array.clone(),
-                                    })
-                                } else {
-                                    None
-                                };
-
-                                vn_painter.draw(
-                                    &vector_layer.vector,
-                                    &vector_layer.fills,
-                                    stroke_options.as_ref(),
-                                    vector_layer.corner_radius,
-                                );
+                                    };
+                                    self.draw_vector_strokes(
+                                        &vn_painter,
+                                        &vector_layer.vector,
+                                        &stroke_options,
+                                        vector_layer.corner_radius,
+                                    );
+                                }
                             });
                         };
                         if let Some(clip) = clip_path {

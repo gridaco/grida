@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;
@@ -41,6 +41,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                         blur: 4.0,
                         spread: 0.0,
                         color: CGColor(0, 0, 0, 128),
+                        active: true,
                     })])
                 } else {
                     LayerEffects::default()

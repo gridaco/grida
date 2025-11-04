@@ -23,7 +23,6 @@ import { PropertyLineLabelWithNumberGesture } from "../ui/label-with-number-gest
 import InputPropertyNumber from "../ui/number";
 import InputPropertyPercentage from "../ui/percentage";
 import {
-  BoxIcon,
   MinusIcon,
   ShadowOuterIcon,
   ShadowInnerIcon,
@@ -31,7 +30,15 @@ import {
 import { RGBAColorControl } from "./color";
 import { editor } from "@/grida-canvas";
 import { Button } from "@/components/ui-editor/button";
+import { Checkbox } from "@/components/ui-editor/checkbox";
 import { mergeDefinedProperties } from "./utils/merge";
+import {
+  FeNoiseIcon,
+  FeLayerBlurIcon,
+  FeBackdropBlurIcon,
+  FeGlassIcon,
+} from "./icons/fe-icons";
+import { BlendModeDropdown } from "./blend-mode";
 
 /**
  * Constraints for filter effect types that control which effect types can be selected.
@@ -68,13 +75,17 @@ export interface FeTypeConstraints {
   shadow?: boolean;
   /** Whether Liquid Glass can be selected. Set to `false` to disable. */
   glass?: boolean;
+  /** Whether Noise effects can be added. Set to `false` to disable. */
+  noise?: boolean;
 }
 
 function getIcon(fe: cg.FilterEffect) {
   switch (fe.type) {
-    case "filter-blur":
+    case "filter-blur": {
+      return FeLayerBlurIcon;
+    }
     case "backdrop-filter-blur": {
-      return BoxIcon;
+      return FeBackdropBlurIcon;
     }
     case "shadow": {
       if (fe.inset) {
@@ -83,7 +94,10 @@ function getIcon(fe: cg.FilterEffect) {
       return ShadowOuterIcon;
     }
     case "glass": {
-      return BoxIcon;
+      return FeGlassIcon;
+    }
+    case "noise": {
+      return FeNoiseIcon;
     }
   }
 }
@@ -120,6 +134,11 @@ function FeTypeSelect({
           value: "glass",
           disabled: constraints?.["glass"] === false,
         },
+        {
+          label: "Noise",
+          value: "noise",
+          disabled: constraints?.["noise"] === false,
+        },
       ]}
       value={value}
       onValueChange={(type) => {
@@ -134,6 +153,10 @@ function FeTypeSelect({
             break;
           }
           case "glass": {
+            onValueChange(type);
+            break;
+          }
+          case "noise": {
             onValueChange(type);
             break;
           }
@@ -155,11 +178,25 @@ export function FeControl({
   constraints?: FeTypeConstraints;
 }) {
   const Icon = getIcon(value);
+  const isActive = value.active ?? true;
+
+  const handleToggleActive = (checked: boolean) => {
+    onValueChange?.({ ...value, active: checked });
+  };
+
   return (
     <Popover modal={false}>
       <div className="flex items-center w-full gap-2">
-        <PopoverTrigger>
-          <Icon />
+        <Checkbox
+          checked={isActive}
+          onCheckedChange={(checked) => {
+            handleToggleActive(Boolean(checked));
+          }}
+        />
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <Icon />
+          </Button>
         </PopoverTrigger>
         <div className="flex items-center flex-1/2">
           <FeTypeSelect
@@ -169,6 +206,7 @@ export function FeControl({
                 case "shadow": {
                   onValueChange?.({
                     ...editor.config.DEFAULT_FE_SHADOW,
+                    active: true,
                     type,
                   });
                   break;
@@ -181,6 +219,7 @@ export function FeControl({
                       ...editor.config.DEFAULT_FE_GAUSSIAN_BLUR,
                     },
                     type,
+                    active: true,
                   });
                   break;
                 }
@@ -188,6 +227,15 @@ export function FeControl({
                   onValueChange?.({
                     ...editor.config.DEFAULT_FE_LIQUID_GLASS,
                     type,
+                    active: true,
+                  });
+                  break;
+                }
+                case "noise": {
+                  onValueChange?.({
+                    type: "noise",
+                    ...editor.config.DEFAULT_FE_NOISE,
+                    active: true,
                   });
                   break;
                 }
@@ -244,7 +292,10 @@ function FeProperties({
         <FeBlurProperties
           value={value.blur}
           onValueChange={(b) => {
-            onValueChange?.({ ...value, blur: b });
+            onValueChange?.({
+              ...value,
+              blur: b,
+            } as Omit<cg.FeLayerBlur | cg.FeBackdropBlur, "type">);
           }}
         />
       );
@@ -256,6 +307,9 @@ function FeProperties({
       return (
         <FeLiquidGlassProperties value={value} onValueChange={onValueChange} />
       );
+    }
+    case "noise": {
+      return <FeNoiseProperties value={value} onValueChange={onValueChange} />;
     }
   }
 }
@@ -626,6 +680,226 @@ function FeLiquidGlassProperties({
           }
         />
       </PropertyLine>
+    </div>
+  );
+}
+
+function FeNoiseProperties({
+  value,
+  onValueChange,
+}: {
+  value: cg.FeNoise;
+  onValueChange?: (value: Omit<cg.FeNoise, "type">) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <PropertyEnumTabs<cg.FeNoise["mode"]>
+          enum={[
+            { label: "Mono", value: "mono" },
+            { label: "Duo", value: "duo" },
+            { label: "Multi", value: "multi" },
+          ]}
+          value={value.mode}
+          onValueChange={(mode) => {
+            // When switching modes, provide appropriate default values
+            const base = {
+              noiseSize: value.noiseSize,
+              density: value.density,
+              blendMode: value.blendMode ?? "normal",
+              ...(value.numOctaves !== undefined && {
+                numOctaves: value.numOctaves,
+              }),
+              ...(value.seed !== undefined && { seed: value.seed }),
+            };
+
+            switch (mode) {
+              case "mono":
+                onValueChange?.({
+                  ...base,
+                  mode: "mono",
+                  color: value.color ?? { r: 0, g: 0, b: 0, a: 0.15 },
+                });
+                break;
+              case "duo":
+                onValueChange?.({
+                  ...base,
+                  mode: "duo",
+                  color1: value.color1 ?? { r: 255, g: 0, b: 0, a: 1 },
+                  color2: value.color2 ?? { r: 255, g: 255, b: 255, a: 0.25 },
+                });
+                break;
+              case "multi":
+                onValueChange?.({
+                  ...base,
+                  mode: "multi",
+                  opacity: value.opacity ?? 1.0,
+                });
+                break;
+            }
+          }}
+        />
+        <BlendModeDropdown
+          type="paint"
+          value={value.blendMode ?? "normal"}
+          onValueChange={(blendMode) => {
+            onValueChange?.({
+              ...value,
+              blendMode: blendMode as cg.BlendMode,
+            });
+          }}
+        />
+      </div>
+      <PropertyLine>
+        <PropertyLineLabelWithNumberGesture
+          step={0.1}
+          min={0.001}
+          max={100}
+          onValueChange={(c) =>
+            onValueChange?.({
+              ...value,
+              noiseSize: Math.max(
+                0.001,
+                Math.min(100, value.noiseSize + (c.value ?? 0))
+              ),
+            })
+          }
+        >
+          Noise Size
+        </PropertyLineLabelWithNumberGesture>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value.noiseSize}
+          min={0.001}
+          max={100}
+          step={0.1}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              noiseSize: v ?? 2.0,
+            })
+          }
+        />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabelWithNumberGesture
+          step={0.01}
+          min={0}
+          max={1}
+          onValueChange={(c) =>
+            onValueChange?.({
+              ...value,
+              density: Math.max(0, Math.min(1, value.density + (c.value ?? 0))),
+            })
+          }
+        >
+          Density
+        </PropertyLineLabelWithNumberGesture>
+        <InputPropertyPercentage
+          mode="fixed"
+          value={value.density}
+          min={0}
+          max={1}
+          step={0.01}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              density: v ?? 0.5,
+            })
+          }
+        />
+      </PropertyLine>
+      <PropertyLine>
+        <PropertyLineLabelWithNumberGesture
+          step={1}
+          min={1}
+          max={8}
+          onValueChange={(c) =>
+            onValueChange?.({
+              ...value,
+              numOctaves: Math.max(
+                1,
+                Math.min(8, (value.numOctaves ?? 3) + (c.value ?? 0))
+              ),
+            })
+          }
+        >
+          Octaves
+        </PropertyLineLabelWithNumberGesture>
+        <InputPropertyNumber
+          mode="fixed"
+          value={value.numOctaves ?? 3}
+          min={1}
+          max={8}
+          step={1}
+          onValueCommit={(v) =>
+            onValueChange?.({
+              ...value,
+              numOctaves: v ?? 3,
+            })
+          }
+        />
+      </PropertyLine>
+      {value.mode === "mono" && value.color && (
+        <PropertyLine>
+          <PropertyLineLabel>Color</PropertyLineLabel>
+          <RGBAColorControl
+            variant="with-opacity"
+            value={value.color}
+            onValueChange={(v) => onValueChange?.({ ...value, color: v })}
+          />
+        </PropertyLine>
+      )}
+      {value.mode === "duo" && (
+        <PropertyLine>
+          <PropertyLineLabel>Colors</PropertyLineLabel>
+          <div className="flex flex-col gap-2 w-full">
+            <RGBAColorControl
+              variant="with-opacity"
+              value={value.color1 ?? { r: 255, g: 0, b: 0, a: 1 }}
+              onValueChange={(v) => onValueChange?.({ ...value, color1: v })}
+            />
+            <RGBAColorControl
+              variant="with-opacity"
+              value={value.color2 ?? { r: 255, g: 255, b: 255, a: 0.25 }}
+              onValueChange={(v) => onValueChange?.({ ...value, color2: v })}
+            />
+          </div>
+        </PropertyLine>
+      )}
+      {value.mode === "multi" && (
+        <PropertyLine>
+          <PropertyLineLabelWithNumberGesture
+            step={0.01}
+            min={0}
+            max={1}
+            onValueChange={(c) =>
+              onValueChange?.({
+                ...value,
+                opacity: Math.max(
+                  0,
+                  Math.min(1, (value.opacity ?? 1) + (c.value ?? 0))
+                ),
+              })
+            }
+          >
+            Opacity
+          </PropertyLineLabelWithNumberGesture>
+          <InputPropertyPercentage
+            mode="fixed"
+            value={value.opacity ?? 1.0}
+            min={0}
+            max={1}
+            step={0.01}
+            onValueCommit={(v) =>
+              onValueChange?.({
+                ...value,
+                opacity: v ?? 1.0,
+              })
+            }
+          />
+        </PropertyLine>
+      )}
     </div>
   );
 }
