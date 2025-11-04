@@ -749,3 +749,4 @@ canvas.draw_path(&path, &paint);
 - [Image Filters](../feat-image-filters/index.md) - Color adjustments and filters
 - [Masks](../feat-masks/index.md) - Layer masking operations
 - [Vector Network](../feat-vector-network/index.md) - Vector path rendering
+- [Grainy Gradients (css tricks)](https://css-tricks.com/grainy-gradients/)
