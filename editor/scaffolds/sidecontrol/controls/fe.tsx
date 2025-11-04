@@ -844,6 +844,7 @@ function FeNoiseProperties({
         <PropertyLine>
           <PropertyLineLabel>Color</PropertyLineLabel>
           <RGBAColorControl
+            variant="with-opacity"
             value={value.color}
             onValueChange={(v) => onValueChange?.({ ...value, color: v })}
           />
@@ -854,10 +855,12 @@ function FeNoiseProperties({
           <PropertyLineLabel>Colors</PropertyLineLabel>
           <div className="flex flex-col gap-2 w-full">
             <RGBAColorControl
+              variant="with-opacity"
               value={value.color1 ?? { r: 255, g: 0, b: 0, a: 1 }}
               onValueChange={(v) => onValueChange?.({ ...value, color1: v })}
             />
             <RGBAColorControl
+              variant="with-opacity"
               value={value.color2 ?? { r: 255, g: 255, b: 255, a: 0.25 }}
               onValueChange={(v) => onValueChange?.({ ...value, color2: v })}
             />

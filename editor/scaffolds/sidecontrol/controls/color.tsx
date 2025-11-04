@@ -9,38 +9,91 @@ import {
 import { cn } from "@/components/lib/utils";
 import { ColorPicker } from "./color-picker";
 import HexValueInput from "./utils/hex";
+import { useNumberInput } from "@grida/number-input/react";
+import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
+import { Separator } from "@/components/ui/separator";
 
 type RGBA = { r: number; g: number; b: number; a: number };
 
 export type RGBAColorControlProps = {
   value: RGBA;
   onValueChange?: (value: RGBA) => void;
+  variant?: "default" | "with-opacity";
 };
+
+function InlineOpacityControl({
+  value,
+  onValueCommit,
+  onFocus,
+  onBlur,
+}: {
+  value?: number;
+  onValueCommit?: (value: number) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+}) {
+  const {
+    internalValue,
+    inputType,
+    handleFocus,
+    handleBlur,
+    handleKeyDown,
+    handleChange,
+    inputRef,
+  } = useNumberInput({
+    type: "number",
+    value,
+    step: 0.01,
+    autoSelect: true,
+    min: 0,
+    max: 1,
+    mode: "fixed",
+    onValueCommit,
+    commitOnBlur: true,
+    suffix: "%",
+    scale: 100,
+  });
+
+  return (
+    <input
+      ref={inputRef}
+      type={inputType}
+      placeholder="<opacity>"
+      value={internalValue}
+      onChange={handleChange}
+      onClick={(e) => {
+        // Prevent InputGroupAddon's onClick from focusing the hex input
+        e.stopPropagation();
+      }}
+      onFocus={(e) => {
+        handleFocus(e, onFocus);
+      }}
+      onBlur={(e) => {
+        handleBlur(e, onBlur);
+      }}
+      onKeyDown={handleKeyDown}
+      className="
+        w-12 appearance-none ps-1.5 text-xs
+        placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground
+        bg-transparent outline-none
+      "
+    />
+  );
+}
 
 export function RGBAColorControl({
   value = { r: 0, g: 0, b: 0, a: 0 },
   onValueChange,
   disabled,
+  variant = "default",
 }: {
   value?: RGBA;
   disabled?: boolean;
   onValueChange?: (value: RGBA) => void;
+  variant?: "default" | "with-opacity";
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = React.useState(false);
-
-  const handleContainerClick = React.useCallback(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const handleContainerPointerDown = React.useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) {
-        inputRef.current?.focus();
-      }
-    },
-    []
-  );
 
   const handleInputFocus = React.useCallback(() => {
     setIsFocused(true);
@@ -52,26 +105,24 @@ export function RGBAColorControl({
 
   return (
     <Popover modal={false}>
-      <div
+      <InputGroup
         className={cn(
-          "flex items-center border cursor-default",
           WorkbenchUI.inputVariants({
             size: "xs",
             variant: "paint-container",
           })
         )}
         data-focus={isFocused}
-        onClick={handleContainerClick}
-        onPointerDown={handleContainerPointerDown}
-        tabIndex={-1}
       >
-        <PopoverTrigger disabled={disabled} className="flex-shrink-0">
-          <RGBAChip rgba={value} className="rounded-sm" />
-        </PopoverTrigger>
+        <InputGroupAddon align="inline-start" className="px-1.5">
+          <PopoverTrigger disabled={disabled}>
+            <RGBAChip rgba={value} className="rounded-sm" />
+          </PopoverTrigger>
+        </InputGroupAddon>
 
         <HexValueInput
           ref={inputRef}
-          className="flex-1 ps-1.5"
+          className="flex-1 !px-0"
           disabled={disabled}
           value={{
             r: value.r,
@@ -87,7 +138,26 @@ export function RGBAColorControl({
             });
           }}
         />
-      </div>
+
+        {variant === "with-opacity" && (
+          <>
+            <Separator orientation="vertical" />
+            <InputGroupAddon align="inline-end">
+              <InlineOpacityControl
+                value={value.a}
+                onValueCommit={(opacity) => {
+                  onValueChange?.({
+                    ...value,
+                    a: opacity,
+                  });
+                }}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
+              />
+            </InputGroupAddon>
+          </>
+        )}
+      </InputGroup>
       <PopoverContent
         align="start"
         side="right"
