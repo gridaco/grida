@@ -52,7 +52,7 @@ pub fn render_noise_effect(effect: &NoiseEffect, canvas: &sk::Canvas, shape: &Pa
         NoiseEffectColors::Mono { color } => {
             // Apply solid color to noise texture: use noise_alpha for pattern shape, but color at full intensity
             let colored_noise = apply_solid_color_to_texture(&noise_alpha, *color);
-            let shader = shaders::blend(sk::BlendMode::DstIn, colored_noise, mask);
+            let shader = shaders::blend(sk::BlendMode::DstIn, mask, colored_noise);
             p.set_shader(shader);
             p.set_blend_mode(sk::BlendMode::SrcOver);
             p.set_anti_alias(true);
@@ -69,12 +69,12 @@ pub fn render_noise_effect(effect: &NoiseEffect, canvas: &sk::Canvas, shape: &Pa
 
             // Apply solid color to noise texture: use noise_alpha for pattern shape, but color at full intensity
             let colored_noise = apply_solid_color_to_texture(&noise_alpha, *pattern);
-            let shader = shaders::blend(sk::BlendMode::DstIn, colored_noise, mask);
+            let shader = shaders::blend(sk::BlendMode::DstIn, mask, colored_noise);
             p.set_shader(shader);
             canvas.draw_path(&path, &p);
         }
         NoiseEffectColors::Multi { opacity } => {
-            let shader = shaders::blend(sk::BlendMode::DstIn, noise, mask);
+            let shader = shaders::blend(sk::BlendMode::DstIn, mask, noise);
             p.set_shader(shader);
             let alpha = (opacity.clamp(0.0, 1.0) * 255.0) as u8;
             p.set_alpha(alpha);
@@ -92,7 +92,7 @@ fn apply_solid_color_to_texture(texture: &Shader, color: CGColor) -> Shader {
 
     // Use DstIn blend: keep color where texture has alpha, transparent elsewhere
     // This gives us solid color with the texture's pattern shape
-    shaders::blend(sk::BlendMode::DstIn, color_shader, (*texture).clone())
+    shaders::blend(sk::BlendMode::DstIn, (*texture).clone(), color_shader)
 }
 
 /// Create a color filter that converts luminance to alpha

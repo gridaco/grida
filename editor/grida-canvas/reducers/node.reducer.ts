@@ -628,7 +628,7 @@ const safe_properties: Partial<
         active: n.active ?? true,
         noiseSize: Math.max(0.001, n.noiseSize),
         density: cmath.clamp(n.density, 0, 1),
-        numOctaves: Math.max(1, n.numOctaves ?? 3),
+        numOctaves: Math.min(4, Math.max(1, n.numOctaves ?? 3)),
       }));
     },
   }),
