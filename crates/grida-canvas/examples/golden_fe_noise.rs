@@ -19,6 +19,7 @@ fn main() {
                     color: CGColor(0, 0, 0, 64), // 25% opacity black
                 },
                 active: true,
+                blend_mode: BlendMode::Normal,
             },
             "mono",
         ),
@@ -33,6 +34,7 @@ fn main() {
                     color2: CGColor(255, 255, 255, 64), // 25% opacity white base
                 },
                 active: true,
+                blend_mode: BlendMode::Normal,
             },
             "duo",
         ),
@@ -44,6 +46,7 @@ fn main() {
                 seed: 8539.0,
                 coloring: NoiseEffectColors::Multi { opacity: 1.0 },
                 active: true,
+                blend_mode: BlendMode::Normal,
             },
             "multi",
         ),

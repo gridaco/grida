@@ -558,4 +558,6 @@ pub struct NoiseEffect {
     pub coloring: NoiseEffectColors,
     /// Whether this effect is active
     pub active: bool,
+    /// Blend mode for compositing the noise effect with fills
+    pub blend_mode: BlendMode,
 }

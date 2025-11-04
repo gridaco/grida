@@ -428,6 +428,8 @@ pub struct JSONFeNoise {
     pub coloring: JSONFeNoiseColors,
     #[serde(default = "default_true")]
     pub active: bool,
+    #[serde(rename = "blendMode", default)]
+    pub blend_mode: BlendMode,
 }
 
 fn default_num_octaves() -> i32 {
@@ -458,6 +460,7 @@ impl From<JSONFeNoise> for NoiseEffect {
             seed: json.seed,
             coloring: json.coloring.into(),
             active: json.active,
+            blend_mode: json.blend_mode,
         }
     }
 }

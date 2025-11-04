@@ -75,6 +75,7 @@ fn main() {
             color: CGColor(0, 0, 0, 100),
         },
         active: true,
+        blend_mode: BlendMode::Normal,
     });
 
     graph.append_children(

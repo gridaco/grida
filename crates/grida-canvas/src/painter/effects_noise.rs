@@ -6,10 +6,23 @@ use skia_safe::{self as sk, shaders, ColorMatrix, ISize, Paint, Shader};
 ///
 /// # Pipeline
 ///
-/// 1. Generate fractal Perlin noise at computed frequency
-/// 2. Convert to alpha mask via luminance-to-alpha
-/// 3. Apply density-based LUT cutoff
-/// 4. Apply type-specific coloring and render to shape path
+/// ## Mono & Duo
+/// 1. Generate fractal Perlin noise (`feTurbulence`)
+/// 2. Convert RGB to alpha via luminance (`feColorMatrix type="luminanceToAlpha"`)
+/// 3. Apply density threshold to alpha (`feComponentTransfer`)
+/// 4. Clip to shape and apply solid color (`feComposite`, `feFlood`)
+/// 5. Merge with fill using blend mode (`feMerge`)
+///
+/// ## Multi (Different approach)
+/// 1. Generate fractal Perlin noise (`feTurbulence`)
+/// 2. Apply RGB contrast enhancement: `output = 2*input - 0.5` (`feComponentTransfer`)
+/// 3. Apply density threshold to alpha only (`feComponentTransfer`)
+/// 4. Merge with fill using blend mode (`feMerge`)
+///
+/// # SVG Filter Compatibility
+///
+/// Implements noise effects following SVG filter semantics.
+/// Multi noise uses contrast-enhanced RGB (not luminance-to-alpha).
 ///
 /// # Requirements
 ///
@@ -33,66 +46,116 @@ pub fn render_noise_effect(effect: &NoiseEffect, canvas: &sk::Canvas, shape: &Pa
     )
     .expect("fractal_perlin_noise failed");
 
-    // === Universal pattern generation ===
-    // Convert noise to alpha mask with density-based LUT cutoff
-    let noise_alpha = noise.with_color_filter(luminance_to_alpha_cf());
-    // Density controls threshold: higher density = lower threshold = more noise visible
-    let threshold = ((1.0 - effect.density.clamp(0.0, 1.0)) * 255.0).round() as usize;
-    let a_lut = lut_threshold(threshold);
-    let ident: [u8; 256] = identity_lut();
-    let alpha_cf =
-        sk::color_filters::table_argb(&a_lut, &ident, &ident, &ident).expect("table_argb failed");
-    let mask = noise_alpha.with_color_filter(alpha_cf);
-
     // === Type-specific coloring & rendering ===
+    // Apply blend mode directly to paint, matching SVG feMerge behavior
+    let blend_mode: sk::BlendMode = effect.blend_mode.into();
     let mut p = Paint::default();
     let path = shape.to_path();
 
     match &effect.coloring {
         NoiseEffectColors::Mono { color } => {
-            // Apply solid color to noise texture: use noise_alpha for pattern shape, but color at full intensity
-            let colored_noise = apply_solid_color_to_texture(&noise_alpha, *color);
-            let shader = shaders::blend(sk::BlendMode::DstIn, mask, colored_noise);
+            // SVG filter pipeline for Mono:
+            // 1. feColorMatrix type="luminanceToAlpha" - convert noise RGB to alpha
+            // 2. feComponentTransfer - apply density threshold to alpha
+            // 3. feFlood - create solid color
+            // 4. feComposite operator="in" - mask solid color with thresholded alpha
+
+            let noise_alpha = noise.with_color_filter(luminance_to_alpha_cf());
+
+            // Density controls threshold: higher density = lower threshold = more noise visible
+            let threshold = ((1.0 - effect.density.clamp(0.0, 1.0)) * 255.0).round() as usize;
+            let a_lut = lut_threshold(threshold);
+            let ident: [u8; 256] = identity_lut();
+            let alpha_cf = sk::color_filters::table_argb(&a_lut, &ident, &ident, &ident)
+                .expect("table_argb failed");
+            let thresholded_alpha = noise_alpha.with_color_filter(alpha_cf);
+
+            // Create solid color shader and mask it with thresholded alpha
+            let color_sk: sk::Color = (*color).into();
+            let solid_color = shaders::color(color_sk);
+            let shader = shaders::blend(sk::BlendMode::DstIn, solid_color, thresholded_alpha);
+
             p.set_shader(shader);
-            p.set_blend_mode(sk::BlendMode::SrcOver);
+            p.set_blend_mode(blend_mode);
             p.set_anti_alias(true);
             canvas.draw_path(&path, &p);
         }
-        NoiseEffectColors::Duo {
-            color1: pattern,
-            color2: background,
-        } => {
-            // Draw color2 base layer
-            let bg_color: sk::Color = (*background).into();
-            p.set_color(bg_color);
+        NoiseEffectColors::Duo { color1, color2 } => {
+            // SVG filter pipeline for Duo (USES TWO DISTINCT NON-OVERLAPPING PATTERNS):
+            // 1. feColorMatrix type="luminanceToAlpha" - convert noise RGB to alpha
+            // 2. feComponentTransfer - split into two SEPARATED patterns:
+            //    - coloredNoise1: lower alpha range (density-based)
+            //    - coloredNoise2: upper alpha range (density-based)
+            //    - Background shows through where neither pattern is active
+            // 3. feFlood - create solid colors
+            // 4. feComposite operator="in" - mask each solid color with its pattern range
+            //
+            // Universal formula: Patterns are centered around midpoint (127.5)
+            // Each pattern width = density × 127.5
+            // At low density: patterns separated with gaps (background shows)
+            // At high density: patterns nearly meet (minimal background)
+
+            let noise_alpha = noise.with_color_filter(luminance_to_alpha_cf());
+            let ident: [u8; 256] = identity_lut();
+
+            // Pattern 1: Lower alpha range [(1-d)/2 × 255, 127]
+            let a_lut1 = lut_duo_pattern1(effect.density);
+            let alpha_cf1 = sk::color_filters::table_argb(&a_lut1, &ident, &ident, &ident)
+                .expect("table_argb failed");
+            let thresholded_alpha1 = noise_alpha.with_color_filter(alpha_cf1);
+
+            // Pattern 2: Upper alpha range [128, 127.5 + d/2 × 255]
+            let a_lut2 = lut_duo_pattern2(effect.density);
+            let alpha_cf2 = sk::color_filters::table_argb(&a_lut2, &ident, &ident, &ident)
+                .expect("table_argb failed");
+            let thresholded_alpha2 = noise_alpha.with_color_filter(alpha_cf2);
+
+            // Draw color1 pattern (lower alpha range)
+            let color1_sk: sk::Color = (*color1).into();
+            let solid_color1 = shaders::color(color1_sk);
+            let shader1 = shaders::blend(sk::BlendMode::DstIn, solid_color1, thresholded_alpha1);
+            p.set_shader(shader1);
+            p.set_blend_mode(blend_mode);
+            p.set_anti_alias(true);
             canvas.draw_path(&path, &p);
 
-            // Apply solid color to noise texture: use noise_alpha for pattern shape, but color at full intensity
-            let colored_noise = apply_solid_color_to_texture(&noise_alpha, *pattern);
-            let shader = shaders::blend(sk::BlendMode::DstIn, mask, colored_noise);
-            p.set_shader(shader);
+            // Draw color2 pattern (upper alpha range) on top
+            let color2_sk: sk::Color = (*color2).into();
+            let solid_color2 = shaders::color(color2_sk);
+            let shader2 = shaders::blend(sk::BlendMode::DstIn, solid_color2, thresholded_alpha2);
+            p.set_shader(shader2);
+            p.set_blend_mode(blend_mode);
+            p.set_anti_alias(true);
             canvas.draw_path(&path, &p);
         }
         NoiseEffectColors::Multi { opacity } => {
-            let shader = shaders::blend(sk::BlendMode::DstIn, mask, noise);
-            p.set_shader(shader);
+            // SVG filter pipeline for Multi:
+            // feComponentTransfer applies SIMULTANEOUSLY to all channels:
+            // - RGB: contrast boost (slope=2, intercept=-0.5) using linear transfer
+            // - A: density threshold using discrete tableValues
+            //
+            // Implementation: Apply contrast enhancement first, then threshold alpha
+
+            // Apply contrast enhancement to RGB channels (keeps alpha)
+            let enhanced_noise = noise.with_color_filter(multi_contrast_cf());
+
+            // Apply density threshold to alpha channel only (keeps enhanced RGB)
+            let threshold = ((1.0 - effect.density.clamp(0.0, 1.0)) * 255.0).round() as usize;
+            let a_lut = lut_threshold(threshold);
+            let ident: [u8; 256] = identity_lut();
+            // table_argb(a, r, g, b) - threshold alpha, pass through RGB
+            let alpha_cf = sk::color_filters::table_argb(&a_lut, &ident, &ident, &ident)
+                .expect("table_argb failed");
+            let final_noise = enhanced_noise.with_color_filter(alpha_cf);
+
+            p.set_shader(final_noise);
             let alpha = (opacity.clamp(0.0, 1.0) * 255.0) as u8;
             p.set_alpha(alpha);
+            p.set_blend_mode(blend_mode);
+            p.set_anti_alias(true);
             canvas.draw_path(&path, &p);
         }
     }
-}
-
-/// Helper: Apply solid color to a texture mask
-/// Uses the texture's alpha for pattern shape, but applies color at full intensity
-fn apply_solid_color_to_texture(texture: &Shader, color: CGColor) -> Shader {
-    // Create a solid color shader
-    let color_sk: sk::Color = color.into();
-    let color_shader = shaders::color(color_sk);
-
-    // Use DstIn blend: keep color where texture has alpha, transparent elsewhere
-    // This gives us solid color with the texture's pattern shape
-    shaders::blend(sk::BlendMode::DstIn, (*texture).clone(), color_shader)
 }
 
 /// Create a color filter that converts luminance to alpha
@@ -108,6 +171,30 @@ fn luminance_to_alpha_cf() -> sk::ColorFilter {
         0.0, 0.0, 0.0, 0.0, 0.0,           // G' = 0
         0.0, 0.0, 0.0, 0.0, 0.0,           // B' = 0
         0.2126, 0.7152, 0.0722, 0.0, 0.0, // A' = luminance
+    );
+    sk::color_filters::matrix(&m, None)
+}
+
+/// Create a color filter that applies contrast enhancement for Multi noise
+///
+/// Equivalent to SVG `<feComponentTransfer>` with linear functions:
+/// - `<feFuncR type="linear" slope="2" intercept="-0.5" />`
+/// - `<feFuncG type="linear" slope="2" intercept="-0.5" />`
+/// - `<feFuncB type="linear" slope="2" intercept="-0.5" />`
+///
+/// Formula: output = 2 * input - 0.5 (in normalized 0-1 range)
+/// This increases contrast and makes colors more vibrant.
+fn multi_contrast_cf() -> sk::ColorFilter {
+    // 4x5 color matrix, row-major (R', G', B', A').
+    // ColorMatrix values are normalized (0-1 range), not 0-255!
+    // Apply contrast boost to RGB, keep alpha unchanged
+    // Formula: output = slope * input + intercept
+    #[rustfmt::skip]
+    let m = ColorMatrix::new(
+        2.0, 0.0, 0.0, 0.0, -0.5,  // R' = 2*R - 0.5
+        0.0, 2.0, 0.0, 0.0, -0.5,  // G' = 2*G - 0.5
+        0.0, 0.0, 2.0, 0.0, -0.5,  // B' = 2*B - 0.5
+        0.0, 0.0, 0.0, 1.0, 0.0,   // A' = A (unchanged)
     );
     sk::color_filters::matrix(&m, None)
 }
@@ -132,4 +219,48 @@ fn lut_threshold(threshold: usize) -> [u8; 256] {
         t[i] = if i >= threshold { 255 } else { 0 };
     }
     t
+}
+
+/// Generate LUT for Duo pattern 1 (lower alpha range)
+///
+/// Universal density-based formula that creates distinct non-overlapping patterns.
+/// Pattern 1 occupies the lower portion of the alpha range, centered around midpoint.
+///
+/// Formula: Pattern covers [(1-density)/2 × 255, 127]
+///
+/// At density=0.4: indices 5-127 (pattern visible, rest is background)
+/// At density=0.8: indices 25-127 (denser pattern)
+/// At density=1.0: indices 0-127 (full coverage)
+fn lut_duo_pattern1(density: f32) -> [u8; 256] {
+    let d = density.clamp(0.0, 1.0);
+    let start = ((1.0 - d) / 2.0 * 255.0).round() as usize;
+    let end = 127; // midpoint
+
+    let mut lut = [0u8; 256];
+    for i in start..=end {
+        lut[i] = 255;
+    }
+    lut
+}
+
+/// Generate LUT for Duo pattern 2 (upper alpha range)
+///
+/// Universal density-based formula that creates distinct non-overlapping patterns.
+/// Pattern 2 occupies the upper portion of the alpha range, centered around midpoint.
+///
+/// Formula: Pattern covers [128, 127.5 + density/2 × 255]
+///
+/// At density=0.4: indices 128-178 (pattern visible, rest is background)
+/// At density=0.8: indices 128-229 (denser pattern)
+/// At density=1.0: indices 128-255 (full coverage)
+fn lut_duo_pattern2(density: f32) -> [u8; 256] {
+    let d = density.clamp(0.0, 1.0);
+    let start = 128; // midpoint + 1
+    let end = (127.5 + d / 2.0 * 255.0).round() as usize;
+
+    let mut lut = [0u8; 256];
+    for i in start..=end.min(255) {
+        lut[i] = 255;
+    }
+    lut
 }
