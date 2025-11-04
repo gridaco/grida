@@ -38,6 +38,7 @@ import {
   FeBackdropBlurIcon,
   FeGlassIcon,
 } from "./icons/fe-icons";
+import { BlendModeDropdown } from "./blend-mode";
 
 /**
  * Constraints for filter effect types that control which effect types can be selected.
@@ -233,10 +234,7 @@ export function FeControl({
                 case "noise": {
                   onValueChange?.({
                     type: "noise",
-                    mode: "mono",
-                    noiseSize: 2.0,
-                    density: 0.5,
-                    color: { r: 0, g: 0, b: 0, a: 0.15 },
+                    ...editor.config.DEFAULT_FE_NOISE,
                     active: true,
                   });
                   break;
@@ -695,8 +693,7 @@ function FeNoiseProperties({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <PropertyLine>
-        <PropertyLineLabel>Mode</PropertyLineLabel>
+      <div className="flex items-center justify-between">
         <PropertyEnumTabs<cg.FeNoise["mode"]>
           enum={[
             { label: "Mono", value: "mono" },
@@ -709,6 +706,7 @@ function FeNoiseProperties({
             const base = {
               noiseSize: value.noiseSize,
               density: value.density,
+              blendMode: value.blendMode ?? "normal",
               ...(value.numOctaves !== undefined && {
                 numOctaves: value.numOctaves,
               }),
@@ -741,7 +739,17 @@ function FeNoiseProperties({
             }
           }}
         />
-      </PropertyLine>
+        <BlendModeDropdown
+          type="paint"
+          value={value.blendMode ?? "normal"}
+          onValueChange={(blendMode) => {
+            onValueChange?.({
+              ...value,
+              blendMode: blendMode as cg.BlendMode,
+            });
+          }}
+        />
+      </div>
       <PropertyLine>
         <PropertyLineLabelWithNumberGesture
           step={0.1}
@@ -842,22 +850,19 @@ function FeNoiseProperties({
         </PropertyLine>
       )}
       {value.mode === "duo" && (
-        <>
-          <PropertyLine>
-            <PropertyLineLabel>Pattern Color</PropertyLineLabel>
+        <PropertyLine>
+          <PropertyLineLabel>Colors</PropertyLineLabel>
+          <div className="flex flex-col gap-2 w-full">
             <RGBAColorControl
               value={value.color1 ?? { r: 255, g: 0, b: 0, a: 1 }}
               onValueChange={(v) => onValueChange?.({ ...value, color1: v })}
             />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Background Color</PropertyLineLabel>
             <RGBAColorControl
               value={value.color2 ?? { r: 255, g: 255, b: 255, a: 0.25 }}
               onValueChange={(v) => onValueChange?.({ ...value, color2: v })}
             />
-          </PropertyLine>
-        </>
+          </div>
+        </PropertyLine>
       )}
       {value.mode === "multi" && (
         <PropertyLine>

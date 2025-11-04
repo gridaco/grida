@@ -1264,7 +1264,7 @@ export namespace cg {
      * Typical values: 0.3 for fine grain, 2.0 for coarse grain
      * UI limit: 100
      *
-     * @default 2.0
+     * @default 0.5
      */
     noiseSize: number;
     /**
@@ -1290,6 +1290,12 @@ export namespace cg {
      * @default 0
      */
     seed?: number;
+    /**
+     * Blend mode for compositing noise with fill
+     *
+     * @default "normal" {@link cg.def.BLENDMODE}
+     */
+    blendMode?: cg.BlendMode;
     /**
      * Color of noise pixels (mono mode only)
      * Includes alpha for opacity control
