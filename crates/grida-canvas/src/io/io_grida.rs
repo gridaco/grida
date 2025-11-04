@@ -451,9 +451,9 @@ impl From<JSONFeNoiseColors> for NoiseEffectColors {
     }
 }
 
-impl From<JSONFeNoise> for NoiseEffect {
+impl From<JSONFeNoise> for FeNoiseEffect {
     fn from(json: JSONFeNoise) -> Self {
-        NoiseEffect {
+        FeNoiseEffect {
             noise_size: json.noise_size,
             density: json.density,
             num_octaves: json.num_octaves,

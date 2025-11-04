@@ -23,7 +23,7 @@ pub enum FilterEffect {
     BackdropBlur(FeBackdropBlur),
 
     /// Noise effect
-    Noise(NoiseEffect),
+    Noise(FeNoiseEffect),
 
     /// Liquid glass effect
     LiquidGlass(FeLiquidGlass),
@@ -442,9 +442,9 @@ impl From<FeShadow> for FilterEffect {
     }
 }
 
-/// Wrap NoiseEffect in FilterEffect
-impl From<NoiseEffect> for FilterEffect {
-    fn from(noise: NoiseEffect) -> Self {
+/// Wrap FeNoiseEffect in FilterEffect
+impl From<FeNoiseEffect> for FilterEffect {
+    fn from(noise: FeNoiseEffect) -> Self {
         FilterEffect::Noise(noise)
     }
 }
@@ -545,7 +545,7 @@ pub enum NoiseEffectColors {
 /// - Density control: `<feComponentTransfer>` with table values
 /// - Color application: `<feFlood>` + `<feComposite operator="in">`
 #[derive(Debug, Clone, Copy)]
-pub struct NoiseEffect {
+pub struct FeNoiseEffect {
     /// Controls noise grain size (lower = finer grains)
     pub noise_size: f32,
     /// Controls pattern visibility via LUT cutoff (0..1)

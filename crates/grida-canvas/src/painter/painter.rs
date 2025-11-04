@@ -208,7 +208,7 @@ impl<'a> Painter<'a> {
     /// # Note
     ///
     /// Text noise rendering would require special handling for glyph positioning.
-    fn draw_noise_effects(&self, shape: &PainterShape, noises: &[NoiseEffect]) {
+    fn draw_noise_effects(&self, shape: &PainterShape, noises: &[FeNoiseEffect]) {
         for noise in noises {
             effects_noise::render_noise_effect(noise, self.canvas, shape);
         }

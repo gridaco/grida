@@ -225,7 +225,7 @@ impl LayerList {
         )
     }
 
-    fn filter_active_noises(noises: &[NoiseEffect]) -> Vec<NoiseEffect> {
+    fn filter_active_noises(noises: &[FeNoiseEffect]) -> Vec<FeNoiseEffect> {
         noises.iter().filter(|n| n.active).cloned().collect()
     }
 

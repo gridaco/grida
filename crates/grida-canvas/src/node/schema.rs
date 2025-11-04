@@ -21,7 +21,7 @@ pub struct LayerEffects {
     /// single liquid glass effect is supported per layer (only fully supported with rectangular shapes)
     pub glass: Option<FeLiquidGlass>,
     /// multiple noise effects are supported per layer
-    pub noises: Vec<NoiseEffect>,
+    pub noises: Vec<FeNoiseEffect>,
 }
 
 impl LayerEffects {
@@ -73,13 +73,13 @@ impl LayerEffects {
     }
 
     /// Add a noise effect
-    pub fn noise(mut self, noise: impl Into<NoiseEffect>) -> Self {
+    pub fn noise(mut self, noise: impl Into<FeNoiseEffect>) -> Self {
         self.noises.push(noise.into());
         self
     }
 
     /// Add multiple noise effects
-    pub fn noises(mut self, noises: Vec<NoiseEffect>) -> Self {
+    pub fn noises(mut self, noises: Vec<FeNoiseEffect>) -> Self {
         self.noises.extend(noises);
         self
     }

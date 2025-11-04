@@ -28,7 +28,7 @@ use skia_safe::{self as sk, shaders, ColorMatrix, ISize, Paint, Shader};
 ///
 /// Noise effects render on both shape and vector nodes when fills are visible.
 /// This function should be called after fills but before strokes.
-pub fn render_noise_effect(effect: &NoiseEffect, canvas: &sk::Canvas, shape: &PainterShape) {
+pub fn render_noise_effect(effect: &FeNoiseEffect, canvas: &sk::Canvas, shape: &PainterShape) {
     // Map UX "noise_size" to SVG-ish baseFrequency.
     let size = effect.noise_size.max(0.001);
     let base_fx = (1.0 / (size * 8.0)).clamp(0.005, 2.0);

@@ -66,7 +66,7 @@ fn main() {
     })]);
 
     // Apply fine film grain with small size and high density
-    rect_grain.effects.noises.push(NoiseEffect {
+    rect_grain.effects.noises.push(FeNoiseEffect {
         noise_size: 2.0, // Very small grain size for fine texture
         density: 1.0,    // High density for prominent grain
         num_octaves: 6,  // Many octaves for detailed texture

@@ -10,7 +10,7 @@ fn main() {
 
     let effects = vec![
         (
-            NoiseEffect {
+            FeNoiseEffect {
                 noise_size: 2.0,
                 density: 0.5,
                 num_octaves: 3,
@@ -24,7 +24,7 @@ fn main() {
             "mono",
         ),
         (
-            NoiseEffect {
+            FeNoiseEffect {
                 noise_size: 2.0,
                 density: 0.5,
                 num_octaves: 3,
@@ -39,7 +39,7 @@ fn main() {
             "duo",
         ),
         (
-            NoiseEffect {
+            FeNoiseEffect {
                 noise_size: 2.0,
                 density: 0.5,
                 num_octaves: 3,
