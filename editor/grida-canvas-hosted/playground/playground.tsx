@@ -133,6 +133,7 @@ import { CursorChat } from "@/components/multiplayer/cursor-chat";
 import { distro } from "../distro";
 import { WithSize } from "@/grida-canvas-react/viewport/size";
 import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
+import { CommandPalette } from "./command-palette";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -477,6 +478,7 @@ function Consumer({
       </PreviewProvider>
 
       {ui.help_fab && <HelpFab />}
+      <CommandPalette />
     </>
   );
 }
