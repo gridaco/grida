@@ -10,6 +10,7 @@ import {
   snapObjectsTranslation,
   threshold,
 } from "../tools/snap";
+import { snapObjectsResize } from "../tools/snap-resize";
 import updateNodeTransform from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
@@ -516,44 +517,59 @@ function __self_update_gesture_transform_scale(
           cmath.compass.invertDirection(direction)
         );
 
-  /**
   // #region [snap]
-  const snap_target_node_ids = getSnapTargets(selection, draft);
-       
-  const snap_target_node_rects = snap_target_node_ids
-    .map((node_id: string) => {
-      const r = domapi.get_node_bounding_rect(node_id);
-      if (!r) reportError(`Node ${node_id} does not have a bounding rect`);
-      return r!;
-    })
-    .filter(Boolean);
-    
-  // the actual handle position
-  const anchorpos = cmath.rect.getCardinalPoint(
-    initial_bounding_rectangle,
-    direction
-  );
+  const should_snap =
+    draft.gesture_modifiers.translate_with_force_disable_snap !== "on";
 
-  const { movement: snappedMovement, snapping } = snapMovement(
-    anchorpos,
-    snap_target_node_rects
-      .map((r) => {
-        const _9 = cmath.rect.to9Points(r);
-        return Object.keys(_9).map((k) => _9[k as keyof typeof _9]);
+  let adjusted_raw_movement = rawMovement;
+
+  if (should_snap) {
+    const snap_target_node_ids = getSnapTargets(selection, {
+      document_ctx: draft.document_ctx,
+      document: draft.document,
+    });
+
+    const snap_target_node_rects = snap_target_node_ids
+      .map((node_id: string) => {
+        const r = context.geometry.getNodeAbsoluteBoundingRect(node_id);
+        if (!r) {
+          reportError(`Node ${node_id} does not have a bounding rect`);
+        }
+        return r;
       })
-      .flat(),
-    rawMovement,
-    SNAP
-  );
+      .filter((r): r is cmath.Rectangle => r !== null && r !== undefined);
 
-  draft.surface_snapping = snapping;
+    const { adjusted_movement, snapping } = snapObjectsResize(
+      initial_rects,
+      {
+        objects: snap_target_node_rects,
+        guides: draft.ruler === "on" ? scene.guides : undefined,
+      },
+      direction,
+      origin,
+      rawMovement,
+      threshold(
+        editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+        draft.transform
+      ),
+      {
+        enabled: should_snap,
+        preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
+        centerOrigin: transform_with_center_origin === "on",
+      }
+    );
+
+    adjusted_raw_movement = adjusted_movement;
+    draft.surface_snapping = snapping;
+  } else {
+    draft.surface_snapping = undefined;
+  }
   // #endregion
-   */
 
   // inverse the delta based on handle
   const movement = cmath.vector2.multiply(
     cmath.compass.cardinal_direction_vector[direction],
-    rawMovement,
+    adjusted_raw_movement,
     transform_with_center_origin === "on" ? [2, 2] : [1, 1]
   );
 
