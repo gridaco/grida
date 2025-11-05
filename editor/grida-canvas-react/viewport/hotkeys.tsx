@@ -378,6 +378,8 @@ export function useEditorHotKeys() {
       editor.surface.surfaceConfigureTransformWithPreserveAspectRatioModifier(
         "off"
       );
+      editor.surface.surfaceConfigureTranslateWithForceDisableSnap("off");
+      editor.surface.surfaceConfigureScaleWithForceDisableSnap("off");
       editor.surface.surfaceConfigureRotateWithQuantizeModifier("off");
       editor.surface.surfaceConfigurePaddingWithMirroringModifier("off");
       setAltKey(false);
@@ -415,6 +417,7 @@ export function useEditorHotKeys() {
             target: "deepest",
           });
           editor.surface.surfaceConfigureTranslateWithForceDisableSnap("on");
+          editor.surface.surfaceConfigureScaleWithForceDisableSnap("on");
           break;
         case "Alt":
           editor.surface.surfaceConfigureMeasurement("on");
@@ -457,6 +460,7 @@ export function useEditorHotKeys() {
             target: "auto",
           });
           editor.surface.surfaceConfigureTranslateWithForceDisableSnap("off");
+          editor.surface.surfaceConfigureScaleWithForceDisableSnap("off");
           break;
         case "Alt":
           editor.surface.surfaceConfigureMeasurement("off");

@@ -3557,6 +3557,15 @@ export class EditorSurface
     });
   }
 
+  public surfaceConfigureScaleWithForceDisableSnap(
+    scale_with_force_disable_snap: "on" | "off"
+  ) {
+    this.dispatch({
+      type: "config/modifiers/scale-with-force-disable-snap",
+      scale_with_force_disable_snap,
+    });
+  }
+
   public surfaceConfigureTransformWithCenterOriginModifier(
     transform_with_center_origin: "on" | "off"
   ) {

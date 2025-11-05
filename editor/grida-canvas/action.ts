@@ -573,6 +573,7 @@ export type EditorConfigAction =
   | EditorConfigureModifier_TranslateWithClone
   | EditorConfigureModifier_TranslateWithAxisLock
   | EditorConfigureModifier_TranslateWithForceDisableSnap
+  | EditorConfigureModifier_ScaleWithForceDisableSnap
   | EditorConfigureModifier_TransformWithCenterOrigin
   | EditorConfigureModifier_TransformWithPreserveAspectRatio
   | EditorConfigureModifier_RotateWithQuantize
@@ -602,6 +603,11 @@ export interface EditorConfigureModifier_TranslateWithAxisLock {
 export interface EditorConfigureModifier_TranslateWithForceDisableSnap {
   type: "config/modifiers/translate-with-force-disable-snap";
   translate_with_force_disable_snap: "on" | "off";
+}
+
+export interface EditorConfigureModifier_ScaleWithForceDisableSnap {
+  type: "config/modifiers/scale-with-force-disable-snap";
+  scale_with_force_disable_snap: "on" | "off";
 }
 
 export interface EditorConfigureModifier_TransformWithCenterOrigin {
