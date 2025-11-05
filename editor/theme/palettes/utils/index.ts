@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod/v3';
 import type { Theme, Palette } from "../types";
 
 export function stringfyThemeVariables(theme: z.infer<typeof Theme>) {

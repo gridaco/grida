@@ -156,9 +156,9 @@ async function upload_generated_to_library({
     height: number;
   };
 }) {
-  const { mimeType, uint8Array } = file;
+  const { mediaType, uint8Array } = file;
 
-  const ext = mime.extension(mimeType);
+  const ext = mime.extension(mediaType);
   const name = v4();
   const folder = "generated";
   const path = `${folder}/${name}${ext ? `.${ext}` : ""}`;
@@ -167,7 +167,7 @@ async function upload_generated_to_library({
     await service_role.library.storage
       .from("library")
       .upload(path, uint8Array, {
-        contentType: mimeType,
+        contentType: mediaType,
       });
 
   if (upload_err) throw new Error(upload_err.message);
@@ -179,7 +179,7 @@ async function upload_generated_to_library({
       bytes: uint8Array.length,
       category: "generated",
       path: uploaded.path,
-      mimetype: mimeType,
+      mimetype: mediaType,
       //
       generator: request.model,
       prompt: request.prompt,

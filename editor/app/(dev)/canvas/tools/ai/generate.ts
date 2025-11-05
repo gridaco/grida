@@ -3,7 +3,7 @@
 import {
   streamObject,
   experimental_generateImage,
-  type CoreUserMessage,
+  type UserModelMessage,
   type UserContent,
   type TextPart,
   type FilePart,
@@ -11,10 +11,10 @@ import {
   type Tool,
 } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { createStreamableValue } from "ai/rsc";
+import { createStreamableValue } from '@ai-sdk/rsc';
 import { request_schema } from "./schema";
 import assert from "assert";
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-4o-mini";
 
@@ -30,7 +30,7 @@ export async function generate({
   user,
   prompt,
   modelId,
-  maxTokens = undefined,
+  maxOutputTokens = undefined,
   temperature = undefined,
   topP = undefined,
 }: {
@@ -41,20 +41,20 @@ export async function generate({
     attachments?: UserAttachment[];
   };
   modelId?: string;
-  maxTokens?: number;
+  maxOutputTokens?: number;
   temperature?: number;
   topP?: number;
 }) {
   const model = openai(modelId ?? MODEL);
   const model_config = {
-    maxTokens: maxTokens,
+    maxOutputTokens: maxOutputTokens,
     temperature: temperature,
     topP: topP,
   };
 
   assert(prompt || user, "Prompt or user is required");
 
-  let message: CoreUserMessage | null = null;
+  let message: UserModelMessage | null = null;
   if (user) {
     const content: UserContent = [
       {
@@ -71,14 +71,14 @@ export async function generate({
               type: "file",
               data: f.url,
               filename: f.filename,
-              mimeType: f.mimeType,
+              mediaType: f.mimeType,
             } satisfies FilePart;
           }
           case "image": {
             return {
               type: "image",
               image: f.url,
-              mimeType: f.mimeType,
+              mediaType: f.mimeType,
             } satisfies ImagePart;
           }
         }
@@ -92,18 +92,15 @@ export async function generate({
     };
   }
 
-  const messages = {
-    system: system,
-    messages: message ? [message] : undefined,
-    prompt: prompt,
-  };
-
   const stream = createStreamableValue({});
   (async () => {
     const { partialObjectStream } = await streamObject({
       model,
       ...model_config,
-      ...messages,
+      system: system,
+      ...(message
+        ? { messages: [message] }
+        : { prompt: prompt || "Generate content" }),
       schema: request_schema,
     });
 

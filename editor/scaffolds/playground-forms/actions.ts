@@ -2,7 +2,7 @@
 
 import { streamObject } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { createStreamableValue } from "ai/rsc";
+import { createStreamableValue } from '@ai-sdk/rsc';
 import { GENzJSONForm } from "@/grida-forms/schema/zod";
 import { service_role } from "@/lib/supabase/server";
 
