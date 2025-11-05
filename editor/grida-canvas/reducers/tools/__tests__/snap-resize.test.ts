@@ -8,7 +8,7 @@ import {
 describe("getResizeSnapPoints", () => {
   it("returns right edge 2 corner points for east handle", () => {
     const rect: cmath.Rectangle = { x: 0, y: 0, width: 100, height: 100 };
-    const points = getResizeSnapPoints(rect, "e", [0, 0], [50, 0], false);
+    const { points } = getResizeSnapPoints(rect, "e", [0, 0], [50, 0], false);
 
     // After applying movement [50, 0], right edge moves from x=100 to x=150
     // Unlike translate snap, resize only tests corners (no midpoints)
@@ -20,7 +20,7 @@ describe("getResizeSnapPoints", () => {
 
   it("returns left edge 2 corner points for west handle", () => {
     const rect: cmath.Rectangle = { x: 100, y: 0, width: 100, height: 100 };
-    const points = getResizeSnapPoints(rect, "w", [200, 0], [50, 0], false);
+    const { points } = getResizeSnapPoints(rect, "w", [200, 0], [50, 0], false);
 
     // West handle moves left edge. Movement [50, 0] with direction vector [-1,0]
     // gives size_delta=[-50, 0], so width becomes 50, left edge moves to x=150
@@ -33,7 +33,7 @@ describe("getResizeSnapPoints", () => {
 
   it("returns top edge 2 corner points for north handle", () => {
     const rect: cmath.Rectangle = { x: 0, y: 100, width: 100, height: 100 };
-    const points = getResizeSnapPoints(rect, "n", [0, 200], [0, 50], false);
+    const { points } = getResizeSnapPoints(rect, "n", [0, 200], [0, 50], false);
 
     // North handle moves top edge. Movement [0, 50] with direction vector [0,-1]
     // gives size_delta=[0, -50], so height becomes 50, top edge moves to y=150
@@ -46,7 +46,7 @@ describe("getResizeSnapPoints", () => {
 
   it("returns bottom edge 2 corner points for south handle", () => {
     const rect: cmath.Rectangle = { x: 0, y: 0, width: 100, height: 100 };
-    const points = getResizeSnapPoints(rect, "s", [0, 0], [0, 50], false);
+    const { points } = getResizeSnapPoints(rect, "s", [0, 0], [0, 50], false);
 
     // After applying movement [0, 50], bottom edge moves from y=100 to y=150
     // Unlike translate snap, resize only tests corners (no midpoints)
@@ -58,7 +58,7 @@ describe("getResizeSnapPoints", () => {
 
   it("returns corner + edges for southeast corner handle", () => {
     const rect: cmath.Rectangle = { x: 0, y: 0, width: 100, height: 100 };
-    const points = getResizeSnapPoints(rect, "se", [0, 0], [50, 50], false);
+    const { points } = getResizeSnapPoints(rect, "se", [0, 0], [50, 50], false);
 
     expect(points.length).toBeGreaterThan(1);
     // After movement [50, 50], corner moves from [100, 100] to [150, 150]
@@ -68,7 +68,13 @@ describe("getResizeSnapPoints", () => {
 
   it("returns corner + edges for northeast corner handle", () => {
     const rect: cmath.Rectangle = { x: 0, y: 100, width: 100, height: 100 };
-    const points = getResizeSnapPoints(rect, "ne", [0, 200], [50, -50], false);
+    const { points } = getResizeSnapPoints(
+      rect,
+      "ne",
+      [0, 200],
+      [50, -50],
+      false
+    );
 
     expect(points.length).toBeGreaterThan(1);
     // NE direction vector is [1, -1]. Movement [50, -50] gives size_delta=[50, 50]
@@ -78,7 +84,7 @@ describe("getResizeSnapPoints", () => {
 
   it("returns only dragging edge for center-origin mode with east handle", () => {
     const rect: cmath.Rectangle = { x: 0, y: 0, width: 100, height: 100 };
-    const points = getResizeSnapPoints(rect, "e", [50, 50], [50, 0], true);
+    const { points } = getResizeSnapPoints(rect, "e", [50, 50], [50, 0], true);
 
     // In center origin mode, only test the side user is dragging (right edge), not the mirrored left edge
     // Unlike translate snap, resize only tests corners (no midpoints)
