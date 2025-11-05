@@ -66,9 +66,15 @@ function getMoving9PointIndices(
 /**
  * Get the snap points for a rectangle being resized in a specific direction.
  *
- * For edge handles (E, W, N, S), returns 3 points along that edge.
- * For corner handles (NE, SE, NW, SW), returns the corner point plus edge points.
- * In center-origin mode, includes points from both sides since both move.
+ * Returns only the corner points (tl/tr/bl/br) of the virtually resized rectangle
+ * that are moving for the given resize direction. Unlike translate snap, resize snap
+ * only tests corners, never edge midpoints.
+ *
+ * For center-origin mode, only tests the side the user is actually dragging,
+ * not the mirrored opposite side (for predictable UX).
+ *
+ * - Edge resizes (E/W/N/S): 2 corners (the dragging edge)
+ * - Corner resizes (NE/SE/NW/SW): 3 corners (the moving corner + adjacent edge corners)
  */
 export function getResizeSnapPoints(
   rect: cmath.Rectangle,
@@ -77,10 +83,7 @@ export function getResizeSnapPoints(
   movement: cmath.Vector2,
   centerOrigin: boolean
 ): cmath.Vector2[] {
-  const points: cmath.Vector2[] = [];
-
   // Calculate the virtually resized rectangle
-  // Apply direction vector to movement to get size change
   const direction_vector = cmath.compass.cardinal_direction_vector[direction];
   const movement_multiplier = centerOrigin ? 2 : 1;
 
@@ -97,217 +100,49 @@ export function getResizeSnapPoints(
   });
 
   const virtual_rect = cmath.rect.scale(rect, origin, scale);
+  const { x, y, width, height } = virtual_rect;
 
-  // Helper to get 3 points along an edge
-  const get3PointsOnEdge = (
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number
-  ): cmath.Vector2[] => {
-    return [
-      [x1, y1],
-      [(x1 + x2) / 2, (y1 + y2) / 2],
-      [x2, y2],
-    ];
-  };
+  // Collect corner points based on which edges are moving
+  // We only test corners (tl/tr/bl/br), not edge midpoints
+  // For center-origin mode, only test the side the user is actually dragging, not the mirrored side
+  const points: cmath.Vector2[] = [];
 
-  // Extract points based on direction
   switch (direction) {
-    case "e": {
-      // Right edge
-      const right_x = virtual_rect.x + virtual_rect.width;
-      points.push(
-        ...get3PointsOnEdge(
-          right_x,
-          virtual_rect.y,
-          right_x,
-          virtual_rect.y + virtual_rect.height
-        )
-      );
-      if (centerOrigin) {
-        // Also include left edge
-        points.push(
-          ...get3PointsOnEdge(
-            virtual_rect.x,
-            virtual_rect.y,
-            virtual_rect.x,
-            virtual_rect.y + virtual_rect.height
-          )
-        );
-      }
+    case "e":
+      // Right edge corners (user is dragging this edge)
+      points.push([x + width, y], [x + width, y + height]);
       break;
-    }
-    case "w": {
-      // Left edge
-      points.push(
-        ...get3PointsOnEdge(
-          virtual_rect.x,
-          virtual_rect.y,
-          virtual_rect.x,
-          virtual_rect.y + virtual_rect.height
-        )
-      );
-      if (centerOrigin) {
-        // Also include right edge
-        const right_x = virtual_rect.x + virtual_rect.width;
-        points.push(
-          ...get3PointsOnEdge(
-            right_x,
-            virtual_rect.y,
-            right_x,
-            virtual_rect.y + virtual_rect.height
-          )
-        );
-      }
+    case "w":
+      // Left edge corners (user is dragging this edge)
+      points.push([x, y], [x, y + height]);
       break;
-    }
-    case "n": {
-      // Top edge
-      points.push(
-        ...get3PointsOnEdge(
-          virtual_rect.x,
-          virtual_rect.y,
-          virtual_rect.x + virtual_rect.width,
-          virtual_rect.y
-        )
-      );
-      if (centerOrigin) {
-        // Also include bottom edge
-        const bottom_y = virtual_rect.y + virtual_rect.height;
-        points.push(
-          ...get3PointsOnEdge(
-            virtual_rect.x,
-            bottom_y,
-            virtual_rect.x + virtual_rect.width,
-            bottom_y
-          )
-        );
-      }
+    case "n":
+      // Top edge corners (user is dragging this edge)
+      points.push([x, y], [x + width, y]);
       break;
-    }
-    case "s": {
-      // Bottom edge
-      const bottom_y = virtual_rect.y + virtual_rect.height;
-      points.push(
-        ...get3PointsOnEdge(
-          virtual_rect.x,
-          bottom_y,
-          virtual_rect.x + virtual_rect.width,
-          bottom_y
-        )
-      );
-      if (centerOrigin) {
-        // Also include top edge
-        points.push(
-          ...get3PointsOnEdge(
-            virtual_rect.x,
-            virtual_rect.y,
-            virtual_rect.x + virtual_rect.width,
-            virtual_rect.y
-          )
-        );
-      }
+    case "s":
+      // Bottom edge corners (user is dragging this edge)
+      points.push([x, y + height], [x + width, y + height]);
       break;
-    }
-    case "ne": {
-      // Top-right corner
-      const right_x = virtual_rect.x + virtual_rect.width;
-      // Corner point
-      points.push([right_x, virtual_rect.y]);
-      // Top edge
-      points.push(
-        ...get3PointsOnEdge(
-          virtual_rect.x,
-          virtual_rect.y,
-          right_x,
-          virtual_rect.y
-        )
-      );
-      // Right edge
-      points.push(
-        ...get3PointsOnEdge(
-          right_x,
-          virtual_rect.y,
-          right_x,
-          virtual_rect.y + virtual_rect.height
-        )
-      );
+    case "ne":
+      // Top-right corner + adjacent corners
+      points.push([x + width, y], [x, y], [x + width, y + height]);
       break;
-    }
-    case "se": {
-      // Bottom-right corner
-      const right_x = virtual_rect.x + virtual_rect.width;
-      const bottom_y = virtual_rect.y + virtual_rect.height;
-      // Corner point
-      points.push([right_x, bottom_y]);
-      // Right edge
-      points.push(
-        ...get3PointsOnEdge(right_x, virtual_rect.y, right_x, bottom_y)
-      );
-      // Bottom edge
-      points.push(
-        ...get3PointsOnEdge(virtual_rect.x, bottom_y, right_x, bottom_y)
-      );
+    case "se":
+      // Bottom-right corner + adjacent corners
+      points.push([x + width, y + height], [x + width, y], [x, y + height]);
       break;
-    }
-    case "nw": {
-      // Top-left corner
-      // Corner point
-      points.push([virtual_rect.x, virtual_rect.y]);
-      // Top edge
-      points.push(
-        ...get3PointsOnEdge(
-          virtual_rect.x,
-          virtual_rect.y,
-          virtual_rect.x + virtual_rect.width,
-          virtual_rect.y
-        )
-      );
-      // Left edge
-      points.push(
-        ...get3PointsOnEdge(
-          virtual_rect.x,
-          virtual_rect.y,
-          virtual_rect.x,
-          virtual_rect.y + virtual_rect.height
-        )
-      );
+    case "nw":
+      // Top-left corner + adjacent corners
+      points.push([x, y], [x + width, y], [x, y + height]);
       break;
-    }
-    case "sw": {
-      // Bottom-left corner
-      const bottom_y = virtual_rect.y + virtual_rect.height;
-      // Corner point
-      points.push([virtual_rect.x, bottom_y]);
-      // Left edge
-      points.push(
-        ...get3PointsOnEdge(
-          virtual_rect.x,
-          virtual_rect.y,
-          virtual_rect.x,
-          bottom_y
-        )
-      );
-      // Bottom edge
-      points.push(
-        ...get3PointsOnEdge(
-          virtual_rect.x,
-          bottom_y,
-          virtual_rect.x + virtual_rect.width,
-          bottom_y
-        )
-      );
+    case "sw":
+      // Bottom-left corner + adjacent corners
+      points.push([x, y + height], [x, y], [x + width, y + height]);
       break;
-    }
   }
 
-  // Remove duplicates
-  const unique_points = points.filter((p, i, arr) => {
-    return arr.findIndex((q) => q[0] === p[0] && q[1] === p[1]) === i;
-  });
-
-  return unique_points;
+  return points;
 }
 
 /**
@@ -624,6 +459,8 @@ export function snapObjectsResize(
 
   // Extract anchor points from objects and guides
   const anchor_points: cmath.Vector2[] = [];
+  // Track which anchor point indices belong to which guide
+  const guide_anchor_indices: number[][] = [];
 
   // From objects: extract 9-point geometry
   anchor_objects_q.forEach((rect) => {
@@ -633,32 +470,36 @@ export function snapObjectsResize(
 
   // From guides: extract points along the guide
   if (anchors.guides) {
-    anchors.guides.forEach((guide) => {
+    anchors.guides.forEach((guide, guideIndex) => {
+      const indices: number[] = [];
+
+      // Helper to track indices as we add guide anchor points
+      const pushGuidePoint = (point: cmath.Vector2) => {
+        indices.push(anchor_points.length);
+        anchor_points.push(point);
+      };
+
       // For a guide, we create anchor points along the line
       // This is a simplified approach - guides are essentially infinite snap lines
       if (guide.axis === "x") {
         // Vertical guide at x=offset
-        anchor_points.push([guide.offset, bounding_rect.y]);
-        anchor_points.push([
-          guide.offset,
-          bounding_rect.y + bounding_rect.height,
-        ]);
-        anchor_points.push([
+        pushGuidePoint([guide.offset, bounding_rect.y]);
+        pushGuidePoint([guide.offset, bounding_rect.y + bounding_rect.height]);
+        pushGuidePoint([
           guide.offset,
           bounding_rect.y + bounding_rect.height / 2,
         ]);
       } else {
         // Horizontal guide at y=offset
-        anchor_points.push([bounding_rect.x, guide.offset]);
-        anchor_points.push([
-          bounding_rect.x + bounding_rect.width,
-          guide.offset,
-        ]);
-        anchor_points.push([
+        pushGuidePoint([bounding_rect.x, guide.offset]);
+        pushGuidePoint([bounding_rect.x + bounding_rect.width, guide.offset]);
+        pushGuidePoint([
           bounding_rect.x + bounding_rect.width / 2,
           guide.offset,
         ]);
       }
+
+      guide_anchor_indices[guideIndex] = indices;
     });
   }
 
@@ -700,6 +541,9 @@ export function snapObjectsResize(
   let snapping: SnapObjectsResult | undefined;
 
   if (result.snapDelta[0] !== 0 || result.snapDelta[1] !== 0) {
+    // Create sets for fast lookup of which anchor points actually snapped
+    const hit_anchor_index_set_x = new Set(result.hitAnchorIndices.x);
+    const hit_anchor_index_set_y = new Set(result.hitAnchorIndices.y);
     // Get indices of 9-point geometry that represent MOVING parts
     // This prevents highlighting non-moving parts that happen to be aligned
     const moving_indices = getMoving9PointIndices(direction, centerOrigin);
@@ -797,9 +641,18 @@ export function snapObjectsResize(
                       distance: result.snapDelta[0],
                       hit_agent_indices: [],
                       hit_anchor_indices: [],
-                      // Find which guides were involved in x-axis snap
+                      // Only include guides whose anchor points actually snapped
                       aligned_anchors_idx: anchors.guides
-                        .map((guide, idx) => (guide.axis === "x" ? idx : -1))
+                        .map((guide, idx) => {
+                          const indices = guide_anchor_indices[idx] ?? [];
+                          // Check if this is an x-axis guide and any of its anchor points were hit
+                          return guide.axis === "x" &&
+                            indices.some((anchorIdx) =>
+                              hit_anchor_index_set_x.has(anchorIdx)
+                            )
+                            ? idx
+                            : -1;
+                        })
                         .filter((idx) => idx >= 0),
                     }
                   : null,
@@ -809,9 +662,18 @@ export function snapObjectsResize(
                       distance: result.snapDelta[1],
                       hit_agent_indices: [],
                       hit_anchor_indices: [],
-                      // Find which guides were involved in y-axis snap
+                      // Only include guides whose anchor points actually snapped
                       aligned_anchors_idx: anchors.guides
-                        .map((guide, idx) => (guide.axis === "y" ? idx : -1))
+                        .map((guide, idx) => {
+                          const indices = guide_anchor_indices[idx] ?? [];
+                          // Check if this is a y-axis guide and any of its anchor points were hit
+                          return guide.axis === "y" &&
+                            indices.some((anchorIdx) =>
+                              hit_anchor_index_set_y.has(anchorIdx)
+                            )
+                            ? idx
+                            : -1;
+                        })
                         .filter((idx) => idx >= 0),
                     }
                   : null,

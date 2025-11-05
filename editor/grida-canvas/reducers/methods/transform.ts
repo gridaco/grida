@@ -519,7 +519,7 @@ function __self_update_gesture_transform_scale(
 
   // #region [snap]
   const should_snap =
-    draft.gesture_modifiers.translate_with_force_disable_snap !== "on";
+    draft.gesture_modifiers.scale_with_force_disable_snap !== "on";
 
   let adjusted_raw_movement = rawMovement;
 

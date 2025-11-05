@@ -402,6 +402,7 @@ export namespace editor.config {
     translate_with_clone: "off",
     tarnslate_with_axis_lock: "off",
     translate_with_force_disable_snap: "off",
+    scale_with_force_disable_snap: "off",
     transform_with_center_origin: "off",
     transform_with_preserve_aspect_ratio: "off",
     path_keep_projecting: "off",
@@ -773,6 +774,14 @@ export namespace editor.state {
      * when on, translation will ignore any snap guides and move freely
      */
     translate_with_force_disable_snap: "on" | "off";
+    /**
+     * force disable snapping while scaling (resizing)
+     *
+     * when on, scale/resize operations will ignore any snap guides and resize freely
+     *
+     * @default "off"
+     */
+    scale_with_force_disable_snap: "on" | "off";
     transform_with_center_origin: "on" | "off";
     transform_with_preserve_aspect_ratio: "on" | "off";
     /**
@@ -3337,6 +3346,9 @@ export namespace editor.api {
     ): void;
     surfaceConfigureTranslateWithForceDisableSnap(
       translate_with_force_disable_snap: "on" | "off"
+    ): void;
+    surfaceConfigureScaleWithForceDisableSnap(
+      scale_with_force_disable_snap: "on" | "off"
     ): void;
     surfaceConfigureTransformWithCenterOriginModifier(
       transform_with_center_origin: "on" | "off"

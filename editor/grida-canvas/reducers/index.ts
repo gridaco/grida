@@ -160,6 +160,13 @@ function _reducer<S extends editor.state.IEditorState>(
         self_update_gesture_transform(draft, context);
       });
     }
+    case "config/modifiers/scale-with-force-disable-snap": {
+      return updateState(state, (draft: Draft<S>) => {
+        draft.gesture_modifiers.scale_with_force_disable_snap =
+          action.scale_with_force_disable_snap;
+        self_update_gesture_transform(draft, context);
+      });
+    }
     case "config/modifiers/transform-with-center-origin": {
       return updateState(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.transform_with_center_origin =
