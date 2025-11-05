@@ -99,7 +99,7 @@ export function useCurrentEditor() {
   const editor = React.useContext(EditorContext);
   if (!editor) {
     throw new Error(
-      "useCurrentEditor must be used within an EditorContextV2.Provider"
+      "useCurrentEditor must be used within an EditorContext.Provider"
     );
   }
   return editor;
