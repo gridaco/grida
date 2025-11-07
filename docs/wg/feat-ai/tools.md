@@ -8,6 +8,10 @@ This document proposes the philosophical basis for the fundamental toolset, enab
 
 ## Tools
 
+### `::man`
+
+This tool serves as the documentation and self-discovery interface for all other tools, inspired by the Unix `man` command. It displays structured, human-readable manual pages for any tool, including syntax, description, and examples, and acts as the primary entry point for understanding system capabilities.
+
 ### `::text_content`
 
 Similar to [DOM's textContent](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent), this tool extracts the node as plain text.
