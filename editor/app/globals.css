@@ -1,1 +1,7 @@
 @import "./ui.css";
+
+/* 
+  Streamdown styles for AI Elements Response component
+  https://github.com/vercel/streamdown?tab=readme-ov-file#installation
+ */
+@source "../node_modules/streamdown/dist/index.js";
