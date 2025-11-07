@@ -34,7 +34,7 @@ importers:
         version: 3.5.3
       ts-jest:
         specifier: ^29.3.2
-        version: 29.3.4(@babel/core@7.27.4)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.27.4))(esbuild@0.25.4)(jest@29.7.0(@types/node@22.15.28)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@22.15.28)(typescript@5.8.3)))(typescript@5.8.3)
+        version: 29.3.4(@babel/core@7.27.1)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.27.1))(esbuild@0.25.4)(jest@29.7.0(@types/node@22.15.28)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@22.15.28)(typescript@5.8.3)))(typescript@5.8.3)
       tsup:
         specifier: ^8.4.0
         version: 8.5.0(jiti@2.4.2)(postcss@8.5.4)(typescript@5.8.3)(yaml@2.7.0)
@@ -49,7 +49,7 @@ importers:
     dependencies:
       '@next/third-parties':
         specifier: 15.3.2
-        version: 15.3.2(next@15.3.2(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react@19.0.0)
+        version: 15.3.2(next@15.3.2(@babel/core@7.27.1)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react@19.0.0)
       '@react-three/drei':
         specifier: ^10.0.7
         version: 10.1.2(@react-three/fiber@9.1.2(@types/react@19.1.3)(immer@9.0.21)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(three@0.170.0))(@types/react@19.1.3)(@types/three@0.170.0)(immer@9.0.21)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(three@0.170.0)
@@ -64,7 +64,7 @@ importers:
         version: 12.15.0(@emotion/is-prop-valid@1.3.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       next:
         specifier: 15.3.2
-        version: 15.3.2(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+        version: 15.3.2(@babel/core@7.27.1)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       react:
         specifier: 19.0.0
         version: 19.0.0
@@ -211,7 +211,7 @@ importers:
         version: 0.511.0(react@19.0.0)
       next:
         specifier: 15.3.2
-        version: 15.3.2(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+        version: 15.3.2(@babel/core@7.27.1)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       pdfjs-dist:
         specifier: 4.8.69
         version: 4.8.69
@@ -299,17 +299,17 @@ importers:
         specifier: 3.0.0-beta.50
         version: 3.0.0-beta.50(zod@4.1.12)
       '@ai-sdk/openai':
-        specifier: 3.0.0-beta.53
-        version: 3.0.0-beta.53(zod@4.1.12)
+        specifier: 3.0.0-beta.55
+        version: 3.0.0-beta.55(zod@4.1.12)
       '@ai-sdk/react':
-        specifier: 3.0.0-beta.93
-        version: 3.0.0-beta.93(react@19.0.0)(zod@4.1.12)
+        specifier: 3.0.0-beta.94
+        version: 3.0.0-beta.94(react@19.0.0)(zod@4.1.12)
       '@ai-sdk/replicate':
         specifier: 2.0.0-beta.31
         version: 2.0.0-beta.31(zod@4.1.12)
       '@ai-sdk/rsc':
-        specifier: 2.0.0-beta.93
-        version: 2.0.0-beta.93(react@19.0.0)(zod@4.1.12)
+        specifier: 2.0.0-beta.94
+        version: 2.0.0-beta.94(react@19.0.0)(zod@4.1.12)
       '@app/database':
         specifier: workspace:*
         version: link:../database
@@ -632,8 +632,8 @@ importers:
         specifier: ^12.6.4
         version: 12.6.4(@types/react@19.1.3)(immer@9.0.21)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       ai:
-        specifier: 6.0.0-beta.93
-        version: 6.0.0-beta.93(zod@4.1.12)
+        specifier: 6.0.0-beta.94
+        version: 6.0.0-beta.94(zod@4.1.12)
       ajv:
         specifier: ^8.13.0
         version: 8.17.1
@@ -1338,8 +1338,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai@3.0.0-beta.53':
-    resolution: {integrity: sha512-KVphjXiguqSj2GbnNwXmF9O0MmjWbBwbQJGE11L3nt+Ib0DhqJwUJ1K43f6EUPL17i2OKCvBF/Kj1b/HZrK+dA==}
+  '@ai-sdk/openai@3.0.0-beta.55':
+    resolution: {integrity: sha512-KWtqms0KecDjA0eME4yCQRTjh3bjUmIz63Nod7/f17vo4bvhjiyRqARsVnG/0ohA23y8/fFNwKyFi40IVHFREQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -1364,8 +1364,8 @@ packages:
     resolution: {integrity: sha512-vHAlJe2yRQvEsB/Ldy799HUjTSDzTWk6w3PIJFAOuhuJ3c2PvOcHrcY3IULPIx6bOnB2OgG3BE6zySey5pnyBQ==}
     engines: {node: '>=18'}
 
-  '@ai-sdk/react@3.0.0-beta.93':
-    resolution: {integrity: sha512-sTvyDCEO7kJgSQt5WH7spjaToF46K/5ShtcZyz/Sz2Js/ws4kWtPUXHjWVTQYgtWna21Z4C6M1HoKE4Cf7Tr1w==}
+  '@ai-sdk/react@3.0.0-beta.94':
+    resolution: {integrity: sha512-oOc72j/LM2YVkPfN7cOnSGgBSxUcCu12JKnxBilHG0DVpRwYj/WxpoQlR59/R3D1obXFLUwfV/afu7sZI9Kvhw==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
@@ -1376,8 +1376,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/rsc@2.0.0-beta.93':
-    resolution: {integrity: sha512-+asDwZTMoVLrx9SLIldP9HKrlo0cSERuYqRYfcQHvI3vk3jznNz//1juG8mayFRPDMJV/dQkNCISOicavBZVCA==}
+  '@ai-sdk/rsc@2.0.0-beta.94':
+    resolution: {integrity: sha512-DI3wA6Y6DnV/oCnqeiI8UhMvxkZaOCuUxNMXgVzHABn6YHT2YrqtRWlfLAEzbeAaxWoEXPIssJK7zhqXbxcFfQ==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
@@ -6649,8 +6649,8 @@ packages:
     resolution: {integrity: sha512-4I7Td01quW/RpocfNayFdFVk1qSuoh0E7JrbRJ16nH01HhKFQ88INq9Sd+nd72zqRySlr9BmDA8xlEJ6vJMrYA==}
     engines: {node: '>=8'}
 
-  ai@6.0.0-beta.93:
-    resolution: {integrity: sha512-HzHA68Toh+Pxn2Jfp6Rs6zIlkd5H/CK5AMextPPZ6JHFJIRO6pMBj5P8QU/NLJzJ41NcirtLlWr7WYRtZziVMQ==}
+  ai@6.0.0-beta.94:
+    resolution: {integrity: sha512-A8cpwbTtagP3UvIcAEh16oaS4Rl36J7mci3H4nl5+22oo0WwL1CN7GbYJnvsrbsxhNZierUS1dNG2hYzqRKhOA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -14308,7 +14308,7 @@ snapshots:
       - arktype
       - effect
 
-  '@ai-sdk/openai@3.0.0-beta.53(zod@4.1.12)':
+  '@ai-sdk/openai@3.0.0-beta.55(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 3.0.0-beta.15
       '@ai-sdk/provider-utils': 4.0.0-beta.31(zod@4.1.12)
@@ -14329,10 +14329,10 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@3.0.0-beta.93(react@19.0.0)(zod@4.1.12)':
+  '@ai-sdk/react@3.0.0-beta.94(react@19.0.0)(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider-utils': 4.0.0-beta.31(zod@4.1.12)
-      ai: 6.0.0-beta.93(zod@4.1.12)
+      ai: 6.0.0-beta.94(zod@4.1.12)
       react: 19.0.0
       swr: 2.3.3(react@19.0.0)
       throttleit: 2.1.0
@@ -14352,11 +14352,11 @@ snapshots:
       - arktype
       - effect
 
-  '@ai-sdk/rsc@2.0.0-beta.93(react@19.0.0)(zod@4.1.12)':
+  '@ai-sdk/rsc@2.0.0-beta.94(react@19.0.0)(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 3.0.0-beta.15
       '@ai-sdk/provider-utils': 4.0.0-beta.31(zod@4.1.12)
-      ai: 6.0.0-beta.93(zod@4.1.12)
+      ai: 6.0.0-beta.94(zod@4.1.12)
       jsondiffpatch: 0.6.0
       react: 19.0.0
     optionalDependencies:
@@ -17745,6 +17745,12 @@ snapshots:
 
   '@next/swc-win32-x64-msvc@15.3.2':
     optional: true
+
+  '@next/third-parties@15.3.2(next@15.3.2(@babel/core@7.27.1)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react@19.0.0)':
+    dependencies:
+      next: 15.3.2(@babel/core@7.27.1)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      react: 19.0.0
+      third-party-capital: 1.0.20
 
   '@next/third-parties@15.3.2(next@15.3.2(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react@19.0.0)':
     dependencies:
@@ -21268,7 +21274,7 @@ snapshots:
       clean-stack: 2.2.0
       indent-string: 4.0.0
 
-  ai@6.0.0-beta.93(zod@4.1.12):
+  ai@6.0.0-beta.94(zod@4.1.12):
     dependencies:
       '@ai-sdk/gateway': 2.0.0-beta.50(zod@4.1.12)
       '@ai-sdk/provider': 3.0.0-beta.15
@@ -26520,6 +26526,33 @@ snapshots:
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
 
+  next@15.3.2(@babel/core@7.27.1)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
+    dependencies:
+      '@next/env': 15.3.2
+      '@swc/counter': 0.1.3
+      '@swc/helpers': 0.5.15
+      busboy: 1.6.0
+      caniuse-lite: 1.0.30001717
+      postcss: 8.4.31
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
+      styled-jsx: 5.1.6(@babel/core@7.27.1)(babel-plugin-macros@3.1.0)(react@19.0.0)
+    optionalDependencies:
+      '@next/swc-darwin-arm64': 15.3.2
+      '@next/swc-darwin-x64': 15.3.2
+      '@next/swc-linux-arm64-gnu': 15.3.2
+      '@next/swc-linux-arm64-musl': 15.3.2
+      '@next/swc-linux-x64-gnu': 15.3.2
+      '@next/swc-linux-x64-musl': 15.3.2
+      '@next/swc-win32-arm64-msvc': 15.3.2
+      '@next/swc-win32-x64-msvc': 15.3.2
+      '@opentelemetry/api': 1.9.0
+      '@playwright/test': 1.52.0
+      sharp: 0.34.1
+    transitivePeerDependencies:
+      - '@babel/core'
+      - babel-plugin-macros
+
   next@15.3.2(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
     dependencies:
       '@next/env': 15.3.2
@@ -29235,6 +29268,14 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.4
 
+  styled-jsx@5.1.6(@babel/core@7.27.1)(babel-plugin-macros@3.1.0)(react@19.0.0):
+    dependencies:
+      client-only: 0.0.1
+      react: 19.0.0
+    optionalDependencies:
+      '@babel/core': 7.27.1
+      babel-plugin-macros: 3.1.0
+
   styled-jsx@5.1.6(@babel/core@7.27.4)(babel-plugin-macros@3.1.0)(react@19.0.0):
     dependencies:
       client-only: 0.0.1
@@ -29572,6 +29613,27 @@ snapshots:
   ts-easing@0.2.0: {}
 
   ts-interface-checker@0.1.13: {}
+
+  ts-jest@29.3.4(@babel/core@7.27.1)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.27.1))(esbuild@0.25.4)(jest@29.7.0(@types/node@22.15.28)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@22.15.28)(typescript@5.8.3)))(typescript@5.8.3):
+    dependencies:
+      bs-logger: 0.2.6
+      ejs: 3.1.10
+      fast-json-stable-stringify: 2.1.0
+      jest: 29.7.0(@types/node@22.15.28)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@22.15.28)(typescript@5.8.3))
+      jest-util: 29.7.0
+      json5: 2.2.3
+      lodash.memoize: 4.1.2
+      make-error: 1.3.6
+      semver: 7.7.2
+      type-fest: 4.41.0
+      typescript: 5.8.3
+      yargs-parser: 21.1.1
+    optionalDependencies:
+      '@babel/core': 7.27.1
+      '@jest/transform': 29.7.0
+      '@jest/types': 29.6.3
+      babel-jest: 29.7.0(@babel/core@7.27.1)
+      esbuild: 0.25.4
 
   ts-jest@29.3.4(@babel/core@7.27.4)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.27.4))(esbuild@0.25.4)(jest@29.7.0(@types/node@22.15.28)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@22.15.28)(typescript@5.8.3)))(typescript@5.8.3):
     dependencies:
