@@ -134,6 +134,7 @@ import { distro } from "../distro";
 import { WithSize } from "@/grida-canvas-react/viewport/size";
 import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { CommandPalette } from "./command-palette";
+import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -340,30 +341,43 @@ export default function CanvasPlayground({
 
   return (
     <>
+      {loadingOverlay && (
+        <FullscreenLoadingOverlay
+          loading={!ready}
+          errmsg={errmsg}
+          onExitComplete={() => {
+            setLoadingOverlay(false);
+          }}
+        />
+      )}
       <ErrorBoundary>
-        <SidebarProvider className="w-full h-full">
-          <TooltipProvider>
-            {loadingOverlay && (
-              <FullscreenLoadingOverlay
-                loading={!ready}
-                errmsg={errmsg}
-                onExitComplete={() => {
-                  setLoadingOverlay(false);
-                }}
-              />
-            )}
-            <main className="w-full h-full select-none">
-              <FontFamilyListProvider fonts={fonts}>
-                <StandaloneDocumentEditor editor={instance}>
-                  <WindowGlobalCurrentEditorProvider />
-                  <UserCustomTemplatesProvider templates={templates}>
-                    <Consumer backend={backend} canvasRef={handleCanvasRef} />
-                  </UserCustomTemplatesProvider>
-                </StandaloneDocumentEditor>
-              </FontFamilyListProvider>
-            </main>
-          </TooltipProvider>
-        </SidebarProvider>
+        <TooltipProvider>
+          <FontFamilyListProvider fonts={fonts}>
+            <StandaloneDocumentEditor editor={instance}>
+              <div className="w-full h-full flex flex-row">
+                <aside className="w-full h-full">
+                  <SidebarProvider className="w-full h-full">
+                    <main className="w-full h-full select-none relative">
+                      <WindowGlobalCurrentEditorProvider />
+                      <UserCustomTemplatesProvider templates={templates}>
+                        <Consumer
+                          backend={backend}
+                          canvasRef={handleCanvasRef}
+                        />
+                      </UserCustomTemplatesProvider>
+                    </main>
+                  </SidebarProvider>
+                </aside>
+                <aside
+                  className="min-w-[400px] w-[600px] border-l h-full bg-sidebar"
+                  aria-label="Agent Panel"
+                >
+                  <AgentPanel className="h-full" />
+                </aside>
+              </div>
+            </StandaloneDocumentEditor>
+          </FontFamilyListProvider>
+        </TooltipProvider>
       </ErrorBoundary>
     </>
   );
@@ -477,7 +491,7 @@ function Consumer({
         </div>
       </PreviewProvider>
 
-      {ui.help_fab && <HelpFab />}
+      {ui.help_fab && <HelpFab className="absolute right-4 bottom-4" />}
       <CommandPalette />
     </>
   );
@@ -675,12 +689,16 @@ function SidebarRight({
     <aside
       data-variant={variant}
       id="sidebar-right"
-      className="relative data-[variant=floating]:absolute"
+      className="relative data-[variant=floating]:absolute data-[variant=floating]:right-0"
     >
       <Sidebar
         side="right"
         variant={variant}
-        className="group-data-[variant=floating]:pt-8 group-data-[variant=floating]:pb-4 group-data-[variant=floating]:pl-0 group-data-[variant=floating]:pr-4"
+        className="
+          group-data-[variant=floating]:h-[700px]
+          group-data-[variant=floating]:pt-8 group-data-[variant=floating]:pb-4 group-data-[variant=floating]:pl-0 group-data-[variant=floating]:pr-4
+          relative
+        "
       >
         <SidebarHeader className="p-0">
           <header className="flex h-11 px-2 justify-between items-center gap-2">

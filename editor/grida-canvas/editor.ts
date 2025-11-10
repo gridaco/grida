@@ -4313,6 +4313,10 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
     }) as T;
   }
 
+  get id() {
+    return this.node_id;
+  }
+
   /**
    * {@link grida.program.nodes.UnknwonNode#name}
    */
