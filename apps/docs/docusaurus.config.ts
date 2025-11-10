@@ -1,6 +1,8 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 
 const footer = {
   links: [
@@ -48,6 +50,7 @@ const config: Config = {
   projectName: "grida",
   onBrokenLinks: "ignore",
   onBrokenMarkdownLinks: "warn",
+  stylesheets: [require.resolve("katex/dist/katex.min.css")],
   i18n: {
     defaultLocale: "en",
     locales: [
@@ -131,6 +134,8 @@ const config: Config = {
           path: "docs",
           sidebarPath: require.resolve("./sidebars.js"),
           editUrl: "https://github.com/gridaco/grida/tree/main/docs",
+          remarkPlugins: [remarkMath],
+          rehypePlugins: [[rehypeKatex, { strict: false }]],
         },
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
