@@ -172,6 +172,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      katex:
+        specifier: ^0.16.11
+        version: 0.16.25
       prism-react-renderer:
         specifier: ^2.4.1
         version: 2.4.1(react@19.0.0)
@@ -181,6 +184,12 @@ importers:
       react-dom:
         specifier: 19.0.0
         version: 19.0.0(react@19.0.0)
+      rehype-katex:
+        specifier: ^7.0.0
+        version: 7.0.1
+      remark-math:
+        specifier: ^6.0.0
+        version: 6.0.0
     devDependencies:
       '@docusaurus/module-type-aliases':
         specifier: 3.7.0
