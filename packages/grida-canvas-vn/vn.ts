@@ -2214,6 +2214,7 @@ export namespace vn {
     const vne = new vn.VectorNetworkEditor();
 
     let lastPoint: [number, number] | null = null;
+    let lastQuadraticControl: Vector2 | null = null;
     // start index of the current path (when closed, this is set to current + 1)
     let start = 0;
 
@@ -2226,6 +2227,7 @@ export namespace vn {
           const { x, y } = command;
           vne.addVertex([x, y]);
           lastPoint = [x, y];
+          lastQuadraticControl = null;
           break;
         }
 
@@ -2237,6 +2239,7 @@ export namespace vn {
             vne.addVertex([x, y], origin);
           }
           lastPoint = [x, y];
+          lastQuadraticControl = null;
           break;
         }
 
@@ -2249,6 +2252,7 @@ export namespace vn {
 
           // Update lastPoint to the new position
           lastPoint = [x, lastPoint ? lastPoint[1] : 0];
+          lastQuadraticControl = null;
           break;
         }
 
@@ -2259,6 +2263,7 @@ export namespace vn {
             vne.addVertex([lastPoint[0], y], origin);
           }
           lastPoint = [lastPoint ? lastPoint[0] : 0, y]; // Update lastPoint to the new position
+          lastQuadraticControl = null;
           break;
         }
 
@@ -2277,6 +2282,7 @@ export namespace vn {
             vne.addVertex([x, y], origin, ta, tb);
           }
           lastPoint = [x, y];
+          lastQuadraticControl = null;
           break;
         }
 
@@ -2292,15 +2298,76 @@ export namespace vn {
           }
 
           lastPoint = [x, y];
+          lastQuadraticControl = null;
           break;
         }
         case SVGPathData.QUAD_TO: {
-          throw new Error("QUAD_TO is not supported");
+          if (lastPoint) {
+            const origin = vne.vertices.length - 1;
+            const control: Vector2 = [command.x1, command.y1];
+            const end: Vector2 = [command.x, command.y];
+
+            const cubicControl1: Vector2 = [
+              lastPoint[0] + ((2 / 3) * (control[0] - lastPoint[0])),
+              lastPoint[1] + ((2 / 3) * (control[1] - lastPoint[1])),
+            ];
+            const cubicControl2: Vector2 = [
+              end[0] + ((2 / 3) * (control[0] - end[0])),
+              end[1] + ((2 / 3) * (control[1] - end[1])),
+            ];
+
+            const ta: Vector2 = [
+              cubicControl1[0] - lastPoint[0],
+              cubicControl1[1] - lastPoint[1],
+            ];
+            const tb: Vector2 = [
+              cubicControl2[0] - end[0],
+              cubicControl2[1] - end[1],
+            ];
+
+            vne.addVertex(end, origin, ta, tb);
+            lastPoint = end;
+            lastQuadraticControl = control;
+          }
+
           break;
           //
         }
         case SVGPathData.SMOOTH_QUAD_TO: {
-          throw new Error("SMOOTH_QUAD_TO is not supported");
+          if (lastPoint) {
+            const origin = vne.vertices.length - 1;
+            const end: Vector2 = [command.x, command.y];
+
+            const control: Vector2 = lastQuadraticControl
+              ? [
+                  2 * lastPoint[0] - lastQuadraticControl[0],
+                  2 * lastPoint[1] - lastQuadraticControl[1],
+                ]
+              : [lastPoint[0], lastPoint[1]];
+
+            const cubicControl1: Vector2 = [
+              lastPoint[0] + ((2 / 3) * (control[0] - lastPoint[0])),
+              lastPoint[1] + ((2 / 3) * (control[1] - lastPoint[1])),
+            ];
+            const cubicControl2: Vector2 = [
+              end[0] + ((2 / 3) * (control[0] - end[0])),
+              end[1] + ((2 / 3) * (control[1] - end[1])),
+            ];
+
+            const ta: Vector2 = [
+              cubicControl1[0] - lastPoint[0],
+              cubicControl1[1] - lastPoint[1],
+            ];
+            const tb: Vector2 = [
+              cubicControl2[0] - end[0],
+              cubicControl2[1] - end[1],
+            ];
+
+            vne.addVertex(end, origin, ta, tb);
+            lastPoint = end;
+            lastQuadraticControl = control;
+          }
+
           break;
           //
         }
@@ -2351,6 +2418,7 @@ export namespace vn {
               previousIndex = endIndex;
             }
           }
+          lastQuadraticControl = null;
           break;
         }
 
@@ -2363,6 +2431,7 @@ export namespace vn {
             // reset the start point (to the next point - which is not present yet)
             start = current + 1;
           }
+          lastQuadraticControl = null;
           break;
         }
 
