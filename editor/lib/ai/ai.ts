@@ -1,3 +1,7 @@
+import { openai } from "@ai-sdk/openai";
+import { replicate } from "@ai-sdk/replicate";
+import type { ImageModel } from "ai";
+
 export namespace ai {
   const grida_ai_credit_in_usd = 0.0016;
 
@@ -65,6 +69,18 @@ export namespace ai {
 
     export type SizeSpec = [number, number, AspectRatioString];
 
+    export type SpeedLabel = "fastest" | "fast" | "medium" | "slow" | "slowest";
+
+    export type ImageModelCardCompact = {
+      id: ImageModelId;
+      label: string;
+      deprecated: boolean;
+      short_description: string;
+      speed_label: SpeedLabel;
+      avg_ppi: number;
+      avg_credit: number;
+    };
+
     export type ImageModelCard = {
       id: ImageModelId;
       label: string;
@@ -73,7 +89,7 @@ export namespace ai {
       vendor: Vendor;
       provider: Provider;
       styles: string[] | null;
-      speed_label: "fastest" | "fast" | "medium" | "slow" | "slowest";
+      speed_label: SpeedLabel;
       speed_max: string;
       min_width: number;
       max_width: number;
@@ -86,6 +102,18 @@ export namespace ai {
         width: number;
         height: number;
         aspect_ratio: AspectRatioString;
+      };
+    };
+
+    export const toCompact = (card: ImageModelCard): ImageModelCardCompact => {
+      return {
+        id: card.id,
+        label: card.label,
+        deprecated: card.deprecated,
+        short_description: card.short_description,
+        speed_label: card.speed_label,
+        avg_ppi: card.avg_ppi,
+        avg_credit: card.avg_credit,
       };
     };
 
@@ -285,5 +313,59 @@ export namespace ai {
         },
       },
     } as const;
+
+    export const image_model_ids = Object.keys(models) as ImageModelId[];
+
+    /**
+     * @param model - the model identifier
+     * @returns {ImageModel} to be piped into api
+     */
+    export function getSDKImageModel(
+      model: ai.image.ProviderModel | ai.image.ImageModelId | string
+    ): {
+      card: ai.image.ImageModelCard;
+      model: ImageModel;
+    } | null {
+      if (!model) return null;
+
+      if (typeof model === "string") {
+        let card: ai.image.ImageModelCard | null = null;
+        // select card
+        {
+          if (model.includes("/")) {
+            card = ai.image.models[model] ?? null;
+          } else {
+            // if no provider is specified, search id with input
+            const searches = Object.values(ai.image.models).filter((card) =>
+              card!.id.includes(model)
+            );
+            if (searches.length === 1) {
+              card = searches[0]!;
+            }
+          }
+        }
+
+        if (!card) return null;
+        switch (card.provider) {
+          case "openai":
+            return { model: openai.image(card.id), card };
+          case "replicate":
+            return { model: replicate.image(card.id), card };
+          default:
+            return null;
+        }
+      } else {
+        const card = ai.image.models[model.modelId];
+        if (!card) return null;
+        switch (model.provider) {
+          case "openai":
+            return { model: openai.image(model.modelId), card };
+          case "replicate":
+            return { model: replicate.image(model.modelId), card };
+          default:
+            return null;
+        }
+      }
+    }
   }
 }
