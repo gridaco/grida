@@ -6,6 +6,7 @@ export namespace ai {
     | "openai"
     | "recraft-ai"
     | "black-forest-labs"
+    | "google"
     | "stability-ai";
 
   export namespace image {
@@ -26,6 +27,7 @@ export namespace ai {
       | (string & {});
 
     export type ReplicateImageModelId =
+      | "black-forest-labs/flux-kontext-max"
       | "black-forest-labs/flux-1.1-pro"
       | "black-forest-labs/flux-1.1-pro-ultra"
       | "black-forest-labs/flux-dev"
@@ -66,6 +68,7 @@ export namespace ai {
     export type ImageModelCard = {
       id: ImageModelId;
       label: string;
+      deprecated: boolean;
       short_description: string;
       vendor: Vendor;
       provider: Provider;
@@ -111,6 +114,7 @@ export namespace ai {
       "gpt-image-1": {
         id: "gpt-image-1",
         label: "GPT Image",
+        deprecated: false,
         short_description: "State-of-the-art image generation model",
         vendor: "openai",
         provider: "openai",
@@ -137,6 +141,7 @@ export namespace ai {
       "recraft-ai/recraft-v3": {
         id: "recraft-ai/recraft-v3",
         label: "Recraft V3",
+        deprecated: true,
         short_description:
           "Recraft V3 (code-named red_panda) is a text-to-image model with the ability to generate long texts, and images in a wide list of styles. As of today, it is SOTA in image generation, proven by the Text-to-Image Benchmark by Artificial Analysis",
         vendor: "recraft-ai",
@@ -193,9 +198,35 @@ export namespace ai {
           aspect_ratio: "1:1",
         },
       },
+      // https://replicate.com/black-forest-labs/flux-kontext-max/api/schema
+      "black-forest-labs/flux-kontext-max": {
+        id: "black-forest-labs/flux-kontext-max",
+        label: "Flux Kontext Max",
+        deprecated: false,
+        short_description:
+          "The fastest image generation model tailored for local development and personal use",
+        vendor: "black-forest-labs",
+        provider: "replicate",
+        speed_label: "fastest",
+        speed_max: "10s",
+        styles: null,
+        sizes: null,
+        min_width: 0,
+        min_height: 0,
+        max_width: 1820,
+        max_height: 1820,
+        avg_ppi: 0.08,
+        avg_credit: 50,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
       "black-forest-labs/flux-1.1-pro": {
         id: "black-forest-labs/flux-1.1-pro",
         label: "Flux Pro 1.1",
+        deprecated: false,
         short_description:
           "Faster, better FLUX Pro. Text-to-image model with excellent image quality, prompt adherence, and output diversity.",
         vendor: "black-forest-labs",
@@ -219,6 +250,7 @@ export namespace ai {
       "black-forest-labs/flux-schnell": {
         id: "black-forest-labs/flux-schnell",
         label: "Flux Schnell",
+        deprecated: true,
         short_description:
           "The fastest image generation model tailored for local development and personal use",
         vendor: "black-forest-labs",
