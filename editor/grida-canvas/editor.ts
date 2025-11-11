@@ -717,7 +717,7 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
-  public createTextNode(): NodeProxy<grida.program.nodes.TextNode> {
+  public createTextNode(text = ""): NodeProxy<grida.program.nodes.TextNode> {
     const id = this.idgen.next();
     this.dispatch({
       type: "insert",
@@ -725,7 +725,7 @@ class EditorDocumentStore
       prototype: {
         type: "text",
         _$id: id,
-        text: "",
+        text: text,
         width: "auto",
         height: "auto",
         fill: {

@@ -24,8 +24,8 @@ export function useCanvasChat() {
         }
 
         switch (toolCall.toolName) {
-          case "canvas_use_create_node_from_svg": {
-            const output = await canvas_use.client_impls.create_node_from_svg(
+          case canvas_use.tools_spec.name_make_from_svg: {
+            const output = await canvas_use.client_impls.make_from_svg(
               editor,
               toolCall.input
             );
@@ -37,12 +37,24 @@ export function useCanvasChat() {
             });
             break;
           }
-          case "canvas_use_create_node_from_image": {
-            const output = await canvas_use.client_impls.create_node_from_image(
+          case canvas_use.tools_spec.name_make_from_image: {
+            const output = await canvas_use.client_impls.make_from_image(
               editor,
               toolCall.input
             );
 
+            chat.addToolOutput({
+              tool: toolCall.toolName,
+              toolCallId: toolCall.toolCallId,
+              ...output,
+            });
+            break;
+          }
+          case canvas_use.tools_spec.name_make_from_markdown: {
+            const output = await canvas_use.client_impls.make_from_markdown(
+              editor,
+              toolCall.input
+            );
             chat.addToolOutput({
               tool: toolCall.toolName,
               toolCallId: toolCall.toolCallId,

@@ -11,13 +11,18 @@ const tools = {
     canvas_use.tools_spec.platform_sys_tool_ai_generate_image,
   // [canvas_use.tools_spec.name_man]: canvas_use.man,
   // [canvas_use.tools_spec.name_create_node]: canvas_use.create_node,
-  [canvas_use.tools_spec.name_create_node_from_svg]:
-    canvas_use.tools_spec.create_node_from_svg,
-  [canvas_use.tools_spec.name_create_node_from_image]:
-    canvas_use.tools_spec.create_node_from_image,
+  [canvas_use.tools_spec.name_make_from_svg]:
+    canvas_use.tools_spec.make_from_svg,
+  [canvas_use.tools_spec.name_make_from_image]:
+    canvas_use.tools_spec.make_from_image,
+  [canvas_use.tools_spec.name_make_from_markdown]:
+    canvas_use.tools_spec.make_from_markdown,
   [canvas_use.tools_spec.name_data_artboard_sizes]:
     canvas_use.tools_spec.data_artboard_sizes,
   // grida_canvas_scripting_exec: grida_canvas_scripting_exec,
+
+  // web search - needs to be exactly "web_search" as name
+  web_search: openai.tools.webSearch({}),
 };
 
 /**
