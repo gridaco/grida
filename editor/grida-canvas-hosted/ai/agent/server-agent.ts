@@ -11,6 +11,7 @@ const tools = {
     canvas_use.tools_spec.platform_sys_tool_ai_generate_image,
   // [canvas_use.tools_spec.name_man]: canvas_use.man,
   // [canvas_use.tools_spec.name_create_node]: canvas_use.create_node,
+  [canvas_use.tools_spec.name_tree]: canvas_use.tools_spec.tree,
   [canvas_use.tools_spec.name_make_from_svg]:
     canvas_use.tools_spec.make_from_svg,
   [canvas_use.tools_spec.name_make_from_image]:

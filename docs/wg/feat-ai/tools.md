@@ -22,6 +22,19 @@ Similar to the [`tree`](<https://en.wikipedia.org/wiki/Tree_(command)>) command,
 
 It enables hierarchical understanding of design components for structured processing.
 
+Example:
+
+```
+└─ ⛶  Document (nodes=4, scenes=1, entry=scene)
+   └─ ⛶  Frame HeroSection  (type=container, id=frame)  [1280×720]  fill=#111111  opacity=0.9
+      ├─ ✎  Text Title  (type=text, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700
+      └─ ◼  Rect Button  (type=rectangle, id=button)  [160×48]  fill=#3B82F6  radius=8
+```
+
+### `::snapshot`
+
+This takes a snapshot of the current canvas state.
+
 ### `::search`
 
 Searches the scene graph for nodes by **semantics**, **geometry**, and **structure**. Returns a stable, ordered list of node IDs (plus brief metadata) without dumping full nodes.
@@ -114,6 +127,14 @@ Insert a node from an image URL/Data. (Non SVG)
 ### `::make_from_markdown`
 
 Insert a node from a markdown (or plain txt) string.
+
+---
+
+> **Unsafe** tools
+
+### `::unsafe_js_eval`
+
+This calls eval() with the givven code string. needs explicit user approval.
 
 ---
 

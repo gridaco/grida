@@ -24,6 +24,18 @@ export function useCanvasChat() {
         }
 
         switch (toolCall.toolName) {
+          case canvas_use.tools_spec.name_tree: {
+            const output = await canvas_use.client_impls.tree(
+              editor,
+              toolCall.input
+            );
+            chat.addToolOutput({
+              tool: toolCall.toolName,
+              toolCallId: toolCall.toolCallId,
+              ...output,
+            });
+            break;
+          }
           case canvas_use.tools_spec.name_make_from_svg: {
             const output = await canvas_use.client_impls.make_from_svg(
               editor,

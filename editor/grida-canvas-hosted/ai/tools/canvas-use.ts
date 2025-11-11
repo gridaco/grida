@@ -22,6 +22,7 @@ export namespace canvas_use {
       "platform_sys_generate_image";
 
     export const name_man = "canvas_use_man" satisfies NS_NAME_CANVAS_USE;
+    export const name_tree = "canvas_use_tree" satisfies NS_NAME_CANVAS_USE;
     export const name_make_from_svg =
       "canvas_use_make_from_svg" satisfies NS_NAME_CANVAS_USE;
     export const name_make_from_image =
@@ -30,20 +31,6 @@ export namespace canvas_use {
       "canvas_use_make_from_markdown" satisfies NS_NAME_CANVAS_USE;
     export const name_data_artboard_sizes =
       "canvas_use_data_artboard_sizes" satisfies NS_NAME_CANVAS_USE;
-
-    export const man = tool({
-      name: name_man,
-      description: "Display the manual page for the given tool.",
-      inputSchema: z.object({
-        tool: z
-          .string()
-          .describe("The name of the tool to display the manual page for"),
-      }),
-      outputSchema: z.object({
-        description: z.string().describe("The description of the tool"),
-        examples: z.array(z.string()).describe("The examples of the tool"),
-      }),
-    });
 
     export const platform_sys_tool_ai_fetch_preflight = tool({
       name: name_platform_sys_tool_ai_fetch_preflight,
@@ -197,6 +184,36 @@ export namespace canvas_use {
       // },
     });
 
+    export const man = tool({
+      name: name_man,
+      description: "Display the manual page for the given tool.",
+      inputSchema: z.object({
+        tool: z
+          .string()
+          .describe("The name of the tool to display the manual page for"),
+      }),
+      outputSchema: z.object({
+        description: z.string().describe("The description of the tool"),
+        examples: z.array(z.string()).describe("The examples of the tool"),
+      }),
+    });
+
+    export const tree = tool({
+      name: name_tree,
+      description: "Display the tree structure of the canvas.",
+      inputSchema: z.object({
+        entry_id: z
+          .string()
+          .describe(
+            "The id of the entry to display the tree for. leave blank for root document"
+          )
+          .optional(),
+      }),
+      outputSchema: z.object({
+        tree: z.string().describe("The tree-as-text structure of the canvas"),
+      }),
+    });
+
     export const make_from_svg = tool({
       name: name_make_from_svg,
       title: "Create Node from SVG",
@@ -267,6 +284,20 @@ export namespace canvas_use {
           state: "output-error";
           errorText: string;
         };
+
+    export async function tree(
+      editor: Editor,
+      params: {
+        entry_id?: string;
+      }
+    ): Promise<ToolCallOutput<{ tree: string }>> {
+      return {
+        state: "output-available",
+        output: {
+          tree: editor.tree(params.entry_id),
+        },
+      };
+    }
 
     export async function make_from_svg(
       editor: Editor,
@@ -452,6 +483,7 @@ export namespace canvas_use {
     - ${tools_spec.name_platform_sys_tool_ai_fetch_preflight}: fetch preflight information for the given URL.
     - ${tools_spec.name_platform_sys_tool_ai_image_model_cards}: list the available image model cards. try to use cheapest one for low-effort generation.
     - ${tools_spec.name_platform_sys_tool_ai_generate_image}: generate an AI image from a text prompt.
+    - ${tools_spec.name_tree}: display the tree structure of the canvas.
     - ${tools_spec.name_make_from_svg}: create a node from SVG string.
     - ${tools_spec.name_make_from_image}: create a node from image (non svg) URL.
     - ${tools_spec.name_make_from_markdown}: create a node from markdown string.
