@@ -15,6 +15,8 @@ const tools = {
     canvas_use.tools_spec.create_node_from_svg,
   [canvas_use.tools_spec.name_create_node_from_image]:
     canvas_use.tools_spec.create_node_from_image,
+  [canvas_use.tools_spec.name_data_artboard_sizes]:
+    canvas_use.tools_spec.data_artboard_sizes,
   // grida_canvas_scripting_exec: grida_canvas_scripting_exec,
 };
 

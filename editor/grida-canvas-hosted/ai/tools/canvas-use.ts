@@ -6,6 +6,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { GenerateImageApiResponse } from "@/app/(api)/private/ai/generate/image/route";
 import { Env } from "@/env";
+import artboard_data from "@/grida-canvas-react-starter-kit/data/artboards.json";
 
 export namespace canvas_use {
   export namespace llm {
@@ -82,6 +83,7 @@ export namespace canvas_use {
     - platform_sys_tool_ai_generate_image: generate an AI image from a text prompt.
     - canvas_use_create_node_from_svg: create a node from SVG string.
     - canvas_use_create_node_from_image: create a node from image (non svg) URL.
+    - canvas_use_data_artboard_sizes: get the list of commonly defined artboard sizes.
     </tools>
     `;
   }
@@ -97,11 +99,14 @@ export namespace canvas_use {
       "platform_sys_ai_image_model_cards" satisfies NS_NAME_PLATFORM_SYS;
     export const name_platform_sys_tool_ai_generate_image =
       "platform_sys_generate_image";
+
     export const name_man = "canvas_use_man" satisfies NS_NAME_CANVAS_USE;
     export const name_create_node_from_svg =
       "canvas_use_create_node_from_svg" satisfies NS_NAME_CANVAS_USE;
     export const name_create_node_from_image =
       "canvas_use_create_node_from_image" satisfies NS_NAME_CANVAS_USE;
+    export const name_data_artboard_sizes =
+      "canvas_use_data_artboard_sizes" satisfies NS_NAME_CANVAS_USE;
 
     export const man = tool({
       name: name_man,
@@ -301,6 +306,15 @@ export namespace canvas_use {
       outputSchema: z.object({
         node_id: z.string().describe("The ID of the created node"),
       }),
+    });
+
+    export const data_artboard_sizes = tool({
+      name: name_data_artboard_sizes,
+      description: "Get the list of commonly defined artboard sizes",
+      inputSchema: z.object({}),
+      execute: async ({}) => {
+        return artboard_data;
+      },
     });
   }
 
