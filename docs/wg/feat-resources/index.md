@@ -1,3 +1,7 @@
+---
+title: Resource Management (resources)
+---
+
 # Resources - `resources`
 
 > Fonts & Images (WASM / Embedded)

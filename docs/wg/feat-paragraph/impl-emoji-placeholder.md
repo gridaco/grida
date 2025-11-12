@@ -1,3 +1,7 @@
+---
+title: Emoji Placeholder Rendering (emoji-placeholder)
+---
+
 # Paragraph - `emoji-placeholder`
 
 | feature id          | status | description                                  |

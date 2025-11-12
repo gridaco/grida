@@ -1,5 +1,5 @@
 ---
-title: Unicode Coverage Tracker (UCT) - Working Group Draft
+title: Unicode Coverage Tracker (UCT)
 description: A working group draft describing the Unicode Coverage Tracker (UCT) feature for the core engine.
 ---
 

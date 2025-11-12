@@ -1,3 +1,7 @@
+---
+title: Font Generation (fontgen)
+---
+
 # Font Generation - `fontgen`
 
 | feature id | status | description                                      |
