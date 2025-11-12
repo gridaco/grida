@@ -426,6 +426,12 @@ export namespace canvas_use {
       Markdown formatting guideline in your chat response.
       - Use structured output: use bullet lists, tables try response in structured format.
       - Prefer table over list when the data is tabular.
+      
+        <uri>
+        Grida chat supports uri highlight for valid links that points to user resources.
+        - node: "[<name>](grida://node/<id>)"
+        - color: "[#000000](grida://color/<css_color_format>)"
+        </uri>
       </markdown_formatting>
     </manners>
 

@@ -116,6 +116,26 @@ Formats design elements for consistent presentation and output.
 
 > **Specialized Insert** tools
 
+### `::make_from_grida`
+
+Insert a .grida compat partial or full packed subtree.
+
+This should support json and kdl format.
+
+```kdl
+clipboard {
+  container "page" {
+    container "header" {
+      text "Logo" {
+        font "Inter"
+        size 16
+        weight 700
+      }
+    }
+  }
+}
+```
+
 ### `::make_from_svg`
 
 Insert a node from an SVG string.
@@ -124,9 +144,43 @@ Insert a node from an SVG string.
 
 Insert a node from an image URL/Data. (Non SVG)
 
+| image  | support                   |
+| ------ | ------------------------- |
+| `png`  | default                   |
+| `jpg`  | default                   |
+| `webp` | with webp feature enabled |
+| `gif`  | planned                   |
+| `svg`  | reject                    |
+
 ### `::make_from_markdown`
 
 Insert a node from a markdown (or plain txt) string.
+
+### `::make_from_csv`
+
+Insert a table from a CSV string.
+
+### `::make_from_mermaid`
+
+Insert a diagram from a mermaid string.
+
+### `::make_from_html`
+
+Insert a node from an HTML string as wireframe (minimal styling).
+This exceptionally accepts interactive elements (e.g. inputs, buttons, etc.)
+
+### `::make_from_widget`
+
+Insert a subtree from a shortcode widget token (similar to flutter)
+This is useful for wireframing
+
+```xml
+<column width="1000" height="1000">
+  <button>
+    <text size="20" weight="bold">Click me</text>
+  </button>
+</column>
+```
 
 ---
 
