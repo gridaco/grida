@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { z } from 'zod/v3';
 import {
   Dialog,
   DialogContent,
@@ -75,7 +75,7 @@ export function TagFormDialog({
   };
 
   const form = useForm<TagFormValues>({
-    resolver: zodResolver(tagFormSchema),
+    resolver: zodResolver(tagFormSchema) as any,
     defaultValues,
   });
 

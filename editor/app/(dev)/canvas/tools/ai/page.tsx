@@ -11,7 +11,7 @@ import { presets } from "./_data/presets";
 import { ModelParams } from "./_components/model-params";
 import { Label } from "@/components/ui/label";
 import { MinimalChatBox } from "@/components/chat";
-import { readStreamableValue } from "ai/rsc";
+import { readStreamableValue } from '@ai-sdk/rsc';
 import { Canvas } from "./_components/canvas";
 import { generate, type UserAttachment } from "./generate";
 import { type StreamingResponse } from "./schema";
@@ -61,7 +61,7 @@ export default function PlaygroundPage() {
     setStreamBusy(true);
     generating.current = true;
 
-    generate({ modelId, system, user, maxTokens: 16384, temperature: 1 })
+    generate({ modelId, system, user, maxOutputTokens: 16384, temperature: 1 })
       .then(async ({ output }) => {
         for await (const delta of readStreamableValue(output)) {
           setResponse(delta as any);

@@ -59,13 +59,23 @@ export namespace Env {
   }
 
   /**
-   * anything related to web & client side
+   * anything related to web & client side (next public)
    */
   export namespace web {
     export const HOST = process.env.NEXT_PUBLIC_URL
       ? // VERCEL_URL does not have protocol
         "https://" + process.env.NEXT_PUBLIC_URL
       : "http://localhost:3000";
+
+    /**
+     * flag for local testing with superuser access
+     * turning this on is safe, it wont affect the hosted environment.
+     *
+     * what this does:
+     * it overrides the rate limit & "payment required" parts, yet you'll have to set your own keys.
+     */
+    export const IS_LOCALDEV_SUPERUSER =
+      process.env.NEXT_PUBLIC_GRIDA_LOCALDEV_SUPERUSER === "1";
   }
 
   export namespace vercel {

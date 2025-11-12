@@ -13,5 +13,8 @@
     "components": "@/components",
     "utils": "@/components/lib/utils",
     "hooks": "@/components/hooks"
+  },
+  "registries": {
+    "@ai-elements": "https://registry.ai-sdk.dev/{name}.json"
   }
 }

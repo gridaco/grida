@@ -29,6 +29,7 @@ import cg from "@grida/cg";
 import iosvg from "@grida/io-svg";
 import cmath from "@grida/cmath";
 import assert from "assert";
+import { describeDocumentTree } from "./utils/cmd-tree";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -717,7 +718,7 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
-  public createTextNode(): NodeProxy<grida.program.nodes.TextNode> {
+  public createTextNode(text = ""): NodeProxy<grida.program.nodes.TextNode> {
     const id = this.idgen.next();
     this.dispatch({
       type: "insert",
@@ -725,7 +726,7 @@ class EditorDocumentStore
       prototype: {
         type: "text",
         _$id: id,
-        text: "",
+        text: text,
         width: "auto",
         height: "auto",
         fill: {
@@ -2307,7 +2308,8 @@ export class Editor
     editor.api.IDocumentGeometryQuery,
     editor.api.IDocumentNodeTextNodeFontActions,
     editor.api.IDocumentExportPluginActions,
-    editor.api.IDocumentVectorInterfaceActions
+    editor.api.IDocumentVectorInterfaceActions,
+    editor.api.IEditorIntrospectActions
 {
   // private readonly listeners: Set<(editor: this, action?: Action) => void> = new Set();
   private readonly logger: (...args: any[]) => void;
@@ -2514,6 +2516,17 @@ export class Editor
 
   public getDocumentJson(): unknown {
     return JSON.parse(JSON.stringify(this.doc.state.document));
+  }
+
+  public tree(entryId?: string): string {
+    return describeDocumentTree(
+      this.doc.state.document,
+      this.doc.state.document_ctx,
+      {
+        entryId,
+        chars: editor.ascii.chars,
+      }
+    );
   }
 
   private __bind_wasm_surface(surface: Scene) {
@@ -4311,6 +4324,10 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
         }
       },
     }) as T;
+  }
+
+  get id() {
+    return this.node_id;
   }
 
   /**

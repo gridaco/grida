@@ -14,7 +14,10 @@ const PlaygroundCanvas = dynamic(
 export default function Editor(
   props: React.ComponentProps<typeof PlaygroundCanvas>
 ) {
-  useUnsavedChangesWarning(() => true);
+  useUnsavedChangesWarning(() => {
+    // on by default, off in development
+    return process.env.NODE_ENV === "development" ? false : true;
+  });
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">

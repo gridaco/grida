@@ -2539,6 +2539,19 @@ export namespace editor.api {
     // #endregion image
   }
 
+  /**
+   * Introspection helpers for generating developer-facing summaries of the document tree.
+   */
+  export interface IEditorIntrospectActions {
+    /**
+     * Render the document hierarchy as an ASCII tree.
+     *
+     * @param entryId - Optional node or scene id to use as the root of the tree. When omitted, the entire document is used.
+     * @returns A trimmed multiline string formatted with box-drawing characters.
+     */
+    tree(entryId?: string): string;
+  }
+
   export interface IEditorDocumentStoreConsumerWithConstraintsActions {
     /**
      * inserts the payload with assertions and constraints
@@ -3422,5 +3435,34 @@ export namespace editor.api {
     openCursorChat(): void;
     closeCursorChat(): void;
     updateCursorChatMessage(message: string | null): void;
+  }
+}
+
+/**
+ *
+ * monospace (ascii) characters used to represent canvas nodes in terminal / plain txt output.
+ *
+ * @note below are technically not 'ascii' characters, we keep the module name as-is, to avoid confusion.
+ */
+export namespace editor.ascii {
+  export namespace chars {
+    export const symbol_container_26F6 = "⛶";
+    export const symbol_group_2B1A = "⬚";
+    export const symbol_text_270E = "✎";
+    export const symbol_rect_25FC = "◼";
+    export const symbol_polygon_2B22 = "⬢";
+    export const symbol_ellipse_25CF = "●";
+    export const symbol_star_2605 = "★";
+
+    export const arrow_up_2191 = "↑";
+    export const arrow_down_2193 = "↓";
+    export const arrow_left_2190 = "←";
+    export const arrow_right_2192 = "→";
+
+    export const line_vert_2502 = "│";
+    export const line_horz_2500 = "─";
+    export const line_tee_251C = "├";
+    export const line_corner_2514 = "└";
+    export const line_root_250C = "┌";
   }
 }
