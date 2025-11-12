@@ -1,3 +1,7 @@
+---
+title: Rendering Optimization Strategies
+---
+
 # Rendering Optimization Strategies
 
 A summary of all discussed optimization techniques for achieving high-performance rendering (e.g., 144fps with large design documents).

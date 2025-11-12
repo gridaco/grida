@@ -1,3 +1,7 @@
+---
+title: Rectangular Stroke Model (stroke-rect)
+---
+
 # Rectangular Stroke - `stroke-rect`
 
 > Per-side stroke widths for rectangular shapes (CSS border equivalent)

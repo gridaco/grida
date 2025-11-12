@@ -1,3 +1,7 @@
+---
+title: Noise Effects (fe-noise)
+---
+
 # Noise Effects - `fe-noise`
 
 > Procedural fractal Perlin noise effects with SVG filter semantics

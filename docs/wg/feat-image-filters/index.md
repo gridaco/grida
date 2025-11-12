@@ -1,3 +1,7 @@
+---
+title: Image Filters (image-filters)
+---
+
 # Image Filters - `image-filters`
 
 | feature id      | status | description                                              |

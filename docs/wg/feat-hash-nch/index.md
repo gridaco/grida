@@ -1,3 +1,7 @@
+---
+title: Fast Hashing (hash-nch)
+---
+
 # Fast Hashing – `hash-nch`
 
 > **Scope:** Fonts & Images (WASM / Embedded)

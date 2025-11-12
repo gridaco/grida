@@ -1,3 +1,7 @@
+---
+title: Optical Size Automation (opsz-auto)
+---
+
 # Paragraph - `opsz: auto`
 
 | feature id  | status    | description                                       | PRs                                               |

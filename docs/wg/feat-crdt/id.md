@@ -1,5 +1,5 @@
 ---
-title: Grida Object (Node) ID Model (for CRDT) - Working Group Draft
+title: CRDT Object ID Model
 description: A working group draft describing the Grida ID Model (for CRDT) feature for the core engine.
 ---
 

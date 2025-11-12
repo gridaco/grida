@@ -1,3 +1,7 @@
+---
+title: Masking Model (masks)
+---
+
 # Masks — Working Group Draft (`masks`)
 
 | feature id | status | description                                   |

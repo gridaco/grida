@@ -1,3 +1,7 @@
+---
+title: Vector Network Implementation
+---
+
 # Grida's VectorNetwork Implementation.
 
 > see [PR #408](https://github.com/gridaco/grida/pull/408)
