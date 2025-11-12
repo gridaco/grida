@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600">
+    <rect x="0" y="0" width="400" height="600" fill="#0f172a" />
+
+    <g transform="translate(32 56)" fill="#e2e8f0">
+        <text x="0" y="0" font-family="Inter, sans-serif" font-size="32" font-weight="700">
+            Sample Heading
+        </text>
+        <text x="0" y="54" font-family="Inter, sans-serif" font-size="18">
+            Simple subtitle line
+        </text>
+        <text x="0" y="94" font-family="Georgia, serif" font-size="20" font-style="italic">
+            italic serif
+        </text>
+        <text x="0" y="134" font-family="Space Mono, monospace" font-size="16">
+            monospace 123456
+        </text>
+    </g>
+
+    <g transform="translate(32 220)" fill="#f8fafc">
+        <text x="0" y="0" font-family="Inter, sans-serif" font-size="16"> Multi-line example: <tspan
+                x="0" dy="26">second line via tspan</tspan>
+            <tspan x="0" dy="26" fill="#38bdf8">third
+            line tinted</tspan>
+        </text>
+    </g>
+
+    <g transform="translate(32 400)" fill="#94a3b8">
+        <text x="0" y="0" font-family="Inter, sans-serif" font-size="20" text-anchor="start">
+            left
+        </text>
+        <text x="160" y="0" font-family="Inter, sans-serif" font-size="20" text-anchor="middle">
+            center
+        </text>
+        <text x="320" y="0" font-family="Inter, sans-serif" font-size="20" text-anchor="end">
+            right
+        </text>
+    </g>
+</svg>
