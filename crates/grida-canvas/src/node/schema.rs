@@ -1531,6 +1531,20 @@ impl VectorNodeRec {
     }
 }
 
+// /// Foreign <svg> node.
+// /// this renders given svg string as-is, without any further controls over the data.
+// /// similar to <img> with svg as src.
+// #[derive(Debug, Clone)]
+// pub struct SVGImageNodeRec {
+//     pub active: bool,
+//     pub opacity: f32,
+//     pub blend_mode: LayerBlendMode,
+//     pub transform: AffineTransform,
+//     pub svg: String,
+//     /// Layout style for this node when it is a child of a layout container.
+//     pub layout_child: Option<LayoutChildStyle>,
+// }
+
 ///
 /// SVG Path compatible path node.
 ///

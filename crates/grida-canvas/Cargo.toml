@@ -36,10 +36,6 @@ figma-api = { version = "0.31.3", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 reqwest = "0.12.19"
-glutin = "0.32.0"
-glutin-winit = "0.5.0"
-raw-window-handle = "0.6.0"
-winit = "0.30.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 
 [features]
@@ -61,6 +57,3 @@ harness = false
 name = "bench_mipmap"
 harness = false
 
-[[example]]
-name = "app_figma"
-required-features = ["figma"]
