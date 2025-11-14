@@ -33,8 +33,13 @@ pub fn linear_gradient_paint(
     let mut matrix = skia_safe::Matrix::scale((x, y));
     matrix.pre_concat(&sk_matrix(gradient.transform.matrix));
 
+    let uv1 = gradient.xy1.to_uv();
+    let uv2 = gradient.xy2.to_uv();
+    let p1 = skia_safe::Point::new(uv1.u(), uv1.v());
+    let p2 = skia_safe::Point::new(uv2.u(), uv2.v());
+
     if let Some(shader) = skia_safe::Shader::linear_gradient(
-        ((0.0, 0.5), (1.0, 0.5)),
+        (p1, p2),
         &colors[..],
         Some(&positions[..]),
         skia_safe::TileMode::Clamp,
@@ -59,8 +64,13 @@ pub fn linear_gradient_shader(
     let mut matrix = skia_safe::Matrix::scale((x, y));
     matrix.pre_concat(&sk_matrix(gradient.transform.matrix));
 
+    let start_uv = gradient.xy1.to_uv();
+    let end_uv = gradient.xy2.to_uv();
+    let start_point = skia_safe::Point::new(start_uv.u(), start_uv.v());
+    let end_point = skia_safe::Point::new(end_uv.u(), end_uv.v());
+
     if let Some(shader) = skia_safe::Shader::linear_gradient(
-        ((0.0, 0.5), (1.0, 0.5)),
+        (start_point, end_point),
         &colors[..],
         Some(&positions[..]),
         skia_safe::TileMode::Clamp,

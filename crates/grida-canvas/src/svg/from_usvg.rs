@@ -126,6 +126,7 @@ impl From<&usvg::LinearGradient> for SVGLinearGradientPaint {
             y2: gradient.y2(),
             transform: gradient.transform().into(),
             stops: Vec::<GradientStop>::from(UsvgStops(gradient.stops())),
+            spread_method: gradient.spread_method().into(),
         }
     }
 }
@@ -141,6 +142,7 @@ impl From<&usvg::RadialGradient> for SVGRadialGradientPaint {
             fy: gradient.fy(),
             transform: gradient.transform().into(),
             stops: Vec::<GradientStop>::from(UsvgStops(gradient.stops())),
+            spread_method: gradient.spread_method().into(),
         }
     }
 }
@@ -193,6 +195,16 @@ impl From<&usvg::Fill> for SVGFillAttributes {
 impl From<&usvg::Stroke> for SVGStrokeAttributes {
     fn from(stroke: &usvg::Stroke) -> Self {
         stroke.clone().into()
+    }
+}
+
+impl From<usvg::SpreadMethod> for SVGGradientSpreadMethod {
+    fn from(method: usvg::SpreadMethod) -> Self {
+        match method {
+            usvg::SpreadMethod::Pad => SVGGradientSpreadMethod::Pad,
+            usvg::SpreadMethod::Reflect => SVGGradientSpreadMethod::Reflect,
+            usvg::SpreadMethod::Repeat => SVGGradientSpreadMethod::Repeat,
+        }
     }
 }
 

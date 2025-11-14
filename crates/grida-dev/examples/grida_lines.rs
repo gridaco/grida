@@ -58,22 +58,9 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_gradient.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
-        transform: AffineTransform::identity(),
-        stops: vec![
-            GradientStop {
-                offset: 0.0,
-                color: CGColor(0, 255, 0, 255),
-            },
-            GradientStop {
-                offset: 1.0,
-                color: CGColor(255, 0, 255, 255),
-            },
-        ],
-        opacity: 1.0,
-        blend_mode: BlendMode::Normal,
-        active: true,
-    })]);
+    line_gradient.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint::from_colors(
+        vec![CGColor(0, 255, 0, 255), CGColor(255, 0, 255, 255)],
+    ))]);
     line_gradient.stroke_width = 6.0;
 
     // Rotated diagonal line

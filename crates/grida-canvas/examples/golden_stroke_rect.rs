@@ -88,9 +88,6 @@ impl DemoConfig {
             },
 
             stroke_paint: cg::cg::Paint::LinearGradient(LinearGradientPaint {
-                active: true,
-                blend_mode: BlendMode::Normal,
-                opacity: 1.0,
                 transform: math2::transform::AffineTransform::identity(),
                 stops: vec![
                     GradientStop {
@@ -102,6 +99,7 @@ impl DemoConfig {
                         color: CGColor(150, 50, 200, 255), // Purple
                     },
                 ],
+                ..Default::default()
             }),
 
             dash: Some((vec![12.0, 8.0], 0.0)),

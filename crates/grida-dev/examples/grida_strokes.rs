@@ -224,22 +224,10 @@ async fn demo_strokes() -> Scene {
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
         rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
-        rect.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
-            transform: AffineTransform::new(0.0, 0.0, 0.0),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(255, 0, 0, 255), // Red
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(0, 0, 255, 255), // Blue
-                },
-            ],
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            active: true,
-        })]);
+
+        rect.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint::from_colors(
+            vec![CGColor::RED, CGColor::BLUE],
+        ))]);
         rect.stroke_width = 8.0.into();
         graph.append_child(
             Node::Rectangle(rect),
@@ -376,8 +364,7 @@ async fn demo_strokes() -> Scene {
                     },
                 ],
                 opacity: 0.7,
-                blend_mode: BlendMode::Normal,
-                active: true,
+                ..Default::default()
             }),
         ]);
         rect.stroke_width = 10.0.into();
@@ -424,8 +411,7 @@ async fn demo_strokes() -> Scene {
                     },
                 ],
                 opacity: 0.8,
-                blend_mode: BlendMode::Normal,
-                active: true,
+                ..Default::default()
             }),
         ]);
         ellipse.stroke_width = 12.0.into();
@@ -458,8 +444,7 @@ async fn demo_strokes() -> Scene {
                     },
                 ],
                 opacity: 0.6,
-                blend_mode: BlendMode::Normal,
-                active: true,
+                ..Default::default()
             }),
             Paint::RadialGradient(RadialGradientPaint {
                 transform: AffineTransform {

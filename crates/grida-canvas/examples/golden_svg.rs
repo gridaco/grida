@@ -80,9 +80,7 @@ async fn demo_scene() -> Scene {
                 color: CGColor(100, 255, 100, 255),
             },
         ],
-        opacity: 1.0,
-        blend_mode: BlendMode::Normal,
-        active: true,
+        ..Default::default()
     }));
     rect_gradient.stroke_width = 3.0.into();
     rect_gradient.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
@@ -180,26 +178,9 @@ async fn demo_scene() -> Scene {
         width: 200.0,
         height: 0.0,
     };
-    line.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
-        transform: AffineTransform::identity(),
-        stops: vec![
-            GradientStop {
-                offset: 0.0,
-                color: CGColor(255, 0, 0, 255),
-            },
-            GradientStop {
-                offset: 0.5,
-                color: CGColor(0, 255, 0, 255),
-            },
-            GradientStop {
-                offset: 1.0,
-                color: CGColor(0, 0, 255, 255),
-            },
-        ],
-        opacity: 1.0,
-        blend_mode: BlendMode::default(),
-        active: true,
-    })]);
+    line.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint::from_colors(
+        vec![CGColor::RED, CGColor::GREEN, CGColor::BLUE],
+    ))]);
     line.stroke_width = 8.0;
 
     // Regular polygon (octagon)

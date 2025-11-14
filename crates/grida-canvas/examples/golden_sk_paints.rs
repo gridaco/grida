@@ -95,6 +95,7 @@ fn main() {
                 opacity: 1.0,
                 blend_mode: BlendMode::Normal,
                 active: true,
+                ..Default::default()
             })]),
             "2. Single Linear Gradient",
         ),
@@ -137,6 +138,7 @@ fn main() {
                     opacity: 0.6,
                     blend_mode: BlendMode::Screen,
                     active: true,
+                    ..Default::default()
                 }),
             ]),
             "4. Solid + Linear (Screen)",
@@ -159,6 +161,7 @@ fn main() {
                     opacity: 0.7,
                     blend_mode: BlendMode::Normal,
                     active: true,
+                    ..Default::default()
                 }),
                 Paint::LinearGradient(LinearGradientPaint {
                     transform: AffineTransform::identity(),
@@ -175,6 +178,7 @@ fn main() {
                     opacity: 0.5,
                     blend_mode: BlendMode::Overlay,
                     active: true,
+                    ..Default::default()
                 }),
             ]),
             "5. Linear + Linear (Overlay)",
@@ -197,6 +201,7 @@ fn main() {
                     opacity: 0.7,
                     blend_mode: BlendMode::Normal,
                     active: true,
+                    ..Default::default()
                 }),
                 Paint::RadialGradient(RadialGradientPaint {
                     transform: AffineTransform::identity(),
@@ -293,6 +298,7 @@ fn main() {
                     opacity: 0.6,
                     blend_mode: BlendMode::Multiply,
                     active: true,
+                    ..Default::default()
                 }),
                 Paint::RadialGradient(RadialGradientPaint {
                     transform: AffineTransform::identity(),

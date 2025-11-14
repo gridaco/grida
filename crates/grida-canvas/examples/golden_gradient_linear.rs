@@ -1,6 +1,5 @@
 use cg::cg::prelude::*;
 use cg::painter::gradient::*;
-use math2::transform::AffineTransform;
 use skia_safe::{surfaces, Color, Rect};
 
 fn main() {
@@ -9,26 +8,11 @@ fn main() {
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    let gradient = LinearGradientPaint {
-        stops: vec![
-            GradientStop {
-                offset: 0.0,
-                color: CGColor(255, 0, 0, 255),
-            },
-            GradientStop {
-                offset: 0.5,
-                color: CGColor(0, 255, 0, 255),
-            },
-            GradientStop {
-                offset: 1.0,
-                color: CGColor(0, 0, 255, 255),
-            },
-        ],
-        opacity: 1.0,
-        transform: AffineTransform::identity(),
-        blend_mode: BlendMode::Normal,
-        active: true,
-    };
+    let gradient = LinearGradientPaint::from_colors(vec![
+        CGColor(255, 0, 0, 255),
+        CGColor(0, 255, 0, 255),
+        CGColor(0, 0, 255, 255),
+    ]);
 
     let paint = linear_gradient_paint(&gradient, (width as f32, height as f32));
 

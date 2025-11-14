@@ -2186,6 +2186,8 @@ pub struct GradientStop {
 #[derive(Debug, Clone)]
 pub struct LinearGradientPaint {
     pub active: bool,
+    pub xy1: Alignment,
+    pub xy2: Alignment,
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
@@ -2196,6 +2198,8 @@ impl LinearGradientPaint {
     pub fn from_colors(colors: Vec<CGColor>) -> Self {
         Self {
             active: true,
+            xy1: Alignment::CENTER_LEFT,
+            xy2: Alignment::CENTER_RIGHT,
             transform: AffineTransform::default(),
             stops: colors
                 .iter()
@@ -2215,6 +2219,8 @@ impl Default for LinearGradientPaint {
     fn default() -> Self {
         Self {
             active: true,
+            xy1: Alignment::CENTER_LEFT,
+            xy2: Alignment::CENTER_RIGHT,
             transform: AffineTransform::default(),
             stops: Vec::new(),
             opacity: 1.0,

@@ -62,8 +62,7 @@ async fn demo_fills() -> Scene {
                 },
             ],
             opacity: 0.6,
-            blend_mode: BlendMode::Normal,
-            active: true,
+            ..Default::default()
         }),
     ]);
     solid_gradient_rect.stroke_width = 3.0.into();
@@ -130,9 +129,7 @@ async fn demo_fills() -> Scene {
                     color: CGColor(0, 0, 255, 255), // Blue
                 },
             ],
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            active: true,
+            ..Default::default()
         }),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform {
@@ -251,8 +248,7 @@ async fn demo_fills() -> Scene {
                 },
             ],
             opacity: 0.7,
-            blend_mode: BlendMode::Normal,
-            active: true,
+            ..Default::default()
         }),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform {
@@ -301,9 +297,7 @@ async fn demo_fills() -> Scene {
                     color: CGColor(255, 0, 0, 0), // Transparent
                 },
             ],
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            active: true,
+            ..Default::default()
         }),
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(60.0),
@@ -318,8 +312,7 @@ async fn demo_fills() -> Scene {
                 },
             ],
             opacity: 0.8,
-            blend_mode: BlendMode::Normal,
-            active: true,
+            ..Default::default()
         }),
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(120.0),
@@ -334,8 +327,7 @@ async fn demo_fills() -> Scene {
                 },
             ],
             opacity: 0.6,
-            blend_mode: BlendMode::Normal,
-            active: true,
+            ..Default::default()
         }),
     ]);
     multi_linear_polygon.stroke_width = 3.0.into();

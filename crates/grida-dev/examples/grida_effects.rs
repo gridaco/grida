@@ -114,7 +114,6 @@ async fn demo_effects() -> Scene {
         height: 90.0,
     };
     vivid_gradient_rect.set_fill(Paint::LinearGradient(LinearGradientPaint {
-        transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
                 offset: 0.0,
@@ -129,9 +128,7 @@ async fn demo_effects() -> Scene {
                 color: CGColor(255, 255, 0, 255),
             }, // Yellow
         ],
-        opacity: 1.0,
-        blend_mode: BlendMode::Normal,
-        active: true,
+        ..Default::default()
     }));
     graph.append_child(
         Node::Rectangle(vivid_gradient_rect),

@@ -114,10 +114,13 @@ impl From<&FigmaPaint> for Paint {
 
                 match gradient.r#type {
                     figma_api::models::gradient_paint::Type::GradientLinear => {
+                        let (xy1, xy2) =
+                            handles_to_linear_alignments(&gradient.gradient_handle_positions);
+
                         Paint::LinearGradient(LinearGradientPaint {
-                            transform: convert_gradient_transform(
-                                &gradient.gradient_handle_positions,
-                            ),
+                            xy1,
+                            xy2,
+                            transform: AffineTransform::identity(),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
@@ -369,6 +372,20 @@ fn convert_gradient_transform(handles: &Vec<Vector>) -> AffineTransform {
     }
 }
 
+fn handles_to_linear_alignments(handles: &Vec<Vector>) -> (Alignment, Alignment) {
+    if handles.len() >= 2 {
+        let start = figma_vector_to_alignment(&handles[0]);
+        let end = figma_vector_to_alignment(&handles[1]);
+        (start, end)
+    } else {
+        (Alignment::CENTER_LEFT, Alignment::CENTER_RIGHT)
+    }
+}
+
+fn figma_vector_to_alignment(vector: &Vector) -> Alignment {
+    Alignment(vector.x as f32 * 2.0 - 1.0, vector.y as f32 * 2.0 - 1.0)
+}
+
 /// Converts Figma nodes to Grida schema
 pub struct FigmaConverter {
     repository: NodeRepository,
@@ -533,10 +550,13 @@ impl FigmaConverter {
 
                 match gradient.r#type {
                     figma_api::models::gradient_paint::Type::GradientLinear => {
+                        let (xy1, xy2) =
+                            handles_to_linear_alignments(&gradient.gradient_handle_positions);
+
                         Paint::LinearGradient(LinearGradientPaint {
-                            transform: convert_gradient_transform(
-                                &gradient.gradient_handle_positions,
-                            ),
+                            xy1,
+                            xy2,
+                            transform: AffineTransform::identity(),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),

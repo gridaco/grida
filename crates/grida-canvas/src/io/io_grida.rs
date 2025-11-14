@@ -487,6 +487,8 @@ impl From<Option<JSONPaint>> for Paint {
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::LinearGradient(LinearGradientPaint {
+                    xy1: Alignment::CENTER_LEFT,
+                    xy2: Alignment::CENTER_RIGHT,
                     transform: transform
                         .map(|t| t.into())
                         .unwrap_or_else(AffineTransform::identity),
