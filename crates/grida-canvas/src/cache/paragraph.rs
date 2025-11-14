@@ -33,7 +33,7 @@
 //! ### For Geometry/Measurement
 //! ```rust
 //! # use cg::cache::paragraph::ParagraphCache;
-//! # use cg::cg::types::*;
+//! # use cg::cg::prelude::*;
 //! # use std::sync::{Arc, Mutex};
 //! # use cg::resources::ByteStore;
 //! # use cg::runtime::font_repository::FontRepository;
@@ -52,7 +52,7 @@
 //! ### For Rendering
 //! ```rust
 //! # use cg::cache::paragraph::ParagraphCache;
-//! # use cg::cg::types::*;
+//! # use cg::cg::prelude::*;
 //! # use std::sync::{Arc, Mutex};
 //! # use cg::resources::ByteStore;
 //! # use cg::runtime::{font_repository::FontRepository, image_repository::ImageRepository};

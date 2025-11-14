@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::io::io_grida::parse;
 use cg::node::schema::*;
 use cg::window;

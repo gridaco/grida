@@ -1,4 +1,4 @@
-use cg::cg::types::*; // import style per repo convention [[memory:8559399]]
+use cg::cg::prelude::*; // import style per repo convention [[memory:8559399]]
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
