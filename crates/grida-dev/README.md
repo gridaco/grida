@@ -25,6 +25,9 @@ cargo run -p grida-dev -- benchmark --size 400
 
 # load the built-in sample scene
 cargo run -p grida-dev -- sample
+
+# open the drop-target master window (drag .grida/.svg/.png/.jpg/.webp)
+cargo run -p grida-dev -- master
 ```
 
 ### Native Examples
@@ -43,4 +46,5 @@ Examples live under `crates/grida-dev/examples/*` (with the CLI now covering the
 - Remote scenes use `reqwest`; stay online or stick to local files.
 - Image/font assets referenced with `http(s)://` URLs are loaded asynchronously inside `cg`.
 - `run_demo_window` currently opens a fixed 1080×1080 window; customize it in `cg` if needed.
+- `master` replaces the in-flight scene whenever a supported file is dropped; unsupported drops panic loudly so you can fix converters.
 - This crate is intentionally `publish = false`—it will gain CLI subcommands/devtools over time (inspector GUIs, perf capture, etc.).

@@ -17,6 +17,7 @@ cargo run -p grida-dev -- figma --file-key ... --api-key ... --scene-index 0
 cargo run -p grida-dev -- svg path/to/file.svg --title "My SVG"
 cargo run -p grida-dev -- benchmark --size 400
 cargo run -p grida-dev -- sample
+cargo run -p grida-dev -- master
 ```
 
 ## Notes
@@ -26,4 +27,5 @@ cargo run -p grida-dev -- sample
 - The crate is `publish = false` and intended solely for local development workflows and devtools.
 - All winit/glutin integration now lives here; the `cg` crate remains platform-agnostic.
 - Expect more CLI commands/subcommands over time for dev inspectors, perf capture, etc.—this crate is the staging ground for those Rust-only utilities.
+- `master` opens a blank window that replaces the scene whenever a `.grida`, `.svg`, `.png`, `.jpg/.jpeg`, or `.webp` file is dropped; unsupported drops panic.
 - Do **not** launch the windowed demo yourself. It spins up a native winit event loop that agents cannot stop, inspect, or debug reliably. Use the forthcoming debug/tooling protocols instead once they land.

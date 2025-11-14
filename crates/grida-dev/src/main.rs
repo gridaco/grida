@@ -1,11 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use cg::cg::prelude::*;
+use cg::cg::types::ResourceRef;
 use cg::helpers::webfont_helper::{find_font_files, load_webfonts_metadata};
 use cg::io::{io_figma::FigmaConverter, io_grida};
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::{Node, Scene, Size};
-use cg::resources::{load_font, load_scene_images, FontMessage};
+use cg::resources::{load_font, load_scene_images, FontMessage, ImageMessage};
 use cg::svg::pack;
 use cg::window::application::{HostEvent, HostEventCallback};
 use clap::{Args, Parser, Subcommand};
@@ -13,16 +14,22 @@ use figma_api::apis::{
     configuration::{ApiKey, Configuration},
     files_api::{get_file, get_image_fills},
 };
+use futures::channel::mpsc;
 use futures::future::join_all;
-use grida_dev::platform::native_demo::{run_demo_window, run_demo_window_with};
+use grida_dev::platform::native_demo::{
+    run_demo_window, run_demo_window_with, run_demo_window_with_drop,
+};
+use image::image_dimensions;
 use math2::transform::AffineTransform;
 use reqwest;
 use serde_json;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::fs as async_fs;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use winit::event_loop::EventLoopProxy;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -51,6 +58,8 @@ enum Command {
     },
     /// Render the built-in sample scene.
     Sample,
+    /// Open an empty scene and replace it when files are dropped onto the window.
+    Master,
 }
 
 #[derive(Args, Debug)]
@@ -102,6 +111,9 @@ async fn main() -> Result<()> {
         Command::Sample => {
             run_demo_window(build_sample_scene()).await;
         }
+        Command::Master => run_master().await?,
+        #[allow(unreachable_patterns)]
+        _ => unreachable!("Unhandled command variant"),
     }
     Ok(())
 }
@@ -237,6 +249,25 @@ async fn run_svg(args: SvgArgs) -> Result<()> {
     };
 
     run_demo_window(scene).await;
+    Ok(())
+}
+
+async fn run_master() -> Result<()> {
+    let initial_scene = build_empty_scene();
+    let (drop_tx, drop_rx) = unbounded_channel::<PathBuf>();
+    let drop_rx = Arc::new(Mutex::new(Some(drop_rx)));
+
+    run_demo_window_with_drop(
+        initial_scene,
+        move |_renderer, tx, _font_tx, proxy| {
+            let mut guard = drop_rx.lock().expect("drop rx mutex poisoned");
+            let drop_rx = guard.take().expect("drop receiver already taken");
+            start_master_drop_task(drop_rx, tx.clone(), proxy.clone());
+        },
+        drop_tx,
+    )
+    .await;
+
     Ok(())
 }
 
@@ -526,4 +557,102 @@ fn parse_hex_color(input: &str) -> Option<CGColor> {
         }
         _ => None,
     }
+}
+
+fn build_empty_scene() -> Scene {
+    Scene {
+        name: "Drop a file to begin".to_string(),
+        graph: SceneGraph::new(),
+        background_color: Some(CGColor(0xF4, 0xF5, 0xF7, 0xFF)),
+    }
+}
+
+async fn load_master_scene_from_path(path: &Path) -> Result<Scene> {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .ok_or_else(|| anyhow!("Dropped file has no extension: {}", path.display()))?;
+
+    match ext.as_str() {
+        "grida" | "json" => load_scene_from_source(&path.to_string_lossy()).await,
+        "svg" => scene_from_svg_path(path),
+        "png" | "jpg" | "jpeg" | "webp" => scene_from_raster_path(path),
+        other => Err(anyhow!(
+            "Unsupported dropped file type ({}): {}",
+            other,
+            path.display()
+        )),
+    }
+}
+
+fn scene_from_svg_path(path: &Path) -> Result<Scene> {
+    let svg_source =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    let graph = pack::from_svg_str(&svg_source)
+        .map_err(|err| anyhow!("failed to convert SVG {}: {err}", path.display()))?;
+
+    Ok(Scene {
+        name: path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "SVG".to_string()),
+        graph,
+        background_color: Some(CGColor(0xF8, 0xF8, 0xF8, 0xFF)),
+    })
+}
+
+fn scene_from_raster_path(path: &Path) -> Result<Scene> {
+    let (width, height) = image_dimensions(path)
+        .with_context(|| format!("failed to read image dimensions {}", path.display()))?;
+    let mut graph = SceneGraph::new();
+    let nf = NodeFactory::new();
+
+    let mut image_node = nf.create_image_node();
+    image_node.size = Size {
+        width: width as f32,
+        height: height as f32,
+    };
+    image_node.image = ResourceRef::RID(path.to_string_lossy().into_owned());
+
+    graph.append_child(Node::Image(image_node), Parent::Root);
+
+    Ok(Scene {
+        name: path
+            .file_stem()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "Image".to_string()),
+        graph,
+        background_color: Some(CGColor(0xF8, 0xF8, 0xF8, 0xFF)),
+    })
+}
+
+fn start_master_drop_task(
+    mut drop_rx: UnboundedReceiver<PathBuf>,
+    image_tx: mpsc::UnboundedSender<ImageMessage>,
+    proxy: EventLoopProxy<HostEvent>,
+) {
+    tokio::spawn(async move {
+        while let Some(path) = drop_rx.recv().await {
+            match load_master_scene_from_path(&path).await {
+                Ok(scene) => {
+                    let scene_for_loader = scene.clone();
+                    if proxy.send_event(HostEvent::LoadScene(scene)).is_err() {
+                        panic!("failed to send LoadScene event");
+                    }
+
+                    let tx_clone = image_tx.clone();
+                    let proxy_clone = proxy.clone();
+                    let event_cb: HostEventCallback = Arc::new(move |event: HostEvent| {
+                        let _ = proxy_clone.send_event(event);
+                    });
+
+                    tokio::spawn(async move {
+                        load_scene_images(&scene_for_loader, tx_clone, event_cb).await;
+                    });
+                }
+                Err(err) => panic!("Failed to load dropped file {}: {err}", path.display()),
+            }
+        }
+    });
 }

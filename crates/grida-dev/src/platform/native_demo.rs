@@ -4,7 +4,9 @@ use cg::resources::{load_scene_images, FontMessage, ImageMessage};
 use cg::runtime::scene::{Backend, Renderer};
 use cg::window::application::{ApplicationApi, HostEvent, HostEventCallback};
 use futures::channel::mpsc;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::mpsc::UnboundedSender;
 
 #[allow(dead_code)]
 pub async fn run_demo_window(scene: Scene) {
@@ -13,6 +15,33 @@ pub async fn run_demo_window(scene: Scene) {
 
 pub async fn run_demo_window_with<F>(scene: Scene, init: F)
 where
+    F: FnOnce(
+        &mut Renderer,
+        mpsc::UnboundedSender<ImageMessage>,
+        mpsc::UnboundedSender<FontMessage>,
+        winit::event_loop::EventLoopProxy<HostEvent>,
+    ),
+{
+    run_demo_window_core(scene, init, None).await;
+}
+
+pub async fn run_demo_window_with_drop<F>(scene: Scene, init: F, drop_tx: UnboundedSender<PathBuf>)
+where
+    F: FnOnce(
+        &mut Renderer,
+        mpsc::UnboundedSender<ImageMessage>,
+        mpsc::UnboundedSender<FontMessage>,
+        winit::event_loop::EventLoopProxy<HostEvent>,
+    ),
+{
+    run_demo_window_core(scene, init, Some(drop_tx)).await;
+}
+
+async fn run_demo_window_core<F>(
+    scene: Scene,
+    init: F,
+    file_drop_tx: Option<UnboundedSender<PathBuf>>,
+) where
     F: FnOnce(
         &mut Renderer,
         mpsc::UnboundedSender<ImageMessage>,
@@ -35,6 +64,8 @@ where
         cg::runtime::scene::RendererOptions {
             use_embedded_fonts: true,
         },
+        file_drop_tx.clone(),
+        file_drop_tx.is_some(),
     );
     let proxy = el.create_proxy();
 
