@@ -227,7 +227,7 @@ fn classify_node(node: &Node) -> &'static str {
         Node::Container(_) => "container",
         Node::Group(_) => "group",
         Node::Vector(_) => "vector",
-        Node::SVGPath(_) => "svg_path",
+        Node::Path(_) => "svg_path",
         Node::BooleanOperation(_) => "boolean",
         Node::Rectangle(_) => "rectangle",
         Node::Ellipse(_) => "ellipse",

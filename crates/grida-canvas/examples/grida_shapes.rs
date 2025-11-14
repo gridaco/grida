@@ -139,10 +139,7 @@ async fn demo_shapes() -> Scene {
             200 - (i * 20) as u8,
             255,
         ))]); // Fading gray
-        graph.append_child(
-            Node::SVGPath(path),
-            Parent::NodeId(root_container_id.clone()),
-        );
+        graph.append_child(Node::Path(path), Parent::NodeId(root_container_id.clone()));
     }
 
     // Star Polygon Row - demonstrating different point counts and inner radius variations

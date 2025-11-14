@@ -168,7 +168,7 @@ impl<'a> NodePainter<'a> {
     }
 
     /// Draw a PathNode (SVG path data)
-    pub fn draw_path_node(&self, node: &SVGPathNodeRec) {
+    pub fn draw_path_node(&self, node: &PathNodeRec) {
         // TODO: Pass id as parameter - using dummy 0 for now in debug mode
         let dummy_id = 0;
         self.painter.with_transform(&node.transform.matrix, || {
@@ -516,7 +516,7 @@ impl<'a> NodePainter<'a> {
                 self.draw_image_node(n);
             }
             Node::Vector(n) => self.draw_vector_node(n),
-            Node::SVGPath(n) => self.draw_path_node(n),
+            Node::Path(n) => self.draw_path_node(n),
             Node::BooleanOperation(n) => {
                 self.draw_boolean_operation_node_recursively(id, n, graph, cache)
             }

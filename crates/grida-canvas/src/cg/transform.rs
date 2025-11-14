@@ -1,7 +1,7 @@
 use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 
-/// ```
+/// ```txt
 /// | m00  m01  m02 |
 /// | m10  m11  m12 |
 /// | 0    0    1   |

@@ -178,7 +178,7 @@ async fn demo_basic() -> Scene {
         vec![
             Node::TextSpan(text_span_node),
             Node::Line(line_node),
-            Node::SVGPath(path_node),
+            Node::Path(path_node),
             Node::Image(image_node),
         ],
         Parent::NodeId(root_container_id),

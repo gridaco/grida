@@ -262,7 +262,7 @@ async fn demo_scene() -> Scene {
             Node::Ellipse(ellipse_radial),
             Node::Polygon(hexagon),
             Node::RegularStarPolygon(star),
-            Node::SVGPath(path),
+            Node::Path(path),
             Node::Line(line),
             Node::RegularPolygon(octagon),
             Node::TextSpan(description_text),

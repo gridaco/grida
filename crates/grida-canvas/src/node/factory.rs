@@ -225,8 +225,8 @@ impl NodeFactory {
     }
 
     /// Creates a new path node with default values
-    pub fn create_path_node(&self) -> SVGPathNodeRec {
-        SVGPathNodeRec {
+    pub fn create_path_node(&self) -> PathNodeRec {
+        PathNodeRec {
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),

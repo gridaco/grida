@@ -815,7 +815,7 @@ impl LayerList {
                     mask: n.mask,
                 }
             }
-            Node::SVGPath(n) => {
+            Node::Path(n) => {
                 let bounds = scene_cache
                     .geometry()
                     .get_world_bounds(id)

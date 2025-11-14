@@ -111,7 +111,7 @@ impl SceneBuilder {
         // SVG does not expose stroke-align; spec defaults to center.
         node.stroke_style.stroke_align = StrokeAlign::Center;
 
-        self.graph.append_child(Node::SVGPath(node), parent);
+        self.graph.append_child(Node::Path(node), parent);
         Ok(())
     }
 
