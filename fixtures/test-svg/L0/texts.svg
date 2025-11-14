@@ -35,4 +35,12 @@
             right
         </text>
     </g>
+
+    <g transform="translate(32 520)" fill="#f1f5f9">
+        <text x="0" y="0" font-family="Inter, sans-serif" font-size="18"> Spans: <tspan x="0"
+                dy="28" fill="#22d3ee">cyan-highlight</tspan>
+            <tspan x="0" dy="28" fill="#f472b6">
+            magenta-highlight</tspan>
+        </text>
+    </g>
 </svg>

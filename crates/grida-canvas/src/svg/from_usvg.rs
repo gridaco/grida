@@ -1,7 +1,7 @@
-use super::types::*;
+// NOTE: This module only contains conversion utilities (Into/From) between usvg
+// primitives and our SVG IR / core CG types. Scene construction lives elsewhere.
+
 use crate::cg::prelude::*;
-use math2::transform::AffineTransform;
-// use usvg::{LinearGradient, Paint, Pattern, RadialGradient, Stroke, Paint};
 
 impl From<usvg::Color> for CGColor {
     fn from(color: usvg::Color) -> Self {
@@ -84,19 +84,17 @@ impl From<usvg::LineJoin> for StrokeJoin {
     }
 }
 
-pub fn map_transform(transform: usvg::Transform) -> AffineTransform {
-    AffineTransform::from_acebdf(
-        transform.sx,
-        transform.kx,
-        transform.tx,
-        transform.ky,
-        transform.sy,
-        transform.ty,
-    )
-}
-
-pub fn map_transform_ref(transform: &usvg::Transform) -> AffineTransform {
-    map_transform(*transform)
+impl From<usvg::Transform> for CGTransform2D {
+    fn from(transform: usvg::Transform) -> Self {
+        CGTransform2D::new(
+            transform.sx,
+            transform.kx,
+            transform.tx,
+            transform.ky,
+            transform.sy,
+            transform.ty,
+        )
+    }
 }
 
 impl From<usvg::Stop> for GradientStop {
@@ -110,61 +108,91 @@ impl From<usvg::Stop> for GradientStop {
     }
 }
 
-impl From<usvg::Paint> for Paint {
-    fn from(paint: usvg::Paint) -> Self {
+struct UsvgStops<'a>(&'a [usvg::Stop]);
+
+impl From<UsvgStops<'_>> for Vec<GradientStop> {
+    fn from(stops: UsvgStops<'_>) -> Self {
+        stops.0.iter().cloned().map(GradientStop::from).collect()
+    }
+}
+
+impl From<&usvg::LinearGradient> for SVGLinearGradientPaint {
+    fn from(gradient: &usvg::LinearGradient) -> Self {
+        SVGLinearGradientPaint {
+            id: gradient.id().to_string(),
+            x1: gradient.x1(),
+            y1: gradient.y1(),
+            x2: gradient.x2(),
+            y2: gradient.y2(),
+            transform: gradient.transform().into(),
+            stops: Vec::<GradientStop>::from(UsvgStops(gradient.stops())),
+        }
+    }
+}
+
+impl From<&usvg::RadialGradient> for SVGRadialGradientPaint {
+    fn from(gradient: &usvg::RadialGradient) -> Self {
+        SVGRadialGradientPaint {
+            id: gradient.id().to_string(),
+            cx: gradient.cx(),
+            cy: gradient.cy(),
+            r: gradient.r().get(),
+            fx: gradient.fx(),
+            fy: gradient.fy(),
+            transform: gradient.transform().into(),
+            stops: Vec::<GradientStop>::from(UsvgStops(gradient.stops())),
+        }
+    }
+}
+
+impl From<&usvg::Paint> for SVGPaint {
+    fn from(paint: &usvg::Paint) -> Self {
         match paint {
-            usvg::Paint::Color(color) => Paint::Solid(SolidPaint::new_color(color.into())),
-            usvg::Paint::LinearGradient(gradient) => Paint::LinearGradient(LinearGradientPaint {
-                active: true,
-                blend_mode: Default::default(),
-                transform: map_transform(gradient.transform()),
-                stops: gradient
-                    .stops()
-                    .iter()
-                    .cloned()
-                    .map(GradientStop::from)
-                    .collect(),
-                opacity: 1.0,
+            usvg::Paint::Color(color) => SVGPaint::Solid(SVGSolidPaint {
+                color: (*color).into(),
             }),
-            usvg::Paint::RadialGradient(gradient) => Paint::RadialGradient(RadialGradientPaint {
-                active: true,
-                blend_mode: Default::default(),
-                transform: map_transform(gradient.transform()),
-                stops: gradient
-                    .stops()
-                    .iter()
-                    .cloned()
-                    .map(GradientStop::from)
-                    .collect(),
-                opacity: 1.0,
-            }),
+            usvg::Paint::LinearGradient(gradient) => {
+                SVGPaint::LinearGradient(gradient.as_ref().into())
+            }
+            usvg::Paint::RadialGradient(gradient) => {
+                SVGPaint::RadialGradient(gradient.as_ref().into())
+            }
             // [MODEL_MISMATCH]
             // fallback to solid paint
-            usvg::Paint::Pattern(_pattern) => Paint::Solid(SolidPaint::TRANSPARENT),
+            usvg::Paint::Pattern(_pattern) => SVGPaint::TRANSPARENT,
         }
     }
 }
 
 impl From<usvg::Stroke> for SVGStrokeAttributes {
     fn from(stroke: usvg::Stroke) -> Self {
-        let paint = Paint::from(stroke.paint().clone());
-        let width = stroke.width().get();
-        let cap = StrokeCap::from(stroke.linecap());
-        let join = StrokeJoin::from(stroke.linejoin());
-        let miter_limit = StrokeMiterLimit::from(stroke.miterlimit().get());
-        let dash_array = stroke
-            .dasharray()
-            .filter(|slice| !slice.is_empty())
-            .map(|slice| StrokeDashArray(slice.to_vec()));
-
         SVGStrokeAttributes {
-            paint,
-            stroke_width: width,
-            stroke_linecap: cap,
-            stroke_linejoin: join,
-            stroke_miterlimit: miter_limit,
-            stroke_dasharray: dash_array,
+            paint: stroke.paint().into(),
+            stroke_opacity: stroke.opacity().get(),
+            stroke_width: stroke.width().get(),
+            stroke_linecap: stroke.linecap().into(),
+            stroke_linejoin: stroke.linejoin().into(),
+            stroke_miterlimit: stroke.miterlimit().into(),
+            stroke_dasharray: stroke
+                .dasharray()
+                .map(|slice| StrokeDashArray(slice.to_vec())),
         }
+    }
+}
+
+impl From<&usvg::Fill> for SVGFillAttributes {
+    fn from(fill: &usvg::Fill) -> Self {
+        SVGFillAttributes {
+            paint: SVGPaint::from(fill.paint()),
+            fill_opacity: fill.opacity().get(),
+            fill_rule: fill.rule().into(),
+        }
+    }
+}
+
+impl From<&usvg::Stroke> for SVGStrokeAttributes {
+    fn from(stroke: &usvg::Stroke) -> Self {
+        stroke.clone().into()
     }
 }
 

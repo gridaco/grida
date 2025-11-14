@@ -1,3 +1,4 @@
+use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 
 /// ```
@@ -51,5 +52,37 @@ impl From<[[f32; 3]; 2]> for CGTransform2D {
             m11: m[1][1],
             m12: m[1][2],
         }
+    }
+}
+
+impl From<CGTransform2D> for AffineTransform {
+    fn from(transform: CGTransform2D) -> Self {
+        AffineTransform::from_acebdf(
+            transform.m00,
+            transform.m01,
+            transform.m02,
+            transform.m10,
+            transform.m11,
+            transform.m12,
+        )
+    }
+}
+
+impl From<&CGTransform2D> for AffineTransform {
+    fn from(transform: &CGTransform2D) -> Self {
+        (*transform).into()
+    }
+}
+
+impl From<AffineTransform> for CGTransform2D {
+    fn from(transform: AffineTransform) -> Self {
+        let [[m00, m01, m02], [m10, m11, m12]] = transform.matrix;
+        CGTransform2D::new(m00, m01, m02, m10, m11, m12)
+    }
+}
+
+impl From<&AffineTransform> for CGTransform2D {
+    fn from(transform: &AffineTransform) -> Self {
+        (*transform).into()
     }
 }

@@ -37,6 +37,8 @@ struct Cli {
     log_usvg: bool,
     #[arg(long = "log-scene")]
     log_scene: bool,
+    #[arg(long = "log-geometry")]
+    log_geometry: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -78,6 +80,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     for (id, msg) in scene_stats.placeholders {
         println!("! placeholder {:?}: {}", id, msg);
+    }
+
+    if cli.log_geometry {
+        log_geometry(&scene)?;
     }
 
     if let Some(out_path) = cli.png {
@@ -290,4 +296,53 @@ fn export_png(
     }
 
     Ok(())
+}
+
+fn log_geometry(scene: &Scene) -> Result<(), Box<dyn std::error::Error>> {
+    println!("• geometry cache:");
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let mut fonts = FontRepository::new(store.clone());
+    fonts.register_embedded_fonts();
+
+    let geometry = GeometryCache::from_scene(scene, &fonts);
+    for root in scene.graph.roots() {
+        log_geometry_recursive(&scene.graph, &geometry, root, 0);
+    }
+    Ok(())
+}
+
+fn log_geometry_recursive(graph: &SceneGraph, geometry: &GeometryCache, id: &NodeId, depth: usize) {
+    let Ok(node) = graph.get_node(id) else {
+        return;
+    };
+    let indent = "  ".repeat(depth);
+    let world_bounds = geometry
+        .get_world_bounds(id)
+        .map(|r| format_rect(&r))
+        .unwrap_or_else(|| "n/a".to_string());
+    let render_bounds = geometry
+        .get_render_bounds(id)
+        .map(|r| format_rect(&r))
+        .unwrap_or_else(|| "n/a".to_string());
+    println!(
+        "{indent}{:?} ⇒ {} world={} render={}",
+        id,
+        classify_node(node),
+        world_bounds,
+        render_bounds,
+        indent = indent
+    );
+
+    if let Some(children) = graph.get_children(id) {
+        for child in children {
+            log_geometry_recursive(graph, geometry, child, depth + 1);
+        }
+    }
+}
+
+fn format_rect(rect: &Rectangle) -> String {
+    format!(
+        "[{:.1}, {:.1}, {:.1}, {:.1}]",
+        rect.x, rect.y, rect.width, rect.height
+    )
 }

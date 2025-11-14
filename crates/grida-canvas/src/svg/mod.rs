@@ -1,6 +1,6 @@
-pub mod mappings;
+pub mod from_usvg;
+pub mod from_usvg_tree;
 pub mod pack;
-pub mod types;
 
-pub use mappings::*;
-pub use types::*;
+pub use from_usvg::*;
+pub use from_usvg_tree::*;

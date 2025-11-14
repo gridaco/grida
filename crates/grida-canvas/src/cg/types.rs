@@ -603,7 +603,7 @@ impl From<f32> for StrokeMiterLimit {
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
 /// - [Figma](https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/)
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum StrokeAlign {
     #[serde(rename = "inside")]
     Inside,
@@ -2176,7 +2176,7 @@ impl From<CGColor> for Paint {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct GradientStop {
     /// 0.0 = start, 1.0 = end
     pub offset: f32,

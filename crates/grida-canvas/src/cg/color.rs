@@ -32,6 +32,17 @@ impl CGColor {
     pub fn a(&self) -> u8 {
         self.3
     }
+
+    /// Returns a new color whose alpha channel is multiplied by `opacity` (0–1).
+    /// Leaves RGB untouched; handy for chaining fill/layer opacity without
+    /// mutating the original color.
+    pub fn with_multiplier(&self, opacity: f32) -> Self {
+        let clamped = opacity.clamp(0.0, 1.0);
+        let existing = self.a() as f32 / 255.0;
+        let combined = (existing * clamped).clamp(0.0, 1.0);
+        let alpha = (combined * 255.0).round() as u8;
+        CGColor::from_rgba(self.r(), self.g(), self.b(), alpha)
+    }
 }
 
 // ---------- Serialize: always [r, g, b, a] ----------
