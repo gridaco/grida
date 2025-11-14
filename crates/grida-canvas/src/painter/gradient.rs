@@ -1,4 +1,4 @@
-use crate::{cg::types::*, sk::sk_matrix};
+use crate::{cg::prelude::*, sk::sk_matrix};
 
 fn build_gradient_stops(stops: &[GradientStop], opacity: f32) -> (Vec<skia_safe::Color>, Vec<f32>) {
     let mut colors = Vec::with_capacity(stops.len());

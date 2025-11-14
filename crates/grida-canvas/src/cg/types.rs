@@ -1,6 +1,7 @@
+use super::color::*;
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 use super::alignment::Alignment;
@@ -48,49 +49,6 @@ impl Default for CGPoint {
 impl Into<skia_safe::Point> for CGPoint {
     fn into(self) -> skia_safe::Point {
         skia_safe::Point::new(self.x, self.y)
-    }
-}
-
-#[derive(Debug, Clone, Copy, Hash)]
-pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
-
-impl CGColor {
-    pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
-    pub const BLACK: Self = Self(0, 0, 0, 0xff);
-    pub const WHITE: Self = Self(0xff, 0xff, 0xff, 0xff);
-    pub const RED: Self = Self(0xff, 0, 0, 0xff);
-    pub const GREEN: Self = Self(0, 0xff, 0, 0xff);
-    pub const BLUE: Self = Self(0, 0, 0xff, 0xff);
-
-    pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
-        Self(r, g, b, a)
-    }
-
-    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
-        Self(r, g, b, 0xff)
-    }
-
-    pub fn r(&self) -> u8 {
-        self.0
-    }
-    pub fn g(&self) -> u8 {
-        self.1
-    }
-    pub fn b(&self) -> u8 {
-        self.2
-    }
-    pub fn a(&self) -> u8 {
-        self.3
-    }
-}
-
-impl From<CGColor> for SolidPaint {
-    fn from(color: CGColor) -> Self {
-        SolidPaint {
-            active: true,
-            color,
-            blend_mode: BlendMode::default(),
-        }
     }
 }
 
@@ -286,7 +244,7 @@ impl Default for LayerBlendMode {
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
 /// - Flutter: https://api.flutter.dev/flutter/dart-ui/BlendMode.html
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BlendMode {
     // Skia: kSrcOver, CSS: normal
     #[serde(rename = "normal")]
@@ -344,7 +302,7 @@ impl Default for BlendMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FillRule {
     #[serde(rename = "nonzero")]
     NonZero,
@@ -434,7 +392,7 @@ impl Default for FillRule {
 ///
 /// - [`StrokeAlign`] - Controls stroke positioning relative to path
 /// - [`StrokeDashArray`] - Defines dash patterns for strokes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StrokeCap {
     /// Flat edge perpendicular to the stroke direction (default)
     #[serde(rename = "butt", alias = "none")]
@@ -541,7 +499,7 @@ impl Default for StrokeCap {
 ///
 /// - [`StrokeCap`] - Controls stroke endpoints for open paths
 /// - [`StrokeAlign`] - Controls stroke positioning relative to path
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum StrokeJoin {
     /// Sharp pointed corner with miter limit fallback (default)
     #[serde(rename = "miter")]
@@ -607,7 +565,7 @@ impl Default for StrokeJoin {
 /// - [`StrokeJoin`] - The join style that miter limit applies to
 /// - [MDN miterLimit](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/miterLimit)
 /// - [SVG stroke-miterlimit](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-miterlimit)
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct StrokeMiterLimit(#[serde(default = "StrokeMiterLimit::default_value")] pub f32);
 
 impl StrokeMiterLimit {
@@ -1941,6 +1899,16 @@ impl Paint {
                 image.opacity.to_bits().hash(hasher);
                 image.blend_mode.hash(hasher);
             }
+        }
+    }
+}
+
+impl From<CGColor> for SolidPaint {
+    fn from(color: CGColor) -> Self {
+        SolidPaint {
+            active: true,
+            color,
+            blend_mode: BlendMode::default(),
         }
     }
 }
