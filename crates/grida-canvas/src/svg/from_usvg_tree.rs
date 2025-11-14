@@ -1,9 +1,11 @@
 use crate::cg::prelude::*;
 use math2::transform::AffineTransform;
+use serde::{Deserialize, Serialize};
 use skia_safe::Path as SkPath;
 use usvg;
 use usvg::tiny_skia_path::{Path as TinyPath, PathSegment};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SVGPackedScene {
     pub svg: IRSVGInitialContainerNode,
 }
@@ -20,6 +22,15 @@ impl SVGPackedScene {
         let svg = build_svg_ir_scene(&tree)?;
         Ok(Self { svg })
     }
+
+    pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+}
+
+pub fn packed_scene_json_from_svg(svg_source: &str) -> Result<String, String> {
+    let scene = SVGPackedScene::new_from_svg_str(svg_source)?;
+    scene.to_json_string().map_err(|err| err.to_string())
 }
 
 fn build_svg_ir_scene(tree: &usvg::Tree) -> Result<IRSVGInitialContainerNode, String> {

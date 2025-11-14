@@ -4,6 +4,7 @@ use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::runtime::scene::RendererOptions;
+use crate::svg::from_usvg_tree::packed_scene_json_from_svg;
 use crate::window::application::ApplicationApi;
 use crate::window::application::UnknownTargetApplication;
 use crate::window::command::ApplicationCommand;
@@ -300,5 +301,9 @@ impl EmscriptenApplication {
         json: &str,
     ) -> Result<Vec<TransactionApplyReport>, serde_json::Error> {
         self.base.apply_document_transactions_json(json)
+    }
+
+    pub fn create_packed_scene_from_svg(&mut self, svg: &str) -> Result<String, String> {
+        packed_scene_json_from_svg(svg)
     }
 }

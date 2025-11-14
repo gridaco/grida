@@ -129,6 +129,29 @@ pub unsafe extern "C" fn set_main_camera_transform(
     }
 }
 
+#[no_mangle]
+/// js::_create_packed_scene_from_svg
+pub unsafe extern "C" fn create_packed_scene_from_svg(
+    app: *mut EmscriptenApplication,
+    ptr: *const u8,
+    len: usize,
+) -> *const u8 {
+    if let (Some(app), Some(svg)) = (app.as_mut(), __str_from_ptr_len(ptr, len)) {
+        match app.create_packed_scene_from_svg(&svg) {
+            Ok(json) => {
+                if let Ok(cstr) = CString::new(json) {
+                    return cstr.into_raw() as *const u8;
+                }
+            }
+            Err(err) => {
+                eprintln!("create_packed_scene_from_svg failed: {}", err);
+            }
+        }
+    }
+
+    std::ptr::null()
+}
+
 // #endregion: main app lifecycle
 
 // ====================================================================================================
