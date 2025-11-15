@@ -91,14 +91,16 @@ impl SceneBuilder {
         });
         node.stroke_style.stroke_align = StrokeAlign::Center;
 
+        let gradient_bounds = Some((path.bounds.width, path.bounds.height));
+
         if let Some(fill) = &path.fill {
-            node.fills = Paints::new([fill.into_paint_with_opacity()]);
+            node.fills = Paints::new([fill.into_paint_with_opacity(gradient_bounds)]);
         } else {
             node.fills = Paints::default();
         }
 
         if let Some(stroke) = &path.stroke {
-            node.strokes = Paints::new([stroke.into_paint_with_opacity()]);
+            node.strokes = Paints::new([stroke.into_paint_with_opacity(gradient_bounds)]);
             node.stroke_style.stroke_cap = stroke.stroke_linecap;
             node.stroke_style.stroke_join = stroke.stroke_linejoin;
             node.stroke_style.stroke_miter_limit = stroke.stroke_miterlimit;
@@ -165,13 +167,13 @@ impl SceneBuilder {
         });
 
         if let Some(fill) = fill {
-            node.fills = Paints::new([fill.into_paint_with_opacity()]);
+            node.fills = Paints::new([fill.into_paint_with_opacity(None)]);
         } else {
             node.fills = Paints::default();
         }
 
         if let Some(stroke) = stroke {
-            node.strokes = Paints::new([stroke.into_paint_with_opacity()]);
+            node.strokes = Paints::new([stroke.into_paint_with_opacity(None)]);
             node.stroke_width = stroke.stroke_width;
         } else {
             node.strokes = Paints::default();

@@ -9,6 +9,17 @@ impl From<usvg::Color> for CGColor {
     }
 }
 
+impl From<usvg::Rect> for IRSVGBounds {
+    fn from(rect: usvg::Rect) -> Self {
+        IRSVGBounds {
+            x: rect.x(),
+            y: rect.y(),
+            width: rect.width(),
+            height: rect.height(),
+        }
+    }
+}
+
 impl From<usvg::BlendMode> for BlendMode {
     fn from(blend_mode: usvg::BlendMode) -> Self {
         match blend_mode {

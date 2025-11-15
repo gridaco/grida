@@ -1,4 +1,5 @@
 use crate::cg::prelude::*;
+use crate::cg::svg::IRSVGBounds;
 use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 use skia_safe::Path as SkPath;
@@ -101,7 +102,9 @@ fn convert_path(path: &usvg::Path, parent_world: &CGTransform2D) -> Result<IRSVG
 
     let tiny_path = path.data();
     let sk_path = tiny_path_to_skia_path(tiny_path);
-    let (offset_x, offset_y, data) = normalize_skia_path(sk_path);
+
+    let bounds: IRSVGBounds = path.bounding_box().into();
+    let (offset_x, offset_y, data) = normalize_skia_path(sk_path, &bounds);
 
     let mut relative_affine: AffineTransform = relative.into();
     if offset_x != 0.0 || offset_y != 0.0 {
@@ -117,6 +120,7 @@ fn convert_path(path: &usvg::Path, parent_world: &CGTransform2D) -> Result<IRSVG
         fill,
         stroke,
         d: data,
+        bounds,
     })
 }
 
@@ -229,15 +233,11 @@ fn tiny_path_to_skia_path(path: &TinyPath) -> SkPath {
     sk_path
 }
 
-fn normalize_skia_path(mut path: SkPath) -> (f32, f32, String) {
-    let bounds = path.compute_tight_bounds();
-    if bounds.left().is_finite() && bounds.top().is_finite() {
-        let translation = (bounds.left(), bounds.top());
-        if translation.0 != 0.0 || translation.1 != 0.0 {
-            path.offset((-translation.0, -translation.1));
-            let data = path.to_svg();
-            return (translation.0, translation.1, data);
-        }
+fn normalize_skia_path(mut path: SkPath, bounds: &IRSVGBounds) -> (f32, f32, String) {
+    if bounds.x != 0.0 || bounds.y != 0.0 {
+        path.offset((-bounds.x, -bounds.y));
+        let data = path.to_svg();
+        return (bounds.x, bounds.y, data);
     }
     let data = path.to_svg();
     (0.0, 0.0, data)

@@ -1,6 +1,7 @@
 // Grida's own SVG Types (that with unique properties)
 
 use crate::cg::prelude::*;
+use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,8 +66,7 @@ pub struct SVGLinearGradientPaint {
     pub y2: f32,
     pub transform: CGTransform2D,
     pub stops: Vec<GradientStop>,
-    // spread_method
-    // units
+    pub spread_method: SVGGradientSpreadMethod,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,8 +79,14 @@ pub struct SVGRadialGradientPaint {
     pub fy: f32,
     pub transform: CGTransform2D,
     pub stops: Vec<GradientStop>,
-    // spread_method
-    // units
+    pub spread_method: SVGGradientSpreadMethod,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum SVGGradientSpreadMethod {
+    Pad,
+    Reflect,
+    Repeat,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,14 +153,14 @@ impl Default for SVGStrokeAttributes {
 }
 
 impl SVGFillAttributes {
-    pub fn into_paint_with_opacity(&self) -> Paint {
-        svg_paint_with_opacity(&self.paint, self.fill_opacity)
+    pub fn into_paint_with_opacity(&self, bounds: Option<(f32, f32)>) -> Paint {
+        svg_paint_with_opacity(&self.paint, self.fill_opacity, bounds)
     }
 }
 
 impl SVGStrokeAttributes {
-    pub fn into_paint_with_opacity(&self) -> Paint {
-        svg_paint_with_opacity(&self.paint, self.stroke_opacity)
+    pub fn into_paint_with_opacity(&self, bounds: Option<(f32, f32)>) -> Paint {
+        svg_paint_with_opacity(&self.paint, self.stroke_opacity, bounds)
     }
 }
 
@@ -163,21 +169,117 @@ impl SVGStrokeAttributes {
 ///
 /// SVG allows opacity on fill/stroke independently of paints; our runtime stores
 /// opacity within each `Paint`. This function is the bridging layer.
-fn svg_paint_with_opacity(paint: &SVGPaint, opacity: f32) -> Paint {
+fn svg_paint_with_opacity(paint: &SVGPaint, opacity: f32, bounds: Option<(f32, f32)>) -> Paint {
     match paint {
         SVGPaint::Solid(solid) => Paint::Solid(SolidPaint {
             active: true,
             color: solid.color.with_multiplier(opacity),
             blend_mode: BlendMode::Normal,
         }),
-        // FIXME:
-        // Gradients and patterns are not supported in this migration step.
-        _ => Paint::Solid(SolidPaint {
-            active: true,
-            color: CGColor::TRANSPARENT,
-            blend_mode: BlendMode::Normal,
-        }),
+        SVGPaint::LinearGradient(linear) => svg_linear_gradient_to_paint(linear, opacity, bounds),
+        SVGPaint::RadialGradient(radial) => svg_radial_gradient_to_paint(radial, opacity, bounds),
     }
+}
+
+fn svg_linear_gradient_to_paint(
+    linear: &SVGLinearGradientPaint,
+    opacity: f32,
+    bounds: Option<(f32, f32)>,
+) -> Paint {
+    // Unsupported: spread method reflect/repeat. We intentionally fall back to pad semantics.
+    if !matches!(linear.spread_method, SVGGradientSpreadMethod::Pad) {
+        return unsupported_svg_gradient("linear spread-method (reflect/repeat)");
+    }
+
+    let xy1 = Alignment::from_uv(Uv(linear.x1, linear.y1));
+    let xy2 = Alignment::from_uv(Uv(linear.x2, linear.y2));
+    let mut transform = AffineTransform::from(&linear.transform);
+    normalize_gradient_transform(&mut transform, bounds);
+
+    Paint::LinearGradient(LinearGradientPaint {
+        active: true,
+        xy1,
+        xy2,
+        transform,
+        stops: linear.stops.clone(),
+        opacity,
+        blend_mode: BlendMode::Normal,
+    })
+}
+
+fn svg_radial_gradient_to_paint(
+    radial: &SVGRadialGradientPaint,
+    opacity: f32,
+    bounds: Option<(f32, f32)>,
+) -> Paint {
+    if !matches!(radial.spread_method, SVGGradientSpreadMethod::Pad) {
+        return unsupported_svg_gradient("radial spread-method (reflect/repeat)");
+    }
+
+    if (radial.fx - radial.cx).abs() > f32::EPSILON || (radial.fy - radial.cy).abs() > f32::EPSILON
+    {
+        return unsupported_svg_gradient("radial focal point (fx/fy)");
+    }
+
+    let mut gradient_transform = AffineTransform::from(&radial.transform);
+    normalize_gradient_transform(&mut gradient_transform, bounds);
+    let alignment = radial_gradient_alignment_transform((radial.cx, radial.cy), radial.r);
+
+    Paint::RadialGradient(RadialGradientPaint {
+        active: true,
+        transform: gradient_transform.compose(&alignment),
+        stops: radial.stops.clone(),
+        opacity,
+        blend_mode: BlendMode::Normal,
+    })
+}
+
+fn unsupported_svg_gradient(reason: &str) -> Paint {
+    // TODO: Implement support for unsupported SVG gradient features:
+    // - spread-method: reflect/repeat (currently only pad is supported)
+    // - radial gradient focal points (fx/fy different from cx/cy)
+    // For now, we ignore these gradients by returning an inactive paint.
+    let _ = reason;
+    Paint::Solid(SolidPaint {
+        active: false,
+        color: CGColor::TRANSPARENT,
+        blend_mode: BlendMode::Normal,
+    })
+}
+
+fn radial_gradient_alignment_transform(center: (f32, f32), radius: f32) -> AffineTransform {
+    if radius <= f32::EPSILON {
+        return AffineTransform::identity();
+    }
+
+    let translate = translation(center.0, center.1);
+    let scale = scale(radius * 2.0, radius * 2.0);
+    let baseline = translation(-0.5, -0.5);
+
+    translate.compose(&scale).compose(&baseline)
+}
+
+fn normalize_gradient_transform(transform: &mut AffineTransform, bounds: Option<(f32, f32)>) {
+    if let Some((width, height)) = bounds {
+        if width > f32::EPSILON && height > f32::EPSILON {
+            let inv_w = 1.0 / width;
+            let inv_h = 1.0 / height;
+            transform.matrix[0][0] *= inv_w;
+            transform.matrix[0][1] *= inv_w;
+            transform.matrix[0][2] *= inv_w;
+            transform.matrix[1][0] *= inv_h;
+            transform.matrix[1][1] *= inv_h;
+            transform.matrix[1][2] *= inv_h;
+        }
+    }
+}
+
+fn translation(tx: f32, ty: f32) -> AffineTransform {
+    AffineTransform::from_acebdf(1.0, 0.0, tx, 0.0, 1.0, ty)
+}
+
+fn scale(sx: f32, sy: f32) -> AffineTransform {
+    AffineTransform::from_acebdf(sx, 0.0, 0.0, 0.0, sy, 0.0)
 }
 
 /// SVG Packed Scene is dedicated struct for archive / transport format of resolved SVG file.
@@ -257,8 +359,17 @@ pub struct IRSVGPathNode {
     pub fill: Option<SVGFillAttributes>,
     pub stroke: Option<SVGStrokeAttributes>,
     pub d: String,
+    pub bounds: IRSVGBounds,
 }
 
 /// <image>
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IRSVGImageNode {}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct IRSVGBounds {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
