@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Rect};
 
 fn main() {

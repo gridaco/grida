@@ -165,5 +165,11 @@ declare namespace canvas {
       state: GridaCanvasWebGlApplicationPtr,
       enabled: boolean
     ): void;
+
+    _create_packed_scene_from_svg(
+      state: GridaCanvasWebGlApplicationPtr,
+      ptr: number,
+      len: number
+    ): Ptr;
   }
 }

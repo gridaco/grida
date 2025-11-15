@@ -2506,6 +2506,14 @@ export class Editor
     return blob;
   }
 
+  public async createPackedSceneFromSVG(svg: string): Promise<string | null> {
+    if (!this._m_wasm_canvas_scene) {
+      reportError("WASM canvas scene is not initialized");
+      return null;
+    }
+    return this._m_wasm_canvas_scene.createPackedSceneFromSVG(svg);
+  }
+
   public getSnapshot(): Readonly<editor.state.IEditorState> {
     return this.doc.state;
   }

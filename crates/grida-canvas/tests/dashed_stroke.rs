@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::shape::*;
 use skia_safe::Path;
 

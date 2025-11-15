@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::node::schema::{LayerEffects, VectorNodeRec};
 use cg::vectornetwork::{
     VectorNetwork, VectorNetworkLoop, VectorNetworkRegion, VectorNetworkSegment,

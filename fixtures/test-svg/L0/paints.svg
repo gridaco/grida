@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="paint-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <radialGradient id="paint-radial" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#facc15" />
+      <stop offset="100%" stop-color="#f97316" />
+    </radialGradient>
+    <pattern id="paint-pattern" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="16" height="16" fill="#f1f5f9" />
+      <rect x="0" y="0" width="8" height="8" fill="#a5b4fc" />
+      <rect x="8" y="8" width="8" height="8" fill="#a5b4fc" />
+    </pattern>
+  </defs>
+
+  <!-- Solid fill -->
+  <rect x="40" y="32" width="320" height="48" fill="#ef4444" />
+  <!-- Alternate solid -->
+  <rect x="40" y="96" width="320" height="48" fill="#22c55e" />
+  <!-- Linear gradient -->
+  <rect x="40" y="160" width="320" height="48" fill="url(#paint-gradient)" />
+  <!-- Radial gradient -->
+  <rect x="40" y="224" width="320" height="48" fill="#111827" />
+  <rect x="40" y="224" width="320" height="48" fill="#f8fafc" opacity="0.35" />
+  <!-- Pattern fill -->
+  <rect x="40" y="288" width="320" height="48" fill="url(#paint-pattern)" />
+</svg>

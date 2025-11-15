@@ -18,6 +18,17 @@ impl From<BooleanPathOperation> for skia_safe::PathOp {
     }
 }
 
+impl From<TileMode> for skia_safe::TileMode {
+    fn from(tile_mode: TileMode) -> Self {
+        match tile_mode {
+            TileMode::Clamp => skia_safe::TileMode::Clamp,
+            TileMode::Repeated => skia_safe::TileMode::Repeat,
+            TileMode::Mirror => skia_safe::TileMode::Mirror,
+            TileMode::Decal => skia_safe::TileMode::Decal,
+        }
+    }
+}
+
 impl Into<skia_safe::Blender> for BlendMode {
     fn into(self) -> skia_safe::Blender {
         use skia_safe::BlendMode::*;

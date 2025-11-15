@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use skia_safe::{
     luma_color_filter, surfaces, BlendMode, Color, Paint, Path, Point, Rect, Shader, TileMode,
 };

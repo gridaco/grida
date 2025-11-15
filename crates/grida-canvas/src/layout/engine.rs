@@ -132,7 +132,7 @@ impl LayoutEngine {
                 let rect = n.network.bounds();
                 (rect.width, rect.height)
             }
-            Node::SVGPath(n) => {
+            Node::Path(n) => {
                 // Use NodeRectMixin::rect() to compute bounds from path data
                 // Note: This involves SVG parsing and is not cached - avoid in tight loops
                 let rect = n.rect();
@@ -171,7 +171,7 @@ impl LayoutEngine {
             Node::RegularStarPolygon(n) => (n.transform.x(), n.transform.y()),
             Node::TextSpan(n) => (n.transform.x(), n.transform.y()),
             Node::Vector(n) => (n.transform.x(), n.transform.y()),
-            Node::SVGPath(n) => (n.transform.x(), n.transform.y()),
+            Node::Path(n) => (n.transform.x(), n.transform.y()),
             Node::Error(n) => (n.transform.x(), n.transform.y()),
 
             // Complex nodes with optional transform
@@ -209,7 +209,7 @@ impl LayoutEngine {
                 | Node::TextSpan(_)
                 | Node::Error(_)
                 | Node::Vector(_)
-                | Node::SVGPath(_)
+                | Node::Path(_)
         )
     }
 
@@ -1342,7 +1342,7 @@ mod tests {
         svgpath.transform = AffineTransform::new(200.0, 150.0, 0.0);
         // layout_child is None by default
 
-        let svgpath_id = graph.append_child(Node::SVGPath(svgpath), Parent::Root);
+        let svgpath_id = graph.append_child(Node::Path(svgpath), Parent::Root);
 
         let scene = Scene {
             name: "SVGPath positioning test".to_string(),

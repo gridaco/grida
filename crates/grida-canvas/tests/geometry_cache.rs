@@ -1,5 +1,5 @@
 use cg::cache::geometry::GeometryCache;
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::node::{
     factory::NodeFactory,
     scene_graph::{Parent, SceneGraph},

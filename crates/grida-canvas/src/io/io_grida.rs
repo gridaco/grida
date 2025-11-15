@@ -487,6 +487,9 @@ impl From<Option<JSONPaint>> for Paint {
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::LinearGradient(LinearGradientPaint {
+                    xy1: Alignment::CENTER_LEFT,
+                    xy2: Alignment::CENTER_RIGHT,
+                    tile_mode: TileMode::Clamp,
                     transform: transform
                         .map(|t| t.into())
                         .unwrap_or_else(AffineTransform::identity),
@@ -513,6 +516,7 @@ impl From<Option<JSONPaint>> for Paint {
                     opacity,
                     blend_mode,
                     active,
+                    tile_mode: TileMode::Clamp,
                 })
             }
             Some(JSONPaint::DiamondGradient {
@@ -906,10 +910,10 @@ pub enum JSONNode {
     Group(JSONGroupNode),
     #[serde(rename = "container", alias = "component")]
     Container(JSONContainerNode),
-    #[serde(rename = "svgpath")]
-    SVGPath(JSONSVGPathNode),
+    #[serde(rename = "path", alias = "svgpath")]
+    Path(JSONPathNode),
     #[serde(rename = "vector")]
-    Path(JSONVectorNode),
+    Vector(JSONVectorNode),
     #[serde(rename = "ellipse")]
     Ellipse(JSONEllipseNode),
     #[serde(rename = "rectangle")]
@@ -1115,7 +1119,7 @@ pub struct JSONTextNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JSONSVGPathNode {
+pub struct JSONPathNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
@@ -1833,8 +1837,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
     }
 }
 
-impl From<JSONSVGPathNode> for Node {
-    fn from(node: JSONSVGPathNode) -> Self {
+impl From<JSONPathNode> for Node {
+    fn from(node: JSONPathNode) -> Self {
         // Build stroke width early before any moves
         let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
 
@@ -1847,7 +1851,7 @@ impl From<JSONSVGPathNode> for Node {
         );
 
         // For vector nodes, we'll create a path node with the path data
-        Node::SVGPath(SVGPathNodeRec {
+        Node::Path(PathNodeRec {
             active: node.base.active,
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
@@ -2043,8 +2047,8 @@ impl From<JSONNode> for Node {
             JSONNode::Group(group) => Node::Group(group.into()),
             JSONNode::Container(container) => Node::Container(container.into()),
             JSONNode::Text(text) => Node::TextSpan(text.into()),
-            JSONNode::SVGPath(vector) => vector.into(),
-            JSONNode::Path(path) => path.into(),
+            JSONNode::Path(vector) => vector.into(),
+            JSONNode::Vector(path) => path.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),
             JSONNode::RegularPolygon(rpolygon) => rpolygon.into(),

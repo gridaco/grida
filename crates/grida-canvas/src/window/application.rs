@@ -19,7 +19,8 @@ use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 use serde_json::Value;
-use skia_safe::Matrix;
+use skia_safe::{Matrix, Surface};
+use std::sync::Arc;
 
 pub trait ApplicationApi {
     fn tick(&mut self, time: f64);
@@ -98,6 +99,10 @@ pub enum HostEvent {
     /// load a new scene on the renderer
     LoadScene(Scene),
 }
+
+/// Host-agnostic callback for emitting [`HostEvent`]s back into the
+/// platform-specific event loop.
+pub type HostEventCallback = Arc<dyn Fn(HostEvent) + Send + Sync + 'static>;
 
 pub struct Clipboard {
     pub(crate) data: Option<Vec<u8>>,
@@ -427,6 +432,47 @@ impl ApplicationApi for UnknownTargetApplication {
 }
 
 impl UnknownTargetApplication {
+    pub fn renderer_mut(&mut self) -> &mut Renderer {
+        &mut self.renderer
+    }
+
+    pub fn set_renderer_backend(&mut self, backend: Backend) {
+        self.renderer.backend = backend;
+    }
+
+    pub fn surface_mut_ptr(&mut self) -> *mut Surface {
+        self.state.surface_mut_ptr()
+    }
+
+    pub fn set_cursor_position(&mut self, position: [f32; 2]) {
+        self.input.cursor = position;
+    }
+
+    pub fn perform_hit_test_host(&mut self) {
+        self.perform_hit_test();
+    }
+
+    pub fn capture_hit_test_selection(&mut self) {
+        self.devtools_selection = self.hit_test_result.clone();
+    }
+
+    pub fn clipboard_bytes(&self) -> Option<&[u8]> {
+        self.clipboard.data.as_deref()
+    }
+
+    pub fn tick_with_current_time(&mut self) {
+        let now = self.clock.now() + self.last_frame_time.elapsed().as_secs_f64() * 1000.0;
+        self.tick(now);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn notify_resource_loaded(&mut self) {
+        self.resource_loaded();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn notify_resource_loaded(&mut self) {}
+
     /// Create a new [`UnknownTargetApplication`] with a renderer configured for
     /// the given backend and camera. Each platform should supply a callback
     /// that requests a redraw on the host when invoked.

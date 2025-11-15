@@ -440,4 +440,21 @@ export class Scene {
   devtools_rendering_set_show_ruler(show: boolean) {
     this.module._devtools_rendering_set_show_ruler(this.appptr, show);
   }
+
+  createPackedSceneFromSVG(svg: string): string | null {
+    const [ptr, len] = this._alloc_string(svg);
+    const outptr = this.module._create_packed_scene_from_svg(
+      this.appptr,
+      ptr,
+      len - 1
+    );
+    this._free_string(ptr, len);
+    if (outptr === 0) {
+      return null;
+    }
+    const json = this.module.UTF8ToString(outptr);
+    const outlen = this.module.lengthBytesUTF8(json) + 1;
+    this._free_string(outptr, outlen);
+    return json;
+  }
 }

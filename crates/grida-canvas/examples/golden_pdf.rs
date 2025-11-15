@@ -92,9 +92,7 @@ async fn demo_scene() -> Scene {
                 color: CGColor(100, 255, 100, 255),
             },
         ],
-        opacity: 1.0,
-        blend_mode: BlendMode::Normal,
-        active: true,
+        ..Default::default()
     }));
     rect_gradient.stroke_width = 3.0.into();
     rect_gradient.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
@@ -115,9 +113,8 @@ async fn demo_scene() -> Scene {
         width: 180.0,
         height: 150.0,
     };
-    ellipse_radial.fills = Paints::new([Paint::RadialGradient(RadialGradientPaint {
-        transform: AffineTransform::identity(),
-        stops: vec![
+    ellipse_radial.fills = Paints::new([Paint::RadialGradient(RadialGradientPaint::from_stops(
+        vec![
             GradientStop {
                 offset: 0.0,
                 color: CGColor(255, 255, 0, 255),
@@ -131,10 +128,7 @@ async fn demo_scene() -> Scene {
                 color: CGColor(255, 0, 0, 255),
             },
         ],
-        opacity: 1.0,
-        blend_mode: BlendMode::Normal,
-        active: true,
-    })]);
+    ))]);
     ellipse_radial.stroke_width = 4.0.into();
     ellipse_radial.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
 
@@ -192,26 +186,13 @@ async fn demo_scene() -> Scene {
         width: 200.0,
         height: 0.0,
     };
-    line.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
-        transform: AffineTransform::identity(),
-        stops: vec![
-            GradientStop {
-                offset: 0.0,
-                color: CGColor(255, 0, 0, 255),
-            },
-            GradientStop {
-                offset: 0.5,
-                color: CGColor(0, 255, 0, 255),
-            },
-            GradientStop {
-                offset: 1.0,
-                color: CGColor(0, 0, 255, 255),
-            },
+    line.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint::from_colors(
+        vec![
+            CGColor(255, 0, 0, 255),
+            CGColor(0, 255, 0, 255),
+            CGColor(0, 0, 255, 255),
         ],
-        opacity: 1.0,
-        blend_mode: BlendMode::Normal,
-        active: true,
-    })]);
+    ))]);
     line.stroke_width = 8.0;
 
     // Regular polygon (octagon)
@@ -262,7 +243,7 @@ async fn demo_scene() -> Scene {
             Node::Ellipse(ellipse_radial),
             Node::Polygon(hexagon),
             Node::RegularStarPolygon(star),
-            Node::SVGPath(path),
+            Node::Path(path),
             Node::Line(line),
             Node::RegularPolygon(octagon),
             Node::TextSpan(description_text),

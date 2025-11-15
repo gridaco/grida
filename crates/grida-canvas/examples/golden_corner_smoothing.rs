@@ -3,7 +3,7 @@
  * Simple overlay test: circular corners (red) vs smoothed corners (blue)
  */
 
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;

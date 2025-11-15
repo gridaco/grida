@@ -114,14 +114,18 @@ impl From<&FigmaPaint> for Paint {
 
                 match gradient.r#type {
                     figma_api::models::gradient_paint::Type::GradientLinear => {
+                        let (xy1, xy2) =
+                            handles_to_linear_alignments(&gradient.gradient_handle_positions);
+
                         Paint::LinearGradient(LinearGradientPaint {
-                            transform: convert_gradient_transform(
-                                &gradient.gradient_handle_positions,
-                            ),
+                            xy1,
+                            xy2,
+                            transform: AffineTransform::identity(),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
                             active: gradient.visible.unwrap_or(true),
+                            tile_mode: TileMode::Clamp,
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -133,6 +137,7 @@ impl From<&FigmaPaint> for Paint {
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
                             active: gradient.visible.unwrap_or(true),
+                            tile_mode: TileMode::Clamp,
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientDiamond => {
@@ -369,6 +374,20 @@ fn convert_gradient_transform(handles: &Vec<Vector>) -> AffineTransform {
     }
 }
 
+fn handles_to_linear_alignments(handles: &Vec<Vector>) -> (Alignment, Alignment) {
+    if handles.len() >= 2 {
+        let start = figma_vector_to_alignment(&handles[0]);
+        let end = figma_vector_to_alignment(&handles[1]);
+        (start, end)
+    } else {
+        (Alignment::CENTER_LEFT, Alignment::CENTER_RIGHT)
+    }
+}
+
+fn figma_vector_to_alignment(vector: &Vector) -> Alignment {
+    Alignment(vector.x as f32 * 2.0 - 1.0, vector.y as f32 * 2.0 - 1.0)
+}
+
 /// Converts Figma nodes to Grida schema
 pub struct FigmaConverter {
     repository: NodeRepository,
@@ -533,14 +552,18 @@ impl FigmaConverter {
 
                 match gradient.r#type {
                     figma_api::models::gradient_paint::Type::GradientLinear => {
+                        let (xy1, xy2) =
+                            handles_to_linear_alignments(&gradient.gradient_handle_positions);
+
                         Paint::LinearGradient(LinearGradientPaint {
-                            transform: convert_gradient_transform(
-                                &gradient.gradient_handle_positions,
-                            ),
+                            xy1,
+                            xy2,
+                            transform: AffineTransform::identity(),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
                             active: gradient.visible.unwrap_or(true),
+                            tile_mode: TileMode::Clamp,
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -552,6 +575,7 @@ impl FigmaConverter {
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
                             active: gradient.visible.unwrap_or(true),
+                            tile_mode: TileMode::Clamp,
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientDiamond => {
@@ -1325,7 +1349,7 @@ impl FigmaConverter {
         // Convert fill geometries to path nodes
         if let Some(fill_geometries) = &origin.fill_geometry {
             for geometry in fill_geometries {
-                let path_node = Node::SVGPath(SVGPathNodeRec {
+                let path_node = Node::Path(PathNodeRec {
                     active: origin.visible.unwrap_or(true),
                     opacity: Self::convert_opacity(origin.visible),
                     blend_mode: Self::convert_blend_mode(origin.blend_mode),
@@ -1353,7 +1377,7 @@ impl FigmaConverter {
         // stroke paint should be applied to the path, not stroke, as the stroke geometry is the baked path of the stroke.
         if let Some(stroke_geometries) = &origin.stroke_geometry {
             for geometry in stroke_geometries {
-                let path_node = Node::SVGPath(SVGPathNodeRec {
+                let path_node = Node::Path(PathNodeRec {
                     active: origin.visible.unwrap_or(true),
                     opacity: Self::convert_opacity(origin.visible),
                     blend_mode: Self::convert_blend_mode(origin.blend_mode),

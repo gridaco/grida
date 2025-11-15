@@ -769,7 +769,7 @@ pub enum Node {
     RegularStarPolygon(RegularStarPolygonNodeRec),
     Line(LineNodeRec),
     TextSpan(TextSpanNodeRec),
-    SVGPath(SVGPathNodeRec),
+    Path(PathNodeRec),
     Vector(VectorNodeRec),
     BooleanOperation(BooleanPathOperationNodeRec),
     Image(ImageNodeRec),
@@ -794,7 +794,7 @@ impl NodeTrait for Node {
             Node::RegularStarPolygon(n) => n.active,
             Node::Line(n) => n.active,
             Node::TextSpan(n) => n.active,
-            Node::SVGPath(n) => n.active,
+            Node::Path(n) => n.active,
             Node::Vector(n) => n.active,
             Node::BooleanOperation(n) => n.active,
             Node::Image(n) => n.active,
@@ -815,7 +815,7 @@ impl Node {
             Node::RegularStarPolygon(n) => n.mask,
             Node::Line(n) => n.mask,
             Node::TextSpan(n) => n.mask,
-            Node::SVGPath(n) => n.mask,
+            Node::Path(n) => n.mask,
             Node::Vector(n) => n.mask,
             Node::BooleanOperation(n) => n.mask,
             Node::Image(n) => n.mask,
@@ -883,7 +883,7 @@ pub enum LeafNode {
     RegularStarPolygon(RegularStarPolygonNodeRec),
     Line(LineNodeRec),
     TextSpan(TextSpanNodeRec),
-    SVGPath(SVGPathNodeRec),
+    SVGPath(PathNodeRec),
     Vector(VectorNodeRec),
     Image(ImageNodeRec),
 }
@@ -1531,11 +1531,25 @@ impl VectorNodeRec {
     }
 }
 
+// /// Foreign <svg> node.
+// /// this renders given svg string as-is, without any further controls over the data.
+// /// similar to <img> with svg as src.
+// #[derive(Debug, Clone)]
+// pub struct SVGImageNodeRec {
+//     pub active: bool,
+//     pub opacity: f32,
+//     pub blend_mode: LayerBlendMode,
+//     pub transform: AffineTransform,
+//     pub svg: String,
+//     /// Layout style for this node when it is a child of a layout container.
+//     pub layout_child: Option<LayoutChildStyle>,
+// }
+
 ///
 /// SVG Path compatible path node.
 ///
 #[derive(Debug, Clone)]
-pub struct SVGPathNodeRec {
+pub struct PathNodeRec {
     pub active: bool,
 
     pub opacity: f32,
@@ -1553,7 +1567,7 @@ pub struct SVGPathNodeRec {
     pub layout_child: Option<LayoutChildStyle>,
 }
 
-impl NodeFillsMixin for SVGPathNodeRec {
+impl NodeFillsMixin for PathNodeRec {
     fn set_fill(&mut self, fill: Paint) {
         self.fills = Paints::new([fill]);
     }
@@ -1563,7 +1577,7 @@ impl NodeFillsMixin for SVGPathNodeRec {
     }
 }
 
-impl NodeStrokesMixin for SVGPathNodeRec {
+impl NodeStrokesMixin for PathNodeRec {
     fn set_stroke(&mut self, stroke: Paint) {
         self.strokes = Paints::new([stroke]);
     }
@@ -1573,7 +1587,7 @@ impl NodeStrokesMixin for SVGPathNodeRec {
     }
 }
 
-impl NodeTransformMixin for SVGPathNodeRec {
+impl NodeTransformMixin for PathNodeRec {
     fn x(&self) -> f32 {
         self.transform.x()
     }
@@ -1583,7 +1597,7 @@ impl NodeTransformMixin for SVGPathNodeRec {
     }
 }
 
-impl NodeRectMixin for SVGPathNodeRec {
+impl NodeRectMixin for PathNodeRec {
     /// Compute bounding rectangle from SVG path data
     ///
     /// **Performance Note**: This is NOT cached and involves parsing the SVG path string

@@ -1,5 +1,5 @@
 use super::{gradient, image};
-use crate::{cg::types::*, runtime::image_repository::ImageRepository};
+use crate::{cg::prelude::*, runtime::image_repository::ImageRepository};
 use skia_safe::{self, shaders, Color, Shader};
 
 pub fn sk_solid_paint(paint: impl Into<SolidPaint>) -> skia_safe::Paint {

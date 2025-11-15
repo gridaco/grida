@@ -137,8 +137,8 @@ impl IdConverter {
         match json_node {
             JSONNode::Group(group) => Node::Group(GroupNodeRec::from(group)),
             JSONNode::Container(container) => Node::Container(ContainerNodeRec::from(container)),
-            JSONNode::SVGPath(path) => Node::from(JSONNode::SVGPath(path)),
             JSONNode::Path(path) => Node::from(JSONNode::Path(path)),
+            JSONNode::Vector(path) => Node::from(JSONNode::Vector(path)),
             JSONNode::Ellipse(ellipse) => Node::from(JSONNode::Ellipse(ellipse)),
             JSONNode::Rectangle(rectangle) => Node::from(JSONNode::Rectangle(rectangle)),
             JSONNode::RegularPolygon(polygon) => Node::from(JSONNode::RegularPolygon(polygon)),

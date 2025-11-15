@@ -710,15 +710,11 @@ impl<'a> Painter<'a> {
                         let draw_content = || {
                             self.with_opacity(shape_layer.base.opacity, || {
                                 // 1. Fills
-                                if shape.is_closed() {
-                                    self.draw_fills(shape, &shape_layer.fills);
+                                self.draw_fills(shape, &shape_layer.fills);
 
-                                    // 2. Noise (only if fills are visible)
-                                    if !shape_layer.fills.is_empty()
-                                        && !effect_ref.noises.is_empty()
-                                    {
-                                        self.draw_noise_effects(shape, &effect_ref.noises);
-                                    }
+                                // 2. Noise (only if fills are visible)
+                                if !shape_layer.fills.is_empty() && !effect_ref.noises.is_empty() {
+                                    self.draw_noise_effects(shape, &effect_ref.noises);
                                 }
 
                                 // 3. Strokes

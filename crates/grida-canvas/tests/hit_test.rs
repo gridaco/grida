@@ -53,7 +53,7 @@ fn path_hit_testing_uses_contains() {
     let mut graph = SceneGraph::new();
     let mut path_node = nf.create_path_node();
     path_node.data = "M0 0 L10 0 L10 10 Z".into();
-    let path_id = graph.append_child(Node::SVGPath(path_node.clone()), Parent::Root);
+    let path_id = graph.append_child(Node::Path(path_node.clone()), Parent::Root);
 
     let scene = Scene {
         name: "test".into(),
