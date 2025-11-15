@@ -489,6 +489,7 @@ impl From<Option<JSONPaint>> for Paint {
                 Paint::LinearGradient(LinearGradientPaint {
                     xy1: Alignment::CENTER_LEFT,
                     xy2: Alignment::CENTER_RIGHT,
+                    tile_mode: TileMode::Clamp,
                     transform: transform
                         .map(|t| t.into())
                         .unwrap_or_else(AffineTransform::identity),

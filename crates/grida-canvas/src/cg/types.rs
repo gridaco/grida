@@ -1,4 +1,4 @@
-use super::color::*;
+use super::prelude::*;
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::{Deserialize, Serialize};
@@ -2188,6 +2188,7 @@ pub struct LinearGradientPaint {
     pub active: bool,
     pub xy1: Alignment,
     pub xy2: Alignment,
+    pub tile_mode: TileMode,
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
@@ -2197,10 +2198,6 @@ pub struct LinearGradientPaint {
 impl LinearGradientPaint {
     pub fn from_colors(colors: Vec<CGColor>) -> Self {
         Self {
-            active: true,
-            xy1: Alignment::CENTER_LEFT,
-            xy2: Alignment::CENTER_RIGHT,
-            transform: AffineTransform::default(),
             stops: colors
                 .iter()
                 .enumerate()
@@ -2209,8 +2206,7 @@ impl LinearGradientPaint {
                     color: *color,
                 })
                 .collect(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
+            ..Default::default()
         }
     }
 }
@@ -2221,6 +2217,7 @@ impl Default for LinearGradientPaint {
             active: true,
             xy1: Alignment::CENTER_LEFT,
             xy2: Alignment::CENTER_RIGHT,
+            tile_mode: TileMode::default(),
             transform: AffineTransform::default(),
             stops: Vec::new(),
             opacity: 1.0,

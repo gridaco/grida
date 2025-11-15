@@ -125,6 +125,7 @@ impl From<&FigmaPaint> for Paint {
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
                             active: gradient.visible.unwrap_or(true),
+                            tile_mode: TileMode::Clamp,
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
@@ -561,6 +562,7 @@ impl FigmaConverter {
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                             blend_mode: BlendMode::default(),
                             active: gradient.visible.unwrap_or(true),
+                            tile_mode: TileMode::Clamp,
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {

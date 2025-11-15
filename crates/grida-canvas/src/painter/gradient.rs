@@ -42,7 +42,7 @@ pub fn linear_gradient_paint(
         (p1, p2),
         &colors[..],
         Some(&positions[..]),
-        skia_safe::TileMode::Clamp,
+        gradient.tile_mode.into(),
         None,
         Some(&matrix),
     ) {
@@ -73,7 +73,7 @@ pub fn linear_gradient_shader(
         (start_point, end_point),
         &colors[..],
         Some(&positions[..]),
-        skia_safe::TileMode::Clamp,
+        gradient.tile_mode.into(),
         None,
         Some(&matrix),
     ) {

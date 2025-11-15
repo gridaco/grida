@@ -89,6 +89,16 @@ pub enum SVGGradientSpreadMethod {
     Repeat,
 }
 
+impl From<SVGGradientSpreadMethod> for TileMode {
+    fn from(spread_method: SVGGradientSpreadMethod) -> Self {
+        match spread_method {
+            SVGGradientSpreadMethod::Pad => TileMode::Clamp,
+            SVGGradientSpreadMethod::Reflect => TileMode::Mirror,
+            SVGGradientSpreadMethod::Repeat => TileMode::Repeated,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SVGFillAttributes {
     /// [`fill`] property
@@ -186,11 +196,6 @@ fn svg_linear_gradient_to_paint(
     opacity: f32,
     bounds: Option<(f32, f32)>,
 ) -> Paint {
-    // Unsupported: spread method reflect/repeat. We intentionally fall back to pad semantics.
-    if !matches!(linear.spread_method, SVGGradientSpreadMethod::Pad) {
-        return unsupported_svg_gradient("linear spread-method (reflect/repeat)");
-    }
-
     let xy1 = Alignment::from_uv(Uv(linear.x1, linear.y1));
     let xy2 = Alignment::from_uv(Uv(linear.x2, linear.y2));
     let mut transform = AffineTransform::from(&linear.transform);
@@ -200,6 +205,7 @@ fn svg_linear_gradient_to_paint(
         active: true,
         xy1,
         xy2,
+        tile_mode: linear.spread_method.into(),
         transform,
         stops: linear.stops.clone(),
         opacity,
@@ -236,7 +242,6 @@ fn svg_radial_gradient_to_paint(
 
 fn unsupported_svg_gradient(reason: &str) -> Paint {
     // TODO: Implement support for unsupported SVG gradient features:
-    // - spread-method: reflect/repeat (currently only pad is supported)
     // - radial gradient focal points (fx/fy different from cx/cy)
     // For now, we ignore these gradients by returning an inactive paint.
     let _ = reason;
