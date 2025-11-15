@@ -100,6 +100,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.7,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }),
     ]);
     solid_radial_rect.stroke_width = 3.0.into();
@@ -148,6 +149,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.5,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }),
     ]);
     gradient_gradient_rect.stroke_width = 3.0.into();
@@ -179,6 +181,7 @@ async fn demo_fills() -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
@@ -195,6 +198,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.8,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
@@ -211,6 +215,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.6,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }),
     ]);
     multi_radial_ellipse.stroke_width = 3.0.into();
@@ -267,6 +272,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.5,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }),
     ]);
     complex_fill_polygon.stroke_width = 4.0.into();
@@ -362,6 +368,7 @@ async fn demo_fills() -> Scene {
             opacity: 0.6,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }),
     ]);
     multi_fill_container.stroke_width = 3.0.into();

@@ -105,6 +105,7 @@ async fn demo_paints() -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }));
         graph.append_child(
             Node::Rectangle(rect),
@@ -212,6 +213,7 @@ async fn demo_paints() -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         })]);
         rect.stroke_width = 4.0.into(); // Consistent stroke width
 

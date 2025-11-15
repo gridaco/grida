@@ -57,26 +57,10 @@ async fn demo_blendmode() -> Scene {
         background.corner_radius = RectangularCornerRadius::circular(20.0);
 
         // Create a complex background with radial gradient (similar to C++ example)
-        background.set_fill(Paint::RadialGradient(RadialGradientPaint {
-            transform: AffineTransform::identity(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: CGColor(255, 255, 255, 255), // White center
-                },
-                GradientStop {
-                    offset: 0.5,
-                    color: CGColor(255, 255, 255, 255), // White middle
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: CGColor(255, 255, 255, 0), // Transparent edge
-                },
-            ],
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            active: true,
-        }));
+
+        background.set_fill(Paint::RadialGradient(RadialGradientPaint::from_colors(
+            vec![CGColor::WHITE, CGColor::WHITE, CGColor::TRANSPARENT],
+        )));
 
         graph.append_child(
             Node::Rectangle(background),
@@ -133,6 +117,7 @@ async fn demo_blendmode() -> Scene {
             opacity: 0.3, // Make it subtle
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }));
 
         graph.append_child(

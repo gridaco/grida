@@ -108,7 +108,7 @@ pub fn radial_gradient_paint(
         0.5,
         &colors[..],
         Some(&positions[..]),
-        skia_safe::TileMode::Clamp,
+        gradient.tile_mode.into(),
         None,
         Some(&matrix),
     ) {
@@ -135,7 +135,7 @@ pub fn radial_gradient_shader(
         0.5,
         &colors[..],
         Some(&positions[..]),
-        skia_safe::TileMode::Clamp,
+        gradient.tile_mode.into(),
         None,
         Some(&matrix),
     ) {

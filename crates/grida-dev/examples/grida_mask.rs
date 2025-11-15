@@ -107,6 +107,7 @@ fn build_alpha_mask(
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
+        ..Default::default()
     })]);
     mask.mask = Some(LayerMaskType::Image(ImageMaskType::Alpha));
     graph.append_child(Node::Rectangle(mask), parent)
@@ -143,6 +144,7 @@ fn build_luminance_mask(
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
         active: true,
+        ..Default::default()
     })]);
     mask.mask = Some(LayerMaskType::Image(ImageMaskType::Luminance));
     graph.append_child(Node::Rectangle(mask), parent)

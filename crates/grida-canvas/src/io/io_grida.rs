@@ -516,6 +516,7 @@ impl From<Option<JSONPaint>> for Paint {
                     opacity,
                     blend_mode,
                     active,
+                    tile_mode: TileMode::Clamp,
                 })
             }
             Some(JSONPaint::DiamondGradient {

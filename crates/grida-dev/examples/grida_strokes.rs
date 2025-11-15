@@ -258,6 +258,7 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         })]);
         rect.stroke_width = 8.0.into();
         graph.append_child(
@@ -293,6 +294,7 @@ async fn demo_strokes() -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         })]);
         rect.stroke_width = 8.0.into();
         graph.append_child(
@@ -397,6 +399,7 @@ async fn demo_strokes() -> Scene {
                 opacity: 1.0,
                 blend_mode: BlendMode::Normal,
                 active: true,
+                ..Default::default()
             }),
             Paint::LinearGradient(LinearGradientPaint {
                 transform: AffineTransform::from_rotatation(90.0),
@@ -463,6 +466,7 @@ async fn demo_strokes() -> Scene {
                 opacity: 0.5,
                 blend_mode: BlendMode::Normal,
                 active: true,
+                ..Default::default()
             }),
         ]);
         polygon.stroke_width = 15.0.into(); // Very thick to show all layers

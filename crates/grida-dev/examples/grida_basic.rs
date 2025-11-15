@@ -59,26 +59,13 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 200.0,
     };
-    ellipse_node.fills = Paints::new([Paint::RadialGradient(RadialGradientPaint {
-        transform: AffineTransform::identity(),
-        stops: vec![
-            GradientStop {
-                offset: 0.0,
-                color: CGColor(0, 255, 0, 255), // Green
-            },
-            GradientStop {
-                offset: 0.5,
-                color: CGColor(255, 255, 0, 255), // Yellow
-            },
-            GradientStop {
-                offset: 1.0,
-                color: CGColor(255, 0, 255, 255), // Magenta
-            },
+    ellipse_node.fills = Paints::new([Paint::RadialGradient(RadialGradientPaint::from_colors(
+        vec![
+            CGColor(0, 255, 0, 255),
+            CGColor(255, 255, 0, 255),
+            CGColor(255, 0, 255, 255),
         ],
-        opacity: 1.0,
-        blend_mode: BlendMode::Normal,
-        active: true,
-    })]);
+    ))]);
     ellipse_node.stroke_width = 6.0.into();
 
     // Create a test polygon node (pentagon)

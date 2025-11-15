@@ -187,7 +187,6 @@ fn main() {
         (
             Paints::new([
                 Paint::LinearGradient(LinearGradientPaint {
-                    transform: AffineTransform::identity(),
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
@@ -199,12 +198,9 @@ fn main() {
                         },
                     ],
                     opacity: 0.7,
-                    blend_mode: BlendMode::Normal,
-                    active: true,
                     ..Default::default()
                 }),
                 Paint::RadialGradient(RadialGradientPaint {
-                    transform: AffineTransform::identity(),
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
@@ -217,7 +213,7 @@ fn main() {
                     ],
                     opacity: 0.5,
                     blend_mode: BlendMode::SoftLight,
-                    active: true,
+                    ..Default::default()
                 }),
             ]),
             "6. Linear + Radial (SoftLight)",
@@ -257,7 +253,6 @@ fn main() {
                     filters: ImageFilters::default(),
                 }),
                 Paint::RadialGradient(RadialGradientPaint {
-                    transform: AffineTransform::identity(),
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
@@ -270,7 +265,7 @@ fn main() {
                     ],
                     opacity: 0.5,
                     blend_mode: BlendMode::HardLight,
-                    active: true,
+                    ..Default::default()
                 }),
             ]),
             "8. Image + Radial (HardLight)",
@@ -301,7 +296,6 @@ fn main() {
                     ..Default::default()
                 }),
                 Paint::RadialGradient(RadialGradientPaint {
-                    transform: AffineTransform::identity(),
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
@@ -314,7 +308,7 @@ fn main() {
                     ],
                     opacity: 0.5,
                     blend_mode: BlendMode::Screen,
-                    active: true,
+                    ..Default::default()
                 }),
                 Paint::Image(ImagePaint {
                     image: checker_image_ref,

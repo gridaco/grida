@@ -74,6 +74,7 @@ async fn demo_gradients() -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         }));
         graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));
     }
@@ -135,6 +136,7 @@ async fn demo_gradients() -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             active: true,
+            ..Default::default()
         })]);
         rect.stroke_width = 8.0.into();
         graph.append_child(Node::Rectangle(rect), Parent::NodeId(root_id.clone()));

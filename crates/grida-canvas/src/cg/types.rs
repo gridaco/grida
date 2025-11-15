@@ -2196,6 +2196,13 @@ pub struct LinearGradientPaint {
 }
 
 impl LinearGradientPaint {
+    pub fn from_stops(stops: Vec<GradientStop>) -> Self {
+        Self {
+            stops,
+            ..Default::default()
+        }
+    }
+
     pub fn from_colors(colors: Vec<CGColor>) -> Self {
         Self {
             stops: colors
@@ -2266,6 +2273,43 @@ pub struct RadialGradientPaint {
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub tile_mode: TileMode,
+}
+
+impl RadialGradientPaint {
+    pub fn from_stops(stops: Vec<GradientStop>) -> Self {
+        Self {
+            stops,
+            ..Default::default()
+        }
+    }
+
+    pub fn from_colors(colors: Vec<CGColor>) -> Self {
+        Self {
+            stops: colors
+                .iter()
+                .enumerate()
+                .map(|(i, color)| GradientStop {
+                    offset: i as f32 / (colors.len() - 1) as f32,
+                    color: *color,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for RadialGradientPaint {
+    fn default() -> Self {
+        Self {
+            active: true,
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+            tile_mode: TileMode::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2290,6 +2334,18 @@ pub struct DiamondGradientPaint {
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+}
+
+impl Default for DiamondGradientPaint {
+    fn default() -> Self {
+        Self {
+            active: true,
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2332,30 +2388,6 @@ pub struct SweepGradientPaint {
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-}
-
-impl Default for RadialGradientPaint {
-    fn default() -> Self {
-        Self {
-            active: true,
-            transform: AffineTransform::default(),
-            stops: Vec::new(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        }
-    }
-}
-
-impl Default for DiamondGradientPaint {
-    fn default() -> Self {
-        Self {
-            active: true,
-            transform: AffineTransform::default(),
-            stops: Vec::new(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        }
-    }
 }
 
 impl Default for SweepGradientPaint {

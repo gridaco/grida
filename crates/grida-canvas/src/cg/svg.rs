@@ -218,10 +218,6 @@ fn svg_radial_gradient_to_paint(
     opacity: f32,
     bounds: Option<(f32, f32)>,
 ) -> Paint {
-    if !matches!(radial.spread_method, SVGGradientSpreadMethod::Pad) {
-        return unsupported_svg_gradient("radial spread-method (reflect/repeat)");
-    }
-
     if (radial.fx - radial.cx).abs() > f32::EPSILON || (radial.fy - radial.cy).abs() > f32::EPSILON
     {
         return unsupported_svg_gradient("radial focal point (fx/fy)");
@@ -237,6 +233,7 @@ fn svg_radial_gradient_to_paint(
         stops: radial.stops.clone(),
         opacity,
         blend_mode: BlendMode::Normal,
+        tile_mode: radial.spread_method.into(),
     })
 }
 

@@ -9,30 +9,12 @@ fn main() {
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
 
-    let gradient = RadialGradientPaint {
-        stops: vec![
-            GradientStop {
-                offset: 0.0,
-                color: CGColor(255, 0, 0, 255),
-            },
-            GradientStop {
-                offset: 0.33,
-                color: CGColor(0, 255, 0, 255),
-            },
-            GradientStop {
-                offset: 0.66,
-                color: CGColor(0, 0, 255, 255),
-            },
-            GradientStop {
-                offset: 1.0,
-                color: CGColor(255, 0, 0, 255),
-            },
-        ],
-        opacity: 1.0,
-        transform: AffineTransform::identity(),
-        blend_mode: BlendMode::Normal,
-        active: true,
-    };
+    let gradient = RadialGradientPaint::from_colors(vec![
+        CGColor::RED,
+        CGColor::GREEN,
+        CGColor::BLUE,
+        CGColor::RED,
+    ]);
 
     let paint = radial_gradient_paint(&gradient, (width as f32, height as f32));
 
