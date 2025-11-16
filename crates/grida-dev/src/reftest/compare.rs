@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use dify::diff::{self, RunParams};
-use image::{GenericImageView, ImageBuffer, Rgba, RgbaImage};
+use image::{ImageBuffer, Rgba, RgbaImage};
 use std::path::Path;
 
 use crate::reftest::args::BgColor;

@@ -1,14 +1,16 @@
-use crate::reftest::args::ReftestArgs;
+use crate::reftest::args::{BgColor, ReftestArgs};
 use crate::reftest::compare::compare_images;
-use crate::reftest::render::{find_test_pairs, render_svg_to_png};
+use crate::reftest::config::ReftestToml;
+use crate::reftest::render::{
+    find_test_pairs_from_glob, find_test_pairs_in_dirs, render_svg_to_png, TestPair,
+};
 use crate::reftest::report::{generate_json_report, ReftestReport, TestResult};
 use anyhow::{Context, Result};
+use image;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 
 fn repo_target_reftests_dir() -> PathBuf {
-    // CARGO_MANIFEST_DIR points to crates/grida-dev
-    // target directory is at workspace root, so go up two levels
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
         .parent()
@@ -18,8 +20,16 @@ fn repo_target_reftests_dir() -> PathBuf {
         .join("reftests")
 }
 
+fn sanitize_dir_name(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' => c,
+            _ => '_',
+        })
+        .collect::<String>()
+}
+
 fn get_score_category(score: f64) -> &'static str {
-    // Convert similarity score to percentage and bucket into S75/S90/S95/S99
     let pct = score * 100.0;
     if pct >= 99.0 {
         "S99"
@@ -33,18 +43,71 @@ fn get_score_category(score: f64) -> &'static str {
 }
 
 pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
-    // Determine output directory
-    let output_dir = args
+    // Load optional config from suite-dir/reftest.toml
+    let cfg = ReftestToml::load_from_dir(&args.suite_dir).unwrap_or(None);
+
+    // Compute base output directory
+    let mut output_dir = args
         .output_dir
         .as_ref()
         .cloned()
         .unwrap_or_else(repo_target_reftests_dir);
 
+    // If no explicit output-dir was provided, append suite name-based folder
+    if args.output_dir.is_none() {
+        let suite_name = cfg.as_ref().and_then(|c| c.resolve_name()).or_else(|| {
+            args.suite_dir
+                .file_name()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+        });
+        if let Some(name) = suite_name {
+            output_dir = output_dir.join(sanitize_dir_name(&name));
+        }
+    }
+
+    // Resolve locators
+    let mut svg_dir = args.suite_dir.join("svg");
+    let mut expects_dir = args.suite_dir.join("png");
+    let mut inputs_pattern: Option<String> = None;
+    if let Some(conf) = &cfg {
+        if let Some(p) = conf.resolve_inputs(&args.suite_dir) {
+            svg_dir = p;
+        }
+        if let Some(p) = conf.resolve_expects(&args.suite_dir) {
+            expects_dir = p;
+        }
+        if let Some(pat) = conf.input_pattern() {
+            inputs_pattern = Some(pat.to_string());
+        }
+    }
+
+    // Effective diff settings (CLI takes precedence when set)
+    let cfg_diff = cfg.as_ref().and_then(|c| c.resolve_diff());
+    let threshold = if args.threshold != 0.0 {
+        args.threshold
+    } else {
+        cfg_diff.and_then(|d| d.threshold).unwrap_or(0.0)
+    };
+    let detect_aa = if args.detect_anti_aliasing {
+        true
+    } else {
+        cfg_diff.and_then(|d| d.aa).unwrap_or(false)
+    };
+    let bg = if let Some(cfg_bg) = cfg.as_ref().and_then(|c| c.resolve_bg()) {
+        match cfg_bg.as_str() {
+            "white" => BgColor::White,
+            "black" => BgColor::Black,
+            _ => args.bg,
+        }
+    } else {
+        args.bg
+    };
+
     // Handle existing output directory
-    let overwrite = args.overwrite.unwrap_or(true); // Default to true
+    let overwrite = args.overwrite.unwrap_or(true);
     if output_dir.exists() {
         if overwrite {
-            // Clear the directory
             std::fs::remove_dir_all(&output_dir).with_context(|| {
                 format!(
                     "failed to remove existing output directory {}",
@@ -63,12 +126,26 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
         }
     }
 
-    // Create output directory
     std::fs::create_dir_all(&output_dir)
         .with_context(|| format!("failed to create output directory {}", output_dir.display()))?;
 
-    println!("Discovering test pairs from {}", args.suite_dir.display());
-    let mut test_pairs = find_test_pairs(&args.suite_dir)?;
+    // Discover test pairs (glob or directory)
+    let mut test_pairs: Vec<TestPair> = if let Some(pat) = inputs_pattern.clone() {
+        let disp = args.suite_dir.join(&pat);
+        println!(
+            "Discovering test pairs from inputs={} expects={}",
+            disp.display(),
+            expects_dir.display()
+        );
+        find_test_pairs_from_glob(&args.suite_dir, &pat, &expects_dir)?
+    } else {
+        println!(
+            "Discovering test pairs from inputs={} expects={}",
+            svg_dir.display(),
+            expects_dir.display()
+        );
+        find_test_pairs_in_dirs(&svg_dir, &expects_dir)?
+    };
 
     // Apply filter if provided
     if let Some(filter_pattern) = &args.filter {
@@ -96,14 +173,20 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     let mut test_results = Vec::new();
 
     // Process each test sequentially
-    for (index, pair) in test_pairs.iter().enumerate() {
+    for (_index, pair) in test_pairs.iter().enumerate() {
         pb.set_message(format!("processing {}", pair.test_name));
+
+        // Load reference PNG to get target dimensions for scaling
+        let target_size = image::open(&pair.ref_png_path).ok().map(|img| {
+            let rgba = img.to_rgba8();
+            rgba.dimensions()
+        });
 
         // Render SVG to PNG (temporary location first)
         let temp_output_png = output_dir.join(format!("{}-temp-output.png", pair.test_name));
 
-        // Render SVG to PNG
-        match render_svg_to_png(&pair.svg_path, &temp_output_png) {
+        // Render SVG to PNG, scaling to match reference size
+        match render_svg_to_png(&pair.svg_path, &temp_output_png, target_size) {
             Ok(_) => {
                 // Compare images
                 let temp_diff_png = output_dir.join(format!("{}-temp-diff.png", pair.test_name));
@@ -111,9 +194,9 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                     &temp_output_png,
                     &pair.ref_png_path,
                     Some(&temp_diff_png),
-                    args.threshold,
-                    args.detect_anti_aliasing,
-                    args.bg,
+                    threshold,
+                    detect_aa,
+                    bg,
                 ) {
                     Ok(comparison) => {
                         // Determine score category and create subdirectory
@@ -184,21 +267,17 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                         ));
                     }
                     Err(e) => {
-                        // Move to lowest category on error
-                        let category = "S75";
-                        let category_dir = output_dir.join(category);
-                        std::fs::create_dir_all(&category_dir).with_context(|| {
-                            format!(
-                                "failed to create category directory {}",
-                                category_dir.display()
-                            )
+                        // On compare error, route to err directory (not a score bucket)
+                        let err_dir = output_dir.join("err");
+                        std::fs::create_dir_all(&err_dir).with_context(|| {
+                            format!("failed to create error directory {}", err_dir.display())
                         })?;
 
                         // Copy reference PNG as expected.png
                         let final_expected_png =
-                            category_dir.join(format!("{}.expected.png", pair.test_name));
+                            err_dir.join(format!("{}.expected.png", pair.test_name));
                         let final_current_png =
-                            category_dir.join(format!("{}.current.png", pair.test_name));
+                            err_dir.join(format!("{}.current.png", pair.test_name));
                         std::fs::copy(&pair.ref_png_path, &final_expected_png).with_context(
                             || {
                                 format!(
@@ -228,24 +307,19 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                             error: Some(format!("Comparison failed: {}", e)),
                         });
 
-                        pb.set_message(format!("error → {}", category));
+                        pb.set_message("error → err".to_string());
                     }
                 }
             }
             Err(e) => {
-                // Move to lowest category on render error
-                let category = "S75";
-                let category_dir = output_dir.join(category);
-                std::fs::create_dir_all(&category_dir).with_context(|| {
-                    format!(
-                        "failed to create category directory {}",
-                        category_dir.display()
-                    )
+                // On render error, route to err directory (not a score bucket)
+                let err_dir = output_dir.join("err");
+                std::fs::create_dir_all(&err_dir).with_context(|| {
+                    format!("failed to create error directory {}", err_dir.display())
                 })?;
 
                 // Copy reference PNG as expected.png even if rendering failed
-                let final_expected_png =
-                    category_dir.join(format!("{}.expected.png", pair.test_name));
+                let final_expected_png = err_dir.join(format!("{}.expected.png", pair.test_name));
                 std::fs::copy(&pair.ref_png_path, &final_expected_png).with_context(|| {
                     format!(
                         "failed to copy reference PNG to {}",
@@ -262,7 +336,7 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                     error: Some(format!("Rendering failed: {}", e)),
                 });
 
-                pb.set_message("render error → S75".to_string());
+                pb.set_message("render error → err".to_string());
             }
         }
 
@@ -293,4 +367,9 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     println!("Max similarity: {:.2}%", report.max_similarity * 100.0);
 
     Ok(())
+}
+
+// Convenience wrapper to match main.rs signature (takes owned args)
+pub async fn run(args: ReftestArgs) -> Result<()> {
+    run_reftest(&args).await
 }

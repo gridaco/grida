@@ -26,4 +26,6 @@ serde = { version = "1.0", features = ["derive"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 dify = "0.6"
 indicatif = "0.17"
+toml = "0.9.8"
+glob = "0.3.3"
 
