@@ -19,6 +19,7 @@ use futures::future::join_all;
 use grida_dev::platform::native_demo::{
     run_demo_window, run_demo_window_with, run_demo_window_with_drop,
 };
+mod reftest;
 use image::image_dimensions;
 use math2::transform::AffineTransform;
 use reqwest;
@@ -60,6 +61,8 @@ enum Command {
     Sample,
     /// Open an empty scene and replace it when files are dropped onto the window.
     Master,
+    /// Run SVG reftests against W3C SVG 1.1 Test Suite.
+    Reftest(reftest::ReftestArgs),
 }
 
 #[derive(Args, Debug)]
@@ -112,6 +115,7 @@ async fn main() -> Result<()> {
             run_demo_window(build_sample_scene()).await;
         }
         Command::Master => run_master().await?,
+        Command::Reftest(args) => reftest::run(args).await?,
         #[allow(unreachable_patterns)]
         _ => unreachable!("Unhandled command variant"),
     }
