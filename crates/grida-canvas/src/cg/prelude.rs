@@ -8,3 +8,4 @@ pub use super::tilemode::*;
 pub use super::transform::*;
 pub use super::types::*;
 pub use super::varwidth::*;
+pub use super::colormatrix::*;
