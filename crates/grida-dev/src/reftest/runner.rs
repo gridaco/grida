@@ -1,5 +1,5 @@
 use crate::reftest::args::{BgColor, ReftestArgs};
-use crate::reftest::compare::compare_images;
+use crate::reftest::compare::{compare_images, ScoringMask};
 use crate::reftest::config::ReftestToml;
 use crate::reftest::render::{
     find_test_pairs_from_glob, find_test_pairs_in_dirs, render_svg_to_png, TestPair,
@@ -103,6 +103,24 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     } else {
         args.bg
     };
+    // Effective scoring settings
+    let cfg_scoring = cfg.as_ref().and_then(|c| c.resolve_scoring());
+    let test_kind = cfg.as_ref().and_then(|c| c.resolve_kind());
+    let mask = cfg_scoring
+        .and_then(|s| s.mask)
+        .as_deref()
+        .map(|m| match m {
+            "alpha" => ScoringMask::Alpha,
+            _ => ScoringMask::None,
+        })
+        .unwrap_or_else(|| {
+            // Default to "alpha" for SVG tests when mask is not explicitly set
+            if test_kind.as_deref() == Some("svg") {
+                ScoringMask::Alpha
+            } else {
+                ScoringMask::None
+            }
+        });
 
     // Handle existing output directory
     let overwrite = args.overwrite.unwrap_or(true);
@@ -197,6 +215,7 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                     threshold,
                     detect_aa,
                     bg,
+                    mask,
                 ) {
                     Ok(comparison) => {
                         // Determine score category and create subdirectory

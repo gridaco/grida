@@ -25,3 +25,10 @@ bg = "white"
 aa = true
 # Dify threshold in YIQ space (0.0 = strict, count any difference)
 threshold = 0.0
+
+[test.scoring]
+# Masking mode for scoring: "none" (all pixels) or "alpha" (only non-transparent pixels)
+# When "alpha", scoring considers only pixels where either expected or actual alpha > 0.
+# This is useful for SVG tests with large transparent regions, as transparent pixels
+# won't skew the mismatch ratio.
+mask = "alpha"  # or "none"

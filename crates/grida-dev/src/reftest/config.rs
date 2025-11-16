@@ -12,6 +12,12 @@ pub struct DiffConfig {
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
+pub struct ScoringConfig {
+    #[serde(default)]
+    pub mask: Option<String>, // "none" | "alpha"
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
 pub struct TestConfig {
     // Optional name under [test]
     #[serde(default)]
@@ -27,6 +33,8 @@ pub struct TestConfig {
     pub expects: Option<String>,
     #[serde(default)]
     pub diff: Option<DiffConfig>,
+    #[serde(default)]
+    pub scoring: Option<ScoringConfig>,
     #[serde(default)]
     pub bg: Option<String>, // "black" | "white"
 }
@@ -77,6 +85,7 @@ impl ReftestToml {
             inputs: self.inputs.clone(),
             expects: self.expects.clone(),
             diff: self.diff,
+            scoring: None, // Legacy configs don't have scoring
             bg: self.bg.clone(),
         }
     }
@@ -106,5 +115,11 @@ impl ReftestToml {
     }
     pub fn resolve_diff(&self) -> Option<DiffConfig> {
         self.pick_test().diff
+    }
+    pub fn resolve_scoring(&self) -> Option<ScoringConfig> {
+        self.pick_test().scoring
+    }
+    pub fn resolve_kind(&self) -> Option<String> {
+        self.pick_test().kind
     }
 }

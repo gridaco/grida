@@ -35,6 +35,12 @@ fn composite_to_opaque(img: &RgbaImage, bg: BgColor) -> RgbaImage {
     out
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ScoringMask {
+    None,
+    Alpha,
+}
+
 pub fn compare_images(
     actual: &Path,
     expected: &Path,
@@ -42,6 +48,7 @@ pub fn compare_images(
     threshold: f32,
     detect_aa: bool,
     bg: BgColor,
+    mask: ScoringMask,
 ) -> Result<ComparisonResult> {
     // Load images and composite to opaque over selected background
     let actual_img_rgba = image::open(actual)
@@ -52,7 +59,7 @@ pub fn compare_images(
         .to_rgba8();
 
     let (width, height) = actual_img_rgba.dimensions();
-    let total_pixels = (width * height) as f64;
+    let full_pixel_count = (width * height) as f64;
 
     // If dimensions mismatch, return early
     if expected_img_rgba.dimensions() != (width, height) {
@@ -68,6 +75,23 @@ pub fn compare_images(
             )),
         });
     }
+
+    // Calculate total_pixels based on mask setting
+    let total_pixels = match mask {
+        ScoringMask::Alpha => {
+            // Count pixels where either expected or actual alpha > 0
+            let mut visible_pixels = 0u64;
+            for (x, y, _) in actual_img_rgba.enumerate_pixels() {
+                let actual_alpha = actual_img_rgba.get_pixel(x, y)[3];
+                let expected_alpha = expected_img_rgba.get_pixel(x, y)[3];
+                if actual_alpha > 0 || expected_alpha > 0 {
+                    visible_pixels += 1;
+                }
+            }
+            visible_pixels as f64
+        }
+        ScoringMask::None => full_pixel_count,
+    };
 
     let opaque_actual = composite_to_opaque(&actual_img_rgba, bg);
     let opaque_expected = composite_to_opaque(&expected_img_rgba, bg);
@@ -116,8 +140,17 @@ pub fn compare_images(
     match diff::run(&params) {
         Ok(Some(diff_count)) => {
             let diff_pixels = diff_count as f64;
-            let diff_percentage = (diff_pixels / total_pixels) * 100.0;
-            let similarity_score = 1.0 - (diff_pixels / total_pixels).min(1.0);
+            // Avoid division by zero if total_pixels is 0 (shouldn't happen, but be safe)
+            let diff_percentage = if total_pixels > 0.0 {
+                (diff_pixels / total_pixels) * 100.0
+            } else {
+                0.0
+            };
+            let similarity_score = if total_pixels > 0.0 {
+                1.0 - (diff_pixels / total_pixels).min(1.0)
+            } else {
+                1.0 // If no visible pixels, consider it perfect match
+            };
 
             Ok(ComparisonResult {
                 similarity_score,

@@ -9,6 +9,7 @@ The reftest system:
 - Renders SVG files to PNG at the target reference size (scaled using camera zoom)
 - Compares rendered outputs with reference PNG images using the `dify` crate
 - Calculates similarity scores (0.0 to 1.0) and difference percentages
+- Supports alpha masking for scoring (excludes transparent pixels from score calculation)
 - Generates comprehensive JSON reports with metrics
 - Creates visual diff images (`d.png`) when differences are detected
 - Organizes results into score-based categories
@@ -121,6 +122,27 @@ cargo run -p grida-dev -- reftest \
   --bg white
 ```
 
+### Scoring Mask
+
+The scoring mask controls which pixels are included in the similarity score calculation:
+
+- **`mask = "none"`**: Score is computed over all pixels in the image (default for non-SVG tests)
+- **`mask = "alpha"`**: Score is computed only over pixels where either expected or actual alpha > 0 (default for SVG tests)
+
+**Rationale**: Image-based tests often include large fully-transparent regions (especially SVG). Counting those pixels in the diff skews the score and makes small visible errors look insignificant. Alpha masking lets you choose whether scoring should consider all pixels or only visibly relevant ones.
+
+**Default behavior**:
+
+- SVG tests (`type = "svg"`) default to `mask = "alpha"` when not explicitly set
+- Other test types default to `mask = "none"` when not explicitly set
+
+You can override the default by explicitly setting `mask` in `[test.scoring]`:
+
+```toml
+[test.scoring]
+mask = "none"  # Override default to include all pixels
+```
+
 ### Report Format
 
 The `report.json` contains:
@@ -183,6 +205,14 @@ aa = true
 
 # Dify threshold in YIQ space (0.0 = strict, count any difference)
 threshold = 0.0
+
+[test.scoring]
+# Masking mode for scoring: "none" (all pixels) or "alpha" (only non-transparent pixels)
+# When "alpha", scoring considers only pixels where either expected or actual alpha > 0.
+# This is useful for SVG tests with large transparent regions, as transparent pixels
+# won't skew the mismatch ratio.
+# Default: "alpha" for SVG tests, "none" for other test types
+mask = "alpha"  # or "none"
 ```
 
 ### Configuration Resolution
