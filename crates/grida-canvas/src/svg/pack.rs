@@ -125,6 +125,8 @@ impl SceneBuilder {
                 text.fill.as_ref(),
                 text.stroke.as_ref(),
                 None,
+                &text.bounds,
+                SVGTextAnchor::Start,
                 parent,
             )
         } else {
@@ -135,6 +137,8 @@ impl SceneBuilder {
                     span.fill.as_ref().or(text.fill.as_ref()),
                     span.stroke.as_ref().or(text.stroke.as_ref()),
                     span.font_size,
+                    &text.bounds,
+                    span.anchor,
                     parent.clone(),
                 )?;
             }
@@ -149,6 +153,8 @@ impl SceneBuilder {
         fill: Option<&SVGFillAttributes>,
         stroke: Option<&SVGStrokeAttributes>,
         font_size: Option<f32>,
+        bounds: &IRSVGBounds,
+        anchor: SVGTextAnchor,
         parent: Parent,
     ) -> Result<(), String> {
         if text.trim().is_empty() {
@@ -156,7 +162,19 @@ impl SceneBuilder {
         }
 
         let mut node = self.factory.create_text_span_node();
-        node.transform = transform;
+        let mut adjusted_transform = transform;
+        let mut anchor_shift = 0.0;
+        match anchor {
+            SVGTextAnchor::Start => {}
+            SVGTextAnchor::Middle => anchor_shift = bounds.width * 0.5,
+            SVGTextAnchor::End => anchor_shift = bounds.width,
+        }
+        adjusted_transform.translate(-anchor_shift, 0.0);
+        if let Some(size) = font_size {
+            // FIXME(svg text): baseline -> top-left conversion needs proper font metrics.
+            adjusted_transform.translate(0.0, -size);
+        }
+        node.transform = adjusted_transform;
         node.text = text.to_string();
         if let Some(size) = font_size {
             node.text_style.font_size = size;

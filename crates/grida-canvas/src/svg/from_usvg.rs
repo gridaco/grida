@@ -61,6 +61,16 @@ impl From<usvg::FillRule> for FillRule {
     }
 }
 
+impl From<usvg::TextAnchor> for SVGTextAnchor {
+    fn from(text_anchor: usvg::TextAnchor) -> Self {
+        match text_anchor {
+            usvg::TextAnchor::Start => SVGTextAnchor::Start,
+            usvg::TextAnchor::Middle => SVGTextAnchor::Middle,
+            usvg::TextAnchor::End => SVGTextAnchor::End,
+        }
+    }
+}
+
 impl From<usvg::StrokeMiterlimit> for StrokeMiterLimit {
     fn from(miterlimit: usvg::StrokeMiterlimit) -> Self {
         StrokeMiterLimit::new(miterlimit.get())

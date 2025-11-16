@@ -1,11 +1,11 @@
 use crate::cg::prelude::*;
 use crate::cg::svg::IRSVGBounds;
+use crate::fonts::embedded::geist;
 use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 use skia_safe::Path as SkPath;
 use usvg;
 use usvg::tiny_skia_path::{Path as TinyPath, PathSegment};
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SVGPackedScene {
     pub svg: IRSVGInitialContainerNode,
@@ -18,7 +18,12 @@ impl SVGPackedScene {
 
     pub fn new_from_svg_str(svg_source: &str) -> Result<Self, String> {
         let mut options = usvg::Options::default();
+        options.font_family = geist::FAMILY.to_string(); // our builtin font
+        options.font_size = 16.0; // font-size default is 'medium' (16px) - based on browser spec
+
+        // #![cfg(target_os = "emscripten")]
         options.fontdb_mut().load_system_fonts();
+
         let tree = usvg::Tree::from_str(svg_source, &options).map_err(|err| err.to_string())?;
         let svg = build_svg_ir_scene(&tree)?;
         Ok(Self { svg })
@@ -127,6 +132,7 @@ fn convert_path(path: &usvg::Path, parent_world: &CGTransform2D) -> Result<IRSVG
 fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVGTextNode, String> {
     let abs: CGTransform2D = text.abs_transform().into();
     let relative = extract_relative_transform(parent_world, &abs);
+    let bounds: IRSVGBounds = text.bounding_box().into();
 
     let mut combined_text = String::new();
     for chunk in text.chunks() {
@@ -182,6 +188,7 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
                 fill: span_fill,
                 stroke: span_stroke,
                 font_size: Some(span.font_size().get()),
+                anchor: chunk.anchor().into(),
             });
         }
     }
@@ -192,6 +199,7 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
         fill,
         stroke,
         spans,
+        bounds,
     })
 }
 

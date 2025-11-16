@@ -342,6 +342,7 @@ pub struct IRSVGTextNode {
     pub fill: Option<SVGFillAttributes>,
     pub stroke: Option<SVGStrokeAttributes>,
     pub spans: Vec<IRSVGTextSpanNode>,
+    pub bounds: IRSVGBounds,
 }
 
 /// <tspan>
@@ -352,6 +353,17 @@ pub struct IRSVGTextSpanNode {
     pub fill: Option<SVGFillAttributes>,
     pub stroke: Option<SVGStrokeAttributes>,
     pub font_size: Option<f32>,
+    pub anchor: SVGTextAnchor,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum SVGTextAnchor {
+    #[serde(rename = "start")]
+    Start,
+    #[serde(rename = "middle")]
+    Middle,
+    #[serde(rename = "end")]
+    End,
 }
 
 /// <path>
