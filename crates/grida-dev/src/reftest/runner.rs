@@ -8,6 +8,7 @@ use crate::reftest::report::{generate_json_report, ReftestReport, TestResult};
 use anyhow::{Context, Result};
 use image;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::panic;
 use std::path::{Path, PathBuf};
 
 fn repo_target_reftests_dir() -> PathBuf {
@@ -204,7 +205,32 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
         let temp_output_png = output_dir.join(format!("{}-temp-output.png", pair.test_name));
 
         // Render SVG to PNG, scaling to match reference size
-        match render_svg_to_png(&pair.svg_path, &temp_output_png, target_size) {
+        // Wrap in catch_unwind to handle panics from usvg library
+        let svg_path_for_panic = pair.svg_path.clone();
+        let render_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            render_svg_to_png(&pair.svg_path, &temp_output_png, target_size)
+        }));
+
+        let render_result = match render_result {
+            Ok(result) => result,
+            Err(panic_payload) => {
+                // Convert panic to error message
+                let panic_msg = if let Some(s) = panic_payload.downcast_ref::<String>() {
+                    s.clone()
+                } else if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                    s.to_string()
+                } else {
+                    "Unknown panic occurred during SVG rendering".to_string()
+                };
+                Err(anyhow::anyhow!(
+                    "Panic during SVG rendering ({}): {}",
+                    svg_path_for_panic.display(),
+                    panic_msg
+                ))
+            }
+        };
+
+        match render_result {
             Ok(_) => {
                 // Compare images
                 let temp_diff_png = output_dir.join(format!("{}-temp-diff.png", pair.test_name));
