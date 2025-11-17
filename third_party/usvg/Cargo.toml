@@ -1,17 +1,15 @@
 [package]
 name = "usvg"
-version = "0.45.1"
+version = "0.0.1"
 keywords = ["svg"]
-license.workspace = true
+license = "Apache-2.0 OR MIT"
 edition = "2021"
 rust-version = "1.82.0"
 description = "An SVG simplification library."
 categories = ["multimedia::images"]
-repository = "https://github.com/linebender/resvg"
-documentation = "https://docs.rs/usvg/"
+publish = false
 readme = "README.md"
 exclude = ["tests"]
-workspace = "../.."
 
 [[bin]]
 name = "usvg"

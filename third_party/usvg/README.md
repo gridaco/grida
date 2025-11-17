@@ -1,7 +1,6 @@
 # usvg
-[![Crates.io](https://img.shields.io/crates/v/usvg.svg)](https://crates.io/crates/usvg)
-[![Documentation](https://docs.rs/usvg/badge.svg)](https://docs.rs/usvg)
-[![Rust 1.65+](https://img.shields.io/badge/rust-1.65+-orange.svg)](https://www.rust-lang.org)
+
+> **Note:** This is a fork of [usvg](https://github.com/linebender/resvg) maintained for the [Grida](https://grida.co) project. This fork is used internally and may contain modifications specific to Grida's needs.
 
 `usvg` (micro SVG) is an [SVG] parser that tries to solve most of SVG complexity.
 
@@ -19,7 +18,7 @@ and can focus just on the rendering part.
 - CSS will be applied
 - Only simple paths
   - Basic shapes (like `rect` and `circle`) will be converted into paths
-  - Paths contain only absolute *MoveTo*, *LineTo*, *QuadTo*, *CurveTo* and *ClosePath* segments.
+  - Paths contain only absolute _MoveTo_, _LineTo_, _QuadTo_, _CurveTo_ and _ClosePath_ segments.
     ArcTo, implicit and relative segments will be converted
 - `use` will be resolved and replaced with the reference content
 - Nested `svg` will be resolved
@@ -44,6 +43,18 @@ and can focus just on the rendering part.
 - Only [static](http://www.w3.org/TR/SVG11/feature#SVG-static) SVG features,
   e.g. no `a`, `view`, `cursor`, `script`, no events and no animations
 
+## About This Fork
+
+This is a fork of the original [usvg](https://github.com/linebender/resvg) library, maintained for use within the Grida project. For the original upstream version, please visit:
+
+- **Original Repository:** [linebender/resvg](https://github.com/linebender/resvg)
+- **Crates.io:** [usvg](https://crates.io/crates/usvg)
+- **Documentation:** [docs.rs/usvg](https://docs.rs/usvg)
+
+### Original Authors
+
+This library was originally created by the [Resvg Authors](https://github.com/linebender/resvg). All credit for the original work goes to them.
+
 ## License
 
 Licensed under either of
@@ -52,13 +63,6 @@ Licensed under either of
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
-
-## Contribution
-
-Contributions are welcome by pull request.
-The [Rust code of conduct] applies.
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be licensed as above, without any additional terms or conditions.
 
 [Rust Code of Conduct]: https://www.rust-lang.org/policies/code-of-conduct
 [SVG]: https://en.wikipedia.org/wiki/Scalable_Vector_Graphics

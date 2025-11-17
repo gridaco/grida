@@ -7,12 +7,12 @@ use once_cell::sync::Lazy;
 
 static GLOBAL_FONTDB: Lazy<Arc<usvg::fontdb::Database>> = Lazy::new(|| {
     let mut fontdb = usvg::fontdb::Database::new();
-    fontdb.load_fonts_dir("../resvg/tests/fonts");
+    fontdb.load_fonts_dir("../../fixtures/fonts");
+
     fontdb.set_serif_family("Noto Serif");
     fontdb.set_sans_serif_family("Noto Sans");
-    fontdb.set_cursive_family("Yellowtail");
-    fontdb.set_fantasy_family("Sedgwick Ave Display");
     fontdb.set_monospace_family("Noto Mono");
+
     Arc::new(fontdb)
 });
 

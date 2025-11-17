@@ -24,9 +24,7 @@ Here is the main differences between SVG Full and SVG Micro.
 - No `style` attribute, except for `mix-blend-mode` and `isolation`
 - Default attributes are implicit.
 
-You can use
-https://github.com/linebender/resvg/tree/main/crates/usvg[usvg]
-to convert a random SVG into a SVG Micro almost losslessly.
+You can use `usvg` command to convert a random SVG into a SVG Micro almost losslessly.
 
 == Elements
 
