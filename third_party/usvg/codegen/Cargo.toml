@@ -1,0 +1,14 @@
+[package]
+name = "codegen"
+version = "0.1.0"
+license.workspace = true
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "codegen"
+path = "main.rs"
+
+[dependencies]
+phf_codegen = "0.7.22"
+itertools = "0.14"
