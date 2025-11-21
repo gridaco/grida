@@ -71,7 +71,7 @@ impl IdConverter {
             if let Some(JSONNode::Scene(scene_node)) = file.document.nodes.get(&scene_id) {
                 (
                     scene_node.name.clone(),
-                    scene_node.background_color.clone().map(Into::into),
+                    Some(scene_node.background_color.clone()),
                 )
             } else {
                 (scene_id.clone(), None)

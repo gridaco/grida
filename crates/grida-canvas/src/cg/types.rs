@@ -2648,13 +2648,16 @@ pub struct ImageTile {
 /// See also:
 /// - https://developer.mozilla.org/en-US/docs/Web/CSS/background-repeat
 /// - https://api.flutter.dev/flutter/painting/ImageRepeat.html
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ImageRepeat {
     /// Repeat the image horizontally (X axis) only.
+    #[serde(rename = "repeat-x")]
     RepeatX,
     /// Repeat the image vertically (Y axis) only.
+    #[serde(rename = "repeat-y")]
     RepeatY,
     /// Repeat the image in both directions.
+    #[serde(rename = "repeat")]
     Repeat,
 }
 

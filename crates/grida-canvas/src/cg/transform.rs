@@ -34,6 +34,20 @@ impl CGTransform2D {
             m10, m11, m12,
         }
     }
+
+    /// Returns the matrix representation as a 2x3 array
+    pub fn matrix(&self) -> [[f32; 3]; 2] {
+        [
+            [self.m00, self.m01, self.m02],
+            [self.m10, self.m11, self.m12],
+        ]
+    }
+}
+
+impl Default for CGTransform2D {
+    fn default() -> Self {
+        Self::identity()
+    }
 }
 
 impl From<CGTransform2D> for [[f32; 3]; 2] {
@@ -84,5 +98,43 @@ impl From<AffineTransform> for CGTransform2D {
 impl From<&AffineTransform> for CGTransform2D {
     fn from(transform: &AffineTransform) -> Self {
         (*transform).into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CGTransform2D;
+    use math2::transform::AffineTransform;
+
+    #[test]
+    fn deserialize_json_transform2d() {
+        // Test CGTransform2D deserialization (flattened structure)
+        let json_transform = r#"[[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]"#;
+        let transform: CGTransform2D =
+            serde_json::from_str(json_transform).expect("Failed to parse transform");
+        assert_eq!(transform.matrix()[0], [1.0, 0.0, 10.0]);
+        assert_eq!(transform.matrix()[1], [0.0, 1.0, 20.0]);
+
+        // Test default value
+        let default_transform = CGTransform2D::default();
+        assert_eq!(default_transform.matrix()[0], [1.0, 0.0, 0.0]);
+        assert_eq!(default_transform.matrix()[1], [0.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    fn json_transform2d_conversion() {
+        // Test conversion to AffineTransform
+        let json_transform = CGTransform2D::from([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]);
+        let affine: AffineTransform = json_transform.into();
+        assert_eq!(affine.matrix[0], [2.0, 0.0, 5.0]);
+        assert_eq!(affine.matrix[1], [0.0, 2.0, 10.0]);
+
+        // Test conversion from AffineTransform
+        let affine_transform = AffineTransform {
+            matrix: [[3.0, 0.0, 15.0], [0.0, 3.0, 30.0]],
+        };
+        let json_transform: CGTransform2D = affine_transform.into();
+        assert_eq!(json_transform.matrix()[0], [3.0, 0.0, 15.0]);
+        assert_eq!(json_transform.matrix()[1], [0.0, 3.0, 30.0]);
     }
 }

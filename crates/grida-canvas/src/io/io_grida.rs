@@ -7,96 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-/// JSON representation of a 2D transform matrix.
-///
-/// This provides a reliable way to handle transform matrices in JSON,
-/// with proper default values and validation.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-pub struct JSONTransform2D([[f32; 3]; 2]);
-
-impl Default for JSONTransform2D {
-    fn default() -> Self {
-        Self([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]) // Identity matrix
-    }
-}
-
-impl From<JSONTransform2D> for AffineTransform {
-    fn from(json_transform: JSONTransform2D) -> Self {
-        AffineTransform {
-            matrix: json_transform.0,
-        }
-    }
-}
-
-impl From<AffineTransform> for JSONTransform2D {
-    fn from(transform: AffineTransform) -> Self {
-        Self(transform.matrix)
-    }
-}
-
-impl JSONTransform2D {
-    /// Get the matrix as a reference
-    pub fn matrix(&self) -> &[[f32; 3]; 2] {
-        &self.0
-    }
-}
-
-#[derive(Debug, Deserialize, Clone, Copy)]
-#[serde(rename_all = "kebab-case")]
-pub enum JSONImageRepeat {
-    RepeatX,
-    RepeatY,
-    Repeat,
-}
-
-impl Default for JSONImageRepeat {
-    fn default() -> Self {
-        JSONImageRepeat::Repeat
-    }
-}
-
-impl From<JSONImageRepeat> for ImageRepeat {
-    fn from(repeat: JSONImageRepeat) -> Self {
-        match repeat {
-            JSONImageRepeat::RepeatX => ImageRepeat::RepeatX,
-            JSONImageRepeat::RepeatY => ImageRepeat::RepeatY,
-            JSONImageRepeat::Repeat => ImageRepeat::Repeat,
-        }
-    }
-}
-
-fn default_image_scale() -> f32 {
-    1.0
-}
-
-/// Helper function to convert JSON paint fields to ImagePaintFit
-/// This handles the logic where transform is used when fit is "transform",
-/// and scale/repeat are used when fit is "tile"
-fn json_paint_to_image_paint_fit(
-    fit: Option<String>,
-    transform: Option<JSONTransform2D>,
-    scale: Option<f32>,
-    repeat: Option<JSONImageRepeat>,
-) -> ImagePaintFit {
-    match fit.as_deref() {
-        Some("transform") => {
-            // Use the separate transform field
-            let json_transform = transform.unwrap_or_default();
-            ImagePaintFit::Transform(json_transform.into())
-        }
-        Some("tile") => {
-            // Handle tile mode using the separate scale and repeat fields
-            ImagePaintFit::Tile(ImageTile {
-                scale: scale.unwrap_or(1.0),
-                repeat: repeat.map(|r| r.into()).unwrap_or(ImageRepeat::Repeat),
-            })
-        }
-        Some("contain") => ImagePaintFit::Fit(BoxFit::Contain),
-        Some("cover") => ImagePaintFit::Fit(BoxFit::Cover),
-        Some("fill") => ImagePaintFit::Fit(BoxFit::Fill),
-        Some("none") => ImagePaintFit::Fit(BoxFit::None),
-        _ => ImagePaintFit::Fit(BoxFit::Cover), // Default fallback
-    }
+pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
+    serde_json::from_str(file)
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,10 +29,12 @@ pub struct JSONDocument {
     pub entry_scene_id: Option<String>,
 }
 
+// remove
 #[derive(Debug, Deserialize)]
 pub struct JSONGradientStop {
     pub offset: f32,
-    pub color: JSONRGBA,
+    #[serde(with = "color_formats::object::RGB888A32F")]
+    pub color: CGColor,
 }
 
 impl From<JSONGradientStop> for GradientStop {
@@ -137,7 +51,8 @@ impl From<JSONGradientStop> for GradientStop {
 pub enum JSONPaint {
     #[serde(rename = "solid")]
     Solid {
-        color: Option<JSONRGBA>,
+        #[serde(with = "color_formats::object::RGB888A32F", default)]
+        color: CGColor,
         #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
         #[serde(default = "default_active")]
@@ -146,7 +61,7 @@ pub enum JSONPaint {
     #[serde(rename = "linear_gradient")]
     LinearGradient {
         id: Option<String>,
-        transform: Option<JSONTransform2D>,
+        transform: Option<CGTransform2D>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -158,7 +73,7 @@ pub enum JSONPaint {
     #[serde(rename = "radial_gradient")]
     RadialGradient {
         id: Option<String>,
-        transform: Option<JSONTransform2D>,
+        transform: Option<CGTransform2D>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -170,7 +85,7 @@ pub enum JSONPaint {
     #[serde(rename = "diamond_gradient")]
     DiamondGradient {
         id: Option<String>,
-        transform: Option<JSONTransform2D>,
+        transform: Option<CGTransform2D>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -182,7 +97,7 @@ pub enum JSONPaint {
     #[serde(rename = "sweep_gradient")]
     SweepGradient {
         id: Option<String>,
-        transform: Option<JSONTransform2D>,
+        transform: Option<CGTransform2D>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -196,11 +111,11 @@ pub enum JSONPaint {
         #[serde(default)]
         src: Option<String>,
         #[serde(default)]
-        transform: Option<JSONTransform2D>,
+        transform: Option<CGTransform2D>,
         #[serde(default)]
         fit: Option<String>,
         #[serde(default)]
-        repeat: JSONImageRepeat,
+        repeat: ImageRepeat,
         #[serde(rename = "quarterTurns", default)]
         quarter_turns: u8,
         #[serde(default = "default_image_scale")]
@@ -221,8 +136,12 @@ pub enum JSONPaint {
 pub struct CSSBorder {
     #[serde(rename = "borderWidth")]
     pub border_width: Option<f32>,
-    #[serde(rename = "borderColor")]
-    pub border_color: Option<JSONRGBA>,
+    #[serde(
+        rename = "borderColor",
+        with = "color_formats::object::RGB888A32F",
+        default
+    )]
+    pub border_color: CGColor,
     #[serde(rename = "borderStyle")]
     pub border_style: Option<String>,
 }
@@ -236,27 +155,14 @@ pub struct JSONSVGPath {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct JSONRGBA {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-    pub a: f32,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct JSONVarWidthStop {
-    pub u: f32,
-    pub r: f32,
-}
-
-#[derive(Debug, Deserialize, Clone)]
 pub struct JSONVariableWidthProfile {
-    pub stops: Vec<JSONVarWidthStop>,
+    pub stops: Vec<WidthStop>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct JSONFeShadow {
-    pub color: JSONRGBA,
+    #[serde(with = "color_formats::object::RGB888A32F")]
+    pub color: CGColor,
     pub dx: f32,
     pub dy: f32,
     #[serde(default)]
@@ -372,12 +278,6 @@ impl From<JSONFeProgressiveBlur> for FeProgressiveBlur {
     }
 }
 
-impl From<JSONRGBA> for CGColor {
-    fn from(color: JSONRGBA) -> Self {
-        CGColor(color.r, color.g, color.b, (color.a * 255.0).round() as u8)
-    }
-}
-
 impl From<JSONFeShadow> for FeShadow {
     fn from(box_shadow: JSONFeShadow) -> Self {
         FeShadow {
@@ -409,9 +309,19 @@ impl From<JSONFeLiquidGlass> for FeLiquidGlass {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "mode", rename_all = "lowercase")]
 pub enum JSONFeNoiseColors {
-    Mono { color: JSONRGBA },
-    Duo { color1: JSONRGBA, color2: JSONRGBA },
-    Multi { opacity: f32 },
+    Mono {
+        #[serde(with = "color_formats::object::RGB888A32F", default)]
+        color: CGColor,
+    },
+    Duo {
+        #[serde(with = "color_formats::object::RGB888A32F")]
+        color1: CGColor,
+        #[serde(with = "color_formats::object::RGB888A32F")]
+        color2: CGColor,
+    },
+    Multi {
+        opacity: f32,
+    },
 }
 
 /// JSON representation of noise effect
@@ -439,12 +349,10 @@ fn default_num_octaves() -> i32 {
 impl From<JSONFeNoiseColors> for NoiseEffectColors {
     fn from(json: JSONFeNoiseColors) -> Self {
         match json {
-            JSONFeNoiseColors::Mono { color } => NoiseEffectColors::Mono {
-                color: color.into(),
-            },
+            JSONFeNoiseColors::Mono { color } => NoiseEffectColors::Mono { color: color },
             JSONFeNoiseColors::Duo { color1, color2 } => NoiseEffectColors::Duo {
-                color1: color1.into(),
-                color2: color2.into(),
+                color1: color1,
+                color2: color2,
             },
             JSONFeNoiseColors::Multi { opacity } => NoiseEffectColors::Multi { opacity },
         }
@@ -473,7 +381,7 @@ impl From<Option<JSONPaint>> for Paint {
                 blend_mode,
                 active,
             }) => Paint::Solid(SolidPaint {
-                color: color.map_or(CGColor::TRANSPARENT, |c| c.into()),
+                color: color,
                 blend_mode,
                 active,
             }),
@@ -596,16 +504,11 @@ impl From<JSONVariableWidthProfile> for VarWidthProfile {
     fn from(profile: JSONVariableWidthProfile) -> Self {
         VarWidthProfile {
             base: 1.0, // TODO: need to use node's stroke width as base
-            stops: profile.stops.into_iter().map(|s| s.into()).collect(),
-        }
-    }
-}
-
-impl From<JSONVarWidthStop> for WidthStop {
-    fn from(stop: JSONVarWidthStop) -> Self {
-        WidthStop {
-            u: stop.u,
-            r: stop.r,
+            stops: profile
+                .stops
+                .into_iter()
+                .map(|s| WidthStop::from(s))
+                .collect(),
         }
     }
 }
@@ -672,8 +575,12 @@ pub struct JSONSceneNode {
     pub name: String,
     pub active: Option<bool>,
     pub locked: Option<bool>,
-    #[serde(rename = "backgroundColor")]
-    pub background_color: Option<JSONRGBA>,
+    #[serde(
+        with = "color_formats::object::RGB888A32F",
+        rename = "backgroundColor",
+        default
+    )]
+    pub background_color: CGColor,
     pub guides: Option<Vec<serde_json::Value>>,
     pub constraints: Option<HashMap<String, String>>,
     pub edges: Option<Vec<serde_json::Value>>,
@@ -1076,8 +983,12 @@ pub struct JSONTextNode {
     pub text_decoration_line: TextDecorationLine,
     #[serde(rename = "textDecorationStyle", default)]
     pub text_decoration_style: Option<TextDecorationStyle>,
-    #[serde(rename = "textDecorationColor", default)]
-    pub text_decoration_color: Option<JSONRGBA>,
+    #[serde(
+        rename = "textDecorationColor",
+        with = "color_formats::object::RGB888A32F",
+        default
+    )]
+    pub text_decoration_color: CGColor,
     #[serde(rename = "textDecorationSkipInk", default)]
     pub text_decoration_skip_ink: Option<bool>,
     #[serde(rename = "textDecorationThickness", default)]
@@ -1289,8 +1200,8 @@ fn default_stroke_width() -> f32 {
     0.0
 }
 
-pub fn parse(file: &str) -> Result<JSONCanvasFile, serde_json::Error> {
-    serde_json::from_str(file)
+fn default_image_scale() -> f32 {
+    1.0
 }
 
 impl From<JSONGroupNode> for GroupNodeRec {
@@ -1443,7 +1354,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             text_style: TextStyleRec {
                 text_decoration: Some(TextDecorationRec {
                     text_decoration_line: node.text_decoration_line,
-                    text_decoration_color: node.text_decoration_color.map(CGColor::from),
+                    text_decoration_color: Some(node.text_decoration_color),
                     text_decoration_style: node.text_decoration_style,
                     text_decoration_skip_ink: node.text_decoration_skip_ink,
                     text_decoration_thinkness: node.text_decoration_thinkness,
@@ -2081,6 +1992,36 @@ impl From<JSONNode> for Node {
                 })
             }
         }
+    }
+}
+
+/// Helper function to convert JSON paint fields to ImagePaintFit
+/// This handles the logic where transform is used when fit is "transform",
+/// and scale/repeat are used when fit is "tile"
+fn json_paint_to_image_paint_fit(
+    fit: Option<String>,
+    transform: Option<CGTransform2D>,
+    scale: Option<f32>,
+    repeat: Option<ImageRepeat>,
+) -> ImagePaintFit {
+    match fit.as_deref() {
+        Some("transform") => {
+            // Use the separate transform field
+            let json_transform = transform.unwrap_or_default();
+            ImagePaintFit::Transform(json_transform.into())
+        }
+        Some("tile") => {
+            // Handle tile mode using the separate scale and repeat fields
+            ImagePaintFit::Tile(ImageTile {
+                scale: scale.unwrap_or(1.0),
+                repeat: repeat.map(|r| r.into()).unwrap_or(ImageRepeat::Repeat),
+            })
+        }
+        Some("contain") => ImagePaintFit::Fit(BoxFit::Contain),
+        Some("cover") => ImagePaintFit::Fit(BoxFit::Cover),
+        Some("fill") => ImagePaintFit::Fit(BoxFit::Fill),
+        Some("none") => ImagePaintFit::Fit(BoxFit::None),
+        _ => ImagePaintFit::Fit(BoxFit::Cover), // Default fallback
     }
 }
 
@@ -2874,12 +2815,7 @@ mod tests {
 
         // Test case 1: paint and no paints, use [paint]
         let paint = Some(JSONPaint::Solid {
-            color: Some(JSONRGBA {
-                r: 255,
-                g: 0,
-                b: 0,
-                a: 1.0,
-            }),
+            color: CGColor::RED,
             blend_mode: BlendMode::default(),
             active: true,
         });
@@ -2895,12 +2831,7 @@ mod tests {
 
         // Test case 3: both paint and paints, if paints is empty, use [paint]
         let paint = Some(JSONPaint::Solid {
-            color: Some(JSONRGBA {
-                r: 255,
-                g: 0,
-                b: 0,
-                a: 1.0,
-            }),
+            color: CGColor::RED,
             blend_mode: BlendMode::default(),
             active: true,
         });
@@ -2910,33 +2841,18 @@ mod tests {
 
         // Test case 4: both paint and paints, if paints >= 1, use paints
         let paint = Some(JSONPaint::Solid {
-            color: Some(JSONRGBA {
-                r: 255,
-                g: 0,
-                b: 0,
-                a: 1.0,
-            }),
+            color: CGColor::RED,
             blend_mode: BlendMode::default(),
             active: true,
         });
         let paints = Some(vec![
             JSONPaint::Solid {
-                color: Some(JSONRGBA {
-                    r: 0,
-                    g: 255,
-                    b: 0,
-                    a: 1.0,
-                }),
+                color: CGColor::GREEN,
                 blend_mode: BlendMode::default(),
                 active: true,
             },
             JSONPaint::Solid {
-                color: Some(JSONRGBA {
-                    r: 0,
-                    g: 0,
-                    b: 255,
-                    a: 1.0,
-                }),
+                color: CGColor::BLUE,
                 blend_mode: BlendMode::default(),
                 active: true,
             },
@@ -2947,12 +2863,7 @@ mod tests {
         // Test case 5: no paint but has paints, use paints
         let paint = None;
         let paints = Some(vec![JSONPaint::Solid {
-            color: Some(JSONRGBA {
-                r: 0,
-                g: 255,
-                b: 0,
-                a: 1.0,
-            }),
+            color: CGColor::GREEN,
             blend_mode: BlendMode::default(),
             active: true,
         }]);
@@ -3163,48 +3074,16 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_json_transform2d() {
-        // Test JSONTransform2D deserialization (flattened structure)
-        let json_transform = r#"[[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]"#;
-        let transform: JSONTransform2D =
-            serde_json::from_str(json_transform).expect("Failed to parse transform");
-        assert_eq!(transform.matrix()[0], [1.0, 0.0, 10.0]);
-        assert_eq!(transform.matrix()[1], [0.0, 1.0, 20.0]);
-
-        // Test default value
-        let default_transform = JSONTransform2D::default();
-        assert_eq!(default_transform.matrix()[0], [1.0, 0.0, 0.0]);
-        assert_eq!(default_transform.matrix()[1], [0.0, 1.0, 0.0]);
-    }
-
-    #[test]
-    fn json_transform2d_conversion() {
-        // Test conversion to AffineTransform
-        let json_transform = JSONTransform2D([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]);
-        let affine: AffineTransform = json_transform.into();
-        assert_eq!(affine.matrix[0], [2.0, 0.0, 5.0]);
-        assert_eq!(affine.matrix[1], [0.0, 2.0, 10.0]);
-
-        // Test conversion from AffineTransform
-        let affine_transform = AffineTransform {
-            matrix: [[3.0, 0.0, 15.0], [0.0, 3.0, 30.0]],
-        };
-        let json_transform: JSONTransform2D = affine_transform.into();
-        assert_eq!(json_transform.matrix()[0], [3.0, 0.0, 15.0]);
-        assert_eq!(json_transform.matrix()[1], [0.0, 3.0, 30.0]);
-    }
-
-    #[test]
     fn json_paint_to_image_paint_fit_helper() {
         // Test the helper function with standard fits (transform should be ignored)
         let fit = Some("cover".to_string());
-        let transform = Some(JSONTransform2D([[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]));
+        let transform = Some(CGTransform2D::from([[1.0, 0.0, 10.0], [0.0, 1.0, 20.0]]));
         let result = json_paint_to_image_paint_fit(fit, transform, None, None);
         assert!(matches!(result, ImagePaintFit::Fit(BoxFit::Cover)));
 
         // Test with transform fit
         let fit = Some("transform".to_string());
-        let transform = Some(JSONTransform2D([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]));
+        let transform = Some(CGTransform2D::from([[2.0, 0.0, 5.0], [0.0, 2.0, 10.0]]));
         let result = json_paint_to_image_paint_fit(fit, transform, None, None);
         match result {
             ImagePaintFit::Transform(affine) => {
@@ -3217,7 +3096,7 @@ mod tests {
         // Test with tile fit using separate scale and repeat
         let fit = Some("tile".to_string());
         let scale = Some(2.0);
-        let repeat = Some(JSONImageRepeat::RepeatX);
+        let repeat = Some(ImageRepeat::RepeatX);
         let result = json_paint_to_image_paint_fit(fit, None, scale, repeat);
         match result {
             ImagePaintFit::Tile(tile) => {
@@ -3250,7 +3129,6 @@ mod tests {
                 assert_eq!(scene_node.name, "Main Scene");
                 assert_eq!(scene_node.active, Some(true));
                 assert_eq!(scene_node.locked, Some(false));
-                assert!(scene_node.background_color.is_some());
             }
             _ => panic!("Expected Scene node"),
         }
