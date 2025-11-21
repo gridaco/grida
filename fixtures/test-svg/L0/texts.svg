@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600">
-    <rect x="0" y="0" width="400" height="600" fill="#0f172a" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+    <rect x="0" y="0" width="400" height="600" fill="#0f172a"/>
 
     <g transform="translate(32 56)" fill="#e2e8f0">
         <text x="0" y="0" font-family="Inter, sans-serif" font-size="32" font-weight="700">

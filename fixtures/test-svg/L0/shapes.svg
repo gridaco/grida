@@ -1,26 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
-    <rect x="0" y="0" width="400" height="300" fill="#0f172a" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+    <rect x="0" y="0" width="400" height="300" fill="#0f172a"/>
 
     <!-- Grid of primitive shapes -->
     <!-- Row 1 -->
-    <rect x="32" y="32" width="64" height="64" fill="#f97316" />
-    <circle cx="144" cy="64" r="32" fill="#22c55e" />
-    <ellipse cx="240" cy="64" rx="36" ry="24" fill="#38bdf8" />
+    <rect x="32" y="32" width="64" height="64" fill="#f97316"/>
+    <circle cx="144" cy="64" r="32" fill="#22c55e"/>
+    <ellipse cx="240" cy="64" rx="36" ry="24" fill="#38bdf8"/>
     <polygon
         points="312,32 360,32 376,72 336,96 296,72"
         fill="#e879f9"
     />
 
     <!-- Row 2 -->
-    <polygon points="32,136 64,120 96,136 96,176 64,192 32,176" fill="#facc15" />
-    <line x1="128" y1="128" x2="192" y2="192" stroke="#f97316" stroke-width="8" />
+    <polygon points="32,136 64,120 96,136 96,176 64,192 32,176" fill="#facc15"/>
+    <line x1="128" y1="128" x2="192" y2="192" stroke="#f97316" stroke-width="8"/>
     <polyline points="224,192 256,152 288,192 320,152 352,192" fill="none" stroke="#4ade80"
-        stroke-width="8" />
-    <path d="M320 128 C 352 104 352 176 384 152" fill="none" stroke="#60a5fa" stroke-width="8" />
+        stroke-width="8"/>
+    <path d="M320 128 C 352 104 352 176 384 152" fill="none" stroke="#60a5fa" stroke-width="8"/>
 
     <!-- Row 3 -->
-    <polygon points="32,224 64,208 96,224 80,256 48,256" fill="#f87171" />
-    <path d="M136 256 L168 208 L200 256 Z" fill="#a78bfa" />
-    <polygon points="224,224 248,208 272,224 256,248" fill="#fda4af" />
-    <rect x="288" y="224" width="80" height="32" fill="#facc15" />
+    <polygon points="32,224 64,208 96,224 80,256 48,256" fill="#f87171"/>
+    <path d="M136 256 L168 208 L200 256 Z" fill="#a78bfa"/>
+    <polygon points="224,224 248,208 272,224 256,248" fill="#fda4af"/>
+    <rect x="288" y="224" width="80" height="32" fill="#facc15"/>
 </svg>

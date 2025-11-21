@@ -1,46 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480">
-    <rect x="0" y="0" width="480" height="480" fill="#0f172a" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" width="480" height="480">
+    <rect x="0" y="0" width="480" height="480" fill="#0f172a"/>
 
     <!-- Canonical row: no transform -->
     <g transform="translate(32 48)" fill="#bae6fd">
-        <rect x="0" y="0" width="48" height="48" rx="8" />
-        <circle cx="96" cy="24" r="24" />
-        <ellipse cx="168" cy="24" rx="32" ry="18" />
-        <polygon points="224,0 256,48 192,48" />
+        <rect x="0" y="0" width="48" height="48" rx="8"/>
+        <circle cx="96" cy="24" r="24"/>
+        <ellipse cx="168" cy="24" rx="32" ry="18"/>
+        <polygon points="224,0 256,48 192,48"/>
     </g>
 
     <!-- Simple translate + rotate -->
     <g transform="translate(32 160) rotate(12)" fill="#f0abfc">
-        <rect x="0" y="0" width="48" height="48" rx="8" />
-        <circle cx="96" cy="24" r="24" />
-        <ellipse cx="168" cy="24" rx="32" ry="18" />
-        <polygon points="224,0 256,48 192,48" />
+        <rect x="0" y="0" width="48" height="48" rx="8"/>
+        <circle cx="96" cy="24" r="24"/>
+        <ellipse cx="168" cy="24" rx="32" ry="18"/>
+        <polygon points="224,0 256,48 192,48"/>
     </g>
 
     <!-- Scale and skew -->
     <g transform="translate(32 272) scale(1.2,0.8) skewX(12)" fill="#fca5a5">
-        <rect x="0" y="0" width="48" height="48" rx="8" />
-        <circle cx="96" cy="24" r="24" />
-        <ellipse cx="168" cy="24" rx="32" ry="18" />
-        <polygon points="224,0 256,48 192,48" />
+        <rect x="0" y="0" width="48" height="48" rx="8"/>
+        <circle cx="96" cy="24" r="24"/>
+        <ellipse cx="168" cy="24" rx="32" ry="18"/>
+        <polygon points="224,0 256,48 192,48"/>
     </g>
 
     <!-- Nested group transforms -->
     <g transform="translate(32 360)">
         <g transform="rotate(-15)" fill="#fde68a">
             <g transform="scale(0.9)">
-                <rect x="0" y="0" width="48" height="48" rx="8" />
-                <circle cx="96" cy="24" r="24" />
-                <ellipse cx="168" cy="24" rx="32" ry="18" />
-                <polygon points="224,0 256,48 192,48" />
+                <rect x="0" y="0" width="48" height="48" rx="8"/>
+                <circle cx="96" cy="24" r="24"/>
+                <ellipse cx="168" cy="24" rx="32" ry="18"/>
+                <polygon points="224,0 256,48 192,48"/>
             </g>
         </g>
     </g>
 
     <!-- Individual shape transforms -->
     <g transform="translate(320 80)" fill="#bbf7d0">
-        <rect x="0" y="0" width="64" height="64" rx="10" transform="rotate(15 32 32)" />
-        <circle cx="32" cy="120" r="28" transform="scale(1.1,0.8)" />
-        <polygon points="0,192 64,192 32,240" transform="skewY(-10)" />
+        <rect x="0" y="0" width="64" height="64" rx="10" transform="rotate(15 32 32)"/>
+        <circle cx="32" cy="120" r="28" transform="scale(1.1,0.8)"/>
+        <polygon points="0,192 64,192 32,240" transform="skewY(-10)"/>
     </g>
 </svg>

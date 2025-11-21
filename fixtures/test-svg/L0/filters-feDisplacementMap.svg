@@ -8,14 +8,14 @@
       type="turbulence"
       baseFrequency="0.05"
       numOctaves="2"
-      result="turbulence" />
+      result="turbulence"/>
     <feDisplacementMap
       in2="turbulence"
       in="SourceGraphic"
       scale="50"
       xChannelSelector="R"
-      yChannelSelector="G" />
+      yChannelSelector="G"/>
   </filter>
 
-  <circle cx="100" cy="100" r="100" filter="url(#displacementFilter)" />
+  <circle cx="100" cy="100" r="100" filter="url(#displacementFilter)"/>
 </svg>

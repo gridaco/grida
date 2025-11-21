@@ -1,64 +1,67 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
-    <rect x="0" y="0" width="800" height="600" fill="#ffffff" />
-    
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+    <rect x="0" y="0" width="800" height="600" fill="#ffffff"/>
+
     <defs>
         <!-- Fractal Noise - Low Frequency -->
         <filter id="fractal-noise-low">
             <feTurbulence type="fractalNoise" baseFrequency="0.05 0.05" numOctaves="4" seed="0"/>
         </filter>
-        
+
         <!-- Fractal Noise - High Frequency -->
         <filter id="fractal-noise-high">
             <feTurbulence type="fractalNoise" baseFrequency="0.3 0.3" numOctaves="3" seed="42"/>
         </filter>
-        
+
         <!-- Fractal Noise - Many Octaves -->
         <filter id="fractal-noise-octaves">
             <feTurbulence type="fractalNoise" baseFrequency="0.1 0.1" numOctaves="8" seed="123"/>
         </filter>
-        
+
         <!-- Turbulence - Low Frequency -->
         <filter id="turbulence-low">
             <feTurbulence type="turbulence" baseFrequency="0.05 0.05" numOctaves="4" seed="456"/>
         </filter>
-        
+
         <!-- Turbulence - High Frequency -->
         <filter id="turbulence-high">
             <feTurbulence type="turbulence" baseFrequency="0.3 0.3" numOctaves="5" seed="789"/>
         </filter>
-        
+
         <!-- Stitched Tiles -->
         <filter id="turbulence-stitched">
-            <feTurbulence type="fractalNoise" baseFrequency="0.2 0.2" numOctaves="3" seed="999" stitchTiles="stitch"/>
+            <feTurbulence type="fractalNoise" baseFrequency="0.2 0.2" numOctaves="3" seed="999"
+                stitchTiles="stitch"/>
         </filter>
-        
+
         <!-- Different X/Y frequencies -->
         <filter id="turbulence-anisotropic">
             <feTurbulence type="turbulence" baseFrequency="0.1 0.3" numOctaves="4" seed="111"/>
         </filter>
     </defs>
-    
+
     <!-- Fractal Noise Examples -->
     <rect x="50" y="50" width="200" height="150" fill="#3b82f6" filter="url(#fractal-noise-low)"/>
     <text x="50" y="220" font-size="14" fill="#000">FractalNoise Low</text>
-    
+
     <rect x="300" y="50" width="200" height="150" fill="#ef4444" filter="url(#fractal-noise-high)"/>
     <text x="300" y="220" font-size="14" fill="#000">FractalNoise High</text>
-    
-    <rect x="550" y="50" width="200" height="150" fill="#10b981" filter="url(#fractal-noise-octaves)"/>
+
+    <rect x="550" y="50" width="200" height="150" fill="#10b981"
+        filter="url(#fractal-noise-octaves)"/>
     <text x="550" y="220" font-size="14" fill="#000">FractalNoise 8 Octaves</text>
-    
+
     <!-- Turbulence Examples -->
     <rect x="50" y="280" width="200" height="150" fill="#f59e0b" filter="url(#turbulence-low)"/>
     <text x="50" y="450" font-size="14" fill="#000">Turbulence Low</text>
-    
+
     <rect x="300" y="280" width="200" height="150" fill="#8b5cf6" filter="url(#turbulence-high)"/>
     <text x="300" y="450" font-size="14" fill="#000">Turbulence High</text>
-    
+
     <rect x="550" y="280" width="200" height="150" fill="#ec4899" filter="url(#turbulence-stitched)"/>
     <text x="550" y="450" font-size="14" fill="#000">Stitched Tiles</text>
-    
+
     <!-- Anisotropic -->
-    <rect x="50" y="510" width="200" height="60" fill="#06b6d4" filter="url(#turbulence-anisotropic)"/>
+    <rect x="50" y="510" width="200" height="60" fill="#06b6d4"
+        filter="url(#turbulence-anisotropic)"/>
     <text x="50" y="590" font-size="14" fill="#000">Anisotropic (0.1, 0.3)</text>
 </svg>

@@ -1,55 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
     <!-- Root background -->
-    <rect x="0" y="0" width="400" height="300" fill="#0f172a" />
+    <rect x="0" y="0" width="400" height="300" fill="#0f172a"/>
 
     <!-- Group with shared opacity -->
     <g id="cards" transform="translate(32 32)" opacity="0.85">
-        <rect x="0" y="0" width="112" height="160" rx="12" fill="#1d4ed8" />
+        <rect x="0" y="0" width="112" height="160" rx="12" fill="#1d4ed8"/>
         <g transform="translate(16 16)">
-            <rect x="0" y="0" width="80" height="56" rx="8" fill="#3b82f6" />
-            <rect x="0" y="72" width="80" height="16" rx="4" fill="#bfdbfe" />
-            <rect x="0" y="96" width="56" height="12" rx="4" fill="#dbeafe" />
+            <rect x="0" y="0" width="80" height="56" rx="8" fill="#3b82f6"/>
+            <rect x="0" y="72" width="80" height="16" rx="4" fill="#bfdbfe"/>
+            <rect x="0" y="96" width="56" height="12" rx="4" fill="#dbeafe"/>
         </g>
     </g>
 
     <!-- Nested transforms -->
     <g id="tiles" transform="translate(176 40)">
         <g transform="rotate(-8)">
-            <rect x="-24" y="-24" width="48" height="48" fill="#f97316" />
+            <rect x="-24" y="-24" width="48" height="48" fill="#f97316"/>
         </g>
         <g transform="translate(72 0) rotate(12)">
-            <rect x="-24" y="-24" width="48" height="48" fill="#10b981" />
+            <rect x="-24" y="-24" width="48" height="48" fill="#10b981"/>
         </g>
         <g transform="translate(144 12) rotate(-18)">
-            <rect x="-24" y="-24" width="48" height="48" fill="#8b5cf6" />
+            <rect x="-24" y="-24" width="48" height="48" fill="#8b5cf6"/>
         </g>
     </g>
 
     <!-- Clip-path style grouping -->
     <g id="clip-group" transform="translate(48 200)">
-        <rect x="0" y="0" width="120" height="56" rx="12" fill="#fca5a5" />
+        <rect x="0" y="0" width="120" height="56" rx="12" fill="#fca5a5"/>
         <g clip-path="url(#clip-pills)">
-            <rect x="0" y="0" width="120" height="56" fill="#fb7185" />
-            <rect x="-20" y="0" width="60" height="56" fill="#f87171" />
-            <rect x="60" y="0" width="60" height="56" fill="#f97316" />
+            <rect x="0" y="0" width="120" height="56" fill="#fb7185"/>
+            <rect x="-20" y="0" width="60" height="56" fill="#f87171"/>
+            <rect x="60" y="0" width="60" height="56" fill="#f97316"/>
         </g>
     </g>
 
     <!-- Reference marker group -->
     <g id="axes" transform="translate(256 196)">
-        <line x1="-40" y1="0" x2="40" y2="0" stroke="#f8fafc" stroke-width="3" />
-        <line x1="0" y1="-40" x2="0" y2="40" stroke="#f8fafc" stroke-width="3" />
+        <line x1="-40" y1="0" x2="40" y2="0" stroke="#f8fafc" stroke-width="3"/>
+        <line x1="0" y1="-40" x2="0" y2="40" stroke="#f8fafc" stroke-width="3"/>
         <g transform="translate(0 -40)">
-            <circle cx="0" cy="0" r="8" fill="#facc15" />
+            <circle cx="0" cy="0" r="8" fill="#facc15"/>
         </g>
         <g transform="translate(40 0)">
-            <rect x="-8" y="-8" width="16" height="16" fill="#22d3ee" />
+            <rect x="-8" y="-8" width="16" height="16" fill="#22d3ee"/>
         </g>
     </g>
 
     <defs>
         <clipPath id="clip-pills">
-            <rect x="0" y="0" width="120" height="56" rx="12" />
+            <rect x="0" y="0" width="120" height="56" rx="12"/>
         </clipPath>
     </defs>
 </svg>
