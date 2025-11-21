@@ -12,6 +12,9 @@
 //! - Filters are treated as a layer property (attached to groups)
 //! - Filter primitives can reference each other via `result` and `in`/`in2` attributes
 //! - The usvg tree structure aligns with rendering order (save/restore)
+//!
+//! ## Known Issues / TODO
+//! - `feMorphology` is not implemented yet (see example: `filters-feMorphology.svg`)
 
 use cg::cg::prelude::*;
 use cg::painter::gradient::linear_gradient_paint;
