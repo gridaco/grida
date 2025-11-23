@@ -1,10 +1,10 @@
 use crate::io::io_grida::JSONVectorNetwork;
 use crate::io::io_grida_patch::TransactionApplyReport;
+use crate::io::io_svg::svg_pack;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::runtime::scene::RendererOptions;
-use crate::svg::from_usvg_tree::packed_scene_json_from_svg;
 use crate::window::application::ApplicationApi;
 use crate::window::application::UnknownTargetApplication;
 use crate::window::command::ApplicationCommand;
@@ -304,6 +304,6 @@ impl EmscriptenApplication {
     }
 
     pub fn create_packed_scene_from_svg(&mut self, svg: &str) -> Result<String, String> {
-        packed_scene_json_from_svg(svg)
+        svg_pack(svg)
     }
 }

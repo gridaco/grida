@@ -5,9 +5,13 @@ use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind")]
 pub enum SVGPaint {
+    #[serde(rename = "solid")]
     Solid(SVGSolidPaint),
+    #[serde(rename = "linear-gradient")]
     LinearGradient(SVGLinearGradientPaint),
+    #[serde(rename = "radial-gradient")]
     RadialGradient(SVGRadialGradientPaint),
 }
 
@@ -16,41 +20,6 @@ impl SVGPaint {
         color: CGColor::TRANSPARENT,
     });
 }
-
-// impl From<SVGPaint> for Paint {
-//     fn from(paint: SVGPaint) -> Self {
-//         match paint {
-//             SVGPaint::Color(color) => Paint::Solid(SolidPaint::new_color(color.into())),
-//             SVGPaint::LinearGradient(gradient) => Paint::LinearGradient(LinearGradientPaint {
-//                 active: true,
-//                 blend_mode: Default::default(),
-//                 transform: map_transform(gradient.transform()),
-//                 stops: gradient
-//                     .stops()
-//                     .iter()
-//                     .cloned()
-//                     .map(GradientStop::from)
-//                     .collect(),
-//                 opacity: 1.0,
-//             }),
-//             SVGPaint::RadialGradient(gradient) => Paint::RadialGradient(RadialGradientPaint {
-//                 active: true,
-//                 blend_mode: Default::default(),
-//                 transform: map_transform(gradient.transform()),
-//                 stops: gradient
-//                     .stops()
-//                     .iter()
-//                     .cloned()
-//                     .map(GradientStop::from)
-//                     .collect(),
-//                 opacity: 1.0,
-//             }),
-//             // [MODEL_MISMATCH]
-//             // fallback to solid paint
-//             SVGPaint::Pattern(_pattern) => Paint::Solid(SolidPaint::TRANSPARENT),
-//         }
-//     }
-// }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SVGSolidPaint {
@@ -295,19 +264,30 @@ fn scale(sx: f32, sy: f32) -> AffineTransform {
 
 /// Intermediate Representation of an SVG node.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind")]
 pub enum IRSVGNode {
+    #[serde(rename = "initial-container")]
     InitialContainer(IRSVGInitialContainerNode),
+    #[serde(rename = "group")]
     Group(IRSVGGroupNode),
+    #[serde(rename = "text")]
     Text(IRSVGTextNode),
+    #[serde(rename = "path")]
     Path(IRSVGPathNode),
+    #[serde(rename = "image")]
     Image(IRSVGImageNode),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind")]
 pub enum IRSVGChildNode {
+    #[serde(rename = "group")]
     Group(IRSVGGroupNode),
+    #[serde(rename = "text")]
     Text(IRSVGTextNode),
+    #[serde(rename = "path")]
     Path(IRSVGPathNode),
+    #[serde(rename = "image")]
     Image(IRSVGImageNode),
 }
 
@@ -342,6 +322,7 @@ pub struct IRSVGTextNode {
     pub fill: Option<SVGFillAttributes>,
     pub stroke: Option<SVGStrokeAttributes>,
     pub spans: Vec<IRSVGTextSpanNode>,
+    #[serde(skip_serializing)]
     pub bounds: IRSVGBounds,
 }
 
@@ -373,6 +354,7 @@ pub struct IRSVGPathNode {
     pub fill: Option<SVGFillAttributes>,
     pub stroke: Option<SVGStrokeAttributes>,
     pub d: String,
+    #[serde(skip_serializing)]
     pub bounds: IRSVGBounds,
 }
 

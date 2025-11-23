@@ -1,11 +1,23 @@
 use crate::cg::prelude::*;
 use crate::cg::svg::IRSVGBounds;
 use crate::fonts::embedded::geist;
+use crate::sk_tiny::tsk_path_to_sk_path;
 use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 use skia_safe::Path as SkPath;
 use usvg;
-use usvg::tiny_skia_path::{Path as TinyPath, PathSegment};
+
+pub fn into_tree(svg_source: &str) -> Result<usvg::Tree, usvg::Error> {
+    let mut options = usvg::Options::default();
+    options.font_family = geist::FAMILY.to_string(); // our builtin font
+    options.font_size = 16.0; // font-size default is 'medium' (16px) - based on browser spec
+
+    // #![cfg(target_os = "emscripten")]
+    options.fontdb_mut().load_system_fonts();
+
+    usvg::Tree::from_str(svg_source, &options)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SVGPackedScene {
     pub svg: IRSVGInitialContainerNode,
@@ -16,27 +28,16 @@ impl SVGPackedScene {
         Self { svg }
     }
 
-    pub fn new_from_svg_str(svg_source: &str) -> Result<Self, String> {
-        let mut options = usvg::Options::default();
-        options.font_family = geist::FAMILY.to_string(); // our builtin font
-        options.font_size = 16.0; // font-size default is 'medium' (16px) - based on browser spec
-
-        // #![cfg(target_os = "emscripten")]
-        options.fontdb_mut().load_system_fonts();
-
-        let tree = usvg::Tree::from_str(svg_source, &options).map_err(|err| err.to_string())?;
-        let svg = build_svg_ir_scene(&tree)?;
+    pub fn new_from_tree(tree: &usvg::Tree) -> Result<Self, String> {
+        let svg = build_svg_ir_scene(tree)?;
         Ok(Self { svg })
     }
 
-    pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(self)
+    pub fn new_from_svg_str(svg_source: &str) -> Result<Self, String> {
+        let tree = into_tree(svg_source).map_err(|err| err.to_string())?;
+        let svg = build_svg_ir_scene(&tree)?;
+        Ok(Self { svg })
     }
-}
-
-pub fn packed_scene_json_from_svg(svg_source: &str) -> Result<String, String> {
-    let scene = SVGPackedScene::new_from_svg_str(svg_source)?;
-    scene.to_json_string().map_err(|err| err.to_string())
 }
 
 fn build_svg_ir_scene(tree: &usvg::Tree) -> Result<IRSVGInitialContainerNode, String> {
@@ -106,7 +107,7 @@ fn convert_path(path: &usvg::Path, parent_world: &CGTransform2D) -> Result<IRSVG
     let relative = extract_relative_transform(parent_world, &abs);
 
     let tiny_path = path.data();
-    let sk_path = tiny_path_to_skia_path(tiny_path);
+    let sk_path = tsk_path_to_sk_path(tiny_path);
 
     let bounds: IRSVGBounds = path.bounding_box().into();
     let (offset_x, offset_y, data) = normalize_skia_path(sk_path, &bounds);
@@ -215,30 +216,6 @@ fn extract_relative_transform(
         child_affine
     };
     CGTransform2D::from(relative_affine)
-}
-
-fn tiny_path_to_skia_path(path: &TinyPath) -> SkPath {
-    let mut sk_path = SkPath::new();
-    for segment in path.segments() {
-        match segment {
-            PathSegment::MoveTo(p) => {
-                sk_path.move_to((p.x, p.y));
-            }
-            PathSegment::LineTo(p) => {
-                sk_path.line_to((p.x, p.y));
-            }
-            PathSegment::QuadTo(p0, p1) => {
-                sk_path.quad_to((p0.x, p0.y), (p1.x, p1.y));
-            }
-            PathSegment::CubicTo(p0, p1, p2) => {
-                sk_path.cubic_to((p0.x, p0.y), (p1.x, p1.y), (p2.x, p2.y));
-            }
-            PathSegment::Close => {
-                sk_path.close();
-            }
-        }
-    }
-    sk_path
 }
 
 fn normalize_skia_path(mut path: SkPath, bounds: &IRSVGBounds) -> (f32, f32, String) {
