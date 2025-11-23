@@ -123,6 +123,23 @@ export class CanvasWasmVectorInterfaceProvider
   }
 }
 
+export class CanvasWasmSVGInterfaceProvider
+  implements editor.api.IDocumentSVGInterfaceProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Scene
+  ) {}
+
+  svgOptimize(svg: string): string | null {
+    const res = this.surface.svgkit.optimize(svg);
+    if (res.success) {
+      return res.data.svg_optimized;
+    }
+    return null;
+  }
+}
+
 class WasmFontAdapter implements FontAdapter {
   constructor(private surface: Scene) {}
 

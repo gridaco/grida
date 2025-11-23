@@ -37,7 +37,7 @@ export default function IOSVGPage() {
   });
 
   const instance = useEditor(undefined, "canvas");
-  const optimizedSvg = useOptimizedSvg(raw);
+  const optimizedSvg = useOptimizedSvg(raw, instance);
   const result = useIOSVGDocument(optimizedSvg, instance);
   const packedScene = usePackedSceneJson(instance, raw);
   const canvasRef = useCanvasSurfaceMount(instance);
@@ -71,18 +71,44 @@ export default function IOSVGPage() {
         </header>
         <div className="flex w-full h-full">
           <aside className="flex-1 h-full w-full space-y-4">
-            <section className="h-1/2 w-full flex flex-col">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
-                Raw SVG
+            <section className="h-1/2 w-full flex flex-col space-y-2 min-h-0">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                SVG
               </span>
-              <ThemedMonacoEditor
-                width="100%"
-                height="100%"
-                language="xml"
-                value={raw ?? ""}
-                onChange={setRaw}
-                options={{ readOnly: false }}
-              />
+              <Tabs
+                defaultValue="original"
+                className="flex flex-col h-full min-h-0"
+              >
+                <TabsList className="w-fit">
+                  <TabsTrigger value="original">Original</TabsTrigger>
+                  <TabsTrigger value="optimized">Optimized</TabsTrigger>
+                </TabsList>
+                <TabsContent
+                  value="original"
+                  className="flex-1 min-h-0 mt-0 focus-visible:outline-none"
+                >
+                  <ThemedMonacoEditor
+                    width="100%"
+                    height="100%"
+                    language="xml"
+                    value={raw ?? ""}
+                    onChange={setRaw}
+                    options={{ readOnly: false }}
+                  />
+                </TabsContent>
+                <TabsContent
+                  value="optimized"
+                  className="flex-1 min-h-0 mt-0 focus-visible:outline-none"
+                >
+                  <ThemedMonacoEditor
+                    width="100%"
+                    height="100%"
+                    language="xml"
+                    value={optimizedSvg ?? ""}
+                    options={{ readOnly: true }}
+                  />
+                </TabsContent>
+              </Tabs>
             </section>
             <hr className="border-t" />
             <section className="h-1/2 w-full flex flex-col space-y-2 min-h-0">
@@ -218,13 +244,13 @@ function useCanvasSurfaceMount(editorInstance: GridaEditor) {
   }, []);
 }
 
-function useOptimizedSvg(raw?: string) {
+function useOptimizedSvg(raw?: string, editorInstance?: GridaEditor) {
   return useMemo(() => {
-    if (!raw) {
+    if (!raw || !editorInstance?.svgProvider) {
       return undefined;
     }
-    return iosvg.v0.optimize(raw).data;
-  }, [raw]);
+    return editorInstance.svgProvider.svgOptimize(raw) ?? undefined;
+  }, [raw, editorInstance]);
 }
 
 function useIOSVGDocument(
@@ -246,7 +272,7 @@ function useIOSVGDocument(
         name: "SVG",
         currentColor: { r: 0, g: 0, b: 0, a: 1 },
       })
-      .then((result) => {
+      .then((result: any) => {
         if (cancelled) {
           return;
         }
@@ -268,7 +294,7 @@ function useIOSVGDocument(
         }
         setConversion(result);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         if (!cancelled) {
           console.error(error);
           setConversion(undefined);

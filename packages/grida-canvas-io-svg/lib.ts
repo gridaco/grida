@@ -1,8 +1,5 @@
 import { parse, type INode } from "svgson";
 import parseStyle, { type Declaration } from "inline-style-parser";
-// @ts-ignore
-import * as svgo from "svgo/dist/svgo.browser.js";
-import type { Config, Output } from "svgo";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
 import cmath from "@grida/cmath";
@@ -622,39 +619,6 @@ export namespace iosvg {
       }
 
       return null;
-    }
-
-    export function optimize(svgstr: string): Output {
-      // Optimize the SVG string
-      const config: Config = {
-        js2svg: {
-          indent: 2,
-          pretty: true,
-        },
-        plugins: [
-          {
-            name: "preset-default",
-            params: {
-              overrides: {
-                removeViewBox: false, // Keep viewBox for scalability
-                removeComments: {
-                  preservePatterns: false,
-                },
-                convertShapeToPath: {
-                  convertArcs: true,
-                },
-                convertColors: {
-                  shorthex: false,
-                  names2hex: true,
-                },
-              },
-            },
-          },
-          "convertStyleToAttrs",
-        ],
-      };
-      const result = svgo.optimize(svgstr, config);
-      return result;
     }
 
     type SVGIOCompatibleNodePrototype =
