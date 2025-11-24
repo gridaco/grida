@@ -133,14 +133,34 @@ export namespace iosvg {
      */
     export function stroke(
       stroke: svgtypes.SVGStrokeAttributes | null | undefined
-    ): { paint: cg.Paint | undefined; opacity: number } {
+    ): {
+      paint: cg.Paint | undefined;
+      opacity: number;
+      strokeWidth: number;
+      strokeCap: cg.StrokeCap;
+      strokeJoin: cg.StrokeJoin;
+      strokeMiterLimit: number;
+      strokeDashArray?: number[];
+    } {
       if (!stroke) {
-        return { paint: undefined, opacity: 1.0 };
+        return {
+          paint: undefined,
+          opacity: 1.0,
+          strokeWidth: 0,
+          strokeCap: "butt",
+          strokeJoin: "miter",
+          strokeMiterLimit: 4,
+        };
       }
 
       return {
         paint: map.paint(stroke.paint, stroke.stroke_opacity),
         opacity: stroke.stroke_opacity,
+        strokeWidth: stroke.stroke_width ?? 0,
+        strokeCap: stroke.stroke_linecap,
+        strokeJoin: stroke.stroke_linejoin,
+        strokeMiterLimit: stroke.stroke_miterlimit,
+        strokeDashArray: stroke.stroke_dasharray ?? undefined,
       };
     }
   }
@@ -192,8 +212,15 @@ export namespace iosvg {
           fillRule,
           opacity: fillOpacity,
         } = map.fill(fillAttr);
-        const { paint: stroke, opacity: strokeOpacity } =
-          map.stroke(strokeAttr);
+        const {
+          paint: stroke,
+          opacity: _strokeOpacity,
+          strokeWidth,
+          strokeCap,
+          strokeJoin,
+          strokeMiterLimit,
+          strokeDashArray,
+        } = map.stroke(strokeAttr);
 
         // Use fill opacity as the primary node opacity (stroke opacity is applied to stroke paint)
         return {
@@ -202,6 +229,11 @@ export namespace iosvg {
           vectorNetwork: vectorNetwork,
           fill: fill,
           stroke: stroke,
+          strokeWidth: strokeWidth,
+          strokeCap: strokeCap,
+          strokeJoin: strokeJoin,
+          strokeMiterLimit: strokeMiterLimit,
+          strokeDashArray: strokeDashArray,
           width: bbox.width,
           height: bbox.height,
           left: position.left,
