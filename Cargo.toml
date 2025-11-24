@@ -4,5 +4,6 @@ members = [
   "crates/grida-canvas",
   "crates/grida-canvas-wasm",
   "crates/grida-canvas-fonts",
+  "crates/grida-dev",
   "crates/math2",
 ]

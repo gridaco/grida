@@ -71,7 +71,7 @@ impl IdConverter {
             if let Some(JSONNode::Scene(scene_node)) = file.document.nodes.get(&scene_id) {
                 (
                     scene_node.name.clone(),
-                    scene_node.background_color.clone().map(Into::into),
+                    Some(scene_node.background_color.clone()),
                 )
             } else {
                 (scene_id.clone(), None)
@@ -137,8 +137,8 @@ impl IdConverter {
         match json_node {
             JSONNode::Group(group) => Node::Group(GroupNodeRec::from(group)),
             JSONNode::Container(container) => Node::Container(ContainerNodeRec::from(container)),
-            JSONNode::SVGPath(path) => Node::from(JSONNode::SVGPath(path)),
             JSONNode::Path(path) => Node::from(JSONNode::Path(path)),
+            JSONNode::Vector(path) => Node::from(JSONNode::Vector(path)),
             JSONNode::Ellipse(ellipse) => Node::from(JSONNode::Ellipse(ellipse)),
             JSONNode::Rectangle(rectangle) => Node::from(JSONNode::Rectangle(rectangle)),
             JSONNode::RegularPolygon(polygon) => Node::from(JSONNode::RegularPolygon(polygon)),

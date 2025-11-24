@@ -7,6 +7,12 @@ impl From<CGColor> for skia_safe::Color {
     }
 }
 
+impl From<CGRect> for skia_safe::Rect {
+    fn from(rect: CGRect) -> skia_safe::Rect {
+        skia_safe::Rect::from_xywh(rect.x, rect.y, rect.width, rect.height)
+    }
+}
+
 impl From<BooleanPathOperation> for skia_safe::PathOp {
     fn from(op: BooleanPathOperation) -> Self {
         match op {
@@ -14,6 +20,17 @@ impl From<BooleanPathOperation> for skia_safe::PathOp {
             BooleanPathOperation::Intersection => skia_safe::PathOp::Intersect,
             BooleanPathOperation::Difference => skia_safe::PathOp::Difference,
             BooleanPathOperation::Xor => skia_safe::PathOp::XOR,
+        }
+    }
+}
+
+impl From<TileMode> for skia_safe::TileMode {
+    fn from(tile_mode: TileMode) -> Self {
+        match tile_mode {
+            TileMode::Clamp => skia_safe::TileMode::Clamp,
+            TileMode::Repeated => skia_safe::TileMode::Repeat,
+            TileMode::Mirror => skia_safe::TileMode::Mirror,
+            TileMode::Decal => skia_safe::TileMode::Decal,
         }
     }
 }

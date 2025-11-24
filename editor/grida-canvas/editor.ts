@@ -8,7 +8,7 @@ import { animateTransformTo } from "./animation";
 import { EditorFollowPlugin } from "./plugins/follow";
 import { DocumentFontManager } from "./font-manager";
 import { DocumentHistoryManager } from "./history-manager";
-import init, { type Scene } from "@grida/canvas-wasm";
+import init, { svgtypes, type Scene } from "@grida/canvas-wasm";
 import locateFile from "./backends/wasm-locate-file";
 import {
   NoopDefaultExportInterfaceProvider,
@@ -17,6 +17,7 @@ import {
   CanvasWasmFontManagerAgentInterfaceProvider,
   CanvasWasmFontParserInterfaceProvider,
   CanvasWasmDefaultExportInterfaceProvider,
+  CanvasWasmSVGInterfaceProvider,
 } from "./backends";
 import { domapi } from "./backends/dom";
 import { dq } from "@/grida-canvas/query";
@@ -358,7 +359,8 @@ class EditorDocumentStore
     initialState: editor.state.IEditorStateInit,
     private readonly backend: editor.EditorContentRenderingBackend,
     private readonly geometry: editor.api.IDocumentGeometryQuery,
-    private readonly vector: editor.api.IDocumentVectorInterfaceActions | null,
+    private readonly vector: editor.api.IDocumentVectorInterfaceActions,
+    private readonly svg: editor.api.IDocumentSVGInterfaceActions,
     /**
      * @deprecated this is event target dependency - will be removed
      */
@@ -679,8 +681,21 @@ class EditorDocumentStore
     svg: string
   ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
     const id = this.idgen.next();
-    const optimized = iosvg.v0.optimize(svg).data;
-    let result = await iosvg.v0.convert(optimized, {
+
+    const packed = await this.svg.svgPack(svg);
+    if (!packed) {
+      throw new Error("Failed to pack SVG");
+    }
+
+    // Handle both response formats: { success: true, data: { svg } } or direct { svg }
+    const svgData =
+      (packed as any).svg ||
+      ((packed as any).success && (packed as any).data?.svg);
+    if (!svgData) {
+      throw new Error("Failed to extract SVG data from packed result");
+    }
+
+    let result = await iosvg.convert(svgData, {
       name: "svg",
       currentColor: { r: 0, g: 0, b: 0, a: 1 },
     });
@@ -2309,6 +2324,7 @@ export class Editor
     editor.api.IDocumentNodeTextNodeFontActions,
     editor.api.IDocumentExportPluginActions,
     editor.api.IDocumentVectorInterfaceActions,
+    editor.api.IDocumentSVGInterfaceProvider,
     editor.api.IEditorIntrospectActions
 {
   // private readonly listeners: Set<(editor: this, action?: Action) => void> = new Set();
@@ -2339,6 +2355,11 @@ export class Editor
   _m_vector: editor.api.IDocumentVectorInterfaceProvider | null = null;
   private get vectorProvider() {
     return this._m_vector;
+  }
+
+  _m_svg: editor.api.IDocumentSVGInterfaceProvider | null = null;
+  public get svgProvider() {
+    return this._m_svg;
   }
 
   _m_font_collection: editor.api.IDocumentFontCollectionInterfaceProvider | null =
@@ -2406,6 +2427,7 @@ export class Editor
       vector?: WithEditorInstance<editor.api.IDocumentVectorInterfaceProvider>;
       font_collection?: WithEditorInstance<editor.api.IDocumentFontCollectionInterfaceProvider>;
       font_parser?: WithEditorInstance<editor.api.IDocumentFontParserInterfaceProvider>;
+      svg?: WithEditorInstance<editor.api.IDocumentSVGInterfaceProvider>;
     };
   }) {
     this.logger = logger;
@@ -2420,6 +2442,7 @@ export class Editor
       // }),
       initialState,
       backend,
+      this,
       this,
       this,
       () => this.camera.viewport.size,
@@ -2451,6 +2474,10 @@ export class Editor
         this,
         interfaces.font_parser
       );
+    }
+
+    if (interfaces?.svg) {
+      this._m_svg = resolveWithEditorInstance(this, interfaces.svg);
     }
 
     this._fontManager = new DocumentFontManager(this);
@@ -2543,6 +2570,8 @@ export class Editor
     );
 
     this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
+
+    this._m_svg = new CanvasWasmSVGInterfaceProvider(this, surface);
 
     this._m_font_collection = new CanvasWasmFontManagerAgentInterfaceProvider(
       this,
@@ -3279,6 +3308,25 @@ export class Editor
     return this.vectorProvider.toVectorNetwork(node_id);
   }
   // #endregion IVectorInterfaceActions implementation
+
+  // #region IDocumentSVGInterfaceActions implementation
+  public svgOptimize(svg: string): string | null {
+    if (!this.svgProvider) {
+      throw new Error("SVG interface provider is not bound");
+    }
+    return this.svgProvider.svgOptimize(svg);
+  }
+
+  public svgPack(
+    svg: string
+  ): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null {
+    if (!this.svgProvider) {
+      throw new Error("SVG interface provider is not bound");
+    }
+    return this.svgProvider.svgPack(svg);
+  }
+
+  // #endregion IDocumentSVGInterfaceActions implementation
 
   // ==============================================================
   // #region IFontLoaderActions implementation

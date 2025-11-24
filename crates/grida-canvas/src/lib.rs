@@ -15,6 +15,8 @@ pub mod resources;
 pub mod runtime;
 pub mod shape;
 pub mod sk;
+pub mod sk_tiny;
+pub mod svg;
 pub mod sys;
 pub mod text;
 pub mod vectornetwork;

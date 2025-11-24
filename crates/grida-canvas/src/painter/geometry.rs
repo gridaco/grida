@@ -170,7 +170,7 @@ pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
             path.line_to((n.size.width, 0.0));
             PainterShape::from_path(path)
         }
-        Node::SVGPath(n) => {
+        Node::Path(n) => {
             if let Some(path) = Path::from_svg(&n.data) {
                 PainterShape::from_path(path)
             } else {
@@ -325,7 +325,7 @@ pub fn boolean_operation_path(
                         Node::RegularPolygon(n) => Node::RegularPolygon(n.clone()),
                         Node::RegularStarPolygon(n) => Node::RegularStarPolygon(n.clone()),
                         Node::Line(n) => Node::Line(n.clone()),
-                        Node::SVGPath(n) => Node::SVGPath(n.clone()),
+                        Node::Path(n) => Node::Path(n.clone()),
                         Node::Vector(n) => Node::Vector(n.clone()),
                         Node::Image(n) => Node::Image(n.clone()),
                         Node::Container(n) => Node::Container(n.clone()),

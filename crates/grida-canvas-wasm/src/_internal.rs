@@ -29,3 +29,60 @@ pub unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
 }
 
 // #endregion: internal helpers
+
+/// Creates a success response wrapper for WASM
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WasmSuccessResponse<T> {
+    /// Success flag
+    pub success: bool,
+    /// Response data
+    pub data: T,
+}
+
+/// Creates an error response wrapper for WASM
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WasmErrorResponse {
+    /// Success flag
+    pub success: bool,
+    /// Error information
+    pub error: WasmError,
+}
+
+/// Error information for WASM responses
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WasmError {
+    /// Error message
+    pub message: String,
+}
+
+impl<T: serde::Serialize> WasmSuccessResponse<T> {
+    /// Creates a new success response
+    pub fn new(data: T) -> Self {
+        Self {
+            success: true,
+            data,
+        }
+    }
+
+    /// Serializes the response to JSON
+    pub fn to_json(&self) -> Result<String, String> {
+        serde_json::to_string(self)
+            .map_err(|e| format!("Failed to serialize success response: {}", e))
+    }
+}
+
+impl WasmErrorResponse {
+    /// Creates a new error response
+    pub fn new(message: String) -> Self {
+        Self {
+            success: false,
+            error: WasmError { message },
+        }
+    }
+
+    /// Serializes the response to JSON
+    pub fn to_json(&self) -> Result<String, String> {
+        serde_json::to_string(self)
+            .map_err(|e| format!("Failed to serialize error response: {}", e))
+    }
+}

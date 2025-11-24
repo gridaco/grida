@@ -14,6 +14,7 @@ import vn from "@grida/vn";
 import grida from "@grida/schema";
 import tree from "@grida/tree";
 import type { io } from "@grida/io";
+import type { svgtypes } from "@grida/io-svg";
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -2437,6 +2438,23 @@ export namespace editor.api {
     setFallbackFonts(fonts: string[]): void;
   }
 
+  /**
+   * interface for svg optimizer/parser/importer
+   *
+   * grida has 2 svg module:
+   * 1. @grida/io-svg (js) (DEPRECATED)
+   * 2. @grida/canvas-wasm (rust)
+   *
+   */
+  export interface IDocumentSVGInterfaceProvider {
+    /**
+     * optimize the svg string
+     * @param svg input svg string
+     */
+    svgOptimize(svg: string): string | null;
+    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
+  }
+
   export interface IDocumentVectorInterfaceProvider {
     /**
      * converts the node into a vector network
@@ -2483,6 +2501,11 @@ export namespace editor.api {
 
   export interface IDocumentVectorInterfaceActions {
     toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
+  export interface IDocumentSVGInterfaceActions {
+    svgOptimize(svg: string): string | null;
+    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
   }
 
   export interface IDocumentFontActions {

@@ -1,0 +1,22 @@
+<svg
+  width="200"
+  height="200"
+  viewBox="0 0 200 200"
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <filter id="emboss">
+      <feConvolveMatrix
+        kernelMatrix="3 0 0
+                      0 0 0
+                      0 0 -3"/>
+    </filter>
+  </defs>
+
+  <circle
+    fill="red"
+    cx="100"
+    cy="100"
+    r="80"
+    filter="url(#emboss)"/>
+</svg>

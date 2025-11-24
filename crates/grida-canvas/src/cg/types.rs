@@ -1,6 +1,7 @@
+use super::prelude::*;
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 use super::alignment::Alignment;
@@ -48,49 +49,6 @@ impl Default for CGPoint {
 impl Into<skia_safe::Point> for CGPoint {
     fn into(self) -> skia_safe::Point {
         skia_safe::Point::new(self.x, self.y)
-    }
-}
-
-#[derive(Debug, Clone, Copy, Hash)]
-pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
-
-impl CGColor {
-    pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
-    pub const BLACK: Self = Self(0, 0, 0, 0xff);
-    pub const WHITE: Self = Self(0xff, 0xff, 0xff, 0xff);
-    pub const RED: Self = Self(0xff, 0, 0, 0xff);
-    pub const GREEN: Self = Self(0, 0xff, 0, 0xff);
-    pub const BLUE: Self = Self(0, 0, 0xff, 0xff);
-
-    pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
-        Self(r, g, b, a)
-    }
-
-    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
-        Self(r, g, b, 0xff)
-    }
-
-    pub fn r(&self) -> u8 {
-        self.0
-    }
-    pub fn g(&self) -> u8 {
-        self.1
-    }
-    pub fn b(&self) -> u8 {
-        self.2
-    }
-    pub fn a(&self) -> u8 {
-        self.3
-    }
-}
-
-impl From<CGColor> for SolidPaint {
-    fn from(color: CGColor) -> Self {
-        SolidPaint {
-            active: true,
-            color,
-            blend_mode: BlendMode::default(),
-        }
     }
 }
 
@@ -286,7 +244,7 @@ impl Default for LayerBlendMode {
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
 /// - Flutter: https://api.flutter.dev/flutter/dart-ui/BlendMode.html
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BlendMode {
     // Skia: kSrcOver, CSS: normal
     #[serde(rename = "normal")]
@@ -344,7 +302,7 @@ impl Default for BlendMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FillRule {
     #[serde(rename = "nonzero")]
     NonZero,
@@ -434,7 +392,7 @@ impl Default for FillRule {
 ///
 /// - [`StrokeAlign`] - Controls stroke positioning relative to path
 /// - [`StrokeDashArray`] - Defines dash patterns for strokes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StrokeCap {
     /// Flat edge perpendicular to the stroke direction (default)
     #[serde(rename = "butt", alias = "none")]
@@ -541,7 +499,7 @@ impl Default for StrokeCap {
 ///
 /// - [`StrokeCap`] - Controls stroke endpoints for open paths
 /// - [`StrokeAlign`] - Controls stroke positioning relative to path
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum StrokeJoin {
     /// Sharp pointed corner with miter limit fallback (default)
     #[serde(rename = "miter")]
@@ -607,7 +565,7 @@ impl Default for StrokeJoin {
 /// - [`StrokeJoin`] - The join style that miter limit applies to
 /// - [MDN miterLimit](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/miterLimit)
 /// - [SVG stroke-miterlimit](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-miterlimit)
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct StrokeMiterLimit(#[serde(default = "StrokeMiterLimit::default_value")] pub f32);
 
 impl StrokeMiterLimit {
@@ -645,7 +603,7 @@ impl From<f32> for StrokeMiterLimit {
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
 /// - [Figma](https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/)
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum StrokeAlign {
     #[serde(rename = "inside")]
     Inside,
@@ -1945,6 +1903,16 @@ impl Paint {
     }
 }
 
+impl From<CGColor> for SolidPaint {
+    fn from(color: CGColor) -> Self {
+        SolidPaint {
+            active: true,
+            color,
+            blend_mode: BlendMode::default(),
+        }
+    }
+}
+
 /// Ordered stack of [`Paint`] values that are composited sequentially.
 ///
 /// Entries are interpreted in **paint order**: the first item is drawn first,
@@ -2208,7 +2176,7 @@ impl From<CGColor> for Paint {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct GradientStop {
     /// 0.0 = start, 1.0 = end
     pub offset: f32,
@@ -2218,6 +2186,9 @@ pub struct GradientStop {
 #[derive(Debug, Clone)]
 pub struct LinearGradientPaint {
     pub active: bool,
+    pub xy1: Alignment,
+    pub xy2: Alignment,
+    pub tile_mode: TileMode,
     pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
@@ -2225,10 +2196,15 @@ pub struct LinearGradientPaint {
 }
 
 impl LinearGradientPaint {
+    pub fn from_stops(stops: Vec<GradientStop>) -> Self {
+        Self {
+            stops,
+            ..Default::default()
+        }
+    }
+
     pub fn from_colors(colors: Vec<CGColor>) -> Self {
         Self {
-            active: true,
-            transform: AffineTransform::default(),
             stops: colors
                 .iter()
                 .enumerate()
@@ -2237,8 +2213,7 @@ impl LinearGradientPaint {
                     color: *color,
                 })
                 .collect(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
+            ..Default::default()
         }
     }
 }
@@ -2247,6 +2222,9 @@ impl Default for LinearGradientPaint {
     fn default() -> Self {
         Self {
             active: true,
+            xy1: Alignment::CENTER_LEFT,
+            xy2: Alignment::CENTER_RIGHT,
+            tile_mode: TileMode::default(),
             transform: AffineTransform::default(),
             stops: Vec::new(),
             opacity: 1.0,
@@ -2295,6 +2273,43 @@ pub struct RadialGradientPaint {
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub tile_mode: TileMode,
+}
+
+impl RadialGradientPaint {
+    pub fn from_stops(stops: Vec<GradientStop>) -> Self {
+        Self {
+            stops,
+            ..Default::default()
+        }
+    }
+
+    pub fn from_colors(colors: Vec<CGColor>) -> Self {
+        Self {
+            stops: colors
+                .iter()
+                .enumerate()
+                .map(|(i, color)| GradientStop {
+                    offset: i as f32 / (colors.len() - 1) as f32,
+                    color: *color,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for RadialGradientPaint {
+    fn default() -> Self {
+        Self {
+            active: true,
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+            tile_mode: TileMode::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2319,6 +2334,18 @@ pub struct DiamondGradientPaint {
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+}
+
+impl Default for DiamondGradientPaint {
+    fn default() -> Self {
+        Self {
+            active: true,
+            transform: AffineTransform::default(),
+            stops: Vec::new(),
+            opacity: 1.0,
+            blend_mode: BlendMode::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2361,30 +2388,6 @@ pub struct SweepGradientPaint {
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
-}
-
-impl Default for RadialGradientPaint {
-    fn default() -> Self {
-        Self {
-            active: true,
-            transform: AffineTransform::default(),
-            stops: Vec::new(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        }
-    }
-}
-
-impl Default for DiamondGradientPaint {
-    fn default() -> Self {
-        Self {
-            active: true,
-            transform: AffineTransform::default(),
-            stops: Vec::new(),
-            opacity: 1.0,
-            blend_mode: BlendMode::default(),
-        }
-    }
 }
 
 impl Default for SweepGradientPaint {
@@ -2645,13 +2648,16 @@ pub struct ImageTile {
 /// See also:
 /// - https://developer.mozilla.org/en-US/docs/Web/CSS/background-repeat
 /// - https://api.flutter.dev/flutter/painting/ImageRepeat.html
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ImageRepeat {
     /// Repeat the image horizontally (X axis) only.
+    #[serde(rename = "repeat-x")]
     RepeatX,
     /// Repeat the image vertically (Y axis) only.
+    #[serde(rename = "repeat-y")]
     RepeatY,
     /// Repeat the image in both directions.
+    #[serde(rename = "repeat")]
     Repeat,
 }
 

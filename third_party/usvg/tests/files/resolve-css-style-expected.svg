@@ -1,0 +1,8 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+    <defs/>
+    <path fill="#ff0000" stroke="#0000ff" stroke-width="3" d="M 80 50 C 80 66.5685 66.5685 80 50 80 C 33.4315 80 20 66.5685 20 50 C 20 33.4315 33.4315 20 50 20 C 66.5685 20 80 33.4315 80 50 Z"/>
+    <g opacity="0.8">
+        <path fill="#00ff00" stroke="none" d="M 100 20 L 160 20 L 160 80 L 100 80 Z"/>
+    </g>
+    <path id="specific-path" fill="none" stroke="#ff00ff" stroke-width="2" d="M 20 120 L 80 120 L 50 180 Z"/>
+</svg>

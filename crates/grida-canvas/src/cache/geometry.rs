@@ -433,7 +433,7 @@ impl GeometryCache {
                         let rect = n.rect();
                         (n.transform, rect.width, rect.height)
                     }
-                    Node::SVGPath(n) => {
+                    Node::Path(n) => {
                         let rect = n.rect();
                         (n.transform, rect.width, rect.height)
                     }
@@ -726,7 +726,7 @@ fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
             n.stroke_style.stroke_align,
             &n.effects,
         ),
-        Node::SVGPath(n) => compute_render_bounds_from_style(
+        Node::Path(n) => compute_render_bounds_from_style(
             world_bounds,
             n.stroke_width.value_or_zero(),
             n.stroke_style.stroke_align,

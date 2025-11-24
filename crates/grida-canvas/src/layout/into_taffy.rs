@@ -282,7 +282,7 @@ pub fn node_to_taffy_style(node: &Node, _graph: &SceneGraph, _node_id: &NodeId) 
         Node::RegularPolygon(n) => n.into(),
         Node::RegularStarPolygon(n) => n.into(),
         Node::Vector(n) => n.into(),
-        Node::SVGPath(n) => n.into(),
+        Node::Path(n) => n.into(),
         Node::Error(n) => Style {
             size: Size {
                 width: Dimension::length(n.size.width),
@@ -501,9 +501,9 @@ impl From<&crate::node::schema::VectorNodeRec> for Style {
     }
 }
 
-/// Convert SVGPathNodeRec to Taffy Style
-impl From<&crate::node::schema::SVGPathNodeRec> for Style {
-    fn from(node: &crate::node::schema::SVGPathNodeRec) -> Self {
+/// Convert PathNodeRec to Taffy Style
+impl From<&crate::node::schema::PathNodeRec> for Style {
+    fn from(node: &crate::node::schema::PathNodeRec) -> Self {
         let rect = node.rect();
         let mut style = Style {
             size: Size {
