@@ -52,9 +52,11 @@ export class SVGAPI {
    * @returns Promise resolving to SvgOptimizeResponse
    */
   optimize(svg: string): svg.SVGOptimizeResponse {
+    let svgPtr: number | null = null;
+    let svgLen: number | null = null;
     try {
       // Allocate SVG string
-      const [svgPtr, svgLen] = this._alloc_string(svg);
+      [svgPtr, svgLen] = this._alloc_string(svg);
 
       // Call WASM function
       const resultPtr = this.module._grida_svg_optimize(svgPtr);
@@ -62,9 +64,6 @@ export class SVGAPI {
       // Get result
       const resultJson = this._string_from_wasm(resultPtr);
       const result = JSON.parse(resultJson) as svg.SVGOptimizeResponse;
-
-      // Clean up memory
-      this._free_string(svgPtr, svgLen);
 
       return result;
     } catch (error) {
@@ -74,14 +73,27 @@ export class SVGAPI {
           message: error instanceof Error ? error.message : String(error),
         },
       };
+    } finally {
+      // Always clean up allocated memory
+      if (svgPtr !== null && svgLen !== null) {
+        this._free_string(svgPtr, svgLen);
+      }
     }
   }
 
   pack(svg: string): svg.SVGPackResponse {
-    const [svgPtr, svgLen] = this._alloc_string(svg);
-    const resultPtr = this.module._grida_svg_pack(svgPtr);
-    const resultJson = this._string_from_wasm(resultPtr);
-    this._free_string(svgPtr, svgLen);
-    return JSON.parse(resultJson);
+    let svgPtr: number | null = null;
+    let svgLen: number | null = null;
+    try {
+      [svgPtr, svgLen] = this._alloc_string(svg);
+      const resultPtr = this.module._grida_svg_pack(svgPtr);
+      const resultJson = this._string_from_wasm(resultPtr);
+      return JSON.parse(resultJson);
+    } finally {
+      // Always clean up allocated memory
+      if (svgPtr !== null && svgLen !== null) {
+        this._free_string(svgPtr, svgLen);
+      }
+    }
   }
 }
