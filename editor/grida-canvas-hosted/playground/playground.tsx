@@ -39,6 +39,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
+  Cross2Icon,
   DownloadIcon,
   FigmaLogoIcon,
   FileIcon,
@@ -368,12 +369,31 @@ export default function CanvasPlayground({
                     </main>
                   </SidebarProvider>
                 </aside>
-                <aside
-                  className="min-w-[400px] w-[600px] border-l h-full bg-sidebar"
-                  aria-label="Agent Panel"
-                >
-                  <AgentPanel className="h-full" />
-                </aside>
+                <DialogPrimitive.Root defaultOpen modal={false}>
+                  <DialogPrimitive.Content asChild>
+                    <aside
+                      className="min-w-[400px] w-[600px] border-l h-full bg-sidebar flex flex-col"
+                      aria-label="Agent Panel"
+                    >
+                      <header className="h-11 flex items-center justify-between px-4 py-2 border-b">
+                        <DialogPrimitive.Title className="text-sm font-medium">
+                          Agent
+                        </DialogPrimitive.Title>
+                        <DialogPrimitive.Close asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            aria-label="Close Agent Panel"
+                          >
+                            <Cross2Icon className="h-4 w-4" />
+                          </Button>
+                        </DialogPrimitive.Close>
+                      </header>
+                      <AgentPanel className="h-full flex-1" />
+                    </aside>
+                  </DialogPrimitive.Content>
+                </DialogPrimitive.Root>
               </div>
             </StandaloneDocumentEditor>
           </FontFamilyListProvider>
