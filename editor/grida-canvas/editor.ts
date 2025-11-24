@@ -18,6 +18,7 @@ import {
   CanvasWasmFontParserInterfaceProvider,
   CanvasWasmDefaultExportInterfaceProvider,
   CanvasWasmSVGInterfaceProvider,
+  CanvasWasmMarkdownInterfaceProvider,
 } from "./backends";
 import { domapi } from "./backends/dom";
 import { dq } from "@/grida-canvas/query";
@@ -2325,6 +2326,7 @@ export class Editor
     editor.api.IDocumentExportPluginActions,
     editor.api.IDocumentVectorInterfaceActions,
     editor.api.IDocumentSVGInterfaceProvider,
+    editor.api.IDocumentMarkdownInterfaceProvider,
     editor.api.IEditorIntrospectActions
 {
   // private readonly listeners: Set<(editor: this, action?: Action) => void> = new Set();
@@ -2360,6 +2362,11 @@ export class Editor
   _m_svg: editor.api.IDocumentSVGInterfaceProvider | null = null;
   public get svgProvider() {
     return this._m_svg;
+  }
+
+  _m_markdown: editor.api.IDocumentMarkdownInterfaceProvider | null = null;
+  public get markdownProvider() {
+    return this._m_markdown;
   }
 
   _m_font_collection: editor.api.IDocumentFontCollectionInterfaceProvider | null =
@@ -2428,6 +2435,7 @@ export class Editor
       font_collection?: WithEditorInstance<editor.api.IDocumentFontCollectionInterfaceProvider>;
       font_parser?: WithEditorInstance<editor.api.IDocumentFontParserInterfaceProvider>;
       svg?: WithEditorInstance<editor.api.IDocumentSVGInterfaceProvider>;
+      markdown?: WithEditorInstance<editor.api.IDocumentMarkdownInterfaceProvider>;
     };
   }) {
     this.logger = logger;
@@ -2478,6 +2486,10 @@ export class Editor
 
     if (interfaces?.svg) {
       this._m_svg = resolveWithEditorInstance(this, interfaces.svg);
+    }
+
+    if (interfaces?.markdown) {
+      this._m_markdown = resolveWithEditorInstance(this, interfaces.markdown);
     }
 
     this._fontManager = new DocumentFontManager(this);
@@ -2572,6 +2584,8 @@ export class Editor
     this._m_vector = new CanvasWasmVectorInterfaceProvider(this, surface);
 
     this._m_svg = new CanvasWasmSVGInterfaceProvider(this, surface);
+
+    this._m_markdown = new CanvasWasmMarkdownInterfaceProvider(this, surface);
 
     this._m_font_collection = new CanvasWasmFontManagerAgentInterfaceProvider(
       this,
@@ -3327,6 +3341,15 @@ export class Editor
   }
 
   // #endregion IDocumentSVGInterfaceActions implementation
+
+  // #region IDocumentMarkdownInterfaceActions implementation
+  public markdownToHtml(markdown: string): string | null {
+    if (!this.markdownProvider) {
+      throw new Error("Markdown interface provider is not bound");
+    }
+    return this.markdownProvider.markdownToHtml(markdown);
+  }
+  // #endregion IDocumentMarkdownInterfaceActions implementation
 
   // ==============================================================
   // #region IFontLoaderActions implementation

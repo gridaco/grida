@@ -2455,6 +2455,20 @@ export namespace editor.api {
     svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
   }
 
+  /**
+   * interface for markdown to html converter
+   *
+   * uses @grida/canvas-wasm (rust)
+   *
+   */
+  export interface IDocumentMarkdownInterfaceProvider {
+    /**
+     * converts markdown text to HTML
+     * @param markdown input markdown string
+     */
+    markdownToHtml(markdown: string): string | null;
+  }
+
   export interface IDocumentVectorInterfaceProvider {
     /**
      * converts the node into a vector network
@@ -2506,6 +2520,10 @@ export namespace editor.api {
   export interface IDocumentSVGInterfaceActions {
     svgOptimize(svg: string): string | null;
     svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
+  }
+
+  export interface IDocumentMarkdownInterfaceActions {
+    markdownToHtml(markdown: string): string | null;
   }
 
   export interface IDocumentFontActions {

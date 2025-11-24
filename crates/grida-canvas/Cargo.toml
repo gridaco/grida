@@ -25,7 +25,11 @@ seahash = "4.1.0"
 # layout engine
 taffy = "0.9.1"
 # svg parsing
-usvg = { path = "../../third_party/usvg" }
+# (+2mb wasm32-unknown-emscripten)
+usvg = { path = "../../third_party/usvg" } 
+# markdown parsing
+# (+0.25mb wasm32-unknown-emscripten)
+pulldown-cmark = "0.13.0"
 
 # toolings
 async-trait = "0.1"

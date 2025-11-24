@@ -146,6 +146,23 @@ export class CanvasWasmSVGInterfaceProvider
   }
 }
 
+export class CanvasWasmMarkdownInterfaceProvider
+  implements editor.api.IDocumentMarkdownInterfaceProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Scene
+  ) {}
+
+  markdownToHtml(markdown: string): string | null {
+    const res = this.surface.markdownkit.toHtml(markdown);
+    if (res.success) {
+      return res.data.html;
+    }
+    return null;
+  }
+}
+
 class WasmFontAdapter implements FontAdapter {
   constructor(private surface: Scene) {}
 

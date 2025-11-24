@@ -1,5 +1,6 @@
 import type { types } from "../";
 import { FontsAPI } from "./fonts";
+import { MarkdownAPI } from "./markdown";
 import { SVGAPI } from "./svg";
 import { memory } from "./memory";
 
@@ -30,12 +31,14 @@ export class Scene {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
 
   public readonly fontskit: FontsAPI;
+  public readonly markdownkit: MarkdownAPI;
   public readonly svgkit: SVGAPI;
 
   constructor(module: createGridaCanvas.GridaCanvasWasmBindings, ptr: number) {
     this.module = module;
     this.appptr = ptr;
     this.fontskit = new FontsAPI(module);
+    this.markdownkit = new MarkdownAPI(module);
     this.svgkit = new SVGAPI(module);
   }
 
