@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { forms_examples } from "./k";
 import { generate } from "./actions";
-import { readStreamableValue } from '@ai-sdk/rsc';
+import { readStreamableValue } from "@ai-sdk/rsc";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PlaygroundPreview from "./preview";
