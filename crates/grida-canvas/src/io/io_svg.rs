@@ -38,6 +38,9 @@ pub fn svg_pack(svg_source: &str) -> Result<JsonString, ErrorMessageString> {
 /// # Example
 ///
 /// ```rust
+/// use cg::io::io_svg::svg_optimize;
+///
+/// # fn main() -> Result<(), String> {
 /// let input = r#"
 /// <svg viewBox="0 0 200 200">
 ///     <style>
@@ -52,6 +55,8 @@ pub fn svg_pack(svg_source: &str) -> Result<JsonString, ErrorMessageString> {
 /// // - <style> tag removed
 /// // - circle converted to path
 /// // - styles applied as fill="#ff0000" stroke="#0000ff"
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// # Errors

@@ -1,6 +1,5 @@
 use crate::io::io_grida::JSONVectorNetwork;
 use crate::io::io_grida_patch::TransactionApplyReport;
-use crate::io::io_svg::svg_pack;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
