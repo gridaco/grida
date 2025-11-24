@@ -4,14 +4,11 @@
   "private": true,
   "dependencies": {
     "@grida/cmath": "workspace:*",
-    "@grida/vn": "workspace:*",
-    "color-name": "^2.0.0",
-    "inline-style-parser": "^0.2.4",
-    "svgson": "^5.3.1"
+    "@grida/vn": "workspace:*"
   },
   "devDependencies": {
+    "@grida/canvas-wasm": "workspace:*",
     "@grida/cg": "workspace:*",
-    "@grida/schema": "workspace:*",
-    "@types/color-name": "^2.0.0"
+    "@grida/schema": "workspace:*"
   }
 }

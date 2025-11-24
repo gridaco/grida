@@ -38,8 +38,7 @@ export default function IOSVGPage() {
 
   const instance = useEditor(undefined, "canvas");
   const optimizedSvg = useOptimizedSvg(raw, instance);
-  const result = useIOSVGDocument(optimizedSvg, instance);
-  const packedScene = usePackedSceneJson(instance, raw);
+  const { result, packedScene } = useIOSVGDocument(raw, instance);
   const canvasRef = useCanvasSurfaceMount(instance);
 
   useHotkeys("ctrl+o, meta+o", openFilePicker, {
@@ -254,100 +253,53 @@ function useOptimizedSvg(raw?: string, editorInstance?: GridaEditor) {
 }
 
 function useIOSVGDocument(
-  svg: string | undefined,
+  raw: string | undefined,
   editorInstance: GridaEditor
 ) {
   const [conversion, setConversion] = useState<any>();
-
-  useEffect(() => {
-    if (!svg) {
-      setConversion(undefined);
-      return;
-    }
-
-    let cancelled = false;
-
-    iosvg.v0
-      .convert(svg, {
-        name: "SVG",
-        currentColor: { r: 0, g: 0, b: 0, a: 1 },
-      })
-      .then((result: any) => {
-        if (cancelled) {
-          return;
-        }
-        if (result) {
-          const doc =
-            grida.program.nodes.factory.packed_scene_document_to_full_document(
-              grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-                result,
-                () => v4()
-              )
-            );
-
-          editorInstance.commands.reset(
-            editor.state.init({
-              editable: true,
-              document: doc,
-            })
-          );
-        }
-        setConversion(result);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          console.error(error);
-          setConversion(undefined);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [svg, editorInstance]);
-
-  return conversion;
-}
-
-function usePackedSceneJson(editorInstance: GridaEditor, raw?: string) {
-  const [packed, setPacked] = useState<string>();
+  const [packedSceneJson, setPackedSceneJson] = useState<string>();
 
   useEffect(() => {
     if (!raw) {
-      setPacked(undefined);
+      setConversion(undefined);
+      setPackedSceneJson(undefined);
       return;
     }
 
-    let cancelled = false;
+    const packed = editorInstance.svgPack(raw);
 
-    editorInstance
-      .createPackedSceneFromSVG(raw)
-      .then((json) => {
-        if (cancelled) {
-          return;
-        }
-        if (json) {
-          try {
-            const formatted = JSON.stringify(JSON.parse(json), null, 2);
-            setPacked(formatted);
-          } catch {
-            setPacked(json);
-          }
-        } else {
-          setPacked(undefined);
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          console.error(error);
-          setPacked(undefined);
-        }
-      });
+    if (!packed) {
+      setConversion(undefined);
+      setPackedSceneJson(undefined);
+      return;
+    }
 
-    return () => {
-      cancelled = true;
-    };
+    // Store packed scene JSON for display
+    setPackedSceneJson(JSON.stringify(packed, null, 2));
+
+    // Use convert with the WASM-resolved SVG tree
+    const result = iosvg.convert(packed.svg, {
+      name: "SVG",
+    });
+
+    if (result) {
+      const doc =
+        grida.program.nodes.factory.packed_scene_document_to_full_document(
+          grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+            result,
+            () => v4()
+          )
+        );
+
+      editorInstance.commands.reset(
+        editor.state.init({
+          editable: true,
+          document: doc,
+        })
+      );
+    }
+    setConversion(result);
   }, [raw, editorInstance]);
 
-  return packed;
+  return { result: conversion, packedScene: packedSceneJson };
 }

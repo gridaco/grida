@@ -8,7 +8,7 @@ import { animateTransformTo } from "./animation";
 import { EditorFollowPlugin } from "./plugins/follow";
 import { DocumentFontManager } from "./font-manager";
 import { DocumentHistoryManager } from "./history-manager";
-import init, { type Scene } from "@grida/canvas-wasm";
+import init, { svgtypes, type Scene } from "@grida/canvas-wasm";
 import locateFile from "./backends/wasm-locate-file";
 import {
   NoopDefaultExportInterfaceProvider,
@@ -681,12 +681,21 @@ class EditorDocumentStore
     svg: string
   ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
     const id = this.idgen.next();
-    const optimized = this.svg.svgOptimize(svg);
-    if (!optimized) {
-      throw new Error("Failed to optimize SVG");
+
+    const packed = await this.svg.svgPack(svg);
+    if (!packed) {
+      throw new Error("Failed to pack SVG");
     }
 
-    let result = await iosvg.v0.convert(optimized, {
+    // Handle both response formats: { success: true, data: { svg } } or direct { svg }
+    const svgData =
+      (packed as any).svg ||
+      ((packed as any).success && (packed as any).data?.svg);
+    if (!svgData) {
+      throw new Error("Failed to extract SVG data from packed result");
+    }
+
+    let result = await iosvg.convert(svgData, {
       name: "svg",
       currentColor: { r: 0, g: 0, b: 0, a: 1 },
     });
@@ -2524,14 +2533,6 @@ export class Editor
     return blob;
   }
 
-  public async createPackedSceneFromSVG(svg: string): Promise<string | null> {
-    if (!this._m_wasm_canvas_scene) {
-      reportError("WASM canvas scene is not initialized");
-      return null;
-    }
-    return this._m_wasm_canvas_scene.createPackedSceneFromSVG(svg);
-  }
-
   public getSnapshot(): Readonly<editor.state.IEditorState> {
     return this.doc.state;
   }
@@ -3309,12 +3310,22 @@ export class Editor
   // #endregion IVectorInterfaceActions implementation
 
   // #region IDocumentSVGInterfaceActions implementation
-  svgOptimize(svg: string): string | null {
+  public svgOptimize(svg: string): string | null {
     if (!this.svgProvider) {
       throw new Error("SVG interface provider is not bound");
     }
     return this.svgProvider.svgOptimize(svg);
   }
+
+  public svgPack(
+    svg: string
+  ): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null {
+    if (!this.svgProvider) {
+      throw new Error("SVG interface provider is not bound");
+    }
+    return this.svgProvider.svgPack(svg);
+  }
+
   // #endregion IDocumentSVGInterfaceActions implementation
 
   // ==============================================================

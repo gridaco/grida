@@ -1,7 +1,7 @@
 import cmath from "@grida/cmath";
 import type { editor } from "..";
 import type { Editor } from "../editor";
-import type { Scene } from "@grida/canvas-wasm";
+import type { Scene, svgtypes } from "@grida/canvas-wasm";
 import type vn from "@grida/vn";
 import {
   UnifiedFontManager,
@@ -136,6 +136,12 @@ export class CanvasWasmSVGInterfaceProvider
     if (res.success) {
       return res.data.svg_optimized;
     }
+    return null;
+  }
+
+  svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null {
+    const res = this.surface.svgkit.pack(svg);
+    if (res.success) return res.data;
     return null;
   }
 }

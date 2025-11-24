@@ -14,6 +14,7 @@ import vn from "@grida/vn";
 import grida from "@grida/schema";
 import tree from "@grida/tree";
 import type { io } from "@grida/io";
+import type { svgtypes } from "@grida/io-svg";
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -2451,6 +2452,7 @@ export namespace editor.api {
      * @param svg input svg string
      */
     svgOptimize(svg: string): string | null;
+    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
   }
 
   export interface IDocumentVectorInterfaceProvider {
@@ -2503,6 +2505,7 @@ export namespace editor.api {
 
   export interface IDocumentSVGInterfaceActions {
     svgOptimize(svg: string): string | null;
+    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
   }
 
   export interface IDocumentFontActions {
