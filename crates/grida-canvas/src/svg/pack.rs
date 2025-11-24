@@ -153,7 +153,7 @@ impl SceneBuilder {
         fill: Option<&SVGFillAttributes>,
         stroke: Option<&SVGStrokeAttributes>,
         font_size: Option<f32>,
-        bounds: &IRSVGBounds,
+        bounds: &CGRect,
         anchor: SVGTextAnchor,
         parent: Parent,
     ) -> Result<(), String> {

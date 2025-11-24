@@ -9,9 +9,9 @@ impl From<usvg::Color> for CGColor {
     }
 }
 
-impl From<usvg::Rect> for IRSVGBounds {
+impl From<usvg::Rect> for CGRect {
     fn from(rect: usvg::Rect) -> Self {
-        IRSVGBounds {
+        CGRect {
             x: rect.x(),
             y: rect.y(),
             width: rect.width(),

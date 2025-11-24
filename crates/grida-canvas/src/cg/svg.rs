@@ -4,6 +4,16 @@ use crate::cg::prelude::*;
 use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum SVGTextAnchor {
+    #[serde(rename = "start")]
+    Start,
+    #[serde(rename = "middle")]
+    Middle,
+    #[serde(rename = "end")]
+    End,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum SVGPaint {
@@ -323,7 +333,7 @@ pub struct IRSVGTextNode {
     pub stroke: Option<SVGStrokeAttributes>,
     pub spans: Vec<IRSVGTextSpanNode>,
     #[serde(skip_serializing)]
-    pub bounds: IRSVGBounds,
+    pub bounds: CGRect,
 }
 
 /// <tspan>
@@ -337,16 +347,6 @@ pub struct IRSVGTextSpanNode {
     pub anchor: SVGTextAnchor,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum SVGTextAnchor {
-    #[serde(rename = "start")]
-    Start,
-    #[serde(rename = "middle")]
-    Middle,
-    #[serde(rename = "end")]
-    End,
-}
-
 /// <path>
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IRSVGPathNode {
@@ -355,17 +355,9 @@ pub struct IRSVGPathNode {
     pub stroke: Option<SVGStrokeAttributes>,
     pub d: String,
     #[serde(skip_serializing)]
-    pub bounds: IRSVGBounds,
+    pub bounds: CGRect,
 }
 
 /// <image>
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IRSVGImageNode {}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct IRSVGBounds {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-}

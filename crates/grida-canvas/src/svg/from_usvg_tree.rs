@@ -1,5 +1,4 @@
 use crate::cg::prelude::*;
-use crate::cg::svg::IRSVGBounds;
 use crate::fonts::embedded::geist;
 use crate::sk_tiny::tsk_path_to_sk_path;
 use math2::transform::AffineTransform;
@@ -109,7 +108,7 @@ fn convert_path(path: &usvg::Path, parent_world: &CGTransform2D) -> Result<IRSVG
     let tiny_path = path.data();
     let sk_path = tsk_path_to_sk_path(tiny_path);
 
-    let bounds: IRSVGBounds = path.bounding_box().into();
+    let bounds: CGRect = path.bounding_box().into();
     let (offset_x, offset_y, data) = normalize_skia_path(sk_path, &bounds);
 
     let mut relative_affine: AffineTransform = relative.into();
@@ -133,7 +132,7 @@ fn convert_path(path: &usvg::Path, parent_world: &CGTransform2D) -> Result<IRSVG
 fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVGTextNode, String> {
     let abs: CGTransform2D = text.abs_transform().into();
     let relative = extract_relative_transform(parent_world, &abs);
-    let bounds: IRSVGBounds = text.bounding_box().into();
+    let bounds: CGRect = text.bounding_box().into();
 
     let mut combined_text = String::new();
     for chunk in text.chunks() {
@@ -218,7 +217,7 @@ fn extract_relative_transform(
     CGTransform2D::from(relative_affine)
 }
 
-fn normalize_skia_path(mut path: SkPath, bounds: &IRSVGBounds) -> (f32, f32, String) {
+fn normalize_skia_path(mut path: SkPath, bounds: &CGRect) -> (f32, f32, String) {
     if bounds.x != 0.0 || bounds.y != 0.0 {
         path.offset((-bounds.x, -bounds.y));
         let data = path.to_svg();

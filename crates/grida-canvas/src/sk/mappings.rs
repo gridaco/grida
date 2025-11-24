@@ -7,6 +7,12 @@ impl From<CGColor> for skia_safe::Color {
     }
 }
 
+impl From<CGRect> for skia_safe::Rect {
+    fn from(rect: CGRect) -> skia_safe::Rect {
+        skia_safe::Rect::from_xywh(rect.x, rect.y, rect.width, rect.height)
+    }
+}
+
 impl From<BooleanPathOperation> for skia_safe::PathOp {
     fn from(op: BooleanPathOperation) -> Self {
         match op {
