@@ -2,7 +2,7 @@
 // #region: High-Level JavaScript Wrapper Functions
 // ====================================================================================================
 
-import type { svg } from "./svg-bindings";
+import type { svg, svgtypes } from "./svg-bindings";
 
 export class SVGAPI {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
@@ -51,7 +51,7 @@ export class SVGAPI {
    * @param svg - Input SVG string
    * @returns Promise resolving to SvgOptimizeResponse
    */
-  optimize(svg: string): svg.types.SvgOptimizeResponse {
+  optimize(svg: string): svg.SVGOptimizeResponse {
     try {
       // Allocate SVG string
       const [svgPtr, svgLen] = this._alloc_string(svg);
@@ -61,9 +61,7 @@ export class SVGAPI {
 
       // Get result
       const resultJson = this._string_from_wasm(resultPtr);
-      const result = JSON.parse(resultJson) as
-        | svg.types.SvgOptimizeResponse
-        | svg.types.SvgError;
+      const result = JSON.parse(resultJson) as svg.SVGOptimizeResponse;
 
       // Clean up memory
       this._free_string(svgPtr, svgLen);
@@ -75,7 +73,15 @@ export class SVGAPI {
         error: {
           message: error instanceof Error ? error.message : String(error),
         },
-      } satisfies svg.types.SvgError;
+      };
     }
+  }
+
+  pack(svg: string): svg.SVGPackResponse {
+    const [svgPtr, svgLen] = this._alloc_string(svg);
+    const resultPtr = this.module._grida_svg_pack(svgPtr);
+    const resultJson = this._string_from_wasm(resultPtr);
+    this._free_string(svgPtr, svgLen);
+    return JSON.parse(resultJson);
   }
 }

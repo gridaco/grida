@@ -302,8 +302,4 @@ impl EmscriptenApplication {
     ) -> Result<Vec<TransactionApplyReport>, serde_json::Error> {
         self.base.apply_document_transactions_json(json)
     }
-
-    pub fn create_packed_scene_from_svg(&mut self, svg: &str) -> Result<String, String> {
-        svg_pack(svg)
-    }
 }

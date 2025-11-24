@@ -259,7 +259,7 @@ export class Scene {
     return JSON.parse(str);
   }
 
-  getNodeIdsFromEnvelope(envelope: types.Rectangle): string[] {
+  getNodeIdsFromEnvelope(envelope: types.Rect): string[] {
     const ptr = this.module._get_node_ids_from_envelope(
       this.appptr,
       envelope.x,
@@ -276,7 +276,7 @@ export class Scene {
     return JSON.parse(str);
   }
 
-  getNodeAbsoluteBoundingBox(id: string): types.Rectangle | null {
+  getNodeAbsoluteBoundingBox(id: string): types.Rect | null {
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._get_node_absolute_bounding_box(
       this.appptr,
@@ -442,22 +442,5 @@ export class Scene {
    */
   devtools_rendering_set_show_ruler(show: boolean) {
     this.module._devtools_rendering_set_show_ruler(this.appptr, show);
-  }
-
-  createPackedSceneFromSVG(svg: string): string | null {
-    const [ptr, len] = this._alloc_string(svg);
-    const outptr = this.module._create_packed_scene_from_svg(
-      this.appptr,
-      ptr,
-      len - 1
-    );
-    this._free_string(ptr, len);
-    if (outptr === 0) {
-      return null;
-    }
-    const json = this.module.UTF8ToString(outptr);
-    const outlen = this.module.lengthBytesUTF8(json) + 1;
-    this._free_string(outptr, outlen);
-    return json;
   }
 }

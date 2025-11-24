@@ -63,8 +63,11 @@ pub struct SVGRadialGradientPaint {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum SVGGradientSpreadMethod {
+    #[serde(rename = "pad")]
     Pad,
+    #[serde(rename = "reflect")]
     Reflect,
+    #[serde(rename = "repeat")]
     Repeat,
 }
 
@@ -273,20 +276,6 @@ fn scale(sx: f32, sy: f32) -> AffineTransform {
 // }
 
 /// Intermediate Representation of an SVG node.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind")]
-pub enum IRSVGNode {
-    #[serde(rename = "initial-container")]
-    InitialContainer(IRSVGInitialContainerNode),
-    #[serde(rename = "group")]
-    Group(IRSVGGroupNode),
-    #[serde(rename = "text")]
-    Text(IRSVGTextNode),
-    #[serde(rename = "path")]
-    Path(IRSVGPathNode),
-    #[serde(rename = "image")]
-    Image(IRSVGImageNode),
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
