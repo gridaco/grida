@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   SidebarMenuSectionContent,
   SidebarSection,
@@ -52,6 +52,7 @@ import {
 } from "@/grida-canvas-react";
 import {
   Crosshair2Icon,
+  DotsVerticalIcon,
   LockClosedIcon,
   LockOpen1Icon,
   MixerVerticalIcon,
@@ -1809,6 +1810,12 @@ function SectionEffects({ node_id }: { node_id: string }) {
 function SelectionColors() {
   const editor = useCurrentEditor();
   const { ids, paints, setPaint } = useMixedPaints();
+  const [showAllColors, setShowAllColors] = useState(false);
+
+  // Reset showAllColors when selection changes (ids change)
+  useEffect(() => {
+    setShowAllColors(false);
+  }, [ids]);
 
   // this should show when,
   // 1. paints are more than 1
@@ -1820,17 +1827,22 @@ function SelectionColors() {
     return null;
   }
 
+  const k = 10; // Maximum number of colors to show initially
+  const shouldShowButton = paints.length > k && !showAllColors;
+  const displayedPaints = showAllColors ? paints : paints.slice(0, k);
+
   return (
     <SidebarSection className="border-b pb-4">
       <SidebarSectionHeaderItem>
         <SidebarSectionHeaderLabel>Selection colors</SidebarSectionHeaderLabel>
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
-        {paints.map(({ value, ids }, index) => (
+        {displayedPaints.map(({ value, ids }, index) => (
           <PropertyLine key={index}>
             <PaintControl
               value={value}
               onValueChange={(value) => {
+                // Since we slice from the start, the index matches the original array
                 setPaint(index, value);
               }}
             />
@@ -1848,6 +1860,19 @@ function SelectionColors() {
             </div>
           </PropertyLine>
         ))}
+        {shouldShowButton && (
+          <Button
+            variant="ghost"
+            size="xs"
+            className="w-full mt-2 text-muted-foreground text-[10px] font-normal"
+            onClick={() => {
+              setShowAllColors(true);
+            }}
+          >
+            <DotsVerticalIcon className="size-3" />
+            See all {paints.length} colors
+          </Button>
+        )}
       </SidebarMenuSectionContent>
     </SidebarSection>
   );
