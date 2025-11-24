@@ -11,7 +11,7 @@ import { presets } from "./_data/presets";
 import { ModelParams } from "./_components/model-params";
 import { Label } from "@/components/ui/label";
 import { MinimalChatBox } from "@/components/chat";
-import { readStreamableValue } from '@ai-sdk/rsc';
+import { readStreamableValue } from "@ai-sdk/rsc";
 import { Canvas } from "./_components/canvas";
 import { generate, type UserAttachment } from "./generate";
 import { type StreamingResponse } from "./schema";

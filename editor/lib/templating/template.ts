@@ -1,7 +1,7 @@
 import { create } from "handlebars";
 import { ObjectPath } from "./@types";
 import { v4 as uuid } from "uuid";
-import { z } from 'zod/v3';
+import { z } from "zod/v3";
 import type { TemplateVariables } from ".";
 import type { i18n } from "i18next";
 import type { Translation } from "@/i18n/resources";
