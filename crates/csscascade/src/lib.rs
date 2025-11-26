@@ -6,3 +6,4 @@
 
 // Public API will be added here as the crate is developed
 
+mod rcdom;

@@ -8,6 +8,8 @@
 
 `csscascade` is a **CSS Cascade & Style Resolution Engine** designed for building browser-like rendering pipelines. Unlike `usvg` (which is a full SVG parser), `csscascade` focuses specifically on the CSS cascade and style resolution step.
 
+The project now embeds [**Stylo**](https://github.com/servo/stylo)—Servo’s production CSS engine—as its core. Instead of re‑implementing parsing, selectors, and cascade logic ourselves, we feed DOM + stylesheet data into Stylo (which runs happily on `wasm32-unknown-emscripten`) and then solve every problem Stylo intentionally leaves to embedders: DOM traversal, HTML/SVG attribute normalization, font parsing/selection, layout integration (e.g. via `taffy`), and renderer hand-off.
+
 **Key Difference from usvg:**
 
 - `usvg`: Parses SVG XML → Resolves CSS → Outputs simplified tree
@@ -15,7 +17,11 @@
 
 **Primary Use Case:** DOM Tree → CSS Cascade → Style-Resolved Tree → Layout → Render
 
-This crate implements the hardest and most fundamental part of a rendering engine: the transformation from loosely-typed DOM nodes + CSS rules into a **fully computed, normalized, strongly-typed tree**.
+This crate implements the hardest and most fundamental part of a rendering engine: the transformation from loosely-typed DOM nodes + CSS rules into a **fully computed, normalized, strongly-typed tree**, now powered by Stylo.
+
+### “Isn’t a full CSS engine overkill?”
+
+Stylo is far lighter than it sounds—our wasm bundles are roughly ~1.5 MB with `wasm-bindgen` and about ~2.5 MB when targeting `wasm32-unknown-emscripten`. Achieving full CSS3 compliance (selectors, specificity, media rules, shorthands, inheritance, etc.) is notoriously complex, and any serious renderer eventually needs browser-grade behavior. Stylo already delivers that accuracy, so we lean on it and concentrate on the remaining pieces (DOM adapters, fonts, layout, rendering).
 
 ## Design Philosophy
 
@@ -56,11 +62,13 @@ Input DOM Tree (HTML / XML / SVG)
     ↓
 [Your Parser] → DOM-like structure (implements csscascade DOM traits)
     ↓
-[csscascade] → CSS Cascade & Style Resolution
+[csscascade front-end] → CSS collection, DOM adapters, font/runtime setup
+    ↓
+[Stylo] → CSS Cascade & Style Resolution
     ↓
 Style-Resolved Static Tree (fully computed styles)
     ↓
-[Your Layout Engine] → Layout-computed tree
+[Your Layout Engine (e.g. taffy)] → Layout-computed tree
     ↓
 [Your Painter] → Rendered Output
 ```
@@ -70,31 +78,15 @@ Style-Resolved Static Tree (fully computed styles)
 ```
 csscascade/
 ├── src/
-│   ├── lib.rs              # Public API (Cascade, StyledTree)
-│   ├── dom/                # DOM trait definitions
-│   │   ├── mod.rs          # DomNode trait
-│   │   └── adapters.rs    # Adapters for common parsers
-│   ├── css/                # CSS parsing and stylesheet
-│   │   ├── mod.rs          # Stylesheet, Rule, Declaration
-│   │   ├── parser.rs       # CSS parser (using cssparser)
-│   │   ├── selector.rs     # Selector matching (using selectors crate)
-│   │   └── values.rs        # CSS value parsing (using cssparser)
-│   ├── cascade/            # Cascade engine
-│   │   ├── mod.rs          # Cascade struct, main logic
-│   │   ├── specificity.rs  # Specificity calculation
-│   │   ├── inheritance.rs  # Property inheritance
-│   │   └── compute.rs      # Style computation
-│   ├── style/              # Computed style types
-│   │   ├── mod.rs          # ComputedStyle struct
-│   │   ├── properties.rs   # CSS property definitions
-│   │   ├── values.rs       # Value types (Color, Length, etc.)
-│   │   └── shorthand.rs    # Shorthand expansion
-│   ├── tree/               # Styled tree output
-│   │   ├── mod.rs          # StyledTree, StyledNode
-│   │   └── builder.rs      # Tree construction
-│   └── utils/              # Utilities
-│       ├── initial.rs      # Initial value handling
-│       └── normalize.rs    # Value normalization
+│   ├── lib.rs                # Public API (Cascade, StyledTree)
+│   ├── dom/                  # DOM trait definitions + adapters
+│   ├── stylesheets/          # CSS collection (style tags, external links)
+│   ├── stylo_bridge/         # Device setup, media lists, Stylo contexts
+│   ├── fonts/                # Font parsing, fallback lists, FontMetricsProvider
+│   ├── cascade/              # Orchestration of passes & Stylo invocations
+│   ├── tree/                 # StyledTree, StyledNode construction
+│   ├── layout_hooks/         # Optional integration points for taffy/etc.
+│   └── utils/                # Shared helpers (initial values, normalization)
 ```
 
 ### Component Interactions
@@ -117,18 +109,19 @@ csscascade/
        │
        ▼
 ┌─────────────────┐
-│  Cascade Engine │ ← Second Pass
+│ csscascade host │ ← Second Pass controller
 │  (per element)  │
 └──────┬──────────┘
        │
-       ├─→ Selector Matching
-       ├─→ Specificity Resolution
-       ├─→ Inheritance
-       └─→ Style Computation
+       ▼
+┌─────────────────┐
+│      Stylo      │ ← Selector matching, specificity, inheritance,
+│ (cascade core)  │    computed values, shorthand expansion
+└──────┬──────────┘
        │
        ▼
 ┌─────────────────┐
-│  StyledTree     │ (output)
+│  StyledTree     │ (output + font/layout metadata)
 └─────────────────┘
 ```
 
@@ -221,129 +214,59 @@ Since the style is computed and normalized, the next stages can be:
 
 ### External Dependencies
 
-1. **`cssparser`** - CSS Syntax Module Level 3 parser
+1. **Stylo (Servo CSS engine)**
 
-   - Purpose: Parse CSS stylesheets, rules, declarations, and values
-   - Handles CSS tokenization and parsing according to W3C CSS Syntax spec
-   - Used by Servo browser engine
-   - **Benefits**: Full CSS3 support, production-proven, actively maintained
+   - Provides parsing, selector matching, cascade, computed values, and shorthand expansion.
+   - Bundles `cssparser`, `selectors`, `style_traits`, etc., so we inherit Servo-quality behavior without re-implementing anything.
+   - Compiles cleanly for `wasm32-unknown-emscripten`, matching our runtime needs.
+   - Already proven across Servo/Firefox experiments.
 
-2. **`selectors`** - CSS Selectors matching engine
-   - Purpose: Match CSS selectors against DOM elements
-   - Handles selector parsing, matching, and specificity calculation
-   - Used by Servo browser engine
-   - **Benefits**: Complete CSS3 selector support, efficient matching, proven in production
+2. **Optional layout / font helpers**
+   - csscascade exposes hooks for layout engines (e.g. `taffy`) and font backends (Skia/system fonts) because Stylo intentionally delegates layout and text shaping to embedders.
 
-**Why `cssparser` + `selectors` over `simplecss`?**
+### Stylo Integration Overview
 
-- **Broader CSS3 support**: `cssparser` and `selectors` provide comprehensive CSS3 feature support, including modern selectors, at-rules, and value types
-- **Production-proven**: Both crates are core components of Servo, ensuring battle-tested reliability
-- **Better separation**: `cssparser` handles CSS parsing, `selectors` handles selector matching - cleaner separation of concerns
-- **Active development**: Both crates are actively maintained and aligned with latest CSS specifications
-- **Extensibility**: Easier to extend for future CSS features (CSS4, custom properties, etc.)
-- **W3C compliance**: Both crates follow W3C specifications closely, ensuring correct behavior
+- **CSS collection**: csscascade still performs the two-pass walk to gather `<style>` elements and linked sheets, then hands the raw CSS to `Stylesheet::from_str`.
+- **Device + media**: we construct Stylo `Device`, viewport/DPR, and media lists from the renderer environment (canvas size, color scheme, etc.).
+- **Font metrics**: by implementing Stylo’s `FontMetricsProvider`, we connect our font parsing/selection pipeline so computed sizes reflect the actual fonts available.
+- **Stylist lifecycle**: csscascade owns the `Stylist`, appends stylesheets, and triggers cascade rebuilds whenever DOM snapshots change.
+- **Result extraction**: after Stylo resolves styles, we convert `ComputedValues` into our strongly typed `ComputedStyle`, injecting presentation attribute normalization, HTML defaults, and layout hints.
 
-### CSS Parsing Architecture
+**Responsibilities outside Stylo**
 
-**cssparser Integration:**
-
-```rust
-use cssparser::{Parser, ParserInput, RuleListParser};
-
-// CSS input string
-let css = ".title { color: red; }";
-
-// Create parser input (zero-copy tokenization)
-let mut input = ParserInput::new(css);
-let mut parser = Parser::new(&mut input);
-
-// Parse stylesheet
-let stylesheet = parse_stylesheet(&mut parser)?;
-```
-
-**Key features:**
-
-- Tokenizes CSS according to CSS Syntax Module Level 3
-- Handles all CSS value types (colors, lengths, functions, etc.)
-- Supports at-rules (`@media`, `@keyframes`, `@import`, etc.)
-- Zero-copy parsing where possible
-- Comprehensive error reporting
-
-### Selector Matching Architecture
-
-**selectors Integration:**
-
-```rust
-use selectors::parser::{SelectorList, Selector};
-use selectors::matching::{matches_selector, MatchingContext, QuirksMode};
-
-// Parse selector list
-let selector_list = SelectorList::parse(
-    &SELECTOR_PARSER,
-    &mut cssparser::Parser::new(&mut selector_text)
-)?;
-
-// Match against DOM element
-let context = MatchingContext::new(
-    MatchingMode::Normal,
-    None,
-    None,
-    QuirksMode::NoQuirks,
-);
-let matches = matches_selector(&selector_list.0[0], element, &context);
-```
-
-**Key features:**
-
-- Full CSS3 selector support (including `:nth-child()`, `:not()`, etc.)
-- Automatic specificity calculation
-- Efficient matching algorithms
-- Pseudo-class and pseudo-element support
-- Attribute selector matching
-- Combinator support (descendant, child, sibling, etc.)
+- HTML/SVG parsing and DOM traversal (csscascade DOM traits + adapters)
+- Presentation attribute normalization and HTML defaulting
+- Font parsing, selection, and metrics backends
+- Layout integration (feeding `taffy` or other layout engines)
+- Renderer-specific pipelines (display lists, painting, WASM bindings)
 
 ### Internal Components
 
 1. **DOM Trait System** (`dom/`)
 
-   - Purpose: Define interface for DOM-like structures
-   - Allows engine-agnostic design
-   - Any parser can implement these traits
-   - **Key trait**: `DomNode` - minimal interface for DOM traversal
+   - Defines the minimal DOM interface and implements `selectors::Element` so Stylo can match selectors against arbitrary DOM providers (html5ever, roxmltree, markdown ASTs, etc.).
 
-2. **CSS Stylesheet** (`css/`)
+2. **Stylesheet Collection** (`stylesheets/`)
 
-   - Purpose: Store and manage CSS rules
-   - Parses CSS into rules using `cssparser`
-   - Maintains rule order for cascading
-   - **Uses `cssparser`**: Tokenizes and parses CSS according to CSS Syntax Module Level 3
+   - Discovers inline/external CSS, resolves URLs, and hands raw CSS + metadata (origin, media) to Stylo while preserving document order.
 
-3. **Selector Matching** (`css/selector.rs`)
+3. **Stylo Bridge** (`stylo_bridge/`)
 
-   - Purpose: Match CSS selectors against DOM elements
-   - Uses `selectors` crate for matching
-   - Handles all CSS3 selectors (including complex combinators, pseudo-classes, etc.)
-   - Calculates specificity automatically via `selectors`
+   - Owns Stylo `Device`, `SharedRwLock`, `DocumentStyleSheet`, and `Stylist`.
+   - Implements `FontMetricsProvider`, color-scheme plumbing, and media query evaluation.
 
-4. **Cascade Engine** (`cascade/`)
+4. **Cascade Orchestrator** (`cascade/`)
 
-   - Purpose: Apply CSS cascade to DOM
-   - Uses `selectors` for selector matching
-   - Resolves specificity and importance (via `selectors`)
-   - Applies inheritance
+   - Coordinates the two-pass process, applies presentation attribute mappings, merges HTML defaults, and drives Stylo rebuilds.
 
-5. **Style Computation** (`style/`)
+5. **Fonts Module** (`fonts/`)
 
-   - Purpose: Compute final styles from CSS rules
-   - Handles specificity (via `selectors`), inheritance, initial values
-   - Normalizes and expands CSS properties
-   - Expands shorthands
-   - Parses CSS values using `cssparser`
+   - Parses @font-face entries, integrates system/embedded fonts, and surfaces handles to both Stylo (for metrics) and the renderer (for shaping).
 
 6. **Styled Tree Builder** (`tree/`)
-   - Purpose: Build output tree with computed styles
-   - Creates `StyledTree` from DOM + computed styles
-   - Maintains tree structure
+
+   - Builds the immutable `StyledTree` from Stylo’s computed values plus csscascade metadata.
+   - Emits layout hints (display, writing mode) for downstream layout engines like `taffy`.
 
 ## Comparison with usvg
 
@@ -365,11 +288,11 @@ Both csscascade and usvg:
 | **Scope**       | Full SVG parser + CSS resolution | CSS cascade only (no parsing)   |
 | **Input**       | SVG XML string                   | Already-parsed DOM tree         |
 | **Parser**      | `roxmltree` (built-in)           | None (bring your own)           |
-| **CSS Parser**  | `simplecss`                      | `cssparser` + `selectors`       |
+| **CSS Engine**  | `simplecss`                      | Stylo (Servo)                   |
 | **Output**      | Simplified SVG tree              | Style-resolved tree             |
 | **Use Case**    | SVG rendering                    | Any HTML/SVG rendering pipeline |
 | **Format**      | SVG only                         | HTML + SVG (unified)            |
-| **CSS Support** | Basic CSS (minimal)              | Full CSS3 support               |
+| **CSS Support** | Basic CSS (minimal)              | Full CSS3 via Stylo             |
 
 ### Why csscascade is Different
 
@@ -382,7 +305,7 @@ SVG XML → [usvg parser] → [CSS resolution] → Simplified tree
 **csscascade approach:**
 
 ```
-HTML/SVG → [your parser] → DOM tree → [csscascade] → Style-resolved tree
+HTML/SVG → [your parser] → DOM tree → [csscascade front-end] → [Stylo] → Style-resolved tree
 ```
 
 **Benefits of csscascade's approach:**

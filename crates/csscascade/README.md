@@ -2,9 +2,17 @@
 
 A modern, Rust-native **CSS Cascade & Style Resolution Engine** designed for building browser‑like rendering pipelines. `csscascade` takes an HTML (and later SVG) DOM tree and produces a **style-resolved static tree** ready for layout and painting.
 
+Today the crate is powered by [**Stylo**](https://github.com/servo/stylo) — Servo’s production CSS engine. Stylo handles parsing, selectors, specificity, and computed values (and compiles cleanly for `wasm32-unknown-emscripten`), while `csscascade` focuses on DOM adapters, HTML/SVG attribute normalization, font parsing/selection, layout hand-off, and everything else outside the CSS engine’s scope.
+
 This crate implements the hardest and most fundamental part of a rendering engine: the transformation from loosely-typed DOM nodes + CSS rules into a **fully computed, normalized, strongly-typed tree**.
 
 Future support for SVG is planned (HTML + SVG share >90% of style logic).
+
+---
+
+### “Isn’t a full CSS engine overkill?”
+
+Not really. Stylo stays surprisingly lean—our builds land around ~1.5 MB when compiled with `wasm-unknwon-unknown` and roughly ~2.5 MB when targeting `wasm32-unknown-emscripten`. More importantly, reproducing the entirety of CSS3 (selectors, cascade rules, media queries, shorthand expansion, inheritance, etc.) is phenomenally difficult; sooner or later any serious renderer ends up needing a browser-grade engine. Stylo already solves that problem with production-ready accuracy, so we embrace it and focus on the rest of the pipeline.
 
 ---
 
@@ -15,6 +23,8 @@ Future support for SVG is planned (HTML + SVG share >90% of style logic).
 Accepts a DOM-like tree (any structure implementing the crate's DOM traits).
 
 ### ✔ 2. Perform full CSS cascade
+
+Backed by Stylo’s battle-tested cascade implementation:
 
 - Selector matching
 - Specificity and importance resolution
@@ -70,7 +80,7 @@ The goal of `csscascade` is **not** to help you build a browser. Instead, it’s
 - design tools (like Figma‑style or illustration tools)
 - “bring your own renderer” pipelines
 
-It handles the universally hard parts (CSS cascade, style normalization, static tree production) so your engine can focus on **layout and painting**, not CSS correctness.
+It handles the universally hard parts (CSS cascade, style normalization, static tree production) by delegating the CSS engine to Stylo and layering our own DOM/font/layout glue on top, so your engine can focus on **layout and painting**, not CSS correctness.
 
 ---
 
@@ -115,7 +125,7 @@ If you need:
 
 ## What this crate produces
 
-`csscascade` outputs a **style‑resolved static tree** — every node has fully computed CSS applied, ready for layout.
+`csscascade` outputs a **style‑resolved static tree** — every node has fully computed CSS (straight from Stylo) applied, ready for layout.
 
 ### (planned) Optional layout integration
 
@@ -126,11 +136,13 @@ A future feature flag will allow the crate to output a **layout‑computed, rend
 ```
 Input DOM Tree (HTML / XML / SVG)
               ↓
-      csscascade (this crate)
+   csscascade front-end (DOM adapters, CSS collection)
+              ↓
+           Stylo engine
               ↓
    Style‑Resolved Static Tree
               ↓
-        Layout Engine
+        Layout Engine (e.g. taffy)
               ↓
            Painting
 ```
@@ -154,7 +166,7 @@ This tree is static and does not update unless the DOM or styles change.
 
 ### Primary Goals
 
-- Accurate CSS cascade implementation
+- Accurate CSS cascade implementation powered by Stylo
 - Browser-inspired computed style model
 - Shared resolution logic for HTML and SVG
 - Zero heap allocations in hot paths where possible
@@ -163,18 +175,18 @@ This tree is static and does not update unless the DOM or styles change.
 ### Future Goals
 
 - SVG presentation attribute mapping
-- CSS variables (`var()`) resolution
-- Support for user-agent stylesheets
-- Inline style parsing
-- @media evaluation hooks
+- CSS variables (`var()`) resolution (via Stylo custom property support)
+- Support for user-agent stylesheets / UA defaults
+- Inline style parsing & extraction from DOM trees
+- @media evaluation hooks that inform downstream layout engines
 
 ---
 
 ## Non‑Goals (for now)
 
-- Layout algorithms (block, inline, flex, grid)
+- Layout algorithms (block, inline, flex, grid) — use `taffy` or your own engine
 - Painting or rasterization
-- Selector parsing (bring your own or implement separately)
+- Re‑implementing Stylo’s internals (parser, selector engine, cascade)
 - JavaScript‑style dynamic live updates
 
 These are intentionally separate stages.
@@ -204,13 +216,21 @@ layout_engine.layout(&styled);
 
 ---
 
+## Powered by Stylo
+
+- **Why Stylo?** It is the most complete, accurate, lightweight CSS engine available in Rust, already proven inside Servo and compatible with `wasm32-unknown-emscripten`.
+- **What csscascade adds:** DOM traversal traits, HTML/SVG attribute normalization, stylesheet collection from `<style>`/external sources, font parsing and selection, and integration points for layout engines such as `taffy`.
+- **What Stylo omits (and we provide):** HTML parsing/processing, DOM ownership, font backends, layout, and painting. This separation lets us reuse Stylo wholesale while still solving the remaining renderer problems.
+
+---
+
 ## Philosophy & Design Principles
 
 - **Engine‑agnostic:** DOM input is not tied to any specific parser.
 - **Format‑agnostic:** HTML and SVG share a unified style pipeline.
-- **Separation of concerns:** Cascade is separate from layout, paint, and parsing.
+- **Separation of concerns:** Stylo handles CSS internals; csscascade handles DOM plumbing, fonts, and layout hand-off.
 - **Deterministic:** Same input always yields the same resolved tree.
-- **Modern CSS:** Designed for progressive extension (variables, calc, etc.).
+- **Modern CSS:** Built on Stylo’s constantly updated property set (variables, calc, etc.).
 
 ---
 

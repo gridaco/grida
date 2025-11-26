@@ -17,6 +17,16 @@ publish = true
 crate-type = ["rlib"]
 
 [dependencies]
+# css parsing
+# (+2.5mb wasm32-unknown-emscripten)
+# stylo = "0.9.0"
+stylo = { git = "https://github.com/gridaco/stylo", branch = "fix-wasm32-unknown-emscripten" }
+url = "2.5"
+euclid = "0.22.11"
+
+# below deps are already included in stylo, this does not increase bundle size, we have them for ease of use
 cssparser = "0.36.0"
 html5ever = "0.36.1"
 selectors = "0.33.0"
+markup5ever = "0.36.1"
+tendril = "0.4.3"
