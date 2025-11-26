@@ -30,10 +30,16 @@ pub struct ReftestReport {
 impl ReftestReport {
     pub fn new(suite_dir: &Path, output_dir: &Path, tests: Vec<TestResult>) -> Self {
         let total = tests.len();
-        
+
         let similarities: Vec<f64> = tests
             .iter()
-            .filter_map(|t| if t.error.is_none() { Some(t.similarity_score) } else { None })
+            .filter_map(|t| {
+                if t.error.is_none() {
+                    Some(t.similarity_score)
+                } else {
+                    None
+                }
+            })
             .collect();
 
         let average_similarity = if similarities.is_empty() {
@@ -80,12 +86,11 @@ pub fn generate_json_report(report: &ReftestReport, output_path: &Path) -> Resul
             .with_context(|| format!("failed to create output directory {}", parent.display()))?;
     }
 
-    let json = serde_json::to_string_pretty(report)
-        .context("failed to serialize report to JSON")?;
+    let json =
+        serde_json::to_string_pretty(report).context("failed to serialize report to JSON")?;
 
     std::fs::write(output_path, json)
         .with_context(|| format!("failed to write report to {}", output_path.display()))?;
 
     Ok(())
 }
-
