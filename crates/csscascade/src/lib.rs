@@ -6,4 +6,5 @@
 
 // Public API will be added here as the crate is developed
 
-mod rcdom;
+pub mod rcdom;
+pub mod tree;

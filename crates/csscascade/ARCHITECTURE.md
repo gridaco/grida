@@ -75,19 +75,40 @@ Style-Resolved Static Tree (fully computed styles)
 
 ### Module Structure (Planned)
 
+Taking direct inspiration from `usvg`’s clean pipeline (parse → collect CSS → resolve → emit tree), but letting **html5ever** and **Stylo** absorb most of the heavy lifting, the crate structure collapses to a comparatively small set of coordination modules:
+
 ```
 csscascade/
 ├── src/
-│   ├── lib.rs                # Public API (Cascade, StyledTree)
-│   ├── dom/                  # DOM trait definitions + adapters
-│   ├── stylesheets/          # CSS collection (style tags, external links)
-│   ├── stylo_bridge/         # Device setup, media lists, Stylo contexts
-│   ├── fonts/                # Font parsing, fallback lists, FontMetricsProvider
-│   ├── cascade/              # Orchestration of passes & Stylo invocations
-│   ├── tree/                 # StyledTree, StyledNode construction
-│   ├── layout_hooks/         # Optional integration points for taffy/etc.
-│   └── utils/                # Shared helpers (initial values, normalization)
+│   ├── lib.rs                 # Public API (Cascade, StyledTree, config)
+│   ├── pipeline.rs            # High-level orchestrator (bytes/DOM → StyledTree)
+│   ├── html/
+│   │   ├── mod.rs             # html5ever entrypoints (stream -> rcdom)
+│   │   └── rcdom.rs           # Thin wrappers exposing rcdom nodes as DomNode/Element
+│   ├── dom/
+│   │   ├── mod.rs             # DomNode trait + traversal/interning helpers
+│   │   └── snapshot.rs        # Optional adapters for pre-built DOMs (markdown, JSON, etc.)
+│   ├── stylesheets/
+│   │   ├── mod.rs             # Two-pass CSS collector (style/link tags, injected CSS)
+│   │   └── loader.rs          # Resource resolution hooks (data:, file:, remote)
+│   ├── stylo_bridge/
+│   │   ├── mod.rs             # Device + Stylist orchestration
+│   │   ├── font_provider.rs   # Stylo FontMetricsProvider + font fallback pipeline
+│   │   └── media.rs           # Viewport, DPR, prefers-color-scheme plumbing
+│   ├── cascade/
+│   │   ├── mod.rs             # usvg-style two-pass coordinator
+│   │   └── presenter.rs       # Presentation attribute + HTML/SVG default mapping
+│   ├── tree/
+│   │   ├── mod.rs             # StyledTree / StyledNode definitions
+│   │   └── computed.rs        # ComputedStyle wrappers, caching, diff helpers
+│   ├── layout_hooks/
+│   │   └── mod.rs             # Optional adapters for taffy/other layout engines
+│   └── utils/
+│       ├── cfg.rs             # Feature flags, logging, panic hooks
+│       └── normalize.rs       # Shared value/attribute normalization helpers
 ```
+
+> **MVP status:** right now only the `tree` module exists in code. The rest of the layout above is aspirational; we’re intentionally building the first proof-of-concept entirely inside `src/tree/mod.rs` to validate APIs before fanning out.
 
 ### Component Interactions
 
@@ -217,7 +238,7 @@ Since the style is computed and normalized, the next stages can be:
 1. **Stylo (Servo CSS engine)**
 
    - Provides parsing, selector matching, cascade, computed values, and shorthand expansion.
-   - Bundles `cssparser`, `selectors`, `style_traits`, etc., so we inherit Servo-quality behavior without re-implementing anything.
+   - Bundles `cssparser`, `selectors`, etc., so we inherit Servo-quality behavior without re-implementing anything.
    - Compiles cleanly for `wasm32-unknown-emscripten`, matching our runtime needs.
    - Already proven across Servo/Firefox experiments.
 

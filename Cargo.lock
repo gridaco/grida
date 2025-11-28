@@ -3724,7 +3724,7 @@ dependencies = [
 [[package]]
 name = "selectors"
 version = "0.33.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "bitflags 2.9.1",
  "cssparser",
@@ -3735,7 +3735,7 @@ dependencies = [
  "phf_codegen",
  "precomputed-hash",
  "rustc-hash",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten)",
+ "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
  "smallvec",
  "to_shmem",
  "to_shmem_derive",
@@ -3866,7 +3866,7 @@ dependencies = [
 [[package]]
 name = "servo_arc"
 version = "0.4.3"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "serde",
  "stable_deref_trait",
@@ -4078,7 +4078,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 [[package]]
 name = "stylo"
 version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "app_units",
  "arrayvec",
@@ -4108,9 +4108,9 @@ dependencies = [
  "rayon",
  "rayon-core",
  "rustc-hash",
- "selectors 0.33.0 (git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten)",
+ "selectors 0.33.0 (git+https://github.com/gridaco/stylo)",
  "serde",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten)",
+ "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
  "smallbitvec",
  "smallvec",
  "static_assertions",
@@ -4135,7 +4135,7 @@ dependencies = [
 [[package]]
 name = "stylo_atoms"
 version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "string_cache",
  "string_cache_codegen",
@@ -4144,12 +4144,12 @@ dependencies = [
 [[package]]
 name = "stylo_config"
 version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 
 [[package]]
 name = "stylo_derive"
 version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -4161,7 +4161,7 @@ dependencies = [
 [[package]]
 name = "stylo_dom"
 version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "bitflags 2.9.1",
  "stylo_malloc_size_of",
@@ -4170,13 +4170,13 @@ dependencies = [
 [[package]]
 name = "stylo_malloc_size_of"
 version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "app_units",
  "cssparser",
  "euclid",
- "selectors 0.33.0 (git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten)",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten)",
+ "selectors 0.33.0 (git+https://github.com/gridaco/stylo)",
+ "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
  "smallbitvec",
  "smallvec",
  "string_cache",
@@ -4187,21 +4187,21 @@ dependencies = [
 [[package]]
 name = "stylo_static_prefs"
 version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 
 [[package]]
 name = "stylo_traits"
 version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "app_units",
  "bitflags 2.9.1",
  "cssparser",
  "euclid",
  "malloc_size_of_derive",
- "selectors 0.33.0 (git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten)",
+ "selectors 0.33.0 (git+https://github.com/gridaco/stylo)",
  "serde",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten)",
+ "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
  "stylo_atoms",
  "stylo_malloc_size_of",
  "thin-vec",
@@ -4498,10 +4498,10 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "to_shmem"
 version = "0.3.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "cssparser",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten)",
+ "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
  "smallbitvec",
  "smallvec",
  "string_cache",
@@ -4511,7 +4511,7 @@ dependencies = [
 [[package]]
 name = "to_shmem_derive"
 version = "0.1.0"
-source = "git+https://github.com/gridaco/stylo?branch=fix-wasm32-unknown-emscripten#573bbb743e78a0f86fe7830b567072b0b44f90f9"
+source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "darling",
  "proc-macro2",

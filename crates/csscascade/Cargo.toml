@@ -19,8 +19,8 @@ crate-type = ["rlib"]
 [dependencies]
 # css parsing
 # (+2.5mb wasm32-unknown-emscripten)
-# stylo = "0.9.0"
-stylo = { git = "https://github.com/gridaco/stylo", branch = "fix-wasm32-unknown-emscripten" }
+# https://github.com/servo/stylo/issues/272 / The issue has been fixed upstream, yet not released. sticking to fork until the next release
+stylo = { git = "https://github.com/gridaco/stylo" } 
 url = "2.5"
 euclid = "0.22.11"
 
