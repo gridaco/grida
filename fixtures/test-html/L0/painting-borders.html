@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Painting – Borders</title>
+    <style>
+        body {
+            font-family: "Sora", system-ui, sans-serif;
+            background: #050b18;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 32px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        .card {
+            padding: 16px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 16px;
+        }
+        .solid {
+            border: 3px solid #22d3ee;
+        }
+        .dashed {
+            border: 3px dashed #f472b6;
+        }
+        .gradient {
+            border: 3px solid transparent;
+            border-radius: 24px;
+            background: linear-gradient(#0f172a, #0f172a) padding-box,
+                linear-gradient(135deg, #6366f1, #ec4899, #f59e0b) border-box;
+        }
+        .shadowed {
+            border: 1px solid rgba(226, 232, 240, 0.45);
+            border-radius: 24px;
+            box-shadow:
+                0 10px 20px rgba(15, 23, 42, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="grid">
+        <div class="card solid">Solid border</div>
+        <div class="card dashed">Dashed border</div>
+        <div class="card gradient">Gradient border</div>
+        <div class="card shadowed">Shadowed border</div>
+    </div>
+</body>
+</html>
+

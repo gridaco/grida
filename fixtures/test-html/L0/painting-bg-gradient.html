@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Painting – Background Gradient</title>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            color: #f1f5f9;
+            background: radial-gradient(circle at top, #38bdf8, #0f172a 55%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            width: 320px;
+            padding: 24px;
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(2, 6, 23, 0.9));
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            box-shadow: 0 10px 40px rgba(15, 23, 42, 0.4);
+        }
+        h2 {
+            margin-top: 0;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Layered background</h2>
+        <p>
+            Shows radial and linear gradients stacked with translucency to validate painting order and
+            blend behavior.
+        </p>
+    </div>
+</body>
+</html>
+

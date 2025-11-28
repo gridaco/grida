@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Structure – Lists and Table</title>
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+        body {
+            font-family: system-ui, sans-serif;
+            background: #020617;
+            color: #f8fafc;
+            margin: 0;
+            padding: 24px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        section {
+            border: 1px solid rgba(248, 250, 252, 0.12);
+            border-radius: 8px;
+            padding: 16px;
+            background: rgba(15, 23, 42, 0.7);
+        }
+        ul,
+        ol {
+            padding-left: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th,
+        td {
+            border: 1px solid rgba(226, 232, 240, 0.3);
+            padding: 6px 8px;
+            text-align: left;
+        }
+        th {
+            background: rgba(14, 116, 144, 0.35);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="grid">
+        <section>
+            <h2>Lists</h2>
+            <ol>
+                <li>Step one</li>
+                <li>Step two</li>
+                <li>Step three</li>
+            </ol>
+            <ul>
+                <li>Unordered item A</li>
+                <li>Unordered item B</li>
+                <li>Unordered item C</li>
+            </ul>
+            <dl>
+                <dt>Term</dt>
+                <dd>Definition of the term with a short sentence.</dd>
+            </dl>
+        </section>
+        <section>
+            <h2>Table</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Layer</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Header</td>
+                        <td>Branding</td>
+                        <td>Active</td>
+                    </tr>
+                    <tr>
+                        <td>Body</td>
+                        <td>Content</td>
+                        <td>Active</td>
+                    </tr>
+                    <tr>
+                        <td>Footer</td>
+                        <td>Navigation</td>
+                        <td>Muted</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </div>
+</body>
+</html>
+

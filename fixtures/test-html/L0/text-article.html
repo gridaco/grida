@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Text – Article</title>
+    <style>
+        body {
+            font-family: "Georgia", serif;
+            background: #0a0a0f;
+            color: #f4f4f5;
+            margin: 0;
+            padding: 32px 16px;
+        }
+        article {
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.8;
+        }
+        header {
+            margin-bottom: 24px;
+        }
+        header p {
+            margin: 4px 0;
+            color: #a1a1aa;
+        }
+        figure {
+            margin: 24px 0;
+            padding: 16px;
+            border-left: 4px solid #f97316;
+            background: rgba(250, 250, 250, 0.02);
+        }
+        pre {
+            background: #111827;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        footer {
+            margin-top: 32px;
+            font-size: 0.9em;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <article>
+        <header>
+            <p>Patterns · Case Study</p>
+            <h1>Design tokens for expressive interfaces</h1>
+            <p>
+                <time datetime="2025-11-28">November 28, 2025</time> · 4 min read
+            </p>
+        </header>
+        <p>
+            Interfaces communicate intent through hierarchy, rhythm, and motion. A good token system
+            keeps those variables predictable without flattening the personality of each surface.
+        </p>
+        <p>
+            Start with a concise scale, reference design primitives, and capture rationale alongside
+            every change so the audit trail stays human.
+        </p>
+        <figure>
+            <figcaption>Figure 1. Affordance layers across surfaces.</figcaption>
+        </figure>
+        <p>
+            When teams remix layers, focus on the relationships: background vs. card, card vs. control.
+            Document the pairings so experimentation remains predictable.
+        </p>
+        <pre><code>token.surface.card = color.neutral.900
+token.surface.raised = mix(token.surface.card, color.primary.500, 12%)</code></pre>
+        <footer>Written by the Grida design systems crew.</footer>
+    </article>
+</body>
+</html>
+

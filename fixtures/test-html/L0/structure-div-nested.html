@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Structure – Div Nested</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0b1120;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 24px;
+        }
+        .page {
+            display: grid;
+            gap: 16px;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        .panel {
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 12px;
+            background: #111827;
+        }
+        .level-1 {
+            background: #1e1b4b;
+        }
+        .level-2 {
+            background: #312e81;
+        }
+        .level-3 {
+            background: #4338ca;
+        }
+        .group {
+            margin-top: 8px;
+            padding: 8px;
+            border: 1px dashed rgba(148, 163, 184, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header class="panel level-1">
+            <h1>Nested Regions</h1>
+            <p>Demonstrates stacked containers with nested divisions.</p>
+        </header>
+        <section class="panel level-2">
+            <h2>Section A</h2>
+            <div class="group">
+                <h3>Group A.1</h3>
+                <div class="group level-3">
+                    <p>Group A.1.a content block.</p>
+                    <div class="group">
+                        <p>Leaf block with inline text only.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="panel level-2">
+            <h2>Section B</h2>
+            <div class="group">
+                <div class="group level-3">
+                    <p>Group B.1 contains two sibling leaves.</p>
+                    <div class="group">
+                        <p>Leaf 1</p>
+                    </div>
+                    <div class="group">
+                        <p>Leaf 2</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
+

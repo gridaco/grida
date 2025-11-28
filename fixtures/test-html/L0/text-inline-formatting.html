@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Text – Inline Formatting</title>
+    <style>
+        body {
+            font-family: "Space Mono", ui-monospace, monospace;
+            background: #0f172a;
+            color: #f1f5f9;
+            margin: 0;
+            padding: 24px;
+        }
+        .sample {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        span {
+            display: inline-block;
+        }
+        kbd {
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <div class="sample">
+        <p><strong>Strong</strong> and <b>bold</b> emphasis.</p>
+        <p><em>Italic</em> and <i>alternate italic</i> words.</p>
+        <p>
+            <span>Superscript H<sup>2</sup>O and subscript CO<sub>2</sub>.</span>
+        </p>
+        <p>
+            Inline <code>code()</code>, <s>strikethrough</s>, and <u>underline</u>.
+        </p>
+        <p>
+            Keyboard combo <kbd>⌘</kbd> + <kbd>K</kbd> with <mark>highlight</mark>.
+        </p>
+        <p>
+            <abbr title="Cascading Style Sheets">CSS</abbr> abbreviation plus <span style="letter-spacing: 0.2em;">spacing</span>.
+        </p>
+    </div>
+</body>
+</html>
+

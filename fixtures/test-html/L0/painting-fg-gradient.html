@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Painting – Foreground Gradient</title>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background: #020617;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 40px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            background: linear-gradient(120deg, #f472b6, #c084fc, #38bdf8);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+        p {
+            font-size: 1.1rem;
+            max-width: 560px;
+            margin: 0 auto;
+        }
+        .accent {
+            font-weight: 600;
+            background: linear-gradient(90deg, #facc15, #f97316);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gradient Text</h1>
+    <p>
+        Text rendering demo with layered gradients. The <span class="accent">foreground</span> uses
+        background clipping to produce a smooth transition across glyphs.
+    </p>
+</body>
+</html>
+
