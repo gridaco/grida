@@ -11,10 +11,10 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { cn } from "@/components/lib/utils";
-import { useCanvasChat } from "../agent/client-chat";
+import { useCurrentAgentChat } from "./chat-provider";
 
 export function AgentPanel({ className }: { className?: string }) {
-  const chat = useCanvasChat();
+  const chat = useCurrentAgentChat();
 
   const { messages, status, error, sendMessage, clearError } = useChat({
     chat,
@@ -71,7 +71,7 @@ export function AgentPanel({ className }: { className?: string }) {
         </div>
       )}
       <div className="p-4 pt-0">
-        <AgentInput onSend={handleSend} isLoading={isLoading} />
+        <AgentInput onSend={handleSend} isLoading={isLoading} autoFocus />
       </div>
     </div>
   );

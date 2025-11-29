@@ -123,6 +123,7 @@ import { distro } from "../distro";
 import { WithSize } from "@/grida-canvas-react/viewport/size";
 import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
+import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { SettingsDialog } from "./settings";
 
 // Custom hook for managing UI layout state
@@ -435,7 +436,7 @@ function Consumer({
   };
 
   return (
-    <>
+    <AgentChatProvider>
       <PreviewProvider>
         <div className="flex w-full h-full">
           {ui.sidebar_left && <SidebarLeft />}
@@ -488,7 +489,7 @@ function Consumer({
         <HelpFab className="absolute right-4 bottom-4" />
       )}
       {/* <CommandPalette /> */}
-    </>
+    </AgentChatProvider>
   );
 }
 

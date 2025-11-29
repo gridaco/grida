@@ -20,6 +20,7 @@ export interface AgentInputProps {
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  autoFocus?: boolean;
   onIncludeContext?: () => void;
 }
 
@@ -28,6 +29,7 @@ export function AgentInput({
   isLoading = false,
   disabled = false,
   placeholder = "Ask anything",
+  autoFocus = true,
 }: AgentInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const status = isLoading ? "streaming" : "ready";
@@ -50,6 +52,7 @@ export function AgentInput({
             placeholder={placeholder}
             disabled={disabled}
             className="min-h-[60px]"
+            autoFocus={autoFocus}
           />
         </PromptInputBody>
         <PromptInputFooter>
