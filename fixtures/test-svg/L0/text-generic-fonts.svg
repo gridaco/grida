@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" width="480" height="360">
+  <rect x="0" y="0" width="480" height="360" fill="#020617"/>
+
+  <g transform="translate(32 48)" fill="#f8fafc">
+    <text x="0" y="0" font-family="sans-serif" font-size="32">
+      Sans-serif heading
+    </text>
+    <text x="0" y="56" font-family="sans-serif" font-size="10" font-weight="600">
+      Sans-serif semi-bold body copy line demonstrating default font fallback.
+    </text>
+  </g>
+
+  <g transform="translate(32 168)" fill="#e0f2fe">
+    <text x="0" y="0" font-family="serif" font-size="28">
+      Serif heading
+    </text>
+    <text x="0" y="48" font-family="serif" font-size="18" font-style="italic">
+      Serif italic subline with generic family only.
+    </text>
+  </g>
+
+  <g transform="translate(32 268)" fill="#c084fc">
+    <text x="0" y="0" font-family="monospace" font-size="18">
+      Monospace sample 0123456789
+    </text>
+    <text x="0" y="32" font-family="cursive" font-size="22">
+      Cursive playful text
+    </text>
+  </g>
+</svg>

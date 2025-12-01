@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getDefaultTexts, render } from "@/lib/templating/template";
-import { z } from "zod";
+import { z } from "zod/v3";
 import {
   Select,
   SelectContent,

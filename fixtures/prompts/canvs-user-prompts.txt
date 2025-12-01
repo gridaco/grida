@@ -1,0 +1,6 @@
+// real world, random user prompt examples - the prompts are as-is, does not mean they are supported by the current system.
+
+can you make {that} rounded?
+{context} can we add dotted-pattern background?
+{context} can we use pixel-style font?
+can you convert {this} to vector graphics?

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { CalendarIcon, InfoIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useCampaign } from "../store";
@@ -195,7 +195,7 @@ function Body({
   const [activeTab, setActiveTab] = useState("general");
 
   const form = useForm<CampaignFormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: defaultValues,
   });
 

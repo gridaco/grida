@@ -14,6 +14,7 @@ import vn from "@grida/vn";
 import grida from "@grida/schema";
 import tree from "@grida/tree";
 import type { io } from "@grida/io";
+import type { svgtypes } from "@grida/io-svg";
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -2437,6 +2438,37 @@ export namespace editor.api {
     setFallbackFonts(fonts: string[]): void;
   }
 
+  /**
+   * interface for svg optimizer/parser/importer
+   *
+   * grida has 2 svg module:
+   * 1. @grida/io-svg (js) (DEPRECATED)
+   * 2. @grida/canvas-wasm (rust)
+   *
+   */
+  export interface IDocumentSVGInterfaceProvider {
+    /**
+     * optimize the svg string
+     * @param svg input svg string
+     */
+    svgOptimize(svg: string): string | null;
+    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
+  }
+
+  /**
+   * interface for markdown to html converter
+   *
+   * uses @grida/canvas-wasm (rust)
+   *
+   */
+  export interface IDocumentMarkdownInterfaceProvider {
+    /**
+     * converts markdown text to HTML
+     * @param markdown input markdown string
+     */
+    markdownToHtml(markdown: string): string | null;
+  }
+
   export interface IDocumentVectorInterfaceProvider {
     /**
      * converts the node into a vector network
@@ -2483,6 +2515,15 @@ export namespace editor.api {
 
   export interface IDocumentVectorInterfaceActions {
     toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+  }
+
+  export interface IDocumentSVGInterfaceActions {
+    svgOptimize(svg: string): string | null;
+    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
+  }
+
+  export interface IDocumentMarkdownInterfaceActions {
+    markdownToHtml(markdown: string): string | null;
   }
 
   export interface IDocumentFontActions {
@@ -2537,6 +2578,19 @@ export namespace editor.api {
     getImage(ref: string): ImageInstance | null;
 
     // #endregion image
+  }
+
+  /**
+   * Introspection helpers for generating developer-facing summaries of the document tree.
+   */
+  export interface IEditorIntrospectActions {
+    /**
+     * Render the document hierarchy as an ASCII tree.
+     *
+     * @param entryId - Optional node or scene id to use as the root of the tree. When omitted, the entire document is used.
+     * @returns A trimmed multiline string formatted with box-drawing characters.
+     */
+    tree(entryId?: string): string;
   }
 
   export interface IEditorDocumentStoreConsumerWithConstraintsActions {
@@ -3422,5 +3476,34 @@ export namespace editor.api {
     openCursorChat(): void;
     closeCursorChat(): void;
     updateCursorChatMessage(message: string | null): void;
+  }
+}
+
+/**
+ *
+ * monospace (ascii) characters used to represent canvas nodes in terminal / plain txt output.
+ *
+ * @note below are technically not 'ascii' characters, we keep the module name as-is, to avoid confusion.
+ */
+export namespace editor.ascii {
+  export namespace chars {
+    export const symbol_container_26F6 = "⛶";
+    export const symbol_group_2B1A = "⬚";
+    export const symbol_text_270E = "✎";
+    export const symbol_rect_25FC = "◼";
+    export const symbol_polygon_2B22 = "⬢";
+    export const symbol_ellipse_25CF = "●";
+    export const symbol_star_2605 = "★";
+
+    export const arrow_up_2191 = "↑";
+    export const arrow_down_2193 = "↓";
+    export const arrow_left_2190 = "←";
+    export const arrow_right_2192 = "→";
+
+    export const line_vert_2502 = "│";
+    export const line_horz_2500 = "─";
+    export const line_tee_251C = "├";
+    export const line_corner_2514 = "└";
+    export const line_root_250C = "┌";
   }
 }

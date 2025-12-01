@@ -9,7 +9,7 @@ import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { z } from "zod";
+import { z } from "zod/v3";
 import { cn } from "@/components/lib/utils";
 import type { Theme } from "@/theme/palettes/types";
 import palettes from "@/theme/palettes";

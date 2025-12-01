@@ -1,0 +1,34 @@
+# Example reftest.toml
+# Copy this file into your test suite directory and adjust paths/settings.
+
+# Use a directory-friendly name (e.g., "W3C_SVG_11_TestSuite").
+# This may be used as the default output folder name under target/{name}/ in future versions.
+
+[test]
+name = "Example_SVG_Test_Suite"
+# Required: currently only "svg" is supported
+type = "svg"
+
+# Paths are relative to this reftest.toml file
+# inputs: ALWAYS USE A GLOB so nested files are picked up
+# e.g., all files under svg/ recursively
+inputs = "svg/**/*.svg"
+# expects: directory that contains expected PNG files (same basenames/relative paths as SVGs)
+expects = "png"
+
+# Background to composite before diffing: "black" or "white"
+# For text-heavy SVGs, "white" is often a better choice
+bg = "white"
+
+[test.diff]
+# Anti-aliasing detection (when true, AA pixels are not counted as diffs)
+aa = true
+# Dify threshold in YIQ space (0.0 = strict, count any difference)
+threshold = 0.0
+
+[test.scoring]
+# Masking mode for scoring: "none" (all pixels) or "alpha" (only non-transparent pixels)
+# When "alpha", scoring considers only pixels where either expected or actual alpha > 0.
+# This is useful for SVG tests with large transparent regions, as transparent pixels
+# won't skew the mismatch ratio.
+mask = "alpha"  # or "none"

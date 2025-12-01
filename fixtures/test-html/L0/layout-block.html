@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Layout – Block Flow</title>
+    <style>
+        body {
+            font-family: "Inter", system-ui, sans-serif;
+            background: #030712;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 32px;
+        }
+        .canvas {
+            max-width: 760px;
+            margin: 0 auto;
+        }
+        .block {
+            display: block;
+            padding: 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            background: rgba(15, 23, 42, 0.75);
+            margin-bottom: 16px;
+        }
+        .stack article {
+            margin-bottom: 12px;
+        }
+        .stack article:last-child {
+            margin-bottom: 0;
+        }
+        aside {
+            width: 320px;
+        }
+        footer {
+            background: rgba(59, 130, 246, 0.18);
+        }
+    </style>
+</head>
+<body>
+    <main class="canvas">
+        <header class="block">
+            <h1>Block Flow Layout</h1>
+            <p>Each region stacks vertically and spans the available inline size.</p>
+        </header>
+        <section class="block stack">
+            <article class="block">
+                <h2>Article A</h2>
+                <p>Demonstrates default block behavior within a block-level parent.</p>
+            </article>
+            <article class="block">
+                <h2>Article B</h2>
+                <p>Blocks consume full width, pushing the following sibling downward.</p>
+            </article>
+        </section>
+        <aside class="block">
+            <h3>Sidebar</h3>
+            <p>Marked up as <code>&lt;aside&gt;</code> but still participates in block stacking.</p>
+        </aside>
+        <footer class="block">
+            <small>Footer sticks to the end of the flow.</small>
+        </footer>
+    </main>
+</body>
+</html>
+

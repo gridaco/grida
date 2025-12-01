@@ -2,8 +2,8 @@
 
 import { streamObject } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { createStreamableValue } from "ai/rsc";
-import { z } from "zod";
+import { createStreamableValue } from "@ai-sdk/rsc";
+import { z } from "zod/v3";
 
 const title_description = z.object({
   h1: z.string().optional(),

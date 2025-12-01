@@ -19,7 +19,7 @@ import { useMetaEnter } from "@/hooks/use-meta-enter";
 import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { useLocalStorage } from "@uidotdev/usehooks";
-import { readStreamableValue } from "ai/rsc";
+import { readStreamableValue } from "@ai-sdk/rsc";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 import {
   toolmode_to_toolbar_value,
@@ -368,7 +368,9 @@ function ClipboardColor() {
       >
         <ColorPicker
           color={color}
-          onColorChange={editor.surface.a11ySetClipboardColor.bind(editor.surface)}
+          onColorChange={editor.surface.a11ySetClipboardColor.bind(
+            editor.surface
+          )}
           options={options}
         />
       </PopoverContent>

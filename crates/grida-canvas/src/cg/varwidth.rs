@@ -1,12 +1,16 @@
+use serde::{Deserialize, Serialize};
+
 /// A single stop in a variable-width profile.
 ///
 /// `pos` is the normalized position along the stroke in [0, 1].
 /// `r` is the half-width at this position in pixels.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct WidthStop {
     /// Normalized position along the stroke [0, 1].
+    #[serde(rename = "u")]
     pub u: f32,
     /// Half-width at this position in pixels.
+    #[serde(rename = "r")]
     pub r: f32,
 }
 

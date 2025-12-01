@@ -1,12 +1,22 @@
 pub mod alignment;
+pub mod color;
+pub mod colormatrix;
 pub mod fe;
 pub mod prelude;
+pub mod rect;
 pub mod stroke_dasharray;
 pub mod stroke_width;
+pub mod svg;
+pub mod tilemode;
+pub mod transform;
 pub mod types;
 pub mod varwidth;
 
 pub use alignment::*;
-pub use types::CGColor;
-pub use types::CGPoint;
+pub use color::*;
+pub use colormatrix::*;
+pub use rect::*;
+pub use svg::*;
+pub use tilemode::*;
+pub use transform::*;
 pub use types::*;

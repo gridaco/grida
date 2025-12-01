@@ -1,0 +1,80 @@
+import { Chat } from "@ai-sdk/react";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithToolCalls,
+} from "ai";
+import type { CanvasDesignAgentMessage } from "./server-agent";
+import { canvas_use } from "../tools/canvas-use";
+import type { Editor } from "@/grida-canvas/editor";
+
+export function makeEditorChat(editor: Editor) {
+  const chat = new Chat<CanvasDesignAgentMessage>({
+    transport: new DefaultChatTransport<CanvasDesignAgentMessage>({
+      api: "/private/ai/chat",
+    }),
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    onToolCall: async ({ toolCall }) => {
+      if (toolCall.dynamic) {
+        return;
+      }
+
+      switch (toolCall.toolName) {
+        case canvas_use.tools_spec.name_tree: {
+          const output = await canvas_use.client_impls.tree(
+            editor,
+            toolCall.input
+          );
+          chat.addToolOutput({
+            tool: toolCall.toolName,
+            toolCallId: toolCall.toolCallId,
+            ...output,
+          });
+          break;
+        }
+        case canvas_use.tools_spec.name_make_from_svg: {
+          const output = await canvas_use.client_impls.make_from_svg(
+            editor,
+            toolCall.input
+          );
+
+          chat.addToolOutput({
+            tool: toolCall.toolName,
+            toolCallId: toolCall.toolCallId,
+            ...output,
+          });
+          break;
+        }
+        case canvas_use.tools_spec.name_make_from_image: {
+          const output = await canvas_use.client_impls.make_from_image(
+            editor,
+            toolCall.input
+          );
+
+          chat.addToolOutput({
+            tool: toolCall.toolName,
+            toolCallId: toolCall.toolCallId,
+            ...output,
+          });
+          break;
+        }
+        case canvas_use.tools_spec.name_make_from_markdown: {
+          const output = await canvas_use.client_impls.make_from_markdown(
+            editor,
+            toolCall.input
+          );
+          chat.addToolOutput({
+            tool: toolCall.toolName,
+            toolCallId: toolCall.toolCallId,
+            ...output,
+          });
+          break;
+        }
+        // case "canvas_use.create_node": {
+        //   // editor.commands.createNodeFromSvg
+        // }
+      }
+    },
+  });
+
+  return chat;
+}

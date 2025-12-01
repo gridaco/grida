@@ -7,7 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TemplateVariables } from "@/lib/templating";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 interface AboutVariable {
   key: string;

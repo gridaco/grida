@@ -1,5 +1,4 @@
-use cg::cg::types::*;
-use cg::cg::varwidth::*;
+use cg::cg::prelude::*;
 use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
 use cg::vectornetwork::vn_painter::VNPainter;
 use skia_safe::{surfaces, Color};

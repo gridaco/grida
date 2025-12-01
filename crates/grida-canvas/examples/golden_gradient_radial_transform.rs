@@ -1,4 +1,4 @@
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::painter::gradient::*;
 use math2::transform::AffineTransform;
 use skia_safe::{surfaces, Color, Rect};
@@ -60,10 +60,7 @@ fn main() {
                 color: CGColor(0, 0, 0, 255), // Black
             },
         ],
-        opacity: 1.0,
-        transform: AffineTransform::identity(),
-        blend_mode: BlendMode::Normal,
-        active: true,
+        ..Default::default()
     };
 
     // Draw rectangles with varying widths in a single row
@@ -90,8 +87,7 @@ fn main() {
         stops: radial_gradient.stops.clone(),
         opacity: radial_gradient.opacity,
         transform: AffineTransform::new(-0.5, -0.5, 0.0), // Move gradient center to top-left
-        blend_mode: BlendMode::Normal,
-        active: true,
+        ..Default::default()
     };
 
     let mut current_x = start_x;
@@ -115,8 +111,7 @@ fn main() {
         stops: radial_gradient.stops.clone(),
         opacity: radial_gradient.opacity,
         transform: AffineTransform::new(0.0, 0.0, 45.0), // Rotate the gradient by 45 degrees
-        blend_mode: BlendMode::Normal,
-        active: true,
+        ..Default::default()
     };
 
     let mut current_x = start_x;

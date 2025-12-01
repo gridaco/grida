@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   CalendarIcon,
   EnvelopeClosedIcon,
@@ -22,6 +22,8 @@ import { sitemap } from "@/www/data/sitemap";
 import Link from "next/link";
 import Head from "next/head";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { cn } from "@/components/lib/utils";
+import type { VariantProps } from "class-variance-authority";
 
 function useGAAuthenticatedUserIDTelemetry() {
   const { organization } = useWorkspace();
@@ -79,12 +81,23 @@ function AnimatedAvatar() {
   );
 }
 
-export function HelpFab() {
+export function HelpFab({
+  className,
+  buttonProps,
+}: {
+  className?: string;
+  buttonProps?: VariantProps<typeof buttonVariants>;
+}) {
   return (
-    <div className="fixed right-4 bottom-4 z-40">
+    <div className={cn("fixed right-4 bottom-4 z-40", className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button className="rounded-full" size="icon">
+          <Button
+            className="rounded-full"
+            variant="default"
+            size="icon-sm"
+            {...buttonProps}
+          >
             <QuestionMarkIcon />
           </Button>
         </DropdownMenuTrigger>

@@ -1,5 +1,7 @@
 import type { types } from "../";
 import { FontsAPI } from "./fonts";
+import { MarkdownAPI } from "./markdown";
+import { SVGAPI } from "./svg";
 import { memory } from "./memory";
 
 const ApplicationCommandID = {
@@ -29,11 +31,15 @@ export class Scene {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
 
   public readonly fontskit: FontsAPI;
+  public readonly markdownkit: MarkdownAPI;
+  public readonly svgkit: SVGAPI;
 
   constructor(module: createGridaCanvas.GridaCanvasWasmBindings, ptr: number) {
     this.module = module;
     this.appptr = ptr;
     this.fontskit = new FontsAPI(module);
+    this.markdownkit = new MarkdownAPI(module);
+    this.svgkit = new SVGAPI(module);
   }
 
   /**
@@ -256,7 +262,7 @@ export class Scene {
     return JSON.parse(str);
   }
 
-  getNodeIdsFromEnvelope(envelope: types.Rectangle): string[] {
+  getNodeIdsFromEnvelope(envelope: types.Rect): string[] {
     const ptr = this.module._get_node_ids_from_envelope(
       this.appptr,
       envelope.x,
@@ -273,7 +279,7 @@ export class Scene {
     return JSON.parse(str);
   }
 
-  getNodeAbsoluteBoundingBox(id: string): types.Rectangle | null {
+  getNodeAbsoluteBoundingBox(id: string): types.Rect | null {
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._get_node_absolute_bounding_box(
       this.appptr,

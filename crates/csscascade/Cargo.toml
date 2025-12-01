@@ -1,0 +1,37 @@
+[package]
+name = "csscascade"
+version = "0.0.0"
+edition = "2024"
+authors = ["Grida <hello@grida.co>", "Universe <universe@grida.co>"]
+description = "A modern, Rust-native CSS Cascade & Style Resolution Engine designed for building browser-like rendering pipelines"
+license = "Apache-2.0"
+repository = "https://github.com/gridaco/grida"
+homepage = "https://grida.co"
+documentation = "https://docs.rs/csscascade"
+keywords = ["css", "stylesheet", "rendering", "html", "svg"]
+categories = ["web-programming", "parser-implementations", "text-processing"]
+readme = "README.md"
+publish = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# css parsing
+# (+2.5mb wasm32-unknown-emscripten)
+# https://github.com/servo/stylo/issues/272 / The issue has been fixed upstream, yet not released. sticking to fork until the next release
+stylo = { git = "https://github.com/gridaco/stylo" } 
+selectors = { git = "https://github.com/gridaco/stylo", package = "selectors" }
+stylo_dom = { git = "https://github.com/gridaco/stylo", package = "stylo_dom" }
+stylo_atoms = { git = "https://github.com/gridaco/stylo", package = "stylo_atoms" }
+style_traits = { git = "https://github.com/gridaco/stylo", package = "stylo_traits" }
+url = "2.5"
+euclid = "0.22.11"
+
+# below deps are already included in stylo, this does not increase bundle size, we have them for ease of use
+cssparser = "0.36.0"
+html5ever = "0.36.1"
+markup5ever = "0.36.1"
+tendril = "0.4.3"
+atomic_refcell = "0.1.13"
+

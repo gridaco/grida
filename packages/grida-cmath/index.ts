@@ -5728,6 +5728,12 @@ namespace cmath {
     }
   }
 
+  /**
+   * @deprecated the color implementation is fundamentally flawed (where it uses 0-1 for alpha, even its named as u8)
+   * this legacy module claims to use RGBA8888, but its actually RGB888A32F
+   *
+   * use {@link colorformats} instead
+   */
   export namespace color {
     /**
      * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
@@ -5874,6 +5880,87 @@ namespace cmath {
       const a = Math.round(color.a * 255);
 
       return `#${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}${a.toString(16).padStart(2, "0")}`;
+    }
+  }
+
+  export namespace colorformats {
+    export type RGBA32F = {
+      /**
+       * 0.0-1.0
+       */
+      r: number;
+      /**
+       * 0.0-1.0
+       */
+      g: number;
+      /**
+       * 0.0-1.0
+       */
+      b: number;
+      /**
+       * 0.0-1.0
+       */
+      a: number;
+    };
+
+    export type RGBA8888 = {
+      /**
+       * 0-255
+       */
+      r: number;
+      /**
+       * 0-255
+       */
+      g: number;
+      /**
+       * 0-255
+       */
+      b: number;
+      /**
+       * 0-255
+       */
+      a: number;
+    };
+
+    export type RGB888A32F = {
+      /**
+       * 0-255
+       */
+      r: number;
+      /**
+       * 0-255
+       */
+      g: number;
+      /**
+       * 0-255
+       */
+      b: number;
+      /**
+       * 0.0-1.0
+       */
+      a: number;
+    };
+
+    export namespace RGBA32F {
+      export function intoRGB888F32A(color: RGBA32F): RGB888A32F {
+        return {
+          r: Math.round(color.r * 255),
+          g: Math.round(color.g * 255),
+          b: Math.round(color.b * 255),
+          a: color.a,
+        };
+      }
+    }
+
+    export namespace RGBA8888 {
+      export function intoRGB888F32A(color: RGBA8888): RGB888A32F {
+        return {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+          a: color.a / 255,
+        };
+      }
     }
   }
 

@@ -4,73 +4,13 @@
 //! from JavaScript/TypeScript in the browser. All functions use the `grida_fonts_` prefix
 //! and return JSON strings for easy consumption by web applications.
 
+use super::_internal::*;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 use fonts::parse::Parser;
 use fonts::parse_ui::{UIFontFaceOwned, UIFontParser};
 use fonts::serde::WasmFontFamilyResult;
-
-// ====================================================================================================
-// #region: Utility Functions
-// ====================================================================================================
-
-/// Creates a success response wrapper for WASM
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmSuccessResponse<T> {
-    /// Success flag
-    pub success: bool,
-    /// Response data
-    pub data: T,
-}
-
-/// Creates an error response wrapper for WASM
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmErrorResponse {
-    /// Success flag
-    pub success: bool,
-    /// Error information
-    pub error: WasmError,
-}
-
-/// Error information for WASM responses
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmError {
-    /// Error message
-    pub message: String,
-}
-
-impl<T: serde::Serialize> WasmSuccessResponse<T> {
-    /// Creates a new success response
-    pub fn new(data: T) -> Self {
-        Self {
-            success: true,
-            data,
-        }
-    }
-
-    /// Serializes the response to JSON
-    pub fn to_json(&self) -> Result<String, String> {
-        serde_json::to_string(self)
-            .map_err(|e| format!("Failed to serialize success response: {}", e))
-    }
-}
-
-impl WasmErrorResponse {
-    /// Creates a new error response
-    pub fn new(message: String) -> Self {
-        Self {
-            success: false,
-            error: WasmError { message },
-        }
-    }
-
-    /// Serializes the response to JSON
-    pub fn to_json(&self) -> Result<String, String> {
-        serde_json::to_string(self)
-            .map_err(|e| format!("Failed to serialize error response: {}", e))
-    }
-}
 
 // ====================================================================================================
 // #region: WASM Response Structs (Single Font Only)

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Layout – Flexbox</title>
+    <style>
+        body {
+            font-family: "Space Grotesk", system-ui, sans-serif;
+            background: #000814;
+            color: #e5e5e5;
+            margin: 0;
+            padding: 32px;
+        }
+        .section {
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            background: rgba(15, 23, 42, 0.8);
+        }
+        .row {
+            display: flex;
+            gap: 12px;
+        }
+        .row.wrap {
+            flex-wrap: wrap;
+        }
+        .row.align-center {
+            align-items: center;
+            justify-content: space-between;
+        }
+        .item {
+            flex: 1 1 140px;
+            padding: 12px;
+            border-radius: 10px;
+            background: #1e293b;
+            text-align: center;
+        }
+        .item.accent {
+            background: #2563eb;
+        }
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .column .item {
+            flex: none;
+        }
+    </style>
+</head>
+<body>
+    <section class="section">
+        <h2>Row Flex</h2>
+        <div class="row wrap">
+            <div class="item">Box A</div>
+            <div class="item accent">Box B</div>
+            <div class="item">Box C</div>
+            <div class="item">Box D</div>
+        </div>
+    </section>
+    <section class="section">
+        <h2>Row aligned</h2>
+        <div class="row align-center">
+            <div class="item">Start</div>
+            <div class="item accent" style="flex: 0 0 160px;">Center</div>
+            <div class="item">End</div>
+        </div>
+    </section>
+    <section class="section">
+        <h2>Column Flex</h2>
+        <div class="column">
+            <div class="item">Col 1</div>
+            <div class="item">Col 2</div>
+            <div class="item accent">Col 3</div>
+        </div>
+    </section>
+</body>
+</html>
+

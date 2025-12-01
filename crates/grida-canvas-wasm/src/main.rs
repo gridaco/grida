@@ -3,6 +3,8 @@
 mod _internal;
 mod wasm_application;
 mod wasm_fonts;
+mod wasm_markdown;
+mod wasm_svg;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {}

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+    <!-- Stroke caps and joins -->
+    <rect x="28" y="28" width="80" height="80" fill="none" stroke="#ef4444" stroke-width="12"
+        stroke-linejoin="bevel"/>
+    <rect x="132" y="28" width="80" height="80" fill="none" stroke="#10b981" stroke-width="12"
+        stroke-linejoin="round"/>
+    <rect x="236" y="28" width="80" height="80" fill="none" stroke="#3b82f6" stroke-width="12"
+        stroke-linejoin="miter" stroke-miterlimit="2"/>
+    <line x1="336" y1="28" x2="360" y2="108" stroke="#f59e0b" stroke-width="12"
+        stroke-linecap="round"/>
+
+    <!-- Dash patterns -->
+    <circle cx="72" cy="180" r="36" fill="none" stroke="#a855f7" stroke-width="10"
+        stroke-dasharray="12 8"/>
+    <ellipse cx="184" cy="180" rx="48" ry="28" fill="none" stroke="#f97316" stroke-width="10"
+        stroke-dasharray="6 6" stroke-linecap="round"/>
+    <path d="M248 140 C 288 108 320 212 360 180" fill="none" stroke="#22c55e" stroke-width="10"
+        stroke-dasharray="18 6 4 6" stroke-linecap="butt"/>
+
+    <!-- Stroke alignment demo (handled by importer) -->
+    <polygon points="48,224 120,224 84,264" fill="#fee2e2" stroke="#dc2626" stroke-width="8"/>
+    <rect x="160" y="224" width="84" height="40" fill="#cffafe" stroke="#0ea5e9" stroke-width="12"/>
+    <circle cx="320" cy="244" r="28" fill="#ede9fe" stroke="#7c3aed" stroke-width="14"/>
+</svg>

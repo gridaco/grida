@@ -1,4 +1,5 @@
-use cg::{cg::types::*, painter::gradient::*};
+use cg::cg::prelude::*;
+use cg::painter::gradient::*;
 use math2::transform::AffineTransform;
 use skia_safe::{surfaces, Color, Rect};
 

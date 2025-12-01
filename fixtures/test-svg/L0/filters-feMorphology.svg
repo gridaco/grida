@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="180">
+    <style>
+        text {
+        font-family: "Geist", sans-serif;
+        font-size: 3em;
+        }
+
+        #thin {
+        filter: url("#erode");
+        }
+
+        #thick {
+        filter: url("#dilate");
+        }
+    </style>
+    <filter id="erode">
+        <feMorphology operator="erode" radius="1"/>
+    </filter>
+    <filter id="dilate">
+        <feMorphology operator="dilate" radius="2"/>
+    </filter>
+    <text y="1em">Normal text</text>
+    <text id="thin" y="2em">Thinned text</text>
+    <text id="thick" y="3em">Fattened text</text>
+</svg>

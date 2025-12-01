@@ -7,6 +7,8 @@
 ///
 
 import type { fonts } from "../modules/fonts-bindings";
+import type { markdown } from "../modules/markdown-bindings";
+import type { svg } from "../modules/svg-bindings";
 
 export = createGridaCanvas;
 export as namespace createGridaCanvas;
@@ -19,5 +21,7 @@ declare namespace createGridaCanvas {
   interface GridaCanvasWasmBindings
     extends emscripten.emscripten_EXPORTED_RUNTIME_METHODS,
       canvas.CanvasModule,
-      fonts.FontsModule {}
+      fonts.FontsModule,
+      markdown.MarkdownModule,
+      svg.SVGModule {}
 }

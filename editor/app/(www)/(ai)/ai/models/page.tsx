@@ -4,7 +4,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -19,17 +18,31 @@ import {
 import type { ai as AITypes } from "@/lib/ai/ai";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
+import { BlackForestLabsLogo } from "@/components/logos/blackforestlabs";
+import { OpenAILogo } from "@/components/logos/openai";
+import { AnthropicLogo } from "@/components/logos/anthropic";
 export const metadata: Metadata = {
   title: "AI Models",
   description: "Explore the AI models on Grida",
 };
 
+const Logos = {
+  ["black-forest-labs"]: BlackForestLabsLogo,
+  ["openai"]: OpenAILogo,
+  ["anthropic"]: AnthropicLogo,
+} as const;
+
 function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
+  const Logo =
+    model.vendor in Logos ? Logos[model.vendor as keyof typeof Logos] : null;
   return (
     <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 backdrop-blur-sm border-muted relative hover:z-50 flex flex-col">
       <CardHeader className="space-y-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl">{model.label}</CardTitle>
+          <CardTitle className="text-xl flex items-center gap-2">
+            {Logo && <Logo className="size-5" />}
+            <span>{model.label}</span>
+          </CardTitle>
           <Badge
             variant="secondary"
             className="capitalize bg-muted/50 hover:bg-muted/80 transition-colors"

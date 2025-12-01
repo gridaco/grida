@@ -1,8 +1,8 @@
 import createGridaCanvas from "./bin/grida-canvas-wasm";
 import { version as _version } from "../package.json";
 import { Scene } from "./modules/canvas";
-
-export { type Scene };
+import { svgtypes } from "./modules/svg-bindings";
+export { type Scene, type svgtypes };
 export const version = _version;
 
 export interface GridaCanvasModuleInitOptions {
@@ -30,7 +30,8 @@ export namespace types {
     [number, number, number],
     [number, number, number],
   ];
-  export type Rectangle = {
+
+  export type Rect = {
     x: number;
     y: number;
     width: number;

@@ -12,12 +12,10 @@ pub use index::ResourceIndex;
 
 use crate::cg::types::{Paint, ResourceRef};
 use crate::node::schema::Scene;
-use crate::window::application::HostEvent;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::window::application::{HostEvent, HostEventCallback};
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
-
-#[cfg(not(target_arch = "wasm32"))]
-use winit::event_loop::EventLoopProxy;
 
 #[derive(Default)]
 pub struct Resources {
@@ -152,7 +150,7 @@ pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
 pub async fn load_scene_images(
     scene: &Scene,
     tx: mpsc::UnboundedSender<ImageMessage>,
-    proxy: EventLoopProxy<HostEvent>,
+    event_cb: HostEventCallback,
 ) {
     for url in extract_image_urls(scene) {
         if let Ok(data) = load_image(&url).await {
@@ -161,7 +159,7 @@ pub async fn load_scene_images(
                 data,
             };
             let _ = tx.unbounded_send(msg.clone());
-            let _ = proxy.send_event(HostEvent::ImageLoaded(msg));
+            (event_cb)(HostEvent::ImageLoaded(msg));
         }
     }
 }

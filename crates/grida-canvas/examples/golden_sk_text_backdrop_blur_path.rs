@@ -25,7 +25,7 @@ use skia_safe::{
     Color, Data, FontMgr, Image, Matrix, Paint as SkPaint, Path, Point, Rect,
 };
 
-use cg::cg::types::*;
+use cg::cg::prelude::*;
 use cg::text::text_style::textstyle;
 
 fn main() {

@@ -1,6 +1,12 @@
 pub use super::alignment::*;
+pub use super::color::*;
+pub use super::colormatrix::*;
 pub use super::fe::*;
+pub use super::rect::*;
 pub use super::stroke_dasharray::*;
 pub use super::stroke_width::*;
+pub use super::svg::*;
+pub use super::tilemode::*;
+pub use super::transform::*;
 pub use super::types::*;
 pub use super::varwidth::*;

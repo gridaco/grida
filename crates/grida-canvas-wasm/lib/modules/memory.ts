@@ -1,7 +1,7 @@
 import type { types } from "..";
 
 export namespace memory {
-  export function rect_from_vec4(vec4: Float32Array): types.Rectangle {
+  export function rect_from_vec4(vec4: Float32Array): types.Rect {
     return {
       x: vec4[0],
       y: vec4[1],

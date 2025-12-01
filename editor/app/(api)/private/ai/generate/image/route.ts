@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   experimental_generateImage,
   type GeneratedFile,
+  type Experimental_GenerateImageResult,
   type ImageModel,
 } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { replicate } from "@ai-sdk/replicate";
 import { createLibraryClient, service_role } from "@/lib/supabase/server";
 import { v4 } from "uuid";
 import { ai_credit_limit } from "../../ratelimit";
 import mime from "mime-types";
 import imageSize from "image-size";
 import ai from "@/lib/ai";
+import { Env } from "@/env";
 
 export type GenerateImageApiRequestBody = {
   prompt: string;
@@ -43,46 +43,70 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for");
   const client = await createLibraryClient();
 
-  // base auth
-  const { data: userdata } = await client.auth.getUser();
-  if (!userdata.user) {
-    return NextResponse.json({ message: "login required" }, { status: 401 });
-  }
-
-  const model = getImageModel(body.model);
-  if (!model) throw new Error("Model not found");
-
-  const rate = await ai_credit_limit(model.card.avg_credit);
-  if (!rate) {
-    return NextResponse.json(
-      { message: "something went wrong" },
-      { status: 500 }
-    );
-  }
-
-  if (!rate.success) {
+  const model = ai.image.getSDKImageModel(body.model);
+  if (!model) {
     return NextResponse.json(
       {
-        message: "ratelimit exceeded",
-        limit: rate.limit,
-        reset: rate.reset,
-        remaining: rate.remaining,
+        message: "invalid model",
+        errors: {
+          field: "model",
+          value: body.model,
+          allowed_values: ai.image.image_model_ids,
+        },
       },
-      {
-        status: 429,
-        headers: { ...rate.headers },
-      }
+      { status: 400 }
     );
+  }
+
+  // auth & rate limit
+  if (!Env.web.IS_LOCALDEV_SUPERUSER) {
+    // base auth
+    const { data: userdata } = await client.auth.getUser();
+    if (!userdata.user) {
+      return NextResponse.json({ message: "login required" }, { status: 401 });
+    }
+
+    const rate = await ai_credit_limit(model.card.avg_credit);
+    if (!rate) {
+      return NextResponse.json(
+        { message: "something went wrong" },
+        { status: 500 }
+      );
+    }
+
+    if (!rate.success) {
+      return NextResponse.json(
+        {
+          message: "ratelimit exceeded",
+          limit: rate.limit,
+          reset: rate.reset,
+          remaining: rate.remaining,
+        },
+        {
+          status: 429,
+          headers: { ...rate.headers },
+        }
+      );
+    }
   }
 
   // generate image
-  const generation = await generateImage({
-    prompt: body.prompt,
-    width: body.width,
-    height: body.height,
-    aspect_ratio: body.aspect_ratio,
-    model: model.model,
-  });
+  let generation: Experimental_GenerateImageResult;
+  try {
+    generation = await generateImage({
+      prompt: body.prompt,
+      width: body.width,
+      height: body.height,
+      aspect_ratio: body.aspect_ratio,
+      model: model.model,
+    });
+  } catch (error) {
+    // the error from generateImage is mostly format related, non-sensitive, its okay to ping back to client with full error.
+    return NextResponse.json(
+      { message: "something went wrong", error: String(error) },
+      { status: 500 }
+    );
+  }
 
   const meta = generation.responses[0];
 
@@ -113,35 +137,6 @@ export async function POST(req: NextRequest) {
   } satisfies GenerateImageApiResponse);
 }
 
-function getImageModel(model: ai.image.ProviderModel | ai.image.ImageModelId): {
-  card: ai.image.ImageModelCard;
-  model: ImageModel;
-} | null {
-  if (typeof model === "string") {
-    const card = ai.image.models[model];
-    if (!card) return null;
-    switch (card.provider) {
-      case "openai":
-        return { model: openai.image(card.id), card };
-      case "replicate":
-        return { model: replicate.image(card.id), card };
-      default:
-        return null;
-    }
-  } else {
-    const card = ai.image.models[model.modelId];
-    if (!card) return null;
-    switch (model.provider) {
-      case "openai":
-        return { model: openai.image(model.modelId), card };
-      case "replicate":
-        return { model: replicate.image(model.modelId), card };
-      default:
-        return null;
-    }
-  }
-}
-
 async function upload_generated_to_library({
   client,
   file,
@@ -156,9 +151,9 @@ async function upload_generated_to_library({
     height: number;
   };
 }) {
-  const { mimeType, uint8Array } = file;
+  const { mediaType, uint8Array } = file;
 
-  const ext = mime.extension(mimeType);
+  const ext = mime.extension(mediaType);
   const name = v4();
   const folder = "generated";
   const path = `${folder}/${name}${ext ? `.${ext}` : ""}`;
@@ -167,7 +162,7 @@ async function upload_generated_to_library({
     await service_role.library.storage
       .from("library")
       .upload(path, uint8Array, {
-        contentType: mimeType,
+        contentType: mediaType,
       });
 
   if (upload_err) throw new Error(upload_err.message);
@@ -179,7 +174,7 @@ async function upload_generated_to_library({
       bytes: uint8Array.length,
       category: "generated",
       path: uploaded.path,
-      mimetype: mimeType,
+      mimetype: mediaType,
       //
       generator: request.model,
       prompt: request.prompt,
@@ -214,7 +209,7 @@ async function generateImage({
   width?: number;
   height?: number;
   aspect_ratio?: ai.image.AspectRatioString;
-}) {
+}): Promise<Experimental_GenerateImageResult> {
   const size: ai.image.SizeString | undefined =
     width && height ? `${width}x${height}` : undefined;
 

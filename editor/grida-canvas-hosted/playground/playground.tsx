@@ -60,12 +60,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
@@ -79,22 +73,17 @@ import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
 import Link from "next/link";
-import { ThemedMonacoEditor } from "@/components/monaco";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLocalStorage } from "@uidotdev/usehooks";
-import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
+import {
+  Tabs,
+  SidebarTabsContent,
+  SidebarTabsList,
+  SidebarTabsTrigger,
+} from "@/components/ui-editor/sidebar-tabs";
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
-import {
-  keybindings_sheet,
-  useEditorHotKeys,
-} from "@/grida-canvas-react/viewport/hotkeys";
+import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { keysymbols } from "@/grida-canvas-react/devtools/keysymbols";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
@@ -133,6 +122,9 @@ import { CursorChat } from "@/components/multiplayer/cursor-chat";
 import { distro } from "../distro";
 import { WithSize } from "@/grida-canvas-react/viewport/size";
 import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
+import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
+import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
+import { SettingsDialog } from "./settings";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -140,6 +132,9 @@ function useUILayout() {
   const [lastVisibleVariant, setLastVisibleVariant] = useState<
     "full" | "minimal"
   >("full");
+  const [rightSidebarTab, setRightSidebarTab] = useState<"inspect" | "agent">(
+    "inspect"
+  );
 
   const ui = useMemo(() => distro.ui.LAYOUT_VARIANTS[uiVariant], [uiVariant]);
 
@@ -167,8 +162,10 @@ function useUILayout() {
   return {
     ui,
     uiVariant,
+    rightSidebarTab,
     toggleVisibility,
     toggleMinimal,
+    setRightSidebarTab,
   };
 }
 
@@ -233,8 +230,8 @@ export default function CanvasPlayground({
   src,
   room_id,
 }: CanvasPlaygroundProps) {
-  useDisableSwipeBack();
   const instance = useEditor(document, backend);
+  useDisableSwipeBack();
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
   const [documentReady, setDocumentReady] = useState(() => !src);
@@ -339,30 +336,32 @@ export default function CanvasPlayground({
 
   return (
     <>
+      {loadingOverlay && (
+        <FullscreenLoadingOverlay
+          loading={!ready}
+          errmsg={errmsg}
+          onExitComplete={() => {
+            setLoadingOverlay(false);
+          }}
+        />
+      )}
       <ErrorBoundary>
-        <SidebarProvider className="w-full h-full">
-          <TooltipProvider>
-            {loadingOverlay && (
-              <FullscreenLoadingOverlay
-                loading={!ready}
-                errmsg={errmsg}
-                onExitComplete={() => {
-                  setLoadingOverlay(false);
-                }}
-              />
-            )}
-            <main className="w-full h-full select-none">
-              <FontFamilyListProvider fonts={fonts}>
-                <StandaloneDocumentEditor editor={instance}>
-                  <WindowGlobalCurrentEditorProvider />
-                  <UserCustomTemplatesProvider templates={templates}>
-                    <Consumer backend={backend} canvasRef={handleCanvasRef} />
-                  </UserCustomTemplatesProvider>
-                </StandaloneDocumentEditor>
-              </FontFamilyListProvider>
-            </main>
-          </TooltipProvider>
-        </SidebarProvider>
+        <TooltipProvider>
+          <FontFamilyListProvider fonts={fonts}>
+            <StandaloneDocumentEditor editor={instance}>
+              <div className="w-full h-full flex flex-row">
+                <SidebarProvider className="w-full h-full">
+                  <main className="w-full h-full select-none relative">
+                    <WindowGlobalCurrentEditorProvider />
+                    <UserCustomTemplatesProvider templates={templates}>
+                      <Consumer backend={backend} canvasRef={handleCanvasRef} />
+                    </UserCustomTemplatesProvider>
+                  </main>
+                </SidebarProvider>
+              </div>
+            </StandaloneDocumentEditor>
+          </FontFamilyListProvider>
+        </TooltipProvider>
       </ErrorBoundary>
     </>
   );
@@ -375,7 +374,13 @@ function Consumer({
   backend: "dom" | "canvas";
   canvasRef?: (canvas: HTMLCanvasElement | null) => void;
 }) {
-  const { ui, toggleVisibility, toggleMinimal } = useUILayout();
+  const {
+    ui,
+    toggleVisibility,
+    toggleMinimal,
+    rightSidebarTab,
+    setRightSidebarTab,
+  } = useUILayout();
   const instance = useCurrentEditor();
   const debug = useEditorState(instance, (state) => state.debug);
 
@@ -431,7 +436,7 @@ function Consumer({
   };
 
   return (
-    <>
+    <AgentChatProvider>
       <PreviewProvider>
         <div className="flex w-full h-full">
           {ui.sidebar_left && <SidebarLeft />}
@@ -471,13 +476,20 @@ function Consumer({
             </EditorSurfaceContextMenu>
           </EditorSurfaceDropzone>
           {should_show_sidebar_right && (
-            <SidebarRight variant={sidebar_right_variant} />
+            <SidebarRight
+              variant={sidebar_right_variant}
+              tab={rightSidebarTab}
+              setTab={setRightSidebarTab}
+            />
           )}
         </div>
       </PreviewProvider>
 
-      {ui.help_fab && <HelpFab />}
-    </>
+      {ui.help_fab && rightSidebarTab !== "agent" && (
+        <HelpFab className="absolute right-4 bottom-4" />
+      )}
+      {/* <CommandPalette /> */}
+    </AgentChatProvider>
   );
 }
 
@@ -664,8 +676,12 @@ function PresenseAvatars() {
 
 function SidebarRight({
   variant = "sidebar",
+  tab,
+  setTab,
 }: {
   variant?: "sidebar" | "floating";
+  tab: "inspect" | "agent";
+  setTab: (tab: "inspect" | "agent") => void;
 }) {
   const should_show_artboards_list = useArtboardListCondition();
 
@@ -673,14 +689,23 @@ function SidebarRight({
     <aside
       data-variant={variant}
       id="sidebar-right"
-      className="relative data-[variant=floating]:absolute"
+      className="relative data-[variant=floating]:absolute data-[variant=floating]:right-0"
+      style={
+        {
+          "--sidebar-width": tab === "inspect" ? "240px" : "400px",
+        } as React.CSSProperties
+      }
     >
       <Sidebar
         side="right"
         variant={variant}
-        className="group-data-[variant=floating]:pt-8 group-data-[variant=floating]:pb-4 group-data-[variant=floating]:pl-0 group-data-[variant=floating]:pr-4"
+        className="
+          group-data-[variant=floating]:h-[700px]
+          group-data-[variant=floating]:pt-8 group-data-[variant=floating]:pb-4 group-data-[variant=floating]:pl-0 group-data-[variant=floating]:pr-4
+          relative
+        "
       >
-        <SidebarHeader className="p-0">
+        <SidebarHeader className="p-0 gap-0">
           <header className="flex h-11 px-2 justify-between items-center gap-2">
             <div className="flex-1">
               <PresenseAvatars />
@@ -698,6 +723,19 @@ function SidebarRight({
               <PreviewButton />
             </div>
           </header>
+          <Tabs
+            value={tab}
+            onValueChange={(v) => setTab(v as "inspect" | "agent")}
+          >
+            <SidebarTabsList className="h-auto bg-transparent px-2 pb-2">
+              <SidebarTabsTrigger value="inspect" size="xs">
+                Inspect
+              </SidebarTabsTrigger>
+              <SidebarTabsTrigger value="agent" size="xs">
+                Agent
+              </SidebarTabsTrigger>
+            </SidebarTabsList>
+          </Tabs>
         </SidebarHeader>
         <hr />
         {should_show_artboards_list ? (
@@ -717,14 +755,26 @@ function SidebarRight({
             </DialogPrimitive.Root>
           </>
         ) : (
-          <SidebarContent className="gap-0">
-            <Selection
-              empty={
-                <div className="mt-4 mb-10">
-                  <DocumentProperties />
-                </div>
-              }
-            />
+          <SidebarContent
+            className={cn("gap-0", tab === "agent" && "overflow-hidden")}
+          >
+            <Tabs
+              value={tab}
+              className={cn(tab === "agent" && "flex flex-col h-full")}
+            >
+              <SidebarTabsContent value="inspect">
+                <Selection
+                  empty={
+                    <div className="mt-4 mb-10">
+                      <DocumentProperties />
+                    </div>
+                  }
+                />
+              </SidebarTabsContent>
+              <SidebarTabsContent value="agent" className="min-h-0">
+                <AgentPanel className="h-full flex-1 min-h-0" />
+              </SidebarTabsContent>
+            </Tabs>
           </SidebarContent>
         )}
       </Sidebar>
@@ -760,130 +810,6 @@ function Hotkyes() {
   useEditorHotKeys();
 
   return <></>;
-}
-
-function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
-  const editor = useCurrentEditor();
-  const [aiSettings, setAiSettings] = useLocalStorage<string | undefined>(
-    CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY,
-    undefined
-  );
-
-  return (
-    <Dialog {...props}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Playground Settings</DialogTitle>
-        </DialogHeader>
-        <hr />
-        <Tabs defaultValue="keybindings" className="min-h-96">
-          <TabsList>
-            <TabsTrigger value="keybindings">Keyboard Shortcuts</TabsTrigger>
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="ai">AI</TabsTrigger>
-          </TabsList>
-          <TabsContent value="general">
-            <div className="py-4 space-y-2">
-              <Label className="flex items-center justify-between">
-                Debug Mode
-                <Switch
-                  checked={editor.debug}
-                  onCheckedChange={(v) => {
-                    editor.debug = v;
-                  }}
-                />
-              </Label>
-              <hr />
-              <Label className="flex items-center justify-between">
-                Rendering Backend
-                <Link href="/canvas/experimental/dom" target="_blank">
-                  <Button size="sm" variant="outline">
-                    DOM
-                    <OpenInNewWindowIcon />
-                  </Button>
-                </Link>
-              </Label>
-              <Label className="flex items-center justify-between">
-                Rendering Backend
-                <Link href="/canvas" target="_blank">
-                  <Button size="sm" variant="outline">
-                    CANVAS WASM
-                    <OpenInNewWindowIcon />
-                  </Button>
-                </Link>
-              </Label>
-
-              {/* <label>
-                Snap to geometry
-                <Switch />
-              </label>
-              <label>
-                Snap to objects
-                <Switch />
-              </label>
-              <label>
-                Snap to pixel grid
-                <Switch />
-              </label> */}
-              {/* <label>Nudge Amount</label> */}
-            </div>
-          </TabsContent>
-          <TabsContent value="keybindings">
-            <ScrollArea className="h-96">
-              <ScrollBar />
-              <div>
-                {keybindings_sheet.map((action) => {
-                  return (
-                    <div
-                      key={action.name}
-                      className="flex items-center justify-between p-2 border-b last:border-b-0"
-                    >
-                      <div className="grid gap-1">
-                        <span className="font-medium text-sm text-gray-800">
-                          {action.name}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {action.description}
-                        </span>
-                      </div>
-                      <div className="flex space-x-2">
-                        {action.keys.map((key) => (
-                          <span
-                            key={key}
-                            className="px-2 py-1 text-xs font-mono font-bold text-gray-700 bg-gray-200 rounded-md shadow"
-                          >
-                            {key
-                              .split("+")
-                              .map(
-                                (part) =>
-                                  keysymbols[part.toLowerCase()] ||
-                                  part.toUpperCase()
-                              )
-                              .join(" + ")}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-          <TabsContent value="ai">
-            <div>
-              <ThemedMonacoEditor
-                value={aiSettings}
-                onChange={setAiSettings}
-                width="100%"
-                height={400}
-                language="txt"
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 function PlaygroundMenuContent() {
