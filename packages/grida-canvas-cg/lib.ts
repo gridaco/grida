@@ -70,7 +70,7 @@ export namespace cg {
   /**
    * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
    */
-  export type TRGBA = {
+  export type RGBA_UNKNWON = {
     r: number;
     g: number;
     b: number;
@@ -81,7 +81,7 @@ export namespace cg {
    * Floating-Point RGBA (Normalized RGBA)
    * Used in computer graphics pipelines, shading, and rendering.
    */
-  export type RGBAf = {
+  export type RGBA32F = {
     /**
      * Red channel value, between 0 and 1.
      */
@@ -104,7 +104,7 @@ export namespace cg {
    * 8-bit Integer RGBA (Standard RGBA)
    * Used in web and raster graphics, including CSS and images.
    */
-  export type RGBA8888 = {
+  export type RGB888A32F = {
     /**
      * Red channel value, between 0 and 255.
      */
@@ -257,8 +257,8 @@ export namespace cg {
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-color
    */
-  export type TextDecorationColor = "currentcolor" | cg.RGBA8888;
-  export type TextDecorationColorValue = cg.RGBA8888;
+  export type TextDecorationColor = "currentcolor" | cg.RGB888A32F;
+  export type TextDecorationColorValue = cg.RGB888A32F;
 
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-skip-ink
@@ -769,7 +769,7 @@ export namespace cg {
 
   export type SolidPaint = {
     type: "solid";
-    color: cg.RGBA8888;
+    color: cg.RGB888A32F;
     blendMode?: cg.BlendMode;
     active: boolean;
   };
@@ -974,7 +974,7 @@ export namespace cg {
      * 1 - end (100%)
      */
     offset: number;
-    color: cg.RGBA8888;
+    color: cg.RGB888A32F;
   };
   //
   //
@@ -990,7 +990,7 @@ export namespace cg {
      * The color of the shadow.
      * Defaults to the current color if not provided.
      */
-    color: RGBA8888;
+    color: RGB888A32F;
 
     /**
      * The horizontal and vertical offset of the shadow.
@@ -1045,7 +1045,7 @@ export namespace cg {
 
     spread: number;
 
-    color: RGBA8888;
+    color: RGB888A32F;
 
     /**
      * Whether this effect is active
@@ -1300,17 +1300,17 @@ export namespace cg {
      * Color of noise pixels (mono mode only)
      * Includes alpha for opacity control
      */
-    color?: RGBA8888;
+    color?: RGB888A32F;
     /**
      * Pattern color (duo mode only)
      * Applied where noise is visible
      */
-    color1?: RGBA8888;
+    color1?: RGB888A32F;
     /**
      * Background color (duo mode only)
      * Base layer behind the noise pattern
      */
-    color2?: RGBA8888;
+    color2?: RGB888A32F;
     /**
      * Overall opacity (multi mode only)
      * Range: 0.0 - 1.0

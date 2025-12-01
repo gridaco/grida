@@ -9,7 +9,7 @@ export type { svgtypes };
 
 interface SVGFactoryUserContext {
   name: string;
-  currentColor?: cmath.colorformats.RGBA8888;
+  currentColor?: cmath.colorformats.RGBA32F;
 }
 
 export namespace iosvg {

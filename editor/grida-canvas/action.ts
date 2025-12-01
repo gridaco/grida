@@ -250,7 +250,7 @@ export interface EditorBlurAction {
  */
 export type EditorClipAction = {
   type: "clip/color";
-  color: cg.RGBA8888;
+  color: cg.RGB888A32F;
 };
 
 // #region copy cut paste

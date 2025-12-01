@@ -11,7 +11,7 @@ export namespace css {
    */
   export const namedcolors = colors;
 
-  export function toRGBAString(rgba: cg.RGBA8888): string {
+  export function toRGBAString(rgba: cg.RGB888A32F): string {
     return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
   }
 

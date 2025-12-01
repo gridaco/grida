@@ -60,7 +60,7 @@ import ControlPoint from "./components/control-point";
  */
 export interface GradientControlPointsEditorProps {
   /** Array of gradient stops with positions and colors */
-  stops: { offset: number; color: cg.RGBA8888 }[];
+  stops: { offset: number; color: cg.RGB888A32F }[];
   /** Index of currently focused stop (null if none) */
   focusedStop: number | null;
   /** Control points for gradient transform [A, B, C] - optional if using internal state */
@@ -102,7 +102,7 @@ export interface GradientControlPointsEditorProps {
 const STOP_SIZE = 18;
 
 // Helper function to convert RGBA8888 to CSS rgba string
-const rgbaToString = (color: cg.RGBA8888) => {
+const rgbaToString = (color: cg.RGB888A32F) => {
   return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
 };
 
@@ -518,8 +518,12 @@ export default function GradientControlPointsEditor({
             id="trackShadow"
             x={-(typeof window !== "undefined" ? window.innerWidth : width)}
             y={-(typeof window !== "undefined" ? window.innerHeight : height)}
-            width={(typeof window !== "undefined" ? window.innerWidth : width) * 2}
-            height={(typeof window !== "undefined" ? window.innerHeight : height) * 2}
+            width={
+              (typeof window !== "undefined" ? window.innerWidth : width) * 2
+            }
+            height={
+              (typeof window !== "undefined" ? window.innerHeight : height) * 2
+            }
             filterUnits="userSpaceOnUse"
           >
             <feDropShadow

@@ -5746,29 +5746,6 @@ namespace cmath {
    */
   export namespace color {
     /**
-     * Floating-Point RGBA (Normalized RGBA)
-     * Used in computer graphics pipelines, shading, and rendering.
-     */
-    export type RGBAf = {
-      /**
-       * Red channel value, between 0 and 1.
-       */
-      r: number;
-      /**
-       * Green channel value, between 0 and 1.
-       */
-      g: number;
-      /**
-       * Blue channel value, between 0 and 1.
-       */
-      b: number;
-      /**
-       * Alpha channel value, between 0 and 1.
-       */
-      a: number;
-    };
-
-    /**
      * 8-bit Integer RGBA (Standard RGBA)
      * Used in web and raster graphics, including CSS and images.
      */

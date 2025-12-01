@@ -662,7 +662,7 @@ export namespace grida.program.document {
     /**
      * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
      */
-    backgroundColor?: cg.RGBAf | null | undefined | "";
+    backgroundColor?: cg.RGBA32F | null | undefined | "";
   }
 
   export interface Guide2D {
@@ -1010,7 +1010,7 @@ export namespace grida.program.css {
    */
   export type Border = {
     borderStyle: "none" | "solid" | "dashed";
-    borderColor: cg.RGBA8888;
+    borderColor: cg.RGB888A32F;
     /**
      * @example
      * ```css

@@ -698,7 +698,7 @@ class EditorDocumentStore
 
     let result = await iosvg.convert(svgData, {
       name: "svg",
-      currentColor: { r: 0, g: 0, b: 0, a: 1 },
+      currentColor: cmath.colorformats.RGBA32F.BLACK,
     });
     if (result) {
       result = result as grida.program.nodes.i.IPositioning &
@@ -4218,7 +4218,7 @@ export class EditorSurface
     this.dispatch({ type: "a11y/delete" });
   }
 
-  public a11ySetClipboardColor(color: cg.RGBA8888) {
+  public a11ySetClipboardColor(color: cg.RGB888A32F) {
     this.dispatch({
       type: "clip/color",
       color,

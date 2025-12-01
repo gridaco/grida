@@ -359,7 +359,7 @@ function PropertyDefinitionValueInput<T = unknown>({
     case "rgba":
       return (
         <RGB888A32FColorControl
-          value={value as cg.RGBA8888}
+          value={value as cg.RGB888A32F}
           onValueChange={(v) => onValueChange(v as unknown as T)}
         />
       );

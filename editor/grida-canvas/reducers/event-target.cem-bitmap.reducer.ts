@@ -207,7 +207,7 @@ export function on_flood_fill(
  */
 function get_next_brush_pain_color(
   state: editor.state.IEditorFeatureBrushState,
-  fallback?: cg.RGBA8888
+  fallback?: cg.RGB888A32F
 ): cmath.Vector4 {
   return cmath.color.rgba_to_unit8_chunk(
     state.brush_color ?? fallback ?? black

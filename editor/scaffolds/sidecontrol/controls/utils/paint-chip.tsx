@@ -49,7 +49,7 @@ export function RGB888A32FChip({
   rgba,
   className,
 }: {
-  rgba: cg.RGBA8888;
+  rgba: cg.RGB888A32F;
   className?: string;
 }) {
   return (

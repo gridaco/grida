@@ -7,7 +7,7 @@ export type GradientType = "linear" | "radial" | "sweep";
 export type GradientValue = {
   transform: cg.AffineTransform;
   positions: number[];
-  colors: cg.RGBA8888[];
+  colors: cg.RGB888A32F[];
 };
 
 export interface Point {
@@ -334,10 +334,10 @@ export const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
 // Helper function to insert a stop in sorted position by offset
 export const insertStopInSortedPosition = (
   positions: number[],
-  colors: cg.RGBA8888[],
+  colors: cg.RGB888A32F[],
   newPosition: number,
-  newColor: cg.RGBA8888
-): { positions: number[]; colors: cg.RGBA8888[]; insertedIndex: number } => {
+  newColor: cg.RGB888A32F
+): { positions: number[]; colors: cg.RGB888A32F[]; insertedIndex: number } => {
   const newPositions = [...positions];
   const newColors = [...colors];
 
@@ -365,9 +365,9 @@ export const insertStopInSortedPosition = (
 // Helper function to sort stops by offset and return the new index of a specific stop
 export const sortStopsByOffset = (
   positions: number[],
-  colors: cg.RGBA8888[],
+  colors: cg.RGB888A32F[],
   originalIndex: number
-): { positions: number[]; colors: cg.RGBA8888[]; newIndex: number } => {
+): { positions: number[]; colors: cg.RGB888A32F[]; newIndex: number } => {
   const newPositions = [...positions];
   const newColors = [...colors];
   const movedPosition = newPositions[originalIndex];
