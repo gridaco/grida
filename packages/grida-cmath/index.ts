@@ -5839,37 +5839,6 @@ namespace cmath {
     }
 
     /**
-     * Converts a normalized RGBA color to an 8-bit integer RGBA color.
-     * @param rgba - The normalized RGBA color to convert.
-     * @returns The 8-bit integer RGBA color.
-     * @see {@link RGBAf}
-     * @see {@link RGBA8888}
-     * @example
-     * ```typescript
-     * const rgba: RGBAf = { r: 1, g: 0.5, b: 0, a: 0.75 };
-     * const rgba8888: RGBA8888 = rgbaf_to_rgba8888(rgba);
-     * console.log(rgba8888); // { r: 255, g: 128, b: 0, a: 0.75 }
-     * ```
-     */
-    export function rgbaf_to_rgba8888(rgba: RGBAf): RGBA8888 {
-      return {
-        r: Math.round(rgba.r * 255),
-        g: Math.round(rgba.g * 255),
-        b: Math.round(rgba.b * 255),
-        a: rgba.a,
-      };
-    }
-
-    export function rgbaf_multiply_alpha(color: TRGBA, alpha: number): TRGBA {
-      return {
-        r: color.r,
-        g: color.g,
-        b: color.b,
-        a: color.a * alpha,
-      };
-    }
-
-    /**
      *
      * @param color
      * @returns hex color string with the leading `#`
@@ -5922,6 +5891,10 @@ namespace cmath {
       a: number;
     };
 
+    /**
+     * @deprecated
+     * use {@link RGBA32F} instead
+     */
     export type RGB888A32F = {
       /**
        * 0-255
@@ -5942,12 +5915,24 @@ namespace cmath {
     };
 
     export namespace RGBA32F {
+      /**
+       * @deprecated
+       */
       export function intoRGB888F32A(color: RGBA32F): RGB888A32F {
         return {
           r: Math.round(color.r * 255),
           g: Math.round(color.g * 255),
           b: Math.round(color.b * 255),
           a: color.a,
+        };
+      }
+
+      export function multiplyA32(color: RGBA32F, alpha: number = 1): RGBA32F {
+        return {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+          a: color.a * alpha,
         };
       }
     }
@@ -5959,6 +5944,24 @@ namespace cmath {
           g: color.g,
           b: color.b,
           a: color.a / 255,
+        };
+      }
+    }
+
+    /**
+     * @deprecated
+     * use {@link RGBA32F} instead
+     */
+    export namespace RGB888A32F {
+      export function multiplyA32(
+        color: RGB888A32F,
+        alpha: number = 1
+      ): RGB888A32F {
+        return {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+          a: color.a * alpha,
         };
       }
     }
