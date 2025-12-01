@@ -1,5 +1,6 @@
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
+import cmath from "@grida/cmath";
 
 export namespace prototypes {
   export const row = {
@@ -34,7 +35,7 @@ export namespace prototypes {
         cornerRadius: 0,
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: cmath.colorformats.RGB888A32F.BLACK,
           active: true,
         },
         strokeWidth: 0,
@@ -52,7 +53,7 @@ export namespace prototypes {
         cornerRadius: 0,
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: cmath.colorformats.RGB888A32F.BLACK,
           active: true,
         },
         strokeWidth: 0,
@@ -70,7 +71,7 @@ export namespace prototypes {
         cornerRadius: 0,
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: cmath.colorformats.RGB888A32F.BLACK,
           active: true,
         },
         strokeWidth: 0,
@@ -153,7 +154,7 @@ export namespace prototypes {
     padding: 8,
     fill: {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 1 },
+      color: cmath.colorformats.RGB888A32F.BLACK,
       active: true,
     },
     children: [
@@ -170,7 +171,7 @@ export namespace prototypes {
         style: {},
         fill: {
           type: "solid",
-          color: { r: 255, g: 255, b: 255, a: 1 },
+          color: cmath.colorformats.RGB888A32F.WHITE,
           active: true,
         },
         textAlign: "center",
@@ -205,7 +206,7 @@ export namespace prototypes {
     padding: 0,
     fill: {
       type: "solid",
-      color: { r: 255, g: 255, b: 255, a: 1 },
+      color: cmath.colorformats.RGB888A32F.WHITE,
       active: true,
     },
     children: [

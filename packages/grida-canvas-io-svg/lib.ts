@@ -45,12 +45,13 @@ export namespace iosvg {
           // paint.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
           const [r, g, b, a] = paint.color;
           // Convert to RGBA8888 object format, apply opacity to alpha, then convert to RGB888A32F
-          const rgba8888: cmath.colorformats.RGBA8888 = {
+          const rgba8888 = cmath.colorformats.newRGBA8888(
             r,
             g,
             b,
-            a: a * opacity, // Apply opacity to alpha (still 0-255 range)
-          };
+            // Apply opacity to alpha (still 0-255 range)
+            a * opacity
+          );
           const rgb888a32f =
             cmath.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
           return {
@@ -68,7 +69,7 @@ export namespace iosvg {
               // stop.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
               const [r, g, b, a] = stop.color;
               // Convert to RGBA8888 object format, then convert to RGB888A32F
-              const rgba8888: cmath.colorformats.RGBA8888 = { r, g, b, a };
+              const rgba8888 = cmath.colorformats.newRGBA8888(r, g, b, a);
               const rgb888a32f =
                 cmath.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
               return {
@@ -90,7 +91,7 @@ export namespace iosvg {
               // stop.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
               const [r, g, b, a] = stop.color;
               // Convert to RGBA8888 object format, then convert to RGB888A32F
-              const rgba8888: cmath.colorformats.RGBA8888 = { r, g, b, a };
+              const rgba8888 = cmath.colorformats.newRGBA8888(r, g, b, a);
               const rgb888a32f =
                 cmath.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
               return {

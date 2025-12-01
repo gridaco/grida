@@ -161,7 +161,7 @@ function getNextPaintForType(
         case "solid": {
           return {
             type: "solid",
-            color: { r: 128, g: 128, b: 128, a: opacity }, // Default gray with preserved opacity
+            color: cmath.colorformats.newRGB888A32F(128, 128, 128, opacity), // Default gray with preserved opacity
             blendMode,
             active: true,
           };
@@ -174,8 +174,14 @@ function getNextPaintForType(
             type: to,
             transform,
             stops: [
-              { offset: 0, color: { r: 128, g: 128, b: 128, a: 1 } },
-              { offset: 1, color: { r: 255, g: 255, b: 255, a: 1 } },
+              {
+                offset: 0,
+                color: cmath.colorformats.RGB888A32F.GRAY,
+              },
+              {
+                offset: 1,
+                color: cmath.colorformats.RGB888A32F.WHITE,
+              },
             ],
             blendMode,
             opacity: opacity,
@@ -269,7 +275,7 @@ function ComputedPaintControl({
   const onAddPaint = () => {
     const paint: ComputedPaint = {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 1 },
+      color: cmath.colorformats.RGB888A32F.BLACK,
       active: true,
     };
     if (onValueAdd) {
@@ -536,7 +542,12 @@ function SolidPaintTrigger({
           onValueChange?.({
             ...value,
             type: "solid",
-            color: { ...color, a: value.color.a },
+            color: cmath.colorformats.newRGB888A32F(
+              color.r,
+              color.g,
+              color.b,
+              value.color.a
+            ),
             active: true,
           });
         }}
@@ -548,7 +559,12 @@ function SolidPaintTrigger({
           onValueChange?.({
             ...value,
             type: "solid",
-            color: { ...value.color, a: opacity },
+            color: cmath.colorformats.newRGB888A32F(
+              value.color.r,
+              value.color.g,
+              value.color.b,
+              opacity
+            ),
             active: true,
           });
         }}

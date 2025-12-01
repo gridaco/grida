@@ -1,3 +1,5 @@
+import type cmath from "@grida/cmath";
+
 /**
  * Core Graphics
  */
@@ -81,47 +83,13 @@ export namespace cg {
    * Floating-Point RGBA (Normalized RGBA)
    * Used in computer graphics pipelines, shading, and rendering.
    */
-  export type RGBA32F = {
-    /**
-     * Red channel value, between 0 and 1.
-     */
-    r: number;
-    /**
-     * Green channel value, between 0 and 1.
-     */
-    g: number;
-    /**
-     * Blue channel value, between 0 and 1.
-     */
-    b: number;
-    /**
-     * Alpha channel value, between 0 and 1.
-     */
-    a: number;
-  };
+  export type RGBA32F = cmath.colorformats.RGBA32F;
 
   /**
    * 8-bit Integer RGBA (Standard RGBA)
    * Used in web and raster graphics, including CSS and images.
    */
-  export type RGB888A32F = {
-    /**
-     * Red channel value, between 0 and 255.
-     */
-    r: number;
-    /**
-     * Green channel value, between 0 and 255.
-     */
-    g: number;
-    /**
-     * Blue channel value, between 0 and 255.
-     */
-    b: number;
-    /**
-     * Alpha channel value, between 0 and 1.
-     */
-    a: number;
-  };
+  export type RGB888A32F = cmath.colorformats.RGB888A32F;
 
   export type LayerMaskType = "geometry" | ImageMaskType;
   export type ImageMaskType = "alpha" | "luminance";
@@ -740,19 +708,19 @@ export namespace cg {
   export namespace paints {
     export const transparent: Paint = {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 0 },
+      color: { r: 0, g: 0, b: 0, a: 0 } as cmath.colorformats.RGB888A32F,
       active: true,
     };
 
     export const black: Paint = {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 1 },
+      color: { r: 0, g: 0, b: 0, a: 1 } as cmath.colorformats.RGB888A32F,
       active: true,
     };
 
     export const white: Paint = {
       type: "solid",
-      color: { r: 255, g: 255, b: 255, a: 1 },
+      color: { r: 255, g: 255, b: 255, a: 1 } as cmath.colorformats.RGB888A32F,
       active: true,
     };
   }

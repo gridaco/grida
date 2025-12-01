@@ -36,7 +36,7 @@ const document: editor.state.IEditorStateInit = {
         name: "A",
         fill: {
           type: "solid",
-          color: cmath.color.hex_to_rgba8888("#00f"),
+          color: cmath.colorformats.RGB888A32F.fromHEX("#00f"),
           active: true,
         },
         left: 0,
@@ -46,7 +46,7 @@ const document: editor.state.IEditorStateInit = {
         name: "B",
         fill: {
           type: "solid",
-          color: cmath.color.hex_to_rgba8888("#0f0"),
+          color: cmath.colorformats.RGB888A32F.fromHEX("#0f0"),
           active: true,
         },
         left: 200,

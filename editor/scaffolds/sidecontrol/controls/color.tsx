@@ -75,7 +75,7 @@ function InlineOpacityControl({
 }
 
 export function RGB888A32FColorControl({
-  value = { r: 0, g: 0, b: 0, a: 0 },
+  value = cmath.colorformats.RGB888A32F.TRANSPARENT,
   onValueChange,
   disabled,
   variant = "default",
@@ -122,13 +122,13 @@ export function RGB888A32FColorControl({
             g: value.g,
             b: value.b,
           }}
+          unit="u8"
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
-          onValueChange={(color) => {
-            onValueChange?.({
-              ...color,
-              a: value.a,
-            });
+          onValueChange={(rgb) => {
+            onValueChange?.(
+              cmath.colorformats.newRGB888A32F(rgb.r, rgb.g, rgb.b, value.a)
+            );
           }}
         />
 
@@ -219,10 +219,9 @@ export function RGBA32FColorControl({
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
           onValueChange={(color) => {
-            onValueChange?.({
-              ...color,
-              a: value.a,
-            });
+            onValueChange?.(
+              cmath.colorformats.newRGBA32F(color.r, color.g, color.b, value.a)
+            );
           }}
         />
 

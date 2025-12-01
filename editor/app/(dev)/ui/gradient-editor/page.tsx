@@ -18,6 +18,7 @@ import {
   type GradientType,
 } from "@/grida-canvas-react-gradient";
 import type cg from "@grida/cg";
+import cmath from "@grida/cmath";
 import { css } from "@/grida-canvas-utils/css";
 import { useWindowSize } from "@uidotdev/usehooks";
 
@@ -27,14 +28,6 @@ const rgbaToHex = (color: cg.RGB888A32F): string => {
   const g = color.g.toString(16).padStart(2, "0");
   const b = color.b.toString(16).padStart(2, "0");
   return `#${r}${g}${b}`;
-};
-
-// Helper function to convert hex string to RGBA8888
-const hexToRgba = (hex: string): cg.RGB888A32F => {
-  const r = Number.parseInt(hex.slice(1, 3), 16);
-  const g = Number.parseInt(hex.slice(3, 5), 16);
-  const b = Number.parseInt(hex.slice(5, 7), 16);
-  return { r, g, b, a: 1 };
 };
 
 // Main gradient editor component that only renders when size is ready
@@ -52,8 +45,8 @@ function GradientEditorContent() {
   const [stops, setStops] = useState<
     { offset: number; color: cg.RGB888A32F }[]
   >([
-    { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } },
-    { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } },
+    { offset: 0, color: cmath.colorformats.newRGB888A32F(255, 0, 0, 1) },
+    { offset: 1, color: cmath.colorformats.newRGB888A32F(0, 0, 255, 1) },
   ]);
   const [focusedStop, setFocusedStop] = useState<number | null>(null);
   const [points, setPoints] = useState<
@@ -127,10 +120,12 @@ function GradientEditorContent() {
   );
 
   const handleInsertStop = useCallback((at: number, position: number) => {
-    const newColor: cg.RGB888A32F = { r: 128, g: 128, b: 128, a: 1 };
     setStops((prev) => {
       const newStops = [...prev];
-      newStops.splice(at, 0, { offset: position, color: newColor });
+      newStops.splice(at, 0, {
+        offset: position,
+        color: cmath.colorformats.RGB888A32F.GRAY,
+      });
       return newStops;
     });
     setFocusedStop(at);
@@ -264,7 +259,8 @@ function GradientEditorContent() {
                       value={rgbaToHex(stop.color)}
                       onChange={(e) => {
                         const hex = e.target.value;
-                        const newColor = hexToRgba(hex);
+                        const newColor =
+                          cmath.colorformats.RGB888A32F.fromHEX(hex);
                         setStops((prev) =>
                           prev.map((s, i) =>
                             i === focusedStop ? { ...s, color: newColor } : s

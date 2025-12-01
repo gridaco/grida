@@ -1,4 +1,5 @@
 import type cg from "@grida/cg";
+import cmath from "@grida/cmath";
 import { css } from "@/grida-canvas-utils/css";
 import React, { useRef, useState, useCallback, useEffect } from "react";
 
@@ -207,7 +208,7 @@ export function GradientStopsSlider({
       if (isDragging) return;
 
       const newPosition = screenToGradientPosition(e.clientX);
-      const newColor: cg.RGB888A32F = { r: 128, g: 128, b: 128, a: 1 };
+      const newColor: cg.RGB888A32F = cmath.colorformats.RGB888A32F.GRAY;
 
       const {
         positions: newPositions,

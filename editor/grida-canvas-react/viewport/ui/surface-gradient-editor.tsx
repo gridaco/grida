@@ -7,6 +7,7 @@ import {
   getTransformFromPoints,
 } from "@/grida-canvas-react-gradient";
 import cg from "@grida/cg";
+import cmath from "@grida/cmath";
 import {
   useContentEditModeState,
   useNodeState,
@@ -213,7 +214,7 @@ function EditorUser({
   const handleInsertStop = useCallback(
     (at: number, position: number) => {
       // Create a gray color for new stops
-      const newColor: cg.RGB888A32F = { r: 128, g: 128, b: 128, a: 1 };
+      const newColor: cg.RGB888A32F = cmath.colorformats.RGB888A32F.GRAY;
       const newStop = { offset: position, color: newColor };
 
       const newStops = [...stops];

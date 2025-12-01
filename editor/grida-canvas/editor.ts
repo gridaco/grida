@@ -747,7 +747,7 @@ class EditorDocumentStore
         height: "auto",
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: cmath.colorformats.RGB888A32F.BLACK,
           active: true,
         },
       },
@@ -768,7 +768,7 @@ class EditorDocumentStore
         height: 100,
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: cmath.colorformats.RGB888A32F.BLACK,
           active: true,
         },
       },

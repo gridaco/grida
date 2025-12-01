@@ -43,7 +43,16 @@ function ColorPickerBase({
         <RGB888A32FColorPicker
           color={color}
           className="!w-full"
-          onChange={onColorChange}
+          onChange={(newColor) =>
+            onColorChange?.(
+              cmath.colorformats.newRGB888A32F(
+                newColor.r,
+                newColor.g,
+                newColor.b,
+                newColor.a
+              )
+            )
+          }
         />
       </div>
 
@@ -81,7 +90,14 @@ function ColorPickerBase({
                 // omit the alpha (handled by slider/picker)
               }}
               onValueChange={(newColor) => {
-                onColorChange?.({ ...color, ...newColor });
+                onColorChange?.(
+                  cmath.colorformats.newRGB888A32F(
+                    newColor.r,
+                    newColor.g,
+                    newColor.b,
+                    color.a
+                  )
+                );
               }}
             />
           </div>
@@ -129,13 +145,23 @@ export function ColorPicker({
   }[];
 }) {
   const { isSupported, open } = useEyeDropper();
+
   return (
     <div>
       <div className="cusom">
         <RGB888A32FColorPicker
           color={color}
           className="!w-full"
-          onChange={onColorChange}
+          onChange={(newColor) =>
+            onColorChange?.(
+              cmath.colorformats.newRGB888A32F(
+                newColor.r,
+                newColor.g,
+                newColor.b,
+                newColor.a
+              )
+            )
+          }
         />
       </div>
 
@@ -149,8 +175,10 @@ export function ColorPicker({
             className="text-muted-foreground"
             onClick={() => {
               open()?.then((result) => {
-                const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
-                onColorChange?.(rgba);
+                const color = cmath.colorformats.RGB888A32F.fromHEX(
+                  result.sRGBHex
+                );
+                onColorChange?.(color);
               });
             }}
           >
@@ -174,7 +202,14 @@ export function ColorPicker({
                 // ommit the alpha
               }}
               onValueChange={(newcolor) => {
-                onColorChange?.({ ...newcolor, a: color.a });
+                onColorChange?.(
+                  cmath.colorformats.newRGB888A32F(
+                    newcolor.r,
+                    newcolor.g,
+                    newcolor.b,
+                    color.a
+                  )
+                );
               }}
             />
           </div>
@@ -241,8 +276,7 @@ export function ColorPicker32F({
   const handleEyeDropperPick = React.useCallback(() => {
     if (!isSupported) return;
     open()?.then((result) => {
-      const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
-      handlePickerChange(rgba);
+      handlePickerChange(cmath.colorformats.RGB888A32F.fromHEX(result.sRGBHex));
     });
   }, [isSupported, open, handlePickerChange]);
 

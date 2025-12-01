@@ -302,9 +302,9 @@ function EyedropButton() {
   const mod = () => {
     if (isSupported) {
       open()?.then((result) => {
-        const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
+        const color = cmath.colorformats.RGB888A32F.fromHEX(result.sRGBHex);
         // editor clipboard
-        editor.surface.a11ySetClipboardColor(rgba);
+        editor.surface.a11ySetClipboardColor(color);
       });
     } else {
       toast.error("This feature is not supported in your browser.");

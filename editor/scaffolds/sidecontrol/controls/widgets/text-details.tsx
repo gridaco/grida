@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import cmath from "@grida/cmath";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Collapsible,
@@ -455,7 +456,7 @@ export function TextDetails({
   textDecorationLine = "none",
   textDecorationStyle = "solid",
   textDecorationThickness = "auto",
-  textDecorationColor = { r: 0, g: 0, b: 0, a: 1 },
+  textDecorationColor = cmath.colorformats.RGB888A32F.BLACK,
   textDecorationSkipInk = true,
   textTransform = "none",
   verticalTrim = "all",

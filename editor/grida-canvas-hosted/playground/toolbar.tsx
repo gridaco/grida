@@ -13,11 +13,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Textarea } from "@/components/ui/textarea";
 import grida from "@grida/schema";
-import { useMetaEnter } from "@/hooks/use-meta-enter";
+import cmath from "@grida/cmath";
 import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
-import { PopoverClose } from "@radix-ui/react-popover";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "@ai-sdk/rsc";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
@@ -311,33 +309,33 @@ function BitmapEditModeAuxiliaryToolbar() {
 
 // TODO: have it somewhere else
 const defaultColors = {
-  red: { r: 255, g: 0, b: 0, a: 1 },
-  green: { r: 0, g: 255, b: 0, a: 1 },
-  blue: { r: 0, g: 0, b: 255, a: 1 },
-  yellow: { r: 255, g: 255, b: 0, a: 1 },
-  orange: { r: 255, g: 165, b: 0, a: 1 },
-  purple: { r: 128, g: 0, b: 128, a: 1 },
-  pink: { r: 255, g: 192, b: 203, a: 1 },
-  cyan: { r: 0, g: 255, b: 255, a: 1 },
-  magenta: { r: 255, g: 0, b: 255, a: 1 },
-  black: { r: 0, g: 0, b: 0, a: 1 },
-  white: { r: 255, g: 255, b: 255, a: 1 },
-  gray: { r: 128, g: 128, b: 128, a: 1 },
-  silver: { r: 192, g: 192, b: 192, a: 1 },
-  brown: { r: 165, g: 42, b: 42, a: 1 },
-  olive: { r: 128, g: 128, b: 0, a: 1 },
-  navy: { r: 0, g: 0, b: 128, a: 1 },
-  teal: { r: 0, g: 128, b: 128, a: 1 },
-  maroon: { r: 128, g: 0, b: 0, a: 1 },
-  gold: { r: 255, g: 215, b: 0, a: 1 },
-  indigo: { r: 75, g: 0, b: 130, a: 1 },
+  red: cmath.colorformats.newRGB888A32F(255, 0, 0, 1),
+  green: cmath.colorformats.newRGB888A32F(0, 255, 0, 1),
+  blue: cmath.colorformats.newRGB888A32F(0, 0, 255, 1),
+  yellow: cmath.colorformats.newRGB888A32F(255, 255, 0, 1),
+  orange: cmath.colorformats.newRGB888A32F(255, 165, 0, 1),
+  purple: cmath.colorformats.newRGB888A32F(128, 0, 128, 1),
+  pink: cmath.colorformats.newRGB888A32F(255, 192, 203, 1),
+  cyan: cmath.colorformats.newRGB888A32F(0, 255, 255, 1),
+  magenta: cmath.colorformats.newRGB888A32F(255, 0, 255, 1),
+  black: cmath.colorformats.newRGB888A32F(0, 0, 0, 1),
+  white: cmath.colorformats.newRGB888A32F(255, 255, 255, 1),
+  gray: cmath.colorformats.newRGB888A32F(128, 128, 128, 1),
+  silver: cmath.colorformats.newRGB888A32F(192, 192, 192, 1),
+  brown: cmath.colorformats.newRGB888A32F(165, 42, 42, 1),
+  olive: cmath.colorformats.newRGB888A32F(128, 128, 0, 1),
+  navy: cmath.colorformats.newRGB888A32F(0, 0, 128, 1),
+  teal: cmath.colorformats.newRGB888A32F(0, 128, 128, 1),
+  maroon: cmath.colorformats.newRGB888A32F(128, 0, 0, 1),
+  gold: cmath.colorformats.newRGB888A32F(255, 215, 0, 1),
+  indigo: cmath.colorformats.newRGB888A32F(75, 0, 130, 1),
 };
 
 function ClipboardColor() {
   const editor = useCurrentEditor();
   const clipboardColor = useEditorState(editor, (s) => s.user_clipboard_color);
 
-  const color = clipboardColor ?? { r: 0, g: 0, b: 0, a: 1 };
+  const color = clipboardColor ?? cmath.colorformats.RGB888A32F.BLACK;
 
   // TODO:
   // - recent colors
@@ -375,41 +373,6 @@ function ClipboardColor() {
         />
       </PopoverContent>
     </Popover>
-  );
-}
-
-function Generate() {
-  const [userprompt, setUserPrompt] = useState("");
-  const { action: textRewrite, loading } = useTextRewriteDemo();
-  const ref = useMetaEnter<HTMLTextAreaElement>({
-    onSubmit: () => textRewrite(userprompt),
-  });
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Textarea
-        readOnly={loading}
-        autoFocus
-        ref={ref}
-        value={userprompt}
-        onChange={(e) => setUserPrompt(e.target.value)}
-        placeholder="Enter a prompt"
-        className="min-h-20"
-      />
-      <div className="flex justify-end">
-        <PopoverClose asChild>
-          <Button
-            variant="outline"
-            disabled={loading}
-            onClick={() => {
-              textRewrite(userprompt);
-            }}
-          >
-            Rewrite ⌘↵
-          </Button>
-        </PopoverClose>
-      </div>
-    </div>
   );
 }
 

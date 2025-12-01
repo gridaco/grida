@@ -121,14 +121,14 @@ export namespace iofigma {
 
     export namespace factory {
       function toGradientPaint(paint: GradientPaint) {
-        const map = {
+        const type_map = {
           GRADIENT_LINEAR: "linear_gradient",
           GRADIENT_RADIAL: "radial_gradient",
           GRADIENT_ANGULAR: "sweep_gradient",
           GRADIENT_DIAMOND: "diamond_gradient",
         } as const;
 
-        const type = map[paint.type as keyof typeof map];
+        const type = type_map[paint.type as keyof typeof type_map];
         const handles = paint.gradientHandlePositions;
         const points: cmath.ui.gradient.ControlPoints = handles
           ? {
@@ -143,8 +143,16 @@ export namespace iofigma {
           transform: cmath.ui.gradient.transformFromControlPoints(points, type),
           stops: paint.gradientStops.map((stop) => ({
             offset: stop.position,
-            color: cmath.colorformats.RGBA32F.intoRGB888F32A(stop.color),
+            color: cmath.colorformats.RGBA32F.intoRGB888F32A(
+              cmath.colorformats.newRGBA32F(
+                stop.color.r,
+                stop.color.g,
+                stop.color.b,
+                stop.color.a
+              )
+            ),
           })),
+          blendMode: map.blendModeMap[paint.blendMode],
           active: paint.visible ?? true,
           opacity: paint.opacity ?? 1,
         } as cg.GradientPaint;
@@ -154,7 +162,14 @@ export namespace iofigma {
         return {
           type: "solid",
           color: cmath.colorformats.RGB888A32F.multiplyA32(
-            cmath.colorformats.RGBA32F.intoRGB888F32A(paint.color),
+            cmath.colorformats.RGBA32F.intoRGB888F32A(
+              cmath.colorformats.newRGBA32F(
+                paint.color.r,
+                paint.color.g,
+                paint.color.b,
+                paint.color.a
+              )
+            ),
             paint.opacity
           ),
           active: paint.visible ?? true,
@@ -173,13 +188,15 @@ export namespace iofigma {
             return toGradientPaint(paint);
           }
           case "IMAGE":
+            // TODO: image support
+            // FALLBACK:
             return {
               type: "linear_gradient",
               transform: cmath.transform.identity,
               active: paint.visible ?? true,
               stops: [
-                { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
-                { offset: 1, color: { r: 115, g: 115, b: 115, a: 1 } },
+                { offset: 0, color: cmath.colorformats.RGB888A32F.BLACK },
+                { offset: 1, color: cmath.colorformats.RGB888A32F.WHITE },
               ],
               blendMode: map.blendModeMap[paint.blendMode],
               opacity: 1,
