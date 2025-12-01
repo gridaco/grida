@@ -43,6 +43,7 @@ import {
   useToolState,
 } from "@/grida-canvas-react/provider";
 import { RGBChip } from "@/scaffolds/sidecontrol/controls/utils/paint-chip";
+import red from "@/theme/palettes/red";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -308,29 +309,34 @@ function BitmapEditModeAuxiliaryToolbar() {
   );
 }
 
-// TODO: have it somewhere else
-const defaultColors = {
-  red: kolor.colorformats.newRGBA32F(1, 0, 0, 1),
-  green: kolor.colorformats.newRGBA32F(0, 1, 0, 1),
-  blue: kolor.colorformats.newRGBA32F(0, 0, 1, 1),
-  yellow: kolor.colorformats.newRGBA32F(1, 1, 0, 1),
-  orange: kolor.colorformats.newRGBA32F(1, 165 / 255, 0, 1),
-  purple: kolor.colorformats.newRGBA32F(128 / 255, 0, 128 / 255, 1),
-  pink: kolor.colorformats.newRGBA32F(1, 192 / 255, 203 / 255, 1),
-  cyan: kolor.colorformats.newRGBA32F(0, 1, 1, 1),
-  magenta: kolor.colorformats.newRGBA32F(1, 0, 1, 1),
-  black: kolor.colorformats.newRGBA32F(0, 0, 0, 1),
-  white: kolor.colorformats.newRGBA32F(1, 1, 1, 1),
-  gray: kolor.colorformats.newRGBA32F(128 / 255, 128 / 255, 128 / 255, 1),
-  silver: kolor.colorformats.newRGBA32F(192 / 255, 192 / 255, 192 / 255, 1),
-  brown: kolor.colorformats.newRGBA32F(165 / 255, 42 / 255, 42 / 255, 1),
-  olive: kolor.colorformats.newRGBA32F(128 / 255, 128 / 255, 0, 1),
-  navy: kolor.colorformats.newRGBA32F(0, 0, 128 / 255, 1),
-  teal: kolor.colorformats.newRGBA32F(0, 128 / 255, 128 / 255, 1),
-  maroon: kolor.colorformats.newRGBA32F(128 / 255, 0, 0, 1),
-  gold: kolor.colorformats.newRGBA32F(255 / 255, 215 / 255, 0, 1),
-  indigo: kolor.colorformats.newRGBA32F(75 / 255, 0, 130 / 255, 1),
-};
+const defaultColors: Record<string, kolor.colorformats.RGBA32F> =
+  Object.fromEntries(
+    [
+      ["red", kolor.names.red],
+      ["greenred", kolor.names.green],
+      ["bluered", kolor.names.blue],
+      ["yellowred", kolor.names.yellow],
+      ["orangered", kolor.names.orange],
+      ["purplered", kolor.names.purple],
+      ["pinkred", kolor.names.pink],
+      ["cyanred", kolor.names.cyan],
+      ["magentared", kolor.names.magenta],
+      ["blackred", kolor.names.black],
+      ["whitered", kolor.names.white],
+      ["grayred", kolor.names.gray],
+      ["silverred", kolor.names.silver],
+      ["brownred", kolor.names.brown],
+      ["olivered", kolor.names.olive],
+      ["navyred", kolor.names.navy],
+      ["tealred", kolor.names.teal],
+      ["maroonred", kolor.names.maroon],
+      ["goldred", kolor.names.gold],
+      ["indigored", kolor.names.indigo],
+    ].map(([id, rgb]) => {
+      const [r, g, b] = rgb as [number, number, number];
+      return [id, kolor.colorformats.newRGBA32F(r / 255, g / 255, b / 255, 1)];
+    })
+  );
 
 function ClipboardColor() {
   const editor = useCurrentEditor();

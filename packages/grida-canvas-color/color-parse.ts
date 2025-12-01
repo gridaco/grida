@@ -61,8 +61,8 @@ function parse(cstr: string | number): ParseResult {
   const cstrLower = String(cstr).toLowerCase();
 
   //keyword
-  if (names[cstrLower]) {
-    parts = names[cstrLower].slice();
+  if (cstrLower in names) {
+    parts = names[cstrLower as keyof typeof names].slice();
     space = "rgb";
   }
 

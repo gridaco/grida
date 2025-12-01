@@ -9,12 +9,12 @@ export namespace color {
 
   export namespace colorformats {
     /**
-     * Clamps a value between 0 and 1.
+     * Clamps a value between 0.0 and 1.0.
      *
      * @param t - The value to clamp.
      * @returns The clamped value.
      */
-    function clamp01(t: number): number {
+    function f32(t: number): number {
       return t <= 0 ? 0 : t >= 1 ? 1 : t;
     }
 
@@ -24,8 +24,8 @@ export namespace color {
      * @param value - The value to clamp.
      * @returns The clamped value.
      */
-    function clamp255(value: number): number {
-      return value <= 0 ? 0 : value >= 255 ? 255 : value;
+    function u8(value: number): number {
+      return value <= 0 ? 0 : value >= 255 ? 255 : Math.round(value);
     }
 
     function u8ToF32(value: number): number {
@@ -265,18 +265,18 @@ export namespace color {
 
       export function intoRGBA8888(color: RGBA32F): RGBA8888 {
         return {
-          r: clamp255(color.r * 255),
-          g: clamp255(color.g * 255),
-          b: clamp255(color.b * 255),
-          a: clamp255(color.a * 255),
+          r: u8(color.r * 255),
+          g: u8(color.g * 255),
+          b: u8(color.b * 255),
+          a: u8(color.a * 255),
         } as RGBA8888;
       }
 
       export function intoRGB888F32A(color: RGBA32F): RGB888A32F {
         return {
-          r: clamp255(color.r * 255),
-          g: clamp255(color.g * 255),
-          b: clamp255(color.b * 255),
+          r: u8(color.r * 255),
+          g: u8(color.g * 255),
+          b: u8(color.b * 255),
           a: color.a,
         } as RGB888A32F;
       }
@@ -378,16 +378,16 @@ export namespace color {
           r: color.r,
           g: color.g,
           b: color.b,
-          a: color.a * 255,
+          a: u8(color.a * 255),
         } as RGBA8888;
       }
 
       export function intoRGBA32F(color: RGB888A32F): RGBA32F {
         return {
-          r: clamp01(color.r / 255),
-          g: clamp01(color.g / 255),
-          b: clamp01(color.b / 255),
-          a: clamp01(color.a),
+          r: f32(color.r / 255),
+          g: f32(color.g / 255),
+          b: f32(color.b / 255),
+          a: f32(color.a),
         } as RGBA32F;
       }
 
