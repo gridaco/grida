@@ -113,7 +113,8 @@ export function StandaloneSceneBackground({
 
   const [cssBackgroundColor, opacity] = useMemo(() => {
     if (!backgroundColor) return [undefined, 1] as const;
-    const hex = cmath.color.rgba8888_to_hex(backgroundColor);
+    const hex = cmath.colorformats.RGB888A32F.intoHEX(backgroundColor);
+    // const hex = cmath.color.rgba8888_to_hex(backgroundColor);
     const opacity = backgroundColor.a;
     return [hex, opacity] as const;
   }, [backgroundColor]);

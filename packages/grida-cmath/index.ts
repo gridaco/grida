@@ -222,6 +222,16 @@ namespace cmath {
   }
 
   /**
+   * Clamps a value between 0 and 255.
+   *
+   * @param value - The value to clamp.
+   * @returns The clamped value.
+   */
+  export function clamp255(value: number): number {
+    return value <= 0 ? 0 : value >= 255 ? 255 : value;
+  }
+
+  /**
    * Finds the nearest value to a given number from a list of target numbers.
    *
    * This function calculates the absolute difference between the given value and each target,
@@ -5837,19 +5847,6 @@ namespace cmath {
     export function rgba_to_unit8_chunk(rgba: RGBA8888): cmath.Vector4 {
       return [rgba.r, rgba.g, rgba.b, Math.round(rgba.a * 255)];
     }
-
-    /**
-     *
-     * @param color
-     * @returns hex color string with the leading `#`
-     * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"#ffffff"`
-     *
-     */
-    export function rgba8888_to_hex(color: RGBA8888): string {
-      const a = Math.round(color.a * 255);
-
-      return `#${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}${a.toString(16).padStart(2, "0")}`;
-    }
   }
 
   export namespace colorformats {
@@ -5915,14 +5912,34 @@ namespace cmath {
     };
 
     export namespace RGBA32F {
+      export const BLACK: RGBA32F = { r: 0, g: 0, b: 0, a: 1 };
+      export const WHITE: RGBA32F = { r: 1, g: 1, b: 1, a: 1 };
+
+      export function intoHEX(color: RGBA32F): string {
+        return RGBA8888.intoHEX(intoRGBA8888(color));
+      }
+
+      export function intoCSSRGBA(color: RGBA32F): string {
+        return RGB888A32F.intoCSSRGBA(intoRGB888F32A(color));
+      }
+
+      export function intoRGBA8888(color: RGBA32F): RGBA8888 {
+        return {
+          r: clamp255(color.r * 255),
+          g: clamp255(color.g * 255),
+          b: clamp255(color.b * 255),
+          a: clamp255(color.a * 255),
+        };
+      }
+
       /**
        * @deprecated
        */
       export function intoRGB888F32A(color: RGBA32F): RGB888A32F {
         return {
-          r: Math.round(color.r * 255),
-          g: Math.round(color.g * 255),
-          b: Math.round(color.b * 255),
+          r: clamp255(color.r * 255),
+          g: clamp255(color.g * 255),
+          b: clamp255(color.b * 255),
           a: color.a,
         };
       }
@@ -5938,6 +5955,17 @@ namespace cmath {
     }
 
     export namespace RGBA8888 {
+      export const BLACK: RGBA8888 = { r: 0, g: 0, b: 0, a: 255 };
+      export const WHITE: RGBA8888 = { r: 255, g: 255, b: 255, a: 255 };
+
+      export function intoHEX(color: RGBA8888): string {
+        const r = color.r.toString(16).padStart(2, "0");
+        const g = color.g.toString(16).padStart(2, "0");
+        const b = color.b.toString(16).padStart(2, "0");
+        const a = color.a.toString(16).padStart(2, "0");
+        return `#${r}${g}${b}${a}`;
+      }
+
       export function intoRGB888F32A(color: RGBA8888): RGB888A32F {
         return {
           r: color.r,
@@ -5953,6 +5981,35 @@ namespace cmath {
      * use {@link RGBA32F} instead
      */
     export namespace RGB888A32F {
+      export const BLACK: RGB888A32F = { r: 0, g: 0, b: 0, a: 1 };
+      export const WHITE: RGB888A32F = { r: 255, g: 255, b: 255, a: 1 };
+
+      export function intoHEX(color: RGB888A32F): string {
+        return RGBA8888.intoHEX(intoRGBA8888(color));
+      }
+
+      export function intoCSSRGBA(color: RGB888A32F): string {
+        return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
+      }
+
+      export function intoRGBA8888(color: RGB888A32F): RGBA8888 {
+        return {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+          a: color.a * 255,
+        };
+      }
+
+      export function intoRGBA32F(color: RGB888A32F): RGBA32F {
+        return {
+          r: clamp01(color.r / 255),
+          g: clamp01(color.g / 255),
+          b: clamp01(color.b / 255),
+          a: clamp01(color.a),
+        };
+      }
+
       export function multiplyA32(
         color: RGB888A32F,
         alpha: number = 1
