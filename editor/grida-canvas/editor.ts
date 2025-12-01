@@ -748,7 +748,7 @@ class EditorDocumentStore
         height: "auto",
         fill: {
           type: "solid",
-          color: kolor.colorformats.RGB888A32F.BLACK,
+          color: kolor.colorformats.RGBA32F.BLACK,
           active: true,
         },
       },
@@ -769,7 +769,7 @@ class EditorDocumentStore
         height: 100,
         fill: {
           type: "solid",
-          color: kolor.colorformats.RGB888A32F.BLACK,
+          color: kolor.colorformats.RGBA32F.BLACK,
           active: true,
         },
       },
@@ -2535,7 +2535,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.1-beta.1+20251010",
+      version: "0.0.1-beta.2+20251201",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -2697,7 +2697,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.0.1-beta.1+20251010",
+          version: "0.0.1-beta.2+20251201",
           document: payloadDocument,
         });
         surface.loadScene(p);

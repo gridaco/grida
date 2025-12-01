@@ -20,7 +20,7 @@ describe("toReactTextStyle", () => {
       fontKerning: true,
       fill: {
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.BLACK,
+        color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
       fontFeatures: { liga: false, smpl: true },
@@ -44,7 +44,7 @@ describe("toReactTextStyle", () => {
       fontKerning: true,
       fill: {
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.BLACK,
+        color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
       fontOpticalSizing: 12,
@@ -68,7 +68,7 @@ describe("toReactTextStyle", () => {
       fontKerning: false,
       fill: {
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.BLACK,
+        color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
       fontFeatures: { kern: true },
@@ -91,7 +91,7 @@ describe("toReactTextStyle", () => {
       fontWidth: 150,
       fill: {
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.BLACK,
+        color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
       fontVariations: { wdth: 120, wght: 500 },
@@ -113,7 +113,7 @@ describe("toReactTextStyle", () => {
       fontKerning: true,
       fill: {
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.BLACK,
+        color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
       textTransform: "uppercase",
@@ -136,7 +136,7 @@ describe("toReactCSSProperties", () => {
       fontWeight: 400,
       fill: {
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.BLACK,
+        color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
       maxLines: 2,

@@ -144,13 +144,11 @@ export namespace iofigma {
           transform: cmath.ui.gradient.transformFromControlPoints(points, type),
           stops: paint.gradientStops.map((stop) => ({
             offset: stop.position,
-            color: kolor.colorformats.RGBA32F.intoRGB888F32A(
-              kolor.colorformats.newRGBA32F(
-                stop.color.r,
-                stop.color.g,
-                stop.color.b,
-                stop.color.a
-              )
+            color: kolor.colorformats.newRGBA32F(
+              stop.color.r,
+              stop.color.g,
+              stop.color.b,
+              stop.color.a
             ),
           })),
           blendMode: map.blendModeMap[paint.blendMode],
@@ -162,14 +160,12 @@ export namespace iofigma {
       function toSolidPaint(paint: SolidPaint): cg.SolidPaint {
         return {
           type: "solid",
-          color: kolor.colorformats.RGB888A32F.multiplyA32(
-            kolor.colorformats.RGBA32F.intoRGB888F32A(
-              kolor.colorformats.newRGBA32F(
-                paint.color.r,
-                paint.color.g,
-                paint.color.b,
-                paint.color.a
-              )
+          color: kolor.colorformats.RGBA32F.multiplyA32(
+            kolor.colorformats.newRGBA32F(
+              paint.color.r,
+              paint.color.g,
+              paint.color.b,
+              paint.color.a
             ),
             paint.opacity
           ),
@@ -196,8 +192,8 @@ export namespace iofigma {
               transform: cmath.transform.identity,
               active: paint.visible ?? true,
               stops: [
-                { offset: 0, color: kolor.colorformats.RGB888A32F.BLACK },
-                { offset: 1, color: kolor.colorformats.RGB888A32F.WHITE },
+                { offset: 0, color: kolor.colorformats.RGBA32F.BLACK },
+                { offset: 1, color: kolor.colorformats.RGBA32F.WHITE },
               ],
               blendMode: map.blendModeMap[paint.blendMode],
               opacity: 1,

@@ -28,7 +28,7 @@ import {
   ShadowOuterIcon,
   ShadowInnerIcon,
 } from "@radix-ui/react-icons";
-import { RGB888A32FColorControl } from "./color";
+import { RGBA32FColorControl } from "./color";
 import { editor } from "@/grida-canvas";
 import { Button } from "@/components/ui-editor/button";
 import { Checkbox } from "@/components/ui-editor/checkbox";
@@ -547,7 +547,7 @@ function FeShadowProperties({
       </PropertyLine>
       <PropertyLine>
         <PropertyLineLabel>Color</PropertyLineLabel>
-        <RGB888A32FColorControl
+        <RGBA32FColorControl
           value={value.color}
           onValueChange={(v) => onValueChange?.({ ...value, color: v })}
         />
@@ -720,8 +720,7 @@ function FeNoiseProperties({
                   ...base,
                   mode: "mono",
                   color:
-                    value.color ??
-                    kolor.colorformats.newRGB888A32F(0, 0, 0, 0.15),
+                    value.color ?? kolor.colorformats.newRGBA32F(0, 0, 0, 0.15),
                 });
                 break;
               case "duo":
@@ -729,11 +728,10 @@ function FeNoiseProperties({
                   ...base,
                   mode: "duo",
                   color1:
-                    value.color1 ??
-                    kolor.colorformats.newRGB888A32F(255, 0, 0, 1),
+                    value.color1 ?? kolor.colorformats.newRGBA32F(1, 0, 0, 1),
                   color2:
                     value.color2 ??
-                    kolor.colorformats.newRGB888A32F(255, 255, 255, 0.25),
+                    kolor.colorformats.newRGBA32F(1, 1, 1, 0.25),
                 });
                 break;
               case "multi":
@@ -850,7 +848,7 @@ function FeNoiseProperties({
       {value.mode === "mono" && value.color && (
         <PropertyLine>
           <PropertyLineLabel>Color</PropertyLineLabel>
-          <RGB888A32FColorControl
+          <RGBA32FColorControl
             variant="with-opacity"
             value={value.color}
             onValueChange={(v) => onValueChange?.({ ...value, color: v })}
@@ -861,18 +859,15 @@ function FeNoiseProperties({
         <PropertyLine>
           <PropertyLineLabel>Colors</PropertyLineLabel>
           <div className="flex flex-col gap-2 w-full">
-            <RGB888A32FColorControl
+            <RGBA32FColorControl
               variant="with-opacity"
-              value={
-                value.color1 ?? kolor.colorformats.newRGB888A32F(255, 0, 0, 1)
-              }
+              value={value.color1 ?? kolor.colorformats.newRGBA32F(1, 0, 0, 1)}
               onValueChange={(v) => onValueChange?.({ ...value, color1: v })}
             />
-            <RGB888A32FColorControl
+            <RGBA32FColorControl
               variant="with-opacity"
               value={
-                value.color2 ??
-                kolor.colorformats.newRGB888A32F(255, 255, 255, 0.25)
+                value.color2 ?? kolor.colorformats.newRGBA32F(1, 1, 1, 0.25)
               }
               onValueChange={(v) => onValueChange?.({ ...value, color2: v })}
             />

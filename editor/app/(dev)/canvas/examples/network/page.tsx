@@ -36,7 +36,7 @@ const document: editor.state.IEditorStateInit = {
         name: "A",
         fill: {
           type: "solid",
-          color: kolor.colorformats.RGB888A32F.fromHEX("#00f"),
+          color: kolor.colorformats.RGBA32F.fromHEX("#00f"),
           active: true,
         },
         left: 0,
@@ -46,7 +46,7 @@ const document: editor.state.IEditorStateInit = {
         name: "B",
         fill: {
           type: "solid",
-          color: kolor.colorformats.RGB888A32F.fromHEX("#0f0"),
+          color: kolor.colorformats.RGBA32F.fromHEX("#0f0"),
           active: true,
         },
         left: 200,

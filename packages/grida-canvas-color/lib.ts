@@ -96,10 +96,6 @@ export namespace color {
       [RGBA8888_BRAND]: true;
     };
 
-    /**
-     * @deprecated
-     * use {@link RGBA32F} instead
-     */
     export type RGB888A32F = {
       /**
        * 0-255
@@ -211,6 +207,7 @@ export namespace color {
       export const TRANSPARENT: RGBA32F = { r: 0, g: 0, b: 0, a: 0 } as RGBA32F;
       export const BLACK: RGBA32F = { r: 0, g: 0, b: 0, a: 1 } as RGBA32F;
       export const WHITE: RGBA32F = { r: 1, g: 1, b: 1, a: 1 } as RGBA32F;
+      export const GRAY: RGBA32F = { r: 0.5, g: 0.5, b: 0.5, a: 1 } as RGBA32F;
 
       /**
        * #F5F5F5
@@ -275,9 +272,6 @@ export namespace color {
         } as RGBA8888;
       }
 
-      /**
-       * @deprecated
-       */
       export function intoRGB888F32A(color: RGBA32F): RGB888A32F {
         return {
           r: clamp255(color.r * 255),
@@ -324,10 +318,6 @@ export namespace color {
       }
     }
 
-    /**
-     * @deprecated
-     * use {@link RGBA32F} instead
-     */
     export namespace RGB888A32F {
       export const TRANSPARENT: RGB888A32F = {
         r: 0,

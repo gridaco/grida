@@ -530,7 +530,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.0.1-beta.1+20251010";
+  export const SCHEMA_VERSION = "0.0.1-beta.2+20251201";
 
   /**
    * Simple Node Selector
@@ -1011,7 +1011,7 @@ export namespace grida.program.css {
    */
   export type Border = {
     borderStyle: "none" | "solid" | "dashed";
-    borderColor: cg.RGB888A32F;
+    borderColor: cg.RGBA32F;
     /**
      * @example
      * ```css

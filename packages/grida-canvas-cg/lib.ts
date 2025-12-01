@@ -1,4 +1,4 @@
-import type kolor from "@grida/color";
+import kolor from "@grida/color";
 
 /**
  * Core Graphics
@@ -80,14 +80,13 @@ export namespace cg {
   };
 
   /**
-   * Floating-Point RGBA (Normalized RGBA)
+   * Standard f32 RGBA (Normalized RGBA)
    * Used in computer graphics pipelines, shading, and rendering.
    */
   export type RGBA32F = kolor.colorformats.RGBA32F;
 
   /**
-   * 8-bit Integer RGBA (Standard RGBA)
-   * Used in web and raster graphics, including CSS and images.
+   * 8-bit Integer RGB, f32 alpha (CSS' rgba format)
    */
   export type RGB888A32F = kolor.colorformats.RGB888A32F;
 
@@ -225,8 +224,8 @@ export namespace cg {
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-color
    */
-  export type TextDecorationColor = "currentcolor" | cg.RGB888A32F;
-  export type TextDecorationColorValue = cg.RGB888A32F;
+  export type TextDecorationColor = "currentcolor" | cg.RGBA32F;
+  export type TextDecorationColorValue = cg.RGBA32F;
 
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-skip-ink
@@ -708,19 +707,19 @@ export namespace cg {
   export namespace paints {
     export const transparent: Paint = {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 0 } as kolor.colorformats.RGB888A32F,
+      color: kolor.colorformats.RGBA32F.TRANSPARENT,
       active: true,
     };
 
     export const black: Paint = {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 1 } as kolor.colorformats.RGB888A32F,
+      color: kolor.colorformats.RGBA32F.BLACK,
       active: true,
     };
 
     export const white: Paint = {
       type: "solid",
-      color: { r: 255, g: 255, b: 255, a: 1 } as kolor.colorformats.RGB888A32F,
+      color: kolor.colorformats.RGBA32F.WHITE,
       active: true,
     };
   }
@@ -737,7 +736,7 @@ export namespace cg {
 
   export type SolidPaint = {
     type: "solid";
-    color: cg.RGB888A32F;
+    color: cg.RGBA32F;
     blendMode?: cg.BlendMode;
     active: boolean;
   };
@@ -942,7 +941,7 @@ export namespace cg {
      * 1 - end (100%)
      */
     offset: number;
-    color: cg.RGB888A32F;
+    color: cg.RGBA32F;
   };
   //
   //
@@ -958,7 +957,7 @@ export namespace cg {
      * The color of the shadow.
      * Defaults to the current color if not provided.
      */
-    color: RGB888A32F;
+    color: RGBA32F;
 
     /**
      * The horizontal and vertical offset of the shadow.
@@ -1013,7 +1012,7 @@ export namespace cg {
 
     spread: number;
 
-    color: RGB888A32F;
+    color: RGBA32F;
 
     /**
      * Whether this effect is active
@@ -1268,17 +1267,17 @@ export namespace cg {
      * Color of noise pixels (mono mode only)
      * Includes alpha for opacity control
      */
-    color?: RGB888A32F;
+    color?: RGBA32F;
     /**
      * Pattern color (duo mode only)
      * Applied where noise is visible
      */
-    color1?: RGB888A32F;
+    color1?: RGBA32F;
     /**
      * Background color (duo mode only)
      * Base layer behind the noise pattern
      */
-    color2?: RGB888A32F;
+    color2?: RGBA32F;
     /**
      * Overall opacity (multi mode only)
      * Range: 0.0 - 1.0

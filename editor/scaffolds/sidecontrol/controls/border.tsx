@@ -8,8 +8,8 @@ import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
 import kolor from "@grida/color";
 import { cn } from "@/components/lib/utils";
-import { RGB888A32FChip } from "./utils/paint-chip";
-import { RGB888A32FColorControl } from "./color";
+import { RGBA32FChip } from "./utils/paint-chip";
+import { RGBA32FColorControl } from "./color";
 import { PropertyEnum, PropertyLine, PropertyLineLabel } from "../ui";
 import { Label } from "@/components/ui/label";
 import { Cross2Icon } from "@radix-ui/react-icons";
@@ -30,7 +30,7 @@ export function BorderControl({
 
   const onAddBorder = () => {
     onValueChange?.({
-      borderColor: kolor.colorformats.RGB888A32F.BLACK,
+      borderColor: kolor.colorformats.RGBA32F.BLACK,
       borderStyle: "solid",
       borderWidth: 1,
     });
@@ -53,9 +53,9 @@ export function BorderControl({
               })
             )}
           >
-            <RGB888A32FChip
+            <RGBA32FChip
               rgba={
-                value?.borderColor ?? kolor.colorformats.RGB888A32F.TRANSPARENT
+                value?.borderColor ?? kolor.colorformats.RGBA32F.TRANSPARENT
               }
               className="rounded-sm"
             />
@@ -80,7 +80,7 @@ export function BorderControl({
             )}
             onClick={onAddBorder}
           >
-            <RGB888A32FChip rgba={kolor.colorformats.RGB888A32F.TRANSPARENT} />
+            <RGBA32FChip rgba={kolor.colorformats.RGBA32F.TRANSPARENT} />
             Add
           </div>
         )}
@@ -92,7 +92,7 @@ export function BorderControl({
           <div className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Color</PropertyLineLabel>
-              <RGB888A32FColorControl
+              <RGBA32FColorControl
                 value={value.borderColor}
                 onValueChange={(v) => {
                   onValueChange?.({

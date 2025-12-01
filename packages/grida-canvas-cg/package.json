@@ -25,7 +25,7 @@
   "files": [
     "dist"
   ],
-  "devDependencies": {
+  "dependencies": {
     "@grida/color": "workspace:*"
   }
 }

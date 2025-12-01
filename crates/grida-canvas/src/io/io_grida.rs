@@ -33,7 +33,7 @@ pub struct JSONDocument {
 #[derive(Debug, Deserialize)]
 pub struct JSONGradientStop {
     pub offset: f32,
-    #[serde(with = "color_formats::object::RGB888A32F")]
+    #[serde(with = "color_formats::object::RGBA32F")]
     pub color: CGColor,
 }
 
@@ -51,7 +51,7 @@ impl From<JSONGradientStop> for GradientStop {
 pub enum JSONPaint {
     #[serde(rename = "solid")]
     Solid {
-        #[serde(with = "color_formats::object::RGB888A32F", default)]
+        #[serde(with = "color_formats::object::RGBA32F", default)]
         color: CGColor,
         #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
@@ -138,7 +138,7 @@ pub struct CSSBorder {
     pub border_width: Option<f32>,
     #[serde(
         rename = "borderColor",
-        with = "color_formats::object::RGB888A32F",
+        with = "color_formats::object::RGBA32F",
         default
     )]
     pub border_color: CGColor,
@@ -161,7 +161,7 @@ pub struct JSONVariableWidthProfile {
 
 #[derive(Debug, Deserialize)]
 pub struct JSONFeShadow {
-    #[serde(with = "color_formats::object::RGB888A32F")]
+    #[serde(with = "color_formats::object::RGBA32F")]
     pub color: CGColor,
     pub dx: f32,
     pub dy: f32,
@@ -310,13 +310,13 @@ impl From<JSONFeLiquidGlass> for FeLiquidGlass {
 #[serde(tag = "mode", rename_all = "lowercase")]
 pub enum JSONFeNoiseColors {
     Mono {
-        #[serde(with = "color_formats::object::RGB888A32F", default)]
+        #[serde(with = "color_formats::object::RGBA32F", default)]
         color: CGColor,
     },
     Duo {
-        #[serde(with = "color_formats::object::RGB888A32F")]
+        #[serde(with = "color_formats::object::RGBA32F")]
         color1: CGColor,
-        #[serde(with = "color_formats::object::RGB888A32F")]
+        #[serde(with = "color_formats::object::RGBA32F")]
         color2: CGColor,
     },
     Multi {
@@ -985,7 +985,7 @@ pub struct JSONTextNode {
     pub text_decoration_style: Option<TextDecorationStyle>,
     #[serde(
         rename = "textDecorationColor",
-        with = "color_formats::object::RGB888A32F",
+        with = "color_formats::object::RGBA32F",
         default
     )]
     pub text_decoration_color: CGColor,
@@ -3137,7 +3137,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.0.1-beta.1+20251010",
+            "version": "0.0.1-beta.2+20251201",
             "document": {
                 "nodes": {
                     "main": {
@@ -3194,7 +3194,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.0.1-beta.1+20251010",
+            "version": "0.0.1-beta.2+20251201",
             "document": {
                 "nodes": {
                     "main": {
@@ -3261,7 +3261,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.0.1-beta.1+20251010",
+            "version": "0.0.1-beta.2+20251201",
             "document": {
                 "nodes": {
                     "main": {

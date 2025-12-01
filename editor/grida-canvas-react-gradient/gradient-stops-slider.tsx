@@ -39,12 +39,12 @@ export function GradientStopsSlider({
   const insertStopInSortedPosition = useCallback(
     (
       positions: number[],
-      colors: cg.RGB888A32F[],
+      colors: cg.RGBA32F[],
       newPosition: number,
-      newColor: cg.RGB888A32F
+      newColor: cg.RGBA32F
     ): {
       positions: number[];
-      colors: cg.RGB888A32F[];
+      colors: cg.RGBA32F[];
       insertedIndex: number;
     } => {
       const newPositions = [...positions];
@@ -77,9 +77,9 @@ export function GradientStopsSlider({
   const sortStopsByOffset = useCallback(
     (
       positions: number[],
-      colors: cg.RGB888A32F[],
+      colors: cg.RGBA32F[],
       originalIndex: number
-    ): { positions: number[]; colors: cg.RGB888A32F[]; newIndex: number } => {
+    ): { positions: number[]; colors: cg.RGBA32F[]; newIndex: number } => {
       const newPositions = [...positions];
       const newColors = [...colors];
       const movedPosition = newPositions[originalIndex];
@@ -110,7 +110,7 @@ export function GradientStopsSlider({
 
   // Update stops with new positions and colors
   const updateStops = useCallback(
-    (newPositions: number[], newColors: cg.RGB888A32F[]) => {
+    (newPositions: number[], newColors: cg.RGBA32F[]) => {
       const newStops = newPositions.map((position, index) => ({
         offset: position,
         color: newColors[index],
@@ -208,7 +208,7 @@ export function GradientStopsSlider({
       if (isDragging) return;
 
       const newPosition = screenToGradientPosition(e.clientX);
-      const newColor: cg.RGB888A32F = kolor.colorformats.RGB888A32F.GRAY;
+      const newColor: cg.RGBA32F = kolor.colorformats.RGBA32F.GRAY;
 
       const {
         positions: newPositions,

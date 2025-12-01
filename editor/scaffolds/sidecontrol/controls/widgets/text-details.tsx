@@ -10,7 +10,7 @@ import { Slider } from "../utils/slider";
 import { Separator } from "@/components/ui/separator";
 import { PropertyLine, PropertyLineLabel, PropertyEnumToggle } from "../../ui";
 import InputPropertyNumber from "../../ui/number";
-import { RGB888A32FColorControl } from "../color";
+import { RGBA32FColorControl } from "../color";
 import { WordSpacingControl } from "../word-spacing";
 import {
   TextAlignLeftIcon,
@@ -393,7 +393,7 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
       {/* Color */}
       <PropertyLine>
         <PropertyLineLabel>Color</PropertyLineLabel>
-        <RGB888A32FColorControl
+        <RGBA32FColorControl
           value={textDecorationColor}
           onValueChange={onTextDecorationColorChange}
           disabled={!isDecorationActive}
@@ -456,7 +456,7 @@ export function TextDetails({
   textDecorationLine = "none",
   textDecorationStyle = "solid",
   textDecorationThickness = "auto",
-  textDecorationColor = kolor.colorformats.RGB888A32F.BLACK,
+  textDecorationColor = kolor.colorformats.RGBA32F.BLACK,
   textDecorationSkipInk = true,
   textTransform = "none",
   verticalTrim = "all",

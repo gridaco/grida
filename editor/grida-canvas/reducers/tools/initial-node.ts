@@ -5,19 +5,19 @@ import { editor } from "@/grida-canvas/editor.i";
 
 export const gray: cg.Paint = {
   type: "solid",
-  color: kolor.colorformats.RGB888A32F.GRAY,
+  color: kolor.colorformats.RGBA32F.GRAY,
   active: true,
 };
 
 export const white: cg.Paint = {
   type: "solid",
-  color: kolor.colorformats.RGB888A32F.WHITE,
+  color: kolor.colorformats.RGBA32F.WHITE,
   active: true,
 };
 
 export const black: cg.Paint = {
   type: "solid",
-  color: kolor.colorformats.RGB888A32F.BLACK,
+  color: kolor.colorformats.RGBA32F.BLACK,
   active: true,
 };
 

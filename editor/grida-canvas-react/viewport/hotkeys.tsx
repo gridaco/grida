@@ -604,7 +604,7 @@ export function useEditorHotKeys() {
               const color = kolor.colorformats.RGBA32F.fromHEX(result.sRGBHex);
               const solidPaint: cg.SolidPaint = {
                 type: "solid",
-                color: kolor.colorformats.RGBA32F.intoRGB888F32A(color),
+                color: color,
                 active: true,
               };
 

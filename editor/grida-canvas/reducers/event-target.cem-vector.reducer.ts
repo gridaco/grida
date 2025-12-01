@@ -375,7 +375,7 @@ export function create_new_vector_node(
     zIndex: 0,
     stroke: {
       type: "solid",
-      color: kolor.colorformats.RGB888A32F.BLACK,
+      color: kolor.colorformats.RGBA32F.BLACK,
       active: true,
     },
     strokeWidth: 1,
@@ -704,7 +704,7 @@ export function on_draw_pointer_down(
     zIndex: 0,
     stroke: {
       type: "solid",
-      color: kolor.colorformats.RGB888A32F.BLACK,
+      color: kolor.colorformats.RGBA32F.BLACK,
       active: true,
     },
     strokeCap: "butt",

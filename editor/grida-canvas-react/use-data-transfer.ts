@@ -70,7 +70,7 @@ export function useDataTransferEventTarget() {
       node.$.top = y;
       node.$.fill = {
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.BLACK,
+        color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       } satisfies cg.Paint;
     },

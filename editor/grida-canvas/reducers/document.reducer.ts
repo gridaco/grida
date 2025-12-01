@@ -493,7 +493,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         return updateState(state, (draft) => {
           const net = action.vector_network!;
           const id = context.idgen.next();
-          const black = kolor.colorformats.RGB888A32F.BLACK;
+          const black = kolor.colorformats.RGBA32F.BLACK;
           const node: grida.program.nodes.VectorNode = {
             type: "vector",
             name: "vector",

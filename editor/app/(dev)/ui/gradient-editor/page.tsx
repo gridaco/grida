@@ -22,14 +22,6 @@ import kolor from "@grida/color";
 import { css } from "@/grida-canvas-utils/css";
 import { useWindowSize } from "@uidotdev/usehooks";
 
-// Helper function to convert RGBA8888 to hex string
-const rgbaToHex = (color: cg.RGB888A32F): string => {
-  const r = color.r.toString(16).padStart(2, "0");
-  const g = color.g.toString(16).padStart(2, "0");
-  const b = color.b.toString(16).padStart(2, "0");
-  return `#${r}${g}${b}`;
-};
-
 // Main gradient editor component that only renders when size is ready
 function GradientEditorContent() {
   const [gradientType, setGradientType] = useState<GradientType>("linear");
@@ -42,11 +34,9 @@ function GradientEditorContent() {
   };
 
   // State for the gradient
-  const [stops, setStops] = useState<
-    { offset: number; color: cg.RGB888A32F }[]
-  >([
-    { offset: 0, color: kolor.colorformats.newRGB888A32F(255, 0, 0, 1) },
-    { offset: 1, color: kolor.colorformats.newRGB888A32F(0, 0, 255, 1) },
+  const [stops, setStops] = useState<{ offset: number; color: cg.RGBA32F }[]>([
+    { offset: 0, color: kolor.colorformats.newRGBA32F(1, 0, 0, 1) },
+    { offset: 1, color: kolor.colorformats.newRGBA32F(0, 0, 1, 1) },
   ]);
   const [focusedStop, setFocusedStop] = useState<number | null>(null);
   const [points, setPoints] = useState<
@@ -124,7 +114,7 @@ function GradientEditorContent() {
       const newStops = [...prev];
       newStops.splice(at, 0, {
         offset: position,
-        color: kolor.colorformats.RGB888A32F.GRAY,
+        color: kolor.colorformats.RGBA32F.GRAY,
       });
       return newStops;
     });
@@ -256,11 +246,11 @@ function GradientEditorContent() {
                     <label className="text-xs">Color</label>
                     <Input
                       type="color"
-                      value={rgbaToHex(stop.color)}
+                      value={kolor.colorformats.RGBA32F.intoHEX(stop.color)}
                       onChange={(e) => {
                         const hex = e.target.value;
                         const newColor =
-                          kolor.colorformats.RGB888A32F.fromHEX(hex);
+                          kolor.colorformats.RGBA32F.fromHEX(hex);
                         setStops((prev) =>
                           prev.map((s, i) =>
                             i === focusedStop ? { ...s, color: newColor } : s

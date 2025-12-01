@@ -9,7 +9,7 @@ export function Header_001({ logo }: { logo?: string }) {
       // component={TemplateBuilderWidgets.flex}
       fill={{
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.TRANSPARENT,
+        color: kolor.colorformats.RGBA32F.TRANSPARENT,
         active: true,
       }}
       style={

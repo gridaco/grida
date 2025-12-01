@@ -44,7 +44,7 @@ export namespace iosvg {
         case "solid": {
           // paint.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
           const [r, g, b, a] = paint.color;
-          // Convert to RGBA8888 object format, apply opacity to alpha, then convert to RGB888A32F
+          // Convert to RGBA8888 object format, apply opacity to alpha, then convert to RGBA32F
           const rgba8888 = kolor.colorformats.newRGBA8888(
             r,
             g,
@@ -52,11 +52,15 @@ export namespace iosvg {
             // Apply opacity to alpha (still 0-255 range)
             a * opacity
           );
-          const rgb888a32f =
-            kolor.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
+          const rgba32f = kolor.colorformats.newRGBA32F(
+            rgba8888.r / 255,
+            rgba8888.g / 255,
+            rgba8888.b / 255,
+            rgba8888.a / 255
+          );
           return {
             type: "solid",
-            color: rgb888a32f,
+            color: rgba32f,
             active: true,
           };
         }
@@ -68,13 +72,17 @@ export namespace iosvg {
             stops: paint.stops.map((stop) => {
               // stop.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
               const [r, g, b, a] = stop.color;
-              // Convert to RGBA8888 object format, then convert to RGB888A32F
+              // Convert to RGBA8888 object format, then convert to RGBA32F
               const rgba8888 = kolor.colorformats.newRGBA8888(r, g, b, a);
-              const rgb888a32f =
-                kolor.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
+              const rgba32f = kolor.colorformats.newRGBA32F(
+                rgba8888.r / 255,
+                rgba8888.g / 255,
+                rgba8888.b / 255,
+                rgba8888.a / 255
+              );
               return {
                 offset: stop.offset,
-                color: rgb888a32f,
+                color: rgba32f,
               };
             }),
             blendMode: "normal",
@@ -90,13 +98,17 @@ export namespace iosvg {
             stops: paint.stops.map((stop) => {
               // stop.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
               const [r, g, b, a] = stop.color;
-              // Convert to RGBA8888 object format, then convert to RGB888A32F
+              // Convert to RGBA8888 object format, then convert to RGBA32F
               const rgba8888 = kolor.colorformats.newRGBA8888(r, g, b, a);
-              const rgb888a32f =
-                kolor.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
+              const rgba32f = kolor.colorformats.newRGBA32F(
+                rgba8888.r / 255,
+                rgba8888.g / 255,
+                rgba8888.b / 255,
+                rgba8888.a / 255
+              );
               return {
                 offset: stop.offset,
-                color: rgb888a32f,
+                color: rgba32f,
               };
             }),
             blendMode: "normal",

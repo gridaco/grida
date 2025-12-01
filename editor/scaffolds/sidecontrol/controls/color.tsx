@@ -1,13 +1,13 @@
 import React from "react";
 import { WorkbenchUI } from "@/components/workbench";
-import { RGB888A32FChip, RGBChip } from "./utils/paint-chip";
+import { RGBChip } from "./utils/paint-chip";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/components/lib/utils";
-import { ColorPicker, ColorPicker32F } from "./color-picker";
+import { ColorPicker32F } from "./color-picker";
 import RGBHexInput from "./utils/hex";
 import { useNumberInput } from "@grida/number-input/react";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
@@ -71,95 +71,6 @@ function InlineOpacityControl({
         bg-transparent outline-none
       "
     />
-  );
-}
-
-export function RGB888A32FColorControl({
-  value = kolor.colorformats.RGB888A32F.TRANSPARENT,
-  onValueChange,
-  disabled,
-  variant = "default",
-}: {
-  value?: kolor.colorformats.RGB888A32F;
-  disabled?: boolean;
-  onValueChange?: (value: kolor.colorformats.RGB888A32F) => void;
-  variant?: "default" | "with-opacity";
-}) {
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  const [isFocused, setIsFocused] = React.useState(false);
-
-  const handleInputFocus = React.useCallback(() => {
-    setIsFocused(true);
-  }, []);
-
-  const handleInputBlur = React.useCallback(() => {
-    setIsFocused(false);
-  }, []);
-
-  return (
-    <Popover modal={false}>
-      <InputGroup
-        className={cn(
-          WorkbenchUI.inputVariants({
-            size: "xs",
-            variant: "paint-container",
-          })
-        )}
-        data-focus={isFocused}
-      >
-        <InputGroupAddon align="inline-start" className="px-1.5">
-          <PopoverTrigger disabled={disabled}>
-            <RGB888A32FChip rgba={value} className="rounded-sm" />
-          </PopoverTrigger>
-        </InputGroupAddon>
-
-        <RGBHexInput
-          ref={inputRef}
-          className="flex-1 !px-0"
-          disabled={disabled}
-          value={{
-            r: value.r,
-            g: value.g,
-            b: value.b,
-          }}
-          unit="u8"
-          onFocus={handleInputFocus}
-          onBlur={handleInputBlur}
-          onValueChange={(rgb) => {
-            onValueChange?.(
-              kolor.colorformats.newRGB888A32F(rgb.r, rgb.g, rgb.b, value.a)
-            );
-          }}
-        />
-
-        {variant === "with-opacity" && (
-          <>
-            <Separator orientation="vertical" />
-            <InputGroupAddon align="inline-end">
-              <InlineOpacityControl
-                value={value.a}
-                onValueCommit={(opacity) => {
-                  onValueChange?.({
-                    ...value,
-                    a: opacity,
-                  });
-                }}
-                onFocus={handleInputFocus}
-                onBlur={handleInputBlur}
-              />
-            </InputGroupAddon>
-          </>
-        )}
-      </InputGroup>
-      <PopoverContent
-        align="start"
-        side="right"
-        sideOffset={16}
-        className="p-0"
-      >
-        <ColorPicker color={value} onColorChange={onValueChange} />
-      </PopoverContent>
-    </Popover>
   );
 }
 

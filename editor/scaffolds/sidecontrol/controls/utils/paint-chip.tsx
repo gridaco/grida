@@ -27,7 +27,14 @@ export function PaintChip({
 }) {
   switch (paint.type) {
     case "solid":
-      return <RGB888A32FChip rgba={paint.color} className={className} />;
+      return (
+        <RGBChip
+          rgb={paint.color}
+          unit="f32"
+          opacity={paint.color.a}
+          className={className}
+        />
+      );
     case "linear_gradient":
       return <LinearGradientPaintChip paint={paint} className={className} />;
     case "radial_gradient":
@@ -42,26 +49,22 @@ export function PaintChip({
 }
 
 /**
- * @deprecated DEPRECATED_COLOR_MODEL
- * use {@link RGBChip} instead
+ * This function now accepts RGBA32F and converts internally.
  */
-export function RGB888A32FChip({
+export function RGBA32FChip({
   rgba,
   className,
 }: {
-  rgba: cg.RGB888A32F;
+  rgba: cg.RGBA32F;
   className?: string;
 }) {
   return (
-    <ChipContainer className={className}>
-      <div
-        className="absolute w-full h-full z-10"
-        style={{
-          backgroundColor: css.toRGBAString(rgba),
-        }}
-      />
-      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
-    </ChipContainer>
+    <RGBChip
+      rgb={{ r: rgba.r, g: rgba.g, b: rgba.b }}
+      unit="f32"
+      opacity={rgba.a}
+      className={className}
+    />
   );
 }
 
@@ -196,10 +199,12 @@ export function DiamondGradientPaintChip({
             transform: paint.transform,
             stops: paint.stops.map((stop, index) => ({
               ...stop,
-              color: {
-                ...stop.color,
-                a: stop.color.a * 0.3, // Reduce opacity for overlay effect
-              },
+              color: kolor.colorformats.newRGBA32F(
+                stop.color.r,
+                stop.color.g,
+                stop.color.b,
+                stop.color.a * 0.3 // Reduce opacity for overlay effect
+              ),
             })),
           }),
         }}

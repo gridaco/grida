@@ -1,6 +1,6 @@
 import React from "react";
 import RGBHexInput from "./utils/hex";
-import { RgbaColorPicker as RGB888A32FColorPicker } from "react-colorful";
+import { RgbaColorPicker } from "react-colorful";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { PipetteIcon } from "lucide-react";
@@ -14,61 +14,70 @@ import {
 import kolor from "@grida/color";
 import "./color-picker.css";
 
-type RGB888A32F = kolor.colorformats.RGB888A32F;
 type RGBA32F = kolor.colorformats.RGBA32F;
 
-type PickerOption<TColor> = {
+type PickerOption = {
   id: string;
-  color: TColor;
+  color: RGBA32F;
 };
 
-type PickerPanelProps = {
-  color: RGB888A32F;
-  onColorChange?: (color: RGB888A32F) => void;
-  options?: PickerOption<RGB888A32F>[];
-  isEyeDropperSupported: boolean;
-  onEyeDropperPick: () => void;
-};
-
-function ColorPickerBase({
+export function ColorPicker32F({
   color,
   onColorChange,
   options,
-  isEyeDropperSupported,
-  onEyeDropperPick,
-}: PickerPanelProps) {
+}: {
+  color: RGBA32F;
+  onColorChange?: (color: RGBA32F) => void;
+  options?: PickerOption[];
+}) {
+  const { isSupported, open } = useEyeDropper();
+
+  // Convert RGBA32F to RGB888A32F for react-colorful (expects 0-255 for RGB, 0-1 for alpha)
+  const pickerColor = React.useMemo(() => {
+    return kolor.colorformats.RGBA32F.intoRGB888F32A(color);
+  }, [color]);
+
+  const handlePickerChange = React.useCallback(
+    (newColor: { r: number; g: number; b: number; a: number }) => {
+      // Convert back from RGB888A32F to RGBA32F
+      const rgb888a32f = kolor.colorformats.newRGB888A32F(
+        newColor.r,
+        newColor.g,
+        newColor.b,
+        newColor.a
+      );
+      onColorChange?.(kolor.colorformats.RGB888A32F.intoRGBA32F(rgb888a32f));
+    },
+    [onColorChange]
+  );
+
+  const handleEyeDropperPick = React.useCallback(() => {
+    if (!isSupported) return;
+    open()?.then((result) => {
+      const rgba32f = kolor.colorformats.RGBA32F.fromHEX(result.sRGBHex);
+      onColorChange?.(rgba32f);
+    });
+  }, [isSupported, open, onColorChange]);
+
   return (
     <div>
       <div className="cusom">
-        <RGB888A32FColorPicker
-          color={color}
+        <RgbaColorPicker
+          color={pickerColor}
           className="!w-full"
-          onChange={(newColor) =>
-            onColorChange?.(
-              kolor.colorformats.newRGB888A32F(
-                newColor.r,
-                newColor.g,
-                newColor.b,
-                newColor.a
-              )
-            )
-          }
+          onChange={handlePickerChange}
         />
       </div>
 
       <div className="p-2">
         <div className="flex items-center gap-2">
           <Button
-            title={
-              isEyeDropperSupported
-                ? "eye dropper"
-                : "eye dropper not supported"
-            }
-            disabled={!isEyeDropperSupported}
+            title={isSupported ? "eye dropper" : "eye dropper not supported"}
+            disabled={!isSupported}
             variant="ghost"
             size="xs"
             className="text-muted-foreground"
-            onClick={onEyeDropperPick}
+            onClick={handleEyeDropperPick}
           >
             <PipetteIcon className="size-4" />
           </Button>
@@ -83,6 +92,7 @@ function ColorPickerBase({
           >
             <RGBHexInput
               className="border-none outline-none w-full h-full ps-2 text-xs"
+              unit="f32"
               value={{
                 r: color.r,
                 g: color.g,
@@ -91,7 +101,7 @@ function ColorPickerBase({
               }}
               onValueChange={(newColor) => {
                 onColorChange?.(
-                  kolor.colorformats.newRGB888A32F(
+                  kolor.colorformats.newRGBA32F(
                     newColor.r,
                     newColor.g,
                     newColor.b,
@@ -104,189 +114,33 @@ function ColorPickerBase({
         </div>
         {options && options.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
-            {options.map((option) => (
-              <Tooltip key={option.id}>
-                <TooltipTrigger>
-                  <div
-                    className="size-4"
-                    onClick={() => onColorChange?.(option.color)}
-                  >
+            {options.map((option) => {
+              // Convert RGBA32F to CSS rgba for display
+              const cssColor = kolor.colorformats.RGBA32F.intoCSSRGBA(
+                option.color
+              );
+              return (
+                <Tooltip key={option.id}>
+                  <TooltipTrigger>
                     <div
-                      className="size-5 rounded-xs border"
-                      style={{
-                        background: `rgba(${option.color.r}, ${option.color.g}, ${option.color.b}, ${option.color.a})`,
-                      }}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{option.id}</TooltipContent>
-              </Tooltip>
-            ))}
+                      className="size-4"
+                      onClick={() => onColorChange?.(option.color)}
+                    >
+                      <div
+                        className="size-5 rounded-xs border"
+                        style={{
+                          background: cssColor,
+                        }}
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{option.id}</TooltipContent>
+                </Tooltip>
+              );
+            })}
           </div>
         )}
       </div>
     </div>
-  );
-}
-
-/**
- * @deprecated Use {@link ColorPicker32F} instead.
- */
-export function ColorPicker({
-  color,
-  onColorChange,
-  options,
-}: {
-  color: kolor.colorformats.RGB888A32F;
-  onColorChange?: (color: kolor.colorformats.RGB888A32F) => void;
-  options?: {
-    id: string;
-    color: kolor.colorformats.RGB888A32F;
-  }[];
-}) {
-  const { isSupported, open } = useEyeDropper();
-
-  return (
-    <div>
-      <div className="cusom">
-        <RGB888A32FColorPicker
-          color={color}
-          className="!w-full"
-          onChange={(newColor) =>
-            onColorChange?.(
-              kolor.colorformats.newRGB888A32F(
-                newColor.r,
-                newColor.g,
-                newColor.b,
-                newColor.a
-              )
-            )
-          }
-        />
-      </div>
-
-      <div className="p-2">
-        <div className="flex items-center gap-2">
-          <Button
-            title={isSupported ? "eye dropper" : "eye dropper not supported"}
-            disabled={!isSupported}
-            variant="ghost"
-            size="xs"
-            className="text-muted-foreground"
-            onClick={() => {
-              open()?.then((result) => {
-                const color = kolor.colorformats.RGB888A32F.fromHEX(
-                  result.sRGBHex
-                );
-                onColorChange?.(color);
-              });
-            }}
-          >
-            <PipetteIcon className="size-4" />
-          </Button>
-          <div
-            className={cn(
-              "border cursor-default",
-              WorkbenchUI.inputVariants({
-                size: "xs",
-                variant: "paint-container",
-              })
-            )}
-          >
-            <RGBHexInput
-              className="border-none outline-none w-full h-full ps-2 text-xs"
-              value={{
-                r: color.r,
-                g: color.g,
-                b: color.b,
-                // ommit the alpha
-              }}
-              onValueChange={(newcolor) => {
-                onColorChange?.(
-                  kolor.colorformats.newRGB888A32F(
-                    newcolor.r,
-                    newcolor.g,
-                    newcolor.b,
-                    color.a
-                  )
-                );
-              }}
-            />
-          </div>
-        </div>
-        {options && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {options?.map((option) => (
-              <Tooltip key={option.id}>
-                <TooltipTrigger>
-                  <div
-                    className="size-4"
-                    onClick={() => onColorChange?.(option.color)}
-                  >
-                    <div
-                      className="size-5 rounded-xs border"
-                      style={{
-                        background: `rgba(${option.color.r}, ${option.color.g}, ${option.color.b}, ${option.color.a})`,
-                      }}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{option.id}</TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function ColorPicker32F({
-  color,
-  onColorChange,
-  options,
-}: {
-  color: RGBA32F;
-  onColorChange?: (color: RGBA32F) => void;
-  options?: PickerOption<RGBA32F>[];
-}) {
-  const { isSupported, open } = useEyeDropper();
-  const normalizedColor = React.useMemo(
-    () => kolor.colorformats.RGBA32F.intoRGB888F32A(color),
-    [color]
-  );
-
-  const normalizedOptions = React.useMemo(() => {
-    if (!options?.length) return undefined;
-    return (
-      options?.map((option) => ({
-        id: option.id,
-        color: kolor.colorformats.RGBA32F.intoRGB888F32A(option.color),
-      })) ?? undefined
-    );
-  }, [options]);
-
-  const handlePickerChange = React.useCallback(
-    (updated: RGB888A32F) => {
-      onColorChange?.(kolor.colorformats.RGB888A32F.intoRGBA32F(updated));
-    },
-    [onColorChange]
-  );
-
-  const handleEyeDropperPick = React.useCallback(() => {
-    if (!isSupported) return;
-    open()?.then((result) => {
-      handlePickerChange(kolor.colorformats.RGB888A32F.fromHEX(result.sRGBHex));
-    });
-  }, [isSupported, open, handlePickerChange]);
-
-  return (
-    <ColorPickerBase
-      color={normalizedColor}
-      onColorChange={handlePickerChange}
-      options={normalizedOptions}
-      isEyeDropperSupported={isSupported}
-      onEyeDropperPick={handleEyeDropperPick}
-    />
   );
 }

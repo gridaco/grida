@@ -355,7 +355,7 @@ export function ChunkPaints({
   const handleAddPaint = React.useCallback(() => {
     const newPaint: cg.Paint = {
       type: "solid",
-      color: kolor.colorformats.newRGB888A32F(
+      color: kolor.colorformats.newRGBA32F(
         0,
         0,
         0,

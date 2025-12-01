@@ -422,7 +422,7 @@ export namespace editor.config {
   };
 
   export const DEFAULT_FE_SHADOW: cg.IFeShadow = {
-    color: kolor.colorformats.newRGB888A32F(0, 0, 0, 0.25),
+    color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.25),
     dx: 0,
     dy: 4,
     blur: 4,
@@ -455,7 +455,7 @@ export namespace editor.config {
     mode: "mono",
     noiseSize: 0.5,
     density: 0.5,
-    color: kolor.colorformats.newRGB888A32F(0, 0, 0, 0.15),
+    color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.15),
     blendMode: "normal",
   };
 

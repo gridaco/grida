@@ -42,6 +42,7 @@ import {
   useContentEditModeMinimalState,
   useToolState,
 } from "@/grida-canvas-react/provider";
+import { RGBChip } from "@/scaffolds/sidecontrol/controls/utils/paint-chip";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -352,11 +353,11 @@ function ClipboardColor() {
       <PopoverTrigger
         className={toggleVariants({ variant: "default", size: "default" })}
       >
-        <div
-          className="border rounded-full size-5"
-          style={{
-            background: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
-          }}
+        <RGBChip
+          rgb={{ r: color.r, g: color.g, b: color.b }}
+          unit="f32"
+          opacity={color.a}
+          className="rounded-full border size-5"
         />
       </PopoverTrigger>
       <PopoverContent

@@ -61,7 +61,7 @@ import ControlPoint from "./components/control-point";
  */
 export interface GradientControlPointsEditorProps {
   /** Array of gradient stops with positions and colors */
-  stops: { offset: number; color: cg.RGB888A32F }[];
+  stops: { offset: number; color: cg.RGBA32F }[];
   /** Index of currently focused stop (null if none) */
   focusedStop: number | null;
   /** Control points for gradient transform [A, B, C] - optional if using internal state */
@@ -606,7 +606,7 @@ export default function GradientControlPointsEditor({
             x={x}
             y={y}
             transform={`translate(-50%, -50%) rotate(${rotation}deg)`}
-            color={kolor.colorformats.RGB888A32F.intoCSSRGBA(stop.color)}
+            color={kolor.colorformats.RGBA32F.intoCSSRGBA(stop.color)}
             selected={focusedStop === index}
             readonly={readonly}
             tabIndex={0}

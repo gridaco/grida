@@ -11,8 +11,12 @@ export namespace css {
    */
   export const namedcolors = kolor.names;
 
-  export function toRGBAString(rgba: kolor.colorformats.RGB888A32F): string {
-    return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
+  export function toRGBAString(rgba: kolor.colorformats.RGBA32F): string {
+    // Format directly from RGBA32F (0.0-1.0) to CSS rgba() format
+    const r = Math.round(rgba.r * 255);
+    const g = Math.round(rgba.g * 255);
+    const b = Math.round(rgba.b * 255);
+    return `rgba(${r}, ${g}, ${b}, ${rgba.a})`;
   }
 
   /**

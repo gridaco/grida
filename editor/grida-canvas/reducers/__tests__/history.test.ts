@@ -71,7 +71,7 @@ function createDocument(): grida.program.document.Document {
         strokeJoin: "miter",
         fill: {
           type: "solid",
-          color: color.colorformats.RGB888A32F.BLACK,
+          color: color.colorformats.RGBA32F.BLACK,
           active: true,
         },
       },
@@ -95,7 +95,7 @@ function createDocument(): grida.program.document.Document {
         strokeJoin: "miter",
         fill: {
           type: "solid",
-          color: color.colorformats.RGB888A32F.BLACK,
+          color: color.colorformats.RGBA32F.BLACK,
           active: true,
         },
       },

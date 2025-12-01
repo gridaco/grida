@@ -214,7 +214,7 @@ function EditorUser({
   const handleInsertStop = useCallback(
     (at: number, position: number) => {
       // Create a gray color for new stops
-      const newColor: cg.RGB888A32F = kolor.colorformats.RGB888A32F.GRAY;
+      const newColor: cg.RGBA32F = kolor.colorformats.RGBA32F.GRAY;
       const newStop = { offset: position, color: newColor };
 
       const newStops = [...stops];

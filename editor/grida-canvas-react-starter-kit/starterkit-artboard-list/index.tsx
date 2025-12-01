@@ -27,7 +27,7 @@ const ArtboardList = () => {
       height: item.height,
       fill: {
         type: "solid",
-        color: kolor.colorformats.RGB888A32F.WHITE,
+        color: kolor.colorformats.RGBA32F.WHITE,
         active: true,
       },
       children: [],
