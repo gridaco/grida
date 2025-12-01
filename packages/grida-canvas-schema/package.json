@@ -6,9 +6,12 @@
     "typecheck": "tsc --noEmit",
     "test": "jest"
   },
+  "dependencies": {
+    "@grida/cg": "workspace:*"
+  },
   "devDependencies": {
-    "@grida/cg": "workspace:*",
     "@grida/cmath": "workspace:*",
+    "@grida/color": "workspace:*",
     "@grida/tokens": "workspace:*",
     "@grida/tree": "workspace:*",
     "@grida/vn": "workspace:*",

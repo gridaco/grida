@@ -314,7 +314,7 @@ fn main() {
         let text_style = TextStyleRec {
             text_decoration: Some(TextDecorationRec {
                 text_decoration_line: TextDecorationLine::Underline,
-                text_decoration_color: Some(CGColor(255, 0, 0, 255)),
+                text_decoration_color: Some(CGColor::from_rgba(255, 0, 0, 255)),
                 text_decoration_style: None,
                 text_decoration_skip_ink: Some(*skip_ink),
                 text_decoration_thinkness: None,
@@ -361,21 +361,21 @@ fn main() {
         (
             TextDecorationLine::Underline,
             Some(TextDecorationStyle::Dashed),
-            Some(CGColor(128, 0, 128, 255)),
+            Some(CGColor::from_rgba(128, 0, 128, 255)),
             Some(2.0),
             "Purple Dashed Thick Underline",
         ),
         (
             TextDecorationLine::Overline,
             Some(TextDecorationStyle::Double),
-            Some(CGColor(255, 140, 0, 255)),
+            Some(CGColor::from_rgba(255, 140, 0, 255)),
             Some(1.5),
             "Orange Double Thick Overline",
         ),
         (
             TextDecorationLine::LineThrough,
             Some(TextDecorationStyle::Dotted),
-            Some(CGColor(0, 128, 128, 255)),
+            Some(CGColor::from_rgba(0, 128, 128, 255)),
             Some(2.5),
             "Teal Dotted Very Thick Strikethrough",
         ),
@@ -442,7 +442,7 @@ fn main() {
         let text_style = TextStyleRec {
             text_decoration: Some(TextDecorationRec {
                 text_decoration_line: *decoration,
-                text_decoration_color: Some(CGColor(100, 100, 100, 255)),
+                text_decoration_color: Some(CGColor::from_rgba(100, 100, 100, 255)),
                 text_decoration_style: Some(TextDecorationStyle::Solid),
                 text_decoration_skip_ink: None,
                 text_decoration_thinkness: Some(1.5),

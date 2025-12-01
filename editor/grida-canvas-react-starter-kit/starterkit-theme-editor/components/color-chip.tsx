@@ -4,8 +4,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/components/lib/utils";
-import parse from "color-parse";
 import { pickers } from "@/components/color-picker";
+import kolor from "@grida/color";
 
 export function ColorPickerChip({
   id,
@@ -20,7 +20,7 @@ export function ColorPickerChip({
   onValueChange?: (value: string) => void;
   className?: string;
 }) {
-  const { space } = parse(value);
+  const { space } = kolor.parse(value);
 
   const Picker =
     space && space in pickers

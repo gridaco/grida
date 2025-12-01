@@ -42,7 +42,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     }));
-    rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
+    rect1.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 0, 0, 255))]);
     rect1.stroke_width = 2.0.into();
 
     let mut graph = SceneGraph::new();
@@ -53,7 +53,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
     let scene = Scene {
         name: "Images Demo".to_string(),
         graph,
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
     };
 
     (scene, bytes)

@@ -1,9 +1,10 @@
 import { css } from "@/grida-canvas-utils/css";
 import { TransparencyGridIcon, ImageIcon } from "@radix-ui/react-icons";
-import type cg from "@grida/cg";
 import { cn } from "@/components/lib/utils";
 import { ImageView } from "@/grida-canvas-react";
 import { ComponentProps } from "react";
+import type cg from "@grida/cg";
+import kolor from "@grida/color";
 
 function ChipContainer({ className, ...props }: ComponentProps<"div">) {
   return (
@@ -26,7 +27,14 @@ export function PaintChip({
 }) {
   switch (paint.type) {
     case "solid":
-      return <RGBAChip rgba={paint.color} className={className} />;
+      return (
+        <RGBChip
+          rgb={paint.color}
+          unit="f32"
+          opacity={paint.color.a}
+          className={className}
+        />
+      );
     case "linear_gradient":
       return <LinearGradientPaintChip paint={paint} className={className} />;
     case "radial_gradient":
@@ -40,11 +48,50 @@ export function PaintChip({
   }
 }
 
-export function RGBAChip({
+/**
+ * This function now accepts RGBA32F and converts internally.
+ */
+export function RGBA32FChip({
   rgba,
   className,
 }: {
-  rgba: cg.RGBA8888;
+  rgba: cg.RGBA32F;
+  className?: string;
+}) {
+  return (
+    <RGBChip
+      rgb={{ r: rgba.r, g: rgba.g, b: rgba.b }}
+      unit="f32"
+      opacity={rgba.a}
+      className={className}
+    />
+  );
+}
+
+/**
+ * Displays a small swatch for arbitrary RGB color data with configurable unit
+ * precision and alpha value.
+ *
+ * @param rgb - Raw RGB `{r, g, b}` in the provided component format.
+ * @param unit - Declares how each component in `rgb` is encoded (`f32`: 0.0-1.0, `u8`: 0-255, etc.).
+ * @param opacity - Final alpha in 0-1 range, applied independently of `unit`.
+ * @param className - Optional utility classes forwarded to the chip container.
+ */
+export function RGBChip({
+  rgb,
+  unit,
+  opacity,
+  className,
+}: {
+  rgb: kolor.colorformats.RGB_UNKNOWN;
+  /**
+   * the format of the rgb values
+   */
+  unit: kolor.colorformats.ColorComponentFormat;
+  /**
+   * 0.0-1.0 (independent of unit)
+   */
+  opacity: number;
   className?: string;
 }) {
   return (
@@ -52,7 +99,8 @@ export function RGBAChip({
       <div
         className="absolute w-full h-full z-10"
         style={{
-          backgroundColor: css.toRGBAString(rgba),
+          backgroundColor: kolor.colorformats.intoCSSRGB(rgb, unit),
+          opacity: opacity,
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-0" />
@@ -151,10 +199,12 @@ export function DiamondGradientPaintChip({
             transform: paint.transform,
             stops: paint.stops.map((stop, index) => ({
               ...stop,
-              color: {
-                ...stop.color,
-                a: stop.color.a * 0.3, // Reduce opacity for overlay effect
-              },
+              color: kolor.colorformats.newRGBA32F(
+                stop.color.r,
+                stop.color.g,
+                stop.color.b,
+                stop.color.a * 0.3 // Reduce opacity for overlay effect
+              ),
             })),
           }),
         }}

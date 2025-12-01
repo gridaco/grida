@@ -27,7 +27,7 @@ async fn demo_basic() -> Scene {
         dy: 4.0,
         blur: 8.0,
         spread: 0.0,
-        color: CGColor(0, 0, 0, 77),
+        color: CGColor::from_rgba(0, 0, 0, 77),
         active: true,
     })]);
     image_node.image = ResourceRef::RID(format!("res://images/{}", demo_image_id));
@@ -40,14 +40,14 @@ async fn demo_basic() -> Scene {
         height: 100.0,
     };
     rect_node.corner_radius = RectangularCornerRadius::circular(10.0);
-    rect_node.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
+    rect_node.set_fill(Paint::from(CGColor::from_rgba(255, 0, 0, 255)));
     rect_node.stroke_width = 2.0.into();
     rect_node.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 4.0,
         dy: 4.0,
         blur: 8.0,
         spread: 0.0,
-        color: CGColor(0, 0, 0, 77),
+        color: CGColor::from_rgba(0, 0, 0, 77),
         active: true,
     })]);
 
@@ -61,9 +61,9 @@ async fn demo_basic() -> Scene {
     };
     ellipse_node.fills = Paints::new([Paint::RadialGradient(RadialGradientPaint::from_colors(
         vec![
-            CGColor(0, 255, 0, 255),
-            CGColor(255, 255, 0, 255),
-            CGColor(255, 0, 255, 255),
+            CGColor::from_rgba(0, 255, 0, 255),
+            CGColor::from_rgba(255, 255, 0, 255),
+            CGColor::from_rgba(255, 0, 255, 255),
         ],
     ))]);
     ellipse_node.stroke_width = 6.0.into();
@@ -83,8 +83,8 @@ async fn demo_basic() -> Scene {
     polygon_node.blend_mode = BlendMode::Screen.into();
     polygon_node.transform = AffineTransform::new(600.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
-    polygon_node.fills = Paints::new([Paint::from(CGColor(255, 200, 0, 255))]);
-    polygon_node.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
+    polygon_node.fills = Paints::new([Paint::from(CGColor::from_rgba(255, 200, 0, 255))]);
+    polygon_node.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]);
     polygon_node.stroke_width = 5.0.into();
 
     // Create a test regular polygon node (hexagon)
@@ -96,7 +96,7 @@ async fn demo_basic() -> Scene {
         height: 200.0,
     };
     regular_polygon_node.point_count = 6; // hexagon
-    regular_polygon_node.fills = Paints::new([Paint::from(CGColor(0, 200, 255, 255))]);
+    regular_polygon_node.fills = Paints::new([Paint::from(CGColor::from_rgba(0, 200, 255, 255))]);
     regular_polygon_node.stroke_width = 4.0.into();
     regular_polygon_node.opacity = 0.5;
 
@@ -108,14 +108,14 @@ async fn demo_basic() -> Scene {
     text_span_node.text_style = TextStyleRec::from_font(font_caveat_family.as_str(), 32.0);
     text_span_node.text_align = TextAlign::Center;
     text_span_node.text_align_vertical = TextAlignVertical::Center;
-    text_span_node.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
+    text_span_node.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]);
     text_span_node.stroke_width = 4.0;
 
     // Create a test path node
     let mut path_node = nf.create_path_node();
     path_node.transform = AffineTransform::new(550.0, 300.0, 0.0);
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
-    path_node.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
+    path_node.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 0, 0, 255))]);
     path_node.stroke_width = 4.0.into();
 
     // Create a test line node with solid color
@@ -126,7 +126,7 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 0.0, // ignored
     };
-    line_node.strokes = Paints::new([Paint::from(CGColor(0, 255, 0, 255))]);
+    line_node.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 255, 0, 255))]);
     line_node.stroke_width = 4.0;
 
     // Create a group node for the shapes (rectangle, ellipse, polygon)
@@ -173,7 +173,7 @@ async fn demo_basic() -> Scene {
 
     Scene {
         name: "Demo".to_string(),
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
         graph,
     }
 }

@@ -2,17 +2,21 @@ import cmath from "@grida/cmath";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
 import type csstype from "csstype";
-import colors from "color-name";
+import kolor from "@grida/color";
 
 export namespace css {
   /**
    * @see https://github.com/bahamas10/css-color-names/blob/master/css-color-names.json
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/named-color
    */
-  export const namedcolors = colors;
+  export const namedcolors = kolor.names;
 
-  export function toRGBAString(rgba: cg.RGBA8888): string {
-    return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
+  export function toRGBAString(rgba: kolor.colorformats.RGBA32F): string {
+    // Format directly from RGBA32F (0.0-1.0) to CSS rgba() format
+    const r = Math.round(rgba.r * 255);
+    const g = Math.round(rgba.g * 255);
+    const b = Math.round(rgba.b * 255);
+    return `rgba(${r}, ${g}, ${b}, ${rgba.a})`;
   }
 
   /**

@@ -1505,7 +1505,7 @@ function PixelGridOverlay() {
 
 function RulerGuideOverlay() {
   const editor = useCurrentEditor();
-  const { guides } = useCurrentSceneState();
+  const { guides = [] } = useCurrentSceneState();
   const { scaleX, scaleY, transform } = useTransformState();
   const viewport = useViewport();
   const d = useSurfaceSelectionGroups();

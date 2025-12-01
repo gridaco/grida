@@ -49,7 +49,7 @@ async fn demo_n_shapes(n: usize) -> Scene {
         // Convert HSV to RGB
         let (r, g, b) = hsv_to_rgb(hue, 1.0, 1.0);
 
-        rect.set_fill(Paint::from(CGColor(r, g, b, 255)));
+        rect.set_fill(Paint::from(CGColor::from_rgba(r, g, b, 255)));
 
         graph.append_child(Node::Rectangle(rect), Parent::Root);
     }

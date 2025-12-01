@@ -30,6 +30,7 @@ import vn from "@grida/vn";
 import cg from "@grida/cg";
 import iosvg from "@grida/io-svg";
 import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 
@@ -698,7 +699,7 @@ class EditorDocumentStore
 
     let result = await iosvg.convert(svgData, {
       name: "svg",
-      currentColor: { r: 0, g: 0, b: 0, a: 1 },
+      currentColor: kolor.colorformats.RGBA32F.BLACK,
     });
     if (result) {
       result = result as grida.program.nodes.i.IPositioning &
@@ -747,7 +748,7 @@ class EditorDocumentStore
         height: "auto",
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: kolor.colorformats.RGBA32F.BLACK,
           active: true,
         },
       },
@@ -768,7 +769,7 @@ class EditorDocumentStore
         height: 100,
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: kolor.colorformats.RGBA32F.BLACK,
           active: true,
         },
       },
@@ -2534,7 +2535,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.1-beta.1+20251010",
+      version: "0.0.1-beta.2+20251201",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -2696,7 +2697,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.0.1-beta.1+20251010",
+          version: "0.0.1-beta.2+20251201",
           document: payloadDocument,
         });
         surface.loadScene(p);
@@ -4218,7 +4219,7 @@ export class EditorSurface
     this.dispatch({ type: "a11y/delete" });
   }
 
-  public a11ySetClipboardColor(color: cg.RGBA8888) {
+  public a11ySetClipboardColor(color: cg.RGBA32F) {
     this.dispatch({
       type: "clip/color",
       color,

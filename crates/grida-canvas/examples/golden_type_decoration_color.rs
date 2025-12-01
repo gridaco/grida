@@ -71,16 +71,16 @@ fn main() {
     let mut y_pos = start_y + 20.0;
 
     let colors = [
-        (CGColor::from_rgb(255, 0, 0), "Red Underline"),
-        (CGColor::from_rgb(0, 255, 0), "Green Underline"),
-        (CGColor::from_rgb(0, 0, 255), "Blue Underline"),
-        (CGColor::from_rgb(255, 165, 0), "Orange Underline"),
-        (CGColor::from_rgb(128, 0, 128), "Purple Underline"),
-        (CGColor::from_rgb(0, 128, 128), "Teal Underline"),
-        (CGColor::from_rgb(255, 20, 147), "Deep Pink Underline"),
-        (CGColor::from_rgb(255, 215, 0), "Gold Underline"),
-        (CGColor::from_rgb(75, 0, 130), "Indigo Underline"),
-        (CGColor::from_rgb(220, 20, 60), "Crimson Underline"),
+        (CGColor::from_rgba(255, 0, 0, 255), "Red Underline"),
+        (CGColor::from_rgba(0, 255, 0, 255), "Green Underline"),
+        (CGColor::from_rgba(0, 0, 255, 255), "Blue Underline"),
+        (CGColor::from_rgba(255, 165, 0, 255), "Orange Underline"),
+        (CGColor::from_rgba(128, 0, 128, 255), "Purple Underline"),
+        (CGColor::from_rgba(0, 128, 128, 255), "Teal Underline"),
+        (CGColor::from_rgba(255, 20, 147, 255), "Deep Pink Underline"),
+        (CGColor::from_rgba(255, 215, 0, 255), "Gold Underline"),
+        (CGColor::from_rgba(75, 0, 130, 255), "Indigo Underline"),
+        (CGColor::from_rgba(220, 20, 60, 255), "Crimson Underline"),
     ];
 
     for (color, label) in colors.iter() {

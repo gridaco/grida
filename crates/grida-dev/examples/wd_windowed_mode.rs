@@ -22,11 +22,11 @@ fn create_flex_demo_scene() -> Scene {
 
     // Create colored boxes for ICB
     let colors = [
-        ("Red", CGColor(239, 68, 68, 255)),
-        ("Blue", CGColor(59, 130, 246, 255)),
-        ("Green", CGColor(34, 197, 94, 255)),
-        ("Yellow", CGColor(234, 179, 8, 255)),
-        ("Purple", CGColor(168, 85, 247, 255)),
+        ("Red", CGColor::from_rgba(239, 68, 68, 255)),
+        ("Blue", CGColor::from_rgba(59, 130, 246, 255)),
+        ("Green", CGColor::from_rgba(34, 197, 94, 255)),
+        ("Yellow", CGColor::from_rgba(234, 179, 8, 255)),
+        ("Purple", CGColor::from_rgba(168, 85, 247, 255)),
     ];
 
     for (_name, color) in colors.iter() {
@@ -59,7 +59,7 @@ fn create_flex_demo_scene() -> Scene {
         ..Default::default()
     };
     fixed_container.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor(255, 200, 200, 255), // Light red background
+        color: CGColor::from_rgba(255, 200, 200, 255), // Light red background
         blend_mode: BlendMode::default(),
         active: true,
     })]);
@@ -68,9 +68,9 @@ fn create_flex_demo_scene() -> Scene {
 
     // Create smaller boxes for fixed container
     let fixed_colors = [
-        ("Orange", CGColor(255, 165, 0, 255)),
-        ("Pink", CGColor(255, 192, 203, 255)),
-        ("Cyan", CGColor(0, 255, 255, 255)),
+        ("Orange", CGColor::from_rgba(255, 165, 0, 255)),
+        ("Pink", CGColor::from_rgba(255, 192, 203, 255)),
+        ("Cyan", CGColor::from_rgba(0, 255, 255, 255)),
     ];
 
     for (_name, color) in fixed_colors.iter() {
@@ -93,7 +93,7 @@ fn create_flex_demo_scene() -> Scene {
     Scene {
         name: "Dual Root Layout Demo".to_string(),
         graph,
-        background_color: Some(CGColor(255, 255, 255, 255)),
+        background_color: Some(CGColor::WHITE),
     }
 }
 

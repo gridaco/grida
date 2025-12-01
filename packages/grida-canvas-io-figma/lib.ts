@@ -10,10 +10,12 @@ import type {
   FrameNode,
   BlendMode,
   GradientPaint,
+  SolidPaint,
 } from "@figma/rest-api-spec";
-import cmath from "@grida/cmath";
 import type cg from "@grida/cg";
 import type grida from "@grida/schema";
+import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 
 export namespace iofigma {
   export namespace restful {
@@ -120,14 +122,14 @@ export namespace iofigma {
 
     export namespace factory {
       function toGradientPaint(paint: GradientPaint) {
-        const map = {
+        const type_map = {
           GRADIENT_LINEAR: "linear_gradient",
           GRADIENT_RADIAL: "radial_gradient",
           GRADIENT_ANGULAR: "sweep_gradient",
           GRADIENT_DIAMOND: "diamond_gradient",
         } as const;
 
-        const type = map[paint.type as keyof typeof map];
+        const type = type_map[paint.type as keyof typeof type_map];
         const handles = paint.gradientHandlePositions;
         const points: cmath.ui.gradient.ControlPoints = handles
           ? {
@@ -142,26 +144,39 @@ export namespace iofigma {
           transform: cmath.ui.gradient.transformFromControlPoints(points, type),
           stops: paint.gradientStops.map((stop) => ({
             offset: stop.position,
-            color: cmath.color.rgbaf_multiply_alpha(
-              cmath.color.rgbaf_to_rgba8888(stop.color),
-              paint.opacity ?? 1
+            color: kolor.colorformats.newRGBA32F(
+              stop.color.r,
+              stop.color.g,
+              stop.color.b,
+              stop.color.a
             ),
           })),
+          blendMode: map.blendModeMap[paint.blendMode],
           active: paint.visible ?? true,
+          opacity: paint.opacity ?? 1,
         } as cg.GradientPaint;
+      }
+
+      function toSolidPaint(paint: SolidPaint): cg.SolidPaint {
+        return {
+          type: "solid",
+          color: kolor.colorformats.RGBA32F.multiplyA32(
+            kolor.colorformats.newRGBA32F(
+              paint.color.r,
+              paint.color.g,
+              paint.color.b,
+              paint.color.a
+            ),
+            paint.opacity
+          ),
+          active: paint.visible ?? true,
+        };
       }
 
       function paint(paint: Paint): cg.Paint | undefined {
         switch (paint.type) {
           case "SOLID": {
-            return {
-              type: "solid",
-              color: cmath.color.rgbaf_multiply_alpha(
-                cmath.color.rgbaf_to_rgba8888(paint.color),
-                paint.opacity ?? 1
-              ),
-              active: paint.visible ?? true,
-            };
+            return toSolidPaint(paint);
           }
           case "GRADIENT_LINEAR":
           case "GRADIENT_RADIAL":
@@ -170,13 +185,15 @@ export namespace iofigma {
             return toGradientPaint(paint);
           }
           case "IMAGE":
+            // TODO: image support
+            // FALLBACK:
             return {
               type: "linear_gradient",
               transform: cmath.transform.identity,
               active: paint.visible ?? true,
               stops: [
-                { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
-                { offset: 1, color: { r: 115, g: 115, b: 115, a: 1 } },
+                { offset: 0, color: kolor.colorformats.RGBA32F.BLACK },
+                { offset: 1, color: kolor.colorformats.RGBA32F.WHITE },
               ],
               blendMode: map.blendModeMap[paint.blendMode],
               opacity: 1,
@@ -352,12 +369,7 @@ export namespace iofigma {
                 first_visible_stroke?.type === "SOLID"
                   ? {
                       borderWidth: strokeWeight ?? 0,
-                      borderColor: cmath.color.rgbaf_multiply_alpha(
-                        cmath.color.rgbaf_to_rgba8888(
-                          first_visible_stroke.color
-                        ),
-                        first_visible_stroke.opacity ?? 1
-                      ),
+                      borderColor: toSolidPaint(first_visible_stroke).color,
                       borderStyle: "none",
                     }
                   : undefined,
@@ -443,12 +455,7 @@ export namespace iofigma {
                 first_visible_stroke?.type === "SOLID"
                   ? {
                       borderWidth: strokeWeight ?? 0,
-                      borderColor: cmath.color.rgbaf_multiply_alpha(
-                        cmath.color.rgbaf_to_rgba8888(
-                          first_visible_stroke.color
-                        ),
-                        first_visible_stroke.opacity ?? 1
-                      ),
+                      borderColor: toSolidPaint(first_visible_stroke).color,
                       borderStyle: strokeDashes ? "dashed" : "solid",
                     }
                   : undefined,
@@ -604,12 +611,7 @@ export namespace iofigma {
                 first_visible_stroke?.type === "SOLID"
                   ? {
                       borderWidth: strokeWeight ?? 0,
-                      borderColor: cmath.color.rgbaf_multiply_alpha(
-                        cmath.color.rgbaf_to_rgba8888(
-                          first_visible_stroke.color
-                        ),
-                        first_visible_stroke.opacity ?? 1
-                      ),
+                      borderColor: toSolidPaint(first_visible_stroke).color,
                       borderStyle: strokeDashes ? "dashed" : "solid",
                     }
                   : undefined,
@@ -686,12 +688,7 @@ export namespace iofigma {
                   first_visible_stroke?.type === "SOLID"
                     ? {
                         borderWidth: strokeWeight ?? 0,
-                        borderColor: cmath.color.rgbaf_multiply_alpha(
-                          cmath.color.rgbaf_to_rgba8888(
-                            first_visible_stroke.color
-                          ),
-                          first_visible_stroke.opacity ?? 1
-                        ),
+                        borderColor: toSolidPaint(first_visible_stroke).color,
                         borderStyle: strokeDashes ? "dashed" : "solid",
                       }
                     : undefined,

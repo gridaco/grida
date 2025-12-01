@@ -3,7 +3,7 @@
   "description": "SVG I/O for Grida Canvas",
   "private": true,
   "dependencies": {
-    "@grida/cmath": "workspace:*",
+    "@grida/color": "workspace:*",
     "@grida/vn": "workspace:*"
   },
   "devDependencies": {

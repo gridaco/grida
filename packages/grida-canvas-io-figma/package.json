@@ -3,7 +3,8 @@
   "description": "Figma I/O for Grida Canvas",
   "private": true,
   "dependencies": {
-    "@grida/cmath": "workspace:*"
+    "@grida/cmath": "workspace:*",
+    "@grida/color": "workspace:*"
   },
   "devDependencies": {
     "@figma/rest-api-spec": "^0.21.0",

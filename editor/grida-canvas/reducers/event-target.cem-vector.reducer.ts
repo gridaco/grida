@@ -22,10 +22,9 @@ import { getInitialCurveGesture } from "./tools/gesture";
 import { threshold, snapMovement } from "./tools/snap";
 import { snapToCanvasGeometry } from "@grida/cmath/_snap";
 import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import vn from "@grida/vn";
 import type { ReducerContext } from ".";
-
-const black = { r: 0, g: 0, b: 0, a: 1 };
 
 /**
  * Computes segment snapping for vector content edit mode.
@@ -374,7 +373,11 @@ export function create_new_vector_node(
     height: 0,
     rotation: 0,
     zIndex: 0,
-    stroke: { type: "solid", color: black, active: true },
+    stroke: {
+      type: "solid",
+      color: kolor.colorformats.RGBA32F.BLACK,
+      active: true,
+    },
     strokeWidth: 1,
     strokeCap: "butt",
     strokeJoin: "miter",
@@ -699,7 +702,11 @@ export function on_draw_pointer_down(
     height: 0,
     rotation: 0,
     zIndex: 0,
-    stroke: { type: "solid", color: black, active: true },
+    stroke: {
+      type: "solid",
+      color: kolor.colorformats.RGBA32F.BLACK,
+      active: true,
+    },
     strokeCap: "butt",
   } as const;
 

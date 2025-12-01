@@ -2,35 +2,64 @@ use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct CGColor(pub u8, pub u8, pub u8, pub u8);
+pub struct CGColor {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
 
 impl CGColor {
-    pub const TRANSPARENT: Self = Self(0, 0, 0, 0);
-    pub const BLACK: Self = Self(0, 0, 0, 0xff);
-    pub const WHITE: Self = Self(0xff, 0xff, 0xff, 0xff);
-    pub const RED: Self = Self(0xff, 0, 0, 0xff);
-    pub const GREEN: Self = Self(0, 0xff, 0, 0xff);
-    pub const BLUE: Self = Self(0, 0, 0xff, 0xff);
+    pub const TRANSPARENT: Self = Self::from_u32(0x00000000);
+    pub const BLACK: Self = Self::from_u32(0x000000FF);
+    pub const WHITE: Self = Self::from_u32(0xFFFFFFFF);
+    pub const RED: Self = Self::from_u32(0xFF0000FF);
+    pub const GREEN: Self = Self::from_u32(0x00FF00FF);
+    pub const BLUE: Self = Self::from_u32(0x0000FFFF);
 
-    pub fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
-        Self(r, g, b, a)
+    /// Initialize from a RGBA u32: 0xRRGGBBAA
+    #[inline]
+    pub const fn from_u32(rgba: u32) -> Self {
+        // Direct struct construction is allowed here as this is the base constructor
+        Self {
+            r: ((rgba >> 24) & 0xff) as u8,
+            g: ((rgba >> 16) & 0xff) as u8,
+            b: ((rgba >> 8) & 0xff) as u8,
+            a: (rgba & 0xff) as u8,
+        }
     }
 
-    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
-        Self(r, g, b, 0xff)
+    /// Initialize from a ARGB u32: 0xAARRGGBB
+    #[inline]
+    pub const fn from_u32_argb(argb: u32) -> Self {
+        // Direct struct construction is allowed here as this is the base constructor
+        Self {
+            a: ((argb >> 24) & 0xff) as u8,
+            r: ((argb >> 16) & 0xff) as u8,
+            g: ((argb >> 8) & 0xff) as u8,
+            b: (argb & 0xff) as u8,
+        }
+    }
+
+    pub const fn from_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self::from_u32((r as u32) << 24 | (g as u32) << 16 | (b as u32) << 8 | (a as u32))
+    }
+
+    pub const fn from_rgb(r: u8, g: u8, b: u8) -> Self {
+        Self::from_u32((r as u32) << 24 | (g as u32) << 16 | (b as u32) << 8 | 0xff)
     }
 
     pub fn r(&self) -> u8 {
-        self.0
+        self.r
     }
     pub fn g(&self) -> u8 {
-        self.1
+        self.g
     }
     pub fn b(&self) -> u8 {
-        self.2
+        self.b
     }
     pub fn a(&self) -> u8 {
-        self.3
+        self.a
     }
 
     /// Returns a new color whose alpha channel is multiplied by `opacity` (0–1).
@@ -57,7 +86,7 @@ impl Serialize for CGColor {
     where
         S: Serializer,
     {
-        let CGColor(r, g, b, a) = *self;
+        let CGColor { r, g, b, a } = *self;
         [r, g, b, a].serialize(serializer)
     }
 }
@@ -81,9 +110,9 @@ impl<'de> Deserialize<'de> for CGColor {
         let repr = Repr::deserialize(deserializer)?;
 
         match repr {
-            Repr::Array3([r, g, b]) => Ok(CGColor(r, g, b, 0xff)),
-            Repr::Array4([r, g, b, a]) => Ok(CGColor(r, g, b, a)),
-            Repr::Object { r, g, b, a } => Ok(CGColor(r, g, b, a.unwrap_or(0xff))),
+            Repr::Array3([r, g, b]) => Ok(CGColor::from_rgba(r, g, b, 0xff)),
+            Repr::Array4([r, g, b, a]) => Ok(CGColor::from_rgba(r, g, b, a)),
+            Repr::Object { r, g, b, a } => Ok(CGColor::from_rgba(r, g, b, a.unwrap_or(0xff))),
             Repr::Hex(s) => parse_hex(&s).map_err(D::Error::custom),
         }
     }
@@ -134,7 +163,7 @@ fn parse_hex(s: &str) -> Result<CGColor, String> {
         _ => return Err("invalid hex color length".into()),
     };
 
-    Ok(CGColor(r, g, b, a))
+    Ok(CGColor::from_rgba(r, g, b, a))
 }
 
 fn dup_hex(d: &str) -> Result<u8, String> {

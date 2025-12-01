@@ -22,13 +22,13 @@ fn test_pdf_export() {
         height: 50.0,
     };
     rect.transform = AffineTransform::new(10.0, 10.0, 0.0);
-    rect.fills = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
+    rect.fills = Paints::new([Paint::from(CGColor::from_rgba(255, 0, 0, 255))]);
 
     let rect_id = graph.append_child(Node::Rectangle(rect), Parent::Root);
 
     let scene = Scene {
         name: "Test Scene".into(),
-        background_color: Some(CGColor(255, 255, 255, 255)), // White background
+        background_color: Some(CGColor::WHITE), // White background
         graph,
     };
 

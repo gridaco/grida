@@ -11,6 +11,7 @@ import {
   type ControlPoints,
 } from "./gradient-reducer";
 import type cg from "@grida/cg";
+import kolor from "@grida/color";
 import StopMarker from "./components/gradient-color-stop-marker";
 import ControlPoint from "./components/control-point";
 
@@ -30,8 +31,8 @@ import ControlPoint from "./components/control-point";
  * ```tsx
  * <GradientControlPointsEditor
  *   stops={[
- *     { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } },
- *     { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } }
+ *     { offset: 0, color: BLACK },
+ *     { offset: 1, color: WHITE }
  *   ]}
  *   focusedStop={null}
  *   points={[
@@ -60,7 +61,7 @@ import ControlPoint from "./components/control-point";
  */
 export interface GradientControlPointsEditorProps {
   /** Array of gradient stops with positions and colors */
-  stops: { offset: number; color: cg.RGBA8888 }[];
+  stops: { offset: number; color: cg.RGBA32F }[];
   /** Index of currently focused stop (null if none) */
   focusedStop: number | null;
   /** Control points for gradient transform [A, B, C] - optional if using internal state */
@@ -100,11 +101,6 @@ export interface GradientControlPointsEditorProps {
 }
 
 const STOP_SIZE = 18;
-
-// Helper function to convert RGBA8888 to CSS rgba string
-const rgbaToString = (color: cg.RGBA8888) => {
-  return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
-};
 
 export default function GradientControlPointsEditor({
   stops,
@@ -518,8 +514,12 @@ export default function GradientControlPointsEditor({
             id="trackShadow"
             x={-(typeof window !== "undefined" ? window.innerWidth : width)}
             y={-(typeof window !== "undefined" ? window.innerHeight : height)}
-            width={(typeof window !== "undefined" ? window.innerWidth : width) * 2}
-            height={(typeof window !== "undefined" ? window.innerHeight : height) * 2}
+            width={
+              (typeof window !== "undefined" ? window.innerWidth : width) * 2
+            }
+            height={
+              (typeof window !== "undefined" ? window.innerHeight : height) * 2
+            }
             filterUnits="userSpaceOnUse"
           >
             <feDropShadow
@@ -606,7 +606,7 @@ export default function GradientControlPointsEditor({
             x={x}
             y={y}
             transform={`translate(-50%, -50%) rotate(${rotation}deg)`}
-            color={rgbaToString(stop.color)}
+            color={kolor.colorformats.RGBA32F.intoCSSRGBA(stop.color)}
             selected={focusedStop === index}
             readonly={readonly}
             tabIndex={0}

@@ -167,7 +167,7 @@ pub fn render_svg_to_png(
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "SVG".to_string()),
         graph,
-        background_color: Some(cg::cg::prelude::CGColor(0xFF, 0xFF, 0xFF, 0xFF)),
+        background_color: Some(cg::cg::prelude::CGColor::from_u32(0xFFFFFFFF)),
     };
 
     let store = Arc::new(Mutex::new(cg::resources::ByteStore::new()));

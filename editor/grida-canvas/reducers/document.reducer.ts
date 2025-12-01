@@ -55,6 +55,7 @@ import {
   self_wrapNodesAsBooleanOperation,
 } from "./methods/wrap";
 import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { layout } from "@grida/cmath/_layout";
 import { snapMovement } from "./tools/snap";
 import schemaReducer from "./schema.reducer";
@@ -492,7 +493,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         return updateState(state, (draft) => {
           const net = action.vector_network!;
           const id = context.idgen.next();
-          const black = { r: 0, g: 0, b: 0, a: 1 };
+          const black = kolor.colorformats.RGBA32F.BLACK;
           const node: grida.program.nodes.VectorNode = {
             type: "vector",
             name: "vector",

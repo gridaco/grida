@@ -1,25 +1,18 @@
 import React from "react";
 import { WorkbenchUI } from "@/components/workbench";
-import { RGBAChip } from "./utils/paint-chip";
+import { RGBChip } from "./utils/paint-chip";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/components/lib/utils";
-import { ColorPicker } from "./color-picker";
-import HexValueInput from "./utils/hex";
+import { ColorPicker32F } from "./color-picker";
+import RGBHexInput from "./utils/hex";
 import { useNumberInput } from "@grida/number-input/react";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Separator } from "@/components/ui/separator";
-
-type RGBA = { r: number; g: number; b: number; a: number };
-
-export type RGBAColorControlProps = {
-  value: RGBA;
-  onValueChange?: (value: RGBA) => void;
-  variant?: "default" | "with-opacity";
-};
+import kolor from "@grida/color";
 
 function InlineOpacityControl({
   value,
@@ -81,15 +74,15 @@ function InlineOpacityControl({
   );
 }
 
-export function RGBAColorControl({
-  value = { r: 0, g: 0, b: 0, a: 0 },
+export function RGBA32FColorControl({
+  value = kolor.colorformats.RGBA32F.TRANSPARENT,
   onValueChange,
   disabled,
   variant = "default",
 }: {
-  value?: RGBA;
+  value?: kolor.colorformats.RGBA32F;
   disabled?: boolean;
-  onValueChange?: (value: RGBA) => void;
+  onValueChange?: (value: kolor.colorformats.RGBA32F) => void;
   variant?: "default" | "with-opacity";
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -116,12 +109,17 @@ export function RGBAColorControl({
       >
         <InputGroupAddon align="inline-start" className="px-1.5">
           <PopoverTrigger disabled={disabled}>
-            <RGBAChip rgba={value} className="rounded-sm" />
+            <RGBChip
+              rgb={value}
+              unit="f32"
+              opacity={value.a}
+              className="rounded-sm"
+            />
           </PopoverTrigger>
         </InputGroupAddon>
-
-        <HexValueInput
+        <RGBHexInput
           ref={inputRef}
+          unit="f32"
           className="flex-1 !px-0"
           disabled={disabled}
           value={{
@@ -132,10 +130,9 @@ export function RGBAColorControl({
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
           onValueChange={(color) => {
-            onValueChange?.({
-              ...color,
-              a: value.a,
-            });
+            onValueChange?.(
+              kolor.colorformats.newRGBA32F(color.r, color.g, color.b, value.a)
+            );
           }}
         />
 
@@ -164,7 +161,7 @@ export function RGBAColorControl({
         sideOffset={16}
         className="p-0"
       >
-        <ColorPicker color={value} onColorChange={onValueChange} />
+        <ColorPicker32F color={value} onColorChange={onValueChange} />
       </PopoverContent>
     </Popover>
   );

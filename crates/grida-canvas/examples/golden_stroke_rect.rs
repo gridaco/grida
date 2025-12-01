@@ -92,11 +92,11 @@ impl DemoConfig {
                 stops: vec![
                     GradientStop {
                         offset: 0.0,
-                        color: CGColor(50, 100, 200, 255), // Blue
+                        color: CGColor::from_rgba(50, 100, 200, 255), // Blue
                     },
                     GradientStop {
                         offset: 1.0,
-                        color: CGColor(150, 50, 200, 255), // Purple
+                        color: CGColor::from_rgba(150, 50, 200, 255), // Purple
                     },
                 ],
                 ..Default::default()
@@ -182,7 +182,7 @@ fn draw_fill(canvas: &Canvas, config: &DemoConfig, align: StrokeAlign) {
 
     let fill_paint = cg::cg::Paint::Solid(SolidPaint {
         active: true,
-        color: CGColor(240, 240, 240, 255),
+        color: CGColor::from_rgba(240, 240, 240, 255),
         blend_mode: BlendMode::Normal,
     });
 

@@ -1855,7 +1855,10 @@ impl Paint {
     pub fn hash_for_cache(&self, hasher: &mut std::collections::hash_map::DefaultHasher) {
         match self {
             Paint::Solid(solid) => {
-                solid.color.0.hash(hasher);
+                solid.color.r.hash(hasher);
+                solid.color.g.hash(hasher);
+                solid.color.b.hash(hasher);
+                solid.color.a.hash(hasher);
                 solid.opacity().to_bits().hash(hasher);
                 solid.blend_mode.hash(hasher);
             }
@@ -1864,7 +1867,10 @@ impl Paint {
                 gradient.blend_mode.hash(hasher);
                 for stop in &gradient.stops {
                     stop.offset.to_bits().hash(hasher);
-                    stop.color.0.hash(hasher);
+                    stop.color.r.hash(hasher);
+                    stop.color.g.hash(hasher);
+                    stop.color.b.hash(hasher);
+                    stop.color.a.hash(hasher);
                 }
             }
             Paint::RadialGradient(gradient) => {
@@ -1872,7 +1878,10 @@ impl Paint {
                 gradient.blend_mode.hash(hasher);
                 for stop in &gradient.stops {
                     stop.offset.to_bits().hash(hasher);
-                    stop.color.0.hash(hasher);
+                    stop.color.r.hash(hasher);
+                    stop.color.g.hash(hasher);
+                    stop.color.b.hash(hasher);
+                    stop.color.a.hash(hasher);
                 }
             }
             Paint::SweepGradient(gradient) => {
@@ -1880,7 +1889,10 @@ impl Paint {
                 gradient.blend_mode.hash(hasher);
                 for stop in &gradient.stops {
                     stop.offset.to_bits().hash(hasher);
-                    stop.color.0.hash(hasher);
+                    stop.color.r.hash(hasher);
+                    stop.color.g.hash(hasher);
+                    stop.color.b.hash(hasher);
+                    stop.color.a.hash(hasher);
                 }
             }
             Paint::DiamondGradient(gradient) => {
@@ -1888,7 +1900,10 @@ impl Paint {
                 gradient.blend_mode.hash(hasher);
                 for stop in &gradient.stops {
                     stop.offset.to_bits().hash(hasher);
-                    stop.color.0.hash(hasher);
+                    stop.color.r.hash(hasher);
+                    stop.color.g.hash(hasher);
+                    stop.color.b.hash(hasher);
+                    stop.color.a.hash(hasher);
                 }
             }
             Paint::Image(image) => {

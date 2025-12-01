@@ -41,11 +41,8 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     // Create a base linear gradient
-    let linear_gradient = LinearGradientPaint::from_colors(vec![
-        CGColor(255, 0, 0, 255),
-        CGColor(0, 255, 0, 255),
-        CGColor(0, 0, 255, 255),
-    ]);
+    let linear_gradient =
+        LinearGradientPaint::from_colors(vec![CGColor::RED, CGColor::GREEN, CGColor::BLUE]);
 
     // Draw rectangles with varying widths in a single row
     let start_x = 50.0;

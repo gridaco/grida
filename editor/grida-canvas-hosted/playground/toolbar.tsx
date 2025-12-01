@@ -13,11 +13,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Textarea } from "@/components/ui/textarea";
 import grida from "@grida/schema";
-import { useMetaEnter } from "@/hooks/use-meta-enter";
+import kolor from "@grida/color";
 import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
-import { PopoverClose } from "@radix-ui/react-popover";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "@ai-sdk/rsc";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
@@ -32,7 +30,7 @@ import {
   ToolsGroup,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
-import { ColorPicker } from "@/scaffolds/sidecontrol/controls/color-picker";
+import { ColorPicker32F } from "@/scaffolds/sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { PaintBucketIcon } from "lucide-react";
 import {
@@ -44,6 +42,8 @@ import {
   useContentEditModeMinimalState,
   useToolState,
 } from "@/grida-canvas-react/provider";
+import { RGBChip } from "@/scaffolds/sidecontrol/controls/utils/paint-chip";
+import red from "@/theme/palettes/red";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -309,35 +309,41 @@ function BitmapEditModeAuxiliaryToolbar() {
   );
 }
 
-// TODO: have it somewhere else
-const defaultColors = {
-  red: { r: 255, g: 0, b: 0, a: 1 },
-  green: { r: 0, g: 255, b: 0, a: 1 },
-  blue: { r: 0, g: 0, b: 255, a: 1 },
-  yellow: { r: 255, g: 255, b: 0, a: 1 },
-  orange: { r: 255, g: 165, b: 0, a: 1 },
-  purple: { r: 128, g: 0, b: 128, a: 1 },
-  pink: { r: 255, g: 192, b: 203, a: 1 },
-  cyan: { r: 0, g: 255, b: 255, a: 1 },
-  magenta: { r: 255, g: 0, b: 255, a: 1 },
-  black: { r: 0, g: 0, b: 0, a: 1 },
-  white: { r: 255, g: 255, b: 255, a: 1 },
-  gray: { r: 128, g: 128, b: 128, a: 1 },
-  silver: { r: 192, g: 192, b: 192, a: 1 },
-  brown: { r: 165, g: 42, b: 42, a: 1 },
-  olive: { r: 128, g: 128, b: 0, a: 1 },
-  navy: { r: 0, g: 0, b: 128, a: 1 },
-  teal: { r: 0, g: 128, b: 128, a: 1 },
-  maroon: { r: 128, g: 0, b: 0, a: 1 },
-  gold: { r: 255, g: 215, b: 0, a: 1 },
-  indigo: { r: 75, g: 0, b: 130, a: 1 },
-};
+const defaultColors: Record<string, kolor.colorformats.RGBA32F> =
+  Object.fromEntries(
+    [
+      ["red", kolor.names.red],
+      ["greenred", kolor.names.green],
+      ["bluered", kolor.names.blue],
+      ["yellowred", kolor.names.yellow],
+      ["orangered", kolor.names.orange],
+      ["purplered", kolor.names.purple],
+      ["pinkred", kolor.names.pink],
+      ["cyanred", kolor.names.cyan],
+      ["magentared", kolor.names.magenta],
+      ["blackred", kolor.names.black],
+      ["whitered", kolor.names.white],
+      ["grayred", kolor.names.gray],
+      ["silverred", kolor.names.silver],
+      ["brownred", kolor.names.brown],
+      ["olivered", kolor.names.olive],
+      ["navyred", kolor.names.navy],
+      ["tealred", kolor.names.teal],
+      ["maroonred", kolor.names.maroon],
+      ["goldred", kolor.names.gold],
+      ["indigored", kolor.names.indigo],
+    ].map(([id, rgb]) => {
+      const [r, g, b] = rgb as [number, number, number];
+      return [id, kolor.colorformats.newRGBA32F(r / 255, g / 255, b / 255, 1)];
+    })
+  );
 
 function ClipboardColor() {
   const editor = useCurrentEditor();
   const clipboardColor = useEditorState(editor, (s) => s.user_clipboard_color);
 
-  const color = clipboardColor ?? { r: 0, g: 0, b: 0, a: 1 };
+  const color: kolor.colorformats.RGBA32F =
+    clipboardColor ?? kolor.colorformats.RGBA32F.BLACK;
 
   // TODO:
   // - recent colors
@@ -353,11 +359,11 @@ function ClipboardColor() {
       <PopoverTrigger
         className={toggleVariants({ variant: "default", size: "default" })}
       >
-        <div
-          className="border rounded-full size-5"
-          style={{
-            background: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
-          }}
+        <RGBChip
+          rgb={{ r: color.r, g: color.g, b: color.b }}
+          unit="f32"
+          opacity={color.a}
+          className="rounded-full border size-5"
         />
       </PopoverTrigger>
       <PopoverContent
@@ -366,7 +372,7 @@ function ClipboardColor() {
         sideOffset={16}
         className="p-0"
       >
-        <ColorPicker
+        <ColorPicker32F
           color={color}
           onColorChange={editor.surface.a11ySetClipboardColor.bind(
             editor.surface
@@ -375,41 +381,6 @@ function ClipboardColor() {
         />
       </PopoverContent>
     </Popover>
-  );
-}
-
-function Generate() {
-  const [userprompt, setUserPrompt] = useState("");
-  const { action: textRewrite, loading } = useTextRewriteDemo();
-  const ref = useMetaEnter<HTMLTextAreaElement>({
-    onSubmit: () => textRewrite(userprompt),
-  });
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Textarea
-        readOnly={loading}
-        autoFocus
-        ref={ref}
-        value={userprompt}
-        onChange={(e) => setUserPrompt(e.target.value)}
-        placeholder="Enter a prompt"
-        className="min-h-20"
-      />
-      <div className="flex justify-end">
-        <PopoverClose asChild>
-          <Button
-            variant="outline"
-            disabled={loading}
-            onClick={() => {
-              textRewrite(userprompt);
-            }}
-          >
-            Rewrite ⌘↵
-          </Button>
-        </PopoverClose>
-      </div>
-    </div>
   );
 }
 

@@ -3,7 +3,8 @@ import type { tokens } from "@grida/tokens";
 import type { TokenizableExcept } from "@grida/tokens/utils";
 import type vn from "@grida/vn";
 import cg from "@grida/cg";
-import tree from "@grida/tree";
+import type kolor from "@grida/color";
+import type tree from "@grida/tree";
 import type cmath from "@grida/cmath";
 import * as CSS from "csstype";
 
@@ -470,18 +471,18 @@ export namespace grida {
         youtube: YoutubeVideoSource;
         vimeo: VimeoVideoSource;
         facebook: FacebookVideoSource;
-        rgba: RGBA;
+        rgba: RGBA32F;
       };
 
-      export type Object = Richtext | RGBA | Source | VideoPlayerSource;
+      export type Object = Richtext | RGBA32F | Source | VideoPlayerSource;
 
       export type Richtext = {
         type: "richtext";
         html: string;
       };
 
-      export type RGBA = {
-        type: "rgba";
+      export type RGBA32F = {
+        type: "rgbaf";
         r: number;
         g: number;
         b: number;
@@ -529,7 +530,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.0.1-beta.1+20251010";
+  export const SCHEMA_VERSION = "0.0.1-beta.2+20251201";
 
   /**
    * Simple Node Selector
@@ -662,7 +663,7 @@ export namespace grida.program.document {
     /**
      * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
      */
-    backgroundColor?: cg.RGBA8888 | null | undefined | "";
+    backgroundColor?: kolor.colorformats.RGBA32F | null | undefined | "";
   }
 
   export interface Guide2D {
@@ -1010,7 +1011,7 @@ export namespace grida.program.css {
    */
   export type Border = {
     borderStyle: "none" | "solid" | "dashed";
-    borderColor: cg.RGBA8888;
+    borderColor: cg.RGBA32F;
     /**
      * @example
      * ```css

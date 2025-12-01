@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "strict": true
+  },
+  "exclude": ["dist"]
+}

@@ -36,7 +36,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     }));
-    rect1.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
+    rect1.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 0, 0, 255))]);
     rect1.stroke_width = 2.0.into();
 
     // Second example: Rectangle with ImagePaint fill and stroke
@@ -76,7 +76,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         height: 200.0,
     };
     rect3.corner_radius = RectangularCornerRadius::circular(40.0);
-    rect3.set_fill(Paint::from(CGColor(240, 240, 240, 255)));
+    rect3.set_fill(Paint::from(CGColor::from_rgba(240, 240, 240, 255)));
     rect3.strokes = Paints::new([Paint::Image(ImagePaint {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
@@ -120,7 +120,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     }));
-    rect4.strokes = Paints::new([Paint::from(CGColor(0, 0, 255, 255))]);
+    rect4.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 0, 255, 255))]);
     rect4.stroke_width = 2.0.into();
 
     // Fifth example: Rectangle demonstrating repeating image tiles
@@ -179,7 +179,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     }));
-    rect7.strokes = Paints::new([Paint::from(CGColor(0, 255, 0, 255))]);
+    rect7.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 255, 0, 255))]);
     rect7.stroke_width = 2.0.into();
 
     // Eighth example: Rectangle with CENTER alignment
@@ -199,7 +199,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     }));
-    rect8.strokes = Paints::new([Paint::from(CGColor(255, 165, 0, 255))]);
+    rect8.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 165, 0, 255))]);
     rect8.stroke_width = 2.0.into();
 
     // Ninth example: Rectangle with RIGHT alignment
@@ -219,7 +219,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
         active: true,
         filters: ImageFilters::default(),
     }));
-    rect9.strokes = Paints::new([Paint::from(CGColor(128, 0, 128, 255))]);
+    rect9.strokes = Paints::new([Paint::from(CGColor::from_rgba(128, 0, 128, 255))]);
     rect9.stroke_width = 2.0.into();
 
     let mut graph = SceneGraph::new();
@@ -245,7 +245,7 @@ async fn demo_images() -> (Scene, Vec<u8>) {
 
     let scene = Scene {
         name: "Images Demo".to_string(),
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
         graph,
     };
 

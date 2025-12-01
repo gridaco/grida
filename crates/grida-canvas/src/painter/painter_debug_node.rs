@@ -309,12 +309,12 @@ impl<'a> NodePainter<'a> {
 
             // Create a red fill paint
             let fill = Paint::Solid(SolidPaint {
-                color: CGColor(255, 0, 0, 51), // Semi-transparent red
+                color: CGColor::from_rgba(255, 0, 0, 51),
                 blend_mode: BlendMode::Normal,
                 active: true,
             });
             let stroke = Paint::Solid(SolidPaint {
-                color: CGColor(255, 0, 0, 255), // Solid red
+                color: CGColor::RED,
                 blend_mode: BlendMode::Normal,
                 active: true,
             });

@@ -1,0 +1,26 @@
+{
+  "name": "@grida/color",
+  "description": "Grida Core Graphics Color Lib",
+  "version": "0.0.0",
+  "homepage": "https://grida.co",
+  "repository": "https://github.com/gridaco/grida",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "private": false,
+  "keywords": [
+    "grida",
+    "canvas",
+    "color"
+  ],
+  "scripts": {
+    "dev": "tsup index.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts --format cjs,esm --dts",
+    "test": "jest"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

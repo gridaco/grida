@@ -15,14 +15,14 @@ async fn demo_clip() -> Scene {
     container.layout_dimensions.width = Some(300.0);
     container.layout_dimensions.height = Some(300.0);
     container.corner_radius = RectangularCornerRadius::circular(20.0);
-    container.set_fill(Paint::from(CGColor(240, 100, 100, 255)));
-    container.strokes = Paints::new([Paint::from(CGColor(200, 50, 50, 255))]);
+    container.set_fill(Paint::from(CGColor::from_rgba(240, 100, 100, 255)));
+    container.strokes = Paints::new([Paint::from(CGColor::from_rgba(200, 50, 50, 255))]);
     container.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 0.0,
         dy: 0.0,
         blur: 10.0,
         spread: 0.0,
-        color: CGColor(0, 0, 0, 255),
+        color: CGColor::from_rgba(0, 0, 0, 255),
         active: true,
     })]);
     container.clip = true;
@@ -35,8 +35,8 @@ async fn demo_clip() -> Scene {
         width: 300.0,
         height: 200.0,
     };
-    ellipse.fills = Paints::new([Paint::from(CGColor(100, 200, 100, 255))]);
-    ellipse.strokes = Paints::new([Paint::from(CGColor(50, 150, 50, 255))]);
+    ellipse.fills = Paints::new([Paint::from(CGColor::from_rgba(100, 200, 100, 255))]);
+    ellipse.strokes = Paints::new([Paint::from(CGColor::from_rgba(50, 150, 50, 255))]);
     ellipse.stroke_width = 2.0.into();
 
     // Build scene graph

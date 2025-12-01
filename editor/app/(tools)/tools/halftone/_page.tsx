@@ -13,10 +13,9 @@ import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ColorPicker } from "@/scaffolds/sidecontrol/controls/color-picker";
+import { ColorPicker32F } from "@/scaffolds/sidecontrol/controls/color-picker";
 import { DownloadIcon } from "lucide-react";
-import type cg from "@grida/cg";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 
 const DEFAULT_GRID = 8;
 const MAX_SIZE = 1024; // px – down‑scale large uploads
@@ -235,12 +234,9 @@ export default function HalftoneTool() {
   const [gamma, setGamma] = useState<number>(1);
   const [jitter, setJitter] = useState<number>(0);
   const [opacity, setOpacity] = useState<number>(1);
-  const [color, setColor] = useState<cg.RGBA8888>({
-    r: 0,
-    g: 0,
-    b: 0,
-    a: 1,
-  });
+  const [color, setColor] = useState<kolor.colorformats.RGBA32F>(
+    kolor.colorformats.RGBA32F.BLACK
+  );
   const [customShapeImage, setCustomShapeImage] =
     useState<HTMLImageElement | null>(null);
   const imageDataRef = useRef<ImageData | null>(null);
@@ -297,7 +293,7 @@ export default function HalftoneTool() {
         gamma,
         jitter,
         opacity,
-        cmath.color.rgba8888_to_hex(color),
+        kolor.colorformats.RGBA32F.intoCSSRGBA(color),
         customShapeImage
       );
     };
@@ -328,7 +324,7 @@ export default function HalftoneTool() {
 
     const { w, h } = dims;
     const { data } = imgData;
-    const fg = cmath.color.rgba8888_to_hex(color);
+    const fg = kolor.colorformats.RGBA32F.intoCSSRGBA(color);
 
     const parts: string[] = [];
     parts.push(
@@ -480,7 +476,7 @@ export default function HalftoneTool() {
 
           <div className="grid gap-2">
             <span className="text-xs">Color</span>
-            <ColorPicker color={color} onColorChange={setColor} />
+            <ColorPicker32F color={color} onColorChange={setColor} />
           </div>
 
           <div className="grid gap-2">

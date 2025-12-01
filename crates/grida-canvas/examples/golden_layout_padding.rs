@@ -145,12 +145,12 @@ fn main() {
 
     // Define colors for children (cycling through)
     let colors = [
-        CGColor::from_rgb(239, 68, 68),  // red-500
-        CGColor::from_rgb(59, 130, 246), // blue-500
-        CGColor::from_rgb(34, 197, 94),  // green-500
-        CGColor::from_rgb(234, 179, 8),  // yellow-500
-        CGColor::from_rgb(168, 85, 247), // purple-500
-        CGColor::from_rgb(236, 72, 153), // pink-500
+        CGColor::from_rgba(239, 68, 68, 255),  // red-500
+        CGColor::from_rgba(59, 130, 246, 255), // blue-500
+        CGColor::from_rgba(34, 197, 94, 255),  // green-500
+        CGColor::from_rgba(234, 179, 8, 255),  // yellow-500
+        CGColor::from_rgba(168, 85, 247, 255), // purple-500
+        CGColor::from_rgba(236, 72, 153, 255), // pink-500
     ];
 
     let start_x = 50.0;

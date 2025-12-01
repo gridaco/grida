@@ -13,15 +13,15 @@ fn main() {
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: CGColor(255, 97, 97, 255),
+                color: CGColor::from_rgba(255, 97, 97, 255),
             },
             GradientStop {
                 offset: 0.5,
-                color: CGColor(133, 0, 0, 255),
+                color: CGColor::from_rgba(133, 0, 0, 255),
             },
             GradientStop {
                 offset: 1.0,
-                color: CGColor(255, 0, 0, 255),
+                color: CGColor::from_rgba(255, 0, 0, 255),
             },
         ],
         opacity: 1.0,

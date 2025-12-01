@@ -31,12 +31,12 @@ fn main() {
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(Paints::new([Paint::from(CGColor(200, 200, 200, 255))])),
+                fills: Some(Paints::new([Paint::from(CGColor::from_rgba(200, 200, 200, 255))])),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![4, 5, 6, 7])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(Paints::new([Paint::from(CGColor(200, 200, 200, 255))])),
+                fills: Some(Paints::new([Paint::from(CGColor::from_rgba(200, 200, 200, 255))])),
             },
         ],
     };
@@ -47,7 +47,7 @@ fn main() {
 
     let painter = VNPainter::new(canvas);
 
-    let stroke_color = CGColor(0, 0, 0, 255); // black stroke
+    let stroke_color = CGColor::from_rgba(0, 0, 0, 255); // black stroke
     let stroke_width = 40.0;
     let aligns = [
         StrokeAlign::Inside,

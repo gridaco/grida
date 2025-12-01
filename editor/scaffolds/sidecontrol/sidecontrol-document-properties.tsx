@@ -24,8 +24,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import grida from "@grida/schema";
-import type cg from "@grida/cg";
-import { RGBAColorControl } from "./controls/color";
+import { RGBA32FColorControl } from "./controls/color";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +38,8 @@ function SceneBackgroundPropertyLine() {
 
   return (
     <PropertyLine>
-      <RGBAColorControl
+      <RGBA32FColorControl
+        variant="with-opacity"
         value={backgroundColor ? backgroundColor : undefined}
         onValueChange={(color) => {
           editor.commands.changeSceneBackground(scene_id, color);
@@ -214,7 +214,7 @@ function PropertyDefinitionBlock({
                   default: (initial_values as any)[v],
                 } as grida.program.schema.PropertyDefinition);
               }}
-              enum={["string", "number", "boolean", "image", "rgba"]}
+              enum={["string", "number", "boolean", "image", "rgbaf"]}
             />
           </PropertyLine>
           <PropertyLine>
@@ -292,10 +292,16 @@ function PropertyDefinitionBlock({
 }
 
 const initial_values = {
-  string: "",
-  number: 0,
-  boolean: false,
-  rgba: { type: "rgba", r: 0, g: 0, b: 0, a: 1 },
+  string: "" satisfies string,
+  number: 0 satisfies number,
+  boolean: false satisfies boolean,
+  rgba: {
+    type: "rgbaf",
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 1,
+  } satisfies grida.program.objects.RGBA32F,
   object: {
     type: "object",
     properties: {},
@@ -355,10 +361,10 @@ function PropertyDefinitionValueInput<T = unknown>({
           ]}
         />
       );
-    case "rgba":
+    case "rgbaf":
       return (
-        <RGBAColorControl
-          value={value as cg.RGBA8888}
+        <RGBA32FColorControl
+          value={value as unknown as any}
           onValueChange={(v) => onValueChange(v as unknown as T)}
         />
       );

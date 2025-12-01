@@ -1,6 +1,4 @@
 import { WorkbenchUI } from "@/components/workbench";
-import grida from "@grida/schema";
-import cg from "@grida/cg";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GradientControl } from "./paint-gradient";
 import { ImagePaintControl } from "./paint-image";
@@ -23,15 +21,18 @@ import {
 } from "./icons/paint-icon";
 import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
-import HexValueInput from "./utils/hex";
-import { ColorPicker } from "./color-picker";
-import cmath from "@grida/cmath";
+import RGBHexInput from "./utils/hex";
+import { ColorPicker32F } from "./color-picker";
 import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import { useNumberInput } from "@grida/number-input/react";
 import { Separator } from "@/components/ui/separator";
+import grida from "@grida/schema";
+import cg from "@grida/cg";
+import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 
 const paint_label = {
   solid: "solid",
@@ -91,6 +92,7 @@ function getNextPaintForType(
         case "sweep_gradient":
         case "diamond_gradient": {
           return {
+            active: current.active,
             type: to,
             transform,
             stops: [
@@ -98,7 +100,7 @@ function getNextPaintForType(
               {
                 offset: 1,
                 // TODO: darken second color based on the first color
-                color: { r: 255, g: 255, b: 255, a: 1 },
+                color: kolor.colorformats.RGBA32F.WHITE,
               },
             ],
             blendMode: blendMode,
@@ -113,7 +115,7 @@ function getNextPaintForType(
             ...DEFAULT_IMAGE_PAINT,
             blendMode,
             opacity: opacity,
-          };
+          } satisfies cg.Paint;
         }
       }
       break;
@@ -124,15 +126,18 @@ function getNextPaintForType(
     case "diamond_gradient": {
       switch (to) {
         case "solid": {
+          const stopColor = current.stops[0].color;
           return {
             type: "solid",
-            color: {
-              ...current.stops[0].color,
-              a: opacity,
-            },
+            color: kolor.colorformats.newRGBA32F(
+              stopColor.r,
+              stopColor.g,
+              stopColor.b,
+              opacity
+            ),
             blendMode,
             active: true,
-          };
+          } satisfies cg.Paint;
         }
         case "linear_gradient":
         case "radial_gradient":
@@ -151,7 +156,7 @@ function getNextPaintForType(
             ...DEFAULT_IMAGE_PAINT,
             blendMode,
             opacity: opacity,
-          };
+          } satisfies cg.Paint;
         }
       }
       break;
@@ -161,7 +166,12 @@ function getNextPaintForType(
         case "solid": {
           return {
             type: "solid",
-            color: { r: 128, g: 128, b: 128, a: opacity }, // Default gray with preserved opacity
+            color: kolor.colorformats.newRGBA32F(
+              kolor.colorformats.RGBA32F.GRAY.r,
+              kolor.colorformats.RGBA32F.GRAY.g,
+              kolor.colorformats.RGBA32F.GRAY.b,
+              opacity
+            ),
             blendMode,
             active: true,
           };
@@ -174,8 +184,14 @@ function getNextPaintForType(
             type: to,
             transform,
             stops: [
-              { offset: 0, color: { r: 128, g: 128, b: 128, a: 1 } },
-              { offset: 1, color: { r: 255, g: 255, b: 255, a: 1 } },
+              {
+                offset: 0,
+                color: kolor.colorformats.RGBA32F.GRAY,
+              },
+              {
+                offset: 1,
+                color: kolor.colorformats.RGBA32F.WHITE,
+              },
             ],
             blendMode,
             opacity: opacity,
@@ -269,7 +285,7 @@ function ComputedPaintControl({
   const onAddPaint = () => {
     const paint: ComputedPaint = {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 1 },
+      color: kolor.colorformats.RGBA32F.BLACK,
       active: true,
     };
     if (onValueAdd) {
@@ -355,7 +371,7 @@ function ContextVariableColors({
   const schema = useSchema();
   const colors = Object.entries(schema?.properties ?? {}).filter(
     ([key, def]) => {
-      return def.type === "rgba";
+      return def.type === "rgbaf";
     }
   );
 
@@ -523,8 +539,9 @@ function SolidPaintTrigger({
       <PopoverTrigger className="flex-shrink-0">
         <PaintChip paint={value} className="rounded-sm" />
       </PopoverTrigger>
-      <HexValueInput
+      <RGBHexInput
         className="flex-1 px-1.5"
+        unit="f32"
         value={{
           r: value.color.r,
           g: value.color.g,
@@ -536,7 +553,12 @@ function SolidPaintTrigger({
           onValueChange?.({
             ...value,
             type: "solid",
-            color: { ...color, a: value.color.a },
+            color: kolor.colorformats.newRGBA32F(
+              color.r,
+              color.g,
+              color.b,
+              value.color.a
+            ),
             active: true,
           });
         }}
@@ -548,7 +570,12 @@ function SolidPaintTrigger({
           onValueChange?.({
             ...value,
             type: "solid",
-            color: { ...value.color, a: opacity },
+            color: kolor.colorformats.newRGBA32F(
+              value.color.r,
+              value.color.g,
+              value.color.b,
+              opacity
+            ),
             active: true,
           });
         }}
@@ -758,7 +785,7 @@ function PaintTabsContent({
   if (value?.type === "solid") {
     return (
       <div>
-        <ColorPicker
+        <ColorPicker32F
           color={value.color}
           onColorChange={(color) => {
             onValueChange?.({

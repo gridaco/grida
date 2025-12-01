@@ -5,7 +5,7 @@ use crate::cg::prelude::*;
 
 impl From<usvg::Color> for CGColor {
     fn from(color: usvg::Color) -> Self {
-        CGColor::from_rgb(color.red, color.green, color.blue)
+        CGColor::from_rgba(color.red, color.green, color.blue, 255)
     }
 }
 

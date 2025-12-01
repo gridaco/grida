@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.1+20251010",
+  "version": "0.0.1-beta.2+20251201",
   "document": {
     "nodes": {
       "blank": {
@@ -14,9 +14,9 @@
         "guides": [],
         "edges": [],
         "backgroundColor": {
-          "r": 245,
-          "g": 245,
-          "b": 245,
+          "r": 0.96,
+          "g": 0.96,
+          "b": 0.96,
           "a": 1
         }
       }

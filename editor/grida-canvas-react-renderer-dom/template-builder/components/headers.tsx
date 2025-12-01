@@ -1,4 +1,4 @@
-import { GridaLogo } from "@/components/grida-logo";
+import kolor from "@grida/color";
 import { NodeElement } from "../../nodes/node";
 
 export function Header_001({ logo }: { logo?: string }) {
@@ -7,7 +7,11 @@ export function Header_001({ logo }: { logo?: string }) {
       // name="Header"
       node_id="header"
       // component={TemplateBuilderWidgets.flex}
-      fill={{ type: "solid", color: { r: 0, g: 0, b: 0, a: 0 }, active: true }}
+      fill={{
+        type: "solid",
+        color: kolor.colorformats.RGBA32F.TRANSPARENT,
+        active: true,
+      }}
       style={
         {
           // right: 0,

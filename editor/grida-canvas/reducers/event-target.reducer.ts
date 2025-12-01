@@ -40,8 +40,6 @@ import { snapGuideTranslation, threshold } from "./tools/snap";
 import cmath from "@grida/cmath";
 import type { ReducerContext } from ".";
 
-const black = { r: 0, g: 0, b: 0, a: 1 };
-
 function __self_evt_on_pointer_move(
   draft: editor.state.IEditorState,
   action: EditorEventTarget_PointerMove,

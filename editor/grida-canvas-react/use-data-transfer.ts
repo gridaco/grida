@@ -6,6 +6,7 @@ import cg from "@grida/cg";
 import { useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
 import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { toast } from "sonner";
 
 /**
@@ -69,8 +70,9 @@ export function useDataTransferEventTarget() {
       node.$.top = y;
       node.$.fill = {
         type: "solid",
-        color: { r: 0, g: 0, b: 0, a: 1 },
-      } as cg.Paint;
+        color: kolor.colorformats.RGBA32F.BLACK,
+        active: true,
+      } satisfies cg.Paint;
     },
     [instance]
   );

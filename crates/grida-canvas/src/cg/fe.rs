@@ -480,7 +480,7 @@ pub enum NoiseEffectColors {
     ///
     /// # Example
     /// ```ignore
-    /// Mono { color: CGColor(0, 0, 0, 64) } // 25% opacity black noise
+    /// Mono { color: CGColor::from_rgba(0, 0, 0, 64) } // 25% opacity black noise
     /// ```
     Mono {
         /// Color of the noise pixels (includes alpha)
@@ -495,8 +495,8 @@ pub enum NoiseEffectColors {
     /// # Example
     /// ```ignore
     /// Duo {
-    ///     color1: CGColor(255, 0, 0, 255),  // red pattern
-    ///     color2: CGColor(255, 255, 255, 128) // semi-transparent white base
+    ///     color1: CGColor::from_rgba(255, 0, 0, 255),  // red pattern
+    ///     color2: CGColor::from_rgba(255, 255, 255, 128) // semi-transparent white base
     /// }
     /// ```
     Duo {

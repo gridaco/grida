@@ -1,4 +1,5 @@
 import type cg from "@grida/cg";
+import kolor from "@grida/color";
 
 type BoxShadow = cg.BoxShadow;
 
@@ -14,7 +15,7 @@ export const boxshadow: Record<
     label: "None",
     class: "shadow-none",
     value: {
-      color: { r: 0, g: 0, b: 0, a: 0 },
+      color: kolor.colorformats.newRGBA32F(0, 0, 0, 0),
       offset: [0, 0],
       blur: 0,
       spread: 0,
@@ -24,7 +25,7 @@ export const boxshadow: Record<
     label: "Small",
     class: "shadow-sm",
     value: {
-      color: { r: 0, g: 0, b: 0, a: 0.05 },
+      color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.05),
       offset: [0, 1],
       blur: 2,
       spread: 0,
@@ -34,7 +35,7 @@ export const boxshadow: Record<
     label: "Default",
     class: "shadow",
     value: {
-      color: { r: 0, g: 0, b: 0, a: 0.1 },
+      color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.1),
       offset: [0, 1],
       blur: 3,
       spread: -1,
@@ -44,7 +45,7 @@ export const boxshadow: Record<
     label: "Medium",
     class: "shadow-md",
     value: {
-      color: { r: 0, g: 0, b: 0, a: 0.1 },
+      color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.1),
       offset: [0, 4],
       blur: 6,
       spread: -1,
@@ -54,7 +55,7 @@ export const boxshadow: Record<
     label: "Large",
     class: "shadow-lg",
     value: {
-      color: { r: 0, g: 0, b: 0, a: 0.1 },
+      color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.1),
       offset: [0, 10],
       blur: 15,
       spread: -3,
@@ -64,7 +65,7 @@ export const boxshadow: Record<
     label: "Extra Large",
     class: "shadow-xl",
     value: {
-      color: { r: 0, g: 0, b: 0, a: 0.1 },
+      color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.1),
       offset: [0, 20],
       blur: 25,
       spread: -5,
@@ -74,7 +75,7 @@ export const boxshadow: Record<
     label: "2 Extra Large",
     class: "shadow-2xl",
     value: {
-      color: { r: 0, g: 0, b: 0, a: 0.25 },
+      color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.25),
       offset: [0, 25],
       blur: 50,
       spread: -12,

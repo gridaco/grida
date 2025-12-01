@@ -23,6 +23,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEyeDropper } from "@/scaffolds/sidecontrol/controls/utils/eyedropper";
 import { toast } from "sonner";
@@ -302,9 +303,9 @@ function EyedropButton() {
   const mod = () => {
     if (isSupported) {
       open()?.then((result) => {
-        const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
+        const color = kolor.colorformats.RGBA32F.fromHEX(result.sRGBHex);
         // editor clipboard
-        editor.surface.a11ySetClipboardColor(rgba);
+        editor.surface.a11ySetClipboardColor(color);
       });
     } else {
       toast.error("This feature is not supported in your browser.");

@@ -18,24 +18,9 @@ import {
   type GradientType,
 } from "@/grida-canvas-react-gradient";
 import type cg from "@grida/cg";
+import kolor from "@grida/color";
 import { css } from "@/grida-canvas-utils/css";
 import { useWindowSize } from "@uidotdev/usehooks";
-
-// Helper function to convert RGBA8888 to hex string
-const rgbaToHex = (color: cg.RGBA8888): string => {
-  const r = color.r.toString(16).padStart(2, "0");
-  const g = color.g.toString(16).padStart(2, "0");
-  const b = color.b.toString(16).padStart(2, "0");
-  return `#${r}${g}${b}`;
-};
-
-// Helper function to convert hex string to RGBA8888
-const hexToRgba = (hex: string): cg.RGBA8888 => {
-  const r = Number.parseInt(hex.slice(1, 3), 16);
-  const g = Number.parseInt(hex.slice(3, 5), 16);
-  const b = Number.parseInt(hex.slice(5, 7), 16);
-  return { r, g, b, a: 1 };
-};
 
 // Main gradient editor component that only renders when size is ready
 function GradientEditorContent() {
@@ -49,9 +34,9 @@ function GradientEditorContent() {
   };
 
   // State for the gradient
-  const [stops, setStops] = useState<{ offset: number; color: cg.RGBA8888 }[]>([
-    { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } },
-    { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } },
+  const [stops, setStops] = useState<{ offset: number; color: cg.RGBA32F }[]>([
+    { offset: 0, color: kolor.colorformats.newRGBA32F(1, 0, 0, 1) },
+    { offset: 1, color: kolor.colorformats.newRGBA32F(0, 0, 1, 1) },
   ]);
   const [focusedStop, setFocusedStop] = useState<number | null>(null);
   const [points, setPoints] = useState<
@@ -125,10 +110,12 @@ function GradientEditorContent() {
   );
 
   const handleInsertStop = useCallback((at: number, position: number) => {
-    const newColor: cg.RGBA8888 = { r: 128, g: 128, b: 128, a: 1 };
     setStops((prev) => {
       const newStops = [...prev];
-      newStops.splice(at, 0, { offset: position, color: newColor });
+      newStops.splice(at, 0, {
+        offset: position,
+        color: kolor.colorformats.RGBA32F.GRAY,
+      });
       return newStops;
     });
     setFocusedStop(at);
@@ -259,10 +246,11 @@ function GradientEditorContent() {
                     <label className="text-xs">Color</label>
                     <Input
                       type="color"
-                      value={rgbaToHex(stop.color)}
+                      value={kolor.colorformats.RGBA32F.intoHEX(stop.color)}
                       onChange={(e) => {
                         const hex = e.target.value;
-                        const newColor = hexToRgba(hex);
+                        const newColor =
+                          kolor.colorformats.RGBA32F.fromHEX(hex);
                         setStops((prev) =>
                           prev.map((s, i) =>
                             i === focusedStop ? { ...s, color: newColor } : s

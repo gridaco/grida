@@ -47,9 +47,12 @@ async fn demo_texts() -> Scene {
         line_height: Default::default(),
         text_transform: TextTransform::Uppercase,
     };
-    word_text_node.strokes = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
+    word_text_node.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 255, 255, 255))]);
     word_text_node.fills = Paints::new([Paint::LinearGradient(LinearGradientPaint::from_colors(
-        vec![CGColor(255, 255, 255, 255), CGColor(0, 0, 0, 255)],
+        vec![
+            CGColor::from_rgba(255, 255, 255, 255),
+            CGColor::from_rgba(0, 0, 0, 255),
+        ],
     ))]);
     word_text_node.stroke_width = 1.0;
     word_text_node.text_align = TextAlign::Left;
@@ -83,7 +86,8 @@ async fn demo_texts() -> Scene {
     second_paragraph_text_node.text_style = TextStyleRec::from_font("VT323", 16.0);
     second_paragraph_text_node.text_align = TextAlign::Left;
     second_paragraph_text_node.text_align_vertical = TextAlignVertical::Top;
-    second_paragraph_text_node.fills = Paints::new([Paint::from(CGColor(70, 130, 180, 255))]);
+    second_paragraph_text_node.fills =
+        Paints::new([Paint::from(CGColor::from_rgba(70, 130, 180, 255))]);
 
     // Create a blurry text span with the commented style
     let mut blurry_text_node = nf.create_text_span_node();
@@ -92,7 +96,7 @@ async fn demo_texts() -> Scene {
     blurry_text_node.text_style = TextStyleRec::from_font("Geist", 40.0);
     blurry_text_node.text_align = TextAlign::Left;
     blurry_text_node.text_align_vertical = TextAlignVertical::Top;
-    blurry_text_node.fills = Paints::new([Paint::from(CGColor(100, 100, 100, 255))]);
+    blurry_text_node.fills = Paints::new([Paint::from(CGColor::from_rgba(100, 100, 100, 255))]);
     blurry_text_node.effects = LayerEffects::new().blur(4.0f32);
 
     // Create a root container node
@@ -120,7 +124,7 @@ async fn demo_texts() -> Scene {
 
     Scene {
         name: "Text Demo".to_string(),
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
         graph,
     }
 }

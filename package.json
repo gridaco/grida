@@ -14,7 +14,7 @@
     "typecheck": "turbo run typecheck",
     "publish-packages": "turbo run build lint test && changeset version && changeset publish"
   },
-  "packageManager": "pnpm@10.10.0",
+  "packageManager": "pnpm@10.24.0",
   "resolutions": {},
   "devDependencies": {
     "@changesets/cli": "^2.29.4",

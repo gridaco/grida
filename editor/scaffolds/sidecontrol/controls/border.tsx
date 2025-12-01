@@ -6,9 +6,10 @@ import {
 } from "@/components/ui/popover";
 import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
+import kolor from "@grida/color";
 import { cn } from "@/components/lib/utils";
-import { RGBAChip } from "./utils/paint-chip";
-import { RGBAColorControl } from "./color";
+import { RGBA32FChip } from "./utils/paint-chip";
+import { RGBA32FColorControl } from "./color";
 import { PropertyEnum, PropertyLine, PropertyLineLabel } from "../ui";
 import { Label } from "@/components/ui/label";
 import { Cross2Icon } from "@radix-ui/react-icons";
@@ -29,7 +30,7 @@ export function BorderControl({
 
   const onAddBorder = () => {
     onValueChange?.({
-      borderColor: { r: 0, g: 0, b: 0, a: 1 },
+      borderColor: kolor.colorformats.RGBA32F.BLACK,
       borderStyle: "solid",
       borderWidth: 1,
     });
@@ -52,8 +53,10 @@ export function BorderControl({
               })
             )}
           >
-            <RGBAChip
-              rgba={value?.borderColor ?? { r: 0, g: 0, b: 0, a: 0 }}
+            <RGBA32FChip
+              rgba={
+                value?.borderColor ?? kolor.colorformats.RGBA32F.TRANSPARENT
+              }
               className="rounded-sm"
             />
             {value?.borderStyle === "solid" && <>Solid</>}
@@ -77,14 +80,7 @@ export function BorderControl({
             )}
             onClick={onAddBorder}
           >
-            <RGBAChip
-              rgba={{
-                r: 0,
-                g: 0,
-                b: 0,
-                a: 0,
-              }}
-            />
+            <RGBA32FChip rgba={kolor.colorformats.RGBA32F.TRANSPARENT} />
             Add
           </div>
         )}
@@ -96,7 +92,7 @@ export function BorderControl({
           <div className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Color</PropertyLineLabel>
-              <RGBAColorControl
+              <RGBA32FColorControl
                 value={value.borderColor}
                 onValueChange={(v) => {
                   onValueChange?.({

@@ -5,6 +5,7 @@ import reducer, { type ReducerContext } from "../index";
 import { DocumentHistoryManager } from "../../history-manager";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
+import color from "@grida/color";
 import type { Action } from "../../action";
 
 // Mock geometry interface
@@ -48,7 +49,7 @@ function createDocument(): grida.program.document.Document {
         constraints: { children: "multiple" },
         guides: [],
         edges: [],
-        backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
+        backgroundColor: null,
       },
       rect1: {
         id: "rect1",
@@ -70,7 +71,7 @@ function createDocument(): grida.program.document.Document {
         strokeJoin: "miter",
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: color.colorformats.RGBA32F.BLACK,
           active: true,
         },
       },
@@ -94,7 +95,7 @@ function createDocument(): grida.program.document.Document {
         strokeJoin: "miter",
         fill: {
           type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
+          color: color.colorformats.RGBA32F.BLACK,
           active: true,
         },
       },

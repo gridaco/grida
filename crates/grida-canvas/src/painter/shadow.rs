@@ -50,7 +50,7 @@ pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeSh
 }
 
 pub fn inner_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
-    let CGColor(r, g, b, a) = shadow.color;
+    let CGColor { r, g, b, a } = shadow.color;
     let spread = shadow.spread;
 
     // Construct color matrix selecting and colorizing the inverse alpha

@@ -25,7 +25,7 @@ const TRANSPARENT: Paint = Paint::Solid(SolidPaint::TRANSPARENT);
 // Map implementations
 impl From<&Rgba> for CGColor {
     fn from(color: &Rgba) -> Self {
-        CGColor(
+        CGColor::from_rgba(
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
             (color.b * 255.0) as u8,
@@ -36,7 +36,7 @@ impl From<&Rgba> for CGColor {
 
 impl From<&Box<Rgba>> for CGColor {
     fn from(color: &Box<Rgba>) -> Self {
-        CGColor(
+        CGColor::from_rgba(
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
             (color.b * 255.0) as u8,
@@ -52,9 +52,9 @@ impl From<&FigmaPaint> for Paint {
                 let mut color = CGColor::from(&solid.color);
                 let opacity = solid.opacity.unwrap_or(1.0) as f32;
                 // Apply opacity to the color's alpha channel
-                let CGColor(r, g, b, a) = color;
+                let CGColor { r, g, b, a } = color;
                 let final_alpha = (a as f32 * opacity).round() as u8;
-                color = CGColor(r, g, b, final_alpha);
+                color = CGColor::from_rgba(r, g, b, final_alpha);
                 Paint::Solid(SolidPaint {
                     color,
                     blend_mode: BlendMode::default(),
@@ -165,7 +165,7 @@ impl From<&FigmaPaint> for Paint {
                 }
             }
             _ => Paint::Solid(SolidPaint {
-                color: CGColor(0, 0, 0, 255),
+                color: CGColor::from_rgba(0, 0, 0, 255),
                 blend_mode: BlendMode::default(),
                 active: true,
             }),
@@ -485,9 +485,9 @@ impl FigmaConverter {
                 let mut color = CGColor::from(&solid.color);
                 let opacity = solid.opacity.unwrap_or(1.0) as f32;
                 // Apply opacity to the color's alpha channel
-                let CGColor(r, g, b, a) = color;
+                let CGColor { r, g, b, a } = color;
                 let final_alpha = (a as f32 * opacity).round() as u8;
-                color = CGColor(r, g, b, final_alpha);
+                color = CGColor::from_rgba(r, g, b, final_alpha);
                 Paint::Solid(SolidPaint {
                     color,
                     blend_mode: BlendMode::default(),
@@ -603,7 +603,7 @@ impl FigmaConverter {
                 }
             }
             _ => Paint::Solid(SolidPaint {
-                color: CGColor(0, 0, 0, 255),
+                color: CGColor::from_rgba(0, 0, 0, 255),
                 blend_mode: BlendMode::default(),
                 active: true,
             }),

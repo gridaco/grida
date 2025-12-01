@@ -29,11 +29,11 @@ pub struct JSONDocument {
     pub entry_scene_id: Option<String>,
 }
 
-// remove
+// TODO_REMOVE_IR: Identical to GradientStop, can use GradientStop directly with serde attributes
 #[derive(Debug, Deserialize)]
 pub struct JSONGradientStop {
     pub offset: f32,
-    #[serde(with = "color_formats::object::RGB888A32F")]
+    #[serde(with = "color_formats::object::RGBA32F")]
     pub color: CGColor,
 }
 
@@ -51,7 +51,7 @@ impl From<JSONGradientStop> for GradientStop {
 pub enum JSONPaint {
     #[serde(rename = "solid")]
     Solid {
-        #[serde(with = "color_formats::object::RGB888A32F", default)]
+        #[serde(with = "color_formats::object::RGBA32F", default)]
         color: CGColor,
         #[serde(rename = "blendMode", default)]
         blend_mode: BlendMode,
@@ -138,7 +138,7 @@ pub struct CSSBorder {
     pub border_width: Option<f32>,
     #[serde(
         rename = "borderColor",
-        with = "color_formats::object::RGB888A32F",
+        with = "color_formats::object::RGBA32F",
         default
     )]
     pub border_color: CGColor,
@@ -159,9 +159,10 @@ pub struct JSONVariableWidthProfile {
     pub stops: Vec<WidthStop>,
 }
 
+// TODO_REMOVE_IR: Almost identical to FeShadow, but has extra `inset` field. Could use FeShadow directly with custom handling for inset flag
 #[derive(Debug, Deserialize)]
 pub struct JSONFeShadow {
-    #[serde(with = "color_formats::object::RGB888A32F")]
+    #[serde(with = "color_formats::object::RGBA32F")]
     pub color: CGColor,
     pub dx: f32,
     pub dy: f32,
@@ -175,6 +176,7 @@ pub struct JSONFeShadow {
     pub active: bool,
 }
 
+// TODO_REMOVE_IR: Identical to FeLiquidGlass, can use FeLiquidGlass directly with serde rename attributes
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct JSONFeLiquidGlass {
@@ -238,6 +240,7 @@ fn default_true() -> bool {
     true
 }
 
+// TODO_REMOVE_IR: Could use FeProgressiveBlur directly with custom serde deserializer for (x1, y1, x2, y2) format
 /// JSON representation of progressive blur with Alignment coordinates (x1, y1, x2, y2)
 ///
 /// Coordinates are in Alignment range where:
@@ -305,18 +308,19 @@ impl From<JSONFeLiquidGlass> for FeLiquidGlass {
     }
 }
 
+// TODO_REMOVE_IR: Identical to NoiseEffectColors, can use NoiseEffectColors directly with serde attributes
 /// JSON representation of noise effect coloring strategies
 #[derive(Debug, Deserialize)]
 #[serde(tag = "mode", rename_all = "lowercase")]
 pub enum JSONFeNoiseColors {
     Mono {
-        #[serde(with = "color_formats::object::RGB888A32F", default)]
+        #[serde(with = "color_formats::object::RGBA32F", default)]
         color: CGColor,
     },
     Duo {
-        #[serde(with = "color_formats::object::RGB888A32F")]
+        #[serde(with = "color_formats::object::RGBA32F")]
         color1: CGColor,
-        #[serde(with = "color_formats::object::RGB888A32F")]
+        #[serde(with = "color_formats::object::RGBA32F")]
         color2: CGColor,
     },
     Multi {
@@ -324,6 +328,7 @@ pub enum JSONFeNoiseColors {
     },
 }
 
+// TODO_REMOVE_IR: Identical to FeNoiseEffect, can use FeNoiseEffect directly with serde rename attributes
 /// JSON representation of noise effect
 #[derive(Debug, Deserialize)]
 pub struct JSONFeNoise {
@@ -576,7 +581,7 @@ pub struct JSONSceneNode {
     pub active: Option<bool>,
     pub locked: Option<bool>,
     #[serde(
-        with = "color_formats::object::RGB888A32F",
+        with = "color_formats::object::RGBA32F",
         rename = "backgroundColor",
         default
     )]
@@ -985,7 +990,7 @@ pub struct JSONTextNode {
     pub text_decoration_style: Option<TextDecorationStyle>,
     #[serde(
         rename = "textDecorationColor",
-        with = "color_formats::object::RGB888A32F",
+        with = "color_formats::object::RGBA32F",
         default
     )]
     pub text_decoration_color: CGColor,
@@ -1039,6 +1044,7 @@ pub struct JSONPathNode {
 
 pub type JSONVectorNetworkVertex = (f32, f32);
 
+// TODO_REMOVE_IR: Identical to VectorNetworkSegment, can use VectorNetworkSegment directly with serde attributes
 #[derive(Debug, Deserialize, Serialize)]
 pub struct JSONVectorNetworkSegment {
     pub a: usize,
@@ -3137,7 +3143,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.0.1-beta.1+20251010",
+            "version": "0.0.1-beta.2+20251201",
             "document": {
                 "nodes": {
                     "main": {
@@ -3194,7 +3200,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.0.1-beta.1+20251010",
+            "version": "0.0.1-beta.2+20251201",
             "document": {
                 "nodes": {
                     "main": {
@@ -3261,7 +3267,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.0.1-beta.1+20251010",
+            "version": "0.0.1-beta.2+20251201",
             "document": {
                 "nodes": {
                     "main": {

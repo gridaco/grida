@@ -1,3 +1,5 @@
+import kolor from "@grida/color";
+
 /**
  * Core Graphics
  */
@@ -70,7 +72,7 @@ export namespace cg {
   /**
    * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
    */
-  export type TRGBA = {
+  export type RGBA_UNKNWON = {
     r: number;
     g: number;
     b: number;
@@ -78,50 +80,15 @@ export namespace cg {
   };
 
   /**
-   * Floating-Point RGBA (Normalized RGBA)
+   * Standard f32 RGBA (Normalized RGBA)
    * Used in computer graphics pipelines, shading, and rendering.
    */
-  export type RGBAf = {
-    /**
-     * Red channel value, between 0 and 1.
-     */
-    r: number;
-    /**
-     * Green channel value, between 0 and 1.
-     */
-    g: number;
-    /**
-     * Blue channel value, between 0 and 1.
-     */
-    b: number;
-    /**
-     * Alpha channel value, between 0 and 1.
-     */
-    a: number;
-  };
+  export type RGBA32F = kolor.colorformats.RGBA32F;
 
   /**
-   * 8-bit Integer RGBA (Standard RGBA)
-   * Used in web and raster graphics, including CSS and images.
+   * 8-bit Integer RGB, f32 alpha (CSS' rgba format)
    */
-  export type RGBA8888 = {
-    /**
-     * Red channel value, between 0 and 255.
-     */
-    r: number;
-    /**
-     * Green channel value, between 0 and 255.
-     */
-    g: number;
-    /**
-     * Blue channel value, between 0 and 255.
-     */
-    b: number;
-    /**
-     * Alpha channel value, between 0 and 1.
-     */
-    a: number;
-  };
+  export type RGB888A32F = kolor.colorformats.RGB888A32F;
 
   export type LayerMaskType = "geometry" | ImageMaskType;
   export type ImageMaskType = "alpha" | "luminance";
@@ -257,8 +224,8 @@ export namespace cg {
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-color
    */
-  export type TextDecorationColor = "currentcolor" | cg.RGBA8888;
-  export type TextDecorationColorValue = cg.RGBA8888;
+  export type TextDecorationColor = "currentcolor" | cg.RGBA32F;
+  export type TextDecorationColorValue = cg.RGBA32F;
 
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-skip-ink
@@ -740,19 +707,19 @@ export namespace cg {
   export namespace paints {
     export const transparent: Paint = {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 0 },
+      color: kolor.colorformats.RGBA32F.TRANSPARENT,
       active: true,
     };
 
     export const black: Paint = {
       type: "solid",
-      color: { r: 0, g: 0, b: 0, a: 1 },
+      color: kolor.colorformats.RGBA32F.BLACK,
       active: true,
     };
 
     export const white: Paint = {
       type: "solid",
-      color: { r: 255, g: 255, b: 255, a: 1 },
+      color: kolor.colorformats.RGBA32F.WHITE,
       active: true,
     };
   }
@@ -769,7 +736,7 @@ export namespace cg {
 
   export type SolidPaint = {
     type: "solid";
-    color: cg.RGBA8888;
+    color: cg.RGBA32F;
     blendMode?: cg.BlendMode;
     active: boolean;
   };
@@ -974,7 +941,7 @@ export namespace cg {
      * 1 - end (100%)
      */
     offset: number;
-    color: cg.RGBA8888;
+    color: cg.RGBA32F;
   };
   //
   //
@@ -990,7 +957,7 @@ export namespace cg {
      * The color of the shadow.
      * Defaults to the current color if not provided.
      */
-    color: RGBA8888;
+    color: RGBA32F;
 
     /**
      * The horizontal and vertical offset of the shadow.
@@ -1045,7 +1012,7 @@ export namespace cg {
 
     spread: number;
 
-    color: RGBA8888;
+    color: RGBA32F;
 
     /**
      * Whether this effect is active
@@ -1300,17 +1267,17 @@ export namespace cg {
      * Color of noise pixels (mono mode only)
      * Includes alpha for opacity control
      */
-    color?: RGBA8888;
+    color?: RGBA32F;
     /**
      * Pattern color (duo mode only)
      * Applied where noise is visible
      */
-    color1?: RGBA8888;
+    color1?: RGBA32F;
     /**
      * Background color (duo mode only)
      * Base layer behind the noise pattern
      */
-    color2?: RGBA8888;
+    color2?: RGBA32F;
     /**
      * Overall opacity (multi mode only)
      * Range: 0.0 - 1.0

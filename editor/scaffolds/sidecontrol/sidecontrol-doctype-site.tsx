@@ -12,10 +12,10 @@ import { Rnd } from "react-rnd";
 import { Portal } from "@radix-ui/react-portal";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { useCurrentEditor } from "@/grida-canvas-react";
-import parsecolor from "color-parse";
 import { PreviewButton } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
+import kolor from "@grida/color";
 
 export function SideControlDoctypeSite() {
   const [open, setOpen] = React.useState(false);
@@ -103,8 +103,8 @@ function ThemeEditorPortal({
               onChange={(s) => {
                 const cssproperties = Object.entries(s.theme.colors).reduce(
                   (acc: ThemeColorProperties, [key, value]) => {
-                    const l = parsecolor(value.light);
-                    const d = parsecolor(value.dark);
+                    const l = kolor.parse(value.light);
+                    const d = kolor.parse(value.dark);
                     acc.light[value.name] = l.values as [
                       number,
                       number,

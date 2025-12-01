@@ -29,7 +29,7 @@ async fn demo_paints() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
-        rect.set_fill(Paint::from(CGColor(
+        rect.set_fill(Paint::from(CGColor::from_rgba(
             255 - (i * 25) as u8,
             100 + (i * 15) as u8,
             50 + (i * 20) as u8,
@@ -60,11 +60,11 @@ async fn demo_paints() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 100, 100, 255),
+                    color: CGColor::from_rgba(255, 100, 100, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(100, 100, 255, 255),
+                    color: CGColor::from_rgba(100, 100, 255, 255),
                 },
             ],
             ..Default::default()
@@ -95,11 +95,11 @@ async fn demo_paints() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 255, 100, 255),
+                    color: CGColor::from_rgba(255, 255, 100, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(100, 255, 100, 255),
+                    color: CGColor::from_rgba(100, 255, 100, 255),
                 },
             ],
             opacity: 1.0,
@@ -124,10 +124,10 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
-        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
+        rect.set_fill(Paint::from(CGColor::from_rgba(0, 0, 0, 0)));
 
         // Solid color stroke with varying colors
-        rect.strokes = Paints::new([Paint::from(CGColor(
+        rect.strokes = Paints::new([Paint::from(CGColor::from_rgba(
             255 - (i * 25) as u8,
             100 + (i * 15) as u8,
             50 + (i * 20) as u8,
@@ -152,7 +152,7 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
-        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
+        rect.set_fill(Paint::from(CGColor::from_rgba(0, 0, 0, 0)));
 
         // Create a linear gradient that changes angle based on index
         let angle = (i as f32 * 36.0) * std::f32::consts::PI / 180.0; // 0 to 360 degrees
@@ -163,11 +163,11 @@ async fn demo_paints() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 100, 100, 255),
+                    color: CGColor::from_rgba(255, 100, 100, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(100, 100, 255, 255),
+                    color: CGColor::from_rgba(100, 100, 255, 255),
                 },
             ],
             ..Default::default()
@@ -191,7 +191,7 @@ async fn demo_paints() -> Scene {
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // No fill
-        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
+        rect.set_fill(Paint::from(CGColor::from_rgba(0, 0, 0, 0)));
 
         // Create a radial gradient with varying center positions
         let center_x = 0.2 + (i as f32 * 0.06); // 0.2 to 0.8
@@ -203,11 +203,11 @@ async fn demo_paints() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 255, 100, 255),
+                    color: CGColor::from_rgba(255, 255, 100, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(100, 255, 100, 255),
+                    color: CGColor::from_rgba(100, 255, 100, 255),
                 },
             ],
             opacity: 1.0,
@@ -225,7 +225,7 @@ async fn demo_paints() -> Scene {
 
     Scene {
         name: "Paints Demo".to_string(),
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
         graph,
     }
 }

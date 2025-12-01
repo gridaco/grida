@@ -1,6 +1,7 @@
-import type cg from "@grida/cg";
-import { css } from "@/grida-canvas-utils/css";
 import React, { useRef, useState, useCallback, useEffect } from "react";
+import type cg from "@grida/cg";
+import kolor from "@grida/color";
+import { css } from "@/grida-canvas-utils/css";
 
 interface GradientStopsSliderProps {
   stops: cg.GradientStop[];
@@ -38,12 +39,12 @@ export function GradientStopsSlider({
   const insertStopInSortedPosition = useCallback(
     (
       positions: number[],
-      colors: cg.RGBA8888[],
+      colors: cg.RGBA32F[],
       newPosition: number,
-      newColor: cg.RGBA8888
+      newColor: cg.RGBA32F
     ): {
       positions: number[];
-      colors: cg.RGBA8888[];
+      colors: cg.RGBA32F[];
       insertedIndex: number;
     } => {
       const newPositions = [...positions];
@@ -76,9 +77,9 @@ export function GradientStopsSlider({
   const sortStopsByOffset = useCallback(
     (
       positions: number[],
-      colors: cg.RGBA8888[],
+      colors: cg.RGBA32F[],
       originalIndex: number
-    ): { positions: number[]; colors: cg.RGBA8888[]; newIndex: number } => {
+    ): { positions: number[]; colors: cg.RGBA32F[]; newIndex: number } => {
       const newPositions = [...positions];
       const newColors = [...colors];
       const movedPosition = newPositions[originalIndex];
@@ -109,7 +110,7 @@ export function GradientStopsSlider({
 
   // Update stops with new positions and colors
   const updateStops = useCallback(
-    (newPositions: number[], newColors: cg.RGBA8888[]) => {
+    (newPositions: number[], newColors: cg.RGBA32F[]) => {
       const newStops = newPositions.map((position, index) => ({
         offset: position,
         color: newColors[index],
@@ -207,7 +208,7 @@ export function GradientStopsSlider({
       if (isDragging) return;
 
       const newPosition = screenToGradientPosition(e.clientX);
-      const newColor: cg.RGBA8888 = { r: 128, g: 128, b: 128, a: 1 };
+      const newColor: cg.RGBA32F = kolor.colorformats.RGBA32F.GRAY;
 
       const {
         positions: newPositions,

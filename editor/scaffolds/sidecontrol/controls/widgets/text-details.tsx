@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import kolor from "@grida/color";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Collapsible,
@@ -9,7 +10,7 @@ import { Slider } from "../utils/slider";
 import { Separator } from "@/components/ui/separator";
 import { PropertyLine, PropertyLineLabel, PropertyEnumToggle } from "../../ui";
 import InputPropertyNumber from "../../ui/number";
-import { RGBAColorControl } from "../color";
+import { RGBA32FColorControl } from "../color";
 import { WordSpacingControl } from "../word-spacing";
 import {
   TextAlignLeftIcon,
@@ -392,7 +393,7 @@ function DecorationDetails(props: DecorationDetailsProps = {}) {
       {/* Color */}
       <PropertyLine>
         <PropertyLineLabel>Color</PropertyLineLabel>
-        <RGBAColorControl
+        <RGBA32FColorControl
           value={textDecorationColor}
           onValueChange={onTextDecorationColorChange}
           disabled={!isDecorationActive}
@@ -455,7 +456,7 @@ export function TextDetails({
   textDecorationLine = "none",
   textDecorationStyle = "solid",
   textDecorationThickness = "auto",
-  textDecorationColor = { r: 0, g: 0, b: 0, a: 1 },
+  textDecorationColor = kolor.colorformats.RGBA32F.BLACK,
   textDecorationSkipInk = true,
   textTransform = "none",
   verticalTrim = "all",

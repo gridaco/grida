@@ -12,6 +12,7 @@ import { dq } from "./query";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import grida from "@grida/schema";
+import kolor from "@grida/color";
 import tree from "@grida/tree";
 import type { io } from "@grida/io";
 import type { svgtypes } from "@grida/io-svg";
@@ -421,7 +422,7 @@ export namespace editor.config {
   };
 
   export const DEFAULT_FE_SHADOW: cg.IFeShadow = {
-    color: { r: 0, g: 0, b: 0, a: 0.25 },
+    color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.25),
     dx: 0,
     dy: 4,
     blur: 4,
@@ -454,7 +455,7 @@ export namespace editor.config {
     mode: "mono",
     noiseSize: 0.5,
     density: 0.5,
-    color: { r: 0, g: 0, b: 0, a: 0.15 },
+    color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.15),
     blendMode: "normal",
   };
 
@@ -862,7 +863,7 @@ export namespace editor.state {
 
   export interface IEditorFeatureBrushState {
     brushes: BitmapEditorBrush[];
-    brush_color?: cg.RGBA8888;
+    brush_color?: cg.RGBA32F;
     brush: editor.state.CurrentBrush;
   }
 
@@ -968,7 +969,7 @@ export namespace editor.state {
      * user clipboard - copied data
      */
     user_clipboard?: io.clipboard.ClipboardPayload;
-    user_clipboard_color?: cg.RGBA8888;
+    user_clipboard_color?: cg.RGBA32F;
   }
 
   /**
@@ -3202,7 +3203,7 @@ export namespace editor.api {
    */
   export interface IEditorA11yActions {
     //
-    a11ySetClipboardColor(color: cg.RGBA8888): void;
+    a11ySetClipboardColor(color: cg.RGBA32F): void;
     a11yNudgeResize(
       target: "selection" | NodeID,
       axis: "x" | "y",

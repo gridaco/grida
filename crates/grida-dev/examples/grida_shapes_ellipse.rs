@@ -29,7 +29,7 @@ async fn demo_ellipses() -> Scene {
             width: base_size * (0.5 + (i as f32 * 0.2)), // 0.5x to 1.9x width
             height: base_size,
         };
-        ellipse.fills = Paints::new([Paint::from(CGColor(
+        ellipse.fills = Paints::new([Paint::from(CGColor::from_rgba(
             100 + (i * 20) as u8,
             150 + (i * 10) as u8,
             200 + (i * 5) as u8,
@@ -50,7 +50,7 @@ async fn demo_ellipses() -> Scene {
             height: base_size,
         };
         ring.inner_radius = Some(0.1 + (i as f32 * 0.1)); // 0.1 to 0.8 inner radius
-        ring.fills = Paints::new([Paint::from(CGColor(
+        ring.fills = Paints::new([Paint::from(CGColor::from_rgba(
             200 + (i * 7) as u8,
             100 + (i * 15) as u8,
             50 + (i * 20) as u8,
@@ -72,7 +72,7 @@ async fn demo_ellipses() -> Scene {
         };
         arc.start_angle = 0.0;
         arc.angle = Some(30.0 + (i as f32 * 45.0)); // 30 to 345 degrees
-        arc.fills = Paints::new([Paint::from(CGColor(
+        arc.fills = Paints::new([Paint::from(CGColor::from_rgba(
             50 + (i * 25) as u8,
             200 + (i * 7) as u8,
             100 + (i * 15) as u8,
@@ -95,7 +95,7 @@ async fn demo_ellipses() -> Scene {
         donut_arc.start_angle = 0.0;
         donut_arc.angle = Some(60.0 + (i as f32 * 37.5)); // 60 to 337.5 degrees
         donut_arc.inner_radius = Some(0.4); // Fixed inner radius
-        donut_arc.fills = Paints::new([Paint::from(CGColor(
+        donut_arc.fills = Paints::new([Paint::from(CGColor::from_rgba(
             200 + (i * 7) as u8,
             50 + (i * 25) as u8,
             150 + (i * 12) as u8,
@@ -115,8 +115,8 @@ async fn demo_ellipses() -> Scene {
             width: base_size * (0.8 + (i as f32 * 0.15)), // 0.8x to 1.85x width
             height: base_size,
         };
-        stroke_ellipse.fills = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
-        stroke_ellipse.strokes = Paints::new([Paint::from(CGColor(
+        stroke_ellipse.fills = Paints::new([Paint::from(CGColor::from_rgba(255, 255, 255, 255))]);
+        stroke_ellipse.strokes = Paints::new([Paint::from(CGColor::from_rgba(
             255 - (i * 30) as u8,
             100 + (i * 20) as u8,
             50 + (i * 25) as u8,
@@ -132,7 +132,7 @@ async fn demo_ellipses() -> Scene {
     Scene {
         name: "Ellipse Demo".to_string(),
         graph,
-        background_color: Some(CGColor(245, 245, 245, 255)),
+        background_color: Some(CGColor::from_rgba(245, 245, 245, 255)),
     }
 }
 

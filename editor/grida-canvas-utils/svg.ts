@@ -2,6 +2,7 @@ import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 import type cg from "@grida/cg";
 import cmath from "@grida/cmath";
 import { v4 } from "uuid";
+import { css } from "./css";
 
 export namespace svg {
   export namespace d {
@@ -93,7 +94,7 @@ export namespace svg {
 
   export namespace gradient {
     export function stringifyGradientStop(stop: cg.GradientStop) {
-      return `<stop offset="${stop.offset * 100}%" stop-color="rgba(${stop.color.r}, ${stop.color.g}, ${stop.color.b}, ${stop.color.a})" />`;
+      return `<stop offset="${stop.offset * 100}%" stop-color="${css.toRGBAString(stop.color)}" />`;
     }
 
     export function stringifyLinearGradient(
@@ -176,7 +177,7 @@ ${gradientStops}
           const { color } = paint;
           return {
             defs: undefined,
-            ref: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
+            ref: css.toRGBAString(color),
           };
         }
         case "sweep_gradient":
