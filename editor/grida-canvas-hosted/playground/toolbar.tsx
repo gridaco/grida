@@ -30,7 +30,7 @@ import {
   ToolsGroup,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
-import { ColorPicker } from "@/scaffolds/sidecontrol/controls/color-picker";
+import { ColorPicker32F } from "@/scaffolds/sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { PaintBucketIcon } from "lucide-react";
 import {
@@ -309,33 +309,34 @@ function BitmapEditModeAuxiliaryToolbar() {
 
 // TODO: have it somewhere else
 const defaultColors = {
-  red: kolor.colorformats.newRGB888A32F(255, 0, 0, 1),
-  green: kolor.colorformats.newRGB888A32F(0, 255, 0, 1),
-  blue: kolor.colorformats.newRGB888A32F(0, 0, 255, 1),
-  yellow: kolor.colorformats.newRGB888A32F(255, 255, 0, 1),
-  orange: kolor.colorformats.newRGB888A32F(255, 165, 0, 1),
-  purple: kolor.colorformats.newRGB888A32F(128, 0, 128, 1),
-  pink: kolor.colorformats.newRGB888A32F(255, 192, 203, 1),
-  cyan: kolor.colorformats.newRGB888A32F(0, 255, 255, 1),
-  magenta: kolor.colorformats.newRGB888A32F(255, 0, 255, 1),
-  black: kolor.colorformats.newRGB888A32F(0, 0, 0, 1),
-  white: kolor.colorformats.newRGB888A32F(255, 255, 255, 1),
-  gray: kolor.colorformats.newRGB888A32F(128, 128, 128, 1),
-  silver: kolor.colorformats.newRGB888A32F(192, 192, 192, 1),
-  brown: kolor.colorformats.newRGB888A32F(165, 42, 42, 1),
-  olive: kolor.colorformats.newRGB888A32F(128, 128, 0, 1),
-  navy: kolor.colorformats.newRGB888A32F(0, 0, 128, 1),
-  teal: kolor.colorformats.newRGB888A32F(0, 128, 128, 1),
-  maroon: kolor.colorformats.newRGB888A32F(128, 0, 0, 1),
-  gold: kolor.colorformats.newRGB888A32F(255, 215, 0, 1),
-  indigo: kolor.colorformats.newRGB888A32F(75, 0, 130, 1),
+  red: kolor.colorformats.newRGBA32F(1, 0, 0, 1),
+  green: kolor.colorformats.newRGBA32F(0, 1, 0, 1),
+  blue: kolor.colorformats.newRGBA32F(0, 0, 1, 1),
+  yellow: kolor.colorformats.newRGBA32F(1, 1, 0, 1),
+  orange: kolor.colorformats.newRGBA32F(1, 165 / 255, 0, 1),
+  purple: kolor.colorformats.newRGBA32F(128 / 255, 0, 128 / 255, 1),
+  pink: kolor.colorformats.newRGBA32F(1, 192 / 255, 203 / 255, 1),
+  cyan: kolor.colorformats.newRGBA32F(0, 1, 1, 1),
+  magenta: kolor.colorformats.newRGBA32F(1, 0, 1, 1),
+  black: kolor.colorformats.newRGBA32F(0, 0, 0, 1),
+  white: kolor.colorformats.newRGBA32F(1, 1, 1, 1),
+  gray: kolor.colorformats.newRGBA32F(128 / 255, 128 / 255, 128 / 255, 1),
+  silver: kolor.colorformats.newRGBA32F(192 / 255, 192 / 255, 192 / 255, 1),
+  brown: kolor.colorformats.newRGBA32F(165 / 255, 42 / 255, 42 / 255, 1),
+  olive: kolor.colorformats.newRGBA32F(128 / 255, 128 / 255, 0, 1),
+  navy: kolor.colorformats.newRGBA32F(0, 0, 128 / 255, 1),
+  teal: kolor.colorformats.newRGBA32F(0, 128 / 255, 128 / 255, 1),
+  maroon: kolor.colorformats.newRGBA32F(128 / 255, 0, 0, 1),
+  gold: kolor.colorformats.newRGBA32F(255 / 255, 215 / 255, 0, 1),
+  indigo: kolor.colorformats.newRGBA32F(75 / 255, 0, 130 / 255, 1),
 };
 
 function ClipboardColor() {
   const editor = useCurrentEditor();
   const clipboardColor = useEditorState(editor, (s) => s.user_clipboard_color);
 
-  const color = clipboardColor ?? kolor.colorformats.RGB888A32F.BLACK;
+  const color: kolor.colorformats.RGBA32F =
+    clipboardColor ?? kolor.colorformats.RGBA32F.BLACK;
 
   // TODO:
   // - recent colors
@@ -364,7 +365,7 @@ function ClipboardColor() {
         sideOffset={16}
         className="p-0"
       >
-        <ColorPicker
+        <ColorPicker32F
           color={color}
           onColorChange={editor.surface.a11ySetClipboardColor.bind(
             editor.surface

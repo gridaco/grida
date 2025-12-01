@@ -3,6 +3,7 @@
   "description": "Core Bitmap Graphics Editor",
   "private": true,
   "dependencies": {
-    "@grida/cmath": "workspace:*"
+    "@grida/cmath": "workspace:*",
+    "@grida/color": "workspace:*"
   }
 }

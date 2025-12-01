@@ -20,6 +20,10 @@ export namespace color {
       return value <= 0 ? 0 : value >= 255 ? 255 : value;
     }
 
+    function u8ToF32(value: number): number {
+      return value / 255;
+    }
+
     export type ColorComponentFormat = "u8" | "f32";
 
     export type RGB_UNKNOWN = {
@@ -140,12 +144,59 @@ export namespace color {
       color: RGB_UNKNOWN,
       unit: ColorComponentFormat
     ): string {
-      if (unit === "u8") {
-        return `rgb(${color.r}, ${color.g}, ${color.b})`;
-      } else if (unit === "f32") {
-        return `rgb(${color.r * 255}, ${color.g * 255}, ${color.b * 255})`;
+      const [r, g, b] = intoU8Chunk(color, unit);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    /**
+     * @param color - The input color to convert.
+     * @param format - The input format to convert from.
+     * @returns The output color as a tuple of [r, g, b] or [r, g, b, a]. (always in u8 range)
+     */
+    export function intoU8Chunk(
+      color: RGB_UNKNOWN | RGBA_UNKNOWN,
+      format: ColorComponentFormat
+    ): [number, number, number] | [number, number, number, number] {
+      const hasalpha = "a" in color;
+      switch (format) {
+        case "u8":
+          return hasalpha
+            ? [color.r, color.g, color.b, color.a]
+            : [color.r, color.g, color.b];
+        case "f32":
+          return hasalpha
+            ? [color.r * 255, color.g * 255, color.b * 255, color.a * 255]
+            : [color.r * 255, color.g * 255, color.b * 255];
       }
-      throw new Error(`Invalid unit: ${unit}`);
+    }
+
+    export function fromHEXIntoU8Chunk(
+      hex: string
+    ): [number, number, number] | [number, number, number, number] {
+      const normalizedHex = hex.replace("#", "");
+      let r, g, b, a;
+
+      if (normalizedHex.length === 3) {
+        r = parseInt(normalizedHex[0] + normalizedHex[0], 16);
+        g = parseInt(normalizedHex[1] + normalizedHex[1], 16);
+        b = parseInt(normalizedHex[2] + normalizedHex[2], 16);
+        return [r, g, b];
+      } else if (normalizedHex.length === 6) {
+        r = parseInt(normalizedHex.substring(0, 2), 16);
+        g = parseInt(normalizedHex.substring(2, 4), 16);
+        b = parseInt(normalizedHex.substring(4, 6), 16);
+        return [r, g, b];
+      } else if (normalizedHex.length === 8) {
+        r = parseInt(normalizedHex.substring(0, 2), 16);
+        g = parseInt(normalizedHex.substring(2, 4), 16);
+        b = parseInt(normalizedHex.substring(4, 6), 16);
+        a = parseInt(normalizedHex.substring(6, 8), 16);
+        return [r, g, b, a];
+      } else {
+        throw new Error(
+          "Invalid hex format. Expected #RGB, #RRGGBB or #RRGGBBAA."
+        );
+      }
     }
 
     export namespace RGBA32F {
@@ -157,14 +208,50 @@ export namespace color {
        * #F5F5F5
        */
       export const WHITESMOKE: RGBA32F = {
-        r: 245 / 255,
-        g: 245 / 255,
-        b: 245 / 255,
+        r: u8ToF32(245),
+        g: u8ToF32(245),
+        b: u8ToF32(245),
         a: 1,
       } as RGBA32F;
 
       export function intoHEX(color: RGBA32F): string {
         return RGBA8888.intoHEX(intoRGBA8888(color));
+      }
+
+      /**
+       * Converts a HEX color string to an RGB888A32F object.
+       *
+       * Supports both short (`#RGB`) and long (`#RRGGBB`) HEX formats.
+       *
+       * @param hex - The HEX color string to convert. Must start with `#` and be 3 or 6 characters long after the `#`.
+       * @returns An object containing `r`, `g`, `b`, and `a` properties.
+       *
+       * @throws {Error} If the input HEX string is invalid.
+       *
+       * @example
+       * ```typescript
+       * fromHEX("#F80"); // { r: 255, g: 136, b: 0, a: 1 }
+       * fromHEX("#FF8800"); // { r: 255, g: 136, b: 0, a: 1 }
+       * ```
+       */
+      export function fromHEX(hex: string): RGBA32F {
+        const [r, g, b, a] = fromHEXIntoU8Chunk(hex);
+
+        if (a === undefined) {
+          return {
+            r: u8ToF32(r),
+            g: u8ToF32(g),
+            b: u8ToF32(b),
+            a: 1,
+          } as RGBA32F;
+        } else {
+          return {
+            r: u8ToF32(r),
+            g: u8ToF32(g),
+            b: u8ToF32(b),
+            a: u8ToF32(a),
+          } as RGBA32F;
+        }
       }
 
       export function intoCSSRGBA(color: RGBA32F): string {
@@ -275,30 +362,13 @@ export namespace color {
        * ```
        */
       export function fromHEX(hex: string): RGB888A32F {
-        const normalizedHex = hex.replace("#", "");
-        let r,
-          g,
-          b,
-          a = 255;
+        const [r, g, b, a] = fromHEXIntoU8Chunk(hex);
 
-        if (normalizedHex.length === 3) {
-          r = parseInt(normalizedHex[0] + normalizedHex[0], 16);
-          g = parseInt(normalizedHex[1] + normalizedHex[1], 16);
-          b = parseInt(normalizedHex[2] + normalizedHex[2], 16);
-        } else if (normalizedHex.length === 6 || normalizedHex.length === 8) {
-          r = parseInt(normalizedHex.substring(0, 2), 16);
-          g = parseInt(normalizedHex.substring(2, 4), 16);
-          b = parseInt(normalizedHex.substring(4, 6), 16);
-          if (normalizedHex.length === 8) {
-            a = parseInt(normalizedHex.substring(6, 8), 16);
-          }
+        if (a === undefined) {
+          return { r, g, b, a: 1 } as RGB888A32F;
         } else {
-          throw new Error(
-            "Invalid hex format. Expected #RGB, #RRGGBB or #RRGGBBAA."
-          );
+          return { r, g, b, a: a / 255 } as RGB888A32F;
         }
-
-        return { r, g, b, a: a / 255 } as RGB888A32F;
       }
 
       export function intoCSSRGBA(color: RGB888A32F): string {

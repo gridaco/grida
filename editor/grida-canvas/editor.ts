@@ -4219,7 +4219,7 @@ export class EditorSurface
     this.dispatch({ type: "a11y/delete" });
   }
 
-  public a11ySetClipboardColor(color: cg.RGB888A32F) {
+  public a11ySetClipboardColor(color: cg.RGBA32F) {
     this.dispatch({
       type: "clip/color",
       color,

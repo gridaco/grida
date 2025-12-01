@@ -1,5 +1,5 @@
 import { type Draft } from "immer";
-
+import kolor from "@grida/color";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
@@ -9,8 +9,6 @@ import cmath from "@grida/cmath";
 import cg from "@grida/cg";
 import { self_try_insert_node, self_clearSelection } from "./methods";
 import type { ReducerContext } from ".";
-
-const black = { r: 0, g: 0, b: 0, a: 1 };
 
 /**
  * Prepares a bitmap node for editing, creating a new one if needed
@@ -207,11 +205,13 @@ export function on_flood_fill(
  */
 function get_next_brush_pain_color(
   state: editor.state.IEditorFeatureBrushState,
-  fallback?: cg.RGB888A32F
+  fallback?: cg.RGBA32F
 ): cmath.Vector4 {
-  return cmath.color.rgba_to_unit8_chunk(
-    state.brush_color ?? fallback ?? black
+  const [r, g, b, a] = kolor.colorformats.intoU8Chunk(
+    state.brush_color ?? fallback ?? kolor.colorformats.RGBA32F.BLACK,
+    "f32"
   );
+  return [r, g, b, a ?? 1];
 }
 
 /**

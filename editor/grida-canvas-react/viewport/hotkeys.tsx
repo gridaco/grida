@@ -601,12 +601,10 @@ export function useEditorHotKeys() {
                */
               sRGBHex: string;
             }) => {
-              const color = kolor.colorformats.RGB888A32F.fromHEX(
-                result.sRGBHex
-              );
+              const color = kolor.colorformats.RGBA32F.fromHEX(result.sRGBHex);
               const solidPaint: cg.SolidPaint = {
                 type: "solid",
-                color: color,
+                color: kolor.colorformats.RGBA32F.intoRGB888F32A(color),
                 active: true,
               };
 

@@ -303,7 +303,7 @@ function EyedropButton() {
   const mod = () => {
     if (isSupported) {
       open()?.then((result) => {
-        const color = kolor.colorformats.RGB888A32F.fromHEX(result.sRGBHex);
+        const color = kolor.colorformats.RGBA32F.fromHEX(result.sRGBHex);
         // editor clipboard
         editor.surface.a11ySetClipboardColor(color);
       });

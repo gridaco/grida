@@ -5739,41 +5739,6 @@ namespace cmath {
   }
 
   /**
-   * @deprecated the color implementation is fundamentally flawed (where it uses 0-1 for alpha, even its named as u8)
-   * this legacy module claims to use RGBA8888, but its actually RGB888A32F
-   *
-   * use {@link colorformats} instead
-   */
-  export namespace color {
-    /**
-     * 8-bit Integer RGBA (Standard RGBA)
-     * Used in web and raster graphics, including CSS and images.
-     */
-    export type RGBA8888 = {
-      /**
-       * Red channel value, between 0 and 255.
-       */
-      r: number;
-      /**
-       * Green channel value, between 0 and 255.
-       */
-      g: number;
-      /**
-       * Blue channel value, between 0 and 255.
-       */
-      b: number;
-      /**
-       * Alpha channel value, between 0 and 1.
-       */
-      a: number;
-    };
-
-    export function rgba_to_unit8_chunk(rgba: RGBA8888): cmath.Vector4 {
-      return [rgba.r, rgba.g, rgba.b, Math.round(rgba.a * 255)];
-    }
-  }
-
-  /**
    * Rasterization utilities for drawing lines between points (e.g., "connect the dots")
    * in integer pixel coordinates, returning the set of covered pixels.
    */

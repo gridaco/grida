@@ -863,7 +863,7 @@ export namespace editor.state {
 
   export interface IEditorFeatureBrushState {
     brushes: BitmapEditorBrush[];
-    brush_color?: cg.RGB888A32F;
+    brush_color?: cg.RGBA32F;
     brush: editor.state.CurrentBrush;
   }
 
@@ -969,7 +969,7 @@ export namespace editor.state {
      * user clipboard - copied data
      */
     user_clipboard?: io.clipboard.ClipboardPayload;
-    user_clipboard_color?: cg.RGB888A32F;
+    user_clipboard_color?: cg.RGBA32F;
   }
 
   /**
@@ -3203,7 +3203,7 @@ export namespace editor.api {
    */
   export interface IEditorA11yActions {
     //
-    a11ySetClipboardColor(color: cg.RGB888A32F): void;
+    a11ySetClipboardColor(color: cg.RGBA32F): void;
     a11yNudgeResize(
       target: "selection" | NodeID,
       axis: "x" | "y",
