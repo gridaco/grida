@@ -36,6 +36,7 @@
     "@grida/canvas-wasm": "workspace:*",
     "@grida/cg": "workspace:*",
     "@grida/cmath": "workspace:*",
+    "@grida/color": "workspace:*",
     "@grida/fonts": "workspace:*",
     "@grida/io": "workspace:*",
     "@grida/io-figma": "workspace:*",

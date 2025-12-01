@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ColorPicker32F } from "@/scaffolds/sidecontrol/controls/color-picker";
 import { DownloadIcon } from "lucide-react";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 
 const DEFAULT_GRID = 8;
 const MAX_SIZE = 1024; // px – down‑scale large uploads
@@ -234,8 +234,8 @@ export default function HalftoneTool() {
   const [gamma, setGamma] = useState<number>(1);
   const [jitter, setJitter] = useState<number>(0);
   const [opacity, setOpacity] = useState<number>(1);
-  const [color, setColor] = useState<cmath.colorformats.RGBA32F>(
-    cmath.colorformats.RGBA32F.BLACK
+  const [color, setColor] = useState<kolor.colorformats.RGBA32F>(
+    kolor.colorformats.RGBA32F.BLACK
   );
   const [customShapeImage, setCustomShapeImage] =
     useState<HTMLImageElement | null>(null);
@@ -293,7 +293,7 @@ export default function HalftoneTool() {
         gamma,
         jitter,
         opacity,
-        cmath.colorformats.RGBA32F.intoCSSRGBA(color),
+        kolor.colorformats.RGBA32F.intoCSSRGBA(color),
         customShapeImage
       );
     };
@@ -324,7 +324,7 @@ export default function HalftoneTool() {
 
     const { w, h } = dims;
     const { data } = imgData;
-    const fg = cmath.colorformats.RGBA32F.intoCSSRGBA(color);
+    const fg = kolor.colorformats.RGBA32F.intoCSSRGBA(color);
 
     const parts: string[] = [];
     parts.push(

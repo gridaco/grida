@@ -30,6 +30,7 @@ import vn from "@grida/vn";
 import cg from "@grida/cg";
 import iosvg from "@grida/io-svg";
 import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 
@@ -698,7 +699,7 @@ class EditorDocumentStore
 
     let result = await iosvg.convert(svgData, {
       name: "svg",
-      currentColor: cmath.colorformats.RGBA32F.BLACK,
+      currentColor: kolor.colorformats.RGBA32F.BLACK,
     });
     if (result) {
       result = result as grida.program.nodes.i.IPositioning &
@@ -747,7 +748,7 @@ class EditorDocumentStore
         height: "auto",
         fill: {
           type: "solid",
-          color: cmath.colorformats.RGB888A32F.BLACK,
+          color: kolor.colorformats.RGB888A32F.BLACK,
           active: true,
         },
       },
@@ -768,7 +769,7 @@ class EditorDocumentStore
         height: 100,
         fill: {
           type: "solid",
-          color: cmath.colorformats.RGB888A32F.BLACK,
+          color: kolor.colorformats.RGB888A32F.BLACK,
           active: true,
         },
       },

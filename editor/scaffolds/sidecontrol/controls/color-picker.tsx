@@ -11,11 +11,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import "./color-picker.css";
 
-type RGB888A32F = cmath.colorformats.RGB888A32F;
-type RGBA32F = cmath.colorformats.RGBA32F;
+type RGB888A32F = kolor.colorformats.RGB888A32F;
+type RGBA32F = kolor.colorformats.RGBA32F;
 
 type PickerOption<TColor> = {
   id: string;
@@ -45,7 +45,7 @@ function ColorPickerBase({
           className="!w-full"
           onChange={(newColor) =>
             onColorChange?.(
-              cmath.colorformats.newRGB888A32F(
+              kolor.colorformats.newRGB888A32F(
                 newColor.r,
                 newColor.g,
                 newColor.b,
@@ -91,7 +91,7 @@ function ColorPickerBase({
               }}
               onValueChange={(newColor) => {
                 onColorChange?.(
-                  cmath.colorformats.newRGB888A32F(
+                  kolor.colorformats.newRGB888A32F(
                     newColor.r,
                     newColor.g,
                     newColor.b,
@@ -137,11 +137,11 @@ export function ColorPicker({
   onColorChange,
   options,
 }: {
-  color: cmath.colorformats.RGB888A32F;
-  onColorChange?: (color: cmath.colorformats.RGB888A32F) => void;
+  color: kolor.colorformats.RGB888A32F;
+  onColorChange?: (color: kolor.colorformats.RGB888A32F) => void;
   options?: {
     id: string;
-    color: cmath.colorformats.RGB888A32F;
+    color: kolor.colorformats.RGB888A32F;
   }[];
 }) {
   const { isSupported, open } = useEyeDropper();
@@ -154,7 +154,7 @@ export function ColorPicker({
           className="!w-full"
           onChange={(newColor) =>
             onColorChange?.(
-              cmath.colorformats.newRGB888A32F(
+              kolor.colorformats.newRGB888A32F(
                 newColor.r,
                 newColor.g,
                 newColor.b,
@@ -175,7 +175,7 @@ export function ColorPicker({
             className="text-muted-foreground"
             onClick={() => {
               open()?.then((result) => {
-                const color = cmath.colorformats.RGB888A32F.fromHEX(
+                const color = kolor.colorformats.RGB888A32F.fromHEX(
                   result.sRGBHex
                 );
                 onColorChange?.(color);
@@ -203,7 +203,7 @@ export function ColorPicker({
               }}
               onValueChange={(newcolor) => {
                 onColorChange?.(
-                  cmath.colorformats.newRGB888A32F(
+                  kolor.colorformats.newRGB888A32F(
                     newcolor.r,
                     newcolor.g,
                     newcolor.b,
@@ -252,7 +252,7 @@ export function ColorPicker32F({
 }) {
   const { isSupported, open } = useEyeDropper();
   const normalizedColor = React.useMemo(
-    () => cmath.colorformats.RGBA32F.intoRGB888F32A(color),
+    () => kolor.colorformats.RGBA32F.intoRGB888F32A(color),
     [color]
   );
 
@@ -261,14 +261,14 @@ export function ColorPicker32F({
     return (
       options?.map((option) => ({
         id: option.id,
-        color: cmath.colorformats.RGBA32F.intoRGB888F32A(option.color),
+        color: kolor.colorformats.RGBA32F.intoRGB888F32A(option.color),
       })) ?? undefined
     );
   }, [options]);
 
   const handlePickerChange = React.useCallback(
     (updated: RGB888A32F) => {
-      onColorChange?.(cmath.colorformats.RGB888A32F.intoRGBA32F(updated));
+      onColorChange?.(kolor.colorformats.RGB888A32F.intoRGBA32F(updated));
     },
     [onColorChange]
   );
@@ -276,7 +276,7 @@ export function ColorPicker32F({
   const handleEyeDropperPick = React.useCallback(() => {
     if (!isSupported) return;
     open()?.then((result) => {
-      handlePickerChange(cmath.colorformats.RGB888A32F.fromHEX(result.sRGBHex));
+      handlePickerChange(kolor.colorformats.RGB888A32F.fromHEX(result.sRGBHex));
     });
   }, [isSupported, open, handlePickerChange]);
 

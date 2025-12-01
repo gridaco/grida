@@ -23,6 +23,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEyeDropper } from "@/scaffolds/sidecontrol/controls/utils/eyedropper";
 import { toast } from "sonner";
@@ -302,7 +303,7 @@ function EyedropButton() {
   const mod = () => {
     if (isSupported) {
       open()?.then((result) => {
-        const color = cmath.colorformats.RGB888A32F.fromHEX(result.sRGBHex);
+        const color = kolor.colorformats.RGB888A32F.fromHEX(result.sRGBHex);
         // editor clipboard
         editor.surface.a11ySetClipboardColor(color);
       });

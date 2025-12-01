@@ -5,7 +5,7 @@ import reducer, { type ReducerContext } from "../index";
 import { DocumentHistoryManager } from "../../history-manager";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
-import cmath from "@grida/cmath";
+import color from "@grida/color";
 import type { Action } from "../../action";
 
 // Mock geometry interface
@@ -71,7 +71,7 @@ function createDocument(): grida.program.document.Document {
         strokeJoin: "miter",
         fill: {
           type: "solid",
-          color: cmath.colorformats.RGB888A32F.BLACK,
+          color: color.colorformats.RGB888A32F.BLACK,
           active: true,
         },
       },
@@ -95,7 +95,7 @@ function createDocument(): grida.program.document.Document {
         strokeJoin: "miter",
         fill: {
           type: "solid",
-          color: cmath.colorformats.RGB888A32F.BLACK,
+          color: color.colorformats.RGB888A32F.BLACK,
           active: true,
         },
       },

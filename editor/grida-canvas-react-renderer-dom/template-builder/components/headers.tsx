@@ -1,4 +1,4 @@
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { NodeElement } from "../../nodes/node";
 
 export function Header_001({ logo }: { logo?: string }) {
@@ -9,7 +9,7 @@ export function Header_001({ logo }: { logo?: string }) {
       // component={TemplateBuilderWidgets.flex}
       fill={{
         type: "solid",
-        color: cmath.colorformats.RGB888A32F.TRANSPARENT,
+        color: kolor.colorformats.RGB888A32F.TRANSPARENT,
         active: true,
       }}
       style={

@@ -22,6 +22,7 @@ import { getInitialCurveGesture } from "./tools/gesture";
 import { threshold, snapMovement } from "./tools/snap";
 import { snapToCanvasGeometry } from "@grida/cmath/_snap";
 import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import vn from "@grida/vn";
 import type { ReducerContext } from ".";
 
@@ -374,7 +375,7 @@ export function create_new_vector_node(
     zIndex: 0,
     stroke: {
       type: "solid",
-      color: cmath.colorformats.RGB888A32F.BLACK,
+      color: kolor.colorformats.RGB888A32F.BLACK,
       active: true,
     },
     strokeWidth: 1,
@@ -703,7 +704,7 @@ export function on_draw_pointer_down(
     zIndex: 0,
     stroke: {
       type: "solid",
-      color: cmath.colorformats.RGB888A32F.BLACK,
+      color: kolor.colorformats.RGB888A32F.BLACK,
       active: true,
     },
     strokeCap: "butt",

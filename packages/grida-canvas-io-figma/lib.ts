@@ -12,9 +12,10 @@ import type {
   GradientPaint,
   SolidPaint,
 } from "@figma/rest-api-spec";
-import cmath from "@grida/cmath";
 import type cg from "@grida/cg";
 import type grida from "@grida/schema";
+import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 
 export namespace iofigma {
   export namespace restful {
@@ -143,8 +144,8 @@ export namespace iofigma {
           transform: cmath.ui.gradient.transformFromControlPoints(points, type),
           stops: paint.gradientStops.map((stop) => ({
             offset: stop.position,
-            color: cmath.colorformats.RGBA32F.intoRGB888F32A(
-              cmath.colorformats.newRGBA32F(
+            color: kolor.colorformats.RGBA32F.intoRGB888F32A(
+              kolor.colorformats.newRGBA32F(
                 stop.color.r,
                 stop.color.g,
                 stop.color.b,
@@ -161,9 +162,9 @@ export namespace iofigma {
       function toSolidPaint(paint: SolidPaint): cg.SolidPaint {
         return {
           type: "solid",
-          color: cmath.colorformats.RGB888A32F.multiplyA32(
-            cmath.colorformats.RGBA32F.intoRGB888F32A(
-              cmath.colorformats.newRGBA32F(
+          color: kolor.colorformats.RGB888A32F.multiplyA32(
+            kolor.colorformats.RGBA32F.intoRGB888F32A(
+              kolor.colorformats.newRGBA32F(
                 paint.color.r,
                 paint.color.g,
                 paint.color.b,
@@ -195,8 +196,8 @@ export namespace iofigma {
               transform: cmath.transform.identity,
               active: paint.visible ?? true,
               stops: [
-                { offset: 0, color: cmath.colorformats.RGB888A32F.BLACK },
-                { offset: 1, color: cmath.colorformats.RGB888A32F.WHITE },
+                { offset: 0, color: kolor.colorformats.RGB888A32F.BLACK },
+                { offset: 1, color: kolor.colorformats.RGB888A32F.WHITE },
               ],
               blendMode: map.blendModeMap[paint.blendMode],
               opacity: 1,

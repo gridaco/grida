@@ -1,6 +1,6 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import artboardData from "../data/artboards.json";
 import {
   Collapsible,
@@ -27,7 +27,7 @@ const ArtboardList = () => {
       height: item.height,
       fill: {
         type: "solid",
-        color: cmath.colorformats.RGB888A32F.WHITE,
+        color: kolor.colorformats.RGB888A32F.WHITE,
         active: true,
       },
       children: [],

@@ -1,5 +1,5 @@
 import cg from "@grida/cg";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import {
   Select,
   SelectContent,
@@ -719,15 +719,21 @@ function FeNoiseProperties({
                 onValueChange?.({
                   ...base,
                   mode: "mono",
-                  color: value.color ?? cmath.colorformats.newRGB888A32F(0, 0, 0, 0.15),
+                  color:
+                    value.color ??
+                    kolor.colorformats.newRGB888A32F(0, 0, 0, 0.15),
                 });
                 break;
               case "duo":
                 onValueChange?.({
                   ...base,
                   mode: "duo",
-                  color1: value.color1 ?? cmath.colorformats.newRGB888A32F(255, 0, 0, 1),
-                  color2: value.color2 ?? cmath.colorformats.newRGB888A32F(255, 255, 255, 0.25),
+                  color1:
+                    value.color1 ??
+                    kolor.colorformats.newRGB888A32F(255, 0, 0, 1),
+                  color2:
+                    value.color2 ??
+                    kolor.colorformats.newRGB888A32F(255, 255, 255, 0.25),
                 });
                 break;
               case "multi":
@@ -857,12 +863,17 @@ function FeNoiseProperties({
           <div className="flex flex-col gap-2 w-full">
             <RGB888A32FColorControl
               variant="with-opacity"
-              value={value.color1 ?? cmath.colorformats.newRGB888A32F(255, 0, 0, 1)}
+              value={
+                value.color1 ?? kolor.colorformats.newRGB888A32F(255, 0, 0, 1)
+              }
               onValueChange={(v) => onValueChange?.({ ...value, color1: v })}
             />
             <RGB888A32FColorControl
               variant="with-opacity"
-              value={value.color2 ?? cmath.colorformats.newRGB888A32F(255, 255, 255, 0.25)}
+              value={
+                value.color2 ??
+                kolor.colorformats.newRGB888A32F(255, 255, 255, 0.25)
+              }
               onValueChange={(v) => onValueChange?.({ ...value, color2: v })}
             />
           </div>

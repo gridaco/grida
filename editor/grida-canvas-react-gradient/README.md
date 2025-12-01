@@ -111,7 +111,7 @@ function MyGradientEditor() {
   const handleInsertStop = useCallback((at, position) => {
     const newStop = {
       offset: position,
-      color: cmath.colorformats.RGB888A32F.GRAY,
+      color: kolor.colorformats.RGB888A32F.GRAY,
     };
     setGradient((prev) => ({
       ...prev,
@@ -338,7 +338,7 @@ function MyComponent() {
       onInsertStop={(at, position) => {
         const newStop = {
           offset: position,
-          color: cmath.colorformats.RGB888A32F.GRAY,
+          color: kolor.colorformats.RGB888A32F.GRAY,
         };
         setGradient((prev) => ({
           ...prev,

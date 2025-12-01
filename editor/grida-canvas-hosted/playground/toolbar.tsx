@@ -14,7 +14,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import grida from "@grida/schema";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "@ai-sdk/rsc";
@@ -309,33 +309,33 @@ function BitmapEditModeAuxiliaryToolbar() {
 
 // TODO: have it somewhere else
 const defaultColors = {
-  red: cmath.colorformats.newRGB888A32F(255, 0, 0, 1),
-  green: cmath.colorformats.newRGB888A32F(0, 255, 0, 1),
-  blue: cmath.colorformats.newRGB888A32F(0, 0, 255, 1),
-  yellow: cmath.colorformats.newRGB888A32F(255, 255, 0, 1),
-  orange: cmath.colorformats.newRGB888A32F(255, 165, 0, 1),
-  purple: cmath.colorformats.newRGB888A32F(128, 0, 128, 1),
-  pink: cmath.colorformats.newRGB888A32F(255, 192, 203, 1),
-  cyan: cmath.colorformats.newRGB888A32F(0, 255, 255, 1),
-  magenta: cmath.colorformats.newRGB888A32F(255, 0, 255, 1),
-  black: cmath.colorformats.newRGB888A32F(0, 0, 0, 1),
-  white: cmath.colorformats.newRGB888A32F(255, 255, 255, 1),
-  gray: cmath.colorformats.newRGB888A32F(128, 128, 128, 1),
-  silver: cmath.colorformats.newRGB888A32F(192, 192, 192, 1),
-  brown: cmath.colorformats.newRGB888A32F(165, 42, 42, 1),
-  olive: cmath.colorformats.newRGB888A32F(128, 128, 0, 1),
-  navy: cmath.colorformats.newRGB888A32F(0, 0, 128, 1),
-  teal: cmath.colorformats.newRGB888A32F(0, 128, 128, 1),
-  maroon: cmath.colorformats.newRGB888A32F(128, 0, 0, 1),
-  gold: cmath.colorformats.newRGB888A32F(255, 215, 0, 1),
-  indigo: cmath.colorformats.newRGB888A32F(75, 0, 130, 1),
+  red: kolor.colorformats.newRGB888A32F(255, 0, 0, 1),
+  green: kolor.colorformats.newRGB888A32F(0, 255, 0, 1),
+  blue: kolor.colorformats.newRGB888A32F(0, 0, 255, 1),
+  yellow: kolor.colorformats.newRGB888A32F(255, 255, 0, 1),
+  orange: kolor.colorformats.newRGB888A32F(255, 165, 0, 1),
+  purple: kolor.colorformats.newRGB888A32F(128, 0, 128, 1),
+  pink: kolor.colorformats.newRGB888A32F(255, 192, 203, 1),
+  cyan: kolor.colorformats.newRGB888A32F(0, 255, 255, 1),
+  magenta: kolor.colorformats.newRGB888A32F(255, 0, 255, 1),
+  black: kolor.colorformats.newRGB888A32F(0, 0, 0, 1),
+  white: kolor.colorformats.newRGB888A32F(255, 255, 255, 1),
+  gray: kolor.colorformats.newRGB888A32F(128, 128, 128, 1),
+  silver: kolor.colorformats.newRGB888A32F(192, 192, 192, 1),
+  brown: kolor.colorformats.newRGB888A32F(165, 42, 42, 1),
+  olive: kolor.colorformats.newRGB888A32F(128, 128, 0, 1),
+  navy: kolor.colorformats.newRGB888A32F(0, 0, 128, 1),
+  teal: kolor.colorformats.newRGB888A32F(0, 128, 128, 1),
+  maroon: kolor.colorformats.newRGB888A32F(128, 0, 0, 1),
+  gold: kolor.colorformats.newRGB888A32F(255, 215, 0, 1),
+  indigo: kolor.colorformats.newRGB888A32F(75, 0, 130, 1),
 };
 
 function ClipboardColor() {
   const editor = useCurrentEditor();
   const clipboardColor = useEditorState(editor, (s) => s.user_clipboard_color);
 
-  const color = clipboardColor ?? cmath.colorformats.RGB888A32F.BLACK;
+  const color = clipboardColor ?? kolor.colorformats.RGB888A32F.BLACK;
 
   // TODO:
   // - recent colors

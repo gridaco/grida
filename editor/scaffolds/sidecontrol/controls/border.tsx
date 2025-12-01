@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/popover";
 import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { cn } from "@/components/lib/utils";
 import { RGB888A32FChip } from "./utils/paint-chip";
 import { RGB888A32FColorControl } from "./color";
@@ -30,7 +30,7 @@ export function BorderControl({
 
   const onAddBorder = () => {
     onValueChange?.({
-      borderColor: cmath.colorformats.RGB888A32F.BLACK,
+      borderColor: kolor.colorformats.RGB888A32F.BLACK,
       borderStyle: "solid",
       borderWidth: 1,
     });
@@ -55,7 +55,7 @@ export function BorderControl({
           >
             <RGB888A32FChip
               rgba={
-                value?.borderColor ?? cmath.colorformats.RGB888A32F.TRANSPARENT
+                value?.borderColor ?? kolor.colorformats.RGB888A32F.TRANSPARENT
               }
               className="rounded-sm"
             />
@@ -80,7 +80,7 @@ export function BorderControl({
             )}
             onClick={onAddBorder}
           >
-            <RGB888A32FChip rgba={cmath.colorformats.RGB888A32F.TRANSPARENT} />
+            <RGB888A32FChip rgba={kolor.colorformats.RGB888A32F.TRANSPARENT} />
             Add
           </div>
         )}

@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import type cg from "@grida/cg";
 import { useEffect, useRef, useState } from "react";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { useCurrentEditor } from "../use-editor";
 
 export const keybindings_sheet = [
@@ -601,7 +601,7 @@ export function useEditorHotKeys() {
                */
               sRGBHex: string;
             }) => {
-              const color = cmath.colorformats.RGB888A32F.fromHEX(
+              const color = kolor.colorformats.RGB888A32F.fromHEX(
                 result.sRGBHex
               );
               const solidPaint: cg.SolidPaint = {

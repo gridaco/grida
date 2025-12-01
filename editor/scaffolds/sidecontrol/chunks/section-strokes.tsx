@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { PropertyLine, PropertyLineLabel } from "../ui";
 import { PaintControl } from "../controls/paint";
 import {
@@ -135,7 +135,12 @@ export function SectionStrokes({
   const handleAddStroke = React.useCallback(() => {
     const paint: cg.Paint = {
       type: "solid",
-      color: cmath.colorformats.newRGB888A32F(0, 0, 0, paints.length > 0 ? 0.5 : 1),
+      color: kolor.colorformats.newRGB888A32F(
+        0,
+        0,
+        0,
+        paints.length > 0 ? 0.5 : 1
+      ),
       active: true,
     };
     // Append new paint to the end (top-most in render order)

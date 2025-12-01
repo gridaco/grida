@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import {
   DndContext,
   PointerSensor,
@@ -355,7 +355,7 @@ export function ChunkPaints({
   const handleAddPaint = React.useCallback(() => {
     const newPaint: cg.Paint = {
       type: "solid",
-      color: cmath.colorformats.newRGB888A32F(
+      color: kolor.colorformats.newRGB888A32F(
         0,
         0,
         0,

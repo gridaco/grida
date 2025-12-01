@@ -1,23 +1,23 @@
 import grida from "@grida/schema";
 import cg from "@grida/cg";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { editor } from "@/grida-canvas/editor.i";
 
 export const gray: cg.Paint = {
   type: "solid",
-  color: cmath.colorformats.RGB888A32F.GRAY,
+  color: kolor.colorformats.RGB888A32F.GRAY,
   active: true,
 };
 
 export const white: cg.Paint = {
   type: "solid",
-  color: cmath.colorformats.RGB888A32F.WHITE,
+  color: kolor.colorformats.RGB888A32F.WHITE,
   active: true,
 };
 
 export const black: cg.Paint = {
   type: "solid",
-  color: cmath.colorformats.RGB888A32F.BLACK,
+  color: kolor.colorformats.RGB888A32F.BLACK,
   active: true,
 };
 

@@ -1,6 +1,6 @@
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import vn from "@grida/vn";
 import type { svgtypes } from "@grida/canvas-wasm";
 
@@ -9,7 +9,7 @@ export type { svgtypes };
 
 interface SVGFactoryUserContext {
   name: string;
-  currentColor?: cmath.colorformats.RGBA32F;
+  currentColor?: kolor.colorformats.RGBA32F;
 }
 
 export namespace iosvg {
@@ -45,7 +45,7 @@ export namespace iosvg {
           // paint.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
           const [r, g, b, a] = paint.color;
           // Convert to RGBA8888 object format, apply opacity to alpha, then convert to RGB888A32F
-          const rgba8888 = cmath.colorformats.newRGBA8888(
+          const rgba8888 = kolor.colorformats.newRGBA8888(
             r,
             g,
             b,
@@ -53,7 +53,7 @@ export namespace iosvg {
             a * opacity
           );
           const rgb888a32f =
-            cmath.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
+            kolor.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
           return {
             type: "solid",
             color: rgb888a32f,
@@ -69,9 +69,9 @@ export namespace iosvg {
               // stop.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
               const [r, g, b, a] = stop.color;
               // Convert to RGBA8888 object format, then convert to RGB888A32F
-              const rgba8888 = cmath.colorformats.newRGBA8888(r, g, b, a);
+              const rgba8888 = kolor.colorformats.newRGBA8888(r, g, b, a);
               const rgb888a32f =
-                cmath.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
+                kolor.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
               return {
                 offset: stop.offset,
                 color: rgb888a32f,
@@ -91,9 +91,9 @@ export namespace iosvg {
               // stop.color is RGBA8888 chunk [r, g, b, a] (all 0-255) from WASM
               const [r, g, b, a] = stop.color;
               // Convert to RGBA8888 object format, then convert to RGB888A32F
-              const rgba8888 = cmath.colorformats.newRGBA8888(r, g, b, a);
+              const rgba8888 = kolor.colorformats.newRGBA8888(r, g, b, a);
               const rgb888a32f =
-                cmath.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
+                kolor.colorformats.RGBA8888.intoRGB888F32A(rgba8888);
               return {
                 offset: stop.offset,
                 color: rgb888a32f,

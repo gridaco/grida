@@ -1,6 +1,6 @@
 {
-  "name": "@grida/cg",
-  "description": "Grida Canvas Core Graphics",
+  "name": "@grida/color",
+  "description": "Grida Core Graphics Color Lib",
   "version": "0.0.0",
   "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
@@ -10,10 +10,7 @@
   "keywords": [
     "grida",
     "canvas",
-    "cg",
-    "core",
-    "graphics",
-    "dts"
+    "color"
   ],
   "scripts": {
     "dev": "tsup index.ts --format cjs,esm --dts --watch",
@@ -24,8 +21,5 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
-  ],
-  "devDependencies": {
-    "@grida/color": "workspace:*"
-  }
+  ]
 }

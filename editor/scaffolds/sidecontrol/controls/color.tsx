@@ -12,7 +12,7 @@ import RGBHexInput from "./utils/hex";
 import { useNumberInput } from "@grida/number-input/react";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Separator } from "@/components/ui/separator";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 
 function InlineOpacityControl({
   value,
@@ -75,14 +75,14 @@ function InlineOpacityControl({
 }
 
 export function RGB888A32FColorControl({
-  value = cmath.colorformats.RGB888A32F.TRANSPARENT,
+  value = kolor.colorformats.RGB888A32F.TRANSPARENT,
   onValueChange,
   disabled,
   variant = "default",
 }: {
-  value?: cmath.colorformats.RGB888A32F;
+  value?: kolor.colorformats.RGB888A32F;
   disabled?: boolean;
-  onValueChange?: (value: cmath.colorformats.RGB888A32F) => void;
+  onValueChange?: (value: kolor.colorformats.RGB888A32F) => void;
   variant?: "default" | "with-opacity";
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -127,7 +127,7 @@ export function RGB888A32FColorControl({
           onBlur={handleInputBlur}
           onValueChange={(rgb) => {
             onValueChange?.(
-              cmath.colorformats.newRGB888A32F(rgb.r, rgb.g, rgb.b, value.a)
+              kolor.colorformats.newRGB888A32F(rgb.r, rgb.g, rgb.b, value.a)
             );
           }}
         />
@@ -164,14 +164,14 @@ export function RGB888A32FColorControl({
 }
 
 export function RGBA32FColorControl({
-  value = cmath.colorformats.RGBA32F.TRANSPARENT,
+  value = kolor.colorformats.RGBA32F.TRANSPARENT,
   onValueChange,
   disabled,
   variant = "default",
 }: {
-  value?: cmath.colorformats.RGBA32F;
+  value?: kolor.colorformats.RGBA32F;
   disabled?: boolean;
-  onValueChange?: (value: cmath.colorformats.RGBA32F) => void;
+  onValueChange?: (value: kolor.colorformats.RGBA32F) => void;
   variant?: "default" | "with-opacity";
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -220,7 +220,7 @@ export function RGBA32FColorControl({
           onBlur={handleInputBlur}
           onValueChange={(color) => {
             onValueChange?.(
-              cmath.colorformats.newRGBA32F(color.r, color.g, color.b, value.a)
+              kolor.colorformats.newRGBA32F(color.r, color.g, color.b, value.a)
             );
           }}
         />

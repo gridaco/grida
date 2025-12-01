@@ -18,7 +18,7 @@ import {
   type GradientType,
 } from "@/grida-canvas-react-gradient";
 import type cg from "@grida/cg";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { css } from "@/grida-canvas-utils/css";
 import { useWindowSize } from "@uidotdev/usehooks";
 
@@ -45,8 +45,8 @@ function GradientEditorContent() {
   const [stops, setStops] = useState<
     { offset: number; color: cg.RGB888A32F }[]
   >([
-    { offset: 0, color: cmath.colorformats.newRGB888A32F(255, 0, 0, 1) },
-    { offset: 1, color: cmath.colorformats.newRGB888A32F(0, 0, 255, 1) },
+    { offset: 0, color: kolor.colorformats.newRGB888A32F(255, 0, 0, 1) },
+    { offset: 1, color: kolor.colorformats.newRGB888A32F(0, 0, 255, 1) },
   ]);
   const [focusedStop, setFocusedStop] = useState<number | null>(null);
   const [points, setPoints] = useState<
@@ -124,7 +124,7 @@ function GradientEditorContent() {
       const newStops = [...prev];
       newStops.splice(at, 0, {
         offset: position,
-        color: cmath.colorformats.RGB888A32F.GRAY,
+        color: kolor.colorformats.RGB888A32F.GRAY,
       });
       return newStops;
     });
@@ -260,7 +260,7 @@ function GradientEditorContent() {
                       onChange={(e) => {
                         const hex = e.target.value;
                         const newColor =
-                          cmath.colorformats.RGB888A32F.fromHEX(hex);
+                          kolor.colorformats.RGB888A32F.fromHEX(hex);
                         setStops((prev) =>
                           prev.map((s, i) =>
                             i === focusedStop ? { ...s, color: newColor } : s

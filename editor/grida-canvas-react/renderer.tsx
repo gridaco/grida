@@ -7,7 +7,7 @@ import { NodeElement } from "@/grida-canvas-react-renderer-dom/nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import grida from "@grida/schema";
 
 type CustomComponent = React.ComponentType<any>;
@@ -113,7 +113,7 @@ export function StandaloneSceneBackground({
 
   const cssBackgroundColor = useMemo(() => {
     if (!backgroundColor) return undefined;
-    return cmath.colorformats.RGBA32F.intoCSSRGBA(backgroundColor);
+    return kolor.colorformats.RGBA32F.intoCSSRGBA(backgroundColor);
   }, [backgroundColor]);
 
   const [visiblearea, { width, height }] = useMeasure();

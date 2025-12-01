@@ -1,6 +1,6 @@
 import Editor from "../../editor";
 import grida from "@grida/schema";
-import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 import { editor } from "@/grida-canvas";
 
 const document: editor.state.IEditorStateInit = {
@@ -16,7 +16,7 @@ const document: editor.state.IEditorStateInit = {
         type: "scene",
         active: true,
         locked: false,
-        backgroundColor: cmath.colorformats.RGBA32F.TRANSPARENT,
+        backgroundColor: kolor.colorformats.RGBA32F.TRANSPARENT,
         id: "main",
         name: "Main",
         constraints: { children: "multiple" },
@@ -36,7 +36,7 @@ const document: editor.state.IEditorStateInit = {
         name: "A",
         fill: {
           type: "solid",
-          color: cmath.colorformats.RGB888A32F.fromHEX("#00f"),
+          color: kolor.colorformats.RGB888A32F.fromHEX("#00f"),
           active: true,
         },
         left: 0,
@@ -46,7 +46,7 @@ const document: editor.state.IEditorStateInit = {
         name: "B",
         fill: {
           type: "solid",
-          color: cmath.colorformats.RGB888A32F.fromHEX("#0f0"),
+          color: kolor.colorformats.RGB888A32F.fromHEX("#0f0"),
           active: true,
         },
         left: 200,

@@ -1,10 +1,10 @@
 import { css } from "@/grida-canvas-utils/css";
 import { TransparencyGridIcon, ImageIcon } from "@radix-ui/react-icons";
-import type cg from "@grida/cg";
 import { cn } from "@/components/lib/utils";
 import { ImageView } from "@/grida-canvas-react";
 import { ComponentProps } from "react";
-import cmath from "@grida/cmath";
+import type cg from "@grida/cg";
+import kolor from "@grida/color";
 
 function ChipContainer({ className, ...props }: ComponentProps<"div">) {
   return (
@@ -80,11 +80,11 @@ export function RGBChip({
   opacity,
   className,
 }: {
-  rgb: cmath.colorformats.RGB_UNKNOWN;
+  rgb: kolor.colorformats.RGB_UNKNOWN;
   /**
    * the format of the rgb values
    */
-  unit: cmath.colorformats.ColorComponentFormat;
+  unit: kolor.colorformats.ColorComponentFormat;
   /**
    * 0.0-1.0 (independent of unit)
    */
@@ -96,7 +96,7 @@ export function RGBChip({
       <div
         className="absolute w-full h-full z-10"
         style={{
-          backgroundColor: cmath.colorformats.intoCSSRGB(rgb, unit),
+          backgroundColor: kolor.colorformats.intoCSSRGB(rgb, unit),
           opacity: opacity,
         }}
       />

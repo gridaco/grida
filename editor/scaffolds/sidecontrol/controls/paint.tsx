@@ -1,6 +1,4 @@
 import { WorkbenchUI } from "@/components/workbench";
-import grida from "@grida/schema";
-import cg from "@grida/cg";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GradientControl } from "./paint-gradient";
 import { ImagePaintControl } from "./paint-image";
@@ -25,13 +23,16 @@ import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
 import RGBHexInput from "./utils/hex";
 import { ColorPicker } from "./color-picker";
-import cmath from "@grida/cmath";
 import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import { useNumberInput } from "@grida/number-input/react";
 import { Separator } from "@/components/ui/separator";
+import grida from "@grida/schema";
+import cg from "@grida/cg";
+import cmath from "@grida/cmath";
+import kolor from "@grida/color";
 
 const paint_label = {
   solid: "solid",
@@ -161,7 +162,7 @@ function getNextPaintForType(
         case "solid": {
           return {
             type: "solid",
-            color: cmath.colorformats.newRGB888A32F(128, 128, 128, opacity), // Default gray with preserved opacity
+            color: kolor.colorformats.newRGB888A32F(128, 128, 128, opacity), // Default gray with preserved opacity
             blendMode,
             active: true,
           };
@@ -176,11 +177,11 @@ function getNextPaintForType(
             stops: [
               {
                 offset: 0,
-                color: cmath.colorformats.RGB888A32F.GRAY,
+                color: kolor.colorformats.RGB888A32F.GRAY,
               },
               {
                 offset: 1,
-                color: cmath.colorformats.RGB888A32F.WHITE,
+                color: kolor.colorformats.RGB888A32F.WHITE,
               },
             ],
             blendMode,
@@ -275,7 +276,7 @@ function ComputedPaintControl({
   const onAddPaint = () => {
     const paint: ComputedPaint = {
       type: "solid",
-      color: cmath.colorformats.RGB888A32F.BLACK,
+      color: kolor.colorformats.RGB888A32F.BLACK,
       active: true,
     };
     if (onValueAdd) {
@@ -542,7 +543,7 @@ function SolidPaintTrigger({
           onValueChange?.({
             ...value,
             type: "solid",
-            color: cmath.colorformats.newRGB888A32F(
+            color: kolor.colorformats.newRGB888A32F(
               color.r,
               color.g,
               color.b,
@@ -559,7 +560,7 @@ function SolidPaintTrigger({
           onValueChange?.({
             ...value,
             type: "solid",
-            color: cmath.colorformats.newRGB888A32F(
+            color: kolor.colorformats.newRGB888A32F(
               value.color.r,
               value.color.g,
               value.color.b,
