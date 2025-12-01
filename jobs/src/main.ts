@@ -1,6 +1,6 @@
 import type { Database } from "../../database/database-generated.types.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
-import { Resend } from "https://esm.sh/resend@6.5.2";
+import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
 import * as templates from "./templates.ts";
 
 const QUEUE_NAME = "grida_hosted_evt_new_organization_jobs";

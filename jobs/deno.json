@@ -4,7 +4,7 @@
     "start": "deno run --allow-net --allow-env --allow-read src/main.ts"
   },
   "imports": {
-    "supabase": "https://esm.sh/@supabase/supabase-js@2.86.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.86.0",
     "resend": "https://esm.sh/resend@6.5.2",
     "std/": "https://deno.land/std@0.224.0/"
   }
