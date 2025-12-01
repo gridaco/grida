@@ -1,4 +1,10 @@
+import colorparse from "color-parse";
+import colorname from "color-name";
+
 export namespace color {
+  export const parse = colorparse;
+  export const names = colorname;
+
   export namespace colorformats {
     /**
      * Clamps a value between 0 and 1.

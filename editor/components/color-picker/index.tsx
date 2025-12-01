@@ -7,7 +7,6 @@ import {
   RgbStringColorPicker,
   RgbaStringColorPicker,
 } from "react-colorful";
-import parse from "color-parse";
 
 type ColorPickerHTMLAttributes = Omit<
   React.HTMLAttributes<HTMLDivElement>,

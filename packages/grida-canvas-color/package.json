@@ -21,5 +21,12 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "color-name": "^2.1.0",
+    "color-parse": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/color-name": "^2.0.0"
+  }
 }
