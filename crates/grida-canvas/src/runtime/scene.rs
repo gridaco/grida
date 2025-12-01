@@ -586,8 +586,7 @@ impl Renderer {
 
         // Paint background color first if present
         if let Some(bg_color) = background_color {
-            let CGColor(r, g, b, a) = bg_color;
-            let color = skia_safe::Color::from_argb(a, r, g, b);
+            let color: skia_safe::Color = bg_color.into();
             let mut paint = SkPaint::default();
             paint.set_color(color);
             // Paint the entire canvas with the background color
@@ -684,8 +683,7 @@ impl Renderer {
 
         // Paint background color first if present
         if let Some(bg_color) = background_color {
-            let CGColor(r, g, b, a) = bg_color;
-            let color = skia_safe::Color::from_argb(a, r, g, b);
+            let color: skia_safe::Color = bg_color.into();
             let mut paint = SkPaint::default();
             paint.set_color(color);
             // Paint the entire canvas with the background color

@@ -9,9 +9,9 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     let gradient = LinearGradientPaint::from_colors(vec![
-        CGColor(255, 0, 0, 255),
-        CGColor(0, 255, 0, 255),
-        CGColor(0, 0, 255, 255),
+        CGColor::from_rgba(255, 0, 0, 255),
+        CGColor::from_rgba(0, 255, 0, 255),
+        CGColor::from_rgba(0, 0, 255, 255),
     ]);
 
     let paint = linear_gradient_paint(&gradient, (width as f32, height as f32));

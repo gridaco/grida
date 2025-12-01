@@ -39,7 +39,7 @@ fn main() {
         dy: 2.0,
         blur: 4.0,
         spread: 0.0,
-        color: CGColor(0, 0, 0, 128), // Semi-transparent black
+        color: CGColor::from_rgba(0, 0, 0, 128), // Semi-transparent black
         active: true,
     };
     draw_text_with_inner_shadow(canvas, "Hello Grida", 50.0, 100.0, &shadow1, Color::BLUE);
@@ -50,7 +50,7 @@ fn main() {
         dy: 3.0,
         blur: 6.0,
         spread: 0.0,
-        color: CGColor(255, 100, 100, 255), // Red shadow
+        color: CGColor::from_rgba(255, 100, 100, 255), // Red shadow
         active: true,
     };
     draw_text_with_inner_shadow(canvas, "Canvas Text", 50.0, 200.0, &shadow2, Color::GREEN);
@@ -61,7 +61,7 @@ fn main() {
         dy: 5.0,
         blur: 8.0,
         spread: 0.0,
-        color: CGColor(100, 50, 200, 180), // Purple shadow
+        color: CGColor::from_rgba(100, 50, 200, 180), // Purple shadow
         active: true,
     };
     draw_text_with_inner_shadow(

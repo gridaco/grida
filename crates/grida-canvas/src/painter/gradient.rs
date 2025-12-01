@@ -5,7 +5,7 @@ fn build_gradient_stops(stops: &[GradientStop], opacity: f32) -> (Vec<skia_safe:
     let mut positions = Vec::with_capacity(stops.len());
 
     for stop in stops {
-        let CGColor(r, g, b, a) = stop.color;
+        let CGColor { r, g, b, a } = stop.color;
         let alpha = (a as f32 * opacity).round().clamp(0.0, 255.0) as u8;
         colors.push(skia_safe::Color::from_argb(alpha, r, g, b));
         positions.push(stop.offset);

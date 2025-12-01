@@ -24,7 +24,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 },
                 corner_radius: RectangularCornerRadius::zero(),
                 corner_smoothing: CornerSmoothing::default(),
-                fills: Paints::new([Paint::from(CGColor(255, 0, 0, 255))]),
+                fills: Paints::new([Paint::from(CGColor::RED)]),
                 strokes: Paints::default(),
                 stroke_style: StrokeStyle {
                     stroke_align: StrokeAlign::Inside,
@@ -40,7 +40,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                         dy: 2.0,
                         blur: 4.0,
                         spread: 0.0,
-                        color: CGColor(0, 0, 0, 128),
+                        color: CGColor::from_rgba(0, 0, 0, 128),
                         active: true,
                     })])
                 } else {

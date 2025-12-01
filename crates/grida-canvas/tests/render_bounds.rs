@@ -19,7 +19,7 @@ fn stroke_affects_render_bounds() {
     rect.stroke_style.stroke_align = StrokeAlign::Outside;
     rect.strokes = Paints::new([Paint::Solid(SolidPaint {
         active: true,
-        color: CGColor(0, 0, 0, 255),
+        color: CGColor::from_rgba(0, 0, 0, 255),
         blend_mode: BlendMode::Normal,
     })]);
 
@@ -79,7 +79,7 @@ fn drop_shadow_expands_render_bounds() {
         dy: 5.0,
         blur: 10.0,
         spread: 0.0,
-        color: CGColor(0, 0, 0, 255),
+        color: CGColor::from_rgba(0, 0, 0, 255),
         active: true,
     })]);
 
@@ -114,7 +114,7 @@ fn drop_shadow_spread_expands_render_bounds() {
         dy: 0.0,
         blur: 0.0,
         spread: 10.0,
-        color: CGColor(0, 0, 0, 255),
+        color: CGColor::from_rgba(0, 0, 0, 255),
         active: true,
     })]);
 

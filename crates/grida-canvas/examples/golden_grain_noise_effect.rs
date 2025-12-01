@@ -72,7 +72,7 @@ fn main() {
         num_octaves: 6,  // Many octaves for detailed texture
         seed: 42.0,
         coloring: NoiseEffectColors::Mono {
-            color: CGColor(0, 0, 0, 100),
+            color: CGColor::from_rgba(0, 0, 0, 100),
         },
         active: true,
         blend_mode: BlendMode::Normal,
@@ -86,7 +86,7 @@ fn main() {
     let scene = Scene {
         name: "Film Grain Effect".into(),
         graph,
-        background_color: Some(CGColor(255, 255, 255, 255)),
+        background_color: Some(CGColor::from_rgba(255, 255, 255, 255)),
     };
 
     // Render the scene

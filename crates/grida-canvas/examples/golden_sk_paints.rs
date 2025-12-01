@@ -75,7 +75,7 @@ fn main() {
     let examples = vec![
         // 1. single solid
         (
-            Paints::new([Paint::from(CGColor(255, 0, 0, 200))]), // opacity 0.78
+            Paints::new([Paint::from(CGColor::from_rgba(255, 0, 0, 200))]), // opacity 0.78
             "1. Single Solid",
         ),
         // 2. single linear gradient
@@ -85,11 +85,11 @@ fn main() {
                 stops: vec![
                     GradientStop {
                         offset: 0.0,
-                        color: CGColor(255, 0, 0, 255),
+                        color: CGColor::from_rgba(255, 0, 0, 255),
                     },
                     GradientStop {
                         offset: 1.0,
-                        color: CGColor(0, 0, 255, 255),
+                        color: CGColor::from_rgba(0, 0, 255, 255),
                     },
                 ],
                 opacity: 1.0,
@@ -103,12 +103,12 @@ fn main() {
         (
             Paints::new([
                 Paint::Solid(SolidPaint {
-                    color: CGColor(255, 0, 0, 100), // opacity 0.39
+                    color: CGColor::from_rgba(255, 0, 0, 100), // opacity 0.39
                     blend_mode: BlendMode::Normal,
                     active: true,
                 }),
                 Paint::Solid(SolidPaint {
-                    color: CGColor(0, 0, 255, 100), // opacity 0.39
+                    color: CGColor::from_rgba(0, 0, 255, 100), // opacity 0.39
                     blend_mode: BlendMode::Multiply,
                     active: true,
                 }),
@@ -119,7 +119,7 @@ fn main() {
         (
             Paints::new([
                 Paint::Solid(SolidPaint {
-                    color: CGColor(255, 255, 0, 180), // opacity 0.71
+                    color: CGColor::from_rgba(255, 255, 0, 180), // opacity 0.71
                     blend_mode: BlendMode::Normal,
                     active: true,
                 }),
@@ -128,11 +128,11 @@ fn main() {
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
-                            color: CGColor(255, 0, 255, 255),
+                            color: CGColor::from_rgba(255, 0, 255, 255),
                         },
                         GradientStop {
                             offset: 1.0,
-                            color: CGColor(0, 255, 255, 255),
+                            color: CGColor::from_rgba(0, 255, 255, 255),
                         },
                     ],
                     opacity: 0.6,
@@ -151,11 +151,11 @@ fn main() {
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
-                            color: CGColor(255, 0, 0, 255),
+                            color: CGColor::from_rgba(255, 0, 0, 255),
                         },
                         GradientStop {
                             offset: 1.0,
-                            color: CGColor(255, 255, 0, 255),
+                            color: CGColor::from_rgba(255, 255, 0, 255),
                         },
                     ],
                     opacity: 0.7,
@@ -168,11 +168,11 @@ fn main() {
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
-                            color: CGColor(0, 255, 0, 255),
+                            color: CGColor::from_rgba(0, 255, 0, 255),
                         },
                         GradientStop {
                             offset: 1.0,
-                            color: CGColor(0, 0, 255, 255),
+                            color: CGColor::from_rgba(0, 0, 255, 255),
                         },
                     ],
                     opacity: 0.5,
@@ -190,11 +190,11 @@ fn main() {
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
-                            color: CGColor(255, 165, 0, 255),
+                            color: CGColor::from_rgba(255, 165, 0, 255),
                         },
                         GradientStop {
                             offset: 1.0,
-                            color: CGColor(0, 255, 0, 255),
+                            color: CGColor::from_rgba(0, 255, 0, 255),
                         },
                     ],
                     opacity: 0.7,
@@ -204,11 +204,11 @@ fn main() {
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
-                            color: CGColor(255, 255, 255, 255),
+                            color: CGColor::from_rgba(255, 255, 255, 255),
                         },
                         GradientStop {
                             offset: 1.0,
-                            color: CGColor(0, 0, 0, 0),
+                            color: CGColor::from_rgba(0, 0, 0, 0),
                         },
                     ],
                     opacity: 0.5,
@@ -232,7 +232,7 @@ fn main() {
                     filters: ImageFilters::default(),
                 }),
                 Paint::Solid(SolidPaint {
-                    color: CGColor(0, 0, 0, 200),
+                    color: CGColor::from_rgba(0, 0, 0, 200),
                     blend_mode: BlendMode::Multiply,
                     active: true,
                 }),
@@ -256,11 +256,11 @@ fn main() {
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
-                            color: CGColor(255, 255, 255, 255),
+                            color: CGColor::from_rgba(255, 255, 255, 255),
                         },
                         GradientStop {
                             offset: 1.0,
-                            color: CGColor(0, 0, 0, 0),
+                            color: CGColor::from_rgba(0, 0, 0, 0),
                         },
                     ],
                     opacity: 0.5,
@@ -274,7 +274,7 @@ fn main() {
         (
             Paints::new([
                 Paint::Solid(SolidPaint {
-                    color: CGColor(255, 0, 0, 200), // opacity 0.78
+                    color: CGColor::from_rgba(255, 0, 0, 200), // opacity 0.78
                     blend_mode: BlendMode::Normal,
                     active: true,
                 }),
@@ -283,11 +283,11 @@ fn main() {
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
-                            color: CGColor(0, 255, 0, 255),
+                            color: CGColor::from_rgba(0, 255, 0, 255),
                         },
                         GradientStop {
                             offset: 1.0,
-                            color: CGColor(0, 0, 255, 255),
+                            color: CGColor::from_rgba(0, 0, 255, 255),
                         },
                     ],
                     opacity: 0.6,
@@ -299,11 +299,11 @@ fn main() {
                     stops: vec![
                         GradientStop {
                             offset: 0.0,
-                            color: CGColor(255, 255, 255, 255),
+                            color: CGColor::from_rgba(255, 255, 255, 255),
                         },
                         GradientStop {
                             offset: 1.0,
-                            color: CGColor(255, 255, 0, 0),
+                            color: CGColor::from_rgba(255, 255, 0, 0),
                         },
                     ],
                     opacity: 0.5,

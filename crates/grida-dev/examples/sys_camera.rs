@@ -55,7 +55,7 @@ fn create_static_scene() -> Scene {
 
     Scene {
         name: "Test Scene".to_string(),
-        background_color: Some(CGColor(255, 255, 255, 255)),
+        background_color: Some(CGColor::WHITE),
         graph,
     }
 }

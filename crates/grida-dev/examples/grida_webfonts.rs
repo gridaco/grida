@@ -141,7 +141,7 @@ async fn demo_webfonts() -> Scene {
 
     Scene {
         name: "Webfonts Demo".to_string(),
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
         graph,
     }
 }

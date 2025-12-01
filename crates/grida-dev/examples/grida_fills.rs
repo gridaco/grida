@@ -29,9 +29,9 @@ async fn demo_fills() -> Scene {
     };
     multi_solid_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     multi_solid_rect.fills = Paints::new([
-        Paint::from(CGColor(255, 0, 0, 255)),
-        Paint::from(CGColor(0, 255, 0, 255)),
-        Paint::from(CGColor(0, 0, 255, 255)),
+        Paint::from(CGColor::RED),
+        Paint::from(CGColor::GREEN),
+        Paint::from(CGColor::BLUE),
     ]);
     multi_solid_rect.stroke_width = 3.0.into();
     graph.append_child(
@@ -48,17 +48,17 @@ async fn demo_fills() -> Scene {
     };
     solid_gradient_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     solid_gradient_rect.fills = Paints::from([
-        Paint::from(CGColor(255, 255, 0, 255)),
+        Paint::from(CGColor::from_rgba(255, 255, 0, 255)),
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(45.0),
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 0, 255, 255), // Magenta
+                    color: CGColor::from_rgba(255, 0, 255, 255), // Magenta
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 255, 255, 255), // Cyan
+                    color: CGColor::from_rgba(0, 255, 255, 255), // Cyan
                 },
             ],
             opacity: 0.6,
@@ -80,21 +80,21 @@ async fn demo_fills() -> Scene {
     };
     solid_radial_rect.corner_radius = RectangularCornerRadius::circular(20.0);
     solid_radial_rect.fills = Paints::new([
-        Paint::from(CGColor(128, 128, 128, 255)),
+        Paint::from(CGColor::from_rgba(128, 128, 128, 255)),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 255, 255, 255), // White center
+                    color: CGColor::from_rgba(255, 255, 255, 255), // White center
                 },
                 GradientStop {
                     offset: 0.7,
-                    color: CGColor(255, 255, 255, 255), // White
+                    color: CGColor::from_rgba(255, 255, 255, 255), // White
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(255, 255, 255, 0), // Transparent edge
+                    color: CGColor::from_rgba(255, 255, 255, 0), // Transparent edge
                 },
             ],
             opacity: 0.7,
@@ -123,11 +123,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 0, 0, 255), // Red
+                    color: CGColor::from_rgba(255, 0, 0, 255), // Red
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 0, 255, 255), // Blue
+                    color: CGColor::from_rgba(0, 0, 255, 255), // Blue
                 },
             ],
             ..Default::default()
@@ -139,11 +139,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 255, 0, 255), // Yellow center
+                    color: CGColor::from_rgba(255, 255, 0, 255), // Yellow center
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(255, 255, 0, 0), // Transparent edge
+                    color: CGColor::from_rgba(255, 255, 0, 0), // Transparent edge
                 },
             ],
             opacity: 0.5,
@@ -171,11 +171,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 0, 0, 255), // Red center
+                    color: CGColor::from_rgba(255, 0, 0, 255), // Red center
                 },
                 GradientStop {
                     offset: 0.33,
-                    color: CGColor(255, 0, 0, 0), // Transparent
+                    color: CGColor::from_rgba(255, 0, 0, 0), // Transparent
                 },
             ],
             opacity: 1.0,
@@ -188,11 +188,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.33,
-                    color: CGColor(0, 255, 0, 255), // Green middle ring
+                    color: CGColor::from_rgba(0, 255, 0, 255), // Green middle ring
                 },
                 GradientStop {
                     offset: 0.66,
-                    color: CGColor(0, 255, 0, 0), // Transparent
+                    color: CGColor::from_rgba(0, 255, 0, 0), // Transparent
                 },
             ],
             opacity: 0.8,
@@ -205,11 +205,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.66,
-                    color: CGColor(0, 0, 255, 255), // Blue outer ring
+                    color: CGColor::from_rgba(0, 0, 255, 255), // Blue outer ring
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 0, 255, 0), // Transparent
+                    color: CGColor::from_rgba(0, 0, 255, 0), // Transparent
                 },
             ],
             opacity: 0.6,
@@ -239,17 +239,17 @@ async fn demo_fills() -> Scene {
     complex_fill_polygon.transform = AffineTransform::new(start_x + spacing, base_y + spacing, 0.0);
     complex_fill_polygon.points = pentagon_points;
     complex_fill_polygon.fills = Paints::new([
-        Paint::from(CGColor(255, 128, 0, 255)),
+        Paint::from(CGColor::from_rgba(255, 128, 0, 255)),
         Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(30.0),
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 255, 255, 255), // White overlay
+                    color: CGColor::from_rgba(255, 255, 255, 255), // White overlay
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(255, 255, 255, 0), // Transparent
+                    color: CGColor::from_rgba(255, 255, 255, 0), // Transparent
                 },
             ],
             opacity: 0.7,
@@ -262,11 +262,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 0, 255, 255), // Magenta highlight
+                    color: CGColor::from_rgba(255, 0, 255, 255), // Magenta highlight
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(255, 0, 255, 0), // Transparent
+                    color: CGColor::from_rgba(255, 0, 255, 0), // Transparent
                 },
             ],
             opacity: 0.5,
@@ -296,11 +296,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 0, 0, 255), // Red
+                    color: CGColor::from_rgba(255, 0, 0, 255), // Red
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(255, 0, 0, 0), // Transparent
+                    color: CGColor::from_rgba(255, 0, 0, 0), // Transparent
                 },
             ],
             ..Default::default()
@@ -310,11 +310,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(0, 255, 0, 255), // Green
+                    color: CGColor::from_rgba(0, 255, 0, 255), // Green
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 255, 0, 0), // Transparent
+                    color: CGColor::from_rgba(0, 255, 0, 0), // Transparent
                 },
             ],
             opacity: 0.8,
@@ -325,11 +325,11 @@ async fn demo_fills() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(0, 0, 255, 255), // Blue
+                    color: CGColor::from_rgba(0, 0, 255, 255), // Blue
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 0, 255, 0), // Transparent
+                    color: CGColor::from_rgba(0, 0, 255, 0), // Transparent
                 },
             ],
             opacity: 0.6,
@@ -348,21 +348,21 @@ async fn demo_fills() -> Scene {
     multi_fill_container.layout_dimensions.width = Some(150.0);
     multi_fill_container.layout_dimensions.height = Some(150.0);
     multi_fill_container.fills = Paints::new([
-        Paint::from(CGColor(128, 0, 128, 255)),
+        Paint::from(CGColor::from_rgba(128, 0, 128, 255)),
         Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::identity(),
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 255, 255, 255), // White center
+                    color: CGColor::from_rgba(255, 255, 255, 255), // White center
                 },
                 GradientStop {
                     offset: 0.5,
-                    color: CGColor(255, 255, 255, 255), // White
+                    color: CGColor::from_rgba(255, 255, 255, 255), // White
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(255, 255, 255, 0), // Transparent edge
+                    color: CGColor::from_rgba(255, 255, 255, 0), // Transparent edge
                 },
             ],
             opacity: 0.6,
@@ -380,7 +380,7 @@ async fn demo_fills() -> Scene {
     Scene {
         name: "Fills Demo".to_string(),
         graph,
-        background_color: Some(CGColor(240, 240, 240, 255)),
+        background_color: Some(CGColor::from_rgba(240, 240, 240, 255)),
     }
 }
 

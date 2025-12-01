@@ -244,7 +244,7 @@ async fn run_svg(args: SvgArgs) -> Result<()> {
         .background
         .as_deref()
         .and_then(parse_hex_color)
-        .or(Some(CGColor(0xF8, 0xF8, 0xF8, 0xFF)));
+        .or(Some(CGColor::from_u32(0xF8F8F8FF)));
 
     let scene = Scene {
         name: scene_name,
@@ -456,7 +456,7 @@ fn build_sample_scene() -> Scene {
     };
     hero.corner_radius = RectangularCornerRadius::circular(32.0);
     hero.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor(74, 108, 247, 255),
+        color: CGColor::from_rgb(74, 108, 247),
         blend_mode: BlendMode::default(),
         active: true,
     })]);
@@ -469,7 +469,7 @@ fn build_sample_scene() -> Scene {
     };
     accent.corner_radius = RectangularCornerRadius::circular(24.0);
     accent.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor(253, 158, 115, 255),
+        color: CGColor::from_rgb(253, 158, 115),
         blend_mode: BlendMode::default(),
         active: true,
     })]);
@@ -482,7 +482,7 @@ fn build_sample_scene() -> Scene {
     };
     pill.corner_radius = RectangularCornerRadius::circular(30.0);
     pill.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor(34, 34, 34, 255),
+        color: CGColor::from_rgb(34, 34, 34),
         blend_mode: BlendMode::default(),
         active: true,
     })]);
@@ -500,7 +500,7 @@ fn build_sample_scene() -> Scene {
     Scene {
         name: "grida-dev sample".to_string(),
         graph,
-        background_color: Some(CGColor(245, 246, 255, 255)),
+        background_color: Some(CGColor::from_rgb(245, 246, 255)),
     }
 }
 
@@ -524,7 +524,7 @@ fn build_benchmark_scene(grid: u32) -> Scene {
                 height: size,
             };
             rect.fills = Paints::new([Paint::Solid(SolidPaint {
-                color: CGColor(((x * 11) % 255) as u8, ((y * 7) % 255) as u8, 210, 255),
+                color: CGColor::from_rgb(((x * 11) % 255) as u8, ((y * 7) % 255) as u8, 210),
                 blend_mode: BlendMode::default(),
                 active: true,
             })]);
@@ -535,7 +535,7 @@ fn build_benchmark_scene(grid: u32) -> Scene {
     Scene {
         name: format!("Benchmark {}x{}", grid, grid),
         graph,
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgb(250, 250, 250)),
     }
 }
 
@@ -550,14 +550,14 @@ fn parse_hex_color(input: &str) -> Option<CGColor> {
             let r = u8::from_str_radix(&s[0..2], 16).ok()?;
             let g = u8::from_str_radix(&s[2..4], 16).ok()?;
             let b = u8::from_str_radix(&s[4..6], 16).ok()?;
-            Some(CGColor(r, g, b, 0xFF))
+            Some(CGColor::from_rgb(r, g, b))
         }
         8 => {
             let r = u8::from_str_radix(&s[0..2], 16).ok()?;
             let g = u8::from_str_radix(&s[2..4], 16).ok()?;
             let b = u8::from_str_radix(&s[4..6], 16).ok()?;
             let a = u8::from_str_radix(&s[6..8], 16).ok()?;
-            Some(CGColor(r, g, b, a))
+            Some(CGColor::from_rgba(r, g, b, a))
         }
         _ => None,
     }
@@ -567,7 +567,7 @@ fn build_empty_scene() -> Scene {
     Scene {
         name: "Drop a file to begin".to_string(),
         graph: SceneGraph::new(),
-        background_color: Some(CGColor(0xF4, 0xF5, 0xF7, 0xFF)),
+        background_color: Some(CGColor::from_u32(0xF4F5F7FF)),
     }
 }
 
@@ -602,7 +602,7 @@ fn scene_from_svg_path(path: &Path) -> Result<Scene> {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "SVG".to_string()),
         graph,
-        background_color: Some(CGColor(0xF8, 0xF8, 0xF8, 0xFF)),
+        background_color: Some(CGColor::from_u32(0xF8F8F8FF)),
     })
 }
 
@@ -627,7 +627,7 @@ fn scene_from_raster_path(path: &Path) -> Result<Scene> {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "Image".to_string()),
         graph,
-        background_color: Some(CGColor(0xF8, 0xF8, 0xF8, 0xFF)),
+        background_color: Some(CGColor::from_u32(0xF8F8F8FF)),
     })
 }
 

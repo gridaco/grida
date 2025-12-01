@@ -70,7 +70,7 @@ pub(crate) fn create_benchmark_scene(cols: u32, rows: u32) -> Scene {
                 height: size,
             };
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: CGColor(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
+                color: CGColor::from_rgba(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
                 blend_mode: BlendMode::default(),
                 active: true,
             }));

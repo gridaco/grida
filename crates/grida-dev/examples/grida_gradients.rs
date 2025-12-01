@@ -35,11 +35,11 @@ async fn demo_gradients() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 0, 0, 255),
+                    color: CGColor::from_rgba(255, 0, 0, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 0, 255, 255),
+                    color: CGColor::from_rgba(0, 0, 255, 255),
                 },
             ],
             ..Default::default()
@@ -64,11 +64,11 @@ async fn demo_gradients() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 255, 0, 255),
+                    color: CGColor::from_rgba(255, 255, 0, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 255, 0, 255),
+                    color: CGColor::from_rgba(0, 255, 0, 255),
                 },
             ],
             opacity: 1.0,
@@ -88,18 +88,18 @@ async fn demo_gradients() -> Scene {
             height: base,
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
-        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
+        rect.set_fill(Paint::from(CGColor::from_rgba(0, 0, 0, 0)));
         let angle = (i as f32) * 45.0;
         rect.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::from_rotatation(angle),
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 0, 255, 255),
+                    color: CGColor::from_rgba(255, 0, 255, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 255, 255, 255),
+                    color: CGColor::from_rgba(0, 255, 255, 255),
                 },
             ],
             ..Default::default()
@@ -117,7 +117,7 @@ async fn demo_gradients() -> Scene {
             height: base,
         };
         rect.corner_radius = RectangularCornerRadius::circular(8.0);
-        rect.set_fill(Paint::from(CGColor(0, 0, 0, 0)));
+        rect.set_fill(Paint::from(CGColor::from_rgba(0, 0, 0, 0)));
         let offset = -0.25 + 0.125 * i as f32;
         rect.strokes = Paints::new([Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform {
@@ -126,11 +126,11 @@ async fn demo_gradients() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 128, 0, 255),
+                    color: CGColor::from_rgba(255, 128, 0, 255),
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(0, 128, 255, 255),
+                    color: CGColor::from_rgba(0, 128, 255, 255),
                 },
             ],
             opacity: 1.0,
@@ -144,7 +144,7 @@ async fn demo_gradients() -> Scene {
 
     Scene {
         name: "Gradients Demo".to_string(),
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
         graph,
     }
 }

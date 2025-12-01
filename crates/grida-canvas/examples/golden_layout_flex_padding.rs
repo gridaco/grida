@@ -70,10 +70,10 @@ fn main() {
     // Note: render_demo function expects ContainerNodeRec which we don't have anymore
     // For now, let's just draw the computed layouts directly
     let colors = [
-        CGColor::from_rgb(239, 68, 68),  // red
-        CGColor::from_rgb(59, 130, 246), // blue
-        CGColor::from_rgb(34, 197, 94),  // green
-        CGColor::from_rgb(234, 179, 8),  // yellow
+        CGColor::from_rgba(239, 68, 68, 255),  // red
+        CGColor::from_rgba(59, 130, 246, 255), // blue
+        CGColor::from_rgba(34, 197, 94, 255),  // green
+        CGColor::from_rgba(234, 179, 8, 255),  // yellow
     ];
 
     for (i, layout) in layouts.iter().enumerate() {

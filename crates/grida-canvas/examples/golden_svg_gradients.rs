@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         scene_from_svg(
             LINEAR_SVG_BYTES,
             "svg linear gradient",
-            Some(CGColor(240, 240, 240, 255)),
+            Some(CGColor::from_rgba(240, 240, 240, 255)),
         ),
         200.0,
         200.0,
@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         scene_from_svg(
             RADIAL_SVG_BYTES,
             "svg radial gradient",
-            Some(CGColor(240, 240, 240, 255)),
+            Some(CGColor::from_rgba(240, 240, 240, 255)),
         ),
         200.0,
         200.0,

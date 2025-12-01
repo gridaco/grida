@@ -55,8 +55,8 @@ fn create_stroke_width_4_scene() -> Scene {
     let nf = NodeFactory::new();
 
     // Shared stroke paint (dark blue)
-    let stroke_paint = Paint::from(CGColor(41, 98, 255, 255));
-    let fill_paint = Paint::from(CGColor(255, 255, 255, 255));
+    let stroke_paint = Paint::from(CGColor::from_rgba(41, 98, 255, 255));
+    let fill_paint = Paint::from(CGColor::from_rgba(255, 255, 255, 255));
 
     let rect_width = 180.0;
     let rect_height = 100.0;
@@ -167,8 +167,8 @@ fn create_stroke_width_4_scene() -> Scene {
             width: rect_width,
             height: rect_height,
         };
-        rect.fills = Paints::new([Paint::from(CGColor(255, 255, 200, 255))]);
-        rect.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]); // Red
+        rect.fills = Paints::new([Paint::from(CGColor::from_rgba(255, 255, 200, 255))]);
+        rect.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 0, 0, 255))]); // Red
         rect.stroke_style.stroke_align = *align;
         rect.stroke_style.stroke_dash_array = Some(StrokeDashArray::from(vec![10.0, 5.0])); // Dashed!
         rect.stroke_width = StrokeWidth::Rectangular(RectangularStrokeWidth {
@@ -187,7 +187,7 @@ fn create_stroke_width_4_scene() -> Scene {
 
     Scene {
         name: "Stroke Width 4 - All Alignments".to_string(),
-        background_color: Some(CGColor(240, 242, 245, 255)),
+        background_color: Some(CGColor::from_rgba(240, 242, 245, 255)),
         graph,
     }
 }

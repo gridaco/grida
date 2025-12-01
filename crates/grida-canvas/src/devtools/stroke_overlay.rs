@@ -18,7 +18,7 @@ impl Default for StrokeOverlayStyle {
     fn default() -> Self {
         Self {
             stroke_width: 3.0,
-            stroke: crate::cg::CGColor(0, 255, 0, 200),
+            stroke: crate::cg::CGColor::from_rgba(0, 255, 0, 200),
         }
     }
 }
@@ -41,10 +41,10 @@ impl StrokeOverlay {
         let style = style.cloned().unwrap_or_default();
         let mut paint = Paint::default();
         paint.set_color(Color::from_argb(
-            style.stroke.3,
-            style.stroke.0,
-            style.stroke.1,
-            style.stroke.2,
+            style.stroke.a,
+            style.stroke.r,
+            style.stroke.g,
+            style.stroke.b,
         ));
         paint.set_style(PaintStyle::Stroke);
         paint.set_stroke_width(style.stroke_width);

@@ -69,22 +69,22 @@ fn main() {
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(Paints::new([Paint::from(CGColor(242, 80, 34, 255))])),
+                fills: Some(Paints::new([Paint::from(CGColor::from_rgba(242, 80, 34, 255))])),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![4, 5, 6, 7])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(Paints::new([Paint::from(CGColor(127, 186, 0, 255))])),
+                fills: Some(Paints::new([Paint::from(CGColor::from_rgba(127, 186, 0, 255))])),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![8, 9, 10, 11])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(Paints::new([Paint::from(CGColor(0, 164, 239, 255))])),
+                fills: Some(Paints::new([Paint::from(CGColor::from_rgba(0, 164, 239, 255))])),
             },
             VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![12, 13, 14, 15])],
                 fill_rule: FillRule::NonZero,
-                fills: Some(Paints::new([Paint::from(CGColor(255, 185, 0, 255))])),
+                fills: Some(Paints::new([Paint::from(CGColor::from_rgba(255, 185, 0, 255))])),
             },
         ],
     };

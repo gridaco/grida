@@ -83,35 +83,35 @@ async fn demo_blendmode() -> Scene {
             stops: vec![
                 GradientStop {
                     offset: 0.0,
-                    color: CGColor(255, 0, 255, 255), // Magenta
+                    color: CGColor::from_rgba(255, 0, 255, 255), // Magenta
                 },
                 GradientStop {
                     offset: 0.14,
-                    color: CGColor(255, 0, 0, 255), // Red
+                    color: CGColor::from_rgba(255, 0, 0, 255), // Red
                 },
                 GradientStop {
                     offset: 0.28,
-                    color: CGColor(255, 255, 0, 255), // Yellow
+                    color: CGColor::from_rgba(255, 255, 0, 255), // Yellow
                 },
                 GradientStop {
                     offset: 0.42,
-                    color: CGColor(0, 255, 0, 255), // Green
+                    color: CGColor::from_rgba(0, 255, 0, 255), // Green
                 },
                 GradientStop {
                     offset: 0.57,
-                    color: CGColor(0, 255, 255, 255), // Cyan
+                    color: CGColor::from_rgba(0, 255, 255, 255), // Cyan
                 },
                 GradientStop {
                     offset: 0.71,
-                    color: CGColor(0, 0, 255, 255), // Blue
+                    color: CGColor::from_rgba(0, 0, 255, 255), // Blue
                 },
                 GradientStop {
                     offset: 0.85,
-                    color: CGColor(255, 0, 255, 255), // Magenta
+                    color: CGColor::from_rgba(255, 0, 255, 255), // Magenta
                 },
                 GradientStop {
                     offset: 1.0,
-                    color: CGColor(255, 0, 255, 255), // Magenta
+                    color: CGColor::from_rgba(255, 0, 255, 255), // Magenta
                 },
             ],
             opacity: 0.3, // Make it subtle
@@ -146,7 +146,7 @@ async fn demo_blendmode() -> Scene {
             width: circle_radius * 2.0,
             height: circle_radius * 2.0,
         };
-        green_circle.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
+        green_circle.set_fill(Paint::from(CGColor::from_rgba(0, 255, 0, 255)));
         green_circle.blend_mode = LayerBlendMode::default();
         graph.append_child(
             Node::Ellipse(green_circle),
@@ -160,7 +160,7 @@ async fn demo_blendmode() -> Scene {
             width: circle_radius * 2.0,
             height: circle_radius * 2.0,
         };
-        red_circle.set_fill(Paint::from(CGColor(255, 0, 0, 255)));
+        red_circle.set_fill(Paint::from(CGColor::from_rgba(255, 0, 0, 255)));
         red_circle.blend_mode = LayerBlendMode::default();
         graph.append_child(
             Node::Ellipse(red_circle),
@@ -175,7 +175,7 @@ async fn demo_blendmode() -> Scene {
             width: circle_radius * 2.0,
             height: circle_radius * 2.0,
         };
-        blue_circle.set_fill(Paint::from(CGColor(0, 0, 255, 255)));
+        blue_circle.set_fill(Paint::from(CGColor::from_rgba(0, 0, 255, 255)));
         blue_circle.blend_mode = LayerBlendMode::default();
         graph.append_child(
             Node::Ellipse(blue_circle),
@@ -190,7 +190,7 @@ async fn demo_blendmode() -> Scene {
         label.text_style = TextStyleRec::from_font("Geist", 14.0);
         label.text_align = TextAlign::Left;
         label.text_align_vertical = TextAlignVertical::Top;
-        label.fills = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
+        label.fills = Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]);
         graph.append_child(
             Node::TextSpan(label),
             Parent::NodeId(root_container_id.clone()),
@@ -199,7 +199,7 @@ async fn demo_blendmode() -> Scene {
 
     Scene {
         name: "Blend Mode Demo".to_string(),
-        background_color: Some(CGColor(240, 240, 240, 255)),
+        background_color: Some(CGColor::from_rgba(240, 240, 240, 255)),
         graph,
     }
 }

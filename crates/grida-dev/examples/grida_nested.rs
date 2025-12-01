@@ -39,10 +39,10 @@ async fn demo_nested() -> Scene {
         let r = (255.0 * depth_ratio) as u8;
         let g = (100.0 * (1.0 - depth_ratio)) as u8;
         let b = (255.0 * (1.0 - depth_ratio)) as u8;
-        container.set_fill(Paint::from(CGColor(r, g, b, 200)));
+        container.set_fill(Paint::from(CGColor::from_rgba(r, g, b, 200)));
 
         // Add stroke to show boundaries
-        container.strokes = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
+        container.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 255, 255, 255))]);
         container.stroke_width = 2.0.into();
 
         let container_id = graph.append_child(Node::Container(container), current_parent);
@@ -52,7 +52,7 @@ async fn demo_nested() -> Scene {
         label.transform = AffineTransform::new(10.0, 10.0, 0.0);
         label.text = format!("Level {}", i);
         label.text_style = TextStyleRec::from_font("", 14.0);
-        label.fills = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
+        label.fills = Paints::new([Paint::from(CGColor::from_rgba(255, 255, 255, 255))]);
         graph.append_child(Node::TextSpan(label), Parent::NodeId(container_id.clone()));
 
         // Move to next level (this container becomes the parent for the next iteration)
@@ -69,14 +69,14 @@ async fn demo_nested() -> Scene {
     };
     star.point_count = 5;
     star.inner_radius = 0.4;
-    star.set_fill(Paint::from(CGColor(255, 255, 0, 255)));
-    star.strokes = Paints::new([Paint::from(CGColor(255, 200, 0, 255))]);
+    star.set_fill(Paint::from(CGColor::from_rgba(255, 255, 0, 255)));
+    star.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 200, 0, 255))]);
     star.stroke_width = 3.0.into();
     graph.append_child(Node::RegularStarPolygon(star), current_parent);
 
     Scene {
         name: "Nested Demo".to_string(),
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
         graph,
     }
 }

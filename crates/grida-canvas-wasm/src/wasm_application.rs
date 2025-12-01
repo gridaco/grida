@@ -624,7 +624,12 @@ pub unsafe extern "C" fn highlight_strokes(
                     }
                     if let Some(color) = s.stroke {
                         let rgba = math2::hex_to_rgba8888(&color);
-                        st.stroke = cg::cg::CGColor(rgba.r, rgba.g, rgba.b, (rgba.a * 255.0) as u8);
+                        st.stroke = cg::cg::CGColor::from_rgba(
+                            rgba.r,
+                            rgba.g,
+                            rgba.b,
+                            (rgba.a * 255.0) as u8,
+                        );
                     }
                     st
                 });

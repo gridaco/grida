@@ -1929,7 +1929,7 @@ fn usvg_linear_gradient_to_linear_gradient_paint(
         .iter()
         .map(|stop| GradientStop {
             offset: stop.offset().get(),
-            color: CGColor(
+            color: CGColor::from_rgba(
                 stop.color().red,
                 stop.color().green,
                 stop.color().blue,

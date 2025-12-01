@@ -21,12 +21,12 @@ fn create_scene(t: f32) -> Scene {
     rect.transform = AffineTransform::new(x, y, t);
     let r = ((t.sin() * 0.5 + 0.5) * 255.0) as u8;
     let g = ((t.cos() * 0.5 + 0.5) * 255.0) as u8;
-    rect.set_fill(Paint::from(CGColor(r, g, 200, 255)));
+    rect.set_fill(Paint::from(CGColor::from_rgba(r, g, 200, 255)));
     graph.append_child(Node::Rectangle(rect), Parent::Root);
 
     Scene {
         name: "Animated".to_string(),
-        background_color: Some(CGColor(255, 255, 255, 255)),
+        background_color: Some(CGColor::from_rgba(255, 255, 255, 255)),
         graph,
     }
 }

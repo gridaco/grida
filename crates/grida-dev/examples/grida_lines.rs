@@ -26,7 +26,7 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_basic.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
+    line_basic.strokes = Paints::new([Paint::from(CGColor::BLACK)]);
     line_basic.stroke_width = 2.0;
 
     // Outside aligned thick line
@@ -36,7 +36,7 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_outside.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
+    line_outside.strokes = Paints::new([Paint::from(CGColor::RED)]);
     line_outside.stroke_width = 8.0;
     line_outside._data_stroke_align = StrokeAlign::Outside;
 
@@ -47,7 +47,7 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_dashed.strokes = Paints::new([Paint::from(CGColor(0, 0, 255, 255))]);
+    line_dashed.strokes = Paints::new([Paint::from(CGColor::BLUE)]);
     line_dashed.stroke_width = 4.0;
     line_dashed.stroke_dash_array = Some([10.0, 5.0].into());
 
@@ -59,7 +59,10 @@ async fn demo_lines() -> Scene {
         height: 0.0,
     };
     line_gradient.strokes = Paints::new([Paint::LinearGradient(LinearGradientPaint::from_colors(
-        vec![CGColor(0, 255, 0, 255), CGColor(255, 0, 255, 255)],
+        vec![
+            CGColor::from_rgba(0, 255, 0, 255),
+            CGColor::from_rgba(255, 0, 255, 255),
+        ],
     ))]);
     line_gradient.stroke_width = 6.0;
 
@@ -71,7 +74,7 @@ async fn demo_lines() -> Scene {
         width: length,
         height: 0.0,
     };
-    line_rotated.strokes = Paints::new([Paint::from(CGColor(0, 128, 128, 255))]);
+    line_rotated.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 128, 128, 255))]);
     line_rotated.stroke_width = 4.0;
 
     // Set up root container and add all lines
@@ -89,7 +92,7 @@ async fn demo_lines() -> Scene {
 
     Scene {
         name: "LineNode Demo".to_string(),
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
         graph,
     }
 }

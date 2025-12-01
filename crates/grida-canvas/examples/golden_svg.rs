@@ -43,7 +43,7 @@ async fn demo_scene() -> Scene {
     };
     title_text.text_align = TextAlign::Center;
     title_text.text_align_vertical = TextAlignVertical::Center;
-    title_text.fills = Paints::new([Paint::from(CGColor(50, 50, 50, 255))]);
+    title_text.fills = Paints::new([Paint::from(CGColor::from_rgba(50, 50, 50, 255))]);
 
     // Subtitle text
     let mut subtitle_text = nf.create_text_span_node();
@@ -54,7 +54,7 @@ async fn demo_scene() -> Scene {
     subtitle_text.text_style = TextStyleRec::from_font("", 18.0);
     subtitle_text.text_align = TextAlign::Center;
     subtitle_text.text_align_vertical = TextAlignVertical::Center;
-    subtitle_text.fills = Paints::new([Paint::from(CGColor(100, 100, 100, 255))]);
+    subtitle_text.fills = Paints::new([Paint::from(CGColor::from_rgba(100, 100, 100, 255))]);
 
     // Rectangle with gradient fill
     let mut rect_gradient = nf.create_rectangle_node();
@@ -69,27 +69,27 @@ async fn demo_scene() -> Scene {
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: CGColor(255, 100, 100, 255),
+                color: CGColor::from_rgba(255, 100, 100, 255),
             },
             GradientStop {
                 offset: 0.5,
-                color: CGColor(100, 100, 255, 255),
+                color: CGColor::from_rgba(100, 100, 255, 255),
             },
             GradientStop {
                 offset: 1.0,
-                color: CGColor(100, 255, 100, 255),
+                color: CGColor::from_rgba(100, 255, 100, 255),
             },
         ],
         ..Default::default()
     }));
     rect_gradient.stroke_width = 3.0.into();
-    rect_gradient.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
+    rect_gradient.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]);
     rect_gradient.effects = LayerEffects::from_array(vec![FeShadow {
         dx: 5.0,
         dy: 5.0,
         blur: 10.0,
         spread: 0.0,
-        color: CGColor(0, 0, 0, 100),
+        color: CGColor::from_rgba(0, 0, 0, 100),
         active: true,
     }
     .into()]);
@@ -105,20 +105,20 @@ async fn demo_scene() -> Scene {
         vec![
             GradientStop {
                 offset: 0.0,
-                color: CGColor(255, 255, 0, 255),
+                color: CGColor::from_rgba(255, 255, 0, 255),
             },
             GradientStop {
                 offset: 0.7,
-                color: CGColor(255, 128, 0, 255),
+                color: CGColor::from_rgba(255, 128, 0, 255),
             },
             GradientStop {
                 offset: 1.0,
-                color: CGColor(255, 0, 0, 255),
+                color: CGColor::from_rgba(255, 0, 0, 255),
             },
         ],
     ))]);
     ellipse_radial.stroke_width = 4.0.into();
-    ellipse_radial.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
+    ellipse_radial.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]);
 
     // Polygon (hexagon)
     let hexagon_points = (0..6)
@@ -134,15 +134,15 @@ async fn demo_scene() -> Scene {
     let mut hexagon = nf.create_polygon_node();
     hexagon.transform = AffineTransform::new(550.0, 200.0, 0.0);
     hexagon.points = hexagon_points;
-    hexagon.fills = Paints::new([Paint::from(CGColor(128, 0, 255, 255))]);
+    hexagon.fills = Paints::new([Paint::from(CGColor::from_rgba(128, 0, 255, 255))]);
     hexagon.stroke_width = 3.0.into();
-    hexagon.strokes = Paints::new([Paint::from(CGColor(255, 255, 255, 255))]);
+    hexagon.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 255, 255, 255))]);
     hexagon.effects = LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
         dx: 3.0,
         dy: 3.0,
         blur: 8.0,
         spread: 0.0,
-        color: CGColor(0, 0, 0, 150),
+        color: CGColor::from_rgba(0, 0, 0, 150),
         active: true,
     })]);
 
@@ -155,17 +155,17 @@ async fn demo_scene() -> Scene {
     };
     star.point_count = 5;
     star.inner_radius = 0.4;
-    star.fills = Paints::new([Paint::from(CGColor(255, 215, 0, 255))]);
+    star.fills = Paints::new([Paint::from(CGColor::from_rgba(255, 215, 0, 255))]);
     star.stroke_width = 2.0.into();
-    star.strokes = Paints::new([Paint::from(CGColor(139, 69, 19, 255))]);
+    star.strokes = Paints::new([Paint::from(CGColor::from_rgba(139, 69, 19, 255))]);
 
     // Path (complex shape)
     let mut path = nf.create_path_node();
     path.transform = AffineTransform::new(220.0, 400.0, 0.0);
     path.data = "M50,0 L61,35 L98,35 L68,57 L79,91 L50,71 L21,91 L32,57 L2,35 L39,35 Z".to_string();
-    path.fills = Paints::new([Paint::from(CGColor(255, 20, 147, 255))]);
+    path.fills = Paints::new([Paint::from(CGColor::from_rgba(255, 20, 147, 255))]);
     path.stroke_width = 2.0.into();
-    path.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
+    path.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]);
 
     // Line with gradient stroke
     let mut line = nf.create_line_node();
@@ -187,9 +187,9 @@ async fn demo_scene() -> Scene {
         height: 100.0,
     };
     octagon.point_count = 8;
-    octagon.fills = Paints::new([Paint::from(CGColor(0, 255, 255, 255))]);
+    octagon.fills = Paints::new([Paint::from(CGColor::from_rgba(0, 255, 255, 255))]);
     octagon.stroke_width = 3.0.into();
-    octagon.strokes = Paints::new([Paint::from(CGColor(0, 0, 0, 255))]);
+    octagon.strokes = Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]);
 
     // Description text
     let mut description_text = nf.create_text_span_node();
@@ -199,7 +199,7 @@ async fn demo_scene() -> Scene {
     description_text.text_style = TextStyleRec::from_font("", 14.0);
     description_text.text_align = TextAlign::Center;
     description_text.text_align_vertical = TextAlignVertical::Center;
-    description_text.fills = Paints::new([Paint::from(CGColor(80, 80, 80, 255))]);
+    description_text.fills = Paints::new([Paint::from(CGColor::from_rgba(80, 80, 80, 255))]);
 
     // Add all nodes to root container
     graph.append_children(
@@ -220,7 +220,7 @@ async fn demo_scene() -> Scene {
 
     Scene {
         name: "SVG Demo".into(),
-        background_color: Some(CGColor(255, 255, 255, 255)),
+        background_color: Some(CGColor::from_rgba(255, 255, 255, 255)),
         graph,
     }
 }

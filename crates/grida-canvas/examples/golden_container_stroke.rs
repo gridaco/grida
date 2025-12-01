@@ -15,8 +15,8 @@ async fn scene() -> Scene {
     container.layout_dimensions.height = Some(400.0);
     container.stroke_width = 10.0.into();
     container.stroke_style.stroke_align = StrokeAlign::Outside;
-    container.strokes = Paints::new([Paint::from(CGColor(255, 0, 0, 255))]);
-    container.set_fill(Paint::from(CGColor(255, 255, 255, 255)));
+    container.strokes = Paints::new([Paint::from(CGColor::RED)]);
+    container.set_fill(Paint::from(CGColor::WHITE));
     // Center the container in the 800x800 canvas
     container.position = CGPoint::new(200.0, 200.0).into();
     container.rotation = 0.0;
@@ -27,7 +27,7 @@ async fn scene() -> Scene {
         width: 400.0,
         height: 400.0,
     };
-    circle.set_fill(Paint::from(CGColor(0, 255, 0, 255)));
+    circle.set_fill(Paint::from(CGColor::GREEN));
     // Position the circle at the right-bottom of the container
     // Container is 400x400, centered at (200, 200), so right-bottom would be around (350, 350)
     // But we want it to overlap with the stroke, so position it at the edge

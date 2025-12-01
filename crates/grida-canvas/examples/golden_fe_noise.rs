@@ -16,7 +16,7 @@ fn main() {
                 num_octaves: 3,
                 seed: 8539.0,
                 coloring: NoiseEffectColors::Mono {
-                    color: CGColor(0, 0, 0, 64), // 25% opacity black
+                    color: CGColor::from_rgba(0, 0, 0, 64), // 25% opacity black
                 },
                 active: true,
                 blend_mode: BlendMode::Normal,
@@ -30,8 +30,8 @@ fn main() {
                 num_octaves: 3,
                 seed: 8539.0,
                 coloring: NoiseEffectColors::Duo {
-                    color1: CGColor(255, 0, 4, 255),    // red pattern
-                    color2: CGColor(255, 255, 255, 64), // 25% opacity white base
+                    color1: CGColor::from_rgba(255, 0, 4, 255),    // red pattern
+                    color2: CGColor::from_rgba(255, 255, 255, 64), // 25% opacity white base
                 },
                 active: true,
                 blend_mode: BlendMode::Normal,

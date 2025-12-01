@@ -36,7 +36,7 @@ async fn create_scene() -> Scene {
     rect_circular.corner_radius = RectangularCornerRadius::circular(corner_radius);
     rect_circular.corner_smoothing = CornerSmoothing::new(0.0); // Circular
     rect_circular.fills = Paints::default(); // No fill
-    rect_circular.strokes = Paints::new([Paint::from(CGColor::from_rgb(255, 50, 50))]);
+    rect_circular.strokes = Paints::new([Paint::from(CGColor::from_rgba(255, 50, 50, 255))]);
     rect_circular.stroke_width = 3.0.into();
     rect_circular.stroke_style.stroke_align = StrokeAlign::Center;
 
@@ -52,7 +52,7 @@ async fn create_scene() -> Scene {
     rect_smoothed.corner_radius = RectangularCornerRadius::circular(corner_radius);
     rect_smoothed.corner_smoothing = CornerSmoothing::new(1.0); // Maximum smoothing
     rect_smoothed.fills = Paints::default(); // No fill
-    rect_smoothed.strokes = Paints::new([Paint::from(CGColor::from_rgb(50, 150, 255))]);
+    rect_smoothed.strokes = Paints::new([Paint::from(CGColor::from_rgba(50, 150, 255, 255))]);
     rect_smoothed.stroke_width = 3.0.into();
     rect_smoothed.stroke_style.stroke_align = StrokeAlign::Center;
 

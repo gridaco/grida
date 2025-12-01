@@ -23,7 +23,7 @@ fn build_demo_content(
         height: h * 0.6,
     };
     a.corner_radius = RectangularCornerRadius::circular(12.0);
-    a.set_fill(CGColor(255, 99, 71, 255).into());
+    a.set_fill(CGColor::from_rgba(255, 99, 71, 255).into());
     let a_id = graph.append_child(Node::Rectangle(a), parent.clone());
 
     // Content B
@@ -34,7 +34,7 @@ fn build_demo_content(
         height: h * 0.6,
     };
     b.corner_radius = RectangularCornerRadius::circular(12.0);
-    b.set_fill(CGColor(65, 105, 225, 255).into());
+    b.set_fill(CGColor::from_rgba(65, 105, 225, 255).into());
     let b_id = graph.append_child(Node::Rectangle(b), parent.clone());
 
     // Diagonal band (thin rotated rectangle)
@@ -49,7 +49,7 @@ fn build_demo_content(
         height: band_h,
     };
     band.corner_radius = RectangularCornerRadius::circular(8.0);
-    band.set_fill(CGColor(60, 179, 113, 200).into());
+    band.set_fill(CGColor::from_rgba(60, 179, 113, 200).into());
     let band_id = graph.append_child(Node::Rectangle(band), parent.clone());
 
     vec![a_id, b_id, band_id]
@@ -71,7 +71,7 @@ fn build_geometry_mask(
         width: radius * 2.0,
         height: radius * 2.0,
     };
-    mask.set_fill(CGColor(0, 0, 0, 255).into());
+    mask.set_fill(CGColor::BLACK.into());
     mask.mask = Some(LayerMaskType::Geometry);
     graph.append_child(Node::Ellipse(mask), parent)
 }
@@ -97,11 +97,11 @@ fn build_alpha_mask(
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: CGColor(128, 128, 128, 255),
+                color: CGColor::from_rgba(128, 128, 128, 255),
             },
             GradientStop {
                 offset: 1.0,
-                color: CGColor(128, 128, 128, 0),
+                color: CGColor::from_rgba(128, 128, 128, 0),
             },
         ],
         opacity: 1.0,
@@ -134,11 +134,11 @@ fn build_luminance_mask(
         stops: vec![
             GradientStop {
                 offset: 0.0,
-                color: CGColor(220, 220, 220, 255),
+                color: CGColor::from_rgba(220, 220, 220, 255),
             },
             GradientStop {
                 offset: 1.0,
-                color: CGColor(40, 40, 40, 255),
+                color: CGColor::from_rgba(40, 40, 40, 255),
             },
         ],
         opacity: 1.0,
@@ -161,7 +161,7 @@ async fn demo_mask_panels() -> Scene {
     root.layout_dimensions.width = Some(width);
     root.layout_dimensions.height = Some(height);
     root.clip = false;
-    root.set_fill(CGColor(255, 255, 255, 255).into());
+    root.set_fill(CGColor::WHITE.into());
 
     let root_id = graph.append_child(Node::Container(root), Parent::Root);
 
@@ -187,7 +187,7 @@ async fn demo_mask_panels() -> Scene {
         panel.layout_dimensions.width = Some(panel_w);
         panel.layout_dimensions.height = Some(panel_h);
         panel.corner_radius = RectangularCornerRadius::circular(6.0);
-        panel.set_fill(CGColor(245, 245, 245, 255).into());
+        panel.set_fill(CGColor::from_rgba(245, 245, 245, 255).into());
 
         // Add panel to root first
         let panel_id = graph.append_child(Node::Container(panel), Parent::NodeId(root_id.clone()));

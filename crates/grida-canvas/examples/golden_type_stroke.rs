@@ -20,7 +20,7 @@ async fn scene() -> Scene {
         text_align_vertical: TextAlignVertical::Top,
         max_lines: None,
         ellipsis: None,
-        fills: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
+        fills: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]),
         strokes: Paints::new([Paint::from(CGColor::GREEN)]),
         stroke_width: 2.0,
         stroke_align: StrokeAlign::Outside,
@@ -43,7 +43,7 @@ async fn scene() -> Scene {
         text_align_vertical: TextAlignVertical::Top,
         max_lines: None,
         ellipsis: None,
-        fills: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
+        fills: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]),
         strokes: Paints::new([Paint::from(CGColor::GREEN)]),
         stroke_width: 2.0,
         stroke_align: StrokeAlign::Center,
@@ -66,7 +66,7 @@ async fn scene() -> Scene {
         text_align_vertical: TextAlignVertical::Top,
         max_lines: None,
         ellipsis: None,
-        fills: Paints::new([Paint::from(CGColor(0, 0, 0, 255))]),
+        fills: Paints::new([Paint::from(CGColor::from_rgba(0, 0, 0, 255))]),
         strokes: Paints::new([Paint::from(CGColor::GREEN)]),
         stroke_width: 2.0,
         stroke_align: StrokeAlign::Inside,
@@ -90,7 +90,7 @@ async fn scene() -> Scene {
     Scene {
         name: "type stroke".into(),
         graph,
-        background_color: Some(CGColor(255, 255, 255, 255)),
+        background_color: Some(CGColor::from_rgba(255, 255, 255, 255)),
     }
 }
 

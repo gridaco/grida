@@ -21,8 +21,8 @@ impl NodeFactory {
         height: 100.0,
     };
 
-    const DEFAULT_COLOR: CGColor = CGColor(255, 255, 255, 255);
-    const DEFAULT_STROKE_COLOR: CGColor = CGColor(0, 0, 0, 255);
+    const DEFAULT_COLOR: CGColor = CGColor::from_rgba(255, 255, 255, 255);
+    const DEFAULT_STROKE_COLOR: CGColor = CGColor::from_rgba(0, 0, 0, 255);
     const DEFAULT_STROKE_WIDTH: f32 = 1.0;
     const DEFAULT_STROKE_ALIGN: StrokeAlign = StrokeAlign::Inside;
     const DEFAULT_OPACITY: f32 = 1.0;

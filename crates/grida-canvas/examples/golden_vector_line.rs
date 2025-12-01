@@ -38,7 +38,7 @@ fn main() {
         let red = (255.0 * (1.0 - normalized_angle)) as u8;
         let green = (255.0 * normalized_angle) as u8;
         let blue = 0u8;
-        let color = CGColor(red, green, blue, 255);
+        let color = CGColor::from_rgba(red, green, blue, 255);
 
         // Create stroke options for VNPainter
         // Every 2nd line gets a dash pattern

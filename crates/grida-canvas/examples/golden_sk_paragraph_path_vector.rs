@@ -190,7 +190,7 @@ fn scenario_geist(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             Slant::Upright,
         ));
         text_style.set_font_families(&["Geist"]);
-        let CGColor(r, g, b, _) = color;
+        let CGColor { r, g, b, .. } = color;
         text_style.set_color(Color::from_argb(255, r, g, b));
         builder.push_style(&text_style);
         builder.add_text(&format!("Geist {} - Typography Excellence", label));
@@ -281,7 +281,7 @@ fn scenario_roboto_flex(canvas: &sk::Canvas, y_offset: f32) -> f32 {
         text_style.set_font_size(42.0);
         text_style.set_font_style(skia_safe::FontStyle::new(weight, width, slant));
         text_style.set_font_families(&["Roboto Flex"]);
-        let CGColor(r, g, b, _) = color;
+        let CGColor { r, g, b, .. } = color;
         text_style.set_color(Color::from_argb(255, r, g, b));
         builder.push_style(&text_style);
         builder.add_text(&format!("Roboto Flex {} - Flexible Typography", label));
@@ -388,7 +388,7 @@ fn scenario_multiscript(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             Width::NORMAL,
             Slant::Upright,
         ));
-        let CGColor(r, g, b, _) = color;
+        let CGColor { r, g, b, .. } = color;
         text_style.set_color(Color::from_argb(255, r, g, b));
         text_style.set_font_families(&["Noto Sans", "Noto Sans JP", "Noto Color Emoji"]);
         builder.push_style(&text_style);
@@ -469,7 +469,7 @@ fn scenario_variable_fonts(canvas: &sk::Canvas, y_offset: f32) -> f32 {
             Width::NORMAL,
             Slant::Upright,
         ));
-        let CGColor(r, g, b, _) = color;
+        let CGColor { r, g, b, .. } = color;
         text_style.set_color(Color::from_argb(255, r, g, b));
         builder.push_style(&text_style);
         builder.add_text(text);

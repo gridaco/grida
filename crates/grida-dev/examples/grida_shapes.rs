@@ -32,7 +32,7 @@ async fn demo_shapes() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::circular(0.0 + (i as f32 * 8.0)); // 0 to 72
-        rect.set_fill(Paint::from(CGColor(
+        rect.set_fill(Paint::from(CGColor::from_rgba(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
@@ -52,7 +52,7 @@ async fn demo_shapes() -> Scene {
             width: base_size * (1.0 + (i as f32 * 0.1)), // 1.0x to 1.9x width
             height: base_size,
         };
-        ellipse.fills = Paints::new([Paint::from(CGColor(
+        ellipse.fills = Paints::new([Paint::from(CGColor::from_rgba(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
@@ -82,7 +82,7 @@ async fn demo_shapes() -> Scene {
         polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         polygon.points = points;
         polygon.corner_radius = 8.0;
-        polygon.fills = Paints::new([Paint::from(CGColor(
+        polygon.fills = Paints::new([Paint::from(CGColor::from_rgba(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
@@ -103,7 +103,7 @@ async fn demo_shapes() -> Scene {
             height: base_size,
         };
         regular_polygon.point_count = 3 + i; // 3 to 12 points
-        regular_polygon.fills = Paints::new([Paint::from(CGColor(
+        regular_polygon.fills = Paints::new([Paint::from(CGColor::from_rgba(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
@@ -133,7 +133,7 @@ async fn demo_shapes() -> Scene {
         let mut path = nf.create_path_node();
         path.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         path.data = data.to_string();
-        path.fills = Paints::new([Paint::from(CGColor(
+        path.fills = Paints::new([Paint::from(CGColor::from_rgba(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
@@ -152,7 +152,7 @@ async fn demo_shapes() -> Scene {
         };
         star.point_count = 3 + i; // 3 to 12 points
         star.inner_radius = 0.7 - (i as f32 * 0.05); // 0.3 to 0.75 inner radius
-        star.fills = Paints::new([Paint::from(CGColor(
+        star.fills = Paints::new([Paint::from(CGColor::from_rgba(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
@@ -176,7 +176,7 @@ async fn demo_shapes() -> Scene {
         arc.start_angle = 0.0;
         arc.angle = Some(45.0 + (i as f32 * 31.5)); // 45 to 360 degrees
         arc.inner_radius = Some(0.3); // Fixed inner radius for visibility
-        arc.fills = Paints::new([Paint::from(CGColor(
+        arc.fills = Paints::new([Paint::from(CGColor::from_rgba(
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
             200 - (i * 20) as u8,
@@ -192,7 +192,7 @@ async fn demo_shapes() -> Scene {
     Scene {
         name: "Shapes Demo".to_string(),
         graph,
-        background_color: Some(CGColor(250, 250, 250, 255)),
+        background_color: Some(CGColor::from_rgba(250, 250, 250, 255)),
     }
 }
 
