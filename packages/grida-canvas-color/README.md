@@ -7,6 +7,15 @@ Zero-cost\* type-safe color authoring and parsing library.
 import kolor from "@grida/color";
 ```
 
+## Features
+
+- **Zero-cost**: No runtime validation, pure TypeScript types
+- **Type-safe**: Branded types prevent mixing incompatible color formats
+- **Convenient**: Helper functions for common operations (`fromHEX`, `newRGB888A32F`, etc.)
+- **Color parsing**: Parse hex, rgb, hsl, named colors, and more
+- **Color names**: Access to CSS color names mapping
+- **Zero-dependency**: No external dependencies
+
 ## Problem
 
 TypeScript can't distinguish between color formats with different component ranges when they share the same structure:
@@ -48,10 +57,32 @@ processColor(color1); // ✅ Works
 processColor(color2); // ❌ TypeScript error!
 ```
 
-## Features
+## Color Parsing
 
-- **Zero-cost**: No runtime validation, pure TypeScript types
-- **Type-safe**: Branded types prevent mixing incompatible color formats
-- **Convenient**: Helper functions for common operations (`fromHEX`, `newRGB888A32F`, etc.)
+Parse various color formats (hex, rgb, hsl, named colors, etc.):
+
+```ts
+import kolor from "@grida/color";
+
+// Parse any color string
+const parsed = kolor.parse("#ff0000");
+// { space: "rgb", values: [255, 0, 0], alpha: 1 }
+
+kolor.parse("rgb(255, 0, 0)");
+kolor.parse("hsl(0, 100%, 50%)");
+kolor.parse("blue");
+```
+
+## Color Names
+
+Access CSS color names mapping:
+
+```ts
+import kolor from "@grida/color";
+
+kolor.names["red"]; // [255, 0, 0]
+kolor.names["blue"]; // [0, 0, 255]
+kolor.names["lime"]; // [0, 255, 0]
+```
 
 \* Zero-cost at runtime. Type checking happens at compile time.

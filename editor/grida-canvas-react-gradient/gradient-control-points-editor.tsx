@@ -11,6 +11,7 @@ import {
   type ControlPoints,
 } from "./gradient-reducer";
 import type cg from "@grida/cg";
+import kolor from "@grida/color";
 import StopMarker from "./components/gradient-color-stop-marker";
 import ControlPoint from "./components/control-point";
 
@@ -30,8 +31,8 @@ import ControlPoint from "./components/control-point";
  * ```tsx
  * <GradientControlPointsEditor
  *   stops={[
- *     { offset: 0, color: { r: 255, g: 0, b: 0, a: 1 } },
- *     { offset: 1, color: { r: 0, g: 0, b: 255, a: 1 } }
+ *     { offset: 0, color: BLACK },
+ *     { offset: 1, color: WHITE }
  *   ]}
  *   focusedStop={null}
  *   points={[
@@ -100,11 +101,6 @@ export interface GradientControlPointsEditorProps {
 }
 
 const STOP_SIZE = 18;
-
-// Helper function to convert RGBA8888 to CSS rgba string
-const rgbaToString = (color: cg.RGB888A32F) => {
-  return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
-};
 
 export default function GradientControlPointsEditor({
   stops,
@@ -610,7 +606,7 @@ export default function GradientControlPointsEditor({
             x={x}
             y={y}
             transform={`translate(-50%, -50%) rotate(${rotation}deg)`}
-            color={rgbaToString(stop.color)}
+            color={kolor.colorformats.RGB888A32F.intoCSSRGBA(stop.color)}
             selected={focusedStop === index}
             readonly={readonly}
             tabIndex={0}

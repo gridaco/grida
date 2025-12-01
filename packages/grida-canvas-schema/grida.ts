@@ -471,18 +471,18 @@ export namespace grida {
         youtube: YoutubeVideoSource;
         vimeo: VimeoVideoSource;
         facebook: FacebookVideoSource;
-        rgba: RGBA;
+        rgba: RGBA32F;
       };
 
-      export type Object = Richtext | RGBA | Source | VideoPlayerSource;
+      export type Object = Richtext | RGBA32F | Source | VideoPlayerSource;
 
       export type Richtext = {
         type: "richtext";
         html: string;
       };
 
-      export type RGBA = {
-        type: "rgba";
+      export type RGBA32F = {
+        type: "rgbaf";
         r: number;
         g: number;
         b: number;

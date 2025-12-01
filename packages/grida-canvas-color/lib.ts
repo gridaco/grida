@@ -1,9 +1,11 @@
-import colorparse from "color-parse";
-import colorname from "color-name";
+import colorparse from "./color-parse";
+import colorname from "./color-name";
 
 export namespace color {
-  export const parse = colorparse;
-  export const names = colorname;
+  export function parse(cstr: string | number) {
+    return colorparse(cstr);
+  }
+  export const names: typeof colorname = colorname;
 
   export namespace colorformats {
     /**

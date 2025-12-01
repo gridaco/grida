@@ -14,19 +14,13 @@
   ],
   "scripts": {
     "dev": "tsup index.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts --format cjs,esm --dts"
+    "build": "tsup index.ts --format cjs,esm --dts",
+    "test": "jest"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
-  ],
-  "dependencies": {
-    "color-name": "^2.1.0",
-    "color-parse": "^2.0.2"
-  },
-  "devDependencies": {
-    "@types/color-name": "^2.0.0"
-  }
+  ]
 }

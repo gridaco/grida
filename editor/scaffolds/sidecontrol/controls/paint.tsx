@@ -99,7 +99,7 @@ function getNextPaintForType(
               {
                 offset: 1,
                 // TODO: darken second color based on the first color
-                color: { r: 255, g: 255, b: 255, a: 1 },
+                color: kolor.colorformats.RGB888A32F.WHITE,
               },
             ],
             blendMode: blendMode,
@@ -362,7 +362,7 @@ function ContextVariableColors({
   const schema = useSchema();
   const colors = Object.entries(schema?.properties ?? {}).filter(
     ([key, def]) => {
-      return def.type === "rgba";
+      return def.type === "rgbaf";
     }
   );
 

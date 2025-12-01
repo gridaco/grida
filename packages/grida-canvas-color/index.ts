@@ -1,3 +1,1 @@
-import { color } from "./lib";
-
-export default color;
+export { color as default } from "./lib";
