@@ -48,7 +48,7 @@ function createDocument(): grida.program.document.Document {
         constraints: { children: "multiple" },
         guides: [],
         edges: [],
-        backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
+        backgroundColor: null,
       },
       rect1: {
         id: "rect1",

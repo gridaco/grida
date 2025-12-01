@@ -662,7 +662,7 @@ export namespace grida.program.document {
     /**
      * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
      */
-    backgroundColor?: cg.RGBA8888 | null | undefined | "";
+    backgroundColor?: cg.RGBAf | null | undefined | "";
   }
 
   export interface Guide2D {

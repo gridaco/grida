@@ -16,7 +16,7 @@ const document: editor.state.IEditorStateInit = {
         type: "scene",
         active: true,
         locked: false,
-        backgroundColor: cmath.color.hex_to_rgba8888("#00000000"),
+        backgroundColor: cmath.colorformats.RGBA32F.TRANSPARENT,
         id: "main",
         name: "Main",
         constraints: { children: "multiple" },

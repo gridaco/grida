@@ -111,12 +111,9 @@ export function StandaloneSceneBackground({
   });
   const { backgroundColor, transform } = slice;
 
-  const [cssBackgroundColor, opacity] = useMemo(() => {
-    if (!backgroundColor) return [undefined, 1] as const;
-    const hex = cmath.colorformats.RGB888A32F.intoHEX(backgroundColor);
-    // const hex = cmath.color.rgba8888_to_hex(backgroundColor);
-    const opacity = backgroundColor.a;
-    return [hex, opacity] as const;
+  const cssBackgroundColor = useMemo(() => {
+    if (!backgroundColor) return undefined;
+    return cmath.colorformats.RGBA32F.intoCSSRGBA(backgroundColor);
   }, [backgroundColor]);
 
   const [visiblearea, { width, height }] = useMeasure();

@@ -5912,8 +5912,19 @@ namespace cmath {
     };
 
     export namespace RGBA32F {
+      export const TRANSPARENT: RGBA32F = { r: 0, g: 0, b: 0, a: 0 };
       export const BLACK: RGBA32F = { r: 0, g: 0, b: 0, a: 1 };
       export const WHITE: RGBA32F = { r: 1, g: 1, b: 1, a: 1 };
+
+      /**
+       * #F5F5F5
+       */
+      export const WHITESMOKE: RGBA32F = {
+        r: 245 / 255,
+        g: 245 / 255,
+        b: 245 / 255,
+        a: 1,
+      };
 
       export function intoHEX(color: RGBA32F): string {
         return RGBA8888.intoHEX(intoRGBA8888(color));

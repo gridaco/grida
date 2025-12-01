@@ -1,4 +1,5 @@
 import type { editor } from "@/grida-canvas";
+import cmath from "@grida/cmath";
 
 export namespace distro {
   export function snapshot_file_name() {
@@ -29,7 +30,7 @@ export namespace distro {
             constraints: {
               children: "multiple",
             },
-            backgroundColor: { r: 245, g: 245, b: 245, a: 1 },
+            backgroundColor: cmath.colorformats.RGBA32F.WHITESMOKE,
           },
         },
       },

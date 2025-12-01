@@ -576,7 +576,7 @@ pub struct JSONSceneNode {
     pub active: Option<bool>,
     pub locked: Option<bool>,
     #[serde(
-        with = "color_formats::object::RGB888A32F",
+        with = "color_formats::object::RGBA32F",
         rename = "backgroundColor",
         default
     )]
