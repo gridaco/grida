@@ -14,7 +14,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let tree = Tree::from_str(&html)?;
-    let verbose = tree.to_string(&WriteOptions::ResolveAllStyle { include_root: true })?;
+    let verbose = tree.to_string(&WriteOptions::ComputedValues {
+        include_root: (true),
+    })?;
     println!("{verbose}");
     Ok(())
 }

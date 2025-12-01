@@ -42,19 +42,19 @@ pub enum WriteOptions {
     /// Output the DOM as parsed, without mutating styles.
     Html { include_root: bool },
     /// Serialize with every computed property inlined into the `style` attribute.
-    ResolveAllStyle { include_root: bool },
+    ComputedValues { include_root: bool },
 }
 
 impl WriteOptions {
     fn include_root(&self) -> bool {
         match self {
             WriteOptions::Html { include_root } => *include_root,
-            WriteOptions::ResolveAllStyle { include_root } => *include_root,
+            WriteOptions::ComputedValues { include_root } => *include_root,
         }
     }
 
     fn inline_styles(&self) -> bool {
-        matches!(self, WriteOptions::ResolveAllStyle { .. })
+        matches!(self, WriteOptions::ComputedValues { .. })
     }
 }
 

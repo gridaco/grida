@@ -768,12 +768,16 @@ checksum = "43da5946c66ffcc7745f48db692ffbb10a83bfe0afd96235c5c2a4fb23994929"
 name = "csscascade"
 version = "0.0.0"
 dependencies = [
+ "atomic_refcell",
  "cssparser",
  "euclid",
  "html5ever",
  "markup5ever",
- "selectors 0.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "selectors",
  "stylo",
+ "stylo_atoms",
+ "stylo_dom",
+ "stylo_traits",
  "tendril",
  "url",
 ]
@@ -3705,25 +3709,6 @@ dependencies = [
 [[package]]
 name = "selectors"
 version = "0.33.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "feef350c36147532e1b79ea5c1f3791373e61cbd9a6a2615413b3807bb164fb7"
-dependencies = [
- "bitflags 2.9.1",
- "cssparser",
- "derive_more",
- "log",
- "new_debug_unreachable",
- "phf",
- "phf_codegen",
- "precomputed-hash",
- "rustc-hash",
- "servo_arc 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "smallvec",
-]
-
-[[package]]
-name = "selectors"
-version = "0.33.0"
 source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "bitflags 2.9.1",
@@ -3735,7 +3720,7 @@ dependencies = [
  "phf_codegen",
  "precomputed-hash",
  "rustc-hash",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
+ "servo_arc",
  "smallvec",
  "to_shmem",
  "to_shmem_derive",
@@ -3852,15 +3837,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "servo_arc"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "170fb83ab34de17dc69aa7c67482b22218ddb85da56546f9bd6b929e32a05930"
-dependencies = [
- "stable_deref_trait",
 ]
 
 [[package]]
@@ -4108,9 +4084,9 @@ dependencies = [
  "rayon",
  "rayon-core",
  "rustc-hash",
- "selectors 0.33.0 (git+https://github.com/gridaco/stylo)",
+ "selectors",
  "serde",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
+ "servo_arc",
  "smallbitvec",
  "smallvec",
  "static_assertions",
@@ -4175,8 +4151,8 @@ dependencies = [
  "app_units",
  "cssparser",
  "euclid",
- "selectors 0.33.0 (git+https://github.com/gridaco/stylo)",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
+ "selectors",
+ "servo_arc",
  "smallbitvec",
  "smallvec",
  "string_cache",
@@ -4199,9 +4175,9 @@ dependencies = [
  "cssparser",
  "euclid",
  "malloc_size_of_derive",
- "selectors 0.33.0 (git+https://github.com/gridaco/stylo)",
+ "selectors",
  "serde",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
+ "servo_arc",
  "stylo_atoms",
  "stylo_malloc_size_of",
  "thin-vec",
@@ -4501,7 +4477,7 @@ version = "0.3.0"
 source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
 dependencies = [
  "cssparser",
- "servo_arc 0.4.3 (git+https://github.com/gridaco/stylo)",
+ "servo_arc",
  "smallbitvec",
  "smallvec",
  "string_cache",
