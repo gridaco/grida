@@ -25,7 +25,7 @@ import {
 import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import type cg from "@grida/cg";
-import { RGBAColorControl } from "./controls/color";
+import { RGB888A32FColorControl, RGBA32FColorControl } from "./controls/color";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +39,8 @@ function SceneBackgroundPropertyLine() {
 
   return (
     <PropertyLine>
-      <RGBAColorControl
+      <RGBA32FColorControl
+        variant="with-opacity"
         value={backgroundColor ? backgroundColor : undefined}
         onValueChange={(color) => {
           editor.commands.changeSceneBackground(scene_id, color);
@@ -357,7 +358,7 @@ function PropertyDefinitionValueInput<T = unknown>({
       );
     case "rgba":
       return (
-        <RGBAColorControl
+        <RGB888A32FColorControl
           value={value as cg.RGBA8888}
           onValueChange={(v) => onValueChange(v as unknown as T)}
         />

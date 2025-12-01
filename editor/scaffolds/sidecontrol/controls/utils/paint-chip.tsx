@@ -4,6 +4,7 @@ import type cg from "@grida/cg";
 import { cn } from "@/components/lib/utils";
 import { ImageView } from "@/grida-canvas-react";
 import { ComponentProps } from "react";
+import cmath from "@grida/cmath";
 
 function ChipContainer({ className, ...props }: ComponentProps<"div">) {
   return (
@@ -26,7 +27,7 @@ export function PaintChip({
 }) {
   switch (paint.type) {
     case "solid":
-      return <RGBAChip rgba={paint.color} className={className} />;
+      return <RGB888A32FChip rgba={paint.color} className={className} />;
     case "linear_gradient":
       return <LinearGradientPaintChip paint={paint} className={className} />;
     case "radial_gradient":
@@ -40,7 +41,11 @@ export function PaintChip({
   }
 }
 
-export function RGBAChip({
+/**
+ * @deprecated DEPRECATED_COLOR_MODEL
+ * use {@link RGBChip} instead
+ */
+export function RGB888A32FChip({
   rgba,
   className,
 }: {
@@ -53,6 +58,46 @@ export function RGBAChip({
         className="absolute w-full h-full z-10"
         style={{
           backgroundColor: css.toRGBAString(rgba),
+        }}
+      />
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
+    </ChipContainer>
+  );
+}
+
+/**
+ * Displays a small swatch for arbitrary RGB color data with configurable unit
+ * precision and alpha value.
+ *
+ * @param rgb - Raw RGB `{r, g, b}` in the provided component format.
+ * @param unit - Declares how each component in `rgb` is encoded (`f32`: 0.0-1.0, `u8`: 0-255, etc.).
+ * @param opacity - Final alpha in 0-1 range, applied independently of `unit`.
+ * @param className - Optional utility classes forwarded to the chip container.
+ */
+export function RGBChip({
+  rgb,
+  unit,
+  opacity,
+  className,
+}: {
+  rgb: cmath.colorformats.RGB_UNKNOWN;
+  /**
+   * the format of the rgb values
+   */
+  unit: cmath.colorformats.ColorComponentFormat;
+  /**
+   * 0.0-1.0 (independent of unit)
+   */
+  opacity: number;
+  className?: string;
+}) {
+  return (
+    <ChipContainer className={className}>
+      <div
+        className="absolute w-full h-full z-10"
+        style={{
+          backgroundColor: cmath.colorformats.intoCSSRGB(rgb, unit),
+          opacity: opacity,
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-0" />

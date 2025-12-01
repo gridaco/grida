@@ -5746,16 +5746,6 @@ namespace cmath {
    */
   export namespace color {
     /**
-     * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
-     */
-    export type TRGBA = {
-      r: number;
-      g: number;
-      b: number;
-      a: number;
-    };
-
-    /**
      * Floating-Point RGBA (Normalized RGBA)
      * Used in computer graphics pipelines, shading, and rendering.
      */
@@ -5850,6 +5840,24 @@ namespace cmath {
   }
 
   export namespace colorformats {
+    export type ColorComponentFormat = "u8" | "f32";
+
+    export type RGB_UNKNOWN = {
+      r: number;
+      g: number;
+      b: number;
+    };
+
+    /**
+     * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
+     */
+    export type RGBA_UNKNOWN = {
+      r: number;
+      g: number;
+      b: number;
+      a: number;
+    };
+
     export type RGBA32F = {
       /**
        * 0.0-1.0
@@ -5910,6 +5918,18 @@ namespace cmath {
        */
       a: number;
     };
+
+    export function intoCSSRGB(
+      color: RGB_UNKNOWN,
+      unit: ColorComponentFormat
+    ): string {
+      if (unit === "u8") {
+        return `rgb(${color.r}, ${color.g}, ${color.b})`;
+      } else if (unit === "f32") {
+        return `rgb(${color.r * 255}, ${color.g * 255}, ${color.b * 255})`;
+      }
+      throw new Error(`Invalid unit: ${unit}`);
+    }
 
     export namespace RGBA32F {
       export const TRANSPARENT: RGBA32F = { r: 0, g: 0, b: 0, a: 0 };

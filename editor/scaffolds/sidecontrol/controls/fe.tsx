@@ -27,7 +27,7 @@ import {
   ShadowOuterIcon,
   ShadowInnerIcon,
 } from "@radix-ui/react-icons";
-import { RGBAColorControl } from "./color";
+import { RGB888A32FColorControl } from "./color";
 import { editor } from "@/grida-canvas";
 import { Button } from "@/components/ui-editor/button";
 import { Checkbox } from "@/components/ui-editor/checkbox";
@@ -546,7 +546,7 @@ function FeShadowProperties({
       </PropertyLine>
       <PropertyLine>
         <PropertyLineLabel>Color</PropertyLineLabel>
-        <RGBAColorControl
+        <RGB888A32FColorControl
           value={value.color}
           onValueChange={(v) => onValueChange?.({ ...value, color: v })}
         />
@@ -843,7 +843,7 @@ function FeNoiseProperties({
       {value.mode === "mono" && value.color && (
         <PropertyLine>
           <PropertyLineLabel>Color</PropertyLineLabel>
-          <RGBAColorControl
+          <RGB888A32FColorControl
             variant="with-opacity"
             value={value.color}
             onValueChange={(v) => onValueChange?.({ ...value, color: v })}
@@ -854,12 +854,12 @@ function FeNoiseProperties({
         <PropertyLine>
           <PropertyLineLabel>Colors</PropertyLineLabel>
           <div className="flex flex-col gap-2 w-full">
-            <RGBAColorControl
+            <RGB888A32FColorControl
               variant="with-opacity"
               value={value.color1 ?? { r: 255, g: 0, b: 0, a: 1 }}
               onValueChange={(v) => onValueChange?.({ ...value, color1: v })}
             />
-            <RGBAColorControl
+            <RGB888A32FColorControl
               variant="with-opacity"
               value={value.color2 ?? { r: 255, g: 255, b: 255, a: 0.25 }}
               onValueChange={(v) => onValueChange?.({ ...value, color2: v })}

@@ -23,7 +23,7 @@ import {
 } from "./icons/paint-icon";
 import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
-import HexValueInput from "./utils/hex";
+import RGBHexInput from "./utils/hex";
 import { ColorPicker } from "./color-picker";
 import cmath from "@grida/cmath";
 import { Button } from "@/components/ui-editor/button";
@@ -523,7 +523,7 @@ function SolidPaintTrigger({
       <PopoverTrigger className="flex-shrink-0">
         <PaintChip paint={value} className="rounded-sm" />
       </PopoverTrigger>
-      <HexValueInput
+      <RGBHexInput
         className="flex-1 px-1.5"
         value={{
           r: value.color.r,

@@ -2,25 +2,33 @@ import React from "react";
 import {
   useHexValueInput,
   type RGB,
-  type RGBA,
+  type RGBUnit,
 } from "@grida/number-input/react";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 
-type HexValueInputProps<T extends RGB | RGBA> = Omit<
+type HexValueInputProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   "value" | "onChange"
 > & {
-  value: T;
-  onValueChange?: (color: T) => void;
+  value: RGB;
+  unit?: RGBUnit;
+  onValueChange?: (color: RGB) => void;
 };
 
-function HexValueInputInner<T extends RGB | RGBA>(
-  { className, value, onValueChange, onFocus, ...props }: HexValueInputProps<T>,
+function RGBHexInputInner(
+  {
+    className,
+    value,
+    unit = "u8",
+    onValueChange,
+    onFocus,
+    ...props
+  }: HexValueInputProps,
   ref: React.Ref<HTMLInputElement>
 ) {
   const { inputRef, hex, handleKeyDown, handleChange, handleFocus } =
-    useHexValueInput<T>({ value, onValueChange });
+    useHexValueInput({ value, unit, onValueChange });
 
   const mergeRefs = React.useCallback(
     (node: HTMLInputElement) => {
@@ -51,6 +59,6 @@ function HexValueInputInner<T extends RGB | RGBA>(
   );
 }
 
-const HexValueInput = React.forwardRef(HexValueInputInner);
+const RGBHexInput = React.forwardRef(RGBHexInputInner);
 
-export default HexValueInput;
+export default RGBHexInput;

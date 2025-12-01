@@ -1,5 +1,5 @@
 import React from "react";
-import HexValueInput from "./utils/hex";
+import RGBHexInput from "./utils/hex";
 import { RgbaColorPicker as RGB888A32FColorPicker } from "react-colorful";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
@@ -72,7 +72,7 @@ function ColorPickerBase({
               })
             )}
           >
-            <HexValueInput
+            <RGBHexInput
               className="border-none outline-none w-full h-full ps-2 text-xs"
               value={{
                 r: color.r,
@@ -165,7 +165,7 @@ export function ColorPicker({
               })
             )}
           >
-            <HexValueInput
+            <RGBHexInput
               className="border-none outline-none w-full h-full ps-2 text-xs"
               value={{
                 r: color.r,

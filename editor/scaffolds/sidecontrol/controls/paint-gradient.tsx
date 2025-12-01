@@ -1,5 +1,5 @@
 import type cg from "@grida/cg";
-import { RGBAColorControl } from "./color";
+import { RGB888A32FColorControl } from "./color";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { GradientStopsSlider } from "@/grida-canvas-react-gradient/gradient-stops-slider";
 import { Label } from "@/components/ui/label";
@@ -83,7 +83,7 @@ function GradientStop({
         className="flex-1"
       />
       <div className="flex-[2]">
-        <RGBAColorControl
+        <RGB888A32FColorControl
           value={stop.color}
           onValueChange={(color) => {
             onValueChange?.({ ...stop, color });
