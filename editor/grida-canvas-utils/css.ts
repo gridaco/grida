@@ -261,12 +261,12 @@ export namespace css {
     border: grida.program.css.Border
   ): Pick<React.CSSProperties, "borderStyle" | "borderColor" | "borderWidth"> {
     return {
-      borderStyle: border.borderStyle,
-      borderColor: toRGBAString(border.borderColor),
+      borderStyle: border.border_style,
+      borderColor: toRGBAString(border.border_color),
       borderWidth:
-        typeof border.borderWidth === "number"
-          ? border.borderWidth
-          : `${border.borderWidth.top}px ${border.borderWidth.right}px ${border.borderWidth.bottom}px ${border.borderWidth.left}px`,
+        typeof border.border_width === "number"
+          ? border.border_width
+          : `${border.border_width.top}px ${border.border_width.right}px ${border.border_width.bottom}px ${border.border_width.left}px`,
     };
   }
 

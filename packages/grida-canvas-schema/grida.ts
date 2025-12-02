@@ -1010,8 +1010,8 @@ export namespace grida.program.css {
    * - only `solid` `dashed` border is supported
    */
   export type Border = {
-    borderStyle: "none" | "solid" | "dashed";
-    borderColor: cg.RGBA32F;
+    border_style: "none" | "solid" | "dashed";
+    border_color: cg.RGBA32F;
     /**
      * @example
      * ```css
@@ -1020,7 +1020,7 @@ export namespace grida.program.css {
      * ```
      *
      */
-    borderWidth:
+    border_width:
       | number
       | {
           top: number;

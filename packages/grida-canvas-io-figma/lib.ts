@@ -368,9 +368,9 @@ export namespace iofigma {
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {
-                      borderWidth: strokeWeight ?? 0,
-                      borderColor: toSolidPaint(first_visible_stroke).color,
-                      borderStyle: "none",
+                      border_width: strokeWeight ?? 0,
+                      border_color: toSolidPaint(first_visible_stroke).color,
+                      border_style: "none",
                     }
                   : undefined,
 
@@ -454,9 +454,9 @@ export namespace iofigma {
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {
-                      borderWidth: strokeWeight ?? 0,
-                      borderColor: toSolidPaint(first_visible_stroke).color,
-                      borderStyle: strokeDashes ? "dashed" : "solid",
+                      border_width: strokeWeight ?? 0,
+                      border_color: toSolidPaint(first_visible_stroke).color,
+                      border_style: strokeDashes ? "dashed" : "solid",
                     }
                   : undefined,
 
@@ -610,9 +610,9 @@ export namespace iofigma {
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {
-                      borderWidth: strokeWeight ?? 0,
-                      borderColor: toSolidPaint(first_visible_stroke).color,
-                      borderStyle: strokeDashes ? "dashed" : "solid",
+                      border_width: strokeWeight ?? 0,
+                      border_color: toSolidPaint(first_visible_stroke).color,
+                      border_style: strokeDashes ? "dashed" : "solid",
                     }
                   : undefined,
               //
@@ -687,9 +687,9 @@ export namespace iofigma {
                 border:
                   first_visible_stroke?.type === "SOLID"
                     ? {
-                        borderWidth: strokeWeight ?? 0,
-                        borderColor: toSolidPaint(first_visible_stroke).color,
-                        borderStyle: strokeDashes ? "dashed" : "solid",
+                        border_width: strokeWeight ?? 0,
+                        border_color: toSolidPaint(first_visible_stroke).color,
+                        border_style: strokeDashes ? "dashed" : "solid",
                       }
                     : undefined,
                 //
