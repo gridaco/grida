@@ -2543,7 +2543,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.1-beta.2+20251201",
+      version: "0.0.3-beta+20251202",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -2705,7 +2705,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.0.1-beta.2+20251201",
+          version: "0.0.3-beta+20251202",
           document: payloadDocument,
         });
         surface.loadScene(p);

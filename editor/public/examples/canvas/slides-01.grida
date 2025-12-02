@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.2+20251201",
+  "version": "0.0.3-beta+20251202",
   "document": {
     "nodes": {
       "1": {
@@ -13,7 +13,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.96,
           "g": 0.96,
           "b": 0.96,
@@ -31,7 +31,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.96,
           "g": 0.96,
           "b": 0.96,
@@ -45,7 +45,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -66,7 +66,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "422:1967": {
         "id": "422:1967",
@@ -75,7 +75,7 @@
         "locked": true,
         "rotation": 0,
         "opacity": 0.20000000298023224,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "image",
         "src": "https://s3-alpha-sig.figma.com/img/7126/029c/b3aaa2ad36f9ef2ed47a54094e63527a?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=nvkC4xwQX1KZyTw1NH1hLrWkLi5fCbadEtJdK~Zw4L141iq0bH03PbglaOnYpGOMHmhKjag4IsTD2AXJezHzLiYrx1avcmUKhE7DcflBQCglmyPcqiShrtJciyfz5ps6H8l3Srd3lk4kEwixDG76yAREoTe4LJ4dNhS1Faw8A9pO2ZepfXMeL9~yzy~ijeYdeMF9pYG-fZDB9bc4CZYtSDJ6CgY1mTnu3Pcl~3h6WJvugQFXrC7qKVfUvr9NzZx6cTU-Vy3dsKDFT8XpBEYg-jgODsJn5SGBrBUbjUh7w1wHwz3Gw2607DfmD5O3ZqEEUvBgCg3PUtig96YoUSYQAA__",
         "position": "absolute",
@@ -83,7 +83,7 @@
         "top": 0,
         "width": 960,
         "height": 540,
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "fit": "cover",
         "style": {}
       },
@@ -94,7 +94,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "XYZ 스타트업 \n제품 론칭 디지털 캠페인",
         "position": "absolute",
@@ -114,14 +114,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.25,
-        "letterSpacing": 0,
-        "fontSize": 20,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.25,
+        "letter_spacing": 0,
+        "font_size": 20,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "422:1969": {
         "id": "422:1969",
@@ -130,7 +130,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "2022.01 - 2022.06",
         "position": "absolute",
@@ -150,14 +150,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.6059999084472656,
-        "letterSpacing": 0,
-        "fontSize": 10,
-        "fontFamily": "Pretendard",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.6059999084472656,
+        "letter_spacing": 0,
+        "font_size": 10,
+        "font_family": "Pretendard",
+        "font_weight": 500
       },
       "422:1970": {
         "id": "422:1970",
@@ -166,7 +166,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -186,7 +186,7 @@
         "style": {
           "padding": "1px 6px 1px 6px"
         },
-        "cornerRadius": 499.5
+        "corner_radius": 499.5
       },
       "422:1971": {
         "id": "422:1971",
@@ -195,7 +195,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "CASE 2",
         "position": "absolute",
@@ -213,14 +213,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "422:1972": {
         "id": "422:1972",
@@ -229,7 +229,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "XYZ 스타트업은 신제품인 기능성 음료를 출시하며 초기 고객층 확보를 목표로 디지털 캠페인을 기획했습니다. 기존 브랜드 인지도가 낮아 초기 고객 유치가 중요한 과제였으며, 제품의 기능성 및 트렌디함을 강조해야 했습니다.",
         "position": "absolute",
@@ -247,14 +247,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.65,
-        "letterSpacing": 0.1,
-        "fontSize": 10,
-        "fontFamily": "Pretendard",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.65,
+        "letter_spacing": 0.1,
+        "font_size": 10,
+        "font_family": "Pretendard",
+        "font_weight": 500
       },
       "422:1973": {
         "id": "422:1973",
@@ -263,7 +263,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -283,7 +283,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "right": 50.8046875
       },
       "422:2015": {
@@ -293,7 +293,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "image",
         "src": "https://s3-alpha-sig.figma.com/img/579e/a586/638fcd3addb03e7c0eeed0bd1293d302?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=nEtYEaifvPkisDLEtjNr4DGZrfsMthK-MJRtEpM6Dhdra84kN0aSj0ppj7YyE~qXSChXbJFvYPp2k4iJp7NEleF4WHfn0I-ZZ5bKsQC0FHeFKZVv5Hqvl-it6kocqILyoj9t8OH77acB3lHthGTQzertJaTr2zuPN5LTZgnyJ3FnOnMfShmzucqjRiKajjTGTebCILFKN6LwB4QSeY~aLpBtKbGNFhwDEVhNkozFVdT~mbwvJ2R-8jbQQtxaabOk4qZrgcqj6qX-5soAFCn7mcnD4Hts6uAcqfowyr14KEtBqqwfRXtnqbEQMYT4xKVzOQp5GWWCItbBoHRZjUJm7w__",
         "position": "absolute",
@@ -301,7 +301,7 @@
         "top": -13,
         "width": 280,
         "height": 350,
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "fit": "cover",
         "style": {}
       },
@@ -312,7 +312,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -321,20 +321,20 @@
         "width": 236,
         "height": 132,
         "border": {
-          "borderWidth": 1,
-          "borderColor": {
+          "border_width": 1,
+          "border_color": {
             "r": 0,
             "g": 0,
             "b": 0,
             "a": 1
           },
-          "borderStyle": "dashed"
+          "border_style": "dashed"
         },
         "style": {
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 20
+        "corner_radius": 20
       },
       "422:1975": {
         "id": "422:1975",
@@ -343,7 +343,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "트렌드 분석과 주요 경쟁사 분석을 통해 젊은 소비자들이 어떤 브랜드 이미지를 선호하는지 파악했습니다. 설문조사와 포커스 그룹 인터뷰를 통해 타겟 고객의 니즈를 확인했습니다.",
         "position": "absolute",
@@ -363,14 +363,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.5,
-        "letterSpacing": 0.11,
-        "fontSize": 11,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.5,
+        "letter_spacing": 0.11,
+        "font_size": 11,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "422:1976": {
         "id": "422:1976",
@@ -379,7 +379,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -399,7 +399,7 @@
         "style": {
           "padding": "1px 6px 1px 6px"
         },
-        "cornerRadius": 499.5
+        "corner_radius": 499.5
       },
       "422:1977": {
         "id": "422:1977",
@@ -408,7 +408,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "STRATEGY 1",
         "position": "absolute",
@@ -426,14 +426,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "422:1978": {
         "id": "422:1978",
@@ -442,7 +442,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -451,20 +451,20 @@
         "width": 236,
         "height": 132,
         "border": {
-          "borderWidth": 1,
-          "borderColor": {
+          "border_width": 1,
+          "border_color": {
             "r": 0,
             "g": 0,
             "b": 0,
             "a": 1
           },
-          "borderStyle": "dashed"
+          "border_style": "dashed"
         },
         "style": {
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 20
+        "corner_radius": 20
       },
       "422:1979": {
         "id": "422:1979",
@@ -473,7 +473,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "로고 및 패키지 디자인을 현대적이고 미니멀한 스타일로 재구성하여 트렌디한 이미지로 변화시키고, 이를 SNS에 노출했습니다.",
         "position": "absolute",
@@ -493,14 +493,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.5,
-        "letterSpacing": 0.11,
-        "fontSize": 11,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.5,
+        "letter_spacing": 0.11,
+        "font_size": 11,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "422:1980": {
         "id": "422:1980",
@@ -509,7 +509,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -529,7 +529,7 @@
         "style": {
           "padding": "1px 6px 1px 6px"
         },
-        "cornerRadius": 499.5
+        "corner_radius": 499.5
       },
       "422:1981": {
         "id": "422:1981",
@@ -538,7 +538,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "STRATEGY 2",
         "position": "absolute",
@@ -556,14 +556,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "422:1982": {
         "id": "422:1982",
@@ -572,7 +572,7 @@
         "locked": false,
         "rotation": 1.5707963705062848,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -581,7 +581,7 @@
         "width": 16.66666603088379,
         "height": 16.66666603088379,
         "style": {},
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "422:1983": {
         "id": "422:1983",
@@ -590,7 +590,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "svgpath",
         "position": "absolute",
         "left": 0,
@@ -609,7 +609,7 @@
         "paths": [
           {
             "d": "M16.6667 8.33333C16.6667 3.73333 12.9333 0 8.33333 0C3.73333 0 0 3.73333 0 8.33333C0 12.9333 3.73333 16.6667 8.33333 16.6667C12.9333 16.6667 16.6667 12.9333 16.6667 8.33333ZM8.33333 9.16667L5 9.16667L5 7.5L8.33333 7.5L8.33333 5L11.6667 8.33333L8.33333 11.6667L8.33333 9.16667Z",
-            "fillRule": "nonzero"
+            "fill_rule": "nonzero"
           }
         ]
       },
@@ -620,7 +620,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -641,7 +641,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 20
+        "corner_radius": 20
       },
       "422:1985": {
         "id": "422:1985",
@@ -650,7 +650,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "리브랜딩 방향을 설정하고, 데이터 기반의 시장 조사를 통해 핵심 메시지를 도출했습니다. 인스타그램 광고 캠페인을 설계하여 광고의 타겟팅과 고객 도달율을 최적화하는 역할을 맡았습니다. ",
         "position": "absolute",
@@ -670,14 +670,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.5,
-        "letterSpacing": 0.11,
-        "fontSize": 11,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.5,
+        "letter_spacing": 0.11,
+        "font_size": 11,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "422:1986": {
         "id": "422:1986",
@@ -686,7 +686,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -706,7 +706,7 @@
         "style": {
           "padding": "1px 6px 1px 6px"
         },
-        "cornerRadius": 499.5
+        "corner_radius": 499.5
       },
       "422:1987": {
         "id": "422:1987",
@@ -715,7 +715,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "PERFORMANCE",
         "position": "absolute",
@@ -733,14 +733,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "421:293": {
         "id": "421:293",
@@ -749,7 +749,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -770,7 +770,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "421:294": {
         "id": "421:294",
@@ -779,7 +779,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -800,11 +800,11 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": {
-          "topLeftRadius": 30,
-          "topRightRadius": 5,
-          "bottomRightRadius": 5,
-          "bottomLeftRadius": 5
+        "corner_radius": {
+          "top_left_radius": 30,
+          "top_right_radius": 5,
+          "bottom_right_radius": 5,
+          "bottom_left_radius": 5
         }
       },
       "421:295": {
@@ -814,7 +814,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "ABC 화장품 \n리브랜딩 캠페인",
         "position": "absolute",
@@ -834,14 +834,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 16,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 16,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "421:296": {
         "id": "421:296",
@@ -850,7 +850,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Case 1",
         "position": "absolute",
@@ -870,14 +870,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12.5,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12.5,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "421:297": {
         "id": "421:297",
@@ -886,7 +886,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "2022.01 - 2022.06",
         "position": "absolute",
@@ -906,14 +906,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.6059999084472656,
-        "letterSpacing": 0,
-        "fontSize": 10,
-        "fontFamily": "Pretendard",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.6059999084472656,
+        "letter_spacing": 0,
+        "font_size": 10,
+        "font_family": "Pretendard",
+        "font_weight": 500
       },
       "421:298": {
         "id": "421:298",
@@ -922,7 +922,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -943,7 +943,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 5
+        "corner_radius": 5
       },
       "421:299": {
         "id": "421:299",
@@ -952,7 +952,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "image",
         "src": "https://s3-alpha-sig.figma.com/img/506f/d6fc/5fea7fd595c785b552d7bc8d58fd9a65?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=glgjrjDQ8zkIU2AwIThGaut7Yj3410~dTDLuFgaG~OGlsYcMKsPoWLZuVdUMKwxr97AT5urYURm0iQmgS1MKrcGFRVXGPlO3p4mmerJRdmHqHph5l5cVzkIZDQwzeoCdoZaoNLm8vpWYfvIP5R26c8oBIJ85Ar9bfwEwTXvrVpPz6tZIoij8kTjYrzbiBQ3eeLjT5HDankHD3Wx0lPXckHfowcvl3WTcCy9eWKjyUY6IYdBLDQAkObO67J3ACvgXbhcsN7X2JvdmZsSQcPMchHCEMGiIrbtPX5NSj7aQDW026zL48~psBfjxnXmQOs1X6v2n2xd1iNE7OSG95jEZ5g__",
         "position": "absolute",
@@ -960,7 +960,7 @@
         "top": -74.5,
         "width": 175.5,
         "height": 254,
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "fit": "cover",
         "style": {}
       },
@@ -971,7 +971,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -992,11 +992,11 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": {
-          "topLeftRadius": 30,
-          "topRightRadius": 5,
-          "bottomRightRadius": 5,
-          "bottomLeftRadius": 5
+        "corner_radius": {
+          "top_left_radius": 30,
+          "top_right_radius": 5,
+          "bottom_right_radius": 5,
+          "bottom_left_radius": 5
         }
       },
       "421:301": {
@@ -1006,7 +1006,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "XYZ 스타트업 \n제품 론칭 디지털 캠페인",
         "position": "absolute",
@@ -1026,14 +1026,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 16,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 16,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "421:302": {
         "id": "421:302",
@@ -1042,7 +1042,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "2022.01 - 2022.06",
         "position": "absolute",
@@ -1062,14 +1062,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.6059999084472656,
-        "letterSpacing": 0,
-        "fontSize": 10,
-        "fontFamily": "Pretendard",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.6059999084472656,
+        "letter_spacing": 0,
+        "font_size": 10,
+        "font_family": "Pretendard",
+        "font_weight": 500
       },
       "421:303": {
         "id": "421:303",
@@ -1078,7 +1078,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1099,7 +1099,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 5
+        "corner_radius": 5
       },
       "421:304": {
         "id": "421:304",
@@ -1108,7 +1108,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "image",
         "src": "https://s3-alpha-sig.figma.com/img/579e/a586/638fcd3addb03e7c0eeed0bd1293d302?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=nEtYEaifvPkisDLEtjNr4DGZrfsMthK-MJRtEpM6Dhdra84kN0aSj0ppj7YyE~qXSChXbJFvYPp2k4iJp7NEleF4WHfn0I-ZZ5bKsQC0FHeFKZVv5Hqvl-it6kocqILyoj9t8OH77acB3lHthGTQzertJaTr2zuPN5LTZgnyJ3FnOnMfShmzucqjRiKajjTGTebCILFKN6LwB4QSeY~aLpBtKbGNFhwDEVhNkozFVdT~mbwvJ2R-8jbQQtxaabOk4qZrgcqj6qX-5soAFCn7mcnD4Hts6uAcqfowyr14KEtBqqwfRXtnqbEQMYT4xKVzOQp5GWWCItbBoHRZjUJm7w__",
         "position": "absolute",
@@ -1116,7 +1116,7 @@
         "top": -62.5,
         "width": 184,
         "height": 230,
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "fit": "cover",
         "style": {}
       },
@@ -1127,7 +1127,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Case 3",
         "position": "absolute",
@@ -1147,14 +1147,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12.5,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12.5,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "421:306": {
         "id": "421:306",
@@ -1163,7 +1163,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1184,11 +1184,11 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": {
-          "topLeftRadius": 30,
-          "topRightRadius": 5,
-          "bottomRightRadius": 5,
-          "bottomLeftRadius": 5
+        "corner_radius": {
+          "top_left_radius": 30,
+          "top_right_radius": 5,
+          "bottom_right_radius": 5,
+          "bottom_left_radius": 5
         }
       },
       "421:307": {
@@ -1198,7 +1198,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "DEF 식품 브랜드 \n‘건강한 간식’ 캠페인",
         "position": "absolute",
@@ -1218,14 +1218,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 16,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 16,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "421:308": {
         "id": "421:308",
@@ -1234,7 +1234,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "2022.01 - 2022.06",
         "position": "absolute",
@@ -1254,14 +1254,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.6059999084472656,
-        "letterSpacing": 0,
-        "fontSize": 10,
-        "fontFamily": "Pretendard",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.6059999084472656,
+        "letter_spacing": 0,
+        "font_size": 10,
+        "font_family": "Pretendard",
+        "font_weight": 500
       },
       "421:309": {
         "id": "421:309",
@@ -1270,7 +1270,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1291,7 +1291,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 5
+        "corner_radius": 5
       },
       "421:310": {
         "id": "421:310",
@@ -1300,7 +1300,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "image",
         "src": "https://s3-alpha-sig.figma.com/img/43b8/ba3a/178f5701a86515269063a4c2694ac6c8?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=DwN1t2BvIqop6zl-aGhNkJv6DIx8upRwV5OBdftLaa7d9k9P82xeslSPp4yTJVc9p9IirNtn8eg-eClvcD1yKV5OCOI2SBRbqIwXQBTOdntFY~TvIvlxNP8VKwqVElC~88TfzBypqP9ZHH1toGxi~MQwDIeTvLNXOImlrxS1-qhhak8xiLGiAZqXem4svC2orNY4V6rVDmLviRf6P7C-ge5QDctqVE4wz01cGHwJo~422QHZbTRwh7BwRarg84sZXLy3bwXm7prtGg7AYVO8t4j5uDkkHepbpf-sqRG3zF7eTRU1PzDt3NmLSCkG-WDn0Xb9Ky2A71YYC~7KsIdLmQ__",
         "position": "absolute",
@@ -1308,7 +1308,7 @@
         "top": -94.5,
         "width": 222,
         "height": 333,
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "fit": "cover",
         "style": {}
       },
@@ -1319,7 +1319,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Case 2",
         "position": "absolute",
@@ -1339,14 +1339,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12.5,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12.5,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "421:312": {
         "id": "421:312",
@@ -1355,7 +1355,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1366,7 +1366,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "421:313": {
         "id": "421:313",
@@ -1375,7 +1375,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Preview",
         "position": "absolute",
@@ -1393,14 +1393,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12.5,
-        "fontFamily": "Pretendard",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12.5,
+        "font_family": "Pretendard",
+        "font_weight": 500
       },
       "421:314": {
         "id": "421:314",
@@ -1409,7 +1409,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "/",
         "position": "absolute",
@@ -1427,14 +1427,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12.5,
-        "fontFamily": "Pretendard",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12.5,
+        "font_family": "Pretendard",
+        "font_weight": 500
       }
     },
     "links": {

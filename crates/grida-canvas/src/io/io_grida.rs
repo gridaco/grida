@@ -2175,15 +2175,15 @@ mod corner_radius_tests {
             "active": true,
             "locked": false,
             "opacity": 1.0,
-            "blendMode": "normal",
-            "zIndex": 0,
+            "blend_mode": "normal",
+            "z_index": 0,
             "position": "absolute",
             "left": 0,
             "top": 0,
             "rotation": 0,
             "width": 100,
             "height": 50,
-            "cornerRadius": [12, 8, 4, 2]
+            "corner_radius": [12, 8, 4, 2]
         });
 
         let props: JSONUnknownNodeProperties = serde_json::from_value(json_props).unwrap();
@@ -2222,10 +2222,10 @@ mod padding_tests {
     #[test]
     fn test_non_uniform_padding_deserialize() {
         let json = json!({
-            "paddingTop": 10.0,
-            "paddingRight": 20.0,
-            "paddingBottom": 30.0,
-            "paddingLeft": 40.0
+            "padding_top": 10.0,
+            "padding_right": 20.0,
+            "padding_bottom": 30.0,
+            "padding_left": 40.0
         });
         let padding: JSONPadding = serde_json::from_value(json).unwrap();
 
@@ -2245,8 +2245,8 @@ mod padding_tests {
             "active": true,
             "locked": false,
             "opacity": 1.0,
-            "blendMode": "normal",
-            "zIndex": 0,
+            "blend_mode": "normal",
+            "z_index": 0,
             "position": "absolute",
             "left": 0,
             "top": 0,
@@ -2276,8 +2276,8 @@ mod padding_tests {
             "active": true,
             "locked": false,
             "opacity": 1.0,
-            "blendMode": "normal",
-            "zIndex": 0,
+            "blend_mode": "normal",
+            "z_index": 0,
             "position": "absolute",
             "left": 0,
             "top": 0,
@@ -2285,10 +2285,10 @@ mod padding_tests {
             "width": 200,
             "height": 200,
             "padding": {
-                "paddingTop": 10.0,
-                "paddingRight": 15.0,
-                "paddingBottom": 20.0,
-                "paddingLeft": 25.0
+                "padding_top": 10.0,
+                "padding_right": 15.0,
+                "padding_bottom": 20.0,
+                "padding_left": 25.0
             },
             "layout": "flex"
         });
@@ -2312,8 +2312,8 @@ mod padding_tests {
             "active": true,
             "locked": false,
             "opacity": 1.0,
-            "blendMode": "normal",
-            "zIndex": 0,
+            "blend_mode": "normal",
+            "z_index": 0,
             "position": "absolute",
             "left": 0,
             "top": 0,
@@ -2678,7 +2678,7 @@ mod tests {
             "text": "Test",
             "left": 0,
             "top": 0,
-            "fontOpticalSizing": "auto"
+            "font_optical_sizing": "auto"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_auto).expect("Failed to parse 'auto'");
@@ -2695,7 +2695,7 @@ mod tests {
             "text": "Test",
             "left": 0,
             "top": 0,
-            "fontOpticalSizing": "none"
+            "font_optical_sizing": "none"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_none).expect("Failed to parse 'none'");
@@ -2712,7 +2712,7 @@ mod tests {
             "text": "Test",
             "left": 0,
             "top": 0,
-            "fontOpticalSizing": 16.5
+            "font_optical_sizing": 16.5
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_fixed).expect("Failed to parse numeric");
@@ -2732,7 +2732,7 @@ mod tests {
             "text": "Test",
             "left": 0,
             "top": 0,
-            "fontOpticalSizing": "invalid_value"
+            "font_optical_sizing": "invalid_value"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_invalid).expect("Failed to parse invalid");
@@ -2753,7 +2753,7 @@ mod tests {
             "text": "Text",
             "left": 100,
             "top": 100,
-            "fontOpticalSizing": "none"
+            "font_optical_sizing": "none"
         }"#;
 
         let node: JSONNode =
@@ -2772,7 +2772,7 @@ mod tests {
             "text": "Text",
             "left": 100,
             "top": 100,
-            "fontOpticalSizing": 16.5
+            "font_optical_sizing": 16.5
         }"#;
 
         let node: JSONNode =
@@ -2930,7 +2930,7 @@ mod tests {
             "top": 0.0,
             "width": 100.0,
             "height": 100.0,
-            "blendMode": "pass-through"
+            "blend_mode": "pass-through"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -2956,7 +2956,7 @@ mod tests {
             "top": 0.0,
             "width": 100.0,
             "height": 100.0,
-            "blendMode": "normal"
+            "blend_mode": "normal"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -2973,7 +2973,7 @@ mod tests {
     fn deserialize_paint_blend_mode_normal() {
         let json = r#"{
             "type": "solid",
-            "blendMode": "normal"
+            "blend_mode": "normal"
         }"#;
 
         let paint: JSONPaint =
@@ -2996,7 +2996,7 @@ mod tests {
             "top": 0.0,
             "width": 100.0,
             "height": 100.0,
-            "blendMode": "multiply"
+            "blend_mode": "multiply"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3164,7 +3164,7 @@ mod tests {
             "type": "scene",
             "active": true,
             "locked": false,
-            "backgroundColor": {"r": 245, "g": 245, "b": 245, "a": 1.0},
+            "background_color": {"r": 245, "g": 245, "b": 245, "a": 1.0},
             "constraints": {"children": "multiple"},
             "guides": [],
             "edges": []
@@ -3186,7 +3186,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.0.1-beta.2+20251201",
+            "version": "0.0.3-beta+20251202",
             "document": {
                 "nodes": {
                     "main": {
@@ -3195,7 +3195,7 @@ mod tests {
                         "type": "scene",
                         "active": true,
                         "locked": false,
-                        "backgroundColor": {"r": 245, "g": 245, "b": 245, "a": 1.0},
+                        "background_color": {"r": 245, "g": 245, "b": 245, "a": 1.0},
                         "constraints": {"children": "multiple"},
                         "guides": [],
                         "edges": []
@@ -3243,7 +3243,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.0.1-beta.2+20251201",
+            "version": "0.0.3-beta+20251202",
             "document": {
                 "nodes": {
                     "main": {
@@ -3252,7 +3252,7 @@ mod tests {
                         "type": "scene",
                         "active": true,
                         "locked": false,
-                        "backgroundColor": {"r": 255, "g": 255, "b": 255, "a": 1.0},
+                        "background_color": {"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0},
                         "constraints": {"children": "multiple"},
                         "guides": [],
                         "edges": []
@@ -3310,7 +3310,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.0.1-beta.2+20251201",
+            "version": "0.0.3-beta+20251202",
             "document": {
                 "nodes": {
                     "main": {
@@ -3319,7 +3319,7 @@ mod tests {
                         "type": "scene",
                         "active": true,
                         "locked": false,
-                        "backgroundColor": {"r": 255, "g": 255, "b": 255, "a": 1.0},
+                        "background_color": {"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0},
                         "constraints": {"children": "multiple"},
                         "guides": [],
                         "edges": []
@@ -3463,7 +3463,7 @@ mod tests {
             "top": 100.0,
             "width": 200.0,
             "height": 200.0,
-            "feBlur": {
+            "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
                     "type": "blur",
@@ -3504,7 +3504,7 @@ mod tests {
             "top": 100.0,
             "width": 200.0,
             "height": 400.0,
-            "feBlur": {
+            "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
                     "type": "progressive-blur",
@@ -3556,7 +3556,7 @@ mod tests {
             "top": 100.0,
             "width": 200.0,
             "height": 200.0,
-            "feBackdropBlur": {
+            "fe_backdrop_blur": {
                 "type": "backdrop-filter-blur",
                 "blur": {
                     "type": "blur",
@@ -3597,7 +3597,7 @@ mod tests {
             "top": 100.0,
             "width": 200.0,
             "height": 300.0,
-            "feBackdropBlur": {
+            "fe_backdrop_blur": {
                 "type": "backdrop-filter-blur",
                 "blur": {
                     "type": "progressive-blur",
@@ -3650,7 +3650,7 @@ mod tests {
             "top": 100.0,
             "width": 200.0,
             "height": "auto",
-            "feBlur": {
+            "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
                     "type": "blur",
@@ -3752,7 +3752,7 @@ mod tests {
             "top": 0.0,
             "width": 300.0,
             "height": 400.0,
-            "feBlur": {
+            "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
                     "type": "progressive-blur",
@@ -3764,7 +3764,7 @@ mod tests {
                     "radius2": 35.0
                 }
             },
-            "feBackdropBlur": {
+            "fe_backdrop_blur": {
                 "type": "backdrop-filter-blur",
                 "blur": {
                     "type": "blur",
@@ -3858,8 +3858,8 @@ mod tests {
             "height": 400.0,
             "layout": "flex",
             "direction": "horizontal",
-            "mainAxisAlignment": "space-between",
-            "crossAxisAlignment": "center"
+            "main_axis_alignment": "space-between",
+            "cross_axis_alignment": "center"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3943,8 +3943,8 @@ mod tests {
             "layout": "flex",
             "direction": "vertical",
             "padding": 15.0,
-            "mainAxisAlignment": "center",
-            "crossAxisAlignment": "stretch"
+            "main_axis_alignment": "center",
+            "cross_axis_alignment": "stretch"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3999,8 +3999,8 @@ mod tests {
             "width": 400.0,
             "height": 300.0,
             "layout": "flex",
-            "mainAxisGap": 20.0,
-            "crossAxisGap": 10.0
+            "main_axis_gap": 20.0,
+            "cross_axis_gap": 10.0
         }"#;
 
         let node: JSONNode =
@@ -4036,7 +4036,7 @@ mod tests {
             "width": 400.0,
             "height": 300.0,
             "layout": "flex",
-            "layoutWrap": "wrap"
+            "layout_wrap": "wrap"
         }"#;
 
         let node: JSONNode =
@@ -4065,7 +4065,7 @@ mod tests {
             "width": 400.0,
             "height": 300.0,
             "layout": "flex",
-            "layoutWrap": "nowrap"
+            "layout_wrap": "nowrap"
         }"#;
 
         let node: JSONNode =
@@ -4095,8 +4095,8 @@ mod tests {
             "top": 100.0,
             "width": 200.0,
             "height": 200.0,
-            "cornerRadius": 50.0,
-            "cornerSmoothing": 0.6
+            "corner_radius": 50.0,
+            "corner_smoothing": 0.6
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -4127,8 +4127,8 @@ mod tests {
             "top": 0.0,
             "width": 300.0,
             "height": 300.0,
-            "cornerRadius": 40.0,
-            "cornerSmoothing": 1.0
+            "corner_radius": 40.0,
+            "corner_smoothing": 1.0
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -4156,8 +4156,8 @@ mod tests {
             "top": 0.0,
             "width": 250.0,
             "height": 250.0,
-            "cornerRadius": 30.0,
-            "cornerSmoothing": 0.8
+            "corner_radius": 30.0,
+            "corner_smoothing": 0.8
         }"#;
 
         let node: JSONNode =
@@ -4191,12 +4191,12 @@ mod tests {
             "height": 500.0,
             "layout": "flex",
             "direction": "horizontal",
-            "layoutWrap": "wrap",
+            "layout_wrap": "wrap",
             "padding": 20.0,
-            "mainAxisGap": 30.0,
-            "crossAxisGap": 15.0,
-            "mainAxisAlignment": "space-between",
-            "crossAxisAlignment": "center"
+            "main_axis_gap": 30.0,
+            "cross_axis_gap": 15.0,
+            "main_axis_alignment": "space-between",
+            "cross_axis_alignment": "center"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)

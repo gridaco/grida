@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.2+20251201",
+  "version": "0.0.3-beta+20251202",
   "document": {
     "nodes": {
       "2": {
@@ -8,7 +8,7 @@
         "active": true,
         "locked": false,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "rotation": 0,
         "position": "absolute",
         "left": 85,
@@ -22,10 +22,10 @@
         "type": "vector",
         "active": true,
         "locked": false,
-        "zIndex": 0,
+        "z_index": 0,
         "rotation": 0,
         "position": "absolute",
-        "vectorNetwork": {
+        "vector_network": {
           "vertices": [
             [
               469.75,
@@ -380,7 +380,7 @@
         "height": 376,
         "left": 0,
         "top": 0,
-        "fillRule": "nonzero",
+        "fill_rule": "nonzero",
         "id": "3"
       },
       "9": {
@@ -392,7 +392,7 @@
         "top": 24,
         "left": 39,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "rotation": 0,
         "fill": {
           "type": "solid",
@@ -407,12 +407,12 @@
         "height": "auto",
         "style": {},
         "type": "text",
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "fontFamily": "Inter",
-        "fontWeight": 700,
-        "fontSize": 36,
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "font_family": "Inter",
+        "font_weight": 700,
+        "font_size": 36,
         "text": "Sketch & Describe your design"
       },
       "root": {
@@ -422,7 +422,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -442,7 +442,7 @@
         "style": {
           "overflow": "clip"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "001": {
         "type": "scene",
@@ -455,7 +455,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.96,
           "g": 0.96,
           "b": 0.96,

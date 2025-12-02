@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.2+20251201",
+  "version": "0.0.3-beta+20251202",
   "document": {
     "nodes": {
       "454:341": {
@@ -9,7 +9,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -30,7 +30,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "454:342": {
         "id": "454:342",
@@ -39,7 +39,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Hello World !",
         "position": "absolute",
@@ -59,14 +59,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 32,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 32,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "454:343": {
         "id": "454:343",
@@ -75,7 +75,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Welcome to Grida Canvas V0",
         "position": "absolute",
@@ -95,14 +95,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 16,
-        "fontFamily": "Pretendard",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 16,
+        "font_family": "Pretendard",
+        "font_weight": 400
       },
       "454:344": {
         "id": "454:344",
@@ -111,7 +111,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "image",
         "src": "https://s3-alpha-sig.figma.com/img/7f12/ea13/00756f144a0fb5daaf68dbfc01103a46?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=W9J8xSHlv8NW~UuDqEwA-R4bVDypjKIQSK9E49cV65WI4blhhFxjPJR9U1ZizlLWjctBB2Ji6KJxqPaHlaBi2ibfBx-QruQs5fFxFDk-lqrhv8Rvcfv2kR6tzy66T0NlHXzdgl0WrJr49s79cZAR8oGC0~dn5-OpeJ451wyZ0Hl7amFpgqJmZSOwdyZZYKPmoVx40DjFQuJremph8mr0K1yo6vVNb-dLlxPy4fEYKX2CR2bGj-RBy3cRIeOvM1t1kRrtDwy9~rvSpfNBHyKY9FeSENyAb0y3DIkX9c1K7pjU-Z67ECgzlJE8nEq56ThEQT9dOdnhV2M5qQWa3j7J6w__",
         "position": "absolute",
@@ -119,7 +119,7 @@
         "top": 67,
         "width": 140,
         "height": 140,
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "fit": "cover",
         "style": {}
       },
@@ -130,7 +130,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "rectangle",
         "position": "absolute",
         "left": 768,
@@ -162,7 +162,7 @@
           ]
         },
         "effects": [],
-        "cornerRadius": 40
+        "corner_radius": 40
       },
       "454:346": {
         "id": "454:346",
@@ -171,7 +171,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "ellipse",
         "position": "absolute",
         "left": 613,
@@ -200,7 +200,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.96,
           "g": 0.96,
           "b": 0.96,
