@@ -53,7 +53,7 @@ pub enum JSONPaint {
     Solid {
         #[serde(with = "color_formats::object::RGBA32F", default)]
         color: CGColor,
-        #[serde(rename = "blendMode", default)]
+        #[serde(rename = "blend_mode", alias = "blendMode", default)]
         blend_mode: BlendMode,
         #[serde(default = "default_active")]
         active: bool,
@@ -65,7 +65,7 @@ pub enum JSONPaint {
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(rename = "blendMode", default)]
+        #[serde(rename = "blend_mode", alias = "blendMode", default)]
         blend_mode: BlendMode,
         #[serde(default = "default_active")]
         active: bool,
@@ -77,7 +77,7 @@ pub enum JSONPaint {
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(rename = "blendMode", default)]
+        #[serde(rename = "blend_mode", alias = "blendMode", default)]
         blend_mode: BlendMode,
         #[serde(default = "default_active")]
         active: bool,
@@ -89,7 +89,7 @@ pub enum JSONPaint {
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(rename = "blendMode", default)]
+        #[serde(rename = "blend_mode", alias = "blendMode", default)]
         blend_mode: BlendMode,
         #[serde(default = "default_active")]
         active: bool,
@@ -101,7 +101,7 @@ pub enum JSONPaint {
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(rename = "blendMode", default)]
+        #[serde(rename = "blend_mode", alias = "blendMode", default)]
         blend_mode: BlendMode,
         #[serde(default = "default_active")]
         active: bool,
@@ -116,13 +116,13 @@ pub enum JSONPaint {
         fit: Option<String>,
         #[serde(default)]
         repeat: ImageRepeat,
-        #[serde(rename = "quarterTurns", default)]
+        #[serde(rename = "quarter_turns", alias = "quarterTurns", default)]
         quarter_turns: u8,
         #[serde(default = "default_image_scale")]
         scale: f32,
         #[serde(default = "default_opacity")]
         opacity: f32,
-        #[serde(rename = "blendMode", default)]
+        #[serde(rename = "blend_mode", alias = "blendMode", default)]
         blend_mode: BlendMode,
         // Image filters
         #[serde(default)]
@@ -134,22 +134,23 @@ pub enum JSONPaint {
 
 #[derive(Debug, Deserialize)]
 pub struct CSSBorder {
-    #[serde(rename = "borderWidth")]
+    #[serde(rename = "border_width", alias = "borderWidth")]
     pub border_width: Option<f32>,
     #[serde(
-        rename = "borderColor",
+        rename = "border_color",
+        alias = "borderColor",
         with = "color_formats::object::RGBA32F",
         default
     )]
     pub border_color: CGColor,
-    #[serde(rename = "borderStyle")]
+    #[serde(rename = "border_style", alias = "borderStyle")]
     pub border_style: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct JSONSVGPath {
     pub d: String,
-    #[serde(rename = "fillRule", default)]
+    #[serde(rename = "fill_rule", alias = "fillRule", default)]
     pub fill_rule: FillRule,
     pub fill: Option<String>,
 }
@@ -180,12 +181,15 @@ pub struct JSONFeShadow {
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct JSONFeLiquidGlass {
-    #[serde(rename = "lightIntensity")]
+    #[serde(rename = "light_intensity", alias = "lightIntensity")]
     pub light_intensity: f32,
-    #[serde(rename = "lightAngle")]
+    #[serde(rename = "light_angle", alias = "lightAngle")]
     pub light_angle: f32,
+    #[serde(rename = "refraction")]
     pub refraction: f32,
+    #[serde(rename = "depth")]
     pub depth: f32,
+    #[serde(rename = "dispersion")]
     pub dispersion: f32,
     #[serde(rename = "radius")]
     pub blur_radius: f32,
@@ -332,18 +336,23 @@ pub enum JSONFeNoiseColors {
 /// JSON representation of noise effect
 #[derive(Debug, Deserialize)]
 pub struct JSONFeNoise {
-    #[serde(rename = "noiseSize")]
+    #[serde(rename = "noise_size", alias = "noiseSize")]
     pub noise_size: f32,
+    #[serde(rename = "density")]
     pub density: f32,
-    #[serde(rename = "numOctaves", default = "default_num_octaves")]
+    #[serde(
+        rename = "num_octaves",
+        alias = "numOctaves",
+        default = "default_num_octaves"
+    )]
     pub num_octaves: i32,
-    #[serde(default)]
+    #[serde(rename = "seed", default)]
     pub seed: f32,
     #[serde(flatten)]
     pub coloring: JSONFeNoiseColors,
-    #[serde(default = "default_true")]
+    #[serde(rename = "active", default = "default_true")]
     pub active: bool,
-    #[serde(rename = "blendMode", default)]
+    #[serde(rename = "blend_mode", alias = "blendMode", default)]
     pub blend_mode: BlendMode,
 }
 
@@ -576,13 +585,18 @@ pub fn merge_paints(paint: Option<JSONPaint>, paints: Option<Vec<JSONPaint>>) ->
 /// SceneNode as it appears in document.nodes
 #[derive(Debug, Deserialize)]
 pub struct JSONSceneNode {
+    #[serde(rename = "id")]
     pub id: String,
+    #[serde(rename = "name")]
     pub name: String,
+    #[serde(rename = "active")]
     pub active: Option<bool>,
+    #[serde(rename = "locked")]
     pub locked: Option<bool>,
     #[serde(
         with = "color_formats::object::RGBA32F",
-        rename = "backgroundColor",
+        rename = "background_color",
+        alias = "backgroundColor",
         default
     )]
     pub background_color: CGColor,
@@ -598,13 +612,13 @@ pub enum JSONCornerRadius {
     Uniform(f32),
     PerCorner(Vec<f32>),
     PerCornerObject {
-        #[serde(rename = "topLeftRadius")]
+        #[serde(rename = "top_left_radius", alias = "topLeftRadius")]
         top_left_radius: f32,
-        #[serde(rename = "topRightRadius")]
+        #[serde(rename = "top_right_radius", alias = "topRightRadius")]
         top_right_radius: f32,
-        #[serde(rename = "bottomRightRadius")]
+        #[serde(rename = "bottom_right_radius", alias = "bottomRightRadius")]
         bottom_right_radius: f32,
-        #[serde(rename = "bottomLeftRadius")]
+        #[serde(rename = "bottom_left_radius", alias = "bottomLeftRadius")]
         bottom_left_radius: f32,
     },
 }
@@ -691,21 +705,22 @@ impl JSONCornerRadius {
 
 #[derive(Debug, Deserialize)]
 pub struct JSONUnknownNodeProperties {
+    #[serde(rename = "id")]
     pub id: String,
-    #[serde(default)]
+    #[serde(rename = "name", default)]
     pub name: Option<String>,
-    #[serde(default = "default_active")]
+    #[serde(rename = "active", default = "default_active")]
     pub active: bool,
-    #[serde(default = "default_locked")]
+    #[serde(rename = "locked", default = "default_locked")]
     pub locked: bool,
     // blend
     #[serde(rename = "opacity", default = "default_opacity")]
     pub opacity: f32,
-    #[serde(rename = "blendMode", default)]
+    #[serde(rename = "blend_mode", alias = "blendMode", default)]
     pub blend_mode: JSONLayerBlendMode,
     #[serde(rename = "mask")]
     pub mask: Option<JSONLayerMaskType>,
-    #[serde(rename = "zIndex", default = "default_z_index")]
+    #[serde(rename = "z_index", alias = "zIndex", default = "default_z_index")]
     pub z_index: i32,
     // css
     #[serde(rename = "position")]
@@ -738,33 +753,37 @@ pub struct JSONUnknownNodeProperties {
     )]
     pub height: CSSDimension,
 
-    #[serde(rename = "cornerRadius", default)]
+    #[serde(rename = "corner_radius", alias = "cornerRadius", default)]
     pub corner_radius: Option<JSONCornerRadius>,
     #[serde(
-        rename = "cornerRadiusTopLeft",
+        rename = "corner_radius_top_left",
+        alias = "cornerRadiusTopLeft",
         default,
         deserialize_with = "de_radius_option"
     )]
     pub corner_radius_top_left: Option<Radius>,
     #[serde(
-        rename = "cornerRadiusTopRight",
+        rename = "corner_radius_top_right",
+        alias = "cornerRadiusTopRight",
         default,
         deserialize_with = "de_radius_option"
     )]
     pub corner_radius_top_right: Option<Radius>,
     #[serde(
-        rename = "cornerRadiusBottomRight",
+        rename = "corner_radius_bottom_right",
+        alias = "cornerRadiusBottomRight",
         default,
         deserialize_with = "de_radius_option"
     )]
     pub corner_radius_bottom_right: Option<Radius>,
     #[serde(
-        rename = "cornerRadiusBottomLeft",
+        rename = "corner_radius_bottom_left",
+        alias = "cornerRadiusBottomLeft",
         default,
         deserialize_with = "de_radius_option"
     )]
     pub corner_radius_bottom_left: Option<Radius>,
-    #[serde(rename = "cornerSmoothing", default)]
+    #[serde(rename = "corner_smoothing", alias = "cornerSmoothing", default)]
     pub corner_smoothing: Option<f32>,
 
     // fill
@@ -773,45 +792,53 @@ pub struct JSONUnknownNodeProperties {
     #[serde(rename = "fills")]
     pub fills: Option<Vec<JSONPaint>>,
     // stroke
-    #[serde(rename = "strokeWidth", default = "default_stroke_width")]
+    #[serde(
+        rename = "stroke_width",
+        alias = "strokeWidth",
+        default = "default_stroke_width"
+    )]
     pub stroke_width: f32,
-    #[serde(rename = "strokeWidthProfile")]
+    #[serde(rename = "stroke_width_profile", alias = "strokeWidthProfile")]
     pub stroke_width_profile: Option<JSONVariableWidthProfile>,
-    #[serde(rename = "strokeLeftWidth")]
+    #[serde(rename = "stroke_left_width", alias = "strokeLeftWidth")]
     pub stroke_left_width: Option<f32>,
-    #[serde(rename = "strokeTopWidth")]
+    #[serde(rename = "stroke_top_width", alias = "strokeTopWidth")]
     pub stroke_top_width: Option<f32>,
-    #[serde(rename = "strokeRightWidth")]
+    #[serde(rename = "stroke_right_width", alias = "strokeRightWidth")]
     pub stroke_right_width: Option<f32>,
-    #[serde(rename = "strokeBottomWidth")]
+    #[serde(rename = "stroke_bottom_width", alias = "strokeBottomWidth")]
     pub stroke_bottom_width: Option<f32>,
-    #[serde(rename = "strokeAlign")]
+    #[serde(rename = "stroke_align", alias = "strokeAlign")]
     pub stroke_align: Option<StrokeAlign>,
-    #[serde(rename = "strokeCap")]
+    #[serde(rename = "stroke_cap", alias = "strokeCap")]
     pub stroke_cap: Option<StrokeCap>,
-    #[serde(rename = "strokeJoin")]
+    #[serde(rename = "stroke_join", alias = "strokeJoin")]
     pub stroke_join: Option<StrokeJoin>,
-    #[serde(rename = "strokeMiterLimit")]
+    #[serde(rename = "stroke_miter_limit", alias = "strokeMiterLimit")]
     pub stroke_miter_limit: Option<StrokeMiterLimit>,
-    #[serde(rename = "strokeDashArray", alias = "strokeDasharray")]
+    #[serde(
+        rename = "stroke_dash_array",
+        alias = "strokeDashArray",
+        alias = "strokeDasharray"
+    )]
     pub stroke_dash_array: Option<Vec<f32>>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
     #[serde(rename = "strokes")]
     pub strokes: Option<Vec<JSONPaint>>,
     // effects
-    #[serde(rename = "feShadows")]
+    #[serde(rename = "fe_shadows", alias = "feShadows")]
     pub fe_shadows: Option<Vec<JSONFeShadow>>,
-    #[serde(rename = "feBlur")]
+    #[serde(rename = "fe_blur", alias = "feBlur")]
     pub fe_blur: Option<JSONFeLayerBlur>,
-    #[serde(rename = "feBackdropBlur")]
+    #[serde(rename = "fe_backdrop_blur", alias = "feBackdropBlur")]
     pub fe_backdrop_blur: Option<JSONFeBackdropBlur>,
-    #[serde(rename = "feLiquidGlass")]
+    #[serde(rename = "fe_liquid_glass", alias = "feLiquidGlass")]
     pub fe_liquid_glass: Option<JSONFeLiquidGlass>,
-    #[serde(rename = "feNoises")]
+    #[serde(rename = "fe_noises", alias = "feNoises")]
     pub fe_noises: Option<Vec<JSONFeNoise>>,
     // vector
-    #[serde(rename = "vectorNetwork")]
+    #[serde(rename = "vector_network", alias = "vectorNetwork")]
     pub vector_network: Option<JSONVectorNetwork>,
 }
 
@@ -906,13 +933,13 @@ pub enum JSONPadding {
     Uniform(f32),
     /// Non-uniform padding with individual sides
     NonUniform {
-        #[serde(rename = "paddingTop")]
+        #[serde(rename = "padding_top", alias = "paddingTop")]
         padding_top: f32,
-        #[serde(rename = "paddingRight")]
+        #[serde(rename = "padding_right", alias = "paddingRight")]
         padding_right: f32,
-        #[serde(rename = "paddingBottom")]
+        #[serde(rename = "padding_bottom", alias = "paddingBottom")]
         padding_bottom: f32,
-        #[serde(rename = "paddingLeft")]
+        #[serde(rename = "padding_left", alias = "paddingLeft")]
         padding_left: f32,
     },
 }
@@ -945,20 +972,21 @@ pub struct JSONContainerNode {
     pub expanded: Option<bool>,
 
     // layout
-    #[serde(default)]
+    #[serde(rename = "layout", default)]
     pub layout: JSONLayoutMode,
+    #[serde(rename = "padding")]
     pub padding: Option<JSONPadding>,
-    #[serde(default)]
+    #[serde(rename = "direction", default)]
     pub direction: JSONAxis,
-    #[serde(rename = "layoutWrap")]
+    #[serde(rename = "layout_wrap", alias = "layoutWrap")]
     pub layout_wrap: Option<LayoutWrap>,
-    #[serde(rename = "mainAxisAlignment")]
+    #[serde(rename = "main_axis_alignment", alias = "mainAxisAlignment")]
     pub main_axis_alignment: Option<MainAxisAlignment>,
-    #[serde(rename = "crossAxisAlignment")]
+    #[serde(rename = "cross_axis_alignment", alias = "crossAxisAlignment")]
     pub cross_axis_alignment: Option<CrossAxisAlignment>,
-    #[serde(rename = "mainAxisGap", default)]
+    #[serde(rename = "main_axis_gap", alias = "mainAxisGap", default)]
     pub main_axis_gap: f32,
-    #[serde(rename = "crossAxisGap", default)]
+    #[serde(rename = "cross_axis_gap", alias = "crossAxisGap", default)]
     pub cross_axis_gap: f32,
 }
 
@@ -976,61 +1004,76 @@ pub struct JSONTextNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
+    #[serde(rename = "text")]
     pub text: String,
-    #[serde(rename = "maxLines", default)]
+    #[serde(rename = "max_lines", alias = "maxLines", default)]
     pub max_lines: Option<usize>,
-    #[serde(rename = "textAlign", default)]
+    #[serde(rename = "text_align", alias = "textAlign", default)]
     pub text_align: TextAlign,
-    #[serde(rename = "textAlignVertical", default)]
+    #[serde(rename = "text_align_vertical", alias = "textAlignVertical", default)]
     pub text_align_vertical: TextAlignVertical,
 
-    #[serde(rename = "textDecorationLine", default)]
+    #[serde(rename = "text_decoration_line", alias = "textDecorationLine", default)]
     pub text_decoration_line: TextDecorationLine,
-    #[serde(rename = "textDecorationStyle", default)]
+    #[serde(
+        rename = "text_decoration_style",
+        alias = "textDecorationStyle",
+        default
+    )]
     pub text_decoration_style: Option<TextDecorationStyle>,
     #[serde(
-        rename = "textDecorationColor",
+        rename = "text_decoration_color",
+        alias = "textDecorationColor",
         with = "color_formats::object::RGBA32F",
         default
     )]
     pub text_decoration_color: CGColor,
-    #[serde(rename = "textDecorationSkipInk", default)]
+    #[serde(
+        rename = "text_decoration_skip_ink",
+        alias = "textDecorationSkipInk",
+        default
+    )]
     pub text_decoration_skip_ink: Option<bool>,
-    #[serde(rename = "textDecorationThickness", default)]
+    #[serde(
+        rename = "text_decoration_thickness",
+        alias = "textDecorationThickness",
+        default
+    )]
     pub text_decoration_thinkness: Option<f32>,
 
-    #[serde(rename = "lineHeight", default)]
+    #[serde(rename = "line_height", alias = "lineHeight", default)]
     pub line_height: Option<f32>,
-    #[serde(rename = "letterSpacing", default)]
+    #[serde(rename = "letter_spacing", alias = "letterSpacing", default)]
     pub letter_spacing: Option<f32>,
-    #[serde(rename = "wordSpacing", default)]
+    #[serde(rename = "word_spacing", alias = "wordSpacing", default)]
     pub word_spacing: Option<f32>,
-    #[serde(rename = "fontSize", default)]
+    #[serde(rename = "font_size", alias = "fontSize", default)]
     pub font_size: Option<f32>,
-    #[serde(rename = "fontFamily", default)]
+    #[serde(rename = "font_family", alias = "fontFamily", default)]
     pub font_family: Option<String>,
-    #[serde(rename = "fontWeight", default)]
+    #[serde(rename = "font_weight", alias = "fontWeight", default)]
     pub font_weight: FontWeight,
-    #[serde(rename = "fontWidth", default)]
+    #[serde(rename = "font_width", alias = "fontWidth", default)]
     pub font_width: Option<f32>,
-    #[serde(rename = "fontStyleItalic", default)]
+    #[serde(rename = "font_style_italic", alias = "fontStyleItalic", default)]
     pub font_style_italic: bool,
 
-    #[serde(rename = "fontKerning", default)]
+    #[serde(rename = "font_kerning", alias = "fontKerning", default)]
     pub font_kerning: bool,
-    #[serde(rename = "fontFeatures", default)]
+    #[serde(rename = "font_features", alias = "fontFeatures", default)]
     pub font_features: Option<HashMap<String, bool>>,
-    #[serde(rename = "fontVariations", default)]
+    #[serde(rename = "font_variations", alias = "fontVariations", default)]
     pub font_variations: Option<HashMap<String, f32>>,
 
     #[serde(
-        rename = "fontOpticalSizing",
+        rename = "font_optical_sizing",
+        alias = "fontOpticalSizing",
         default,
         deserialize_with = "de_optical_sizing"
     )]
     pub font_optical_sizing: FontOpticalSizing,
 
-    #[serde(rename = "textTransform", default)]
+    #[serde(rename = "text_transform", alias = "textTransform", default)]
     pub text_transform: TextTransform,
 }
 
@@ -1127,7 +1170,7 @@ pub struct JSONVectorNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
-    #[serde(rename = "vectorNetwork")]
+    #[serde(rename = "vector_network", alias = "vectorNetwork")]
     pub vector_network: Option<JSONVectorNetwork>,
 }
 
@@ -1141,11 +1184,11 @@ pub struct JSONEllipseNode {
     pub angle: Option<f32>,
 
     /// angle offset in degrees (start angle) 0..360
-    #[serde(rename = "angleOffset", default)]
+    #[serde(rename = "angle_offset", alias = "angleOffset", default)]
     pub angle_offset: Option<f32>,
 
     /// inner radius in 0..1
-    #[serde(rename = "innerRadius", default)]
+    #[serde(rename = "inner_radius", alias = "innerRadius", default)]
     pub inner_radius: Option<f32>,
 }
 
@@ -1160,7 +1203,7 @@ pub struct JSONRegularPolygonNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
-    #[serde(rename = "pointCount")]
+    #[serde(rename = "point_count", alias = "pointCount")]
     pub point_count: usize,
 }
 
@@ -1169,10 +1212,10 @@ pub struct JSONRegularStarPolygonNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
-    #[serde(rename = "pointCount")]
+    #[serde(rename = "point_count", alias = "pointCount")]
     pub point_count: usize,
 
-    #[serde(rename = "innerRadius")]
+    #[serde(rename = "inner_radius", alias = "innerRadius")]
     pub inner_radius: f32,
 }
 
