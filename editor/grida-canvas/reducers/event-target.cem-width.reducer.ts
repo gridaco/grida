@@ -101,7 +101,7 @@ export function on_pointer_move(
     draft,
     logical_pos,
     rect,
-    node.vectorNetwork,
+    node.vector_network,
     segment_snap_threshold
   );
 }
@@ -125,7 +125,7 @@ export function on_pointer_down(
       node_id
     ) as grida.program.nodes.VectorNode;
 
-    const { segments } = node.vectorNetwork;
+    const { segments } = node.vector_network;
     const totalSegments = segments.length;
 
     // Convert segment index and t to global u parameter
@@ -210,7 +210,7 @@ export function on_drag_gesture_translate_variable_width_stop(
       node_id
     ) as grida.program.nodes.VectorNode;
 
-    const { segments } = node.vectorNetwork;
+    const { segments } = node.vector_network;
     const totalSegments = segments.length;
 
     // Convert segment index and t to global u parameter

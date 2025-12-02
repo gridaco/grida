@@ -2323,7 +2323,7 @@ export namespace grida.program.nodes {
      */
     fillRule?: cg.FillRule;
 
-    vectorNetwork: vn.VectorNetwork;
+    vector_network: vn.VectorNetwork;
   }
 
   export interface ComputedVectorNode

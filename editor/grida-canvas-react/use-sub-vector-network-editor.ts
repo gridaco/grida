@@ -86,8 +86,8 @@ export default function useVectorContentEditMode(): VectorContentEditor {
     snapped_segment_p,
   } = state.content_edit_mode;
 
-  const vertices = node.vectorNetwork.vertices;
-  const segments = node.vectorNetwork.segments;
+  const vertices = node.vector_network.vertices;
+  const segments = node.vector_network.segments;
   const { selection_neighbouring_vertices: neighbouring_vertices } =
     state.content_edit_mode;
 
@@ -98,8 +98,8 @@ export default function useVectorContentEditMode(): VectorContentEditor {
     : [node.left!, node.top!];
 
   const vne = useMemo(
-    () => new vn.VectorNetworkEditor(node.vectorNetwork),
-    [node.vectorNetwork]
+    () => new vn.VectorNetworkEditor(node.vector_network),
+    [node.vector_network]
   );
 
   const absolute_vertices = useMemo(
@@ -236,7 +236,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
   return useMemo(
     () => ({
       node_id,
-      network: node.vectorNetwork,
+      network: node.vector_network,
       path_cursor_position,
       absolute_vertices,
       absolute_tangents,
@@ -269,7 +269,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
     [
       //
       node_id,
-      node.vectorNetwork,
+      node.vector_network,
       path_cursor_position,
       absolute_vertices,
       absolute_tangents,

@@ -16,7 +16,7 @@ export function VectorWidget({
   stroke_width,
   stroke_cap,
   style,
-  vectorNetwork,
+  vector_network,
   fillRule,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
@@ -37,7 +37,7 @@ export function VectorWidget({
         ref: "none",
       };
 
-  const d = useMemo(() => vn.toSVGPathData(vectorNetwork), [vectorNetwork]);
+  const d = useMemo(() => vn.toSVGPathData(vector_network), [vector_network]);
 
   return (
     <svg

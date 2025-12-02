@@ -77,7 +77,7 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
     active: node.active,
     corner_radius: modeProperties.cornerRadius(node),
     fillRule: (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
-    vectorNetwork: v,
+    vector_network: v,
     width: rect.width,
     height: rect.height,
     left: (node as any).left!,

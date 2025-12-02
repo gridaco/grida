@@ -137,7 +137,7 @@ export function NodeElement<P extends Record<string, any>>({
     muted: node.muted,
     autoplay: node.autoplay,
     paths: node.paths,
-    vectorNetwork: node.vectorNetwork,
+    vector_network: node.vector_network,
     opacity: node.opacity,
     z_index: DEFAULT_ZINDEX ?? node.z_index,
     position: DEFAULT_POSITION ?? node.position,

@@ -239,7 +239,7 @@ export namespace iosvg {
         return {
           type: "vector",
           name: name,
-          vectorNetwork: vectorNetwork,
+          vector_network: vectorNetwork,
           fill: fill,
           stroke: stroke,
           stroke_width: strokeWidth,

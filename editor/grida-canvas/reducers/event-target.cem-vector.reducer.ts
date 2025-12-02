@@ -55,9 +55,9 @@ function __self_compute_vector_segment_snapping<
     const local_point = cmath.vector2.sub(logical_pos, [rect.x, rect.y]);
 
     const segment_index = draft.content_edit_mode.hovered_control.index;
-    const segment = node.vectorNetwork.segments[segment_index];
-    const a = node.vectorNetwork.vertices[segment.a];
-    const b = node.vectorNetwork.vertices[segment.b];
+    const segment = node.vector_network.segments[segment_index];
+    const a = node.vector_network.vertices[segment.a];
+    const b = node.vector_network.vertices[segment.b];
     const ta = segment.ta;
     const tb = segment.tb;
 
@@ -108,7 +108,7 @@ export function on_pointer_move(
     ) as grida.program.nodes.VectorNode;
     const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
     const n_offset: cmath.Vector2 = [rect.x, rect.y];
-    const { vertices } = node.vectorNetwork;
+    const { vertices } = node.vector_network;
     const a = vertices[a_point];
 
     const movement = cmath.vector2.sub(
@@ -132,7 +132,7 @@ export function on_pointer_move(
     node_id
   ) as grida.program.nodes.VectorNode;
   const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
-  const anchor_points = node.vectorNetwork.vertices.map((v) =>
+  const anchor_points = node.vector_network.vertices.map((v) =>
     cmath.vector2.add(v, [rect.x, rect.y])
   );
 
@@ -197,7 +197,7 @@ export function on_path_pointer_down(
     node_id
   ) as grida.program.nodes.VectorNode;
 
-  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+  const vne = new vn.VectorNetworkEditor(node.vector_network);
 
   // Handle snapped segment point - split the segment and start/finish at the split point
   if (snapped_segment_p) {
@@ -212,7 +212,7 @@ export function on_path_pointer_down(
     node.top = new_pos[1];
     node.width = bb_b.width;
     node.height = bb_b.height;
-    node.vectorNetwork = vne.value;
+    node.vector_network = vne.value;
 
     if (typeof a_point !== "number") {
       // Starting a new path at the split point
@@ -223,7 +223,7 @@ export function on_path_pointer_down(
       };
       draft.content_edit_mode.selection_neighbouring_vertices =
         getUXNeighbouringVertices(
-          node.vectorNetwork,
+          node.vector_network,
           draft.content_edit_mode.selection
         );
       draft.content_edit_mode.a_point = split_vertex_idx;
@@ -251,7 +251,7 @@ export function on_path_pointer_down(
       node.top = new_pos2[1];
       node.width = bb_b2.width;
       node.height = bb_b2.height;
-      node.vectorNetwork = vne.value;
+      node.vector_network = vne.value;
 
       draft.content_edit_mode.selection.selected_vertices = [new_vertex_idx];
       draft.content_edit_mode.selection.selected_tangents = [];
@@ -287,7 +287,7 @@ export function on_path_pointer_down(
       selected_tangents: [],
     };
     draft.content_edit_mode.selection_neighbouring_vertices =
-      getUXNeighbouringVertices(node.vectorNetwork, {
+      getUXNeighbouringVertices(node.vector_network, {
         selected_vertices: [snapped_point],
         selected_segments: [],
         selected_tangents: [],
@@ -299,7 +299,7 @@ export function on_path_pointer_down(
 
   const position =
     typeof snapped_point === "number"
-      ? node.vectorNetwork.vertices[snapped_point]
+      ? node.vector_network.vertices[snapped_point]
       : // relative position (absolute -> local)
         (() => {
           const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
@@ -326,7 +326,7 @@ export function on_path_pointer_down(
   node.width = bb_b.width;
   node.height = bb_b.height;
 
-  node.vectorNetwork = vne.value;
+  node.vector_network = vne.value;
   draft.content_edit_mode.selection.selected_vertices = [new_vertex_idx];
   draft.content_edit_mode.selection.selected_tangents = [];
 
@@ -381,7 +381,7 @@ export function create_new_vector_node(
     stroke_width: 1,
     stroke_cap: "butt",
     stroke_join: "miter",
-    vectorNetwork: {
+    vector_network: {
       vertices: [cmath.vector2.zero],
       segments: [],
     },
@@ -413,7 +413,7 @@ export function create_new_vector_node(
     },
     a_point: 0,
     next_ta: null,
-    initial_vector_network: vector.vectorNetwork,
+    initial_vector_network: vector.vector_network,
     original: null,
     selection_neighbouring_vertices: [0],
     cursor: pos,
@@ -485,8 +485,8 @@ export function on_drag_gesture_curve(
     node_id
   ) as grida.program.nodes.VectorNode;
 
-  const { vectorNetwork } = node;
-  const vne = new vn.VectorNetworkEditor(vectorNetwork);
+  const { vector_network } = node;
+  const vne = new vn.VectorNetworkEditor(vector_network);
 
   const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
   const node_pos_abs: cmath.Vector2 = [rect.x, rect.y];
@@ -561,7 +561,7 @@ export function on_drag_gesture_curve(
   node.width = bb.width;
   node.height = bb.height;
 
-  node.vectorNetwork = vne.value;
+  node.vector_network = vne.value;
 }
 
 /**
@@ -674,7 +674,7 @@ export function on_drag_gesture_translate_vector_controls(
   node.width = bb_b.width;
   node.height = bb_b.height;
 
-  node.vectorNetwork = vne.value;
+  node.vector_network = vne.value;
 }
 
 /**
@@ -718,7 +718,7 @@ export function on_draw_pointer_down(
         name: "vector",
         stroke_width: 3,
         stroke_join: "miter",
-        vectorNetwork: vn.polyline([cmath.vector2.zero]),
+        vector_network: vn.polyline([cmath.vector2.zero]),
       } satisfies grida.program.nodes.VectorNode;
       break;
     }
@@ -735,7 +735,7 @@ export function on_draw_pointer_down(
         name: "line",
         stroke_width: 1,
         stroke_join: "miter",
-        vectorNetwork: vn.polyline([cmath.vector2.zero]),
+        vector_network: vn.polyline([cmath.vector2.zero]),
       } satisfies grida.program.nodes.VectorNode;
       break;
     }
@@ -813,7 +813,7 @@ export function on_drag_gesture_draw(
 
   const vne = new vn.VectorNetworkEditor({
     vertices: points.map((p) => p),
-    segments: node.vectorNetwork.segments,
+    segments: node.vector_network.segments,
   });
 
   switch (mode) {
@@ -840,7 +840,7 @@ export function on_drag_gesture_draw(
   node.top = new_pos[1];
   node.width = bb.width;
   node.height = bb.height;
-  node.vectorNetwork = vne.value;
+  node.vector_network = vne.value;
 }
 
 /**

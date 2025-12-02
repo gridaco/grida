@@ -326,7 +326,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           state,
           node_id
         ) as grida.program.nodes.VectorNode;
-        const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+        const vne = new vn.VectorNetworkEditor(node.vector_network);
         const vertices = Array.from(
           new Set([...selected_vertices, ...selected_tangents.map(([v]) => v)])
         );
@@ -441,8 +441,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               draft,
               mode.node_id
             ) as grida.program.nodes.VectorNode;
-            const vertex_offset = node.vectorNetwork.vertices.length;
-            const segment_offset = node.vectorNetwork.segments.length;
+            const vertex_offset = node.vector_network.vertices.length;
+            const segment_offset = node.vector_network.segments.length;
 
             let net_to_union = net;
             if (mode.clipboard && mode.clipboard_node_position) {
@@ -455,8 +455,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               }
             }
 
-            node.vectorNetwork = vn.VectorNetworkEditor.union(
-              node.vectorNetwork,
+            node.vector_network = vn.VectorNetworkEditor.union(
+              node.vector_network,
               net_to_union,
               null
             );
@@ -475,7 +475,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               selected_tangents: [],
             };
             mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
-              node.vectorNetwork,
+              node.vector_network,
               {
                 selected_vertices: new_vertices,
                 selected_segments: new_segments,
@@ -512,7 +512,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             stroke_cap: "butt",
             stroke_join: "miter",
             stroke_width: 1,
-            vectorNetwork: net,
+            vector_network: net,
           };
 
           normalizeVectorNodeBBox(node);
@@ -541,8 +541,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft,
             mode.node_id
           ) as grida.program.nodes.VectorNode;
-          const vertex_offset = node.vectorNetwork.vertices.length;
-          const segment_offset = node.vectorNetwork.segments.length;
+          const vertex_offset = node.vector_network.vertices.length;
+          const segment_offset = node.vector_network.segments.length;
 
           let net_to_union = net;
           if (mode.clipboard_node_position) {
@@ -553,8 +553,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             net_to_union = vn.VectorNetworkEditor.translate(net, delta);
           }
 
-          node.vectorNetwork = vn.VectorNetworkEditor.union(
-            node.vectorNetwork,
+          node.vector_network = vn.VectorNetworkEditor.union(
+            node.vector_network,
             net_to_union,
             null
           );
@@ -573,7 +573,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             selected_tangents: [],
           };
           mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
-            node.vectorNetwork,
+            node.vector_network,
             {
               selected_vertices: new_vertices,
               selected_segments: new_segments,
@@ -1057,18 +1057,18 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               ) as grida.program.nodes.VectorNode;
 
               const { vertices, tangents } = encodeTranslateVectorCommand(
-                node.vectorNetwork,
+                node.vector_network,
                 selection
               );
 
               const scene = getScene(draft.document, draft.scene_id!);
               const agent_points = vertices.map((i) =>
-                cmath.vector2.add(node.vectorNetwork.vertices[i], [
+                cmath.vector2.add(node.vector_network.vertices[i], [
                   node.left!,
                   node.top!,
                 ])
               );
-              const anchor_points = node.vectorNetwork.vertices
+              const anchor_points = node.vector_network.vertices
                 .map((v, i) => ({ p: v, i }))
                 .filter(({ i }) => !vertices.includes(i))
                 .map(({ p }) => cmath.vector2.add(p, [node.left!, node.top!]));
@@ -1589,7 +1589,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
-                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                (node as grida.program.nodes.VectorNode).vector_network,
                 {
                   selected_vertices: next.selected_vertices,
                   selected_segments: next.selected_segments,
@@ -1641,7 +1641,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
-                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                (node as grida.program.nodes.VectorNode).vector_network,
                 {
                   selected_vertices: next.selected_vertices,
                   selected_segments: next.selected_segments,
@@ -1666,7 +1666,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
-                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                (node as grida.program.nodes.VectorNode).vector_network,
                 next
               );
             draft.content_edit_mode.a_point =
@@ -2145,7 +2145,7 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
     if (!rect || !flattened) continue;
     const { node: v, delta } = flattened;
     const abs_pos: cmath.Vector2 = [rect.x + delta[0], rect.y + delta[1]];
-    const vne = new vn.VectorNetworkEditor(v.vectorNetwork);
+    const vne = new vn.VectorNetworkEditor(v.vector_network);
     vne.translate(abs_pos);
     union_net = union_net
       ? vn.VectorNetworkEditor.union(union_net, vne.value)
@@ -2162,7 +2162,7 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
   const node: grida.program.nodes.VectorNode = {
     ...base,
     id,
-    vectorNetwork: union_net,
+    vector_network: union_net,
     left: 0,
     top: 0,
     width: 0,
