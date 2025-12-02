@@ -123,7 +123,7 @@ _003.definition = {
       style: {},
       width: "auto",
       height: "auto",
-      cornerRadius: 0,
+      corner_radius: 0,
       position: "absolute",
       top: 0,
       left: 0,

@@ -223,10 +223,10 @@ export namespace iofigma {
         rectangleCornerRadii?: number[] | [number, number, number, number]
       ): grida.program.nodes.i.IRectangularCornerRadius {
         return {
-          cornerRadiusTopLeft: rectangleCornerRadii?.[0] ?? 0,
-          cornerRadiusTopRight: rectangleCornerRadii?.[1] ?? 0,
-          cornerRadiusBottomLeft: rectangleCornerRadii?.[2] ?? 0,
-          cornerRadiusBottomRight: rectangleCornerRadii?.[3] ?? 0,
+          corner_radius_top_left: rectangleCornerRadii?.[0] ?? 0,
+          corner_radius_top_right: rectangleCornerRadii?.[1] ?? 0,
+          corner_radius_bottom_left: rectangleCornerRadii?.[2] ?? 0,
+          corner_radius_bottom_right: rectangleCornerRadii?.[3] ?? 0,
         };
       }
 
@@ -376,11 +376,11 @@ export namespace iofigma {
 
               //
               style: {},
-              cornerRadius: 0,
-              cornerRadiusTopLeft: 0,
-              cornerRadiusTopRight: 0,
-              cornerRadiusBottomLeft: 0,
-              cornerRadiusBottomRight: 0,
+              corner_radius: 0,
+              corner_radius_top_left: 0,
+              corner_radius_top_right: 0,
+              corner_radius_bottom_left: 0,
+              corner_radius_bottom_right: 0,
               padding: 0,
               // TODO:
               layout: "flow",
@@ -464,7 +464,7 @@ export namespace iofigma {
               style: {
                 overflow: clipsContent ? "clip" : undefined,
               },
-              cornerRadius: node.cornerRadius ?? 0,
+              corner_radius: node.cornerRadius ?? 0,
               ...rectangleCornerRadius(node.rectangleCornerRadii),
               padding:
                 paddingTop === paddingRight &&
@@ -512,7 +512,7 @@ export namespace iofigma {
               border: undefined,
               //
               style: {},
-              cornerRadius: 0,
+              corner_radius: 0,
               ...rectangleCornerRadius([0, 0, 0, 0]),
               padding: 0,
               layout: "flow",
@@ -680,7 +680,7 @@ export namespace iofigma {
                 top: node.relativeTransform![1][2],
                 width: node.size!.x,
                 height: node.size!.y,
-                cornerRadius: node.cornerRadius ?? 0,
+                corner_radius: node.cornerRadius ?? 0,
                 ...rectangleCornerRadius(node.rectangleCornerRadii),
                 fit: "cover",
                 //
@@ -722,7 +722,7 @@ export namespace iofigma {
               strokeJoin: strokeJoin
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
-              cornerRadius: node.cornerRadius ?? 0,
+              corner_radius: node.cornerRadius ?? 0,
               ...rectangleCornerRadius(node.rectangleCornerRadii),
             } satisfies grida.program.nodes.RectangleNode;
           }

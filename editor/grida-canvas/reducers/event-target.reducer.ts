@@ -627,7 +627,7 @@ function __self_evt_on_drag(
         const [dx, dy] = delta;
         const node = dq.__getNodeById(draft, node_id);
 
-        if (!("cornerRadius" in node)) {
+        if (!("corner_radius" in node)) {
           return;
         }
 
@@ -654,10 +654,10 @@ function __self_evt_on_drag(
 
         if (anchor) {
           const keyMap = {
-            nw: "cornerRadiusTopLeft",
-            ne: "cornerRadiusTopRight",
-            se: "cornerRadiusBottomRight",
-            sw: "cornerRadiusBottomLeft",
+            nw: "corner_radius_top_left",
+            ne: "corner_radius_top_right",
+            se: "corner_radius_bottom_right",
+            sw: "corner_radius_bottom_left",
           } as const;
 
           const key = keyMap[anchor];
@@ -673,18 +673,18 @@ function __self_evt_on_drag(
           });
         } else {
           const current =
-            typeof node.cornerRadius == "number" ? node.cornerRadius : 0;
+            typeof node.corner_radius == "number" ? node.corner_radius : 0;
           const nextRadius = current + d;
           const nextRadiusClamped = Math.floor(
             Math.min(maxRadius, Math.max(0, nextRadius))
           );
           draft.document.nodes[node_id] = nodeReducer(node, {
             type: "node/change/*",
-            cornerRadius: nextRadiusClamped,
-            cornerRadiusTopLeft: nextRadiusClamped,
-            cornerRadiusTopRight: nextRadiusClamped,
-            cornerRadiusBottomRight: nextRadiusClamped,
-            cornerRadiusBottomLeft: nextRadiusClamped,
+            corner_radius: nextRadiusClamped,
+            corner_radius_top_left: nextRadiusClamped,
+            corner_radius_top_right: nextRadiusClamped,
+            corner_radius_bottom_right: nextRadiusClamped,
+            corner_radius_bottom_left: nextRadiusClamped,
             node_id,
           });
         }

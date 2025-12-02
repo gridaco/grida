@@ -1469,17 +1469,17 @@ export namespace grida.program.nodes {
      * Corner radius
      */
     export interface ICornerRadius {
-      cornerRadius?: number;
+      corner_radius?: number;
     }
 
     /**
      * Rectangle Corner
      */
     export interface IRectangularCornerRadius {
-      cornerRadiusTopLeft?: number;
-      cornerRadiusTopRight?: number;
-      cornerRadiusBottomLeft?: number;
-      cornerRadiusBottomRight?: number;
+      corner_radius_top_left?: number;
+      corner_radius_top_right?: number;
+      corner_radius_bottom_left?: number;
+      corner_radius_bottom_right?: number;
       cornerSmoothing?: number;
     }
 
@@ -2569,11 +2569,11 @@ export namespace grida.program.nodes {
             position: "absolute",
             top: 0,
             left: 0,
-            cornerRadius: 0,
-            cornerRadiusTopLeft: 0,
-            cornerRadiusTopRight: 0,
-            cornerRadiusBottomLeft: 0,
-            cornerRadiusBottomRight: 0,
+            corner_radius: 0,
+            corner_radius_top_left: 0,
+            corner_radius_top_right: 0,
+            corner_radius_bottom_left: 0,
+            corner_radius_bottom_right: 0,
             strokeWidth: 0,
             strokeCap: "butt",
             strokeJoin: "miter",
@@ -2795,11 +2795,11 @@ export namespace grida.program.nodes {
         padding: 0,
         width: 100,
         height: 100,
-        cornerRadius: 0,
-        cornerRadiusTopLeft: 0,
-        cornerRadiusTopRight: 0,
-        cornerRadiusBottomLeft: 0,
-        cornerRadiusBottomRight: 0,
+        corner_radius: 0,
+        corner_radius_top_left: 0,
+        corner_radius_top_right: 0,
+        corner_radius_bottom_left: 0,
+        corner_radius_bottom_right: 0,
         style: {},
         // children_refs: [],
         ...partial,

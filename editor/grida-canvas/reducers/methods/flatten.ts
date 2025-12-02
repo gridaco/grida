@@ -75,7 +75,7 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
     type: "vector",
     id: node.id,
     active: node.active,
-    cornerRadius: modeProperties.cornerRadius(node),
+    corner_radius: modeProperties.cornerRadius(node),
     fillRule: (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
     vectorNetwork: v,
     width: rect.width,
@@ -108,16 +108,16 @@ function __dangerously_delete_non_vector_properties(
 }
 
 function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {
-  if ("cornerRadius" in node) {
-    return node.cornerRadius;
+  if ("corner_radius" in node) {
+    return node.corner_radius;
   }
 
-  if ("cornerRadiusTopLeft" in node) {
+  if ("corner_radius_top_left" in node) {
     const values: number[] = [
-      node.cornerRadiusTopLeft,
-      node.cornerRadiusTopRight,
-      node.cornerRadiusBottomLeft,
-      node.cornerRadiusBottomRight,
+      node.corner_radius_top_left,
+      node.corner_radius_top_right,
+      node.corner_radius_bottom_left,
+      node.corner_radius_bottom_right,
     ].filter((it) => it !== undefined);
 
     return cmath.mode(values);

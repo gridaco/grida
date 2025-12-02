@@ -317,13 +317,13 @@ export function useMixedProperties(ids: string[]) {
     [mixedProperties.crossAxisAlignment?.ids, instance.commands]
   );
 
-  const cornerRadius = useCallback(
+  const corner_radius = useCallback(
     (value: cg.CornerRadius) => {
-      mixedProperties.cornerRadius?.ids.forEach((id) => {
+      mixedProperties.corner_radius?.ids.forEach((id) => {
         instance.commands.changeNodePropertyCornerRadius(id, value);
       });
     },
-    [mixedProperties.cornerRadius?.ids, instance.commands]
+    [mixedProperties.corner_radius?.ids, instance.commands]
   );
 
   const cursor = useCallback(
@@ -368,7 +368,7 @@ export function useMixedProperties(ids: string[]) {
       direction,
       mainAxisAlignment,
       crossAxisAlignment,
-      cornerRadius,
+      corner_radius,
       cursor,
     }),
     [
@@ -403,7 +403,7 @@ export function useMixedProperties(ids: string[]) {
       direction,
       mainAxisAlignment,
       crossAxisAlignment,
-      cornerRadius,
+      corner_radius,
       cursor,
     ]
   );

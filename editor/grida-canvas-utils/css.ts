@@ -77,11 +77,11 @@ export namespace css {
       rotation,
       fill,
       fit,
-      cornerRadius,
-      cornerRadiusTopLeft,
-      cornerRadiusTopRight,
-      cornerRadiusBottomLeft,
-      cornerRadiusBottomRight,
+      corner_radius,
+      corner_radius_top_left,
+      corner_radius_top_right,
+      corner_radius_bottom_left,
+      corner_radius_bottom_right,
       //
       border,
       //
@@ -128,11 +128,11 @@ export namespace css {
       rotate: rotation ? `${rotation}deg` : undefined,
       //
       borderRadius: cornerRadiusToBorderRadiusCSS({
-        cornerRadius,
-        cornerRadiusTopLeft,
-        cornerRadiusTopRight,
-        cornerRadiusBottomLeft,
-        cornerRadiusBottomRight,
+        corner_radius,
+        corner_radius_top_left,
+        corner_radius_top_right,
+        corner_radius_bottom_left,
+        corner_radius_bottom_right,
       }),
       //
       padding: padding ? paddingToPaddingCSS(padding) : undefined,
@@ -425,7 +425,7 @@ export namespace css {
     >
   ): string | undefined {
     if (!cr) return undefined;
-    return `${cr.cornerRadiusTopLeft ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusTopRight ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusBottomRight ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusBottomLeft ?? cr.cornerRadius ?? 0}px`;
+    return `${cr.corner_radius_top_left ?? cr.corner_radius ?? 0}px ${cr.corner_radius_top_right ?? cr.corner_radius ?? 0}px ${cr.corner_radius_bottom_right ?? cr.corner_radius ?? 0}px ${cr.corner_radius_bottom_left ?? cr.corner_radius ?? 0}px`;
   }
 
   export function paddingToPaddingCSS(

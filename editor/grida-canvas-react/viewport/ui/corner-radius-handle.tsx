@@ -25,7 +25,7 @@ export function NodeOverlayCornerRadiusHandle({
   });
 
   const node = useNode(node_id);
-  const radii = typeof node.cornerRadius === "number" ? node.cornerRadius : 0;
+  const radii = typeof node.corner_radius === "number" ? node.corner_radius : 0;
   const minmargin = Math.max(radii + size, margin);
 
   return (

@@ -303,30 +303,30 @@ const safe_properties: Partial<
       writePaints(target, "fill", paints);
     },
   }),
-  cornerRadius: defineNodeProperty<"cornerRadius">({
+  corner_radius: defineNodeProperty<"corner_radius">({
     apply: (draft, value, prev) => {
-      // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
-      (draft as UN).cornerRadius = value;
+      // TODO: make [corner_radius < (Math.min(width, height) / 2)]
+      (draft as UN).corner_radius = value;
     },
   }),
-  cornerRadiusTopLeft: defineNodeProperty<"cornerRadiusTopLeft">({
+  corner_radius_top_left: defineNodeProperty<"corner_radius_top_left">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerRadiusTopLeft = value;
+      (draft as UN).corner_radius_top_left = value;
     },
   }),
-  cornerRadiusTopRight: defineNodeProperty<"cornerRadiusTopRight">({
+  corner_radius_top_right: defineNodeProperty<"corner_radius_top_right">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerRadiusTopRight = value;
+      (draft as UN).corner_radius_top_right = value;
     },
   }),
-  cornerRadiusBottomRight: defineNodeProperty<"cornerRadiusBottomRight">({
+  corner_radius_bottom_right: defineNodeProperty<"corner_radius_bottom_right">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerRadiusBottomRight = value;
+      (draft as UN).corner_radius_bottom_right = value;
     },
   }),
-  cornerRadiusBottomLeft: defineNodeProperty<"cornerRadiusBottomLeft">({
+  corner_radius_bottom_left: defineNodeProperty<"corner_radius_bottom_left">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerRadiusBottomLeft = value;
+      (draft as UN).corner_radius_bottom_left = value;
     },
   }),
   cornerSmoothing: defineNodeProperty<"cornerSmoothing">({

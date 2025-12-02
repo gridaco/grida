@@ -281,11 +281,11 @@ function ModeMixedNodeProperties({
     active,
     locked,
     opacity,
-    cornerRadius,
-    cornerRadiusTopLeft,
-    cornerRadiusTopRight,
-    cornerRadiusBottomRight,
-    cornerRadiusBottomLeft,
+    corner_radius,
+    corner_radius_top_left,
+    corner_radius_top_right,
+    corner_radius_bottom_right,
+    corner_radius_bottom_left,
     fill,
     stroke,
     strokeWidth,
@@ -492,29 +492,29 @@ function ModeMixedNodeProperties({
           {supports_corner_radius && (
             <PropertyLine>
               <PropertyLineLabel>Radius</PropertyLineLabel>
-              {cornerRadius?.mixed ? (
-                <CornerRadius4Control onValueCommit={change.cornerRadius} />
+              {corner_radius?.mixed ? (
+                <CornerRadius4Control onValueCommit={change.corner_radius} />
               ) : (
                 <CornerRadius4Control
                   value={{
-                    cornerRadiusTopLeft:
-                      typeof cornerRadiusTopLeft?.value === "number"
-                        ? cornerRadiusTopLeft?.value
+                    corner_radius_top_left:
+                      typeof corner_radius_top_left?.value === "number"
+                        ? corner_radius_top_left?.value
                         : undefined,
-                    cornerRadiusTopRight:
-                      typeof cornerRadiusTopRight?.value === "number"
-                        ? cornerRadiusTopRight?.value
+                    corner_radius_top_right:
+                      typeof corner_radius_top_right?.value === "number"
+                        ? corner_radius_top_right?.value
                         : undefined,
-                    cornerRadiusBottomRight:
-                      typeof cornerRadiusBottomRight?.value === "number"
-                        ? cornerRadiusBottomRight?.value
+                    corner_radius_bottom_right:
+                      typeof corner_radius_bottom_right?.value === "number"
+                        ? corner_radius_bottom_right?.value
                         : undefined,
-                    cornerRadiusBottomLeft:
-                      typeof cornerRadiusBottomLeft?.value === "number"
-                        ? cornerRadiusBottomLeft?.value
+                    corner_radius_bottom_left:
+                      typeof corner_radius_bottom_left?.value === "number"
+                        ? corner_radius_bottom_left?.value
                         : undefined,
                   }}
-                  onValueCommit={change.cornerRadius}
+                  onValueCommit={change.corner_radius}
                 />
               )}
             </PropertyLine>
@@ -889,11 +889,11 @@ function ModeNodeProperties({
     src: node.src,
     type: node.type,
     blendMode: node.blendMode,
-    cornerRadius: node.cornerRadius,
-    cornerRadiusTopLeft: node.cornerRadiusTopLeft,
-    cornerRadiusTopRight: node.cornerRadiusTopRight,
-    cornerRadiusBottomRight: node.cornerRadiusBottomRight,
-    cornerRadiusBottomLeft: node.cornerRadiusBottomLeft,
+    corner_radius: node.corner_radius,
+    corner_radius_top_left: node.corner_radius_top_left,
+    corner_radius_top_right: node.corner_radius_top_right,
+    corner_radius_bottom_right: node.corner_radius_bottom_right,
+    corner_radius_bottom_left: node.corner_radius_bottom_left,
     pointCount: node.pointCount,
     innerRadius: node.innerRadius,
     angle: node.angle,
@@ -932,11 +932,11 @@ function ModeNodeProperties({
     component_id,
     type,
     blendMode,
-    cornerRadius,
-    cornerRadiusTopLeft,
-    cornerRadiusTopRight,
-    cornerRadiusBottomRight,
-    cornerRadiusBottomLeft,
+    corner_radius,
+    corner_radius_top_left,
+    corner_radius_top_right,
+    corner_radius_bottom_right,
+    corner_radius_bottom_left,
     pointCount,
     innerRadius,
     angle,
@@ -1137,12 +1137,12 @@ function ModeNodeProperties({
                   </PropertyLineLabelWithNumberGesture>
                   <CornerRadius4Control
                     value={{
-                      cornerRadiusTopLeft,
-                      cornerRadiusTopRight,
-                      cornerRadiusBottomRight,
-                      cornerRadiusBottomLeft,
+                      corner_radius_top_left,
+                      corner_radius_top_right,
+                      corner_radius_bottom_right,
+                      corner_radius_bottom_left,
                     }}
-                    onValueCommit={actions.cornerRadius}
+                    onValueCommit={actions.corner_radius}
                   />
                 </PropertyLine>
               ) : (
@@ -1155,8 +1155,8 @@ function ModeNodeProperties({
                     Radius
                   </PropertyLineLabelWithNumberGesture>
                   <CornerRadiusControl
-                    value={cornerRadius}
-                    onValueCommit={actions.cornerRadius}
+                    value={corner_radius}
+                    onValueCommit={actions.corner_radius}
                   />
                 </PropertyLine>
               )}

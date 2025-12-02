@@ -124,7 +124,7 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyPositioningMode(node_id, value),
 
       //
-      cornerRadius: (value: cg.CornerRadius) =>
+      corner_radius: (value: cg.CornerRadius) =>
         instance.commands.changeNodePropertyCornerRadius(node_id, value),
       cornerRadiusDelta: (delta: number) =>
         instance.commands.changeNodePropertyCornerRadiusWithDelta(

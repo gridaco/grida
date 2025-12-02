@@ -10,14 +10,14 @@ function cornerRadius(
   const values: number[] = [];
 
   for (const node of nodes) {
-    if ("cornerRadius" in node && node.cornerRadius !== undefined) {
-      values.push(node.cornerRadius);
-    } else if ("cornerRadiusTopLeft" in node) {
+    if ("corner_radius" in node && node.corner_radius !== undefined) {
+      values.push(node.corner_radius);
+    } else if ("corner_radius_top_left" in node) {
       const cornerValues: number[] = [
-        node.cornerRadiusTopLeft,
-        node.cornerRadiusTopRight,
-        node.cornerRadiusBottomLeft,
-        node.cornerRadiusBottomRight,
+        node.corner_radius_top_left,
+        node.corner_radius_top_right,
+        node.corner_radius_bottom_left,
+        node.corner_radius_bottom_right,
       ].filter((it) => it !== undefined);
 
       if (cornerValues.length > 0) {

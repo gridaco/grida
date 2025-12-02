@@ -160,7 +160,7 @@ export function NodeElement<P extends Record<string, any>>({
     // IDemension (does not instrictly mean width and height)
     // width: node.width,
     // height: node.height,
-    cornerRadius: node.cornerRadius,
+    corner_radius: node.corner_radius,
     // @ts-ignore
   } satisfies grida.program.document.IGlobalRenderingContext &
     (
