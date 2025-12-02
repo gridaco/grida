@@ -73,7 +73,7 @@ export namespace css {
       height,
       zIndex,
       opacity,
-      blendMode,
+      blend_mode,
       rotation,
       fill,
       fit,
@@ -123,7 +123,7 @@ export namespace css {
       bottom: bottom,
       zIndex: zIndex,
       opacity: opacity,
-      mixBlendMode: blendMode ? toMixBlendMode(blendMode) : undefined,
+      mixBlendMode: blend_mode ? toMixBlendMode(blend_mode) : undefined,
       objectFit: fit,
       rotate: rotation ? `${rotation}deg` : undefined,
       //

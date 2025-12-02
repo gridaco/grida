@@ -169,8 +169,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyFit(node_id, value),
       // stylable
       opacity: (change: editor.api.NumberChange) => node.changeOpacity(change),
-      blendMode: (value: cg.LayerBlendMode) => {
-        node.blendMode = value;
+      blend_mode: (value: cg.LayerBlendMode) => {
+        node.blend_mode = value;
       },
       maskType: (value: cg.LayerMaskType) => {
         node.mask = value;

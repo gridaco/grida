@@ -1408,7 +1408,7 @@ export namespace grida.program.nodes {
        *
        * @default "pass-through"
        */
-      blendMode?: cg.LayerBlendMode;
+      blend_mode?: cg.LayerBlendMode;
     }
 
     export interface ILayerMaskType {
@@ -2561,7 +2561,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
-            blendMode: cg.def.LAYER_BLENDMODE,
+            blend_mode: cg.def.LAYER_BLENDMODE,
             zIndex: 0,
             rotation: 0,
             width: 0,
@@ -2784,7 +2784,7 @@ export namespace grida.program.nodes {
         rotation: 0,
         zIndex: 0,
         opacity: 1,
-        blendMode: cg.def.LAYER_BLENDMODE,
+        blend_mode: cg.def.LAYER_BLENDMODE,
         position: "absolute",
         layout: "flow",
         direction: "horizontal",

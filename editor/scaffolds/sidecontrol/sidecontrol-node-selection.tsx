@@ -888,7 +888,7 @@ function ModeNodeProperties({
     component_id: node.component_id,
     src: node.src,
     type: node.type,
-    blendMode: node.blendMode,
+    blend_mode: node.blend_mode,
     corner_radius: node.corner_radius,
     corner_radius_top_left: node.corner_radius_top_left,
     corner_radius_top_right: node.corner_radius_top_right,
@@ -931,7 +931,7 @@ function ModeNodeProperties({
     locked,
     component_id,
     type,
-    blendMode,
+    blend_mode,
     corner_radius,
     corner_radius_top_left,
     corner_radius_top_right,
@@ -1111,8 +1111,8 @@ function ModeNodeProperties({
           <SidebarSectionHeaderActions>
             <BlendModeDropdown
               type="layer"
-              value={blendMode}
-              onValueChange={actions.blendMode}
+              value={blend_mode}
+              onValueChange={actions.blend_mode}
             />
           </SidebarSectionHeaderActions>
         </SidebarSectionHeaderItem>

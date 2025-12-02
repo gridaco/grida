@@ -253,10 +253,10 @@ const safe_properties: Partial<
       (draft as UN).opacity = ranged(0, value, 1);
     },
   }),
-  blendMode: defineNodeProperty<"blendMode">({
-    assert: (node) => typeof node.blendMode === "string",
+  blend_mode: defineNodeProperty<"blend_mode">({
+    assert: (node) => typeof node.blend_mode === "string",
     apply: (draft, value, prev) => {
-      (draft as UN).blendMode = value;
+      (draft as UN).blend_mode = value;
     },
   }),
   mask: defineNodeProperty<"mask">({

@@ -1786,8 +1786,14 @@ class EditorDocumentStore
       corner_radius: applyDelta(node.corner_radius, delta),
       corner_radius_top_left: applyDelta(node.corner_radius_top_left, delta),
       corner_radius_top_right: applyDelta(node.corner_radius_top_right, delta),
-      corner_radius_bottom_right: applyDelta(node.corner_radius_bottom_right, delta),
-      corner_radius_bottom_left: applyDelta(node.corner_radius_bottom_left, delta),
+      corner_radius_bottom_right: applyDelta(
+        node.corner_radius_bottom_right,
+        delta
+      ),
+      corner_radius_bottom_left: applyDelta(
+        node.corner_radius_bottom_left,
+        delta
+      ),
     };
 
     this.dispatch({
@@ -4510,13 +4516,13 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#blendMode}
+   * {@link grida.program.nodes.UnknwonNode#blend_mode}
    */
-  set blendMode(blendMode: cg.LayerBlendMode) {
+  set blend_mode(blend_mode: cg.LayerBlendMode) {
     this.doc.dispatch({
       type: "node/change/*",
       node_id: this.node_id,
-      blendMode,
+      blend_mode,
     });
   }
 
