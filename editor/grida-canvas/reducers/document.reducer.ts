@@ -2009,8 +2009,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         assert(node, `node not found with node_id: "${node_id}"`);
         if (node.type !== "text") return;
 
-        const isUnderline = node.textDecorationLine === "underline";
-        node.textDecorationLine = isUnderline ? "none" : "underline";
+        const isUnderline = node.text_decoration_line === "underline";
+        node.text_decoration_line = isUnderline ? "none" : "underline";
       });
       //
     }
@@ -2021,8 +2021,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         assert(node, `node not found with node_id: "${node_id}"`);
         if (node.type !== "text") return;
 
-        const isLineThrough = node.textDecorationLine === "line-through";
-        node.textDecorationLine = isLineThrough ? "none" : "line-through";
+        const isLineThrough = node.text_decoration_line === "line-through";
+        node.text_decoration_line = isLineThrough ? "none" : "line-through";
       });
       //
     }

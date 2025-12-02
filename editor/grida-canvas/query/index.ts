@@ -607,7 +607,7 @@ export namespace dq {
       return Array.from(
         new Set(
           this.textnodes()
-            .map((node) => node.fontFamily)
+            .map((node) => node.font_family)
             .filter(Boolean) as Array<string>
         )
       );

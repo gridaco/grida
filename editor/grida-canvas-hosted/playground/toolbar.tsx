@@ -95,7 +95,7 @@ function useTextRewriteDemo() {
         return {
           id: node.id,
           text: node.text,
-          maxLength: node.maxLength,
+          maxLength: node.max_length,
           usermetadata: node.userdata,
         };
       });

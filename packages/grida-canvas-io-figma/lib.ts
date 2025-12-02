@@ -617,26 +617,26 @@ export namespace iofigma {
                   : undefined,
               //
               style: {},
-              textAlign: node.style.textAlignHorizontal
+              text_align: node.style.textAlignHorizontal
                 ? (map.textAlignMap[node.style.textAlignHorizontal] ?? "left")
                 : "left",
-              textAlignVertical: node.style.textAlignVertical
+              text_align_vertical: node.style.textAlignVertical
                 ? map.textAlignVerticalMap[node.style.textAlignVertical]
                 : "top",
-              textDecorationLine: node.style.textDecoration
+              text_decoration_line: node.style.textDecoration
                 ? (map.textDecorationMap[node.style.textDecoration] ?? "none")
                 : "none",
-              lineHeight: node.style.lineHeightPercentFontSize
+              line_height: node.style.lineHeightPercentFontSize
                 ? node.style.lineHeightPercentFontSize / 100
                 : // normal = 1.2
                   1.2,
 
-              letterSpacing: node.style.letterSpacing,
-              fontSize: node.style.fontSize ?? 0,
-              fontFamily: node.style.fontFamily,
-              fontWeight:
+              letter_spacing: node.style.letterSpacing,
+              font_size: node.style.fontSize ?? 0,
+              font_family: node.style.fontFamily,
+              font_weight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
-              fontKerning: true, // TODO: parse from features (`kern`)
+              font_kerning: true, // TODO: parse from features (`kern`)
             };
           }
           case "RECTANGLE": {

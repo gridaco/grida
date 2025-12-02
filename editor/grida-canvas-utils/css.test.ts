@@ -11,20 +11,20 @@ import { css } from "./css";
 describe("toReactTextStyle", () => {
   it("applies font feature and variation settings", () => {
     const style: grida.program.nodes.i.IComputedTextNodeStyle = {
-      textAlign: "left",
-      textAlignVertical: "top",
-      textDecorationLine: "none",
-      fontFamily: "Inter",
-      fontSize: 16,
-      fontWeight: 400,
-      fontKerning: true,
+      text_align: "left",
+      text_align_vertical: "top",
+      text_decoration_line: "none",
+      font_family: "Inter",
+      font_size: 16,
+      font_weight: 400,
+      font_kerning: true,
       fill: {
         type: "solid",
         color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
-      fontFeatures: { liga: false, smpl: true },
-      fontVariations: { wght: 700, slnt: 12 },
+      font_features: { liga: false, smpl: true },
+      font_variations: { wght: 700, slnt: 12 },
     };
 
     const result = css.toReactTextStyle(style);
@@ -35,20 +35,20 @@ describe("toReactTextStyle", () => {
 
   it("handles font optical sizing", () => {
     const style: grida.program.nodes.i.IComputedTextNodeStyle = {
-      textAlign: "left",
-      textAlignVertical: "top",
-      textDecorationLine: "none",
-      fontFamily: "Inter",
-      fontSize: 16,
-      fontWeight: 400,
-      fontKerning: true,
+      text_align: "left",
+      text_align_vertical: "top",
+      text_decoration_line: "none",
+      font_family: "Inter",
+      font_size: 16,
+      font_weight: 400,
+      font_kerning: true,
       fill: {
         type: "solid",
         color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
-      fontOpticalSizing: 12,
-      fontVariations: { wght: 500 },
+      font_optical_sizing: 12,
+      font_variations: { wght: 500 },
     };
 
     const result = css.toReactTextStyle(style);
@@ -59,19 +59,19 @@ describe("toReactTextStyle", () => {
 
   it("overrides kern feature with fontKerning", () => {
     const style: grida.program.nodes.i.IComputedTextNodeStyle = {
-      textAlign: "left",
-      textAlignVertical: "top",
-      textDecorationLine: "none",
-      fontFamily: "Inter",
-      fontSize: 16,
-      fontWeight: 400,
-      fontKerning: false,
+      text_align: "left",
+      text_align_vertical: "top",
+      text_decoration_line: "none",
+      font_family: "Inter",
+      font_size: 16,
+      font_weight: 400,
+      font_kerning: false,
       fill: {
         type: "solid",
         color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
-      fontFeatures: { kern: true },
+      font_features: { kern: true },
     };
 
     const result = css.toReactTextStyle(style);
@@ -81,20 +81,20 @@ describe("toReactTextStyle", () => {
 
   it("overrides wdth variation with fontWidth", () => {
     const style: grida.program.nodes.i.IComputedTextNodeStyle = {
-      textAlign: "left",
-      textAlignVertical: "top",
-      textDecorationLine: "none",
-      fontFamily: "Inter",
-      fontSize: 16,
-      fontWeight: 400,
-      fontKerning: true,
-      fontWidth: 150,
+      text_align: "left",
+      text_align_vertical: "top",
+      text_decoration_line: "none",
+      font_family: "Inter",
+      font_size: 16,
+      font_weight: 400,
+      font_kerning: true,
+      font_width: 150,
       fill: {
         type: "solid",
         color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
-      fontVariations: { wdth: 120, wght: 500 },
+      font_variations: { wdth: 120, wght: 500 },
     };
 
     const result = css.toReactTextStyle(style);
@@ -104,19 +104,19 @@ describe("toReactTextStyle", () => {
 
   it("maps textTransform to CSS property", () => {
     const style: grida.program.nodes.i.IComputedTextNodeStyle = {
-      textAlign: "left",
-      textAlignVertical: "top",
-      textDecorationLine: "none",
-      fontFamily: "Inter",
-      fontSize: 16,
-      fontWeight: 400,
-      fontKerning: true,
+      text_align: "left",
+      text_align_vertical: "top",
+      text_decoration_line: "none",
+      font_family: "Inter",
+      font_size: 16,
+      font_weight: 400,
+      font_kerning: true,
       fill: {
         type: "solid",
         color: kolor.colorformats.RGBA32F.BLACK,
         active: true,
       },
-      textTransform: "uppercase",
+      text_transform: "uppercase",
     };
 
     const result = css.toReactTextStyle(style);

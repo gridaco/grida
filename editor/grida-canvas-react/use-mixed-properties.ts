@@ -119,123 +119,123 @@ export function useMixedProperties(ids: string[]) {
 
   const fontFamily = useCallback(
     (value: string, force?: boolean) => {
-      mixedProperties.fontFamily?.ids.forEach((id) => {
+      mixedProperties.font_family?.ids.forEach((id) => {
         instance.changeTextNodeFontFamilySync(id, value, force);
       });
     },
-    [mixedProperties.fontFamily?.ids, instance.changeTextNodeFontFamilySync]
+    [mixedProperties.font_family?.ids, instance.changeTextNodeFontFamilySync]
   );
 
   const fontWeight = useCallback(
     (value: cg.NFontWeight) => {
-      mixedProperties.fontWeight?.ids.forEach((id) => {
+      mixedProperties.font_weight?.ids.forEach((id) => {
         instance.commands.changeTextNodeFontWeight(id, value);
       });
     },
-    [mixedProperties.fontWeight?.ids, instance.commands]
+    [mixedProperties.font_weight?.ids, instance.commands]
   );
 
   const fontKerning = useCallback(
     (value: boolean) => {
-      mixedProperties.fontKerning?.ids.forEach((id) => {
+      mixedProperties.font_kerning?.ids.forEach((id) => {
         instance.commands.changeTextNodeFontKerning(id, value);
       });
     },
-    [mixedProperties.fontKerning?.ids, instance.commands]
+    [mixedProperties.font_kerning?.ids, instance.commands]
   );
 
   const fontWidth = useCallback(
     (value: number) => {
-      mixedProperties.fontWidth?.ids.forEach((id) => {
+      mixedProperties.font_width?.ids.forEach((id) => {
         instance.commands.changeTextNodeFontWidth(id, value);
       });
     },
-    [mixedProperties.fontWidth?.ids, instance.commands]
+    [mixedProperties.font_width?.ids, instance.commands]
   );
 
   const fontStyle = useCallback(
     (change: editor.api.FontStyleChangeDescription) => {
-      mixedProperties.fontStyleItalic?.ids.forEach((id) => {
+      mixedProperties.font_style_italic?.ids.forEach((id) => {
         instance.changeTextNodeFontStyle(id, change);
       });
     },
-    [mixedProperties.fontStyleItalic?.ids, instance.changeTextNodeFontStyle]
+    [mixedProperties.font_style_italic?.ids, instance.changeTextNodeFontStyle]
   );
 
   const fontOpticalSizing = useCallback(
     (value: cg.OpticalSizing) => {
-      mixedProperties.fontOpticalSizing?.ids.forEach((id) => {
+      mixedProperties.font_optical_sizing?.ids.forEach((id) => {
         instance.commands.changeTextNodeFontOpticalSizing(id, value);
       });
     },
-    [mixedProperties.fontOpticalSizing?.ids, instance.commands]
+    [mixedProperties.font_optical_sizing?.ids, instance.commands]
   );
 
   const fontVariation = useCallback(
     (key: string, value: number) => {
-      mixedProperties.fontWeight?.ids.forEach((id) => {
+      mixedProperties.font_weight?.ids.forEach((id) => {
         instance.commands.changeTextNodeFontVariation(id, key, value);
       });
     },
-    [mixedProperties.fontWeight?.ids, instance.commands]
+    [mixedProperties.font_weight?.ids, instance.commands]
   );
 
   const fontSize = useCallback(
     (change: editor.api.NumberChange) => {
-      mixedProperties.fontSize?.ids.forEach((id) => {
+      mixedProperties.font_size?.ids.forEach((id) => {
         instance.commands.changeTextNodeFontSize(id, change);
       });
     },
-    [mixedProperties.fontSize?.ids, instance.commands]
+    [mixedProperties.font_size?.ids, instance.commands]
   );
 
   const lineHeight = useCallback(
     (change: editor.api.NumberChange) => {
-      mixedProperties.lineHeight?.ids.forEach((id) => {
+      mixedProperties.line_height?.ids.forEach((id) => {
         instance.commands.changeTextNodeLineHeight(id, change);
       });
     },
-    [mixedProperties.lineHeight?.ids, instance.commands]
+    [mixedProperties.line_height?.ids, instance.commands]
   );
 
   const letterSpacing = useCallback(
     (
-      change: editor.api.TChange<grida.program.nodes.TextNode["letterSpacing"]>
+      change: editor.api.TChange<grida.program.nodes.TextNode["letter_spacing"]>
     ) => {
-      mixedProperties.letterSpacing?.ids.forEach((id) => {
+      mixedProperties.letter_spacing?.ids.forEach((id) => {
         instance.commands.changeTextNodeLetterSpacing(id, change);
       });
     },
-    [mixedProperties.letterSpacing?.ids, instance.commands]
+    [mixedProperties.letter_spacing?.ids, instance.commands]
   );
 
   const wordSpacing = useCallback(
     (
-      change: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
+      change: editor.api.TChange<grida.program.nodes.TextNode["word_spacing"]>
     ) => {
-      mixedProperties.wordSpacing?.ids.forEach((id) => {
+      mixedProperties.word_spacing?.ids.forEach((id) => {
         instance.commands.changeTextNodeWordSpacing(id, change);
       });
     },
-    [mixedProperties.wordSpacing?.ids, instance.commands]
+    [mixedProperties.word_spacing?.ids, instance.commands]
   );
 
   const textAlign = useCallback(
     (value: cg.TextAlign) => {
-      mixedProperties.textAlign?.ids.forEach((id) => {
+      mixedProperties.text_align?.ids.forEach((id) => {
         instance.commands.changeTextNodeTextAlign(id, value);
       });
     },
-    [mixedProperties.textAlign?.ids, instance.commands]
+    [mixedProperties.text_align?.ids, instance.commands]
   );
 
   const textAlignVertical = useCallback(
     (value: cg.TextAlignVertical) => {
-      mixedProperties.textAlignVertical?.ids.forEach((id) => {
+      mixedProperties.text_align_vertical?.ids.forEach((id) => {
         instance.commands.changeTextNodeTextAlignVertical(id, value);
       });
     },
-    [mixedProperties.textAlignVertical?.ids, instance.commands]
+    [mixedProperties.text_align_vertical?.ids, instance.commands]
   );
 
   const fit = useCallback(
@@ -346,19 +346,19 @@ export function useMixedProperties(ids: string[]) {
       width,
       height,
       positioningMode,
-      fontFamily,
+      font_family: fontFamily,
       fontWeight,
       fontKerning,
       fontWidth,
       fontStyle,
       fontOpticalSizing,
       fontVariation,
-      fontSize,
-      lineHeight,
-      letterSpacing,
+      font_size: fontSize,
+      line_height: lineHeight,
+      letter_spacing: letterSpacing,
       wordSpacing,
-      textAlign,
-      textAlignVertical,
+      text_align: textAlign,
+      text_align_vertical: textAlignVertical,
       fit,
       fill,
       stroke,

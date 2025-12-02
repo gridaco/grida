@@ -103,8 +103,8 @@ export default function initialNode(
         ...styles,
         ...editor.config.fonts.DEFAULT_TEXT_STYLE_INTER,
         type: "text",
-        textAlign: "left",
-        textAlignVertical: "top",
+        text_align: "left",
+        text_align_vertical: "top",
         fill: constraints.fill === "fills" ? undefined : black,
         fills: constraints.fill === "fills" ? [black] : undefined,
         width: "auto",
@@ -112,10 +112,10 @@ export default function initialNode(
         text: "Text",
         stroke: constraints.stroke === "strokes" ? undefined : undefined,
         strokes: constraints.stroke === "strokes" ? [] : undefined,
-        letterSpacing: 0,
-        lineHeight: undefined, // normal
+        letter_spacing: 0,
+        line_height: undefined, // normal
         stroke_width: 0,
-        wordSpacing: 0,
+        word_spacing: 0,
         ...seed,
       } satisfies grida.program.nodes.TextNode;
     }

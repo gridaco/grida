@@ -248,15 +248,15 @@ export namespace editor.config {
     export const DEFAULT_FONT_SIZE = 14;
 
     export const DEFAULT_TEXT_STYLE_INTER: grida.program.nodes.i.ITextStyle = {
-      fontFamily: DEFAULT_FONT_FAMILY,
-      fontPostscriptName: null,
-      fontStyleItalic: false,
-      fontFeatures: {},
-      fontOpticalSizing: "auto",
-      fontWeight: DEFAULT_FONT_WEIGHT,
-      fontKerning: true,
-      fontSize: DEFAULT_FONT_SIZE,
-      textDecorationLine: "none",
+      font_family: DEFAULT_FONT_FAMILY,
+      font_postscript_name: null,
+      font_style_italic: false,
+      font_features: {},
+      font_optical_sizing: "auto",
+      font_weight: DEFAULT_FONT_WEIGHT,
+      font_kerning: true,
+      font_size: DEFAULT_FONT_SIZE,
+      text_decoration_line: "none",
     };
 
     const PLATFORM_FONTS = {
@@ -3171,15 +3171,15 @@ export namespace editor.api {
     ): void;
     changeTextNodeLineHeight(
       node_id: NodeID,
-      lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
+      lineHeight: TChange<grida.program.nodes.TextNode["line_height"]>
     ): void;
     changeTextNodeLetterSpacing(
       node_id: NodeID,
-      letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
+      letterSpacing: TChange<grida.program.nodes.TextNode["letter_spacing"]>
     ): void;
     changeTextNodeWordSpacing(
       node_id: NodeID,
-      wordSpacing: TChange<grida.program.nodes.TextNode["wordSpacing"]>
+      wordSpacing: TChange<grida.program.nodes.TextNode["word_spacing"]>
     ): void;
     changeTextNodeMaxlength(
       node_id: NodeID,

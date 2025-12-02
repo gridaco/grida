@@ -1842,7 +1842,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontWeight,
+      font_weight: fontWeight,
     });
   }
 
@@ -1850,7 +1850,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontKerning,
+      font_kerning: fontKerning,
     });
   }
 
@@ -1858,7 +1858,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontWidth,
+      font_width: fontWidth,
     });
   }
 
@@ -1870,13 +1870,13 @@ class EditorDocumentStore
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextNode;
-    const features = Object.assign({}, node.fontFeatures ?? {});
+    const features = Object.assign({}, node.font_features ?? {});
     features[feature] = value;
 
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontFeatures: features,
+      font_features: features,
     });
   }
   changeTextNodeFontVariation(
@@ -1887,13 +1887,13 @@ class EditorDocumentStore
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextNode;
-    const variations = Object.assign({}, node.fontVariations ?? {});
+    const variations = Object.assign({}, node.font_variations ?? {});
     variations[key] = value;
 
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontVariations: variations,
+      font_variations: variations,
     });
   }
 
@@ -1904,7 +1904,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontOpticalSizing,
+      font_optical_sizing: fontOpticalSizing,
     });
   }
 
@@ -1912,14 +1912,14 @@ class EditorDocumentStore
     try {
       const value = resolveNumberChangeValue(
         this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-        "fontSize",
+        "font_size",
         fontSize
       );
 
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        fontSize: value,
+        font_size: value,
       });
     } catch (e) {
       reportError(e);
@@ -1930,7 +1930,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textAlign,
+      text_align: textAlign,
     });
   }
 
@@ -1941,7 +1941,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textAlignVertical,
+      text_align_vertical: textAlignVertical,
     });
   }
 
@@ -1952,7 +1952,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textTransform,
+      text_transform: textTransform,
     });
   }
 
@@ -1963,7 +1963,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationLine: textDecorationLine,
+      text_decoration_line: textDecorationLine,
     });
   }
 
@@ -1974,7 +1974,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationStyle,
+      text_decoration_style: textDecorationStyle,
     });
   }
 
@@ -1985,7 +1985,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationThickness,
+      text_decoration_thickness: textDecorationThickness,
     });
   }
 
@@ -1999,7 +1999,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationColor: value,
+      text_decoration_color: value,
     });
   }
 
@@ -2010,7 +2010,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationSkipInk,
+      text_decoration_skip_ink: textDecorationSkipInk,
     });
   }
 
@@ -2021,13 +2021,13 @@ class EditorDocumentStore
     try {
       const value = resolveNumberChangeValue(
         this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-        "lineHeight",
+        "line_height",
         lineHeight
       );
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        lineHeight: value,
+        line_height: value,
       });
     } catch (e) {
       reportError(e);
@@ -2038,7 +2038,7 @@ class EditorDocumentStore
   changeTextNodeLetterSpacing(
     node_id: string,
     letterSpacing: editor.api.TChange<
-      grida.program.nodes.TextNode["letterSpacing"]
+      grida.program.nodes.TextNode["letter_spacing"]
     >
   ) {
     try {
@@ -2048,7 +2048,7 @@ class EditorDocumentStore
       } else {
         value = resolveNumberChangeValue(
           this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-          "letterSpacing",
+          "letter_spacing",
           letterSpacing as editor.api.NumberChange
         );
       }
@@ -2056,7 +2056,7 @@ class EditorDocumentStore
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        letterSpacing: value,
+        letter_spacing: value,
       });
     } catch (e) {
       reportError(e);
@@ -2066,7 +2066,9 @@ class EditorDocumentStore
 
   changeTextNodeWordSpacing(
     node_id: string,
-    wordSpacing: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
+    wordSpacing: editor.api.TChange<
+      grida.program.nodes.TextNode["word_spacing"]
+    >
   ) {
     try {
       let value: number | undefined;
@@ -2075,7 +2077,7 @@ class EditorDocumentStore
       } else {
         value = resolveNumberChangeValue(
           this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-          "wordSpacing",
+          "word_spacing",
           wordSpacing as editor.api.NumberChange
         );
       }
@@ -2083,7 +2085,7 @@ class EditorDocumentStore
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        wordSpacing: value,
+        word_spacing: value,
       });
     } catch (e) {
       reportError(e);
@@ -2095,7 +2097,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      maxLength,
+      max_length: maxLength,
     });
   }
 
@@ -2103,7 +2105,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      maxLines,
+      max_lines: maxLines,
     });
   }
 
@@ -3059,15 +3061,15 @@ export class Editor
     ) as grida.program.nodes.TextNode;
     if (node.type !== "text") return false;
 
-    const isBold = node.fontWeight === 700;
+    const isBold = node.font_weight === 700;
     const next_weight = isBold ? 400 : 700;
-    const fontFamily = node.fontFamily;
+    const fontFamily = node.font_family;
     if (!fontFamily) return false;
 
     const match = this.selectFontStyle({
       fontFamily: fontFamily,
       fontWeight: next_weight,
-      fontStyleItalic: node.fontStyleItalic,
+      fontStyleItalic: node.font_style_italic,
     });
 
     if (!match) {
@@ -3075,7 +3077,7 @@ export class Editor
         "toggleNodeBold: matching font face not found",
         fontFamily,
         next_weight,
-        node.fontStyleItalic
+        node.font_style_italic
       );
       return false;
     }
@@ -3090,13 +3092,13 @@ export class Editor
     ) as grida.program.nodes.TextNode;
     if (node.type !== "text") return false;
 
-    const next_italic = !node.fontStyleItalic;
-    const fontFamily = node.fontFamily;
+    const next_italic = !node.font_style_italic;
+    const fontFamily = node.font_family;
     if (!fontFamily) return false;
 
     const match = this.selectFontStyle({
       fontFamily: fontFamily,
-      fontWeight: node.fontWeight,
+      fontWeight: node.font_weight,
       fontStyleItalic: next_italic,
     });
 
@@ -3105,7 +3107,7 @@ export class Editor
         "toggleNodeItalic: matching font face not found",
         fontFamily,
         next_italic,
-        node.fontWeight
+        node.font_weight
       );
       return false;
     }
@@ -3126,15 +3128,15 @@ export class Editor
     ) as grida.program.nodes.TextNode;
 
     const prev: grida.program.nodes.i.IFontStyle = {
-      fontPostscriptName: node.fontPostscriptName,
-      fontWeight: node.fontWeight,
-      fontWidth: node.fontWidth,
-      fontKerning: node.fontKerning,
-      fontSize: node.fontSize,
-      fontVariations: node.fontVariations,
-      fontFeatures: node.fontFeatures,
-      fontOpticalSizing: node.fontOpticalSizing,
-      fontStyleItalic: node.fontStyleItalic,
+      font_postscript_name: node.font_postscript_name,
+      font_weight: node.font_weight,
+      font_width: node.font_width,
+      font_kerning: node.font_kerning,
+      font_size: node.font_size,
+      font_variations: node.font_variations,
+      font_features: node.font_features,
+      font_optical_sizing: node.font_optical_sizing,
+      font_style_italic: node.font_style_italic,
     };
 
     const description = Object.assign(
@@ -3163,28 +3165,28 @@ export class Editor
     }
 
     const {
-      fontFamily: _fontFamily,
+      font_family: _fontFamily,
       ...next
     }: grida.program.nodes.i.IFontStyle = {
       ...prev,
-      fontPostscriptName:
+      font_postscript_name:
         match.instance?.postscriptName || match.face.postscriptName,
       // ----
       // [high level variables]
-      fontWeight: match.instance?.coordinates?.wght ?? prev.fontWeight,
-      fontWidth: match.instance?.coordinates?.wdth ?? prev.fontWidth,
+      font_weight: match.instance?.coordinates?.wght ?? prev.font_weight,
+      font_width: match.instance?.coordinates?.wdth ?? prev.font_width,
       // TODO: should prevent optical sizing auto => fixed
       // (if the next value === auto's expected value && prev value is auto, keep auto) => the change style does not change the size, so the logic can be even simpler.
-      fontOpticalSizing:
-        match.instance?.coordinates?.opsz ?? prev.fontOpticalSizing,
+      font_optical_sizing:
+        match.instance?.coordinates?.opsz ?? prev.font_optical_sizing,
       // ----
       // Clear variable axes for non-variable fonts
-      fontVariations: match.isVariable
+      font_variations: match.isVariable
         ? match.instance?.coordinates
         : undefined,
       // TODO: clean the invalid features by face change.
       // fontFeatures: match.features,
-      fontStyleItalic: match.face.italic,
+      font_style_italic: match.face.italic,
     } as const;
 
     this.doc.dispatch({
@@ -3228,9 +3230,9 @@ export class Editor
 
     if (!force) {
       // when not force, try to keep the previous (current) font style
-      description.fontWeight = node.fontWeight;
-      description.fontStyleItalic = node.fontStyleItalic;
-      description.fontVariations = node.fontVariations;
+      description.fontWeight = node.font_weight;
+      description.fontStyleItalic = node.font_style_italic;
+      description.fontVariations = node.font_variations;
     }
 
     const match = this.selectFontStyle(description);
@@ -3260,8 +3262,8 @@ export class Editor
     const prev = this.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
     if (!prev) return;
 
-    const h_align = node.textAlign;
-    const v_align = node.textAlignVertical;
+    const h_align = node.text_align;
+    const v_align = node.text_align_vertical;
 
     // FIXME: nested raf.
     // why this is needed?

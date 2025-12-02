@@ -293,17 +293,17 @@ function ModeMixedNodeProperties({
     width,
     height,
     fit,
-    fontFamily,
-    fontWeight,
-    fontStyleItalic,
-    fontPostscriptName,
-    fontOpticalSizing,
-    fontVariations,
-    fontSize,
-    lineHeight,
-    letterSpacing,
-    textAlign,
-    textAlignVertical,
+    font_family,
+    font_weight,
+    font_style_italic,
+    font_postscript_name,
+    font_optical_sizing,
+    font_variations,
+    font_size,
+    line_height,
+    letter_spacing,
+    text_align,
+    text_align_vertical,
 
     //
     layout,
@@ -567,22 +567,22 @@ function ModeMixedNodeProperties({
         <CurrentFontProvider
           description={{
             fontFamily:
-              typeof fontFamily?.value === "string" ? fontFamily.value : "",
+              typeof font_family?.value === "string" ? font_family.value : "",
             fontPostscriptName:
-              typeof fontPostscriptName?.value === "string"
-                ? fontPostscriptName.value
+              typeof font_postscript_name?.value === "string"
+                ? font_postscript_name.value
                 : undefined,
             fontWeight:
-              typeof fontWeight?.value === "number"
-                ? fontWeight.value
+              typeof font_weight?.value === "number"
+                ? font_weight.value
                 : undefined,
             fontStyleItalic:
-              typeof fontStyleItalic?.value === "boolean"
-                ? fontStyleItalic.value
+              typeof font_style_italic?.value === "boolean"
+                ? font_style_italic.value
                 : undefined,
             fontVariations:
-              typeof fontVariations?.value === "object"
-                ? (fontVariations.value as Record<string, number>)
+              typeof font_variations?.value === "object"
+                ? (font_variations.value as Record<string, number>)
                 : undefined,
           }}
         >
@@ -595,8 +595,8 @@ function ModeMixedNodeProperties({
                 <PropertyLineLabel>Font</PropertyLineLabel>
                 <div className="flex-1">
                   <FontFamilyControl
-                    value={fontFamily?.value}
-                    onValueChange={change.fontFamily}
+                    value={font_family?.value}
+                    onValueChange={change.font_family}
                   />
                 </div>
               </PropertyLine>
@@ -607,36 +607,36 @@ function ModeMixedNodeProperties({
               <PropertyLine>
                 <PropertyLineLabel>Size</PropertyLineLabel>
                 <FontSizeControl
-                  value={fontSize?.value}
-                  onValueCommit={change.fontSize}
+                  value={font_size?.value}
+                  onValueCommit={change.font_size}
                 />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Line</PropertyLineLabel>
                 <LineHeightControl
-                  value={lineHeight?.value}
-                  onValueCommit={change.lineHeight}
+                  value={line_height?.value}
+                  onValueCommit={change.line_height}
                 />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Letter</PropertyLineLabel>
                 <LetterSpacingControl
-                  value={letterSpacing?.value}
-                  onValueCommit={change.letterSpacing}
+                  value={letter_spacing?.value}
+                  onValueCommit={change.letter_spacing}
                 />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Align</PropertyLineLabel>
                 <TextAlignControl
-                  value={textAlign?.value}
-                  onValueChange={change.textAlign}
+                  value={text_align?.value}
+                  onValueChange={change.text_align}
                 />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel></PropertyLineLabel>
                 <TextAlignVerticalControl
-                  value={textAlignVertical?.value}
-                  onValueChange={change.textAlignVertical}
+                  value={text_align_vertical?.value}
+                  onValueChange={change.text_align_vertical}
                 />
               </PropertyLine>
               <PropertyLine>
@@ -1473,29 +1473,29 @@ function SectionText({ node_id }: { node_id: string }) {
     const node = _node as grida.program.nodes.TextNode;
     return {
       text: node.text,
-      fontFamily: node.fontFamily,
-      fontWeight: node.fontWeight,
-      fontStyleItalic: node.fontStyleItalic,
-      fontSize: node.fontSize,
-      lineHeight: node.lineHeight,
-      letterSpacing: node.letterSpacing,
-      wordSpacing: node.wordSpacing,
-      textAlign: node.textAlign,
-      textAlignVertical: node.textAlignVertical,
-      textDecorationLine: node.textDecorationLine,
-      textDecorationStyle: node.textDecorationStyle,
-      textDecorationColor: node.textDecorationColor,
-      textDecorationSkipInk: node.textDecorationSkipInk,
-      textDecorationThickness: node.textDecorationThickness,
-      textTransform: node.textTransform,
-      maxLines: node.maxLines,
-      maxLength: node.maxLength,
-      fontPostscriptName: node.fontPostscriptName,
-      fontVariations: node.fontVariations,
-      fontFeatures: node.fontFeatures,
-      fontOpticalSizing: node.fontOpticalSizing,
-      fontKerning: node.fontKerning,
-      fontWidth: node.fontWidth,
+      fontFamily: node.font_family,
+      fontWeight: node.font_weight,
+      fontStyleItalic: node.font_style_italic,
+      fontSize: node.font_size,
+      lineHeight: node.line_height,
+      letterSpacing: node.letter_spacing,
+      wordSpacing: node.word_spacing,
+      textAlign: node.text_align,
+      textAlignVertical: node.text_align_vertical,
+      textDecorationLine: node.text_decoration_line,
+      textDecorationStyle: node.text_decoration_style,
+      textDecorationColor: node.text_decoration_color,
+      textDecorationSkipInk: node.text_decoration_skip_ink,
+      textDecorationThickness: node.text_decoration_thickness,
+      textTransform: node.text_transform,
+      maxLines: node.max_lines,
+      maxLength: node.max_length,
+      fontPostscriptName: node.font_postscript_name,
+      fontVariations: node.font_variations,
+      fontFeatures: node.font_features,
+      fontOpticalSizing: node.font_optical_sizing,
+      fontKerning: node.font_kerning,
+      fontWidth: node.font_width,
     };
   });
 

@@ -1791,8 +1791,8 @@ export namespace grida.program.nodes {
      * this is a abstract font-related style container, where this subset of text style attrutes are hightly likely change within this scope, as font family or font (postscript) / instance change.
      */
     export interface IFontStyle {
-      fontFamily?: string;
-      fontSize: number;
+      font_family?: string;
+      font_size: number;
       /**
        * font weight
        *
@@ -1800,7 +1800,7 @@ export namespace grida.program.nodes {
        *
        * @default 400
        */
-      fontWeight: cg.NFontWeight | number;
+      font_weight: cg.NFontWeight | number;
 
       /**
        * font width
@@ -1811,7 +1811,7 @@ export namespace grida.program.nodes {
        * @default undefined
        *
        */
-      fontWidth?: number;
+      font_width?: number;
 
       /**
        * font optical sizing
@@ -1820,7 +1820,7 @@ export namespace grida.program.nodes {
        *
        * @default "auto"
        */
-      fontOpticalSizing?: cg.OpticalSizing;
+      font_optical_sizing?: cg.OpticalSizing;
 
       /**
        * Font kerning mode
@@ -1830,18 +1830,18 @@ export namespace grida.program.nodes {
        *
        * @default `normal`
        */
-      fontKerning: cg.FontKerningFlag;
+      font_kerning: cg.FontKerningFlag;
 
       /**
        * OpenType features
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-feature-settings
        */
-      fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
+      font_features?: Partial<Record<cg.OpenTypeFeature, boolean>>;
       /**
        * custom font variations
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-variation-settings
        */
-      fontVariations?: Record<string, number>;
+      font_variations?: Record<string, number>;
 
       // #region semantics
       /**
@@ -1853,7 +1853,7 @@ export namespace grida.program.nodes {
        *
        * if the used fvar.instance is semantically italic, this can be set true.
        */
-      fontStyleItalic?: boolean;
+      font_style_italic?: boolean;
 
       /**
        * [font post script name]
@@ -1862,7 +1862,7 @@ export namespace grida.program.nodes {
        *
        * @note some fonts, like Inter, do not have a postscript name for instances.
        */
-      fontPostscriptName?: string | null;
+      font_postscript_name?: string | null;
       // #endregion semantics
     }
 
@@ -1873,14 +1873,14 @@ export namespace grida.program.nodes {
      */
     export interface ITextStyle extends IFontStyle {
       // #region decorations
-      textDecorationLine: cg.TextDecorationLine;
-      textDecorationStyle?: cg.TextDecorationStyle | null;
-      textDecorationColor?: cg.TextDecorationColorValue | null;
-      textDecorationSkipInk?: cg.TextDecorationSkipInkFlag | null;
-      textDecorationThickness?: cg.TextDecorationThicknessPercentage | null;
+      text_decoration_line: cg.TextDecorationLine;
+      text_decoration_style?: cg.TextDecorationStyle | null;
+      text_decoration_color?: cg.TextDecorationColorValue | null;
+      text_decoration_skip_ink?: cg.TextDecorationSkipInkFlag | null;
+      text_decoration_thickness?: cg.TextDecorationThicknessPercentage | null;
       // #endregion decorations
 
-      textTransform?: cg.TextTransform;
+      text_transform?: cg.TextTransform;
 
       /**
        * letter-spacing in em (percentage) value
@@ -1888,7 +1888,7 @@ export namespace grida.program.nodes {
        * @example 1 = 100% / 1em
        * @default 0
        */
-      letterSpacing?: number;
+      letter_spacing?: number;
 
       /**
        * word-spacing in em (percentage) value
@@ -1896,7 +1896,7 @@ export namespace grida.program.nodes {
        * @example 1 = 100% / 1em
        * @default 0
        */
-      wordSpacing?: number;
+      word_spacing?: number;
 
       /**
        * line-height in percentage value only. 0% ~
@@ -1904,7 +1904,7 @@ export namespace grida.program.nodes {
        * @example 1 = 100% / 1em
        * @min 0
        */
-      lineHeight?: number;
+      line_height?: number;
     }
 
     /**
@@ -1918,11 +1918,11 @@ export namespace grida.program.nodes {
       /**
        * @default "left"
        */
-      textAlign: cg.TextAlign;
+      text_align: cg.TextAlign;
       /**
        * @default "top"
        */
-      textAlignVertical: cg.TextAlignVertical;
+      text_align_vertical: cg.TextAlignVertical;
     }
 
     export interface IComputedTextNodeStyle
@@ -1943,7 +1943,7 @@ export namespace grida.program.nodes {
        *
        * @deprecated - not standard
        */
-      maxLength?: number;
+      max_length?: number;
     }
 
     export interface IComputedTextValue {
@@ -2072,7 +2072,7 @@ export namespace grida.program.nodes {
       i.ITextStroke {
     readonly type: "text";
 
-    maxLines?: number | null;
+    max_lines?: number | null;
     // textAutoResize: "none" | "width" | "height" | "auto";
   }
 
@@ -2083,7 +2083,7 @@ export namespace grida.program.nodes {
       i.IComputedTextValue & i.IComputedTextNodeStyle
     > {
     readonly type: "text";
-    maxLines?: number | null;
+    max_lines?: number | null;
   }
 
   export interface ImageNode
