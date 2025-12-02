@@ -151,7 +151,7 @@ export namespace iofigma {
               stop.color.a
             ),
           })),
-          blendMode: map.blendModeMap[paint.blendMode],
+          blend_mode: map.blendModeMap[paint.blendMode],
           active: paint.visible ?? true,
           opacity: paint.opacity ?? 1,
         } as cg.GradientPaint;
@@ -195,7 +195,7 @@ export namespace iofigma {
                 { offset: 0, color: kolor.colorformats.RGBA32F.BLACK },
                 { offset: 1, color: kolor.colorformats.RGBA32F.WHITE },
               ],
-              blendMode: map.blendModeMap[paint.blendMode],
+              blend_mode: map.blendModeMap[paint.blendMode],
               opacity: 1,
             };
         }
@@ -900,12 +900,12 @@ export namespace iofigma {
               paths: [
                 ...(node.fillGeometry?.map((p) => ({
                   d: p.path ?? "",
-                  fillRule: map.windingRuleMap[p.windingRule],
+                  fill_rule: map.windingRuleMap[p.windingRule],
                   fill: "fill" as const,
                 })) ?? []),
                 ...(node.strokeGeometry?.map((p) => ({
                   d: p.path ?? "",
-                  fillRule: map.windingRuleMap[p.windingRule],
+                  fill_rule: map.windingRuleMap[p.windingRule],
                   fill: "stroke" as const,
                 })) ?? []),
               ],

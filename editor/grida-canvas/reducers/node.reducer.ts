@@ -600,8 +600,8 @@ const safe_properties: Partial<
         value = {
           ...value,
           active: value.active ?? true,
-          lightIntensity: cmath.clamp(value.lightIntensity, 0, 1),
-          lightAngle: value.lightAngle,
+          light_intensity: cmath.clamp(value.light_intensity, 0, 1),
+          light_angle: value.light_angle,
           // refraction is now normalized 0-1, maps to IOR 1.0-2.0
           refraction: cmath.clamp(value.refraction, 0, 1),
           // depth is now absolute pixels [1.0+]
@@ -626,9 +626,9 @@ const safe_properties: Partial<
       (draft as UN).fe_noises = value?.map((n) => ({
         ...n,
         active: n.active ?? true,
-        noiseSize: Math.max(0.001, n.noiseSize),
+        noise_size: Math.max(0.001, n.noise_size),
         density: cmath.clamp(n.density, 0, 1),
-        numOctaves: Math.min(4, Math.max(1, n.numOctaves ?? 3)),
+        num_octaves: Math.min(4, Math.max(1, n.num_octaves ?? 3)),
       }));
     },
   }),

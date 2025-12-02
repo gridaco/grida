@@ -85,7 +85,7 @@ export namespace iosvg {
                 color: rgba32f,
               };
             }),
-            blendMode: "normal",
+            blend_mode: "normal",
             opacity: opacity,
             active: true,
           };
@@ -111,7 +111,7 @@ export namespace iosvg {
                 color: rgba32f,
               };
             }),
-            blendMode: "normal",
+            blend_mode: "normal",
             opacity: opacity,
             active: true,
           };

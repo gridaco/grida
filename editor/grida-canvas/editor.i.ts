@@ -443,8 +443,8 @@ export namespace editor.config {
   };
 
   export const DEFAULT_FE_LIQUID_GLASS: Omit<cg.FeLiquidGlass, "type"> = {
-    lightIntensity: 0.9,
-    lightAngle: 45.0,
+    light_intensity: 0.9,
+    light_angle: 45.0,
     refraction: 0.8, // Normalized [0.0-1.0], maps to IOR [1.0-2.0]
     depth: 20.0, // Absolute pixels [1.0+], typical values: 20-100
     dispersion: 0.5,
@@ -453,10 +453,10 @@ export namespace editor.config {
 
   export const DEFAULT_FE_NOISE: Omit<cg.FeNoise, "type"> = {
     mode: "mono",
-    noiseSize: 0.5,
+    noise_size: 0.5,
     density: 0.5,
     color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.15),
-    blendMode: "normal",
+    blend_mode: "normal",
   };
 
   export const DEFAULT_MAX_STROKE_WIDTH = 1000;
