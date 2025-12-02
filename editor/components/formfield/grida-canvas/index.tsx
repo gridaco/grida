@@ -48,7 +48,7 @@ export function GridaCanvasFormField() {
   //
 
   useEffect(() => {
-    fetch("/examples/canvas/sketch-teimplate-01.grida").then((res) => {
+    fetch("/examples/canvas/blank.grida").then((res) => {
       res.json().then((file) => {
         instance.commands.reset(
           editor.state.init({
