@@ -152,7 +152,7 @@ function toVectorNetworkFallback(
         y: 0,
         width: size.width,
         height: size.height,
-        points: node.pointCount ?? 3,
+        points: node.point_count ?? 3,
       });
     }
     case "star": {
@@ -161,8 +161,8 @@ function toVectorNetworkFallback(
         y: 0,
         width: size.width,
         height: size.height,
-        points: node.pointCount ?? 5,
-        innerRadius: node.innerRadius ?? 0.5,
+        points: node.point_count ?? 5,
+        innerRadius: node.inner_radius ?? 0.5,
       });
     }
     case "line": {

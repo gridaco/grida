@@ -334,16 +334,16 @@ const safe_properties: Partial<
       (draft as UN).cornerSmoothing = cmath.clamp(value, 0, 1);
     },
   }),
-  pointCount: defineNodeProperty<"pointCount">({
-    assert: (node) => typeof node.pointCount === "number",
+  point_count: defineNodeProperty<"point_count">({
+    assert: (node) => typeof node.point_count === "number",
     apply: (draft, value, prev) => {
-      (draft as UN).pointCount = cmath.clamp(value, 3, 60);
+      (draft as UN).point_count = cmath.clamp(value, 3, 60);
     },
   }),
-  innerRadius: defineNodeProperty<"innerRadius">({
-    assert: (node) => typeof node.innerRadius === "number",
+  inner_radius: defineNodeProperty<"inner_radius">({
+    assert: (node) => typeof node.inner_radius === "number",
     apply: (draft, value, prev) => {
-      (draft as UN).innerRadius = cmath.clamp(value, 0, 1);
+      (draft as UN).inner_radius = cmath.clamp(value, 0, 1);
     },
   }),
   angle: defineNodeProperty<"angle">({
@@ -352,10 +352,10 @@ const safe_properties: Partial<
       (draft as UN).angle = cmath.clamp(value, 0, 360);
     },
   }),
-  angleOffset: defineNodeProperty<"angleOffset">({
-    assert: (node) => typeof node.angleOffset === "number",
+  angle_offset: defineNodeProperty<"angle_offset">({
+    assert: (node) => typeof node.angle_offset === "number",
     apply: (draft, value, prev) => {
-      (draft as UN).angleOffset = cmath.clamp(value, 0, 360);
+      (draft as UN).angle_offset = cmath.clamp(value, 0, 360);
     },
   }),
   border: defineNodeProperty<"border">({

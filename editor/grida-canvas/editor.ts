@@ -1810,7 +1810,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      pointCount,
+      point_count: pointCount,
     });
   }
 
@@ -1821,7 +1821,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      innerRadius,
+      inner_radius: innerRadius,
     });
   }
 
@@ -1832,9 +1832,9 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      innerRadius: arcData.innerRadius,
+      inner_radius: arcData.inner_radius,
       angle: arcData.angle,
-      angleOffset: arcData.angleOffset,
+      angle_offset: arcData.angle_offset,
     });
   }
 

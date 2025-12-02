@@ -1607,13 +1607,13 @@ export namespace grida.program.nodes {
        * start angle in degree
        * @default 0
        */
-      angleOffset: number;
+      angle_offset: number;
 
       /**
        * inner radius in 0~1
        * @default 0
        */
-      innerRadius: number;
+      inner_radius: number;
     }
 
     /**
@@ -2282,7 +2282,7 @@ export namespace grida.program.nodes {
       i.IFill<cg.Paint>,
       i.IStroke {
     readonly type: "polygon";
-    pointCount: number;
+    point_count: number;
   }
 
   export interface RegularStarPolygonNode
@@ -2298,8 +2298,8 @@ export namespace grida.program.nodes {
       i.IFill<cg.Paint>,
       i.IStroke {
     readonly type: "star";
-    pointCount: number;
-    innerRadius: number;
+    point_count: number;
+    inner_radius: number;
   }
 
   export interface VectorNode

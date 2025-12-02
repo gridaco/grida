@@ -767,8 +767,8 @@ export namespace iofigma {
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
               // arc data
-              innerRadius: node.arcData.innerRadius,
-              angleOffset: cmath.rad2deg(node.arcData.startingAngle),
+              inner_radius: node.arcData.innerRadius,
+              angle_offset: cmath.rad2deg(node.arcData.startingAngle),
               angle: cmath.rad2deg(
                 node.arcData.endingAngle - node.arcData.startingAngle
               ),

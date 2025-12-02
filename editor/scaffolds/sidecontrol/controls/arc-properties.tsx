@@ -21,11 +21,11 @@ export function ArcPropertiesControl({
           title="Angle Offset"
           mode="fixed"
           type="number"
-          value={value.angleOffset}
+          value={value.angle_offset}
           step={1}
           appearance="none"
           onValueChange={(v) => {
-            onValueChange?.({ ...value, angleOffset: v });
+            onValueChange?.({ ...value, angle_offset: v });
           }}
         />
       </div>
@@ -47,13 +47,13 @@ export function ArcPropertiesControl({
           title="Inner Radius"
           mode="fixed"
           type="number"
-          value={value.innerRadius}
+          value={value.inner_radius}
           min={0}
           max={1}
           step={0.01}
           appearance="none"
           onValueChange={(v) => {
-            onValueChange?.({ ...value, innerRadius: v });
+            onValueChange?.({ ...value, inner_radius: v });
           }}
         />
       </div>

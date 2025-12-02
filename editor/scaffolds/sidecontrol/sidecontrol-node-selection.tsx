@@ -894,10 +894,10 @@ function ModeNodeProperties({
     corner_radius_top_right: node.corner_radius_top_right,
     corner_radius_bottom_right: node.corner_radius_bottom_right,
     corner_radius_bottom_left: node.corner_radius_bottom_left,
-    pointCount: node.pointCount,
-    innerRadius: node.innerRadius,
+    pointCount: node.point_count,
+    innerRadius: node.inner_radius,
     angle: node.angle,
-    angleOffset: node.angleOffset,
+    angleOffset: node.angle_offset,
 
     fit: node.fit,
 
@@ -1198,8 +1198,8 @@ function ModeNodeProperties({
               <ArcPropertiesControl
                 value={{
                   angle: angle ?? 360,
-                  angleOffset: angleOffset ?? 0,
-                  innerRadius: innerRadius ?? 0,
+                  angle_offset: angleOffset ?? 0,
+                  inner_radius: innerRadius ?? 0,
                 }}
                 onValueChange={(v) => {
                   actions.arcData(v);

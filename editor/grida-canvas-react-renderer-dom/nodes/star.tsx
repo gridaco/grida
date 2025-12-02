@@ -7,8 +7,8 @@ import vn from "@grida/vn";
 export function RegularStarPolygonWidget({
   width,
   height,
-  pointCount,
-  innerRadius,
+  point_count,
+  inner_radius,
   fill,
   stroke,
   stroke_width,
@@ -29,12 +29,12 @@ export function RegularStarPolygonWidget({
       y: 0,
       width,
       height,
-      points: pointCount,
-      innerRadius,
+      points: point_count,
+      innerRadius: inner_radius,
     });
 
     return v.vertices.map((v) => `${v[0]},${v[1]}`).join(" ");
-  }, [width, height, pointCount, innerRadius]);
+  }, [width, height, point_count, inner_radius]);
 
   return (
     <svg
