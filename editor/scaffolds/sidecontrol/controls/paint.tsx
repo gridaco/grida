@@ -737,7 +737,7 @@ function PaintTabsHeader({
       <div className="flex items-center">
         <BlendModeDropdown
           type="paint"
-          value={value?.blend_mode || cg.def.BLENDMODE}
+          value={value?.blend_mode ?? cg.def.BLENDMODE}
           onValueChange={(blend_mode) => {
             if (value) {
               onValueChange?.({
