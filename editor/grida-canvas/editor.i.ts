@@ -248,15 +248,15 @@ export namespace editor.config {
     export const DEFAULT_FONT_SIZE = 14;
 
     export const DEFAULT_TEXT_STYLE_INTER: grida.program.nodes.i.ITextStyle = {
-      fontFamily: DEFAULT_FONT_FAMILY,
-      fontPostscriptName: null,
-      fontStyleItalic: false,
-      fontFeatures: {},
-      fontOpticalSizing: "auto",
-      fontWeight: DEFAULT_FONT_WEIGHT,
-      fontKerning: true,
-      fontSize: DEFAULT_FONT_SIZE,
-      textDecorationLine: "none",
+      font_family: DEFAULT_FONT_FAMILY,
+      font_postscript_name: null,
+      font_style_italic: false,
+      font_features: {},
+      font_optical_sizing: "auto",
+      font_weight: DEFAULT_FONT_WEIGHT,
+      font_kerning: true,
+      font_size: DEFAULT_FONT_SIZE,
+      text_decoration_line: "none",
     };
 
     const PLATFORM_FONTS = {
@@ -443,8 +443,8 @@ export namespace editor.config {
   };
 
   export const DEFAULT_FE_LIQUID_GLASS: Omit<cg.FeLiquidGlass, "type"> = {
-    lightIntensity: 0.9,
-    lightAngle: 45.0,
+    light_intensity: 0.9,
+    light_angle: 45.0,
     refraction: 0.8, // Normalized [0.0-1.0], maps to IOR [1.0-2.0]
     depth: 20.0, // Absolute pixels [1.0+], typical values: 20-100
     dispersion: 0.5,
@@ -453,10 +453,10 @@ export namespace editor.config {
 
   export const DEFAULT_FE_NOISE: Omit<cg.FeNoise, "type"> = {
     mode: "mono",
-    noiseSize: 0.5,
+    noise_size: 0.5,
     density: 0.5,
     color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.15),
-    blendMode: "normal",
+    blend_mode: "normal",
   };
 
   export const DEFAULT_MAX_STROKE_WIDTH = 1000;
@@ -1467,7 +1467,7 @@ export namespace editor.state {
             order: scene.order,
             guides: scene.guides,
             edges: scene.edges,
-            backgroundColor: scene.backgroundColor,
+            background_color: scene.background_color,
           };
           migrated_nodes[scene_id] = sceneNode;
         }
@@ -2643,7 +2643,7 @@ export namespace editor.api {
     renameScene(scene_id: string, name: string): void;
     changeSceneBackground(
       scene_id: string,
-      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+      backgroundColor: grida.program.document.ISceneBackground["background_color"]
     ): void;
 
     /**
@@ -3104,7 +3104,7 @@ export namespace editor.api {
     ): void;
     changeFlexContainerNodeGap(
       node_id: string,
-      gap: number | { mainAxisGap: number; crossAxisGap: number }
+      gap: number | { main_axis_gap: number; cross_axis_gap: number }
     ): void;
     changeFlexContainerNodeWrap(node_id: string, wrap: "wrap" | "nowrap"): void;
 
@@ -3171,15 +3171,15 @@ export namespace editor.api {
     ): void;
     changeTextNodeLineHeight(
       node_id: NodeID,
-      lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
+      lineHeight: TChange<grida.program.nodes.TextNode["line_height"]>
     ): void;
     changeTextNodeLetterSpacing(
       node_id: NodeID,
-      letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
+      letterSpacing: TChange<grida.program.nodes.TextNode["letter_spacing"]>
     ): void;
     changeTextNodeWordSpacing(
       node_id: NodeID,
-      wordSpacing: TChange<grida.program.nodes.TextNode["wordSpacing"]>
+      wordSpacing: TChange<grida.program.nodes.TextNode["word_spacing"]>
     ): void;
     changeTextNodeMaxlength(
       node_id: NodeID,

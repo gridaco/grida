@@ -143,7 +143,7 @@ export function __self_try_enter_content_edit_mode_vector(
         },
         a_point: null,
         next_ta: null,
-        initial_vector_network: node.vectorNetwork,
+        initial_vector_network: node.vector_network,
         original: nodeSnapshot,
         selection_neighbouring_vertices: [],
         cursor: draft.pointer.position,
@@ -174,7 +174,7 @@ export function __self_try_enter_content_edit_mode_vector(
         },
         a_point: null,
         next_ta: null,
-        initial_vector_network: vectornode.vectorNetwork,
+        initial_vector_network: vectornode.vector_network,
         original: nodeSnapshot,
         selection_neighbouring_vertices: [],
         cursor: draft.pointer.position,
@@ -323,7 +323,7 @@ function __try_restore_vector_mode_original_node(
     mode.node_id
   ) as grida.program.nodes.VectorNode;
 
-  const dirty = !equal(mode.initial_vector_network, current.vectorNetwork);
+  const dirty = !equal(mode.initial_vector_network, current.vector_network);
   if (dirty) return;
 
   draft.document.nodes[mode.node_id] = {
@@ -358,8 +358,8 @@ function __self_before_exit_content_edit_mode(
 
       // auto remove the node when the vector network is effectively empty
       if (
-        current.vectorNetwork.segments.length < 1 ||
-        current.vectorNetwork.vertices.length < 2
+        current.vector_network.segments.length < 1 ||
+        current.vector_network.vertices.length < 2
       ) {
         self_try_remove_node(draft, mode.node_id);
         break;
@@ -565,11 +565,11 @@ function __self_start_gesture(
         node_id
       ) as grida.program.nodes.VectorNode;
 
-      const verticies = node.vectorNetwork.vertices.map((v) => v);
-      const segments = node.vectorNetwork.segments.map((s) => ({ ...s }));
+      const verticies = node.vector_network.vertices.map((v) => v);
+      const segments = node.vector_network.segments.map((s) => ({ ...s }));
 
       const { vertices, tangents } = encodeTranslateVectorCommand(
-        node.vectorNetwork,
+        node.vector_network,
         {
           selected_vertices: content_edit_mode.selection.selected_vertices,
           selected_segments: content_edit_mode.selection.selected_segments,
@@ -643,7 +643,7 @@ function __self_start_gesture(
       // Calculate the initial angle from the curve at the curve position
       // This matches the calculation in SurfaceVariableWidthEditor
       const t_param = initial_stop.u;
-      const segments = node.vectorNetwork.segments;
+      const segments = node.vector_network.segments;
       const totalSegments = segments.length;
       const segmentIndex = Math.floor(t_param * totalSegments);
       const ct = (t_param * totalSegments) % 1;
@@ -655,7 +655,7 @@ function __self_start_gesture(
         const segment = segments[segmentIndex];
 
         // Get absolute vertices (similar to useVariableWithEditor)
-        const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+        const vne = new vn.VectorNetworkEditor(node.vector_network);
         const absolute_vertices = vne.getVerticesAbsolute([
           node.left!,
           node.top!,
@@ -786,7 +786,7 @@ function __self_start_gesture(
           "the selection is not a flex container"
         );
         // (we only support main axis gap for now) - ignoring the input axis.
-        const { direction, mainAxisGap } = node;
+        const { direction, main_axis_gap } = node;
 
         const children = dq.getChildren(draft.document_ctx, selection);
 
@@ -802,8 +802,8 @@ function __self_start_gesture(
           axis: direction === "horizontal" ? "x" : "y",
           layout,
           min_gap: 0,
-          initial_gap: mainAxisGap,
-          gap: mainAxisGap,
+          initial_gap: main_axis_gap,
+          gap: main_axis_gap,
           movement: cmath.vector2.zero,
           first: cmath.vector2.zero,
           last: cmath.vector2.zero,
@@ -834,16 +834,16 @@ function __self_start_gesture(
         // Padding is an object with per-side values
         switch (side) {
           case "top":
-            currentValue = currentPadding.paddingTop ?? 0;
+            currentValue = currentPadding.padding_top ?? 0;
             break;
           case "right":
-            currentValue = currentPadding.paddingRight ?? 0;
+            currentValue = currentPadding.padding_right ?? 0;
             break;
           case "bottom":
-            currentValue = currentPadding.paddingBottom ?? 0;
+            currentValue = currentPadding.padding_bottom ?? 0;
             break;
           case "left":
-            currentValue = currentPadding.paddingLeft ?? 0;
+            currentValue = currentPadding.padding_left ?? 0;
             break;
         }
       }

@@ -40,30 +40,30 @@ export function SectionStrokes({
   const {
     stroke,
     strokes,
-    strokeWidth,
-    strokeTopWidth,
-    strokeRightWidth,
-    strokeBottomWidth,
-    strokeLeftWidth,
-    strokeAlign,
-    strokeCap,
-    strokeJoin,
-    strokeMiterLimit,
-    strokeDashArray,
+    stroke_width,
+    stroke_top_width,
+    stroke_right_width,
+    stroke_bottom_width,
+    stroke_left_width,
+    stroke_align,
+    stroke_cap,
+    stroke_join,
+    stroke_miter_limit,
+    stroke_dash_array,
     type,
   } = useNodeState(node_id, (node) => ({
     stroke: node.stroke,
     strokes: node.strokes,
-    strokeWidth: node.strokeWidth,
-    strokeTopWidth: node.strokeTopWidth,
-    strokeRightWidth: node.strokeRightWidth,
-    strokeBottomWidth: node.strokeBottomWidth,
-    strokeLeftWidth: node.strokeLeftWidth,
-    strokeAlign: node.strokeAlign,
-    strokeCap: node.strokeCap,
-    strokeJoin: node.strokeJoin,
-    strokeMiterLimit: node.strokeMiterLimit,
-    strokeDashArray: node.strokeDashArray,
+    stroke_width: node.stroke_width,
+    stroke_top_width: node.stroke_top_width,
+    stroke_right_width: node.stroke_right_width,
+    stroke_bottom_width: node.stroke_bottom_width,
+    stroke_left_width: node.stroke_left_width,
+    stroke_align: node.stroke_align,
+    stroke_cap: node.stroke_cap,
+    stroke_join: node.stroke_join,
+    stroke_miter_limit: node.stroke_miter_limit,
+    stroke_dash_array: node.stroke_dash_array,
     type: node.type,
   }));
 
@@ -75,28 +75,28 @@ export function SectionStrokes({
   const strokeWidthValue = React.useMemo(() => {
     // Check if any individual side widths are defined
     const hasIndividualWidths =
-      strokeTopWidth !== undefined ||
-      strokeRightWidth !== undefined ||
-      strokeBottomWidth !== undefined ||
-      strokeLeftWidth !== undefined;
+      stroke_top_width !== undefined ||
+      stroke_right_width !== undefined ||
+      stroke_bottom_width !== undefined ||
+      stroke_left_width !== undefined;
 
     if (hasIndividualWidths) {
-      const fallbackWidth = strokeWidth ?? 1;
+      const fallbackWidth = stroke_width ?? 1;
       return {
-        top: strokeTopWidth ?? fallbackWidth,
-        right: strokeRightWidth ?? fallbackWidth,
-        bottom: strokeBottomWidth ?? fallbackWidth,
-        left: strokeLeftWidth ?? fallbackWidth,
+        top: stroke_top_width ?? fallbackWidth,
+        right: stroke_right_width ?? fallbackWidth,
+        bottom: stroke_bottom_width ?? fallbackWidth,
+        left: stroke_left_width ?? fallbackWidth,
       };
     }
 
-    return strokeWidth ?? 1;
+    return stroke_width ?? 1;
   }, [
-    strokeWidth,
-    strokeTopWidth,
-    strokeRightWidth,
-    strokeBottomWidth,
-    strokeLeftWidth,
+    stroke_width,
+    stroke_top_width,
+    stroke_right_width,
+    stroke_bottom_width,
+    stroke_left_width,
   ]);
   const paints = isCanvasBackend
     ? Array.isArray(strokes) && strokes.length > 0
@@ -112,9 +112,9 @@ export function SectionStrokes({
 
   // Derive stroke class from dash array
   const strokeClass: StrokeClass =
-    strokeDashArray &&
-    Array.isArray(strokeDashArray) &&
-    strokeDashArray.length > 0
+    stroke_dash_array &&
+    Array.isArray(stroke_dash_array) &&
+    stroke_dash_array.length > 0
       ? "dashed"
       : "solid";
 
@@ -146,14 +146,14 @@ export function SectionStrokes({
     // Append new paint to the end (top-most in render order)
     actions.addStroke(paint, "end");
 
-    if (!strokeWidth || strokeWidth === 0) {
+    if (!stroke_width || stroke_width === 0) {
       actions.strokeWidth({ type: "set", value: 1 });
     }
 
-    if (is_text_node && !strokeAlign) {
+    if (is_text_node && !stroke_align) {
       actions.strokeAlign("outside");
     }
-  }, [actions, strokeWidth, is_text_node, strokeAlign, paints.length]);
+  }, [actions, stroke_width, is_text_node, stroke_align, paints.length]);
 
   const handleUpdateStrokes = React.useCallback(
     (paints: any[]) => {
@@ -202,7 +202,7 @@ export function SectionStrokes({
           />
         ) : (
           <StrokeWidthControl
-            value={strokeWidth}
+            value={stroke_width}
             onValueCommit={actions.strokeWidth}
           />
         )}
@@ -210,27 +210,30 @@ export function SectionStrokes({
       <PropertyLine>
         <PropertyLineLabel>Align</PropertyLineLabel>
         <StrokeAlignControl
-          value={strokeAlign}
+          value={stroke_align}
           onValueChange={actions.strokeAlign}
         />
       </PropertyLine>
       <PropertyLine hidden={config.stroke_cap === "off"}>
         <PropertyLineLabel>Cap</PropertyLineLabel>
-        <StrokeCapControl value={strokeCap} onValueChange={actions.strokeCap} />
+        <StrokeCapControl
+          value={stroke_cap}
+          onValueChange={actions.strokeCap}
+        />
       </PropertyLine>
       <PropertyLine hidden={config.stroke_join === "off"}>
         <PropertyLineLabel>Join</PropertyLineLabel>
         <StrokeJoinControl
-          value={strokeJoin}
+          value={stroke_join}
           onValueChange={actions.strokeJoin}
         />
       </PropertyLine>
       <PropertyLine
-        hidden={config.stroke_join === "off" || strokeJoin !== "miter"}
+        hidden={config.stroke_join === "off" || stroke_join !== "miter"}
       >
         <PropertyLineLabel>Miter</PropertyLineLabel>
         <StrokeMiterLimitControl
-          value={strokeMiterLimit}
+          value={stroke_miter_limit}
           onValueChange={actions.strokeMiterLimit}
         />
       </PropertyLine>
@@ -241,10 +244,12 @@ export function SectionStrokes({
           onValueChange={handleStrokeClassChange}
         />
       </PropertyLine>
-      <PropertyLine hidden={!strokeDashArray || strokeDashArray.length === 0}>
+      <PropertyLine
+        hidden={!stroke_dash_array || stroke_dash_array.length === 0}
+      >
         <PropertyLineLabel>Dash</PropertyLineLabel>
         <StrokeDashArrayControl
-          value={strokeDashArray}
+          value={stroke_dash_array}
           onValueCommit={actions.strokeDashArray}
         />
       </PropertyLine>

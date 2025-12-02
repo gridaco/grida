@@ -58,7 +58,7 @@ const DEFAULT_IMAGE_PAINT: cg.ImagePaint = {
   fit: "cover",
   transform: cmath.transform.identity,
   filters: cg.def.IMAGE_FILTERS,
-  blendMode: cg.def.BLENDMODE,
+  blend_mode: cg.def.BLENDMODE,
   opacity: 1,
   active: true,
 };
@@ -69,8 +69,8 @@ function getNextPaintForType(
 ): cg.Paint | null {
   const to = next;
 
-  const blendMode =
-    (current && "blendMode" in current ? current.blendMode : undefined) ??
+  const blend_mode =
+    (current && "blend_mode" in current ? current.blend_mode : undefined) ??
     cg.def.BLENDMODE;
 
   const transform =
@@ -103,7 +103,7 @@ function getNextPaintForType(
                 color: kolor.colorformats.RGBA32F.WHITE,
               },
             ],
-            blendMode: blendMode,
+            blend_mode,
             opacity: opacity,
           } as cg.Paint;
         }
@@ -113,7 +113,7 @@ function getNextPaintForType(
         case "image": {
           return {
             ...DEFAULT_IMAGE_PAINT,
-            blendMode,
+            blend_mode,
             opacity: opacity,
           } satisfies cg.Paint;
         }
@@ -135,7 +135,7 @@ function getNextPaintForType(
               stopColor.b,
               opacity
             ),
-            blendMode,
+            blend_mode,
             active: true,
           } satisfies cg.Paint;
         }
@@ -147,14 +147,14 @@ function getNextPaintForType(
             type: to,
             stops: current.stops,
             transform,
-            blendMode,
+            blend_mode,
             opacity: current.opacity || 1,
           } as cg.Paint;
         }
         case "image": {
           return {
             ...DEFAULT_IMAGE_PAINT,
-            blendMode,
+            blend_mode,
             opacity: opacity,
           } satisfies cg.Paint;
         }
@@ -172,7 +172,7 @@ function getNextPaintForType(
               kolor.colorformats.RGBA32F.GRAY.b,
               opacity
             ),
-            blendMode,
+            blend_mode,
             active: true,
           };
         }
@@ -193,7 +193,7 @@ function getNextPaintForType(
                 color: kolor.colorformats.RGBA32F.WHITE,
               },
             ],
-            blendMode,
+            blend_mode,
             opacity: opacity,
           } as cg.Paint;
         }
@@ -737,12 +737,12 @@ function PaintTabsHeader({
       <div className="flex items-center">
         <BlendModeDropdown
           type="paint"
-          value={value?.blendMode || cg.def.BLENDMODE}
-          onValueChange={(blendMode) => {
+          value={value?.blend_mode ?? cg.def.BLENDMODE}
+          onValueChange={(blend_mode) => {
             if (value) {
               onValueChange?.({
                 ...value,
-                blendMode,
+                blend_mode,
               } as any);
             }
           }}

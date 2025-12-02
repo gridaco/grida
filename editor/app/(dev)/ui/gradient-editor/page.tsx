@@ -79,7 +79,7 @@ function GradientEditorContent() {
       type: `${gradientType}_gradient`,
       stops,
       transform,
-      blendMode: "normal",
+      blend_mode: "normal",
       opacity: 1,
       active: true,
     });

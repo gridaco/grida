@@ -44,7 +44,7 @@ export function prepare_bitmap_node(
       position: "absolute",
       opacity: 1,
       rotation: 0,
-      zIndex: 0,
+      z_index: 0,
       left: x,
       top: y,
       width: width,

@@ -31,10 +31,10 @@ export function PaddingControl({
       };
     }
     return {
-      top: value.paddingTop ?? 0,
-      right: value.paddingRight ?? 0,
-      bottom: value.paddingBottom ?? 0,
-      left: value.paddingLeft ?? 0,
+      top: value.padding_top ?? 0,
+      right: value.padding_right ?? 0,
+      bottom: value.padding_bottom ?? 0,
+      left: value.padding_left ?? 0,
     };
   }, [value]);
 
@@ -69,10 +69,10 @@ export function PaddingControl({
   ) => {
     if (newValue === undefined) return;
     onValueCommit?.({
-      paddingTop: side === "top" ? newValue : paddingValues.top,
-      paddingRight: side === "right" ? newValue : paddingValues.right,
-      paddingBottom: side === "bottom" ? newValue : paddingValues.bottom,
-      paddingLeft: side === "left" ? newValue : paddingValues.left,
+      padding_top: side === "top" ? newValue : paddingValues.top,
+      padding_right: side === "right" ? newValue : paddingValues.right,
+      padding_bottom: side === "bottom" ? newValue : paddingValues.bottom,
+      padding_left: side === "left" ? newValue : paddingValues.left,
     });
   };
 

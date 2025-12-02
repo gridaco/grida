@@ -24,15 +24,15 @@ export function BorderControl({
   const onBorderWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onValueChange?.({
       ...value!,
-      borderWidth: parseInt(e.target.value),
+      border_width: parseInt(e.target.value),
     });
   };
 
   const onAddBorder = () => {
     onValueChange?.({
-      borderColor: kolor.colorformats.RGBA32F.BLACK,
-      borderStyle: "solid",
-      borderWidth: 1,
+      border_color: kolor.colorformats.RGBA32F.BLACK,
+      border_style: "solid",
+      border_width: 1,
     });
   };
 
@@ -55,12 +55,12 @@ export function BorderControl({
           >
             <RGBA32FChip
               rgba={
-                value?.borderColor ?? kolor.colorformats.RGBA32F.TRANSPARENT
+                value?.border_color ?? kolor.colorformats.RGBA32F.TRANSPARENT
               }
               className="rounded-sm"
             />
-            {value?.borderStyle === "solid" && <>Solid</>}
-            {value?.borderStyle === "dashed" && <>Dashed</>}
+            {value?.border_style === "solid" && <>Solid</>}
+            {value?.border_style === "dashed" && <>Dashed</>}
             <span
               role="button"
               onClick={onRemove}
@@ -88,16 +88,16 @@ export function BorderControl({
       <PopoverContent align="end" side="top">
         <Label>Border</Label>
         <hr className="my-2" />
-        {value?.borderColor && (
+        {value?.border_color && (
           <div className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Color</PropertyLineLabel>
               <RGBA32FColorControl
-                value={value.borderColor}
+                value={value.border_color}
                 onValueChange={(v) => {
                   onValueChange?.({
                     ...(value || {}),
-                    borderColor: v,
+                    border_color: v,
                   });
                 }}
               />
@@ -110,8 +110,8 @@ export function BorderControl({
                 className={WorkbenchUI.inputVariants({ size: "xs" })}
                 min={0}
                 value={
-                  typeof value?.borderWidth === "number"
-                    ? value.borderWidth
+                  typeof value?.border_width === "number"
+                    ? value.border_width
                     : ""
                 }
                 onChange={onBorderWidthChange}
@@ -119,16 +119,16 @@ export function BorderControl({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Style</PropertyLineLabel>
-              <PropertyEnum<grida.program.css.Border["borderStyle"]>
+              <PropertyEnum<grida.program.css.Border["border_style"]>
                 enum={[
                   { value: "solid", label: "Solid" },
                   { value: "dashed", label: "Dashed" },
                 ]}
-                value={value.borderStyle}
+                value={value.border_style}
                 onValueChange={(v) => {
                   onValueChange?.({
                     ...(value || {}),
-                    borderStyle: v,
+                    border_style: v,
                   });
                 }}
               />

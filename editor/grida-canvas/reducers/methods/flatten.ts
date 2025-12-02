@@ -75,9 +75,9 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
     type: "vector",
     id: node.id,
     active: node.active,
-    cornerRadius: modeProperties.cornerRadius(node),
-    fillRule: (node as grida.program.nodes.UnknwonNode).fillRule ?? "nonzero",
-    vectorNetwork: v,
+    corner_radius: modeProperties.cornerRadius(node),
+    fill_rule: (node as grida.program.nodes.UnknwonNode).fill_rule ?? "nonzero",
+    vector_network: v,
     width: rect.width,
     height: rect.height,
     left: (node as any).left!,
@@ -108,16 +108,16 @@ function __dangerously_delete_non_vector_properties(
 }
 
 function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {
-  if ("cornerRadius" in node) {
-    return node.cornerRadius;
+  if ("corner_radius" in node) {
+    return node.corner_radius;
   }
 
-  if ("cornerRadiusTopLeft" in node) {
+  if ("corner_radius_top_left" in node) {
     const values: number[] = [
-      node.cornerRadiusTopLeft,
-      node.cornerRadiusTopRight,
-      node.cornerRadiusBottomLeft,
-      node.cornerRadiusBottomRight,
+      node.corner_radius_top_left,
+      node.corner_radius_top_right,
+      node.corner_radius_bottom_left,
+      node.corner_radius_bottom_right,
     ].filter((it) => it !== undefined);
 
     return cmath.mode(values);
@@ -152,7 +152,7 @@ function toVectorNetworkFallback(
         y: 0,
         width: size.width,
         height: size.height,
-        points: node.pointCount ?? 3,
+        points: node.point_count ?? 3,
       });
     }
     case "star": {
@@ -161,8 +161,8 @@ function toVectorNetworkFallback(
         y: 0,
         width: size.width,
         height: size.height,
-        points: node.pointCount ?? 5,
-        innerRadius: node.innerRadius ?? 0.5,
+        points: node.point_count ?? 5,
+        innerRadius: node.inner_radius ?? 0.5,
       });
     }
     case "line": {

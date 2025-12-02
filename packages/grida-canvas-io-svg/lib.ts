@@ -85,7 +85,7 @@ export namespace iosvg {
                 color: rgba32f,
               };
             }),
-            blendMode: "normal",
+            blend_mode: "normal",
             opacity: opacity,
             active: true,
           };
@@ -111,7 +111,7 @@ export namespace iosvg {
                 color: rgba32f,
               };
             }),
-            blendMode: "normal",
+            blend_mode: "normal",
             opacity: opacity,
             active: true,
           };
@@ -127,16 +127,16 @@ export namespace iosvg {
      */
     export function fill(fill: svgtypes.SVGFillAttributes | null | undefined): {
       paint: cg.Paint | undefined;
-      fillRule: cg.FillRule;
+      fill_rule: cg.FillRule;
       opacity: number;
     } {
       if (!fill) {
-        return { paint: undefined, fillRule: "nonzero", opacity: 1.0 };
+        return { paint: undefined, fill_rule: "nonzero", opacity: 1.0 };
       }
 
       return {
         paint: map.paint(fill.paint, fill.fill_opacity),
-        fillRule: fill.fill_rule,
+        fill_rule: fill.fill_rule,
         opacity: fill.fill_opacity,
       };
     }
@@ -218,40 +218,40 @@ export namespace iosvg {
         const { transform, fill: fillAttr, stroke: strokeAttr, d } = node;
         const position = map.extractTranslation(transform);
 
-        const vectorNetwork = vn.fromSVGPathData(d);
-        const bbox = vn.getBBox(vectorNetwork);
+        const vector_network = vn.fromSVGPathData(d);
+        const bbox = vn.getBBox(vector_network);
         const {
           paint: fill,
-          fillRule,
+          fill_rule,
           opacity: fillOpacity,
         } = map.fill(fillAttr);
         const {
           paint: stroke,
           opacity: _strokeOpacity,
-          strokeWidth,
-          strokeCap,
-          strokeJoin,
-          strokeMiterLimit,
-          strokeDashArray,
+          strokeWidth: stroke_width,
+          strokeCap: stroke_cap,
+          strokeJoin: stroke_join,
+          strokeMiterLimit: stroke_miter_limit,
+          strokeDashArray: stroke_dash_array,
         } = map.stroke(strokeAttr);
 
         // Use fill opacity as the primary node opacity (stroke opacity is applied to stroke paint)
         return {
           type: "vector",
           name: name,
-          vectorNetwork: vectorNetwork,
+          vector_network,
           fill: fill,
           stroke: stroke,
-          strokeWidth: strokeWidth,
-          strokeCap: strokeCap,
-          strokeJoin: strokeJoin,
-          strokeMiterLimit: strokeMiterLimit,
-          strokeDashArray: strokeDashArray,
+          stroke_width,
+          stroke_cap,
+          stroke_join,
+          stroke_miter_limit,
+          stroke_dash_array,
           width: bbox.width,
           height: bbox.height,
           left: position.left,
           top: position.top,
-          fillRule: fillRule,
+          fill_rule: fill_rule,
           opacity: fillOpacity,
         } satisfies grida.program.nodes.PathNodePrototype;
       }

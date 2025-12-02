@@ -34,13 +34,13 @@ import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 
 function SceneBackgroundPropertyLine() {
   const editor = useCurrentEditor();
-  const { id: scene_id, backgroundColor } = useCurrentSceneState();
+  const { id: scene_id, background_color } = useCurrentSceneState();
 
   return (
     <PropertyLine>
       <RGBA32FColorControl
         variant="with-opacity"
-        value={backgroundColor ? backgroundColor : undefined}
+        value={background_color ? background_color : undefined}
         onValueChange={(color) => {
           editor.commands.changeSceneBackground(scene_id, color);
         }}

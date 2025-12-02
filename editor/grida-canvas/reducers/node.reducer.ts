@@ -253,10 +253,10 @@ const safe_properties: Partial<
       (draft as UN).opacity = ranged(0, value, 1);
     },
   }),
-  blendMode: defineNodeProperty<"blendMode">({
-    assert: (node) => typeof node.blendMode === "string",
+  blend_mode: defineNodeProperty<"blend_mode">({
+    assert: (node) => typeof node.blend_mode === "string",
     apply: (draft, value, prev) => {
-      (draft as UN).blendMode = value;
+      (draft as UN).blend_mode = value;
     },
   }),
   mask: defineNodeProperty<"mask">({
@@ -303,47 +303,47 @@ const safe_properties: Partial<
       writePaints(target, "fill", paints);
     },
   }),
-  cornerRadius: defineNodeProperty<"cornerRadius">({
+  corner_radius: defineNodeProperty<"corner_radius">({
     apply: (draft, value, prev) => {
-      // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
-      (draft as UN).cornerRadius = value;
+      // TODO: make [corner_radius < (Math.min(width, height) / 2)]
+      (draft as UN).corner_radius = value;
     },
   }),
-  cornerRadiusTopLeft: defineNodeProperty<"cornerRadiusTopLeft">({
+  corner_radius_top_left: defineNodeProperty<"corner_radius_top_left">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerRadiusTopLeft = value;
+      (draft as UN).corner_radius_top_left = value;
     },
   }),
-  cornerRadiusTopRight: defineNodeProperty<"cornerRadiusTopRight">({
+  corner_radius_top_right: defineNodeProperty<"corner_radius_top_right">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerRadiusTopRight = value;
+      (draft as UN).corner_radius_top_right = value;
     },
   }),
-  cornerRadiusBottomRight: defineNodeProperty<"cornerRadiusBottomRight">({
+  corner_radius_bottom_right: defineNodeProperty<"corner_radius_bottom_right">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerRadiusBottomRight = value;
+      (draft as UN).corner_radius_bottom_right = value;
     },
   }),
-  cornerRadiusBottomLeft: defineNodeProperty<"cornerRadiusBottomLeft">({
+  corner_radius_bottom_left: defineNodeProperty<"corner_radius_bottom_left">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerRadiusBottomLeft = value;
+      (draft as UN).corner_radius_bottom_left = value;
     },
   }),
-  cornerSmoothing: defineNodeProperty<"cornerSmoothing">({
+  corner_smoothing: defineNodeProperty<"corner_smoothing">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerSmoothing = cmath.clamp(value, 0, 1);
+      (draft as UN).corner_smoothing = cmath.clamp(value, 0, 1);
     },
   }),
-  pointCount: defineNodeProperty<"pointCount">({
-    assert: (node) => typeof node.pointCount === "number",
+  point_count: defineNodeProperty<"point_count">({
+    assert: (node) => typeof node.point_count === "number",
     apply: (draft, value, prev) => {
-      (draft as UN).pointCount = cmath.clamp(value, 3, 60);
+      (draft as UN).point_count = cmath.clamp(value, 3, 60);
     },
   }),
-  innerRadius: defineNodeProperty<"innerRadius">({
-    assert: (node) => typeof node.innerRadius === "number",
+  inner_radius: defineNodeProperty<"inner_radius">({
+    assert: (node) => typeof node.inner_radius === "number",
     apply: (draft, value, prev) => {
-      (draft as UN).innerRadius = cmath.clamp(value, 0, 1);
+      (draft as UN).inner_radius = cmath.clamp(value, 0, 1);
     },
   }),
   angle: defineNodeProperty<"angle">({
@@ -352,10 +352,10 @@ const safe_properties: Partial<
       (draft as UN).angle = cmath.clamp(value, 0, 360);
     },
   }),
-  angleOffset: defineNodeProperty<"angleOffset">({
-    assert: (node) => typeof node.angleOffset === "number",
+  angle_offset: defineNodeProperty<"angle_offset">({
+    assert: (node) => typeof node.angle_offset === "number",
     apply: (draft, value, prev) => {
-      (draft as UN).angleOffset = cmath.clamp(value, 0, 360);
+      (draft as UN).angle_offset = cmath.clamp(value, 0, 360);
     },
   }),
   border: defineNodeProperty<"border">({
@@ -403,7 +403,7 @@ const safe_properties: Partial<
       writePaints(target, "stroke", paints);
     },
   }),
-  strokeWidth: defineNodeProperty<"strokeWidth">({
+  stroke_width: defineNodeProperty<"stroke_width">({
     assert: (node) =>
       node.type === "vector" ||
       node.type === "line" ||
@@ -411,54 +411,54 @@ const safe_properties: Partial<
       node.type === "ellipse" ||
       node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeWidth = ranged(
+      (draft as UN).stroke_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeTopWidth: defineNodeProperty<"strokeTopWidth">({
+  stroke_top_width: defineNodeProperty<"stroke_top_width">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeTopWidth = ranged(
+      (draft as UN).stroke_top_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeRightWidth: defineNodeProperty<"strokeRightWidth">({
+  stroke_right_width: defineNodeProperty<"stroke_right_width">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeRightWidth = ranged(
+      (draft as UN).stroke_right_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeBottomWidth: defineNodeProperty<"strokeBottomWidth">({
+  stroke_bottom_width: defineNodeProperty<"stroke_bottom_width">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeBottomWidth = ranged(
+      (draft as UN).stroke_bottom_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeLeftWidth: defineNodeProperty<"strokeLeftWidth">({
+  stroke_left_width: defineNodeProperty<"stroke_left_width">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeLeftWidth = ranged(
+      (draft as UN).stroke_left_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeAlign: defineNodeProperty<"strokeAlign">({
+  stroke_align: defineNodeProperty<"stroke_align">({
     assert: (node) =>
       node.type === "vector" ||
       node.type === "line" ||
@@ -466,25 +466,25 @@ const safe_properties: Partial<
       node.type === "ellipse" ||
       node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeAlign = value;
+      (draft as UN).stroke_align = value;
     },
   }),
-  strokeCap: defineNodeProperty<"strokeCap">({
+  stroke_cap: defineNodeProperty<"stroke_cap">({
     apply: (draft, value, prev) => {
-      (draft as UN).strokeCap = value;
+      (draft as UN).stroke_cap = value;
     },
   }),
-  strokeJoin: defineNodeProperty<"strokeJoin">({
+  stroke_join: defineNodeProperty<"stroke_join">({
     apply: (draft, value, prev) => {
-      (draft as UN).strokeJoin = value;
+      (draft as UN).stroke_join = value;
     },
   }),
-  strokeMiterLimit: defineNodeProperty<"strokeMiterLimit">({
+  stroke_miter_limit: defineNodeProperty<"stroke_miter_limit">({
     apply: (draft, value, prev) => {
-      (draft as UN).strokeMiterLimit = value;
+      (draft as UN).stroke_miter_limit = value;
     },
   }),
-  strokeDashArray: defineNodeProperty<"strokeDashArray">({
+  stroke_dash_array: defineNodeProperty<"stroke_dash_array">({
     assert: (node) =>
       node.type === "vector" ||
       node.type === "line" ||
@@ -497,12 +497,12 @@ const safe_properties: Partial<
       node.type === "container" ||
       node.type === "boolean",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeDashArray = value;
+      (draft as UN).stroke_dash_array = value;
     },
   }),
-  feShadows: defineNodeProperty<"feShadows">({
+  fe_shadows: defineNodeProperty<"fe_shadows">({
     apply: (draft, value, prev) => {
-      (draft as UN).feShadows = value?.map((s) => ({
+      (draft as UN).fe_shadows = value?.map((s) => ({
         ...s,
         active: s.active ?? true,
         dx: ranged(
@@ -524,10 +524,10 @@ const safe_properties: Partial<
       }));
     },
   }),
-  feBlur: defineNodeProperty<"feBlur">({
+  fe_blur: defineNodeProperty<"fe_blur">({
     apply: (draft, value, prev) => {
       if (value) {
-        (draft as UN).feBlur = {
+        (draft as UN).fe_blur = {
           ...value,
           blur: {
             ...value.blur,
@@ -555,14 +555,14 @@ const safe_properties: Partial<
           active: value.active ?? true,
         };
       } else {
-        (draft as UN).feBlur = undefined;
+        (draft as UN).fe_blur = undefined;
       }
     },
   }),
-  feBackdropBlur: defineNodeProperty<"feBackdropBlur">({
+  fe_backdrop_blur: defineNodeProperty<"fe_backdrop_blur">({
     apply: (draft, value, prev) => {
       if (value) {
-        (draft as UN).feBackdropBlur = {
+        (draft as UN).fe_backdrop_blur = {
           ...value,
           blur: {
             ...value.blur,
@@ -590,18 +590,18 @@ const safe_properties: Partial<
           active: value.active ?? true,
         };
       } else {
-        (draft as UN).feBackdropBlur = undefined;
+        (draft as UN).fe_backdrop_blur = undefined;
       }
     },
   }),
-  feLiquidGlass: defineNodeProperty<"feLiquidGlass">({
+  fe_liquid_glass: defineNodeProperty<"fe_liquid_glass">({
     apply: (draft, value, prev) => {
       if (value) {
         value = {
           ...value,
           active: value.active ?? true,
-          lightIntensity: cmath.clamp(value.lightIntensity, 0, 1),
-          lightAngle: value.lightAngle,
+          light_intensity: cmath.clamp(value.light_intensity, 0, 1),
+          light_angle: value.light_angle,
           // refraction is now normalized 0-1, maps to IOR 1.0-2.0
           refraction: cmath.clamp(value.refraction, 0, 1),
           // depth is now absolute pixels [1.0+]
@@ -618,24 +618,24 @@ const safe_properties: Partial<
           ),
         } satisfies cg.FeLiquidGlass;
       }
-      (draft as UN).feLiquidGlass = value;
+      (draft as UN).fe_liquid_glass = value;
     },
   }),
-  feNoises: defineNodeProperty<"feNoises">({
+  fe_noises: defineNodeProperty<"fe_noises">({
     apply: (draft, value, prev) => {
-      (draft as UN).feNoises = value?.map((n) => ({
+      (draft as UN).fe_noises = value?.map((n) => ({
         ...n,
         active: n.active ?? true,
-        noiseSize: Math.max(0.001, n.noiseSize),
+        noise_size: Math.max(0.001, n.noise_size),
         density: cmath.clamp(n.density, 0, 1),
-        numOctaves: Math.min(4, Math.max(1, n.numOctaves ?? 3)),
+        num_octaves: Math.min(4, Math.max(1, n.num_octaves ?? 3)),
       }));
     },
   }),
-  zIndex: defineNodeProperty<"zIndex">({
-    assert: (node) => typeof node.zIndex === "number",
+  z_index: defineNodeProperty<"z_index">({
+    assert: (node) => typeof node.z_index === "number",
     apply: (draft, value, prev) => {
-      (draft as UN).zIndex = value;
+      (draft as UN).z_index = value;
     },
   }),
   fit: defineNodeProperty<"fit">({
@@ -658,10 +658,10 @@ const safe_properties: Partial<
         // initialize flex layout
         // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
         if (!draft.direction) draft.direction = "horizontal";
-        if (!draft.mainAxisAlignment) draft.mainAxisAlignment = "start";
-        if (!draft.crossAxisAlignment) draft.crossAxisAlignment = "start";
-        if (!draft.mainAxisGap) draft.mainAxisGap = 0;
-        if (!draft.crossAxisGap) draft.crossAxisGap = 0;
+        if (!draft.main_axis_alignment) draft.main_axis_alignment = "start";
+        if (!draft.cross_axis_alignment) draft.cross_axis_alignment = "start";
+        if (!draft.main_axis_gap) draft.main_axis_gap = 0;
+        if (!draft.cross_axis_gap) draft.cross_axis_gap = 0;
       }
     },
   }),
@@ -671,166 +671,166 @@ const safe_properties: Partial<
       (draft as UN).direction = value;
     },
   }),
-  mainAxisAlignment: defineNodeProperty<"mainAxisAlignment">({
+  main_axis_alignment: defineNodeProperty<"main_axis_alignment">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).mainAxisAlignment = value;
+      (draft as UN).main_axis_alignment = value;
     },
   }),
-  crossAxisAlignment: defineNodeProperty<"crossAxisAlignment">({
+  cross_axis_alignment: defineNodeProperty<"cross_axis_alignment">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).crossAxisAlignment = value;
+      (draft as UN).cross_axis_alignment = value;
     },
   }),
-  mainAxisGap: defineNodeProperty<"mainAxisGap">({
+  main_axis_gap: defineNodeProperty<"main_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).mainAxisGap = value;
+      (draft as UN).main_axis_gap = value;
     },
   }),
-  crossAxisGap: defineNodeProperty<"crossAxisGap">({
+  cross_axis_gap: defineNodeProperty<"cross_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).crossAxisGap = value;
+      (draft as UN).cross_axis_gap = value;
     },
   }),
-  layoutWrap: defineNodeProperty<"layoutWrap">({
+  layout_wrap: defineNodeProperty<"layout_wrap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).layoutWrap = value;
+      (draft as UN).layout_wrap = value;
     },
   }),
-  textAlign: defineNodeProperty<"textAlign">({
+  text_align: defineNodeProperty<"text_align">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).textAlign = value;
+      (draft as UN).text_align = value;
     },
   }),
-  textAlignVertical: defineNodeProperty<"textAlignVertical">({
+  text_align_vertical: defineNodeProperty<"text_align_vertical">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).textAlignVertical = value;
+      (draft as UN).text_align_vertical = value;
     },
   }),
-  textDecorationLine: defineNodeProperty<"textDecorationLine">({
+  text_decoration_line: defineNodeProperty<"text_decoration_line">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).textDecorationLine = value;
+      (draft as UN).text_decoration_line = value;
     },
   }),
-  textDecorationStyle: defineNodeProperty<"textDecorationStyle">({
+  text_decoration_style: defineNodeProperty<"text_decoration_style">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).textDecorationStyle = value;
+      (draft as UN).text_decoration_style = value;
     },
   }),
-  textDecorationColor: defineNodeProperty<"textDecorationColor">({
+  text_decoration_color: defineNodeProperty<"text_decoration_color">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).textDecorationColor = value;
+      (draft as UN).text_decoration_color = value;
     },
   }),
-  textDecorationSkipInk: defineNodeProperty<"textDecorationSkipInk">({
+  text_decoration_skip_ink: defineNodeProperty<"text_decoration_skip_ink">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).textDecorationSkipInk = value;
+      (draft as UN).text_decoration_skip_ink = value;
     },
   }),
-  textDecorationThickness: defineNodeProperty<"textDecorationThickness">({
+  text_decoration_thickness: defineNodeProperty<"text_decoration_thickness">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).textDecorationThickness = value;
+      (draft as UN).text_decoration_thickness = value;
     },
   }),
-  textTransform: defineNodeProperty<"textTransform">({
+  text_transform: defineNodeProperty<"text_transform">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).textTransform = value;
+      (draft as UN).text_transform = value;
     },
   }),
-  fontStyleItalic: defineNodeProperty<"fontStyleItalic">({
+  font_style_italic: defineNodeProperty<"font_style_italic">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontStyleItalic = value;
+      (draft as UN).font_style_italic = value;
     },
   }),
-  fontPostscriptName: defineNodeProperty<"fontPostscriptName">({
+  font_postscript_name: defineNodeProperty<"font_postscript_name">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontPostscriptName = value;
+      (draft as UN).font_postscript_name = value;
     },
   }),
-  fontWeight: defineNodeProperty<"fontWeight">({
+  font_weight: defineNodeProperty<"font_weight">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontWeight = value;
+      (draft as UN).font_weight = value;
     },
   }),
-  fontKerning: defineNodeProperty<"fontKerning">({
+  font_kerning: defineNodeProperty<"font_kerning">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontKerning = value;
+      (draft as UN).font_kerning = value;
     },
   }),
-  fontWidth: defineNodeProperty<"fontWidth">({
+  font_width: defineNodeProperty<"font_width">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontWidth = value;
+      (draft as UN).font_width = value;
     },
   }),
-  fontFeatures: defineNodeProperty<"fontFeatures">({
+  font_features: defineNodeProperty<"font_features">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontFeatures = value;
+      (draft as UN).font_features = value;
     },
   }),
-  fontVariations: defineNodeProperty<"fontVariations">({
+  font_variations: defineNodeProperty<"font_variations">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontVariations = value;
+      (draft as UN).font_variations = value;
     },
   }),
-  fontOpticalSizing: defineNodeProperty<"fontOpticalSizing">({
+  font_optical_sizing: defineNodeProperty<"font_optical_sizing">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontOpticalSizing = value;
+      (draft as UN).font_optical_sizing = value;
     },
   }),
-  fontSize: defineNodeProperty<"fontSize">({
+  font_size: defineNodeProperty<"font_size">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).fontSize = ranged(1, value);
+      (draft as UN).font_size = ranged(1, value);
     },
   }),
-  lineHeight: defineNodeProperty<"lineHeight">({
+  line_height: defineNodeProperty<"line_height">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).lineHeight = ranged(0, value);
+      (draft as UN).line_height = ranged(0, value);
     },
   }),
-  letterSpacing: defineNodeProperty<"letterSpacing">({
+  letter_spacing: defineNodeProperty<"letter_spacing">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).letterSpacing = value;
+      (draft as UN).letter_spacing = value;
     },
   }),
-  wordSpacing: defineNodeProperty<"wordSpacing">({
+  word_spacing: defineNodeProperty<"word_spacing">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).wordSpacing = value;
+      (draft as UN).word_spacing = value;
     },
   }),
-  maxLength: defineNodeProperty<"maxLength">({
+  max_length: defineNodeProperty<"max_length">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).maxLength = value;
+      (draft as UN).max_length = value;
     },
   }),
-  maxLines: defineNodeProperty<"maxLines">({
+  max_lines: defineNodeProperty<"max_lines">({
     assert: (node) => node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).maxLines = value ? ranged(1, value) : null;
+      (draft as UN).max_lines = value ? ranged(1, value) : null;
     },
   }),
   text: defineNodeProperty<"text">({
@@ -938,7 +938,7 @@ export default function nodeReducer<
       }
       case "node/change/fontFamily": {
         assert(draft.type === "text");
-        draft.fontFamily = action.fontFamily;
+        draft.font_family = action.fontFamily;
         break;
       }
 

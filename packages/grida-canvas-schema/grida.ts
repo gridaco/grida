@@ -530,7 +530,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.0.1-beta.2+20251201";
+  export const SCHEMA_VERSION = "0.0.3-beta+20251202";
 
   /**
    * Simple Node Selector
@@ -663,7 +663,7 @@ export namespace grida.program.document {
     /**
      * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
      */
-    backgroundColor?: kolor.colorformats.RGBA32F | null | undefined | "";
+    background_color?: kolor.colorformats.RGBA32F | null | undefined | "";
   }
 
   export interface Guide2D {
@@ -1010,8 +1010,8 @@ export namespace grida.program.css {
    * - only `solid` `dashed` border is supported
    */
   export type Border = {
-    borderStyle: "none" | "solid" | "dashed";
-    borderColor: cg.RGBA32F;
+    border_style: "none" | "solid" | "dashed";
+    border_color: cg.RGBA32F;
     /**
      * @example
      * ```css
@@ -1020,7 +1020,7 @@ export namespace grida.program.css {
      * ```
      *
      */
-    borderWidth:
+    border_width:
       | number
       | {
           top: number;
@@ -1408,7 +1408,7 @@ export namespace grida.program.nodes {
        *
        * @default "pass-through"
        */
-      blendMode?: cg.LayerBlendMode;
+      blend_mode?: cg.LayerBlendMode;
     }
 
     export interface ILayerMaskType {
@@ -1436,7 +1436,7 @@ export namespace grida.program.nodes {
        * @default 0
        * @type {number} integer
        */
-      zIndex: number;
+      z_index: number;
     }
 
     /**
@@ -1469,18 +1469,18 @@ export namespace grida.program.nodes {
      * Corner radius
      */
     export interface ICornerRadius {
-      cornerRadius?: number;
+      corner_radius?: number;
     }
 
     /**
      * Rectangle Corner
      */
     export interface IRectangularCornerRadius {
-      cornerRadiusTopLeft?: number;
-      cornerRadiusTopRight?: number;
-      cornerRadiusBottomLeft?: number;
-      cornerRadiusBottomRight?: number;
-      cornerSmoothing?: number;
+      corner_radius_top_left?: number;
+      corner_radius_top_right?: number;
+      corner_radius_bottom_left?: number;
+      corner_radius_bottom_right?: number;
+      corner_smoothing?: number;
     }
 
     /**
@@ -1490,10 +1490,10 @@ export namespace grida.program.nodes {
       padding:
         | number
         | {
-            paddingTop: number;
-            paddingRight: number;
-            paddingBottom: number;
-            paddingLeft: number;
+            padding_top: number;
+            padding_right: number;
+            padding_bottom: number;
+            padding_left: number;
           };
     }
 
@@ -1525,7 +1525,7 @@ export namespace grida.program.nodes {
        *
        * @default "nowrap"
        */
-      layoutWrap?: "wrap" | "nowrap";
+      layout_wrap?: "wrap" | "nowrap";
 
       /**
        *
@@ -1533,7 +1533,7 @@ export namespace grida.program.nodes {
        *
        * @default "start"
        */
-      mainAxisAlignment: cg.MainAxisAlignment;
+      main_axis_alignment: cg.MainAxisAlignment;
 
       /**
        *
@@ -1541,7 +1541,7 @@ export namespace grida.program.nodes {
        *
        * @default "start"
        */
-      crossAxisAlignment: cg.CrossAxisAlignment;
+      cross_axis_alignment: cg.CrossAxisAlignment;
 
       /**
        * the gap between the children in main axis - takes effect when layout is set to `flex`
@@ -1550,7 +1550,7 @@ export namespace grida.program.nodes {
        *
        * @default 0
        */
-      mainAxisGap: number;
+      main_axis_gap: number;
 
       /**
        * the gap between the children in cross axis - takes effect when layout is set to `flex`
@@ -1559,7 +1559,7 @@ export namespace grida.program.nodes {
        *
        * @default 0
        */
-      crossAxisGap: number;
+      cross_axis_gap: number;
     }
 
     /**
@@ -1584,11 +1584,11 @@ export namespace grida.program.nodes {
     }
 
     export interface IEffects {
-      feBlur?: cg.FeLayerBlur;
-      feBackdropBlur?: cg.FeBackdropBlur;
-      feShadows?: cg.FeShadow[];
-      feLiquidGlass?: cg.FeLiquidGlass;
-      feNoises?: cg.FeNoise[];
+      fe_blur?: cg.FeLayerBlur;
+      fe_backdrop_blur?: cg.FeBackdropBlur;
+      fe_shadows?: cg.FeShadow[];
+      fe_liquid_glass?: cg.FeLiquidGlass;
+      fe_noises?: cg.FeNoise[];
     }
 
     export interface IEllipseArcData {
@@ -1607,13 +1607,13 @@ export namespace grida.program.nodes {
        * start angle in degree
        * @default 0
        */
-      angleOffset: number;
+      angle_offset: number;
 
       /**
        * inner radius in 0~1
        * @default 0
        */
-      innerRadius: number;
+      inner_radius: number;
     }
 
     /**
@@ -1630,17 +1630,17 @@ export namespace grida.program.nodes {
       /**
        * stroke width - 0 or greater
        */
-      strokeWidth: number;
+      stroke_width: number;
 
       /**
        * variable width stroke width profile
        */
-      strokeWidthProfile?: cg.VariableWidthProfile;
+      stroke_width_profile?: cg.VariableWidthProfile;
 
       /**
        * stroke alignment - takes effect when stroke is set
        */
-      strokeAlign?: cg.StrokeAlign;
+      stroke_align?: cg.StrokeAlign;
 
       /**
        * stroke dash pattern - array of dash and gap lengths
@@ -1653,23 +1653,23 @@ export namespace grida.program.nodes {
        * @example [10, 5, 2, 5] - 10px dash, 5px gap, 2px dot, 5px gap
        * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray
        */
-      strokeDashArray?: number[];
+      stroke_dash_array?: number[];
 
       /**
        * @default "butt"
        */
-      strokeCap: cg.StrokeCap;
+      stroke_cap: cg.StrokeCap;
 
       /**
        * @default "miter"
        */
-      strokeJoin: cg.StrokeJoin;
+      stroke_join: cg.StrokeJoin;
 
       /**
        * stroke miter limit - 0 or greater
        * @default 4
        */
-      strokeMiterLimit?: number;
+      stroke_miter_limit?: number;
     }
 
     /**
@@ -1679,19 +1679,19 @@ export namespace grida.program.nodes {
       /**
        * sets or overrides the top stroke width
        */
-      strokeTopWidth?: number;
+      stroke_top_width?: number;
       /**
        * sets or overrides the right stroke width
        */
-      strokeRightWidth?: number;
+      stroke_right_width?: number;
       /**
        * sets or overrides the bottom stroke width
        */
-      strokeBottomWidth?: number;
+      stroke_bottom_width?: number;
       /**
        * sets or overrides the left stroke width
        */
-      strokeLeftWidth?: number;
+      stroke_left_width?: number;
     }
 
     /**
@@ -1703,11 +1703,11 @@ export namespace grida.program.nodes {
       /**
        * stroke width - 0 or greater
        */
-      strokeWidth?: number;
+      stroke_width?: number;
       /**
        * stroke alignment - takes effect when stroke is set
        */
-      strokeAlign?: cg.StrokeAlign;
+      stroke_align?: cg.StrokeAlign;
     }
 
     export interface ICSSBorder {
@@ -1791,8 +1791,8 @@ export namespace grida.program.nodes {
      * this is a abstract font-related style container, where this subset of text style attrutes are hightly likely change within this scope, as font family or font (postscript) / instance change.
      */
     export interface IFontStyle {
-      fontFamily?: string;
-      fontSize: number;
+      font_family?: string;
+      font_size: number;
       /**
        * font weight
        *
@@ -1800,7 +1800,7 @@ export namespace grida.program.nodes {
        *
        * @default 400
        */
-      fontWeight: cg.NFontWeight | number;
+      font_weight: cg.NFontWeight | number;
 
       /**
        * font width
@@ -1811,7 +1811,7 @@ export namespace grida.program.nodes {
        * @default undefined
        *
        */
-      fontWidth?: number;
+      font_width?: number;
 
       /**
        * font optical sizing
@@ -1820,7 +1820,7 @@ export namespace grida.program.nodes {
        *
        * @default "auto"
        */
-      fontOpticalSizing?: cg.OpticalSizing;
+      font_optical_sizing?: cg.OpticalSizing;
 
       /**
        * Font kerning mode
@@ -1830,18 +1830,18 @@ export namespace grida.program.nodes {
        *
        * @default `normal`
        */
-      fontKerning: cg.FontKerningFlag;
+      font_kerning: cg.FontKerningFlag;
 
       /**
        * OpenType features
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-feature-settings
        */
-      fontFeatures?: Partial<Record<cg.OpenTypeFeature, boolean>>;
+      font_features?: Partial<Record<cg.OpenTypeFeature, boolean>>;
       /**
        * custom font variations
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-variation-settings
        */
-      fontVariations?: Record<string, number>;
+      font_variations?: Record<string, number>;
 
       // #region semantics
       /**
@@ -1853,7 +1853,7 @@ export namespace grida.program.nodes {
        *
        * if the used fvar.instance is semantically italic, this can be set true.
        */
-      fontStyleItalic?: boolean;
+      font_style_italic?: boolean;
 
       /**
        * [font post script name]
@@ -1862,7 +1862,7 @@ export namespace grida.program.nodes {
        *
        * @note some fonts, like Inter, do not have a postscript name for instances.
        */
-      fontPostscriptName?: string | null;
+      font_postscript_name?: string | null;
       // #endregion semantics
     }
 
@@ -1873,14 +1873,14 @@ export namespace grida.program.nodes {
      */
     export interface ITextStyle extends IFontStyle {
       // #region decorations
-      textDecorationLine: cg.TextDecorationLine;
-      textDecorationStyle?: cg.TextDecorationStyle | null;
-      textDecorationColor?: cg.TextDecorationColorValue | null;
-      textDecorationSkipInk?: cg.TextDecorationSkipInkFlag | null;
-      textDecorationThickness?: cg.TextDecorationThicknessPercentage | null;
+      text_decoration_line: cg.TextDecorationLine;
+      text_decoration_style?: cg.TextDecorationStyle | null;
+      text_decoration_color?: cg.TextDecorationColorValue | null;
+      text_decoration_skip_ink?: cg.TextDecorationSkipInkFlag | null;
+      text_decoration_thickness?: cg.TextDecorationThicknessPercentage | null;
       // #endregion decorations
 
-      textTransform?: cg.TextTransform;
+      text_transform?: cg.TextTransform;
 
       /**
        * letter-spacing in em (percentage) value
@@ -1888,7 +1888,7 @@ export namespace grida.program.nodes {
        * @example 1 = 100% / 1em
        * @default 0
        */
-      letterSpacing?: number;
+      letter_spacing?: number;
 
       /**
        * word-spacing in em (percentage) value
@@ -1896,7 +1896,7 @@ export namespace grida.program.nodes {
        * @example 1 = 100% / 1em
        * @default 0
        */
-      wordSpacing?: number;
+      word_spacing?: number;
 
       /**
        * line-height in percentage value only. 0% ~
@@ -1904,7 +1904,7 @@ export namespace grida.program.nodes {
        * @example 1 = 100% / 1em
        * @min 0
        */
-      lineHeight?: number;
+      line_height?: number;
     }
 
     /**
@@ -1918,11 +1918,11 @@ export namespace grida.program.nodes {
       /**
        * @default "left"
        */
-      textAlign: cg.TextAlign;
+      text_align: cg.TextAlign;
       /**
        * @default "top"
        */
-      textAlignVertical: cg.TextAlignVertical;
+      text_align_vertical: cg.TextAlignVertical;
     }
 
     export interface IComputedTextNodeStyle
@@ -1943,7 +1943,7 @@ export namespace grida.program.nodes {
        *
        * @deprecated - not standard
        */
-      maxLength?: number;
+      max_length?: number;
     }
 
     export interface IComputedTextValue {
@@ -2072,8 +2072,8 @@ export namespace grida.program.nodes {
       i.ITextStroke {
     readonly type: "text";
 
-    maxLines?: number | null;
-    // textAutoResize: "none" | "width" | "height" | "auto";
+    max_lines?: number | null;
+    // text_auto_resize: "none" | "width" | "height" | "auto";
   }
 
   export interface ComputedTextNode
@@ -2083,7 +2083,7 @@ export namespace grida.program.nodes {
       i.IComputedTextValue & i.IComputedTextNodeStyle
     > {
     readonly type: "text";
-    maxLines?: number | null;
+    max_lines?: number | null;
   }
 
   export interface ImageNode
@@ -2282,7 +2282,7 @@ export namespace grida.program.nodes {
       i.IFill<cg.Paint>,
       i.IStroke {
     readonly type: "polygon";
-    pointCount: number;
+    point_count: number;
   }
 
   export interface RegularStarPolygonNode
@@ -2298,8 +2298,8 @@ export namespace grida.program.nodes {
       i.IFill<cg.Paint>,
       i.IStroke {
     readonly type: "star";
-    pointCount: number;
-    innerRadius: number;
+    point_count: number;
+    inner_radius: number;
   }
 
   export interface VectorNode
@@ -2321,9 +2321,9 @@ export namespace grida.program.nodes {
      * @deprecated
      * @default "nonzero"
      */
-    fillRule?: cg.FillRule;
+    fill_rule?: cg.FillRule;
 
-    vectorNetwork: vn.VectorNetwork;
+    vector_network: vn.VectorNetwork;
   }
 
   export interface ComputedVectorNode
@@ -2561,22 +2561,22 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
-            blendMode: cg.def.LAYER_BLENDMODE,
-            zIndex: 0,
+            blend_mode: cg.def.LAYER_BLENDMODE,
+            z_index: 0,
             rotation: 0,
             width: 0,
             height: 0,
             position: "absolute",
             top: 0,
             left: 0,
-            cornerRadius: 0,
-            cornerRadiusTopLeft: 0,
-            cornerRadiusTopRight: 0,
-            cornerRadiusBottomLeft: 0,
-            cornerRadiusBottomRight: 0,
-            strokeWidth: 0,
-            strokeCap: "butt",
-            strokeJoin: "miter",
+            corner_radius: 0,
+            corner_radius_top_left: 0,
+            corner_radius_top_right: 0,
+            corner_radius_bottom_left: 0,
+            corner_radius_bottom_right: 0,
+            stroke_width: 0,
+            stroke_cap: "butt",
+            stroke_join: "miter",
             ...prototype,
             id: id,
           } satisfies RectangleNode;
@@ -2597,7 +2597,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
-            zIndex: 0,
+            z_index: 0,
             rotation: 0,
             ...prototypeWithoutChildren,
             id: id,
@@ -2623,7 +2623,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
-            zIndex: 0,
+            z_index: 0,
             rotation: 0,
             width: 100,
             height: 100,
@@ -2682,13 +2682,13 @@ export namespace grida.program.nodes {
 
         // Process children and populate links (not node properties)
         if (nodes.hasChildren(prototype)) {
-          const childIds: nodes.NodeID[] = [];
+          const child_ids: nodes.NodeID[] = [];
           for (const childPrototype of prototype.children) {
             const childNode = processNode(childPrototype, nid, depth + 1);
-            childIds.push(childNode.id);
+            child_ids.push(childNode.id);
           }
           // Populate document.links instead of node.children
-          document.links[node.id] = childIds;
+          document.links[node.id] = child_ids;
         }
 
         return node;
@@ -2706,7 +2706,7 @@ export namespace grida.program.nodes {
       const { scene, ...defs } = packed;
 
       // Create SceneNode from Scene
-      const sceneNode: nodes.SceneNode = {
+      const node: nodes.SceneNode = {
         type: "scene",
         id: scene.id,
         name: scene.name,
@@ -2716,12 +2716,12 @@ export namespace grida.program.nodes {
         order: scene.order,
         guides: scene.guides,
         edges: scene.edges,
-        backgroundColor: scene.backgroundColor,
+        background_color: scene.background_color,
       };
 
       // Add scene to nodes if not present
       if (!defs.nodes[scene.id]) {
-        defs.nodes[scene.id] = sceneNode;
+        defs.nodes[scene.id] = node;
       }
 
       // Add scene children to links if not present
@@ -2782,24 +2782,24 @@ export namespace grida.program.nodes {
         locked: false,
         expanded: false,
         rotation: 0,
-        zIndex: 0,
+        z_index: 0,
         opacity: 1,
-        blendMode: cg.def.LAYER_BLENDMODE,
+        blend_mode: cg.def.LAYER_BLENDMODE,
         position: "absolute",
         layout: "flow",
         direction: "horizontal",
-        mainAxisAlignment: "start",
-        mainAxisGap: 0,
-        crossAxisAlignment: "start",
-        crossAxisGap: 0,
+        main_axis_alignment: "start",
+        main_axis_gap: 0,
+        cross_axis_alignment: "start",
+        cross_axis_gap: 0,
         padding: 0,
         width: 100,
         height: 100,
-        cornerRadius: 0,
-        cornerRadiusTopLeft: 0,
-        cornerRadiusTopRight: 0,
-        cornerRadiusBottomLeft: 0,
-        cornerRadiusBottomRight: 0,
+        corner_radius: 0,
+        corner_radius_top_left: 0,
+        corner_radius_top_right: 0,
+        corner_radius_bottom_left: 0,
+        corner_radius_bottom_right: 0,
         style: {},
         // children_refs: [],
         ...partial,

@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.2+20251201",
+  "version": "0.0.3-beta+20251202",
   "document": {
     "nodes": {
       "202:2": {
@@ -9,7 +9,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -30,7 +30,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "202:3": {
         "id": "202:3",
@@ -39,7 +39,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "image",
         "src": "https://s3-alpha-sig.figma.com/img/a49e/fb52/8341b0acefdd6387e3dec5b7da9d9361?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=ZO0A6hXI7GP9kGIEaiSyS9WmQtjXNHjP8hAaYFDVctHbhfPaGzhHo8t0nOMQco-0IhiHWV86xaAqNPV8u9CphZsDNxFpJBHSktgo7oRLBVeM8klNo~pH8tjxqXTy0ZHTFYusgHv-ncu-3FTKrfTtgpM~moQH0ndNBRqzJfivAxrtNmafp~Vi7vHl5UpSmvcfKuTY5QMealvyw-S9sEHPb0pL26BlkWuLA57gcrqgGowdRDqfeXGpYyBD-M1QmOzFfgUvBeqfDSxMQmwAql4iIVLHa-NXxL1iWQO5Jb1Pt1Ca3Q1Sj07PtVHBE9DBCOXxVvd~jNhscACfkKOJKWI7eQ__",
         "position": "absolute",
@@ -47,7 +47,7 @@
         "top": 0,
         "width": 540,
         "height": 540,
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "fit": "cover",
         "style": {}
       },
@@ -58,7 +58,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 0.7,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "# our favorite question",
         "position": "absolute",
@@ -76,14 +76,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.25,
-        "letterSpacing": 0,
-        "fontSize": 16,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.25,
+        "letter_spacing": 0,
+        "font_size": 16,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "202:5": {
         "id": "202:5",
@@ -92,7 +92,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -103,7 +103,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "202:6": {
         "id": "202:6",
@@ -112,7 +112,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "How to turn off \nthe TV correctly?",
         "position": "absolute",
@@ -130,14 +130,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.01,
-        "letterSpacing": 0,
-        "fontSize": 44,
-        "fontFamily": "Inter",
-        "fontWeight": 700
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.01,
+        "letter_spacing": 0,
+        "font_size": 44,
+        "font_family": "Inter",
+        "font_weight": 700
       },
       "202:7": {
         "id": "202:7",
@@ -146,7 +146,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 0.7,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "1 of 10",
         "position": "absolute",
@@ -164,14 +164,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.43,
-        "letterSpacing": 0,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.43,
+        "letter_spacing": 0,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "202:8": {
         "id": "202:8",
@@ -180,7 +180,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 0.7,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "getting started",
         "position": "absolute",
@@ -198,14 +198,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.43,
-        "letterSpacing": 1.5,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.43,
+        "letter_spacing": 1.5,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "202:9": {
         "id": "202:9",
@@ -214,7 +214,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "cashier app",
         "position": "absolute",
@@ -232,14 +232,14 @@
           }
         },
         "style": {},
-        "textAlign": "right",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.43,
-        "letterSpacing": 1.5,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "right",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.43,
+        "letter_spacing": 1.5,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "202:10": {
         "id": "202:10",
@@ -248,7 +248,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -259,7 +259,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "202:11": {
         "id": "202:11",
@@ -268,7 +268,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -280,7 +280,7 @@
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "202:12": {
         "id": "202:12",
@@ -289,7 +289,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "svgpath",
         "position": "absolute",
         "left": 1.67,
@@ -308,7 +308,7 @@
         "paths": [
           {
             "d": "M8.33333 0C3.725 0 0 3.75 0 8.33333C0 10.5435 0.877974 12.6631 2.44078 14.2259C3.2146 14.9997 4.13326 15.6135 5.1443 16.0323C6.15535 16.4511 7.23898 16.6667 8.33333 16.6667C10.5435 16.6667 12.6631 15.7887 14.2259 14.2259C15.7887 12.6631 16.6667 10.5435 16.6667 8.33333C16.6667 7.23898 16.4511 6.15535 16.0323 5.1443C15.6135 4.13326 14.9997 3.2146 14.2259 2.44078C13.4521 1.66696 12.5334 1.05313 11.5224 0.634337C10.5113 0.215548 9.42768 1.11022e-15 8.33333 0L8.33333 0ZM11.25 5C11.5815 5 11.8995 5.1317 12.1339 5.36612C12.3683 5.60054 12.5 5.91848 12.5 6.25C12.5 6.58152 12.3683 6.89946 12.1339 7.13388C11.8995 7.3683 11.5815 7.5 11.25 7.5C10.9185 7.5 10.6005 7.3683 10.3661 7.13388C10.1317 6.89946 10 6.58152 10 6.25C10 5.91848 10.1317 5.60054 10.3661 5.36612C10.6005 5.1317 10.9185 5 11.25 5L11.25 5ZM5.41667 5C5.74819 5 6.06613 5.1317 6.30055 5.36612C6.53497 5.60054 6.66667 5.91848 6.66667 6.25C6.66667 6.58152 6.53497 6.89946 6.30055 7.13388C6.06613 7.3683 5.74819 7.5 5.41667 7.5C5.08515 7.5 4.7672 7.3683 4.53278 7.13388C4.29836 6.89946 4.16667 6.58152 4.16667 6.25C4.16667 5.91848 4.29836 5.60054 4.53278 5.36612C4.7672 5.1317 5.08515 5 5.41667 5ZM8.33333 12.9167C6.39167 12.9167 4.74167 11.7 4.075 10L12.5917 10C11.9167 11.7 10.275 12.9167 8.33333 12.9167Z",
-            "fillRule": "nonzero"
+            "fill_rule": "nonzero"
           }
         ]
       },
@@ -319,7 +319,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "youami",
         "position": "absolute",
@@ -337,14 +337,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 0.8,
-        "letterSpacing": 0,
-        "fontSize": 20,
-        "fontFamily": "Inter",
-        "fontWeight": 800
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 0.8,
+        "letter_spacing": 0,
+        "font_size": 20,
+        "font_family": "Inter",
+        "font_weight": 800
       },
       "post": {
         "type": "scene",
@@ -357,7 +357,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.96,
           "g": 0.96,
           "b": 0.96,

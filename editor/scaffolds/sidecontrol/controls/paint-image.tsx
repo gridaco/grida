@@ -213,12 +213,12 @@ export function ImagePaintControl({
   const handleRotate = useCallback(() => {
     if (!value.src) return; // Don't update if no image source
 
-    const quarterTurns = (value.quarterTurns ?? 0) + 1;
+    const quarter_turns = (value.quarter_turns ?? 0) + 1;
     onValueChange?.({
       ...value,
-      quarterTurns,
+      quarter_turns,
     });
-  }, [value.quarterTurns, onValueChange]);
+  }, [value.quarter_turns, onValueChange]);
 
   const handleFilterChange = useCallback(
     (key: keyof NonNullable<cg.ImagePaint["filters"]>, fvalue: number) => {

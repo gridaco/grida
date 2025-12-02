@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.2+20251201",
+  "version": "0.0.3-beta+20251202",
   "document": {
     "nodes": {
       "root": {
@@ -9,7 +9,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -26,7 +26,7 @@
             "a": 1.0
           }
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "text": {
         "id": "text",
@@ -35,7 +35,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Programmable Design",
         "position": "absolute",
@@ -53,14 +53,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 32,
-        "fontFamily": "Pretendard",
-        "fontWeight": 600
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 32,
+        "font_family": "Pretendard",
+        "font_weight": 600
       },
       "demo": {
         "type": "scene",
@@ -73,7 +73,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.96,
           "g": 0.96,
           "b": 0.96,

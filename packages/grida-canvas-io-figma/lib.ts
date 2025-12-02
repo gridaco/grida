@@ -151,7 +151,7 @@ export namespace iofigma {
               stop.color.a
             ),
           })),
-          blendMode: map.blendModeMap[paint.blendMode],
+          blend_mode: map.blendModeMap[paint.blendMode],
           active: paint.visible ?? true,
           opacity: paint.opacity ?? 1,
         } as cg.GradientPaint;
@@ -195,7 +195,7 @@ export namespace iofigma {
                 { offset: 0, color: kolor.colorformats.RGBA32F.BLACK },
                 { offset: 1, color: kolor.colorformats.RGBA32F.WHITE },
               ],
-              blendMode: map.blendModeMap[paint.blendMode],
+              blend_mode: map.blendModeMap[paint.blendMode],
               opacity: 1,
             };
         }
@@ -223,10 +223,10 @@ export namespace iofigma {
         rectangleCornerRadii?: number[] | [number, number, number, number]
       ): grida.program.nodes.i.IRectangularCornerRadius {
         return {
-          cornerRadiusTopLeft: rectangleCornerRadii?.[0] ?? 0,
-          cornerRadiusTopRight: rectangleCornerRadii?.[1] ?? 0,
-          cornerRadiusBottomLeft: rectangleCornerRadii?.[2] ?? 0,
-          cornerRadiusBottomRight: rectangleCornerRadii?.[3] ?? 0,
+          corner_radius_top_left: rectangleCornerRadii?.[0] ?? 0,
+          corner_radius_top_right: rectangleCornerRadii?.[1] ?? 0,
+          corner_radius_bottom_left: rectangleCornerRadii?.[2] ?? 0,
+          corner_radius_bottom_right: rectangleCornerRadii?.[3] ?? 0,
         };
       }
 
@@ -351,8 +351,8 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: 1,
-              blendMode: "pass-through",
-              zIndex: 0,
+              blend_mode: "pass-through",
+              z_index: 0,
               type: "container",
               expanded: false,
               //
@@ -368,27 +368,27 @@ export namespace iofigma {
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {
-                      borderWidth: strokeWeight ?? 0,
-                      borderColor: toSolidPaint(first_visible_stroke).color,
-                      borderStyle: "none",
+                      border_width: strokeWeight ?? 0,
+                      border_color: toSolidPaint(first_visible_stroke).color,
+                      border_style: "none",
                     }
                   : undefined,
 
               //
               style: {},
-              cornerRadius: 0,
-              cornerRadiusTopLeft: 0,
-              cornerRadiusTopRight: 0,
-              cornerRadiusBottomLeft: 0,
-              cornerRadiusBottomRight: 0,
+              corner_radius: 0,
+              corner_radius_top_left: 0,
+              corner_radius_top_right: 0,
+              corner_radius_bottom_left: 0,
+              corner_radius_bottom_right: 0,
               padding: 0,
               // TODO:
               layout: "flow",
               direction: "horizontal",
-              mainAxisAlignment: "start",
-              crossAxisAlignment: "start",
-              mainAxisGap: 0,
-              crossAxisGap: 0,
+              main_axis_alignment: "start",
+              cross_axis_alignment: "start",
+              main_axis_gap: 0,
+              cross_axis_gap: 0,
             } satisfies grida.program.nodes.ContainerNode;
           }
           //
@@ -437,8 +437,8 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
               type: "container",
               expanded: false,
               //
@@ -454,9 +454,9 @@ export namespace iofigma {
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {
-                      borderWidth: strokeWeight ?? 0,
-                      borderColor: toSolidPaint(first_visible_stroke).color,
-                      borderStyle: strokeDashes ? "dashed" : "solid",
+                      border_width: strokeWeight ?? 0,
+                      border_color: toSolidPaint(first_visible_stroke).color,
+                      border_style: strokeDashes ? "dashed" : "solid",
                     }
                   : undefined,
 
@@ -464,7 +464,7 @@ export namespace iofigma {
               style: {
                 overflow: clipsContent ? "clip" : undefined,
               },
-              cornerRadius: node.cornerRadius ?? 0,
+              corner_radius: node.cornerRadius ?? 0,
               ...rectangleCornerRadius(node.rectangleCornerRadii),
               padding:
                 paddingTop === paddingRight &&
@@ -472,18 +472,18 @@ export namespace iofigma {
                 paddingTop === paddingLeft
                   ? (paddingTop ?? 0)
                   : {
-                      paddingTop: paddingTop ?? 0,
-                      paddingRight: paddingRight ?? 0,
-                      paddingBottom: paddingBottom ?? 0,
-                      paddingLeft: paddingLeft ?? 0,
+                      padding_top: paddingTop ?? 0,
+                      padding_right: paddingRight ?? 0,
+                      padding_bottom: paddingBottom ?? 0,
+                      padding_left: paddingLeft ?? 0,
                     },
               // TODO:
               layout: "flow",
               direction: "horizontal",
-              mainAxisAlignment: "start",
-              crossAxisAlignment: "start",
-              mainAxisGap: itemSpacing ?? 0,
-              crossAxisGap: counterAxisSpacing ?? itemSpacing ?? 0,
+              main_axis_alignment: "start",
+              cross_axis_alignment: "start",
+              main_axis_gap: itemSpacing ?? 0,
+              cross_axis_gap: counterAxisSpacing ?? itemSpacing ?? 0,
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -497,8 +497,8 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
               type: "container",
               expanded: false,
               //
@@ -512,15 +512,15 @@ export namespace iofigma {
               border: undefined,
               //
               style: {},
-              cornerRadius: 0,
+              corner_radius: 0,
               ...rectangleCornerRadius([0, 0, 0, 0]),
               padding: 0,
               layout: "flow",
               direction: "horizontal",
-              mainAxisAlignment: "start",
-              crossAxisAlignment: "start",
-              mainAxisGap: 0,
-              crossAxisGap: 0,
+              main_axis_alignment: "start",
+              cross_axis_alignment: "start",
+              main_axis_gap: 0,
+              cross_axis_gap: 0,
             } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }
@@ -579,8 +579,8 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
               type: "text",
               text: node.characters,
               position: "absolute",
@@ -606,37 +606,37 @@ export namespace iofigma {
                 ? paint(first_visible_stroke)
                 : undefined,
               strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              strokeWidth: strokeWeight ?? 0,
+              stroke_width: strokeWeight ?? 0,
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {
-                      borderWidth: strokeWeight ?? 0,
-                      borderColor: toSolidPaint(first_visible_stroke).color,
-                      borderStyle: strokeDashes ? "dashed" : "solid",
+                      border_width: strokeWeight ?? 0,
+                      border_color: toSolidPaint(first_visible_stroke).color,
+                      border_style: strokeDashes ? "dashed" : "solid",
                     }
                   : undefined,
               //
               style: {},
-              textAlign: node.style.textAlignHorizontal
+              text_align: node.style.textAlignHorizontal
                 ? (map.textAlignMap[node.style.textAlignHorizontal] ?? "left")
                 : "left",
-              textAlignVertical: node.style.textAlignVertical
+              text_align_vertical: node.style.textAlignVertical
                 ? map.textAlignVerticalMap[node.style.textAlignVertical]
                 : "top",
-              textDecorationLine: node.style.textDecoration
+              text_decoration_line: node.style.textDecoration
                 ? (map.textDecorationMap[node.style.textDecoration] ?? "none")
                 : "none",
-              lineHeight: node.style.lineHeightPercentFontSize
+              line_height: node.style.lineHeightPercentFontSize
                 ? node.style.lineHeightPercentFontSize / 100
                 : // normal = 1.2
                   1.2,
 
-              letterSpacing: node.style.letterSpacing,
-              fontSize: node.style.fontSize ?? 0,
-              fontFamily: node.style.fontFamily,
-              fontWeight:
+              letter_spacing: node.style.letterSpacing,
+              font_size: node.style.fontSize ?? 0,
+              font_family: node.style.fontFamily,
+              font_weight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
-              fontKerning: true, // TODO: parse from features (`kern`)
+              font_kerning: true, // TODO: parse from features (`kern`)
             };
           }
           case "RECTANGLE": {
@@ -671,8 +671,8 @@ export namespace iofigma {
                 locked: node.locked ?? false,
                 rotation: node.rotation ?? 0,
                 opacity: node.opacity ?? 1,
-                blendMode: map.layerBlendModeMap[node.blendMode],
-                zIndex: 0,
+                blend_mode: map.layerBlendModeMap[node.blendMode],
+                z_index: 0,
                 type: "image",
                 src: images[first_visible_fill.imageRef!],
                 position: "absolute",
@@ -680,16 +680,16 @@ export namespace iofigma {
                 top: node.relativeTransform![1][2],
                 width: node.size!.x,
                 height: node.size!.y,
-                cornerRadius: node.cornerRadius ?? 0,
+                corner_radius: node.cornerRadius ?? 0,
                 ...rectangleCornerRadius(node.rectangleCornerRadii),
                 fit: "cover",
                 //
                 border:
                   first_visible_stroke?.type === "SOLID"
                     ? {
-                        borderWidth: strokeWeight ?? 0,
-                        borderColor: toSolidPaint(first_visible_stroke).color,
-                        borderStyle: strokeDashes ? "dashed" : "solid",
+                        border_width: strokeWeight ?? 0,
+                        border_color: toSolidPaint(first_visible_stroke).color,
+                        border_style: strokeDashes ? "dashed" : "solid",
                       }
                     : undefined,
                 //
@@ -704,8 +704,8 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
               type: "rectangle",
               //
               position: "absolute",
@@ -715,14 +715,14 @@ export namespace iofigma {
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokeWidth: strokeWeight ?? 0,
-              strokeCap: strokeCap
+              stroke_width: strokeWeight ?? 0,
+              stroke_cap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              strokeJoin: strokeJoin
+              stroke_join: strokeJoin
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
-              cornerRadius: node.cornerRadius ?? 0,
+              corner_radius: node.cornerRadius ?? 0,
               ...rectangleCornerRadius(node.rectangleCornerRadii),
             } satisfies grida.program.nodes.RectangleNode;
           }
@@ -748,8 +748,8 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
               type: "ellipse",
               //
               position: "absolute",
@@ -759,16 +759,16 @@ export namespace iofigma {
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokeWidth: strokeWeight ?? 0,
-              strokeCap: strokeCap
+              stroke_width: strokeWeight ?? 0,
+              stroke_cap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              strokeJoin: strokeJoin
+              stroke_join: strokeJoin
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
               // arc data
-              innerRadius: node.arcData.innerRadius,
-              angleOffset: cmath.rad2deg(node.arcData.startingAngle),
+              inner_radius: node.arcData.innerRadius,
+              angle_offset: cmath.rad2deg(node.arcData.startingAngle),
               angle: cmath.rad2deg(
                 node.arcData.endingAngle - node.arcData.startingAngle
               ),
@@ -799,22 +799,22 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
               type: "line",
               position: "absolute",
               stroke: first_visible_stroke
                 ? paint(first_visible_stroke)
                 : undefined,
               strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              strokeWidth: strokeWeight ?? 0,
-              strokeAlign: strokeAlign
+              stroke_width: strokeWeight ?? 0,
+              stroke_align: strokeAlign
                 ? (map.strokeAlignMap[strokeAlign] ?? "inside")
                 : "inside",
-              strokeCap: strokeCap
+              stroke_cap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              strokeJoin: strokeJoin
+              stroke_join: strokeJoin
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
               left: node.relativeTransform![0][2],
@@ -875,8 +875,8 @@ export namespace iofigma {
               locked: node.locked ?? false,
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
-              blendMode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
               type: "svgpath",
               //
               position: "absolute",
@@ -900,12 +900,12 @@ export namespace iofigma {
               paths: [
                 ...(node.fillGeometry?.map((p) => ({
                   d: p.path ?? "",
-                  fillRule: map.windingRuleMap[p.windingRule],
+                  fill_rule: map.windingRuleMap[p.windingRule],
                   fill: "fill" as const,
                 })) ?? []),
                 ...(node.strokeGeometry?.map((p) => ({
                   d: p.path ?? "",
-                  fillRule: map.windingRuleMap[p.windingRule],
+                  fill_rule: map.windingRuleMap[p.windingRule],
                   fill: "stroke" as const,
                 })) ?? []),
               ],

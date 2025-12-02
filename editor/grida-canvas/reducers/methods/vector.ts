@@ -111,7 +111,7 @@ export function self_updateVectorNodeVectorNetwork<R>(
   node: grida.program.nodes.VectorNode,
   edit: (vne: vn.VectorNetworkEditor) => R
 ): R {
-  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+  const vne = new vn.VectorNetworkEditor(node.vector_network);
   const bb_a = vne.getBBox();
   const result = edit(vne);
   const bb_b = vne.getBBox();
@@ -124,7 +124,7 @@ export function self_updateVectorNodeVectorNetwork<R>(
   node.width = bb_b.width;
   node.height = bb_b.height;
 
-  node.vectorNetwork = vne.value;
+  node.vector_network = vne.value;
 
   return result;
 }
@@ -143,7 +143,7 @@ export function self_updateVectorNodeVectorNetwork<R>(
 export function normalizeVectorNodeBBox(
   node: grida.program.nodes.VectorNode
 ): cmath.Vector2 {
-  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+  const vne = new vn.VectorNetworkEditor(node.vector_network);
   const bb = vne.getBBox();
   const delta: cmath.Vector2 = [bb.x, bb.y];
   vne.translate(cmath.vector2.invert(delta));
@@ -152,7 +152,7 @@ export function normalizeVectorNodeBBox(
   node.top = (node.top ?? 0) + delta[1];
   node.width = bb.width;
   node.height = bb.height;
-  node.vectorNetwork = vne.value;
+  node.vector_network = vne.value;
 
   return delta;
 }
@@ -174,7 +174,7 @@ export function self_updateVectorAreaSelection<
     node_id
   ) as grida.program.nodes.VectorNode;
   const node_rect = context.geometry.getNodeAbsoluteBoundingRect(node_id)!;
-  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+  const vne = new vn.VectorNetworkEditor(node.vector_network);
 
   const verts = vne.getVerticesAbsolute([node_rect.x, node_rect.y]);
   let selected_vertices = verts
@@ -194,30 +194,30 @@ export function self_updateVectorAreaSelection<
     .filter(({ segment, control }) => {
       const vert =
         control === "ta"
-          ? node.vectorNetwork.segments[segment].a
-          : node.vectorNetwork.segments[segment].b;
+          ? node.vector_network.segments[segment].a
+          : node.vector_network.segments[segment].b;
       return neighbouring_vertices.includes(vert);
     });
   let selected_tangents = control_points
     .filter(({ point }) => predicate(point))
     .map(({ segment, control }) => [
       control === "ta"
-        ? node.vectorNetwork.segments[segment].a
-        : node.vectorNetwork.segments[segment].b,
+        ? node.vector_network.segments[segment].a
+        : node.vector_network.segments[segment].b,
       control === "ta" ? 0 : 1,
     ]) as [number, 0 | 1][];
 
   const offset: cmath.Vector2 = [node_rect.x, node_rect.y];
   let selected_segments: number[] = [];
   if (rect) {
-    selected_segments = node.vectorNetwork.segments
+    selected_segments = node.vector_network.segments
       .map((seg, i) => {
         const va = cmath.vector2.add(
-          node.vectorNetwork.vertices[seg.a],
+          node.vector_network.vertices[seg.a],
           offset
         );
         const vb = cmath.vector2.add(
-          node.vectorNetwork.vertices[seg.b],
+          node.vector_network.vertices[seg.b],
           offset
         );
         return cmath.bezier.intersectsRect(va, vb, seg.ta, seg.tb, rect)
@@ -242,9 +242,9 @@ export function self_updateVectorAreaSelection<
   // any segment touching a selected vertex is dropped
   // from the selection unless the segment is fully contained by the marquee.
   selected_segments = selected_segments.filter((i) => {
-    const seg = node.vectorNetwork.segments[i];
-    const va = cmath.vector2.add(node.vectorNetwork.vertices[seg.a], offset);
-    const vb = cmath.vector2.add(node.vectorNetwork.vertices[seg.b], offset);
+    const seg = node.vector_network.segments[i];
+    const va = cmath.vector2.add(node.vector_network.vertices[seg.a], offset);
+    const vb = cmath.vector2.add(node.vector_network.vertices[seg.b], offset);
     const contained = rect
       ? cmath.bezier.containedByRect(va, vb, seg.ta, seg.tb, rect)
       : false;
@@ -272,7 +272,7 @@ export function self_updateVectorAreaSelection<
     selected_tangents,
   };
   draft.content_edit_mode.selection_neighbouring_vertices =
-    getUXNeighbouringVertices(node.vectorNetwork, {
+    getUXNeighbouringVertices(node.vector_network, {
       selected_vertices,
       selected_segments,
       selected_tangents,
@@ -281,7 +281,7 @@ export function self_updateVectorAreaSelection<
     selected_vertices.length > 0
       ? selected_vertices[0]
       : selected_segments.length > 0
-        ? node.vectorNetwork.segments[selected_segments[0]].a
+        ? node.vector_network.segments[selected_segments[0]].a
         : selected_tangents.length > 0
           ? selected_tangents[0][0]
           : null;
@@ -300,8 +300,8 @@ export function self_optimizeVectorNetwork(
     draft,
     node_id
   ) as grida.program.nodes.VectorNode;
-  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-  node.vectorNetwork = vne.optimize(
+  const vne = new vn.VectorNetworkEditor(node.vector_network);
+  node.vector_network = vne.optimize(
     editor.config.DEFAULT_VECTOR_OPTIMIZATION_CONFIG
   );
 }

@@ -57,7 +57,7 @@ export namespace css {
       Partial<grida.program.nodes.i.IPadding> &
       Partial<grida.program.nodes.i.IEffects> &
       Partial<grida.program.nodes.i.IFlexContainer> &
-      Partial<{ maxLines?: number | null }>,
+      Partial<Pick<grida.program.nodes.TextNode, "max_lines">>,
     config: {
       hasTextStyle: boolean;
       fill: "color" | "background" | "fill" | "none";
@@ -71,32 +71,32 @@ export namespace css {
       right,
       width,
       height,
-      zIndex,
+      z_index,
       opacity,
-      blendMode,
+      blend_mode,
       rotation,
       fill,
       fit,
-      cornerRadius,
-      cornerRadiusTopLeft,
-      cornerRadiusTopRight,
-      cornerRadiusBottomLeft,
-      cornerRadiusBottomRight,
+      corner_radius,
+      corner_radius_top_left,
+      corner_radius_top_right,
+      corner_radius_bottom_left,
+      corner_radius_bottom_right,
       //
       border,
       //
       padding,
       //
-      feShadows,
+      fe_shadows,
       //
       layout,
       direction,
-      mainAxisAlignment,
-      crossAxisAlignment,
-      mainAxisGap,
-      crossAxisGap,
+      main_axis_alignment,
+      cross_axis_alignment,
+      main_axis_gap,
+      cross_axis_gap,
       //
-      maxLines,
+      max_lines,
       //
       cursor,
       //
@@ -104,7 +104,7 @@ export namespace css {
     } = styles;
 
     // box-shadow - fallbacks from feDropShadow, first item.
-    const _fb_first_boxShadow = feShadows?.[0];
+    const _fb_first_boxShadow = fe_shadows?.[0];
 
     let result: React.CSSProperties = {
       //
@@ -121,18 +121,18 @@ export namespace css {
       left: left,
       right: right,
       bottom: bottom,
-      zIndex: zIndex,
+      zIndex: z_index,
       opacity: opacity,
-      mixBlendMode: blendMode ? toMixBlendMode(blendMode) : undefined,
+      mixBlendMode: blend_mode ? toMixBlendMode(blend_mode) : undefined,
       objectFit: fit,
       rotate: rotation ? `${rotation}deg` : undefined,
       //
       borderRadius: cornerRadiusToBorderRadiusCSS({
-        cornerRadius,
-        cornerRadiusTopLeft,
-        cornerRadiusTopRight,
-        cornerRadiusBottomLeft,
-        cornerRadiusBottomRight,
+        corner_radius,
+        corner_radius_top_left,
+        corner_radius_top_right,
+        corner_radius_bottom_left,
+        corner_radius_bottom_right,
       }),
       //
       padding: padding ? paddingToPaddingCSS(padding) : undefined,
@@ -156,12 +156,12 @@ export namespace css {
     if (layout === "flex") {
       result["display"] = "flex";
       result["flexDirection"] = axisToFlexDirection(direction!);
-      result["justifyContent"] = mainAxisAlignment;
-      result["alignItems"] = crossAxisAlignment;
+      result["justifyContent"] = main_axis_alignment;
+      result["alignItems"] = cross_axis_alignment;
       result["gap"] =
         direction === "horizontal"
-          ? `${mainAxisGap}px ${crossAxisGap}px`
-          : `${crossAxisGap}px ${mainAxisGap}px`;
+          ? `${main_axis_gap}px ${cross_axis_gap}px`
+          : `${cross_axis_gap}px ${main_axis_gap}px`;
     }
 
     switch (config.fill) {
@@ -179,58 +179,58 @@ export namespace css {
     }
 
     if (config.hasTextStyle) {
-      const { textAlign, textAlignVertical } =
+      const { text_align, text_align_vertical } =
         styles as Partial<grida.program.nodes.i.ITextNodeStyle>;
       const {
-        textDecorationLine,
-        textDecorationStyle,
-        textDecorationThickness,
-        textDecorationColor,
-        textDecorationSkipInk,
-        fontFamily,
-        fontSize,
-        fontWeight,
-        fontKerning,
-        fontWidth,
-        letterSpacing,
-        lineHeight,
-        fontFeatures,
-        fontVariations,
-        fontOpticalSizing,
-        textTransform,
+        text_decoration_line,
+        text_decoration_style,
+        text_decoration_thickness,
+        text_decoration_color,
+        text_decoration_skip_ink,
+        font_family,
+        font_size,
+        font_weight,
+        font_kerning,
+        font_width,
+        letter_spacing,
+        line_height,
+        font_features,
+        font_variations,
+        font_optical_sizing,
+        text_transform,
       } = styles as grida.program.nodes.i.ITextStyle;
 
       result = {
         ...result,
         ...toReactTextStyle({
           // text node style - can be undefined (need a better way to handle this - not pass it at all)
-          textAlign: textAlign ?? "left",
-          textAlignVertical: textAlignVertical ?? "top",
+          text_align: text_align ?? "left",
+          text_align_vertical: text_align_vertical ?? "top",
           // text span style
-          textDecorationLine,
-          textDecorationStyle,
-          textDecorationThickness,
-          textDecorationColor,
-          textDecorationSkipInk,
-          fontFamily,
-          fontSize,
-          fontWeight,
-          fontKerning,
-          fontWidth,
-          letterSpacing,
-          lineHeight,
-          fontFeatures,
-          fontVariations,
-          fontOpticalSizing,
-          textTransform,
+          text_decoration_line,
+          text_decoration_style,
+          text_decoration_thickness,
+          text_decoration_color,
+          text_decoration_skip_ink,
+          font_family,
+          font_size,
+          font_weight,
+          font_kerning,
+          font_width,
+          letter_spacing,
+          line_height,
+          font_features,
+          font_variations,
+          font_optical_sizing,
+          text_transform,
           fill: fill!,
         }),
       };
     }
 
-    if (config.hasTextStyle && maxLines && maxLines > 0) {
+    if (config.hasTextStyle && max_lines && max_lines > 0) {
       result.display = "-webkit-box";
-      (result as any).WebkitLineClamp = maxLines;
+      (result as any).WebkitLineClamp = max_lines;
       (result as any).WebkitBoxOrient = "vertical";
       result.overflow = "hidden";
     }
@@ -261,12 +261,12 @@ export namespace css {
     border: grida.program.css.Border
   ): Pick<React.CSSProperties, "borderStyle" | "borderColor" | "borderWidth"> {
     return {
-      borderStyle: border.borderStyle,
-      borderColor: toRGBAString(border.borderColor),
+      borderStyle: border.border_style,
+      borderColor: toRGBAString(border.border_color),
       borderWidth:
-        typeof border.borderWidth === "number"
-          ? border.borderWidth
-          : `${border.borderWidth.top}px ${border.borderWidth.right}px ${border.borderWidth.bottom}px ${border.borderWidth.left}px`,
+        typeof border.border_width === "number"
+          ? border.border_width
+          : `${border.border_width.top}px ${border.border_width.right}px ${border.border_width.bottom}px ${border.border_width.left}px`,
     };
   }
 
@@ -296,81 +296,81 @@ export namespace css {
     | "color"
   > {
     const {
-      textAlign,
-      textAlignVertical,
-      textDecorationLine,
-      textDecorationStyle,
-      textDecorationThickness,
-      textDecorationColor,
-      textDecorationSkipInk,
-      fontFamily,
-      fontSize,
-      fontWeight,
-      fontKerning,
-      fontWidth,
-      letterSpacing,
-      wordSpacing,
-      lineHeight,
-      fontFeatures,
-      fontVariations,
-      fontOpticalSizing,
-      textTransform,
+      text_align,
+      text_align_vertical,
+      text_decoration_line,
+      text_decoration_style,
+      text_decoration_thickness,
+      text_decoration_color,
+      text_decoration_skip_ink,
+      font_family,
+      font_size,
+      font_weight,
+      font_kerning,
+      font_width,
+      letter_spacing,
+      word_spacing,
+      line_height,
+      font_features,
+      font_variations,
+      font_optical_sizing,
+      text_transform,
       fill,
     } = style;
 
-    let ffs = fontFeatures ? { ...fontFeatures } : undefined;
-    if (typeof fontKerning === "boolean") {
-      ffs = { ...(ffs ?? {}), kern: fontKerning };
+    let ffs = font_features ? { ...font_features } : undefined;
+    if (typeof font_kerning === "boolean") {
+      ffs = { ...(ffs ?? {}), kern: font_kerning };
     }
 
-    let fvs = fontVariations ? { ...fontVariations } : undefined;
-    if (typeof fontWeight === "number" && fvs) {
+    let fvs = font_variations ? { ...font_variations } : undefined;
+    if (typeof font_weight === "number" && fvs) {
       delete (fvs as any).wght;
     }
-    if (typeof fontWidth === "number") {
-      fvs = { ...(fvs ?? {}), wdth: fontWidth };
+    if (typeof font_width === "number") {
+      fvs = { ...(fvs ?? {}), wdth: font_width };
     }
-    if (typeof fontOpticalSizing === "number") {
-      fvs = { ...(fvs ?? {}), opsz: fontOpticalSizing };
+    if (typeof font_optical_sizing === "number") {
+      fvs = { ...(fvs ?? {}), opsz: font_optical_sizing };
     }
 
     return {
-      textAlign: textAlign,
-      alignContent: textAlignVertical
-        ? text_align_vertical_to_css_align_content[textAlignVertical]
+      textAlign: text_align,
+      alignContent: text_align_vertical
+        ? text_align_vertical_to_css_align_content[text_align_vertical]
         : undefined,
-      textDecorationLine: textDecorationLine,
-      textDecorationStyle: textDecorationStyle ?? undefined,
+      textDecorationLine: text_decoration_line,
+      textDecorationStyle: text_decoration_style ?? undefined,
       textDecorationThickness:
-        typeof textDecorationThickness === "number"
-          ? textDecorationThickness
-          : textDecorationThickness === "auto"
+        typeof text_decoration_thickness === "number"
+          ? text_decoration_thickness
+          : text_decoration_thickness === "auto"
             ? "auto"
             : undefined,
-      textDecorationColor: textDecorationColor
-        ? toRGBAString(textDecorationColor)
+      textDecorationColor: text_decoration_color
+        ? toRGBAString(text_decoration_color)
         : undefined,
       textDecorationSkipInk:
-        typeof textDecorationSkipInk === "boolean"
-          ? textDecorationSkipInk
+        typeof text_decoration_skip_ink === "boolean"
+          ? text_decoration_skip_ink
             ? "auto"
             : "none"
           : undefined,
-      fontFamily: fontFamily,
+      fontFamily: font_family,
       lineHeight:
-        typeof lineHeight === "number" ? `${lineHeight * 100}%` : "normal",
+        typeof line_height === "number" ? `${line_height * 100}%` : "normal",
       letterSpacing:
-        typeof letterSpacing === "number" ? `${letterSpacing}em` : undefined,
+        typeof letter_spacing === "number" ? `${letter_spacing}em` : undefined,
       wordSpacing:
-        typeof wordSpacing === "number" ? `${wordSpacing}em` : undefined,
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      fontKerning: fontKerning ? "normal" : "none",
+        typeof word_spacing === "number" ? `${word_spacing}em` : undefined,
+      fontSize: font_size,
+      fontWeight: font_weight,
+      fontKerning: font_kerning ? "normal" : "none",
       fontOpticalSizing:
-        typeof fontOpticalSizing === "number" ? "none" : fontOpticalSizing,
+        typeof font_optical_sizing === "number" ? "none" : font_optical_sizing,
       fontFeatureSettings: ffs ? toFontFeatureSettings(ffs) : undefined,
       fontVariationSettings: fvs ? toFontVariationSettings(fvs) : undefined,
-      textTransform: textTransform,
+      textTransform: text_transform,
       color: fill ? toFillString(fill) : undefined,
     };
   }
@@ -425,7 +425,7 @@ export namespace css {
     >
   ): string | undefined {
     if (!cr) return undefined;
-    return `${cr.cornerRadiusTopLeft ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusTopRight ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusBottomRight ?? cr.cornerRadius ?? 0}px ${cr.cornerRadiusBottomLeft ?? cr.cornerRadius ?? 0}px`;
+    return `${cr.corner_radius_top_left ?? cr.corner_radius ?? 0}px ${cr.corner_radius_top_right ?? cr.corner_radius ?? 0}px ${cr.corner_radius_bottom_right ?? cr.corner_radius ?? 0}px ${cr.corner_radius_bottom_left ?? cr.corner_radius ?? 0}px`;
   }
 
   export function paddingToPaddingCSS(
@@ -435,7 +435,7 @@ export namespace css {
     if (typeof padding === "number") {
       return `${padding}px`;
     } else {
-      return `${padding.paddingTop}px ${padding.paddingRight}px ${padding.paddingBottom}px ${padding.paddingLeft}px`;
+      return `${padding.padding_top}px ${padding.padding_right}px ${padding.padding_bottom}px ${padding.padding_left}px`;
     }
   }
 

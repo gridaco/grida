@@ -124,7 +124,7 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyPositioningMode(node_id, value),
 
       //
-      cornerRadius: (value: cg.CornerRadius) =>
+      corner_radius: (value: cg.CornerRadius) =>
         instance.commands.changeNodePropertyCornerRadius(node_id, value),
       cornerRadiusDelta: (delta: number) =>
         instance.commands.changeNodePropertyCornerRadiusWithDelta(
@@ -169,8 +169,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyFit(node_id, value),
       // stylable
       opacity: (change: editor.api.NumberChange) => node.changeOpacity(change),
-      blendMode: (value: cg.LayerBlendMode) => {
-        node.blendMode = value;
+      blend_mode: (value: cg.LayerBlendMode) => {
+        node.blend_mode = value;
       },
       maskType: (value: cg.LayerMaskType) => {
         node.mask = value;
@@ -220,11 +220,11 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (
         change: editor.api.TChange<
-          grida.program.nodes.TextNode["letterSpacing"]
+          grida.program.nodes.TextNode["letter_spacing"]
         >
       ) => instance.commands.changeTextNodeLetterSpacing(node_id, change),
       wordSpacing: (
-        change: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
+        change: editor.api.TChange<grida.program.nodes.TextNode["word_spacing"]>
       ) => instance.commands.changeTextNodeWordSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         instance.commands.changeTextNodeMaxlength(node_id, value),
@@ -263,8 +263,9 @@ export function useNodeActions(node_id: string | undefined) {
           node_id,
           value
         ),
-      gap: (value: number | { mainAxisGap: number; crossAxisGap: number }) =>
-        instance.commands.changeFlexContainerNodeGap(node_id, value),
+      gap: (
+        value: number | { main_axis_gap: number; cross_axis_gap: number }
+      ) => instance.commands.changeFlexContainerNodeGap(node_id, value),
 
       // css style
       aspectRatio: (value?: number) =>

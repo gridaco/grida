@@ -134,7 +134,7 @@ export namespace cg {
     /**
      * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule
      */
-    fillRule: FillRule;
+    fill_rule: FillRule;
   };
 
   /**
@@ -737,7 +737,7 @@ export namespace cg {
   export type SolidPaint = {
     type: "solid";
     color: cg.RGBA32F;
-    blendMode?: cg.BlendMode;
+    blend_mode?: cg.BlendMode;
     active: boolean;
   };
 
@@ -772,7 +772,7 @@ export namespace cg {
     /**
      * @default "normal" {@link cg.def.BLENDMODE}
      */
-    blendMode: cg.BlendMode;
+    blend_mode: cg.BlendMode;
 
     /**
      * @default 1
@@ -789,7 +789,7 @@ export namespace cg {
     /**
      * @default "normal" {@link cg.def.BLENDMODE}
      */
-    blendMode: cg.BlendMode;
+    blend_mode: cg.BlendMode;
 
     /**
      * @default 1
@@ -806,7 +806,7 @@ export namespace cg {
     /**
      * @default "normal" {@link cg.def.BLENDMODE}
      */
-    blendMode: cg.BlendMode;
+    blend_mode: cg.BlendMode;
 
     /**
      * @default 1
@@ -823,7 +823,7 @@ export namespace cg {
     /**
      * @default "normal" {@link cg.def.BLENDMODE}
      */
-    blendMode: cg.BlendMode;
+    blend_mode: cg.BlendMode;
 
     /**
      * @default 1
@@ -852,7 +852,7 @@ export namespace cg {
      *
      * @default 0
      */
-    quarterTurns?: number;
+    quarter_turns?: number;
 
     /**
      * when mode is "tile", scale the image to the given value.
@@ -866,7 +866,7 @@ export namespace cg {
     /**
      * @default "normal" {@link cg.def.BLENDMODE}
      */
-    blendMode: cg.BlendMode;
+    blend_mode: cg.BlendMode;
 
     /**
      * @default 1
@@ -1114,7 +1114,7 @@ export namespace cg {
      *
      * @default 0.9
      */
-    lightIntensity: number;
+    light_intensity: number;
 
     /**
      * The angle of the specular light in degrees.
@@ -1122,7 +1122,7 @@ export namespace cg {
      *
      * @default 45.0
      */
-    lightAngle: number;
+    light_angle: number;
 
     /**
      * Refraction strength [0.0-1.0]
@@ -1185,9 +1185,9 @@ export namespace cg {
    * const grain: FeNoise = {
    *   type: "noise",
    *   mode: "mono",
-   *   noiseSize: 0.3,
+   *   noise_size: 0.3,
    *   density: 0.8,
-   *   numOctaves: 6,
+   *   num_octaves: 6,
    *   seed: 42,
    *   color: { r: 0, g: 0, b: 0, a: 0.15 }
    * };
@@ -1196,9 +1196,9 @@ export namespace cg {
    * const duo: FeNoise = {
    *   type: "noise",
    *   mode: "duo",
-   *   noiseSize: 2.0,
+   *   noise_size: 2.0,
    *   density: 0.5,
-   *   numOctaves: 3,
+   *   num_octaves: 3,
    *   seed: 8539,
    *   color1: { r: 255, g: 0, b: 0, a: 1 },
    *   color2: { r: 255, g: 255, b: 255, a: 0.25 }
@@ -1208,9 +1208,9 @@ export namespace cg {
    * const multi: FeNoise = {
    *   type: "noise",
    *   mode: "multi",
-   *   noiseSize: 1.5,
+   *   noise_size: 1.5,
    *   density: 0.7,
-   *   numOctaves: 4,
+   *   num_octaves: 4,
    *   seed: 1234,
    *   opacity: 1.0
    * };
@@ -1233,7 +1233,7 @@ export namespace cg {
      *
      * @default 0.5
      */
-    noiseSize: number;
+    noise_size: number;
     /**
      * Controls pattern visibility (0 = sparse, 1 = dense)
      * Range: 0.0 - 1.0
@@ -1249,7 +1249,7 @@ export namespace cg {
      *
      * @default 3
      */
-    numOctaves?: number;
+    num_octaves?: number;
     /**
      * Random seed for reproducibility
      * Different seeds produce different noise patterns
@@ -1262,7 +1262,7 @@ export namespace cg {
      *
      * @default "normal" {@link cg.def.BLENDMODE}
      */
-    blendMode?: cg.BlendMode;
+    blend_mode?: cg.BlendMode;
     /**
      * Color of noise pixels (mono mode only)
      * Includes alpha for opacity control

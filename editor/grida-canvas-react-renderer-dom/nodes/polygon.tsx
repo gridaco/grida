@@ -7,10 +7,10 @@ import vn from "@grida/vn";
 export function RegularPolygonWidget({
   width,
   height,
-  pointCount,
+  point_count,
   fill,
   stroke,
-  strokeWidth,
+  stroke_width,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RegularPolygonNode>) {
@@ -28,11 +28,11 @@ export function RegularPolygonWidget({
       y: 0,
       width,
       height,
-      points: pointCount,
+      points: point_count,
     });
 
     return v.vertices.map((v) => `${v[0]},${v[1]}`).join(" ");
-  }, [width, height, pointCount]);
+  }, [width, height, point_count]);
 
   return (
     <svg
@@ -47,7 +47,7 @@ export function RegularPolygonWidget({
         points={points}
         fill={fillDef}
         stroke={strokeDef}
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke_width}
       />
     </svg>
   );

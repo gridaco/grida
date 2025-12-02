@@ -14,11 +14,11 @@ import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/components/lib/utils";
 
 function isUniform(value: grida.program.nodes.i.IRectangularCornerRadius) {
-  const _tl = value.cornerRadiusTopLeft;
+  const _tl = value.corner_radius_top_left;
   const is_all_4_uniform =
-    _tl === value.cornerRadiusTopRight &&
-    _tl === value.cornerRadiusBottomRight &&
-    _tl === value.cornerRadiusBottomLeft;
+    _tl === value.corner_radius_top_right &&
+    _tl === value.corner_radius_bottom_right &&
+    _tl === value.corner_radius_bottom_left;
 
   return is_all_4_uniform;
 }
@@ -72,15 +72,15 @@ export function CornerRadius4Control({
   const uniformValue = useMemo(() => {
     if (!value) return undefined;
     if (!isUniform(value)) return undefined;
-    return value.cornerRadiusTopLeft; // asserted uniform, use top left
+    return value.corner_radius_top_left; // asserted uniform, use top left
   }, [value]);
 
   const cornerValues = useMemo(() => {
     return [
-      value?.cornerRadiusTopLeft ?? 0,
-      value?.cornerRadiusTopRight ?? 0,
-      value?.cornerRadiusBottomRight ?? 0,
-      value?.cornerRadiusBottomLeft ?? 0,
+      value?.corner_radius_top_left ?? 0,
+      value?.corner_radius_top_right ?? 0,
+      value?.corner_radius_bottom_right ?? 0,
+      value?.corner_radius_bottom_left ?? 0,
     ] as cg.CornerRadius4;
   }, [value]);
 

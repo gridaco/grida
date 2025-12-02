@@ -179,7 +179,7 @@ function EditorUser({
         type: gradient.type,
         stops,
         transform,
-        blendMode: gradient.blendMode,
+        blend_mode: gradient.blend_mode,
         opacity: gradient.opacity || 1,
         active: true,
       });
@@ -203,7 +203,7 @@ function EditorUser({
         type: gradient.type,
         stops: newStops,
         transform,
-        blendMode: gradient.blendMode,
+        blend_mode: gradient.blend_mode,
         opacity: gradient.opacity || 1,
         active: true,
       });
@@ -232,7 +232,7 @@ function EditorUser({
         type: gradient.type,
         stops: newStops,
         transform,
-        blendMode: gradient.blendMode,
+        blend_mode: gradient.blend_mode,
         opacity: gradient.opacity || 1,
         active: true,
       });

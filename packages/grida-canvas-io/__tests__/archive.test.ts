@@ -69,7 +69,7 @@ describe("archive comprehensive", () => {
 
   // Simple document data for testing
   const mockDocumentData: io.JSONDocumentFileModel = {
-    version: "0.0.1-beta.2+20251201",
+    version: "0.0.3-beta+20251202",
     document: {
       nodes: {
         scene1: {
@@ -96,7 +96,7 @@ describe("archive comprehensive", () => {
 
   // Complex document data for testing (without bitmaps for now)
   const complexDocumentData: io.JSONDocumentFileModel = {
-    version: "0.0.1-beta.2+20251201",
+    version: "0.0.3-beta+20251202",
     document: {
       nodes: {
         scene1: {
@@ -120,10 +120,10 @@ describe("archive comprehensive", () => {
           position: "absolute",
           opacity: 1,
           rotation: 0,
-          zIndex: 0,
-          strokeWidth: 0,
-          strokeCap: "butt",
-          strokeJoin: "miter",
+          z_index: 0,
+          stroke_width: 0,
+          stroke_cap: "butt",
+          stroke_join: "miter",
           fill: {
             type: "solid",
             color: { r: 0, g: 0, b: 0, a: 0 } as any,

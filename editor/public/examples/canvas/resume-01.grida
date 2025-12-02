@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.2+20251201",
+  "version": "0.0.3-beta+20251202",
   "document": {
     "nodes": {
       "1:475": {
@@ -9,7 +9,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -30,13 +30,13 @@
           "overflow": "clip",
           "padding": "32px 33px 32px 33px"
         },
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "layout": "flex",
         "direction": "horizontal",
-        "mainAxisAlignment": "center",
-        "crossAxisAlignment": "center",
-        "mainAxisGap": 0,
-        "crossAxisGap": 0,
+        "main_axis_alignment": "center",
+        "cross_axis_alignment": "center",
+        "main_axis_gap": 0,
+        "cross_axis_gap": 0,
         "padding": 32
       },
       "1:476": {
@@ -46,7 +46,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -55,7 +55,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:477": {
         "id": "1:477",
@@ -64,7 +64,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -75,7 +75,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:478": {
         "id": "1:478",
@@ -84,7 +84,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -95,13 +95,13 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "layout": "flex",
         "direction": "vertical",
-        "mainAxisAlignment": "start",
-        "crossAxisAlignment": "start",
-        "mainAxisGap": 4,
-        "crossAxisGap": 4
+        "main_axis_alignment": "start",
+        "cross_axis_alignment": "start",
+        "main_axis_gap": 4,
+        "cross_axis_gap": 4
       },
       "1:479": {
         "id": "1:479",
@@ -110,7 +110,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Madhu sudhan",
         "position": "relative",
@@ -126,14 +126,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": -0.42,
-        "fontSize": 21,
-        "fontFamily": "General Sans",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": -0.42,
+        "font_size": 21,
+        "font_family": "General Sans",
+        "font_weight": 500
       },
       "1:480": {
         "id": "1:480",
@@ -142,7 +142,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Product Designer",
         "position": "relative",
@@ -158,14 +158,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": -0.24,
-        "fontSize": 12,
-        "fontFamily": "General Sans",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": -0.24,
+        "font_size": 12,
+        "font_family": "General Sans",
+        "font_weight": 500
       },
       "1:481": {
         "id": "1:481",
@@ -174,7 +174,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -185,13 +185,13 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "layout": "flex",
         "direction": "vertical",
-        "mainAxisAlignment": "start",
-        "crossAxisAlignment": "start",
-        "mainAxisGap": 4,
-        "crossAxisGap": 4
+        "main_axis_alignment": "start",
+        "cross_axis_alignment": "start",
+        "main_axis_gap": 4,
+        "cross_axis_gap": 4
       },
       "1:482": {
         "id": "1:482",
@@ -200,7 +200,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "yourwebsite.com",
         "position": "relative",
@@ -216,14 +216,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": -0.24,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 300
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": -0.24,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 300
       },
       "1:483": {
         "id": "1:483",
@@ -232,7 +232,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "your@gmail.com",
         "position": "relative",
@@ -248,14 +248,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": -0.24,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 300
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": -0.24,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 300
       },
       "1:484": {
         "id": "1:484",
@@ -264,7 +264,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "LinkedIn : @id",
         "position": "relative",
@@ -280,14 +280,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": -0.24,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 300
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": -0.24,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 300
       },
       "1:485": {
         "id": "1:485",
@@ -296,7 +296,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -307,7 +307,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:486": {
         "id": "1:486",
@@ -316,7 +316,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "svgpath",
         "position": "absolute",
         "left": 2,
@@ -332,7 +332,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -343,7 +343,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:488": {
         "id": "1:488",
@@ -352,7 +352,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -363,7 +363,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:489": {
         "id": "1:489",
@@ -372,7 +372,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Education",
         "position": "absolute",
@@ -390,14 +390,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": -0.36,
-        "fontSize": 18,
-        "fontFamily": "General Sans",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": -0.36,
+        "font_size": 18,
+        "font_family": "General Sans",
+        "font_weight": 500
       },
       "1:490": {
         "id": "1:490",
@@ -406,7 +406,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -417,7 +417,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:491": {
         "id": "1:491",
@@ -426,7 +426,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -437,7 +437,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:492": {
         "id": "1:492",
@@ -446,7 +446,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -457,7 +457,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:493": {
         "id": "1:493",
@@ -466,7 +466,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "University",
         "position": "absolute",
@@ -484,14 +484,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.3,
-        "fontSize": 15,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.3,
+        "font_size": 15,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:494": {
         "id": "1:494",
@@ -500,7 +500,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Aug 2022 | Location",
         "position": "absolute",
@@ -518,14 +518,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:495": {
         "id": "1:495",
@@ -534,7 +534,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces ",
         "position": "absolute",
@@ -552,14 +552,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.22,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.22,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:496": {
         "id": "1:496",
@@ -568,7 +568,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -579,7 +579,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:497": {
         "id": "1:497",
@@ -588,7 +588,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -599,7 +599,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:498": {
         "id": "1:498",
@@ -608,7 +608,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "College",
         "position": "absolute",
@@ -626,14 +626,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.3,
-        "fontSize": 15,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.3,
+        "font_size": 15,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:499": {
         "id": "1:499",
@@ -642,7 +642,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Aug 2022 | Location",
         "position": "absolute",
@@ -660,14 +660,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:500": {
         "id": "1:500",
@@ -676,7 +676,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces ",
         "position": "absolute",
@@ -694,14 +694,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.22,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.22,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:501": {
         "id": "1:501",
@@ -710,7 +710,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -721,7 +721,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:502": {
         "id": "1:502",
@@ -730,7 +730,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Experience",
         "position": "absolute",
@@ -748,14 +748,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": -0.36,
-        "fontSize": 18,
-        "fontFamily": "General Sans",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": -0.36,
+        "font_size": 18,
+        "font_family": "General Sans",
+        "font_weight": 500
       },
       "1:503": {
         "id": "1:503",
@@ -764,7 +764,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -775,7 +775,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:504": {
         "id": "1:504",
@@ -784,7 +784,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -795,7 +795,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:505": {
         "id": "1:505",
@@ -804,7 +804,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -815,7 +815,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:506": {
         "id": "1:506",
@@ -824,7 +824,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -835,7 +835,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:507": {
         "id": "1:507",
@@ -844,7 +844,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Company",
         "position": "absolute",
@@ -862,14 +862,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.28,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.28,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:508": {
         "id": "1:508",
@@ -878,7 +878,7 @@
         "locked": false,
         "rotation": 4.3711384734024224e-08,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "svgpath",
         "position": "absolute",
         "left": 69,
@@ -894,7 +894,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Product Designer",
         "position": "absolute",
@@ -912,14 +912,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.28,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.28,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:510": {
         "id": "1:510",
@@ -928,7 +928,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Aug 2022 - Present",
         "position": "absolute",
@@ -946,14 +946,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:511": {
         "id": "1:511",
@@ -962,7 +962,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
         "position": "absolute",
@@ -980,14 +980,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.22,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.22,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:512": {
         "id": "1:512",
@@ -996,7 +996,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1007,7 +1007,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:513": {
         "id": "1:513",
@@ -1016,7 +1016,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1027,7 +1027,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:514": {
         "id": "1:514",
@@ -1036,7 +1036,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1047,7 +1047,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:515": {
         "id": "1:515",
@@ -1056,7 +1056,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Company",
         "position": "absolute",
@@ -1074,14 +1074,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.28,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.28,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:516": {
         "id": "1:516",
@@ -1090,7 +1090,7 @@
         "locked": false,
         "rotation": 4.3711384734024224e-08,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "svgpath",
         "position": "absolute",
         "left": 69,
@@ -1106,7 +1106,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Product Designer",
         "position": "absolute",
@@ -1124,14 +1124,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.28,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.28,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:518": {
         "id": "1:518",
@@ -1140,7 +1140,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Aug 2022 - Present",
         "position": "absolute",
@@ -1158,14 +1158,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:519": {
         "id": "1:519",
@@ -1174,7 +1174,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
         "position": "absolute",
@@ -1192,14 +1192,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.22,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.22,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:520": {
         "id": "1:520",
@@ -1208,7 +1208,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1219,7 +1219,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:521": {
         "id": "1:521",
@@ -1228,7 +1228,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1239,7 +1239,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:522": {
         "id": "1:522",
@@ -1248,7 +1248,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1259,7 +1259,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:523": {
         "id": "1:523",
@@ -1268,7 +1268,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Company",
         "position": "absolute",
@@ -1286,14 +1286,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.28,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.28,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:524": {
         "id": "1:524",
@@ -1302,7 +1302,7 @@
         "locked": false,
         "rotation": 4.3711384734024224e-08,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "svgpath",
         "position": "absolute",
         "left": 69,
@@ -1318,7 +1318,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Product Designer",
         "position": "absolute",
@@ -1336,14 +1336,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.28,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.28,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:526": {
         "id": "1:526",
@@ -1352,7 +1352,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Aug 2022 - Present",
         "position": "absolute",
@@ -1370,14 +1370,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:527": {
         "id": "1:527",
@@ -1386,7 +1386,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
         "position": "absolute",
@@ -1404,14 +1404,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.22,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.22,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:528": {
         "id": "1:528",
@@ -1420,7 +1420,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1431,7 +1431,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:529": {
         "id": "1:529",
@@ -1440,7 +1440,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1451,7 +1451,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:530": {
         "id": "1:530",
@@ -1460,7 +1460,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1471,7 +1471,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:531": {
         "id": "1:531",
@@ -1480,7 +1480,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Company",
         "position": "absolute",
@@ -1498,14 +1498,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.28,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.28,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:532": {
         "id": "1:532",
@@ -1514,7 +1514,7 @@
         "locked": false,
         "rotation": 4.3711384734024224e-08,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "svgpath",
         "position": "absolute",
         "left": 69,
@@ -1530,7 +1530,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Product Designer",
         "position": "absolute",
@@ -1548,14 +1548,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.28,
-        "fontSize": 14,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.28,
+        "font_size": 14,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:534": {
         "id": "1:534",
@@ -1564,7 +1564,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Aug 2022 - Present",
         "position": "absolute",
@@ -1582,14 +1582,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": 0,
-        "fontSize": 12,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": 0,
+        "font_size": 12,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:535": {
         "id": "1:535",
@@ -1598,7 +1598,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
         "position": "absolute",
@@ -1616,14 +1616,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.22,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.22,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:536": {
         "id": "1:536",
@@ -1632,7 +1632,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1643,7 +1643,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:537": {
         "id": "1:537",
@@ -1652,7 +1652,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "svgpath",
         "position": "absolute",
         "left": 1,
@@ -1668,7 +1668,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1679,7 +1679,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:539": {
         "id": "1:539",
@@ -1688,7 +1688,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Skills",
         "position": "absolute",
@@ -1706,14 +1706,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.2,
-        "letterSpacing": -0.36,
-        "fontSize": 18,
-        "fontFamily": "General Sans",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.2,
+        "letter_spacing": -0.36,
+        "font_size": 18,
+        "font_family": "General Sans",
+        "font_weight": 500
       },
       "1:540": {
         "id": "1:540",
@@ -1722,7 +1722,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1733,7 +1733,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:541": {
         "id": "1:541",
@@ -1742,7 +1742,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1753,7 +1753,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:542": {
         "id": "1:542",
@@ -1762,7 +1762,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Design",
         "position": "absolute",
@@ -1780,14 +1780,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.3,
-        "fontSize": 15,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.3,
+        "font_size": 15,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:543": {
         "id": "1:543",
@@ -1796,7 +1796,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "User Interviews\nAffinity Diagramming\nCard Sorting\nInformation Architecture\nA/B Testing\nDesign  Handoff",
         "position": "absolute",
@@ -1814,14 +1814,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.22,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.22,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:544": {
         "id": "1:544",
@@ -1830,7 +1830,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1841,7 +1841,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:545": {
         "id": "1:545",
@@ -1850,7 +1850,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Tools",
         "position": "absolute",
@@ -1868,14 +1868,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.3,
-        "fontSize": 15,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.3,
+        "font_size": 15,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:546": {
         "id": "1:546",
@@ -1884,7 +1884,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Framer\nWebflow\nSketch\nAdobe XD\nHTML/CSS\nZeplin",
         "position": "absolute",
@@ -1902,14 +1902,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.465,
-        "letterSpacing": 0,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.465,
+        "letter_spacing": 0,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "1:547": {
         "id": "1:547",
@@ -1918,7 +1918,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -1929,7 +1929,7 @@
         "style": {
           "padding": "0px 0px 0px 0px"
         },
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "1:548": {
         "id": "1:548",
@@ -1938,7 +1938,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "Languages",
         "position": "absolute",
@@ -1956,14 +1956,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.4202273559570313,
-        "letterSpacing": -0.3,
-        "fontSize": 15,
-        "fontFamily": "Inter",
-        "fontWeight": 500
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.4202273559570313,
+        "letter_spacing": -0.3,
+        "font_size": 15,
+        "font_family": "Inter",
+        "font_weight": 500
       },
       "1:549": {
         "id": "1:549",
@@ -1972,7 +1972,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "text",
         "text": "English\nTelugu\nHindi",
         "position": "absolute",
@@ -1990,14 +1990,14 @@
           }
         },
         "style": {},
-        "textAlign": "left",
-        "textAlignVertical": "top",
-        "textDecorationLine": "none",
-        "lineHeight": 1.465,
-        "letterSpacing": 0,
-        "fontSize": 11,
-        "fontFamily": "Inter",
-        "fontWeight": 400
+        "text_align": "left",
+        "text_align_vertical": "top",
+        "text_decoration_line": "none",
+        "line_height": 1.465,
+        "letter_spacing": 0,
+        "font_size": 11,
+        "font_family": "Inter",
+        "font_weight": 400
       },
       "resume": {
         "type": "scene",
@@ -2010,7 +2010,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.2,
           "g": 0.2,
           "b": 0.2,

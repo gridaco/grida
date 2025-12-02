@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.2+20251201",
+  "version": "0.0.3-beta+20251202",
   "document": {
     "nodes": {
       "rectangle": {
@@ -11,7 +11,7 @@
         "top": 0,
         "left": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "rotation": 0,
         "fill": {
           "type": "solid",
@@ -26,10 +26,10 @@
         "height": 100,
         "style": {},
         "type": "rectangle",
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "effects": [],
-        "strokeWidth": 0,
-        "strokeCap": "butt"
+        "stroke_width": 0,
+        "stroke_cap": "butt"
       },
       "main": {
         "type": "scene",
@@ -42,7 +42,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.96,
           "g": 0.96,
           "b": 0.96,

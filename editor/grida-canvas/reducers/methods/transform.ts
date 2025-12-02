@@ -634,7 +634,7 @@ function __self_update_gesture_transform_scale(
 
     if (initial_node.type === "vector") {
       // TODO: mrege with the above
-      const vne = new vn.VectorNetworkEditor(initial_node.vectorNetwork);
+      const vne = new vn.VectorNetworkEditor(initial_node.vector_network);
       const scale = cmath.rect.getScaleFactors(initial_rect, {
         x: initial_rect.x,
         y: initial_rect.y,
@@ -644,7 +644,7 @@ function __self_update_gesture_transform_scale(
       vne.scale(scale);
       (
         draft.document.nodes[node_id] as grida.program.nodes.VectorNode
-      ).vectorNetwork = vne.value;
+      ).vector_network = vne.value;
       //
     }
   }

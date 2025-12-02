@@ -43,8 +43,8 @@ function useVariableWithEditor() {
     // cursor: path_cursor_position
   } = state.content_edit_mode;
 
-  const vertices = node.vectorNetwork.vertices;
-  const segments = node.vectorNetwork.segments;
+  const vertices = node.vector_network.vertices;
+  const segments = node.vector_network.segments;
   const {
     snapped_p,
     variable_width_selected_stop: selected_stop,
@@ -58,8 +58,8 @@ function useVariableWithEditor() {
     : [node.left!, node.top!];
 
   const vne = useMemo(
-    () => new vn.VectorNetworkEditor(node.vectorNetwork),
-    [node.vectorNetwork]
+    () => new vn.VectorNetworkEditor(node.vector_network),
+    [node.vector_network]
   );
 
   const absolute_vertices = useMemo(

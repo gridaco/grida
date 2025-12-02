@@ -105,7 +105,7 @@ export function StandaloneSceneBackground({
       state.scene_id!
     ] as grida.program.nodes.SceneNode;
     return {
-      backgroundColor: scene?.backgroundColor,
+      backgroundColor: scene?.background_color,
       transform: state.transform,
     };
   });

@@ -7,8 +7,8 @@ export function SVGLineWidget({
   width,
   height,
   stroke,
-  strokeWidth,
-  strokeCap,
+  stroke_width,
+  stroke_cap,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.LineNode>) {
@@ -38,8 +38,8 @@ export function SVGLineWidget({
         x2={width}
         y2={0}
         stroke={strokeDef}
-        strokeWidth={strokeWidth}
-        strokeLinecap={strokeCap}
+        strokeWidth={stroke_width}
+        strokeLinecap={stroke_cap}
       />
     </svg>
   );

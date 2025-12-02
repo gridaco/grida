@@ -31,7 +31,7 @@ export function SVGPathWidget({
   const strokepaths = paths.filter((p) => p.fill === "stroke");
   // Combine all paths into a single composite shape
   const fp_combinedPathD = fillpaths.map(({ d }) => d).join(" ");
-  const fp_fillrule = fillpaths[0]?.fillRule;
+  const fp_fillrule = fillpaths[0]?.fill_rule;
 
   return (
     <svg
@@ -47,14 +47,14 @@ export function SVGPathWidget({
       )}
 
       {/* stroke paths */}
-      {strokepaths.map(({ d, fillRule }, i) => (
+      {strokepaths.map(({ d, fill_rule }, i) => (
         <path
           key={i}
           kernelMatrix={i}
           d={d}
           // TODO:
           fill="red"
-          fillRule={fillRule}
+          fillRule={fill_rule}
         />
       ))}
     </svg>

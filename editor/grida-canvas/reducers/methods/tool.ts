@@ -94,7 +94,7 @@ export function self_select_tool<S extends editor.state.IEditorState>(
         draft.content_edit_mode.node_id
       ) as grida.program.nodes.VectorNode;
 
-      const currentProfile = node.strokeWidthProfile || { stops: [] };
+      const currentProfile = node.stroke_width_profile || { stops: [] };
       draft.content_edit_mode = {
         type: "width",
         node_id: draft.content_edit_mode.node_id,

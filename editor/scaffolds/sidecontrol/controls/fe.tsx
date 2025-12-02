@@ -52,8 +52,8 @@ import { BlendModeDropdown } from "./blend-mode";
  * <FeControl
  *   value={effect}
  *   constraints={{
- *     "filter-blur": !node.feBlur || effect.type === "filter-blur",
- *     "backdrop-filter-blur": !node.feBackdropBlur || effect.type === "backdrop-filter-blur",
+ *     "filter-blur": !node.fe_blur || effect.type === "filter-blur",
+ *     "backdrop-filter-blur": !node.fe_backdrop_blur || effect.type === "backdrop-filter-blur",
  *     shadow: true, // Always allow (multiple shadows supported)
  *   }}
  * />
@@ -691,11 +691,11 @@ function FeNoiseProperties({
           onValueChange={(mode) => {
             // When switching modes, provide appropriate default values
             const base = {
-              noiseSize: value.noiseSize,
+              noise_size: value.noise_size,
               density: value.density,
-              blendMode: value.blendMode ?? "normal",
-              ...(value.numOctaves !== undefined && {
-                numOctaves: value.numOctaves,
+              blend_mode: value.blend_mode ?? "normal",
+              ...(value.num_octaves !== undefined && {
+                num_octaves: value.num_octaves,
               }),
               ...(value.seed !== undefined && { seed: value.seed }),
             };
@@ -732,11 +732,11 @@ function FeNoiseProperties({
         />
         <BlendModeDropdown
           type="paint"
-          value={value.blendMode ?? "normal"}
-          onValueChange={(blendMode) => {
+          value={value.blend_mode ?? "normal"}
+          onValueChange={(blend_mode) => {
             onValueChange?.({
               ...value,
-              blendMode: blendMode as cg.BlendMode,
+              blend_mode: blend_mode as cg.BlendMode,
             });
           }}
         />
@@ -749,9 +749,9 @@ function FeNoiseProperties({
           onValueChange={(c) =>
             onValueChange?.({
               ...value,
-              noiseSize: Math.max(
+              noise_size: Math.max(
                 0.001,
-                Math.min(100, value.noiseSize + (c.value ?? 0))
+                Math.min(100, value.noise_size + (c.value ?? 0))
               ),
             })
           }
@@ -760,14 +760,14 @@ function FeNoiseProperties({
         </PropertyLineLabelWithNumberGesture>
         <InputPropertyNumber
           mode="fixed"
-          value={value.noiseSize}
+          value={value.noise_size}
           min={0.001}
           max={100}
           step={0.1}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              noiseSize: v ?? 2.0,
+              noise_size: v ?? 2.0,
             })
           }
         />
@@ -808,9 +808,9 @@ function FeNoiseProperties({
           onValueChange={(c) =>
             onValueChange?.({
               ...value,
-              numOctaves: Math.max(
+              num_octaves: Math.max(
                 1,
-                Math.min(8, (value.numOctaves ?? 3) + (c.value ?? 0))
+                Math.min(8, (value.num_octaves ?? 3) + (c.value ?? 0))
               ),
             })
           }
@@ -819,14 +819,14 @@ function FeNoiseProperties({
         </PropertyLineLabelWithNumberGesture>
         <InputPropertyNumber
           mode="fixed"
-          value={value.numOctaves ?? 3}
+          value={value.num_octaves ?? 3}
           min={1}
           max={8}
           step={1}
           onValueCommit={(v) =>
             onValueChange?.({
               ...value,
-              numOctaves: v ?? 3,
+              num_octaves: v ?? 3,
             })
           }
         />

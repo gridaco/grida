@@ -23,7 +23,7 @@ export function getInitialCurveGesture(
     node_id
   ) as grida.program.nodes.VectorNode;
 
-  const segment = node.vectorNetwork.segments[segment_idx];
+  const segment = node.vector_network.segments[segment_idx];
   const tangent = segment[control];
 
   return {

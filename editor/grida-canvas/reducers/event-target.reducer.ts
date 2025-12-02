@@ -627,7 +627,7 @@ function __self_evt_on_drag(
         const [dx, dy] = delta;
         const node = dq.__getNodeById(draft, node_id);
 
-        if (!("cornerRadius" in node)) {
+        if (!("corner_radius" in node)) {
           return;
         }
 
@@ -654,10 +654,10 @@ function __self_evt_on_drag(
 
         if (anchor) {
           const keyMap = {
-            nw: "cornerRadiusTopLeft",
-            ne: "cornerRadiusTopRight",
-            se: "cornerRadiusBottomRight",
-            sw: "cornerRadiusBottomLeft",
+            nw: "corner_radius_top_left",
+            ne: "corner_radius_top_right",
+            se: "corner_radius_bottom_right",
+            sw: "corner_radius_bottom_left",
           } as const;
 
           const key = keyMap[anchor];
@@ -673,18 +673,18 @@ function __self_evt_on_drag(
           });
         } else {
           const current =
-            typeof node.cornerRadius == "number" ? node.cornerRadius : 0;
+            typeof node.corner_radius == "number" ? node.corner_radius : 0;
           const nextRadius = current + d;
           const nextRadiusClamped = Math.floor(
             Math.min(maxRadius, Math.max(0, nextRadius))
           );
           draft.document.nodes[node_id] = nodeReducer(node, {
             type: "node/change/*",
-            cornerRadius: nextRadiusClamped,
-            cornerRadiusTopLeft: nextRadiusClamped,
-            cornerRadiusTopRight: nextRadiusClamped,
-            cornerRadiusBottomRight: nextRadiusClamped,
-            cornerRadiusBottomLeft: nextRadiusClamped,
+            corner_radius: nextRadiusClamped,
+            corner_radius_top_left: nextRadiusClamped,
+            corner_radius_top_right: nextRadiusClamped,
+            corner_radius_bottom_right: nextRadiusClamped,
+            corner_radius_bottom_left: nextRadiusClamped,
             node_id,
           });
         }
@@ -745,8 +745,8 @@ function __self_evt_on_drag(
             draft.document.nodes[layout.group] = nodeReducer(container, {
               type: "node/change/*",
               node_id: container.id,
-              mainAxisGap: gap,
-              crossAxisGap: gap,
+              main_axis_gap: gap,
+              cross_axis_gap: gap,
             });
 
             draft.gesture.gap = gap;
@@ -777,18 +777,18 @@ function __self_evt_on_drag(
           if (typeof currentPadding === "number") {
             // Convert uniform padding to individual sides
             newPadding = {
-              paddingTop: currentPadding,
-              paddingRight: currentPadding,
-              paddingBottom: currentPadding,
-              paddingLeft: currentPadding,
+              padding_top: currentPadding,
+              padding_right: currentPadding,
+              padding_bottom: currentPadding,
+              padding_left: currentPadding,
             };
           } else {
             // Use existing individual padding values
             newPadding = {
-              paddingTop: currentPadding.paddingTop,
-              paddingRight: currentPadding.paddingRight,
-              paddingBottom: currentPadding.paddingBottom,
-              paddingLeft: currentPadding.paddingLeft,
+              padding_top: currentPadding.padding_top,
+              padding_right: currentPadding.padding_right,
+              padding_bottom: currentPadding.padding_bottom,
+              padding_left: currentPadding.padding_left,
             };
           }
 
@@ -798,27 +798,27 @@ function __self_evt_on_drag(
           // Update the specific side
           switch (side) {
             case "top":
-              newPadding.paddingTop = padding;
+              newPadding.padding_top = padding;
               if (mirroringEnabled) {
-                newPadding.paddingBottom = padding;
+                newPadding.padding_bottom = padding;
               }
               break;
             case "right":
-              newPadding.paddingRight = padding;
+              newPadding.padding_right = padding;
               if (mirroringEnabled) {
-                newPadding.paddingLeft = padding;
+                newPadding.padding_left = padding;
               }
               break;
             case "bottom":
-              newPadding.paddingBottom = padding;
+              newPadding.padding_bottom = padding;
               if (mirroringEnabled) {
-                newPadding.paddingTop = padding;
+                newPadding.padding_top = padding;
               }
               break;
             case "left":
-              newPadding.paddingLeft = padding;
+              newPadding.padding_left = padding;
               if (mirroringEnabled) {
-                newPadding.paddingRight = padding;
+                newPadding.padding_right = padding;
               }
               break;
           }

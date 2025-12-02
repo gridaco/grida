@@ -4,7 +4,6 @@ jest.mock("@/grida-canvas", () => ({
 
 jest.mock("@grida/cmath", () => ({}), { virtual: true });
 jest.mock("@grida/schema", () => ({}), { virtual: true });
-jest.mock("@grida/vn", () => ({}), { virtual: true });
 jest.mock("svg-pathdata", () => ({}), { virtual: true });
 
 jest.mock("../methods", () => ({
@@ -29,9 +28,18 @@ describe("surface reducer - vector self remove", () => {
         [node_id]: {
           id: node_id,
           type: "vector",
+          name: "Vector",
+          active: true,
+          locked: false,
+          position: "absolute",
           left: 0,
           top: 0,
-          vectorNetwork: { vertices: [], segments: [] },
+          width: 0,
+          height: 0,
+          opacity: 1,
+          rotation: 0,
+          z_index: 0,
+          vector_network: { vertices: [], segments: [] },
         },
       },
       scenes: {

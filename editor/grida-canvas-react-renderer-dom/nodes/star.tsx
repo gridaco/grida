@@ -7,11 +7,11 @@ import vn from "@grida/vn";
 export function RegularStarPolygonWidget({
   width,
   height,
-  pointCount,
-  innerRadius,
+  point_count,
+  inner_radius,
   fill,
   stroke,
-  strokeWidth,
+  stroke_width,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RegularStarPolygonNode>) {
@@ -29,12 +29,12 @@ export function RegularStarPolygonWidget({
       y: 0,
       width,
       height,
-      points: pointCount,
-      innerRadius,
+      points: point_count,
+      innerRadius: inner_radius,
     });
 
     return v.vertices.map((v) => `${v[0]},${v[1]}`).join(" ");
-  }, [width, height, pointCount, innerRadius]);
+  }, [width, height, point_count, inner_radius]);
 
   return (
     <svg
@@ -49,7 +49,7 @@ export function RegularStarPolygonWidget({
         points={points}
         fill={fillDef}
         stroke={strokeDef}
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke_width}
       />
     </svg>
   );

@@ -5,7 +5,7 @@ import queryattributes from "./utils/attributes";
 export const TextWidget = ({
   text,
   style,
-  maxLines,
+  max_lines,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.TextNode>) => {
   const children = text?.toString();

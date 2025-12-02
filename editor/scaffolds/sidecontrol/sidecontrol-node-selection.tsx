@@ -281,35 +281,35 @@ function ModeMixedNodeProperties({
     active,
     locked,
     opacity,
-    cornerRadius,
-    cornerRadiusTopLeft,
-    cornerRadiusTopRight,
-    cornerRadiusBottomRight,
-    cornerRadiusBottomLeft,
+    corner_radius,
+    corner_radius_top_left,
+    corner_radius_top_right,
+    corner_radius_bottom_right,
+    corner_radius_bottom_left,
     fill,
     stroke,
-    strokeWidth,
-    strokeCap,
+    stroke_width,
+    stroke_cap,
     width,
     height,
     fit,
-    fontFamily,
-    fontWeight,
-    fontStyleItalic,
-    fontPostscriptName,
-    fontOpticalSizing,
-    fontVariations,
-    fontSize,
-    lineHeight,
-    letterSpacing,
-    textAlign,
-    textAlignVertical,
+    font_family,
+    font_weight,
+    font_style_italic,
+    font_postscript_name,
+    font_optical_sizing,
+    font_variations,
+    font_size,
+    line_height,
+    letter_spacing,
+    text_align,
+    text_align_vertical,
 
     //
     layout,
     direction,
-    mainAxisAlignment,
-    crossAxisAlignment,
+    main_axis_alignment,
+    cross_axis_alignment,
     //
     cursor,
 
@@ -441,19 +441,19 @@ function ModeMixedNodeProperties({
                   : (direction?.value ?? "horizontal")
               }
               value={
-                mainAxisAlignment?.value === grida.mixed ||
-                crossAxisAlignment?.value === grida.mixed ||
-                mainAxisAlignment?.value === undefined ||
-                crossAxisAlignment?.value === undefined
+                main_axis_alignment?.value === grida.mixed ||
+                cross_axis_alignment?.value === grida.mixed ||
+                main_axis_alignment?.value === undefined ||
+                cross_axis_alignment?.value === undefined
                   ? undefined
                   : {
-                      mainAxisAlignment: mainAxisAlignment.value,
-                      crossAxisAlignment: crossAxisAlignment.value,
+                      mainAxisAlignment: main_axis_alignment.value,
+                      crossAxisAlignment: cross_axis_alignment.value,
                     }
               }
               onValueChange={(value) => {
-                change.mainAxisAlignment(value.mainAxisAlignment);
-                change.crossAxisAlignment(value.crossAxisAlignment);
+                change.main_axis_alignment(value.mainAxisAlignment);
+                change.cross_axis_alignment(value.crossAxisAlignment);
               }}
             />
           </PropertyLine>
@@ -492,29 +492,29 @@ function ModeMixedNodeProperties({
           {supports_corner_radius && (
             <PropertyLine>
               <PropertyLineLabel>Radius</PropertyLineLabel>
-              {cornerRadius?.mixed ? (
-                <CornerRadius4Control onValueCommit={change.cornerRadius} />
+              {corner_radius?.mixed ? (
+                <CornerRadius4Control onValueCommit={change.corner_radius} />
               ) : (
                 <CornerRadius4Control
                   value={{
-                    cornerRadiusTopLeft:
-                      typeof cornerRadiusTopLeft?.value === "number"
-                        ? cornerRadiusTopLeft?.value
+                    corner_radius_top_left:
+                      typeof corner_radius_top_left?.value === "number"
+                        ? corner_radius_top_left?.value
                         : undefined,
-                    cornerRadiusTopRight:
-                      typeof cornerRadiusTopRight?.value === "number"
-                        ? cornerRadiusTopRight?.value
+                    corner_radius_top_right:
+                      typeof corner_radius_top_right?.value === "number"
+                        ? corner_radius_top_right?.value
                         : undefined,
-                    cornerRadiusBottomRight:
-                      typeof cornerRadiusBottomRight?.value === "number"
-                        ? cornerRadiusBottomRight?.value
+                    corner_radius_bottom_right:
+                      typeof corner_radius_bottom_right?.value === "number"
+                        ? corner_radius_bottom_right?.value
                         : undefined,
-                    cornerRadiusBottomLeft:
-                      typeof cornerRadiusBottomLeft?.value === "number"
-                        ? cornerRadiusBottomLeft?.value
+                    corner_radius_bottom_left:
+                      typeof corner_radius_bottom_left?.value === "number"
+                        ? corner_radius_bottom_left?.value
                         : undefined,
                   }}
-                  onValueCommit={change.cornerRadius}
+                  onValueCommit={change.corner_radius}
                 />
               )}
             </PropertyLine>
@@ -567,22 +567,22 @@ function ModeMixedNodeProperties({
         <CurrentFontProvider
           description={{
             fontFamily:
-              typeof fontFamily?.value === "string" ? fontFamily.value : "",
+              typeof font_family?.value === "string" ? font_family.value : "",
             fontPostscriptName:
-              typeof fontPostscriptName?.value === "string"
-                ? fontPostscriptName.value
+              typeof font_postscript_name?.value === "string"
+                ? font_postscript_name.value
                 : undefined,
             fontWeight:
-              typeof fontWeight?.value === "number"
-                ? fontWeight.value
+              typeof font_weight?.value === "number"
+                ? font_weight.value
                 : undefined,
             fontStyleItalic:
-              typeof fontStyleItalic?.value === "boolean"
-                ? fontStyleItalic.value
+              typeof font_style_italic?.value === "boolean"
+                ? font_style_italic.value
                 : undefined,
             fontVariations:
-              typeof fontVariations?.value === "object"
-                ? (fontVariations.value as Record<string, number>)
+              typeof font_variations?.value === "object"
+                ? (font_variations.value as Record<string, number>)
                 : undefined,
           }}
         >
@@ -595,8 +595,8 @@ function ModeMixedNodeProperties({
                 <PropertyLineLabel>Font</PropertyLineLabel>
                 <div className="flex-1">
                   <FontFamilyControl
-                    value={fontFamily?.value}
-                    onValueChange={change.fontFamily}
+                    value={font_family?.value}
+                    onValueChange={change.font_family}
                   />
                 </div>
               </PropertyLine>
@@ -607,36 +607,36 @@ function ModeMixedNodeProperties({
               <PropertyLine>
                 <PropertyLineLabel>Size</PropertyLineLabel>
                 <FontSizeControl
-                  value={fontSize?.value}
-                  onValueCommit={change.fontSize}
+                  value={font_size?.value}
+                  onValueCommit={change.font_size}
                 />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Line</PropertyLineLabel>
                 <LineHeightControl
-                  value={lineHeight?.value}
-                  onValueCommit={change.lineHeight}
+                  value={line_height?.value}
+                  onValueCommit={change.line_height}
                 />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Letter</PropertyLineLabel>
                 <LetterSpacingControl
-                  value={letterSpacing?.value}
-                  onValueCommit={change.letterSpacing}
+                  value={letter_spacing?.value}
+                  onValueCommit={change.letter_spacing}
                 />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel>Align</PropertyLineLabel>
                 <TextAlignControl
-                  value={textAlign?.value}
-                  onValueChange={change.textAlign}
+                  value={text_align?.value}
+                  onValueChange={change.text_align}
                 />
               </PropertyLine>
               <PropertyLine>
                 <PropertyLineLabel></PropertyLineLabel>
                 <TextAlignVerticalControl
-                  value={textAlignVertical?.value}
-                  onValueChange={change.textAlignVertical}
+                  value={text_align_vertical?.value}
+                  onValueChange={change.text_align_vertical}
                 />
               </PropertyLine>
               <PropertyLine>
@@ -724,19 +724,19 @@ function ModeMixedNodeProperties({
                   : (direction?.value ?? "horizontal")
               }
               value={
-                mainAxisAlignment?.value === grida.mixed ||
-                crossAxisAlignment?.value === grida.mixed ||
-                mainAxisAlignment?.value === undefined ||
-                crossAxisAlignment?.value === undefined
+                main_axis_alignment?.value === grida.mixed ||
+                cross_axis_alignment?.value === grida.mixed ||
+                main_axis_alignment?.value === undefined ||
+                cross_axis_alignment?.value === undefined
                   ? undefined
                   : {
-                      mainAxisAlignment: mainAxisAlignment.value,
-                      crossAxisAlignment: crossAxisAlignment.value,
+                      mainAxisAlignment: main_axis_alignment.value,
+                      crossAxisAlignment: cross_axis_alignment.value,
                     }
               }
               onValueChange={(value) => {
-                change.mainAxisAlignment(value.mainAxisAlignment);
-                change.crossAxisAlignment(value.crossAxisAlignment);
+                change.main_axis_alignment(value.mainAxisAlignment);
+                change.cross_axis_alignment(value.crossAxisAlignment);
               }}
             />
           </PropertyLine>
@@ -772,8 +772,8 @@ function ModeMixedNodeProperties({
                   onValueChange={change.stroke}
                   onValueAdd={(value) => {
                     change.stroke(value);
-                    if (!strokeWidth?.value || strokeWidth?.value === 0) {
-                      change.strokeWidth({ type: "set", value: 1 });
+                    if (!stroke_width?.value || stroke_width?.value === 0) {
+                      change.stroke_width({ type: "set", value: 1 });
                     }
                   }}
                 />
@@ -783,8 +783,8 @@ function ModeMixedNodeProperties({
                   onValueChange={change.stroke}
                   onValueAdd={(value) => {
                     change.stroke(value);
-                    if (!strokeWidth?.value || strokeWidth?.value === 0) {
-                      change.strokeWidth({ type: "set", value: 1 });
+                    if (!stroke_width?.value || stroke_width?.value === 0) {
+                      change.stroke_width({ type: "set", value: 1 });
                     }
                   }}
                 />
@@ -793,15 +793,15 @@ function ModeMixedNodeProperties({
             <PropertyLine hidden={!stroke?.value}>
               <PropertyLineLabel>Width</PropertyLineLabel>
               <StrokeWidthControl
-                value={strokeWidth?.value}
-                onValueCommit={change.strokeWidth}
+                value={stroke_width?.value}
+                onValueCommit={change.stroke_width}
               />
             </PropertyLine>
             <PropertyLine hidden={!supports_stroke_cap}>
               <PropertyLineLabel>Cap</PropertyLineLabel>
               <StrokeCapControl
-                value={strokeCap?.value}
-                onValueChange={change.strokeCap}
+                value={stroke_cap?.value}
+                onValueChange={change.stroke_cap}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
@@ -888,16 +888,16 @@ function ModeNodeProperties({
     component_id: node.component_id,
     src: node.src,
     type: node.type,
-    blendMode: node.blendMode,
-    cornerRadius: node.cornerRadius,
-    cornerRadiusTopLeft: node.cornerRadiusTopLeft,
-    cornerRadiusTopRight: node.cornerRadiusTopRight,
-    cornerRadiusBottomRight: node.cornerRadiusBottomRight,
-    cornerRadiusBottomLeft: node.cornerRadiusBottomLeft,
-    pointCount: node.pointCount,
-    innerRadius: node.innerRadius,
+    blend_mode: node.blend_mode,
+    corner_radius: node.corner_radius,
+    corner_radius_top_left: node.corner_radius_top_left,
+    corner_radius_top_right: node.corner_radius_top_right,
+    corner_radius_bottom_right: node.corner_radius_bottom_right,
+    corner_radius_bottom_left: node.corner_radius_bottom_left,
+    point_count: node.point_count,
+    inner_radius: node.inner_radius,
     angle: node.angle,
-    angleOffset: node.angleOffset,
+    angle_offset: node.angle_offset,
 
     fit: node.fit,
 
@@ -909,11 +909,11 @@ function ModeNodeProperties({
     //
     layout: node.layout,
     direction: node.direction,
-    mainAxisAlignment: node.mainAxisAlignment,
-    crossAxisAlignment: node.crossAxisAlignment,
-    mainAxisGap: node.mainAxisGap,
-    crossAxisGap: node.crossAxisGap,
-    layoutWrap: node.layoutWrap,
+    main_axis_alignment: node.main_axis_alignment,
+    cross_axis_alignment: node.cross_axis_alignment,
+    main_axis_gap: node.main_axis_gap,
+    cross_axis_gap: node.cross_axis_gap,
+    layout_wrap: node.layout_wrap,
 
     //
     href: node.href,
@@ -931,16 +931,16 @@ function ModeNodeProperties({
     locked,
     component_id,
     type,
-    blendMode,
-    cornerRadius,
-    cornerRadiusTopLeft,
-    cornerRadiusTopRight,
-    cornerRadiusBottomRight,
-    cornerRadiusBottomLeft,
-    pointCount,
-    innerRadius,
+    blend_mode,
+    corner_radius,
+    corner_radius_top_left,
+    corner_radius_top_right,
+    corner_radius_bottom_right,
+    corner_radius_bottom_left,
+    point_count,
+    inner_radius,
     angle,
-    angleOffset,
+    angle_offset,
 
     fit,
 
@@ -951,11 +951,11 @@ function ModeNodeProperties({
     //
     layout,
     direction,
-    mainAxisAlignment,
-    crossAxisAlignment,
-    mainAxisGap,
-    crossAxisGap,
-    layoutWrap,
+    main_axis_alignment,
+    cross_axis_alignment,
+    main_axis_gap,
+    cross_axis_gap,
+    layout_wrap,
 
     //
     href,
@@ -1066,11 +1066,11 @@ function ModeNodeProperties({
               className="w-full"
               direction={direction ?? "horizontal"}
               value={
-                mainAxisAlignment !== undefined &&
-                crossAxisAlignment !== undefined
+                main_axis_alignment !== undefined &&
+                cross_axis_alignment !== undefined
                   ? {
-                      mainAxisAlignment,
-                      crossAxisAlignment,
+                      mainAxisAlignment: main_axis_alignment,
+                      crossAxisAlignment: cross_axis_alignment,
                     }
                   : undefined
               }
@@ -1083,17 +1083,17 @@ function ModeNodeProperties({
           <PropertyLine hidden={!is_flex_container}>
             <PropertyLineLabel>Wrap</PropertyLineLabel>
             <FlexWrapControl
-              value={layoutWrap}
+              value={layout_wrap}
               onValueChange={actions.layoutWrap}
             />
           </PropertyLine>
           <PropertyLine hidden={!is_flex_container}>
             <PropertyLineLabel>Gap</PropertyLineLabel>
             <GapControl
-              mode={layoutWrap === "wrap" ? "multiple" : "single"}
+              mode={layout_wrap === "wrap" ? "multiple" : "single"}
               value={{
-                mainAxisGap: mainAxisGap!,
-                crossAxisGap: crossAxisGap,
+                main_axis_gap: main_axis_gap!,
+                cross_axis_gap: cross_axis_gap,
               }}
               onValueCommit={actions.gap}
             />
@@ -1111,8 +1111,8 @@ function ModeNodeProperties({
           <SidebarSectionHeaderActions>
             <BlendModeDropdown
               type="layer"
-              value={blendMode}
-              onValueChange={actions.blendMode}
+              value={blend_mode}
+              onValueChange={actions.blend_mode}
             />
           </SidebarSectionHeaderActions>
         </SidebarSectionHeaderItem>
@@ -1137,12 +1137,12 @@ function ModeNodeProperties({
                   </PropertyLineLabelWithNumberGesture>
                   <CornerRadius4Control
                     value={{
-                      cornerRadiusTopLeft,
-                      cornerRadiusTopRight,
-                      cornerRadiusBottomRight,
-                      cornerRadiusBottomLeft,
+                      corner_radius_top_left,
+                      corner_radius_top_right,
+                      corner_radius_bottom_right,
+                      corner_radius_bottom_left,
                     }}
-                    onValueCommit={actions.cornerRadius}
+                    onValueCommit={actions.corner_radius}
                   />
                 </PropertyLine>
               ) : (
@@ -1155,16 +1155,16 @@ function ModeNodeProperties({
                     Radius
                   </PropertyLineLabelWithNumberGesture>
                   <CornerRadiusControl
-                    value={cornerRadius}
-                    onValueCommit={actions.cornerRadius}
+                    value={corner_radius}
+                    onValueCommit={actions.corner_radius}
                   />
                 </PropertyLine>
               )}
             </>
           )}
-          {(pointCount != null || innerRadius != null) && (
+          {(point_count != null || inner_radius != null) && (
             <>
-              {pointCount != null &&
+              {point_count != null &&
                 supports.pointCount(node.type, { backend }) && (
                   <PropertyLine>
                     <PropertyLineLabel>Count</PropertyLineLabel>
@@ -1172,12 +1172,12 @@ function ModeNodeProperties({
                       mode="fixed"
                       min={3}
                       max={60}
-                      value={pointCount}
+                      value={point_count}
                       onValueCommit={actions.pointCount}
                     />
                   </PropertyLine>
                 )}
-              {innerRadius != null && type !== "ellipse" && (
+              {inner_radius != null && type !== "ellipse" && (
                 <PropertyLine>
                   <PropertyLineLabel>Ratio</PropertyLineLabel>
                   <InputPropertyNumber
@@ -1185,7 +1185,7 @@ function ModeNodeProperties({
                     min={0}
                     max={1}
                     step={0.01}
-                    value={innerRadius}
+                    value={inner_radius}
                     onValueCommit={actions.innerRadius}
                   />
                 </PropertyLine>
@@ -1198,8 +1198,8 @@ function ModeNodeProperties({
               <ArcPropertiesControl
                 value={{
                   angle: angle ?? 360,
-                  angleOffset: angleOffset ?? 0,
-                  innerRadius: innerRadius ?? 0,
+                  angle_offset: angle_offset ?? 0,
+                  inner_radius: inner_radius ?? 0,
                 }}
                 onValueChange={(v) => {
                   actions.arcData(v);
@@ -1446,67 +1446,67 @@ function SectionText({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const {
     text,
-    fontFamily,
-    fontWeight,
-    fontStyleItalic,
-    fontSize,
-    lineHeight,
-    letterSpacing,
-    wordSpacing,
-    textAlign,
-    textAlignVertical,
-    textDecorationLine,
-    textDecorationStyle,
-    textDecorationColor,
-    textDecorationSkipInk,
-    textDecorationThickness,
-    textTransform,
-    maxLines,
-    maxLength,
-    fontPostscriptName,
-    fontVariations,
-    fontFeatures,
-    fontOpticalSizing,
-    fontKerning,
-    fontWidth,
+    font_family,
+    font_weight,
+    font_style_italic,
+    font_size,
+    line_height,
+    letter_spacing,
+    word_spacing,
+    text_align,
+    text_align_vertical,
+    text_decoration_line,
+    text_decoration_style,
+    text_decoration_color,
+    text_decoration_skip_ink,
+    text_decoration_thickness,
+    text_transform,
+    max_lines,
+    max_length,
+    font_postscript_name,
+    font_variations,
+    font_features,
+    font_optical_sizing,
+    font_kerning,
+    font_width,
   } = useNodeState(node_id, (_node) => {
     const node = _node as grida.program.nodes.TextNode;
     return {
       text: node.text,
-      fontFamily: node.fontFamily,
-      fontWeight: node.fontWeight,
-      fontStyleItalic: node.fontStyleItalic,
-      fontSize: node.fontSize,
-      lineHeight: node.lineHeight,
-      letterSpacing: node.letterSpacing,
-      wordSpacing: node.wordSpacing,
-      textAlign: node.textAlign,
-      textAlignVertical: node.textAlignVertical,
-      textDecorationLine: node.textDecorationLine,
-      textDecorationStyle: node.textDecorationStyle,
-      textDecorationColor: node.textDecorationColor,
-      textDecorationSkipInk: node.textDecorationSkipInk,
-      textDecorationThickness: node.textDecorationThickness,
-      textTransform: node.textTransform,
-      maxLines: node.maxLines,
-      maxLength: node.maxLength,
-      fontPostscriptName: node.fontPostscriptName,
-      fontVariations: node.fontVariations,
-      fontFeatures: node.fontFeatures,
-      fontOpticalSizing: node.fontOpticalSizing,
-      fontKerning: node.fontKerning,
-      fontWidth: node.fontWidth,
+      font_family: node.font_family,
+      font_weight: node.font_weight,
+      font_style_italic: node.font_style_italic,
+      font_size: node.font_size,
+      line_height: node.line_height,
+      letter_spacing: node.letter_spacing,
+      word_spacing: node.word_spacing,
+      text_align: node.text_align,
+      text_align_vertical: node.text_align_vertical,
+      text_decoration_line: node.text_decoration_line,
+      text_decoration_style: node.text_decoration_style,
+      text_decoration_color: node.text_decoration_color,
+      text_decoration_skip_ink: node.text_decoration_skip_ink,
+      text_decoration_thickness: node.text_decoration_thickness,
+      text_transform: node.text_transform,
+      max_lines: node.max_lines,
+      max_length: node.max_length,
+      font_postscript_name: node.font_postscript_name,
+      font_variations: node.font_variations,
+      font_features: node.font_features,
+      font_optical_sizing: node.font_optical_sizing,
+      font_kerning: node.font_kerning,
+      font_width: node.font_width,
     };
   });
 
   return (
     <CurrentFontProvider
       description={{
-        fontFamily: fontFamily ?? "",
-        fontInstancePostscriptName: fontPostscriptName,
-        fontWeight,
-        fontStyleItalic,
-        fontVariations,
+        fontFamily: font_family ?? "",
+        fontInstancePostscriptName: font_postscript_name,
+        fontWeight: font_weight,
+        fontStyleItalic: font_style_italic,
+        fontVariations: font_variations,
       }}
     >
       <SidebarSection className="border-b pb-4">
@@ -1521,24 +1521,26 @@ function SectionText({ node_id }: { node_id: string }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="p-0 w-64 h-[500px]">
                 <TextDetails
-                  textAlign={textAlign}
-                  textDecorationLine={textDecorationLine}
-                  textDecorationStyle={textDecorationStyle ?? undefined}
-                  textDecorationThickness={textDecorationThickness ?? undefined}
-                  textDecorationColor={textDecorationColor ?? undefined}
-                  textDecorationSkipInk={textDecorationSkipInk ?? undefined}
-                  textTransform={textTransform}
-                  maxLines={maxLines}
-                  maxLength={maxLength}
-                  fontVariations={fontVariations}
-                  fontOpticalSizing={fontOpticalSizing}
-                  fontWeight={fontWeight}
-                  fontKerning={fontKerning}
-                  fontWidth={fontWidth}
-                  fontSize={fontSize}
-                  fontFamily={fontFamily}
-                  fontFeatures={fontFeatures}
-                  wordSpacing={wordSpacing}
+                  textAlign={text_align}
+                  textDecorationLine={text_decoration_line}
+                  textDecorationStyle={text_decoration_style ?? undefined}
+                  textDecorationThickness={
+                    text_decoration_thickness ?? undefined
+                  }
+                  textDecorationColor={text_decoration_color ?? undefined}
+                  textDecorationSkipInk={text_decoration_skip_ink ?? undefined}
+                  textTransform={text_transform}
+                  maxLines={max_lines}
+                  maxLength={max_length}
+                  fontVariations={font_variations}
+                  fontOpticalSizing={font_optical_sizing}
+                  fontWeight={font_weight}
+                  fontKerning={font_kerning}
+                  fontWidth={font_width}
+                  fontSize={font_size}
+                  fontFamily={font_family}
+                  fontFeatures={font_features}
+                  wordSpacing={word_spacing}
                   onTextTransformChange={actions.textTransform}
                   onTextAlignChange={actions.textAlign}
                   onTextDecorationLineChange={actions.textDecorationLine}
@@ -1573,7 +1575,7 @@ function SectionText({ node_id }: { node_id: string }) {
             <PropertyLineLabel>Font</PropertyLineLabel>
             <div className="flex-1">
               <FontFamilyControl
-                value={fontFamily}
+                value={font_family}
                 onValueChange={actions.fontFamily}
               />
             </div>
@@ -1585,7 +1587,7 @@ function SectionText({ node_id }: { node_id: string }) {
           <PropertyLine>
             <PropertyLineLabel>Size</PropertyLineLabel>
             <FontSizeControl
-              value={fontSize}
+              value={font_size}
               onValueCommit={actions.fontSize}
             />
           </PropertyLine>
@@ -1598,7 +1600,7 @@ function SectionText({ node_id }: { node_id: string }) {
               Line
             </PropertyLineLabelWithNumberGesture>
             <LineHeightControl
-              value={lineHeight}
+              value={line_height}
               onValueCommit={actions.lineHeight}
             />
           </PropertyLine>
@@ -1610,21 +1612,21 @@ function SectionText({ node_id }: { node_id: string }) {
               Letter
             </PropertyLineLabelWithNumberGesture>
             <LetterSpacingControl
-              value={letterSpacing}
+              value={letter_spacing}
               onValueCommit={actions.letterSpacing}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <TextAlignControl
-              value={textAlign}
+              value={text_align}
               onValueChange={actions.textAlign}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel></PropertyLineLabel>
             <TextAlignVerticalControl
-              value={textAlignVertical}
+              value={text_align_vertical}
               onValueChange={actions.textAlignVertical}
             />
           </PropertyLine>
@@ -1723,35 +1725,41 @@ function SectionMask({ node_id, editor }: { node_id: string; editor: Editor }) {
 function SectionEffects({ node_id }: { node_id: string }) {
   const backend = useBackendState();
   const instance = useCurrentEditor();
-  const { type, feShadows, feBlur, feBackdropBlur, feLiquidGlass, feNoises } =
-    useNodeState(node_id, (node) => ({
-      type: node.type,
-      feShadows: node.feShadows,
-      feBlur: node.feBlur,
-      feBackdropBlur: node.feBackdropBlur,
-      feLiquidGlass: node.feLiquidGlass,
-      feNoises: node.feNoises,
-    }));
+  const {
+    type,
+    fe_shadows,
+    fe_blur,
+    fe_backdrop_blur,
+    fe_liquid_glass,
+    fe_noises,
+  } = useNodeState(node_id, (node) => ({
+    type: node.type,
+    fe_shadows: node.fe_shadows,
+    fe_blur: node.fe_blur,
+    fe_backdrop_blur: node.fe_backdrop_blur,
+    fe_liquid_glass: node.fe_liquid_glass,
+    fe_noises: node.fe_noises,
+  }));
 
   const effects = useMemo(() => {
     const effects: cg.FilterEffect[] = [];
-    if (feShadows) {
-      effects.push(...feShadows);
+    if (fe_shadows) {
+      effects.push(...fe_shadows);
     }
-    if (feBlur) {
-      effects.push(feBlur);
+    if (fe_blur) {
+      effects.push(fe_blur);
     }
-    if (feBackdropBlur) {
-      effects.push(feBackdropBlur);
+    if (fe_backdrop_blur) {
+      effects.push(fe_backdrop_blur);
     }
-    if (feLiquidGlass) {
-      effects.push(feLiquidGlass);
+    if (fe_liquid_glass) {
+      effects.push(fe_liquid_glass);
     }
-    if (feNoises) {
-      effects.push(...feNoises);
+    if (fe_noises) {
+      effects.push(...fe_noises);
     }
     return effects;
-  }, [feShadows, feBlur, feBackdropBlur, feLiquidGlass, feNoises]);
+  }, [fe_shadows, fe_blur, fe_backdrop_blur, fe_liquid_glass, fe_noises]);
 
   const onAddEffect = useCallback(() => {
     instance.commands.changeNodeFilterEffects(node_id, [

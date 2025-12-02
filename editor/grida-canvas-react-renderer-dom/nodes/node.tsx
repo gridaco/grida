@@ -137,18 +137,18 @@ export function NodeElement<P extends Record<string, any>>({
     muted: node.muted,
     autoplay: node.autoplay,
     paths: node.paths,
-    vectorNetwork: node.vectorNetwork,
+    vector_network: node.vector_network,
     opacity: node.opacity,
-    zIndex: DEFAULT_ZINDEX ?? node.zIndex,
+    z_index: DEFAULT_ZINDEX ?? node.z_index,
     position: DEFAULT_POSITION ?? node.position,
     left: DEFAULT_LEFT ?? node.left,
     top: DEFAULT_TOP ?? node.top,
     width: DEFAULT_WIDTH ?? node.width,
     height: DEFAULT_HEIGHT ?? node.height,
-    fillRule: node.fillRule,
+    fill_rule: node.fill_rule,
     stroke: node.stroke,
-    strokeWidth: node.strokeWidth,
-    strokeCap: node.strokeCap,
+    stroke_width: node.stroke_width,
+    stroke_cap: node.stroke_cap,
     cursor: node.cursor,
     style: {
       ...style,
@@ -160,7 +160,7 @@ export function NodeElement<P extends Record<string, any>>({
     // IDemension (does not instrictly mean width and height)
     // width: node.width,
     // height: node.height,
-    cornerRadius: node.cornerRadius,
+    corner_radius: node.corner_radius,
     // @ts-ignore
   } satisfies grida.program.document.IGlobalRenderingContext &
     (
@@ -170,7 +170,7 @@ export function NodeElement<P extends Record<string, any>>({
 
   if (!node.active) return <></>;
 
-  const { opacity, zIndex, ...props } = renderprops;
+  const { opacity, z_index, ...props } = renderprops;
 
   return (
     <HrefWrapper href={computed.href} target={node.target}>

@@ -108,7 +108,7 @@ export function useDataTransferEventTarget() {
           fit: "cover",
           transform: cmath.transform.identity,
           filters: cg.def.IMAGE_FILTERS,
-          blendMode: cg.def.BLENDMODE,
+          blend_mode: cg.def.BLENDMODE,
           opacity: 1,
           active: true,
         } satisfies cg.ImagePaint,

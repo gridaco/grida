@@ -134,7 +134,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         order: scene?.order ?? scene_count,
         guides: scene?.guides ?? [],
         edges: scene?.edges ?? [],
-        backgroundColor: scene?.backgroundColor,
+        background_color: scene?.background_color,
       };
 
       return updateState(state, (draft) => {
@@ -250,7 +250,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           scene
         ] as grida.program.nodes.SceneNode;
         if (scene_node?.type === "scene") {
-          scene_node.backgroundColor = action.backgroundColor;
+          scene_node.background_color = action.backgroundColor;
         }
       });
     }
@@ -326,7 +326,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           state,
           node_id
         ) as grida.program.nodes.VectorNode;
-        const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+        const vne = new vn.VectorNetworkEditor(node.vector_network);
         const vertices = Array.from(
           new Set([...selected_vertices, ...selected_tangents.map(([v]) => v)])
         );
@@ -441,8 +441,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               draft,
               mode.node_id
             ) as grida.program.nodes.VectorNode;
-            const vertex_offset = node.vectorNetwork.vertices.length;
-            const segment_offset = node.vectorNetwork.segments.length;
+            const vertex_offset = node.vector_network.vertices.length;
+            const segment_offset = node.vector_network.segments.length;
 
             let net_to_union = net;
             if (mode.clipboard && mode.clipboard_node_position) {
@@ -455,8 +455,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               }
             }
 
-            node.vectorNetwork = vn.VectorNetworkEditor.union(
-              node.vectorNetwork,
+            node.vector_network = vn.VectorNetworkEditor.union(
+              node.vector_network,
               net_to_union,
               null
             );
@@ -475,7 +475,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               selected_tangents: [],
             };
             mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
-              node.vectorNetwork,
+              node.vector_network,
               {
                 selected_vertices: new_vertices,
                 selected_segments: new_segments,
@@ -507,12 +507,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             width: 0,
             height: 0,
             rotation: 0,
-            zIndex: 0,
+            z_index: 0,
             stroke: { type: "solid", color: black, active: true },
-            strokeCap: "butt",
-            strokeJoin: "miter",
-            strokeWidth: 1,
-            vectorNetwork: net,
+            stroke_cap: "butt",
+            stroke_join: "miter",
+            stroke_width: 1,
+            vector_network: net,
           };
 
           normalizeVectorNodeBBox(node);
@@ -541,8 +541,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft,
             mode.node_id
           ) as grida.program.nodes.VectorNode;
-          const vertex_offset = node.vectorNetwork.vertices.length;
-          const segment_offset = node.vectorNetwork.segments.length;
+          const vertex_offset = node.vector_network.vertices.length;
+          const segment_offset = node.vector_network.segments.length;
 
           let net_to_union = net;
           if (mode.clipboard_node_position) {
@@ -553,8 +553,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             net_to_union = vn.VectorNetworkEditor.translate(net, delta);
           }
 
-          node.vectorNetwork = vn.VectorNetworkEditor.union(
-            node.vectorNetwork,
+          node.vector_network = vn.VectorNetworkEditor.union(
+            node.vector_network,
             net_to_union,
             null
           );
@@ -573,7 +573,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             selected_tangents: [],
           };
           mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
-            node.vectorNetwork,
+            node.vector_network,
             {
               selected_vertices: new_vertices,
               selected_segments: new_segments,
@@ -1057,18 +1057,18 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               ) as grida.program.nodes.VectorNode;
 
               const { vertices, tangents } = encodeTranslateVectorCommand(
-                node.vectorNetwork,
+                node.vector_network,
                 selection
               );
 
               const scene = getScene(draft.document, draft.scene_id!);
               const agent_points = vertices.map((i) =>
-                cmath.vector2.add(node.vectorNetwork.vertices[i], [
+                cmath.vector2.add(node.vector_network.vertices[i], [
                   node.left!,
                   node.top!,
                 ])
               );
-              const anchor_points = node.vectorNetwork.vertices
+              const anchor_points = node.vector_network.vertices
                 .map((v, i) => ({ p: v, i }))
                 .filter(({ i }) => !vertices.includes(i))
                 .map(({ p }) => cmath.vector2.add(p, [node.left!, node.top!]));
@@ -1342,10 +1342,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           // Apply flex layout properties to the existing container
           container.layout = "flex";
           container.direction = lay.direction;
-          container.mainAxisGap = cmath.quantize(lay.spacing, 1);
-          container.crossAxisGap = cmath.quantize(lay.spacing, 1);
-          container.mainAxisAlignment = lay.mainAxisAlignment;
-          container.crossAxisAlignment = lay.crossAxisAlignment;
+          container.main_axis_gap = cmath.quantize(lay.spacing, 1);
+          container.cross_axis_gap = cmath.quantize(lay.spacing, 1);
+          container.main_axis_alignment = lay.mainAxisAlignment;
+          container.cross_axis_alignment = lay.crossAxisAlignment;
 
           // [reorder children according to guessed layout]
           const ordered = lay.orders.map((i) => children[i]);
@@ -1428,10 +1428,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               top: cmath.quantize(layout.union.y, 1),
               left: cmath.quantize(layout.union.x, 1),
               direction: layout.direction,
-              mainAxisGap: cmath.quantize(layout.spacing, 1),
-              crossAxisGap: cmath.quantize(layout.spacing, 1),
-              mainAxisAlignment: layout.mainAxisAlignment,
-              crossAxisAlignment: layout.crossAxisAlignment,
+              main_axis_gap: cmath.quantize(layout.spacing, 1),
+              cross_axis_gap: cmath.quantize(layout.spacing, 1),
+              main_axis_alignment: layout.mainAxisAlignment,
+              cross_axis_alignment: layout.crossAxisAlignment,
               padding: children.length === 1 ? 16 : 0,
               // children (empty when init)
               children: [],
@@ -1589,7 +1589,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
-                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                (node as grida.program.nodes.VectorNode).vector_network,
                 {
                   selected_vertices: next.selected_vertices,
                   selected_segments: next.selected_segments,
@@ -1641,7 +1641,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
-                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                (node as grida.program.nodes.VectorNode).vector_network,
                 {
                   selected_vertices: next.selected_vertices,
                   selected_segments: next.selected_segments,
@@ -1666,7 +1666,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.content_edit_mode.selection = next;
             draft.content_edit_mode.selection_neighbouring_vertices =
               getUXNeighbouringVertices(
-                (node as grida.program.nodes.VectorNode).vectorNetwork,
+                (node as grida.program.nodes.VectorNode).vector_network,
                 next
               );
             draft.content_edit_mode.a_point =
@@ -1898,7 +1898,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           // Also update the node's strokeWidthProfile property
           if (node.type === "vector") {
-            node.strokeWidthProfile = profile;
+            node.stroke_width_profile = profile;
           }
         }
       });
@@ -1928,7 +1928,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           // Also update the node's strokeWidthProfile property
           if (node.type === "vector") {
-            node.strokeWidthProfile = profile;
+            node.stroke_width_profile = profile;
           }
         }
       });
@@ -2009,8 +2009,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         assert(node, `node not found with node_id: "${node_id}"`);
         if (node.type !== "text") return;
 
-        const isUnderline = node.textDecorationLine === "underline";
-        node.textDecorationLine = isUnderline ? "none" : "underline";
+        const isUnderline = node.text_decoration_line === "underline";
+        node.text_decoration_line = isUnderline ? "none" : "underline";
       });
       //
     }
@@ -2021,8 +2021,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         assert(node, `node not found with node_id: "${node_id}"`);
         if (node.type !== "text") return;
 
-        const isLineThrough = node.textDecorationLine === "line-through";
-        node.textDecorationLine = isLineThrough ? "none" : "line-through";
+        const isLineThrough = node.text_decoration_line === "line-through";
+        node.text_decoration_line = isLineThrough ? "none" : "line-through";
       });
       //
     }
@@ -2145,7 +2145,7 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
     if (!rect || !flattened) continue;
     const { node: v, delta } = flattened;
     const abs_pos: cmath.Vector2 = [rect.x + delta[0], rect.y + delta[1]];
-    const vne = new vn.VectorNetworkEditor(v.vectorNetwork);
+    const vne = new vn.VectorNetworkEditor(v.vector_network);
     vne.translate(abs_pos);
     union_net = union_net
       ? vn.VectorNetworkEditor.union(union_net, vne.value)
@@ -2162,7 +2162,7 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
   const node: grida.program.nodes.VectorNode = {
     ...base,
     id,
-    vectorNetwork: union_net,
+    vector_network: union_net,
     left: 0,
     top: 0,
     width: 0,

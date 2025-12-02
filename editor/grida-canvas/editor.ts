@@ -670,7 +670,7 @@ class EditorDocumentStore
 
   public changeSceneBackground(
     scene_id: string,
-    backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+    backgroundColor: grida.program.document.ISceneBackground["background_color"]
   ) {
     this.dispatch({
       type: "scenes/change/background-color",
@@ -1267,11 +1267,11 @@ class EditorDocumentStore
             node_id: node_id,
             layout: "flow",
             direction: undefined,
-            mainAxisGap: undefined,
-            crossAxisGap: undefined,
-            mainAxisAlignment: undefined,
-            crossAxisAlignment: undefined,
-            layoutWrap: undefined,
+            main_axis_gap: undefined,
+            cross_axis_gap: undefined,
+            main_axis_alignment: undefined,
+            cross_axis_alignment: undefined,
+            layout_wrap: undefined,
           },
         ]);
 
@@ -1609,14 +1609,14 @@ class EditorDocumentStore
     try {
       const value = resolveNumberChangeValue(
         this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-        "strokeWidth",
+        "stroke_width",
         strokeWidth
       );
 
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        strokeWidth: value,
+        stroke_width: value,
       });
     } catch (e) {
       reportError(e);
@@ -1626,53 +1626,53 @@ class EditorDocumentStore
 
   changeNodePropertyStrokeTopWidth(
     node_id: editor.NodeID,
-    strokeTopWidth: number
+    stroke_top_width: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeTopWidth,
+      stroke_top_width,
     });
   }
 
   changeNodePropertyStrokeRightWidth(
     node_id: editor.NodeID,
-    strokeRightWidth: number
+    stroke_right_width: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeRightWidth,
+      stroke_right_width,
     });
   }
 
   changeNodePropertyStrokeBottomWidth(
     node_id: editor.NodeID,
-    strokeBottomWidth: number
+    stroke_bottom_width: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeBottomWidth,
+      stroke_bottom_width,
     });
   }
 
   changeNodePropertyStrokeLeftWidth(
     node_id: editor.NodeID,
-    strokeLeftWidth: number
+    stroke_left_width: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeLeftWidth,
+      stroke_left_width,
     });
   }
 
-  changeNodePropertyStrokeAlign(node_id: string, strokeAlign: cg.StrokeAlign) {
+  changeNodePropertyStrokeAlign(node_id: string, stroke_align: cg.StrokeAlign) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeAlign,
+      stroke_align,
     });
   }
 
@@ -1680,7 +1680,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeCap,
+      stroke_cap: strokeCap,
     });
   }
 
@@ -1688,7 +1688,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeJoin,
+      stroke_join: strokeJoin,
     });
   }
 
@@ -1699,7 +1699,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeMiterLimit,
+      stroke_miter_limit: strokeMiterLimit,
     });
   }
 
@@ -1710,7 +1710,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeDashArray,
+      stroke_dash_array: strokeDashArray,
     });
   }
 
@@ -1729,39 +1729,39 @@ class EditorDocumentStore
     if (typeof cornerRadius === "number") {
       // When a uniform corner radius is applied after using individual corner
       // values, the individual corner properties may still remain on the node
-      // (e.g. cornerRadiusBottomLeft). Since the renderer prioritizes the
+      // (e.g. corner_radius_bottom_left). Since the renderer prioritizes the
       // per-corner properties, the final value may appear reverted. To ensure
       // consistency, update all four corner values together when the uniform
       // radius is set.
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        cornerRadius,
-        cornerRadiusTopLeft: cornerRadius,
-        cornerRadiusTopRight: cornerRadius,
-        cornerRadiusBottomRight: cornerRadius,
-        cornerRadiusBottomLeft: cornerRadius,
+        corner_radius: cornerRadius,
+        corner_radius_top_left: cornerRadius,
+        corner_radius_top_right: cornerRadius,
+        corner_radius_bottom_right: cornerRadius,
+        corner_radius_bottom_left: cornerRadius,
       });
     } else {
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        cornerRadiusTopLeft: cornerRadius[0],
-        cornerRadiusTopRight: cornerRadius[1],
-        cornerRadiusBottomRight: cornerRadius[2],
-        cornerRadiusBottomLeft: cornerRadius[3],
+        corner_radius_top_left: cornerRadius[0],
+        corner_radius_top_right: cornerRadius[1],
+        corner_radius_bottom_right: cornerRadius[2],
+        corner_radius_bottom_left: cornerRadius[3],
       });
     }
   }
 
   changeNodePropertyCornerSmoothing(
     node_id: editor.NodeID,
-    cornerSmoothing: number
+    corner_smoothing: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      cornerSmoothing,
+      corner_smoothing,
     });
   }
 
@@ -1783,11 +1783,17 @@ class EditorDocumentStore
     };
 
     const next = {
-      cornerRadius: applyDelta(node.cornerRadius, delta),
-      cornerRadiusTopLeft: applyDelta(node.cornerRadiusTopLeft, delta),
-      cornerRadiusTopRight: applyDelta(node.cornerRadiusTopRight, delta),
-      cornerRadiusBottomRight: applyDelta(node.cornerRadiusBottomRight, delta),
-      cornerRadiusBottomLeft: applyDelta(node.cornerRadiusBottomLeft, delta),
+      corner_radius: applyDelta(node.corner_radius, delta),
+      corner_radius_top_left: applyDelta(node.corner_radius_top_left, delta),
+      corner_radius_top_right: applyDelta(node.corner_radius_top_right, delta),
+      corner_radius_bottom_right: applyDelta(
+        node.corner_radius_bottom_right,
+        delta
+      ),
+      corner_radius_bottom_left: applyDelta(
+        node.corner_radius_bottom_left,
+        delta
+      ),
     };
 
     this.dispatch({
@@ -1804,7 +1810,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      pointCount,
+      point_count: pointCount,
     });
   }
 
@@ -1815,7 +1821,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      innerRadius,
+      inner_radius: innerRadius,
     });
   }
 
@@ -1826,9 +1832,9 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      innerRadius: arcData.innerRadius,
+      inner_radius: arcData.inner_radius,
       angle: arcData.angle,
-      angleOffset: arcData.angleOffset,
+      angle_offset: arcData.angle_offset,
     });
   }
 
@@ -1836,7 +1842,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontWeight,
+      font_weight: fontWeight,
     });
   }
 
@@ -1844,7 +1850,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontKerning,
+      font_kerning: fontKerning,
     });
   }
 
@@ -1852,7 +1858,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontWidth,
+      font_width: fontWidth,
     });
   }
 
@@ -1864,13 +1870,13 @@ class EditorDocumentStore
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextNode;
-    const features = Object.assign({}, node.fontFeatures ?? {});
+    const features = Object.assign({}, node.font_features ?? {});
     features[feature] = value;
 
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontFeatures: features,
+      font_features: features,
     });
   }
   changeTextNodeFontVariation(
@@ -1881,13 +1887,13 @@ class EditorDocumentStore
     const node = this.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextNode;
-    const variations = Object.assign({}, node.fontVariations ?? {});
+    const variations = Object.assign({}, node.font_variations ?? {});
     variations[key] = value;
 
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontVariations: variations,
+      font_variations: variations,
     });
   }
 
@@ -1898,7 +1904,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      fontOpticalSizing,
+      font_optical_sizing: fontOpticalSizing,
     });
   }
 
@@ -1906,14 +1912,14 @@ class EditorDocumentStore
     try {
       const value = resolveNumberChangeValue(
         this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-        "fontSize",
+        "font_size",
         fontSize
       );
 
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        fontSize: value,
+        font_size: value,
       });
     } catch (e) {
       reportError(e);
@@ -1924,7 +1930,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textAlign,
+      text_align: textAlign,
     });
   }
 
@@ -1935,7 +1941,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textAlignVertical,
+      text_align_vertical: textAlignVertical,
     });
   }
 
@@ -1946,7 +1952,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textTransform,
+      text_transform: textTransform,
     });
   }
 
@@ -1957,7 +1963,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationLine: textDecorationLine,
+      text_decoration_line: textDecorationLine,
     });
   }
 
@@ -1968,7 +1974,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationStyle,
+      text_decoration_style: textDecorationStyle,
     });
   }
 
@@ -1979,7 +1985,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationThickness,
+      text_decoration_thickness: textDecorationThickness,
     });
   }
 
@@ -1993,7 +1999,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationColor: value,
+      text_decoration_color: value,
     });
   }
 
@@ -2004,7 +2010,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      textDecorationSkipInk,
+      text_decoration_skip_ink: textDecorationSkipInk,
     });
   }
 
@@ -2015,13 +2021,13 @@ class EditorDocumentStore
     try {
       const value = resolveNumberChangeValue(
         this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-        "lineHeight",
+        "line_height",
         lineHeight
       );
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        lineHeight: value,
+        line_height: value,
       });
     } catch (e) {
       reportError(e);
@@ -2032,7 +2038,7 @@ class EditorDocumentStore
   changeTextNodeLetterSpacing(
     node_id: string,
     letterSpacing: editor.api.TChange<
-      grida.program.nodes.TextNode["letterSpacing"]
+      grida.program.nodes.TextNode["letter_spacing"]
     >
   ) {
     try {
@@ -2042,7 +2048,7 @@ class EditorDocumentStore
       } else {
         value = resolveNumberChangeValue(
           this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-          "letterSpacing",
+          "letter_spacing",
           letterSpacing as editor.api.NumberChange
         );
       }
@@ -2050,7 +2056,7 @@ class EditorDocumentStore
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        letterSpacing: value,
+        letter_spacing: value,
       });
     } catch (e) {
       reportError(e);
@@ -2060,7 +2066,9 @@ class EditorDocumentStore
 
   changeTextNodeWordSpacing(
     node_id: string,
-    wordSpacing: editor.api.TChange<grida.program.nodes.TextNode["wordSpacing"]>
+    wordSpacing: editor.api.TChange<
+      grida.program.nodes.TextNode["word_spacing"]
+    >
   ) {
     try {
       let value: number | undefined;
@@ -2069,7 +2077,7 @@ class EditorDocumentStore
       } else {
         value = resolveNumberChangeValue(
           this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-          "wordSpacing",
+          "word_spacing",
           wordSpacing as editor.api.NumberChange
         );
       }
@@ -2077,7 +2085,7 @@ class EditorDocumentStore
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        wordSpacing: value,
+        word_spacing: value,
       });
     } catch (e) {
       reportError(e);
@@ -2089,7 +2097,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      maxLength,
+      max_length: maxLength,
     });
   }
 
@@ -2097,7 +2105,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      maxLines,
+      max_lines: maxLines,
     });
   }
 
@@ -2128,28 +2136,28 @@ class EditorDocumentStore
     node_id: editor.NodeID,
     effects?: cg.FilterEffect[]
   ): void {
-    const feBlur = effects?.find((effect) => effect.type === "filter-blur") as
+    const fe_blur = effects?.find((effect) => effect.type === "filter-blur") as
       | cg.FeLayerBlur
       | undefined;
-    const feBackdropBlur = effects?.find(
+    const fe_backdrop_blur = effects?.find(
       (effect) => effect.type === "backdrop-filter-blur"
     ) as cg.FeBackdropBlur | undefined;
-    const feShadows = effects?.filter(
+    const fe_shadows = effects?.filter(
       (e): e is cg.FeShadow => e.type === "shadow"
     );
-    const feLiquidGlass = effects?.find((effect) => effect.type === "glass") as
-      | cg.FeLiquidGlass
-      | undefined;
-    const feNoises = effects?.filter(
+    const fe_liquid_glass = effects?.find(
+      (effect) => effect.type === "glass"
+    ) as cg.FeLiquidGlass | undefined;
+    const fe_noises = effects?.filter(
       (e): e is cg.FeNoise => e.type === "noise"
     );
 
     const i: grida.program.nodes.i.IEffects = {
-      feBackdropBlur: feBackdropBlur,
-      feBlur: feBlur,
-      feShadows: feShadows,
-      feLiquidGlass: feLiquidGlass,
-      feNoises: feNoises,
+      fe_backdrop_blur,
+      fe_blur,
+      fe_shadows,
+      fe_liquid_glass,
+      fe_noises,
     };
 
     this.dispatch({
@@ -2163,7 +2171,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      feShadows: effects,
+      fe_shadows: effects,
     });
   }
 
@@ -2171,7 +2179,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      feBlur: effect,
+      fe_blur: effect,
     });
   }
 
@@ -2182,7 +2190,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      feBackdropBlur: effect,
+      fe_backdrop_blur: effect,
     });
   }
 
@@ -2190,7 +2198,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      feNoises: effects,
+      fe_noises: effects,
     });
   }
 
@@ -2220,7 +2228,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      mainAxisAlignment,
+      main_axis_alignment: mainAxisAlignment,
     });
   }
 
@@ -2231,25 +2239,25 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      crossAxisAlignment,
+      cross_axis_alignment: crossAxisAlignment,
     });
   }
   changeFlexContainerNodeGap(
     node_id: string,
-    gap: number | { mainAxisGap: number; crossAxisGap: number }
+    gap: number | { main_axis_gap: number; cross_axis_gap: number }
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      mainAxisGap: typeof gap === "number" ? gap : gap.mainAxisGap,
-      crossAxisGap: typeof gap === "number" ? gap : gap.crossAxisGap,
+      main_axis_gap: typeof gap === "number" ? gap : gap.main_axis_gap,
+      cross_axis_gap: typeof gap === "number" ? gap : gap.cross_axis_gap,
     });
   }
   changeFlexContainerNodeWrap(node_id: string, layoutWrap: "wrap" | "nowrap") {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      layoutWrap,
+      layout_wrap: layoutWrap,
     });
   }
   //
@@ -2535,7 +2543,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.1-beta.2+20251201",
+      version: "0.0.3-beta+20251202",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -2697,7 +2705,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.0.1-beta.2+20251201",
+          version: "0.0.3-beta+20251202",
           document: payloadDocument,
         });
         surface.loadScene(p);
@@ -3053,15 +3061,15 @@ export class Editor
     ) as grida.program.nodes.TextNode;
     if (node.type !== "text") return false;
 
-    const isBold = node.fontWeight === 700;
+    const isBold = node.font_weight === 700;
     const next_weight = isBold ? 400 : 700;
-    const fontFamily = node.fontFamily;
+    const fontFamily = node.font_family;
     if (!fontFamily) return false;
 
     const match = this.selectFontStyle({
       fontFamily: fontFamily,
       fontWeight: next_weight,
-      fontStyleItalic: node.fontStyleItalic,
+      fontStyleItalic: node.font_style_italic,
     });
 
     if (!match) {
@@ -3069,7 +3077,7 @@ export class Editor
         "toggleNodeBold: matching font face not found",
         fontFamily,
         next_weight,
-        node.fontStyleItalic
+        node.font_style_italic
       );
       return false;
     }
@@ -3084,13 +3092,13 @@ export class Editor
     ) as grida.program.nodes.TextNode;
     if (node.type !== "text") return false;
 
-    const next_italic = !node.fontStyleItalic;
-    const fontFamily = node.fontFamily;
+    const next_italic = !node.font_style_italic;
+    const fontFamily = node.font_family;
     if (!fontFamily) return false;
 
     const match = this.selectFontStyle({
       fontFamily: fontFamily,
-      fontWeight: node.fontWeight,
+      fontWeight: node.font_weight,
       fontStyleItalic: next_italic,
     });
 
@@ -3099,7 +3107,7 @@ export class Editor
         "toggleNodeItalic: matching font face not found",
         fontFamily,
         next_italic,
-        node.fontWeight
+        node.font_weight
       );
       return false;
     }
@@ -3120,15 +3128,15 @@ export class Editor
     ) as grida.program.nodes.TextNode;
 
     const prev: grida.program.nodes.i.IFontStyle = {
-      fontPostscriptName: node.fontPostscriptName,
-      fontWeight: node.fontWeight,
-      fontWidth: node.fontWidth,
-      fontKerning: node.fontKerning,
-      fontSize: node.fontSize,
-      fontVariations: node.fontVariations,
-      fontFeatures: node.fontFeatures,
-      fontOpticalSizing: node.fontOpticalSizing,
-      fontStyleItalic: node.fontStyleItalic,
+      font_postscript_name: node.font_postscript_name,
+      font_weight: node.font_weight,
+      font_width: node.font_width,
+      font_kerning: node.font_kerning,
+      font_size: node.font_size,
+      font_variations: node.font_variations,
+      font_features: node.font_features,
+      font_optical_sizing: node.font_optical_sizing,
+      font_style_italic: node.font_style_italic,
     };
 
     const description = Object.assign(
@@ -3157,28 +3165,28 @@ export class Editor
     }
 
     const {
-      fontFamily: _fontFamily,
+      font_family: _fontFamily,
       ...next
     }: grida.program.nodes.i.IFontStyle = {
       ...prev,
-      fontPostscriptName:
+      font_postscript_name:
         match.instance?.postscriptName || match.face.postscriptName,
       // ----
       // [high level variables]
-      fontWeight: match.instance?.coordinates?.wght ?? prev.fontWeight,
-      fontWidth: match.instance?.coordinates?.wdth ?? prev.fontWidth,
+      font_weight: match.instance?.coordinates?.wght ?? prev.font_weight,
+      font_width: match.instance?.coordinates?.wdth ?? prev.font_width,
       // TODO: should prevent optical sizing auto => fixed
       // (if the next value === auto's expected value && prev value is auto, keep auto) => the change style does not change the size, so the logic can be even simpler.
-      fontOpticalSizing:
-        match.instance?.coordinates?.opsz ?? prev.fontOpticalSizing,
+      font_optical_sizing:
+        match.instance?.coordinates?.opsz ?? prev.font_optical_sizing,
       // ----
       // Clear variable axes for non-variable fonts
-      fontVariations: match.isVariable
+      font_variations: match.isVariable
         ? match.instance?.coordinates
         : undefined,
       // TODO: clean the invalid features by face change.
       // fontFeatures: match.features,
-      fontStyleItalic: match.face.italic,
+      font_style_italic: match.face.italic,
     } as const;
 
     this.doc.dispatch({
@@ -3222,9 +3230,9 @@ export class Editor
 
     if (!force) {
       // when not force, try to keep the previous (current) font style
-      description.fontWeight = node.fontWeight;
-      description.fontStyleItalic = node.fontStyleItalic;
-      description.fontVariations = node.fontVariations;
+      description.fontWeight = node.font_weight;
+      description.fontStyleItalic = node.font_style_italic;
+      description.fontVariations = node.font_variations;
     }
 
     const match = this.selectFontStyle(description);
@@ -3254,8 +3262,8 @@ export class Editor
     const prev = this.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
     if (!prev) return;
 
-    const h_align = node.textAlign;
-    const v_align = node.textAlignVertical;
+    const h_align = node.text_align;
+    const v_align = node.text_align_vertical;
 
     // FIXME: nested raf.
     // why this is needed?
@@ -4510,13 +4518,13 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#blendMode}
+   * {@link grida.program.nodes.UnknwonNode#blend_mode}
    */
-  set blendMode(blendMode: cg.LayerBlendMode) {
+  set blend_mode(blend_mode: cg.LayerBlendMode) {
     this.doc.dispatch({
       type: "node/change/*",
       node_id: this.node_id,
-      blendMode,
+      blend_mode,
     });
   }
 

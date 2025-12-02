@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1-beta.2+20251201",
+  "version": "0.0.3-beta+20251202",
   "document": {
     "nodes": {
       "173:49": {
@@ -9,7 +9,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "relative",
@@ -29,14 +29,14 @@
         "style": {
           "overflow": "clip"
         },
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "padding": 0,
         "layout": "flow",
         "direction": "horizontal",
-        "mainAxisAlignment": "start",
-        "crossAxisAlignment": "start",
-        "mainAxisGap": 0,
-        "crossAxisGap": 0
+        "main_axis_alignment": "start",
+        "cross_axis_alignment": "start",
+        "main_axis_gap": 0,
+        "cross_axis_gap": 0
       },
       "173:52": {
         "id": "173:52",
@@ -45,7 +45,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -54,14 +54,14 @@
         "width": "auto",
         "height": "auto",
         "style": {},
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "padding": 0,
         "layout": "flex",
         "direction": "vertical",
-        "mainAxisAlignment": "start",
-        "crossAxisAlignment": "start",
-        "mainAxisGap": 24,
-        "crossAxisGap": 24
+        "main_axis_alignment": "start",
+        "cross_axis_alignment": "start",
+        "main_axis_gap": 24,
+        "cross_axis_gap": 24
       },
       "173:50": {
         "id": "173:50",
@@ -70,7 +70,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "rectangle",
         "position": "relative",
         "width": 141,
@@ -85,7 +85,7 @@
           }
         },
         "effects": [],
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "173:53": {
         "id": "173:53",
@@ -94,7 +94,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "rectangle",
         "position": "relative",
         "width": 141,
@@ -109,7 +109,7 @@
           }
         },
         "effects": [],
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "173:51": {
         "id": "173:51",
@@ -118,7 +118,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "rectangle",
         "position": "relative",
         "width": 141,
@@ -133,7 +133,7 @@
           }
         },
         "effects": [],
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "173:55": {
         "id": "173:55",
@@ -142,7 +142,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "container",
         "expanded": false,
         "position": "absolute",
@@ -151,14 +151,14 @@
         "width": "auto",
         "height": "auto",
         "style": {},
-        "cornerRadius": 0,
+        "corner_radius": 0,
         "padding": 0,
         "layout": "flex",
         "direction": "horizontal",
-        "mainAxisAlignment": "start",
-        "crossAxisAlignment": "start",
-        "mainAxisGap": 24,
-        "crossAxisGap": 24
+        "main_axis_alignment": "start",
+        "cross_axis_alignment": "start",
+        "main_axis_gap": 24,
+        "cross_axis_gap": 24
       },
       "173:56": {
         "id": "173:56",
@@ -167,7 +167,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "rectangle",
         "position": "relative",
         "width": 31,
@@ -182,7 +182,7 @@
           }
         },
         "effects": [],
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "173:57": {
         "id": "173:57",
@@ -191,7 +191,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "rectangle",
         "position": "relative",
         "width": 31,
@@ -206,7 +206,7 @@
           }
         },
         "effects": [],
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "173:58": {
         "id": "173:58",
@@ -215,7 +215,7 @@
         "locked": false,
         "rotation": 0,
         "opacity": 1,
-        "zIndex": 0,
+        "z_index": 0,
         "type": "rectangle",
         "position": "relative",
         "width": 31,
@@ -230,7 +230,7 @@
           }
         },
         "effects": [],
-        "cornerRadius": 0
+        "corner_radius": 0
       },
       "flex": {
         "type": "scene",
@@ -243,7 +243,7 @@
         },
         "guides": [],
         "edges": [],
-        "backgroundColor": {
+        "background_color": {
           "r": 0.96,
           "g": 0.96,
           "b": 0.96,
