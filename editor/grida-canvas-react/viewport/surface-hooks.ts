@@ -369,7 +369,7 @@ export function useSingleSelection(
       };
 
       const container = node as grida.program.nodes.ContainerNode;
-      const { direction, mainAxisGap, crossAxisGap } = container;
+      const { direction, main_axis_gap, cross_axis_gap } = container;
       const axis = direction === "horizontal" ? "x" : "y";
       const children = dq.getChildren(document_ctx, node_id);
       const children_rects = children
@@ -378,11 +378,11 @@ export function useSingleSelection(
 
       distribution.rects = children_rects;
       distribution[axis] = {
-        gap: mainAxisGap,
+        gap: main_axis_gap,
         tolerance: 0,
         gaps: Array.from(
           { length: children_rects.length - 1 },
-          () => mainAxisGap
+          () => main_axis_gap
         ),
       };
     }

@@ -658,10 +658,10 @@ const safe_properties: Partial<
         // initialize flex layout
         // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
         if (!draft.direction) draft.direction = "horizontal";
-        if (!draft.mainAxisAlignment) draft.mainAxisAlignment = "start";
-        if (!draft.crossAxisAlignment) draft.crossAxisAlignment = "start";
-        if (!draft.mainAxisGap) draft.mainAxisGap = 0;
-        if (!draft.crossAxisGap) draft.crossAxisGap = 0;
+        if (!draft.main_axis_alignment) draft.main_axis_alignment = "start";
+        if (!draft.cross_axis_alignment) draft.cross_axis_alignment = "start";
+        if (!draft.main_axis_gap) draft.main_axis_gap = 0;
+        if (!draft.cross_axis_gap) draft.cross_axis_gap = 0;
       }
     },
   }),
@@ -671,34 +671,34 @@ const safe_properties: Partial<
       (draft as UN).direction = value;
     },
   }),
-  mainAxisAlignment: defineNodeProperty<"mainAxisAlignment">({
+  main_axis_alignment: defineNodeProperty<"main_axis_alignment">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).mainAxisAlignment = value;
+      (draft as UN).main_axis_alignment = value;
     },
   }),
-  crossAxisAlignment: defineNodeProperty<"crossAxisAlignment">({
+  cross_axis_alignment: defineNodeProperty<"cross_axis_alignment">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).crossAxisAlignment = value;
+      (draft as UN).cross_axis_alignment = value;
     },
   }),
-  mainAxisGap: defineNodeProperty<"mainAxisGap">({
+  main_axis_gap: defineNodeProperty<"main_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).mainAxisGap = value;
+      (draft as UN).main_axis_gap = value;
     },
   }),
-  crossAxisGap: defineNodeProperty<"crossAxisGap">({
+  cross_axis_gap: defineNodeProperty<"cross_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).crossAxisGap = value;
+      (draft as UN).cross_axis_gap = value;
     },
   }),
-  layoutWrap: defineNodeProperty<"layoutWrap">({
+  layout_wrap: defineNodeProperty<"layout_wrap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).layoutWrap = value;
+      (draft as UN).layout_wrap = value;
     },
   }),
   text_align: defineNodeProperty<"text_align">({

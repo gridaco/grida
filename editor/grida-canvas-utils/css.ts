@@ -91,10 +91,10 @@ export namespace css {
       //
       layout,
       direction,
-      mainAxisAlignment,
-      crossAxisAlignment,
-      mainAxisGap,
-      crossAxisGap,
+      main_axis_alignment,
+      cross_axis_alignment,
+      main_axis_gap,
+      cross_axis_gap,
       //
       maxLines,
       //
@@ -156,12 +156,12 @@ export namespace css {
     if (layout === "flex") {
       result["display"] = "flex";
       result["flexDirection"] = axisToFlexDirection(direction!);
-      result["justifyContent"] = mainAxisAlignment;
-      result["alignItems"] = crossAxisAlignment;
+      result["justifyContent"] = main_axis_alignment;
+      result["alignItems"] = cross_axis_alignment;
       result["gap"] =
         direction === "horizontal"
-          ? `${mainAxisGap}px ${crossAxisGap}px`
-          : `${crossAxisGap}px ${mainAxisGap}px`;
+          ? `${main_axis_gap}px ${cross_axis_gap}px`
+          : `${cross_axis_gap}px ${main_axis_gap}px`;
     }
 
     switch (config.fill) {

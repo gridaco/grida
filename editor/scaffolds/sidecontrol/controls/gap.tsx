@@ -5,13 +5,13 @@ export function GapControl({
   mode = "single",
   onValueCommit,
 }: {
-  value: { mainAxisGap: number; crossAxisGap?: number };
+  value: { main_axis_gap: number; cross_axis_gap?: number };
   mode?: "single" | "multiple";
   onValueCommit?: (
-    value: number | { mainAxisGap: number; crossAxisGap: number }
+    value: number | { main_axis_gap: number; cross_axis_gap: number }
   ) => void;
 }) {
-  const mainAxisGap = value.mainAxisGap ?? 0;
+  const mainAxisGap = value.main_axis_gap ?? 0;
 
   if (mode === "multiple") {
     return (
@@ -25,22 +25,22 @@ export function GapControl({
           min={0}
           onValueCommit={(v) =>
             onValueCommit?.({
-              mainAxisGap: v ?? 0,
-              crossAxisGap: value.crossAxisGap ?? v ?? 0,
+              main_axis_gap: v ?? 0,
+              cross_axis_gap: value.cross_axis_gap ?? v ?? 0,
             })
           }
         />
         <InputPropertyNumber
           mode="fixed"
           type="number"
-          value={value.crossAxisGap}
+          value={value.cross_axis_gap}
           placeholder={String(mainAxisGap)}
           step={1}
           min={0}
           onValueCommit={(v) =>
             onValueCommit?.({
-              mainAxisGap,
-              crossAxisGap: v ?? 0,
+              main_axis_gap: mainAxisGap,
+              cross_axis_gap: v ?? 0,
             })
           }
         />

@@ -1525,7 +1525,7 @@ export namespace grida.program.nodes {
        *
        * @default "nowrap"
        */
-      layoutWrap?: "wrap" | "nowrap";
+      layout_wrap?: "wrap" | "nowrap";
 
       /**
        *
@@ -1533,7 +1533,7 @@ export namespace grida.program.nodes {
        *
        * @default "start"
        */
-      mainAxisAlignment: cg.MainAxisAlignment;
+      main_axis_alignment: cg.MainAxisAlignment;
 
       /**
        *
@@ -1541,7 +1541,7 @@ export namespace grida.program.nodes {
        *
        * @default "start"
        */
-      crossAxisAlignment: cg.CrossAxisAlignment;
+      cross_axis_alignment: cg.CrossAxisAlignment;
 
       /**
        * the gap between the children in main axis - takes effect when layout is set to `flex`
@@ -1550,7 +1550,7 @@ export namespace grida.program.nodes {
        *
        * @default 0
        */
-      mainAxisGap: number;
+      main_axis_gap: number;
 
       /**
        * the gap between the children in cross axis - takes effect when layout is set to `flex`
@@ -1559,7 +1559,7 @@ export namespace grida.program.nodes {
        *
        * @default 0
        */
-      crossAxisGap: number;
+      cross_axis_gap: number;
     }
 
     /**
@@ -2788,10 +2788,10 @@ export namespace grida.program.nodes {
         position: "absolute",
         layout: "flow",
         direction: "horizontal",
-        mainAxisAlignment: "start",
-        mainAxisGap: 0,
-        crossAxisAlignment: "start",
-        crossAxisGap: 0,
+        main_axis_alignment: "start",
+        main_axis_gap: 0,
+        cross_axis_alignment: "start",
+        cross_axis_gap: 0,
         padding: 0,
         width: 100,
         height: 100,

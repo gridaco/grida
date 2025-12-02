@@ -301,20 +301,20 @@ export function useMixedProperties(ids: string[]) {
 
   const mainAxisAlignment = useCallback(
     (value: cg.MainAxisAlignment) => {
-      mixedProperties.mainAxisAlignment?.ids.forEach((id) => {
+      mixedProperties.main_axis_alignment?.ids.forEach((id) => {
         instance.commands.changeFlexContainerNodeMainAxisAlignment(id, value);
       });
     },
-    [mixedProperties.mainAxisAlignment?.ids, instance.commands]
+    [mixedProperties.main_axis_alignment?.ids, instance.commands]
   );
 
   const crossAxisAlignment = useCallback(
     (value: cg.CrossAxisAlignment) => {
-      mixedProperties.crossAxisAlignment?.ids.forEach((id) => {
+      mixedProperties.cross_axis_alignment?.ids.forEach((id) => {
         instance.commands.changeFlexContainerNodeCrossAxisAlignment(id, value);
       });
     },
-    [mixedProperties.crossAxisAlignment?.ids, instance.commands]
+    [mixedProperties.cross_axis_alignment?.ids, instance.commands]
   );
 
   const corner_radius = useCallback(
@@ -366,8 +366,8 @@ export function useMixedProperties(ids: string[]) {
       stroke_cap: strokeCap,
       layout,
       direction,
-      mainAxisAlignment,
-      crossAxisAlignment,
+      main_axis_alignment: mainAxisAlignment,
+      cross_axis_alignment: crossAxisAlignment,
       corner_radius,
       cursor,
     }),

@@ -135,10 +135,10 @@ export default function initialNode(
         padding: 0,
         layout: "flow",
         direction: "horizontal",
-        mainAxisAlignment: "start",
-        crossAxisAlignment: "start",
-        mainAxisGap: 0,
-        crossAxisGap: 0,
+        main_axis_alignment: "start",
+        cross_axis_alignment: "start",
+        main_axis_gap: 0,
+        cross_axis_gap: 0,
         ...seed,
       } satisfies grida.program.nodes.ContainerNode;
     }

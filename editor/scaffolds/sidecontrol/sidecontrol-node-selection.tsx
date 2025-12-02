@@ -308,8 +308,8 @@ function ModeMixedNodeProperties({
     //
     layout,
     direction,
-    mainAxisAlignment,
-    crossAxisAlignment,
+    main_axis_alignment,
+    cross_axis_alignment,
     //
     cursor,
 
@@ -441,19 +441,19 @@ function ModeMixedNodeProperties({
                   : (direction?.value ?? "horizontal")
               }
               value={
-                mainAxisAlignment?.value === grida.mixed ||
-                crossAxisAlignment?.value === grida.mixed ||
-                mainAxisAlignment?.value === undefined ||
-                crossAxisAlignment?.value === undefined
+                main_axis_alignment?.value === grida.mixed ||
+                cross_axis_alignment?.value === grida.mixed ||
+                main_axis_alignment?.value === undefined ||
+                cross_axis_alignment?.value === undefined
                   ? undefined
                   : {
-                      mainAxisAlignment: mainAxisAlignment.value,
-                      crossAxisAlignment: crossAxisAlignment.value,
+                      mainAxisAlignment: main_axis_alignment.value,
+                      crossAxisAlignment: cross_axis_alignment.value,
                     }
               }
               onValueChange={(value) => {
-                change.mainAxisAlignment(value.mainAxisAlignment);
-                change.crossAxisAlignment(value.crossAxisAlignment);
+                change.main_axis_alignment(value.mainAxisAlignment);
+                change.cross_axis_alignment(value.crossAxisAlignment);
               }}
             />
           </PropertyLine>
@@ -724,19 +724,19 @@ function ModeMixedNodeProperties({
                   : (direction?.value ?? "horizontal")
               }
               value={
-                mainAxisAlignment?.value === grida.mixed ||
-                crossAxisAlignment?.value === grida.mixed ||
-                mainAxisAlignment?.value === undefined ||
-                crossAxisAlignment?.value === undefined
+                main_axis_alignment?.value === grida.mixed ||
+                cross_axis_alignment?.value === grida.mixed ||
+                main_axis_alignment?.value === undefined ||
+                cross_axis_alignment?.value === undefined
                   ? undefined
                   : {
-                      mainAxisAlignment: mainAxisAlignment.value,
-                      crossAxisAlignment: crossAxisAlignment.value,
+                      mainAxisAlignment: main_axis_alignment.value,
+                      crossAxisAlignment: cross_axis_alignment.value,
                     }
               }
               onValueChange={(value) => {
-                change.mainAxisAlignment(value.mainAxisAlignment);
-                change.crossAxisAlignment(value.crossAxisAlignment);
+                change.main_axis_alignment(value.mainAxisAlignment);
+                change.cross_axis_alignment(value.crossAxisAlignment);
               }}
             />
           </PropertyLine>
@@ -909,11 +909,11 @@ function ModeNodeProperties({
     //
     layout: node.layout,
     direction: node.direction,
-    mainAxisAlignment: node.mainAxisAlignment,
-    crossAxisAlignment: node.crossAxisAlignment,
-    mainAxisGap: node.mainAxisGap,
-    crossAxisGap: node.crossAxisGap,
-    layoutWrap: node.layoutWrap,
+    mainAxisAlignment: node.main_axis_alignment,
+    crossAxisAlignment: node.cross_axis_alignment,
+    mainAxisGap: node.main_axis_gap,
+    crossAxisGap: node.cross_axis_gap,
+    layoutWrap: node.layout_wrap,
 
     //
     href: node.href,
@@ -1092,8 +1092,8 @@ function ModeNodeProperties({
             <GapControl
               mode={layoutWrap === "wrap" ? "multiple" : "single"}
               value={{
-                mainAxisGap: mainAxisGap!,
-                crossAxisGap: crossAxisGap,
+                main_axis_gap: mainAxisGap!,
+                cross_axis_gap: crossAxisGap,
               }}
               onValueCommit={actions.gap}
             />

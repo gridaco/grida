@@ -385,10 +385,10 @@ export namespace iofigma {
               // TODO:
               layout: "flow",
               direction: "horizontal",
-              mainAxisAlignment: "start",
-              crossAxisAlignment: "start",
-              mainAxisGap: 0,
-              crossAxisGap: 0,
+              main_axis_alignment: "start",
+              cross_axis_alignment: "start",
+              main_axis_gap: 0,
+              cross_axis_gap: 0,
             } satisfies grida.program.nodes.ContainerNode;
           }
           //
@@ -480,10 +480,10 @@ export namespace iofigma {
               // TODO:
               layout: "flow",
               direction: "horizontal",
-              mainAxisAlignment: "start",
-              crossAxisAlignment: "start",
-              mainAxisGap: itemSpacing ?? 0,
-              crossAxisGap: counterAxisSpacing ?? itemSpacing ?? 0,
+              main_axis_alignment: "start",
+              cross_axis_alignment: "start",
+              main_axis_gap: itemSpacing ?? 0,
+              cross_axis_gap: counterAxisSpacing ?? itemSpacing ?? 0,
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -517,10 +517,10 @@ export namespace iofigma {
               padding: 0,
               layout: "flow",
               direction: "horizontal",
-              mainAxisAlignment: "start",
-              crossAxisAlignment: "start",
-              mainAxisGap: 0,
-              crossAxisGap: 0,
+              main_axis_alignment: "start",
+              cross_axis_alignment: "start",
+              main_axis_gap: 0,
+              cross_axis_gap: 0,
             } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }

@@ -1342,10 +1342,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           // Apply flex layout properties to the existing container
           container.layout = "flex";
           container.direction = lay.direction;
-          container.mainAxisGap = cmath.quantize(lay.spacing, 1);
-          container.crossAxisGap = cmath.quantize(lay.spacing, 1);
-          container.mainAxisAlignment = lay.mainAxisAlignment;
-          container.crossAxisAlignment = lay.crossAxisAlignment;
+          container.main_axis_gap = cmath.quantize(lay.spacing, 1);
+          container.cross_axis_gap = cmath.quantize(lay.spacing, 1);
+          container.main_axis_alignment = lay.mainAxisAlignment;
+          container.cross_axis_alignment = lay.crossAxisAlignment;
 
           // [reorder children according to guessed layout]
           const ordered = lay.orders.map((i) => children[i]);
@@ -1428,10 +1428,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               top: cmath.quantize(layout.union.y, 1),
               left: cmath.quantize(layout.union.x, 1),
               direction: layout.direction,
-              mainAxisGap: cmath.quantize(layout.spacing, 1),
-              crossAxisGap: cmath.quantize(layout.spacing, 1),
-              mainAxisAlignment: layout.mainAxisAlignment,
-              crossAxisAlignment: layout.crossAxisAlignment,
+              main_axis_gap: cmath.quantize(layout.spacing, 1),
+              cross_axis_gap: cmath.quantize(layout.spacing, 1),
+              main_axis_alignment: layout.mainAxisAlignment,
+              cross_axis_alignment: layout.crossAxisAlignment,
               padding: children.length === 1 ? 16 : 0,
               // children (empty when init)
               children: [],

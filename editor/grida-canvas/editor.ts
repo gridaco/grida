@@ -1267,11 +1267,11 @@ class EditorDocumentStore
             node_id: node_id,
             layout: "flow",
             direction: undefined,
-            mainAxisGap: undefined,
-            crossAxisGap: undefined,
-            mainAxisAlignment: undefined,
-            crossAxisAlignment: undefined,
-            layoutWrap: undefined,
+            main_axis_gap: undefined,
+            cross_axis_gap: undefined,
+            main_axis_alignment: undefined,
+            cross_axis_alignment: undefined,
+            layout_wrap: undefined,
           },
         ]);
 
@@ -2228,7 +2228,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      mainAxisAlignment,
+      main_axis_alignment: mainAxisAlignment,
     });
   }
 
@@ -2239,25 +2239,25 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      crossAxisAlignment,
+      cross_axis_alignment: crossAxisAlignment,
     });
   }
   changeFlexContainerNodeGap(
     node_id: string,
-    gap: number | { mainAxisGap: number; crossAxisGap: number }
+    gap: number | { main_axis_gap: number; cross_axis_gap: number }
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      mainAxisGap: typeof gap === "number" ? gap : gap.mainAxisGap,
-      crossAxisGap: typeof gap === "number" ? gap : gap.crossAxisGap,
+      main_axis_gap: typeof gap === "number" ? gap : gap.main_axis_gap,
+      cross_axis_gap: typeof gap === "number" ? gap : gap.cross_axis_gap,
     });
   }
   changeFlexContainerNodeWrap(node_id: string, layoutWrap: "wrap" | "nowrap") {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      layoutWrap,
+      layout_wrap: layoutWrap,
     });
   }
   //
