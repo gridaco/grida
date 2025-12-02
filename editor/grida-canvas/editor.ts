@@ -1756,12 +1756,12 @@ class EditorDocumentStore
 
   changeNodePropertyCornerSmoothing(
     node_id: editor.NodeID,
-    cornerSmoothing: number
+    corner_smoothing: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      cornerSmoothing,
+      corner_smoothing,
     });
   }
 

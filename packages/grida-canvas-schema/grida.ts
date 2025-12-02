@@ -1480,7 +1480,7 @@ export namespace grida.program.nodes {
       corner_radius_top_right?: number;
       corner_radius_bottom_left?: number;
       corner_radius_bottom_right?: number;
-      cornerSmoothing?: number;
+      corner_smoothing?: number;
     }
 
     /**
@@ -2073,7 +2073,7 @@ export namespace grida.program.nodes {
     readonly type: "text";
 
     max_lines?: number | null;
-    // textAutoResize: "none" | "width" | "height" | "auto";
+    // text_auto_resize: "none" | "width" | "height" | "auto";
   }
 
   export interface ComputedTextNode
@@ -2321,7 +2321,7 @@ export namespace grida.program.nodes {
      * @deprecated
      * @default "nonzero"
      */
-    fillRule?: cg.FillRule;
+    fill_rule?: cg.FillRule;
 
     vector_network: vn.VectorNetwork;
   }
@@ -2682,13 +2682,13 @@ export namespace grida.program.nodes {
 
         // Process children and populate links (not node properties)
         if (nodes.hasChildren(prototype)) {
-          const childIds: nodes.NodeID[] = [];
+          const child_ids: nodes.NodeID[] = [];
           for (const childPrototype of prototype.children) {
             const childNode = processNode(childPrototype, nid, depth + 1);
-            childIds.push(childNode.id);
+            child_ids.push(childNode.id);
           }
           // Populate document.links instead of node.children
-          document.links[node.id] = childIds;
+          document.links[node.id] = child_ids;
         }
 
         return node;
@@ -2706,7 +2706,7 @@ export namespace grida.program.nodes {
       const { scene, ...defs } = packed;
 
       // Create SceneNode from Scene
-      const sceneNode: nodes.SceneNode = {
+      const node: nodes.SceneNode = {
         type: "scene",
         id: scene.id,
         name: scene.name,
@@ -2721,7 +2721,7 @@ export namespace grida.program.nodes {
 
       // Add scene to nodes if not present
       if (!defs.nodes[scene.id]) {
-        defs.nodes[scene.id] = sceneNode;
+        defs.nodes[scene.id] = node;
       }
 
       // Add scene children to links if not present

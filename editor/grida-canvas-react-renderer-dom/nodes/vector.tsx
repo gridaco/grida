@@ -17,7 +17,7 @@ export function VectorWidget({
   stroke_cap,
   style,
   vector_network,
-  fillRule,
+  fill_rule,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
   const width = Math.max(_width, 1);
@@ -55,7 +55,7 @@ export function VectorWidget({
       <path
         d={d}
         fill={fillDef}
-        fillRule={fillRule}
+        fillRule={fill_rule}
         stroke={strokeDef}
         strokeWidth={stroke_width}
         strokeLinecap={stroke_cap}

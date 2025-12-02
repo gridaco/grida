@@ -127,16 +127,16 @@ export namespace iosvg {
      */
     export function fill(fill: svgtypes.SVGFillAttributes | null | undefined): {
       paint: cg.Paint | undefined;
-      fillRule: cg.FillRule;
+      fill_rule: cg.FillRule;
       opacity: number;
     } {
       if (!fill) {
-        return { paint: undefined, fillRule: "nonzero", opacity: 1.0 };
+        return { paint: undefined, fill_rule: "nonzero", opacity: 1.0 };
       }
 
       return {
         paint: map.paint(fill.paint, fill.fill_opacity),
-        fillRule: fill.fill_rule,
+        fill_rule: fill.fill_rule,
         opacity: fill.fill_opacity,
       };
     }
@@ -222,7 +222,7 @@ export namespace iosvg {
         const bbox = vn.getBBox(vectorNetwork);
         const {
           paint: fill,
-          fillRule,
+          fill_rule,
           opacity: fillOpacity,
         } = map.fill(fillAttr);
         const {
@@ -251,7 +251,7 @@ export namespace iosvg {
           height: bbox.height,
           left: position.left,
           top: position.top,
-          fillRule: fillRule,
+          fill_rule: fill_rule,
           opacity: fillOpacity,
         } satisfies grida.program.nodes.PathNodePrototype;
       }

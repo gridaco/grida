@@ -329,9 +329,9 @@ const safe_properties: Partial<
       (draft as UN).corner_radius_bottom_left = value;
     },
   }),
-  cornerSmoothing: defineNodeProperty<"cornerSmoothing">({
+  corner_smoothing: defineNodeProperty<"corner_smoothing">({
     apply: (draft, value, prev) => {
-      (draft as UN).cornerSmoothing = cmath.clamp(value, 0, 1);
+      (draft as UN).corner_smoothing = cmath.clamp(value, 0, 1);
     },
   }),
   point_count: defineNodeProperty<"point_count">({
