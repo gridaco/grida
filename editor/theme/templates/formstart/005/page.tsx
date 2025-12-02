@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   Carousel,
   CarouselContent,
@@ -22,7 +22,7 @@ import _messages from "./messages.json";
 import { Features } from "@/grida-forms-hosted/features/scheduling";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/components/lib/utils";
-import { DataProvider, useData } from "../../kit/contexts/data.context";
+import { useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
 import type grida from "@grida/schema";
@@ -297,7 +297,7 @@ _005.definition = {
       textAlignVertical: "top",
       textDecorationLine: "none",
       text: factory.createPropertyAccessExpression(["props", "title"]),
-      zIndex: 0,
+      z_index: 0,
     },
     "005.body": {
       id: "005.body",
@@ -312,7 +312,7 @@ _005.definition = {
       width: "auto",
       height: "auto",
       html: factory.createPropertyAccessExpression(["props", "body"]),
-      zIndex: 0,
+      z_index: 0,
     },
     // "005.media": {
     //   id: "005.media",

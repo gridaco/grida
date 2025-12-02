@@ -632,10 +632,10 @@ const safe_properties: Partial<
       }));
     },
   }),
-  zIndex: defineNodeProperty<"zIndex">({
-    assert: (node) => typeof node.zIndex === "number",
+  z_index: defineNodeProperty<"z_index">({
+    assert: (node) => typeof node.z_index === "number",
     apply: (draft, value, prev) => {
-      (draft as UN).zIndex = value;
+      (draft as UN).z_index = value;
     },
   }),
   fit: defineNodeProperty<"fit">({

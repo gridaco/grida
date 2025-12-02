@@ -1436,7 +1436,7 @@ export namespace grida.program.nodes {
        * @default 0
        * @type {number} integer
        */
-      zIndex: number;
+      z_index: number;
     }
 
     /**
@@ -2562,7 +2562,7 @@ export namespace grida.program.nodes {
             locked: false,
             opacity: 1,
             blend_mode: cg.def.LAYER_BLENDMODE,
-            zIndex: 0,
+            z_index: 0,
             rotation: 0,
             width: 0,
             height: 0,
@@ -2597,7 +2597,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
-            zIndex: 0,
+            z_index: 0,
             rotation: 0,
             ...prototypeWithoutChildren,
             id: id,
@@ -2623,7 +2623,7 @@ export namespace grida.program.nodes {
             active: true,
             locked: false,
             opacity: 1,
-            zIndex: 0,
+            z_index: 0,
             rotation: 0,
             width: 100,
             height: 100,
@@ -2782,7 +2782,7 @@ export namespace grida.program.nodes {
         locked: false,
         expanded: false,
         rotation: 0,
-        zIndex: 0,
+        z_index: 0,
         opacity: 1,
         blend_mode: cg.def.LAYER_BLENDMODE,
         position: "absolute",

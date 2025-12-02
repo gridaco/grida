@@ -84,7 +84,7 @@ export default function initialNode(
   const styles: grida.program.nodes.i.ICSSStylable = {
     opacity: 1,
     blend_mode: cg.def.LAYER_BLENDMODE,
-    zIndex: 0,
+    z_index: 0,
     rotation: 0,
     fill: constraints.fill === "fills" ? undefined : gray,
     fills: constraints.fill === "fills" ? [gray] : undefined,

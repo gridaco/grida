@@ -139,7 +139,7 @@ export function NodeElement<P extends Record<string, any>>({
     paths: node.paths,
     vectorNetwork: node.vectorNetwork,
     opacity: node.opacity,
-    zIndex: DEFAULT_ZINDEX ?? node.zIndex,
+    z_index: DEFAULT_ZINDEX ?? node.z_index,
     position: DEFAULT_POSITION ?? node.position,
     left: DEFAULT_LEFT ?? node.left,
     top: DEFAULT_TOP ?? node.top,
@@ -170,7 +170,7 @@ export function NodeElement<P extends Record<string, any>>({
 
   if (!node.active) return <></>;
 
-  const { opacity, zIndex, ...props } = renderprops;
+  const { opacity, z_index, ...props } = renderprops;
 
   return (
     <HrefWrapper href={computed.href} target={node.target}>

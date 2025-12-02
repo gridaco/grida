@@ -30,7 +30,7 @@ describe("clipboard", () => {
         text: "Text",
         type: "text",
         width: "auto",
-        zIndex: 0,
+        z_index: 0,
       },
     ],
   } satisfies io.clipboard.ClipboardPayload;

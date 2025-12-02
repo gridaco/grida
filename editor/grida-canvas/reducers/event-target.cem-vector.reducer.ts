@@ -372,7 +372,7 @@ export function create_new_vector_node(
     width: 0,
     height: 0,
     rotation: 0,
-    zIndex: 0,
+    z_index: 0,
     stroke: {
       type: "solid",
       color: kolor.colorformats.RGBA32F.BLACK,
@@ -701,7 +701,7 @@ export function on_draw_pointer_down(
     width: 0,
     height: 0,
     rotation: 0,
-    zIndex: 0,
+    z_index: 0,
     stroke: {
       type: "solid",
       color: kolor.colorformats.RGBA32F.BLACK,

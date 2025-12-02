@@ -352,7 +352,7 @@ export namespace iofigma {
               rotation: node.rotation ?? 0,
               opacity: 1,
               blend_mode: "pass-through",
-              zIndex: 0,
+              z_index: 0,
               type: "container",
               expanded: false,
               //
@@ -438,7 +438,7 @@ export namespace iofigma {
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
               blend_mode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              z_index: 0,
               type: "container",
               expanded: false,
               //
@@ -498,7 +498,7 @@ export namespace iofigma {
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
               blend_mode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              z_index: 0,
               type: "container",
               expanded: false,
               //
@@ -580,7 +580,7 @@ export namespace iofigma {
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
               blend_mode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              z_index: 0,
               type: "text",
               text: node.characters,
               position: "absolute",
@@ -672,7 +672,7 @@ export namespace iofigma {
                 rotation: node.rotation ?? 0,
                 opacity: node.opacity ?? 1,
                 blend_mode: map.layerBlendModeMap[node.blendMode],
-                zIndex: 0,
+                z_index: 0,
                 type: "image",
                 src: images[first_visible_fill.imageRef!],
                 position: "absolute",
@@ -705,7 +705,7 @@ export namespace iofigma {
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
               blend_mode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              z_index: 0,
               type: "rectangle",
               //
               position: "absolute",
@@ -749,7 +749,7 @@ export namespace iofigma {
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
               blend_mode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              z_index: 0,
               type: "ellipse",
               //
               position: "absolute",
@@ -800,7 +800,7 @@ export namespace iofigma {
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
               blend_mode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              z_index: 0,
               type: "line",
               position: "absolute",
               stroke: first_visible_stroke
@@ -876,7 +876,7 @@ export namespace iofigma {
               rotation: node.rotation ?? 0,
               opacity: node.opacity ?? 1,
               blend_mode: map.layerBlendModeMap[node.blendMode],
-              zIndex: 0,
+              z_index: 0,
               type: "svgpath",
               //
               position: "absolute",

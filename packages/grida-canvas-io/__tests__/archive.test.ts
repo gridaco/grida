@@ -120,7 +120,7 @@ describe("archive comprehensive", () => {
           position: "absolute",
           opacity: 1,
           rotation: 0,
-          zIndex: 0,
+          z_index: 0,
           strokeWidth: 0,
           strokeCap: "butt",
           strokeJoin: "miter",
