@@ -147,8 +147,8 @@ export function NodeElement<P extends Record<string, any>>({
     height: DEFAULT_HEIGHT ?? node.height,
     fillRule: node.fillRule,
     stroke: node.stroke,
-    strokeWidth: node.strokeWidth,
-    strokeCap: node.strokeCap,
+    stroke_width: node.stroke_width,
+    stroke_cap: node.stroke_cap,
     cursor: node.cursor,
     style: {
       ...style,

@@ -288,8 +288,8 @@ function ModeMixedNodeProperties({
     corner_radius_bottom_left,
     fill,
     stroke,
-    strokeWidth,
-    strokeCap,
+    stroke_width,
+    stroke_cap,
     width,
     height,
     fit,
@@ -772,8 +772,8 @@ function ModeMixedNodeProperties({
                   onValueChange={change.stroke}
                   onValueAdd={(value) => {
                     change.stroke(value);
-                    if (!strokeWidth?.value || strokeWidth?.value === 0) {
-                      change.strokeWidth({ type: "set", value: 1 });
+                    if (!stroke_width?.value || stroke_width?.value === 0) {
+                      change.stroke_width({ type: "set", value: 1 });
                     }
                   }}
                 />
@@ -783,8 +783,8 @@ function ModeMixedNodeProperties({
                   onValueChange={change.stroke}
                   onValueAdd={(value) => {
                     change.stroke(value);
-                    if (!strokeWidth?.value || strokeWidth?.value === 0) {
-                      change.strokeWidth({ type: "set", value: 1 });
+                    if (!stroke_width?.value || stroke_width?.value === 0) {
+                      change.stroke_width({ type: "set", value: 1 });
                     }
                   }}
                 />
@@ -793,15 +793,15 @@ function ModeMixedNodeProperties({
             <PropertyLine hidden={!stroke?.value}>
               <PropertyLineLabel>Width</PropertyLineLabel>
               <StrokeWidthControl
-                value={strokeWidth?.value}
-                onValueCommit={change.strokeWidth}
+                value={stroke_width?.value}
+                onValueCommit={change.stroke_width}
               />
             </PropertyLine>
             <PropertyLine hidden={!supports_stroke_cap}>
               <PropertyLineLabel>Cap</PropertyLineLabel>
               <StrokeCapControl
-                value={strokeCap?.value}
-                onValueChange={change.strokeCap}
+                value={stroke_cap?.value}
+                onValueChange={change.stroke_cap}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>

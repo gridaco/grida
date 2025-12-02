@@ -38,8 +38,8 @@ export namespace prototypes {
           color: kolor.colorformats.RGBA32F.BLACK,
           active: true,
         },
-        strokeWidth: 0,
-        strokeCap: "butt",
+        stroke_width: 0,
+        stroke_cap: "butt",
       },
       {
         type: "rectangle",
@@ -56,8 +56,8 @@ export namespace prototypes {
           color: kolor.colorformats.RGBA32F.BLACK,
           active: true,
         },
-        strokeWidth: 0,
-        strokeCap: "butt",
+        stroke_width: 0,
+        stroke_cap: "butt",
       },
       {
         type: "rectangle",
@@ -74,8 +74,8 @@ export namespace prototypes {
           color: kolor.colorformats.RGBA32F.BLACK,
           active: true,
         },
-        strokeWidth: 0,
-        strokeCap: "butt",
+        stroke_width: 0,
+        stroke_cap: "butt",
       },
     ],
   } satisfies grida.program.nodes.NodePrototype;

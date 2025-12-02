@@ -378,9 +378,9 @@ export function create_new_vector_node(
       color: kolor.colorformats.RGBA32F.BLACK,
       active: true,
     },
-    strokeWidth: 1,
-    strokeCap: "butt",
-    strokeJoin: "miter",
+    stroke_width: 1,
+    stroke_cap: "butt",
+    stroke_join: "miter",
     vectorNetwork: {
       vertices: [cmath.vector2.zero],
       segments: [],
@@ -707,7 +707,7 @@ export function on_draw_pointer_down(
       color: kolor.colorformats.RGBA32F.BLACK,
       active: true,
     },
-    strokeCap: "butt",
+    stroke_cap: "butt",
   } as const;
 
   switch (tool) {
@@ -716,8 +716,8 @@ export function on_draw_pointer_down(
         ...__base,
         type: "vector",
         name: "vector",
-        strokeWidth: 3,
-        strokeJoin: "miter",
+        stroke_width: 3,
+        stroke_join: "miter",
         vectorNetwork: vn.polyline([cmath.vector2.zero]),
       } satisfies grida.program.nodes.VectorNode;
       break;
@@ -733,8 +733,8 @@ export function on_draw_pointer_down(
         ...__base,
         type: "vector",
         name: "line",
-        strokeWidth: 1,
-        strokeJoin: "miter",
+        stroke_width: 1,
+        stroke_join: "miter",
         vectorNetwork: vn.polyline([cmath.vector2.zero]),
       } satisfies grida.program.nodes.VectorNode;
       break;

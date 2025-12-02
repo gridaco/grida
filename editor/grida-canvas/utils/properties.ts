@@ -76,8 +76,8 @@ function strokeWidth(...nodes: grida.program.nodes.Node[]): number | undefined {
   const values: number[] = [];
 
   for (const node of nodes) {
-    if ("strokeWidth" in node && node.strokeWidth !== undefined) {
-      values.push(node.strokeWidth);
+    if ("stroke_width" in node && node.stroke_width !== undefined) {
+      values.push(node.stroke_width);
     }
   }
 

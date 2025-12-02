@@ -10,7 +10,7 @@ export function EllipseWidget({
   height,
   fill,
   stroke,
-  strokeWidth,
+  stroke_width,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.EllipseNode>) {
   const { defs: fillDefs, ref: fillDef } = fill
@@ -47,7 +47,7 @@ export function EllipseWidget({
         rx={width / 2}
         ry={height / 2}
         fill={fillDef}
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke_width}
         stroke={strokeDef}
       />
     </svg>

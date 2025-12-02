@@ -8,7 +8,7 @@ export function RectangleWidget({
   height,
   fill,
   stroke,
-  strokeWidth,
+  stroke_width,
   corner_radius_top_left,
   corner_radius_top_right,
   corner_radius_bottom_left,
@@ -55,7 +55,7 @@ export function RectangleWidget({
           width={width}
           height={height}
           fill={fillDef}
-          strokeWidth={strokeWidth}
+          strokeWidth={stroke_width}
           stroke={strokeDef}
         />
       ) : (
@@ -67,7 +67,7 @@ export function RectangleWidget({
             corner_radius_bottom_left ?? 0,
           ])}
           fill={fillDef}
-          strokeWidth={strokeWidth}
+          strokeWidth={stroke_width}
           stroke={strokeDef}
         />
       )}

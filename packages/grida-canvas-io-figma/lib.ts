@@ -606,7 +606,7 @@ export namespace iofigma {
                 ? paint(first_visible_stroke)
                 : undefined,
               strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              strokeWidth: strokeWeight ?? 0,
+              stroke_width: strokeWeight ?? 0,
               border:
                 first_visible_stroke?.type === "SOLID"
                   ? {
@@ -715,11 +715,11 @@ export namespace iofigma {
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokeWidth: strokeWeight ?? 0,
-              strokeCap: strokeCap
+              stroke_width: strokeWeight ?? 0,
+              stroke_cap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              strokeJoin: strokeJoin
+              stroke_join: strokeJoin
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
               corner_radius: node.cornerRadius ?? 0,
@@ -759,11 +759,11 @@ export namespace iofigma {
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokeWidth: strokeWeight ?? 0,
-              strokeCap: strokeCap
+              stroke_width: strokeWeight ?? 0,
+              stroke_cap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              strokeJoin: strokeJoin
+              stroke_join: strokeJoin
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
               // arc data
@@ -807,14 +807,14 @@ export namespace iofigma {
                 ? paint(first_visible_stroke)
                 : undefined,
               strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              strokeWidth: strokeWeight ?? 0,
-              strokeAlign: strokeAlign
+              stroke_width: strokeWeight ?? 0,
+              stroke_align: strokeAlign
                 ? (map.strokeAlignMap[strokeAlign] ?? "inside")
                 : "inside",
-              strokeCap: strokeCap
+              stroke_cap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
-              strokeJoin: strokeJoin
+              stroke_join: strokeJoin
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
               left: node.relativeTransform![0][2],

@@ -13,8 +13,8 @@ export function VectorWidget({
   height: _height,
   fill,
   stroke,
-  strokeWidth,
-  strokeCap,
+  stroke_width,
+  stroke_cap,
   style,
   vectorNetwork,
   fillRule,
@@ -57,8 +57,8 @@ export function VectorWidget({
         fill={fillDef}
         fillRule={fillRule}
         stroke={strokeDef}
-        strokeWidth={strokeWidth}
-        strokeLinecap={strokeCap}
+        strokeWidth={stroke_width}
+        strokeLinecap={stroke_cap}
       />
     </svg>
   );

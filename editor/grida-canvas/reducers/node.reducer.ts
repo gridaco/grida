@@ -403,7 +403,7 @@ const safe_properties: Partial<
       writePaints(target, "stroke", paints);
     },
   }),
-  strokeWidth: defineNodeProperty<"strokeWidth">({
+  stroke_width: defineNodeProperty<"stroke_width">({
     assert: (node) =>
       node.type === "vector" ||
       node.type === "line" ||
@@ -411,54 +411,54 @@ const safe_properties: Partial<
       node.type === "ellipse" ||
       node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeWidth = ranged(
+      (draft as UN).stroke_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeTopWidth: defineNodeProperty<"strokeTopWidth">({
+  stroke_top_width: defineNodeProperty<"stroke_top_width">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeTopWidth = ranged(
+      (draft as UN).stroke_top_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeRightWidth: defineNodeProperty<"strokeRightWidth">({
+  stroke_right_width: defineNodeProperty<"stroke_right_width">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeRightWidth = ranged(
+      (draft as UN).stroke_right_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeBottomWidth: defineNodeProperty<"strokeBottomWidth">({
+  stroke_bottom_width: defineNodeProperty<"stroke_bottom_width">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeBottomWidth = ranged(
+      (draft as UN).stroke_bottom_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeLeftWidth: defineNodeProperty<"strokeLeftWidth">({
+  stroke_left_width: defineNodeProperty<"stroke_left_width">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeLeftWidth = ranged(
+      (draft as UN).stroke_left_width = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  strokeAlign: defineNodeProperty<"strokeAlign">({
+  stroke_align: defineNodeProperty<"stroke_align">({
     assert: (node) =>
       node.type === "vector" ||
       node.type === "line" ||
@@ -466,25 +466,25 @@ const safe_properties: Partial<
       node.type === "ellipse" ||
       node.type === "text",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeAlign = value;
+      (draft as UN).stroke_align = value;
     },
   }),
-  strokeCap: defineNodeProperty<"strokeCap">({
+  stroke_cap: defineNodeProperty<"stroke_cap">({
     apply: (draft, value, prev) => {
-      (draft as UN).strokeCap = value;
+      (draft as UN).stroke_cap = value;
     },
   }),
-  strokeJoin: defineNodeProperty<"strokeJoin">({
+  stroke_join: defineNodeProperty<"stroke_join">({
     apply: (draft, value, prev) => {
-      (draft as UN).strokeJoin = value;
+      (draft as UN).stroke_join = value;
     },
   }),
-  strokeMiterLimit: defineNodeProperty<"strokeMiterLimit">({
+  stroke_miter_limit: defineNodeProperty<"stroke_miter_limit">({
     apply: (draft, value, prev) => {
-      (draft as UN).strokeMiterLimit = value;
+      (draft as UN).stroke_miter_limit = value;
     },
   }),
-  strokeDashArray: defineNodeProperty<"strokeDashArray">({
+  stroke_dash_array: defineNodeProperty<"stroke_dash_array">({
     assert: (node) =>
       node.type === "vector" ||
       node.type === "line" ||
@@ -497,7 +497,7 @@ const safe_properties: Partial<
       node.type === "container" ||
       node.type === "boolean",
     apply: (draft, value, prev) => {
-      (draft as UN).strokeDashArray = value;
+      (draft as UN).stroke_dash_array = value;
     },
   }),
   feShadows: defineNodeProperty<"feShadows">({

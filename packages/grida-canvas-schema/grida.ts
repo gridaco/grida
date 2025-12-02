@@ -1630,17 +1630,17 @@ export namespace grida.program.nodes {
       /**
        * stroke width - 0 or greater
        */
-      strokeWidth: number;
+      stroke_width: number;
 
       /**
        * variable width stroke width profile
        */
-      strokeWidthProfile?: cg.VariableWidthProfile;
+      stroke_width_profile?: cg.VariableWidthProfile;
 
       /**
        * stroke alignment - takes effect when stroke is set
        */
-      strokeAlign?: cg.StrokeAlign;
+      stroke_align?: cg.StrokeAlign;
 
       /**
        * stroke dash pattern - array of dash and gap lengths
@@ -1653,23 +1653,23 @@ export namespace grida.program.nodes {
        * @example [10, 5, 2, 5] - 10px dash, 5px gap, 2px dot, 5px gap
        * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray
        */
-      strokeDashArray?: number[];
+      stroke_dash_array?: number[];
 
       /**
        * @default "butt"
        */
-      strokeCap: cg.StrokeCap;
+      stroke_cap: cg.StrokeCap;
 
       /**
        * @default "miter"
        */
-      strokeJoin: cg.StrokeJoin;
+      stroke_join: cg.StrokeJoin;
 
       /**
        * stroke miter limit - 0 or greater
        * @default 4
        */
-      strokeMiterLimit?: number;
+      stroke_miter_limit?: number;
     }
 
     /**
@@ -1679,19 +1679,19 @@ export namespace grida.program.nodes {
       /**
        * sets or overrides the top stroke width
        */
-      strokeTopWidth?: number;
+      stroke_top_width?: number;
       /**
        * sets or overrides the right stroke width
        */
-      strokeRightWidth?: number;
+      stroke_right_width?: number;
       /**
        * sets or overrides the bottom stroke width
        */
-      strokeBottomWidth?: number;
+      stroke_bottom_width?: number;
       /**
        * sets or overrides the left stroke width
        */
-      strokeLeftWidth?: number;
+      stroke_left_width?: number;
     }
 
     /**
@@ -1703,11 +1703,11 @@ export namespace grida.program.nodes {
       /**
        * stroke width - 0 or greater
        */
-      strokeWidth?: number;
+      stroke_width?: number;
       /**
        * stroke alignment - takes effect when stroke is set
        */
-      strokeAlign?: cg.StrokeAlign;
+      stroke_align?: cg.StrokeAlign;
     }
 
     export interface ICSSBorder {
@@ -2574,9 +2574,9 @@ export namespace grida.program.nodes {
             corner_radius_top_right: 0,
             corner_radius_bottom_left: 0,
             corner_radius_bottom_right: 0,
-            strokeWidth: 0,
-            strokeCap: "butt",
-            strokeJoin: "miter",
+            stroke_width: 0,
+            stroke_cap: "butt",
+            stroke_join: "miter",
             ...prototype,
             id: id,
           } satisfies RectangleNode;

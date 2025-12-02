@@ -10,7 +10,7 @@ export function RegularPolygonWidget({
   pointCount,
   fill,
   stroke,
-  strokeWidth,
+  stroke_width,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RegularPolygonNode>) {
@@ -47,7 +47,7 @@ export function RegularPolygonWidget({
         points={points}
         fill={fillDef}
         stroke={strokeDef}
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke_width}
       />
     </svg>
   );

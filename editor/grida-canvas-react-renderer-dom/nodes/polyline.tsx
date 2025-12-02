@@ -32,8 +32,8 @@ export function SVGPolyLineWidget({
   height: _height,
   fill,
   stroke,
-  strokeWidth,
-  strokeCap,
+  stroke_width,
+  stroke_cap,
   style,
   points,
   ...props
@@ -74,8 +74,8 @@ grida.program.document.IComputedNodeReactRenderProps<PolylineNode>) {
         points={points.map(([x, y]) => `${x},${y}`).join(" ")}
         fill={fillDef}
         stroke={strokeDef}
-        strokeWidth={strokeWidth}
-        strokeLinecap={strokeCap}
+        strokeWidth={stroke_width}
+        strokeLinecap={stroke_cap}
       />
     </svg>
   );

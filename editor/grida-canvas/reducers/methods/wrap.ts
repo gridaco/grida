@@ -318,7 +318,7 @@ export function self_wrapNodesAsBooleanOperation<
       cornerRadius: modeProperties.cornerRadius(...nodes),
       fill: modeProperties.fill(...nodes),
       stroke: modeProperties.stroke(...nodes),
-      strokeWidth: modeProperties.strokeWidth(...nodes),
+      stroke_width: modeProperties.strokeWidth(...nodes),
     } as grida.program.nodes.BooleanPathOperationNodePrototype;
 
     const wrapperId = self_insertSubDocument(

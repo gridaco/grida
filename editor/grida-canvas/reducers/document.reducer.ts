@@ -509,9 +509,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             rotation: 0,
             z_index: 0,
             stroke: { type: "solid", color: black, active: true },
-            strokeCap: "butt",
-            strokeJoin: "miter",
-            strokeWidth: 1,
+            stroke_cap: "butt",
+            stroke_join: "miter",
+            stroke_width: 1,
             vectorNetwork: net,
           };
 
@@ -1898,7 +1898,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           // Also update the node's strokeWidthProfile property
           if (node.type === "vector") {
-            node.strokeWidthProfile = profile;
+            node.stroke_width_profile = profile;
           }
         }
       });
@@ -1928,7 +1928,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           // Also update the node's strokeWidthProfile property
           if (node.type === "vector") {
-            node.strokeWidthProfile = profile;
+            node.stroke_width_profile = profile;
           }
         }
       });

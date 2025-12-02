@@ -11,7 +11,7 @@ export function RegularStarPolygonWidget({
   innerRadius,
   fill,
   stroke,
-  strokeWidth,
+  stroke_width,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RegularStarPolygonNode>) {
@@ -49,7 +49,7 @@ export function RegularStarPolygonWidget({
         points={points}
         fill={fillDef}
         stroke={strokeDef}
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke_width}
       />
     </svg>
   );

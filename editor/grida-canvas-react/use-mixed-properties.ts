@@ -265,20 +265,20 @@ export function useMixedProperties(ids: string[]) {
 
   const strokeWidth = useCallback(
     (change: editor.api.NumberChange) => {
-      mixedProperties.strokeWidth?.ids.forEach((id) => {
+      mixedProperties.stroke_width?.ids.forEach((id) => {
         instance.commands.changeNodePropertyStrokeWidth(id, change);
       });
     },
-    [mixedProperties.strokeWidth?.ids, instance.commands]
+    [mixedProperties.stroke_width?.ids, instance.commands]
   );
 
   const strokeCap = useCallback(
     (value: cg.StrokeCap) => {
-      mixedProperties.strokeCap?.ids.forEach((id) => {
+      mixedProperties.stroke_cap?.ids.forEach((id) => {
         instance.commands.changeNodePropertyStrokeCap(id, value);
       });
     },
-    [mixedProperties.strokeCap?.ids, instance.commands]
+    [mixedProperties.stroke_cap?.ids, instance.commands]
   );
 
   const layout = useCallback(
@@ -362,8 +362,8 @@ export function useMixedProperties(ids: string[]) {
       fit,
       fill,
       stroke,
-      strokeWidth,
-      strokeCap,
+      stroke_width: strokeWidth,
+      stroke_cap: strokeCap,
       layout,
       direction,
       mainAxisAlignment,

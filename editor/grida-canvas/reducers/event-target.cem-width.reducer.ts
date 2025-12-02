@@ -226,7 +226,7 @@ export function on_drag_gesture_translate_variable_width_stop(
     };
 
     // Also update the node's strokeWidthProfile property
-    node.strokeWidthProfile = content_edit_mode.variable_width_profile;
+    node.stroke_width_profile = content_edit_mode.variable_width_profile;
   }
 }
 
@@ -280,5 +280,5 @@ export function on_drag_resize_variable_width_stop(
     draft,
     draft.gesture.node_id
   ) as grida.program.nodes.VectorNode;
-  node.strokeWidthProfile = content_edit_mode.variable_width_profile;
+  node.stroke_width_profile = content_edit_mode.variable_width_profile;
 }

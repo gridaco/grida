@@ -1609,14 +1609,14 @@ class EditorDocumentStore
     try {
       const value = resolveNumberChangeValue(
         this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
-        "strokeWidth",
+        "stroke_width",
         strokeWidth
       );
 
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        strokeWidth: value,
+        stroke_width: value,
       });
     } catch (e) {
       reportError(e);
@@ -1626,53 +1626,53 @@ class EditorDocumentStore
 
   changeNodePropertyStrokeTopWidth(
     node_id: editor.NodeID,
-    strokeTopWidth: number
+    stroke_top_width: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeTopWidth,
+      stroke_top_width,
     });
   }
 
   changeNodePropertyStrokeRightWidth(
     node_id: editor.NodeID,
-    strokeRightWidth: number
+    stroke_right_width: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeRightWidth,
+      stroke_right_width,
     });
   }
 
   changeNodePropertyStrokeBottomWidth(
     node_id: editor.NodeID,
-    strokeBottomWidth: number
+    stroke_bottom_width: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeBottomWidth,
+      stroke_bottom_width,
     });
   }
 
   changeNodePropertyStrokeLeftWidth(
     node_id: editor.NodeID,
-    strokeLeftWidth: number
+    stroke_left_width: number
   ): void {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeLeftWidth,
+      stroke_left_width,
     });
   }
 
-  changeNodePropertyStrokeAlign(node_id: string, strokeAlign: cg.StrokeAlign) {
+  changeNodePropertyStrokeAlign(node_id: string, stroke_align: cg.StrokeAlign) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeAlign,
+      stroke_align,
     });
   }
 
@@ -1680,7 +1680,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeCap,
+      stroke_cap: strokeCap,
     });
   }
 
@@ -1688,7 +1688,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeJoin,
+      stroke_join: strokeJoin,
     });
   }
 
@@ -1699,7 +1699,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeMiterLimit,
+      stroke_miter_limit: strokeMiterLimit,
     });
   }
 
@@ -1710,7 +1710,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      strokeDashArray,
+      stroke_dash_array: strokeDashArray,
     });
   }
 
