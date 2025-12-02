@@ -1838,7 +1838,7 @@ function SelectionColors() {
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
         {displayedPaints.map(({ value, ids }, index) => (
-          <PropertyLine key={index}>
+          <PropertyLine key={index} className="group/color-item">
             <PaintControl
               value={value}
               onValueChange={(value) => {
@@ -1850,7 +1850,7 @@ function SelectionColors() {
               <Button
                 variant="ghost"
                 size="xs"
-                className="opacity-0 group-hover:opacity-100"
+                className="opacity-0 group-hover/color-item:opacity-100"
                 onClick={() => {
                   editor.commands.select(ids);
                 }}

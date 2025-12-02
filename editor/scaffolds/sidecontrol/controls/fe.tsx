@@ -1,13 +1,5 @@
 import cg from "@grida/cg";
 import kolor from "@grida/color";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { WorkbenchUI } from "@/components/workbench";
 import * as tw from "./k/tailwindcss";
 import {
   Popover,
@@ -469,7 +461,8 @@ function FeShadowProperties({
       </PropertyLine>
       <PropertyLine>
         <PropertyLineLabel>Preset</PropertyLineLabel>
-        <Select
+        <PropertyEnum
+          placeholder="Preset"
           value={undefined}
           onValueChange={(key) => {
             const preset = tw.boxshadow[key as keyof typeof tw.boxshadow];
@@ -483,21 +476,14 @@ function FeShadowProperties({
               inset: false,
             });
           }}
-        >
-          <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
-            <SelectValue placeholder="Preset" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.keys(tw.boxshadow).map((key) => {
-              const shadow = tw.boxshadow[key as keyof typeof tw.boxshadow];
-              return (
-                <SelectItem key={key} value={shadow.class}>
-                  {shadow.label}
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+          enum={Object.keys(tw.boxshadow).map((key) => {
+            const shadow = tw.boxshadow[key as keyof typeof tw.boxshadow];
+            return {
+              label: shadow.label,
+              value: shadow.class,
+            };
+          })}
+        />
       </PropertyLine>
       <PropertyLine>
         <PropertyLineLabel>Offset X</PropertyLineLabel>
