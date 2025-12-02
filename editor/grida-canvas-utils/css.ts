@@ -87,7 +87,7 @@ export namespace css {
       //
       padding,
       //
-      feShadows,
+      fe_shadows,
       //
       layout,
       direction,
@@ -104,7 +104,7 @@ export namespace css {
     } = styles;
 
     // box-shadow - fallbacks from feDropShadow, first item.
-    const _fb_first_boxShadow = feShadows?.[0];
+    const _fb_first_boxShadow = fe_shadows?.[0];
 
     let result: React.CSSProperties = {
       //

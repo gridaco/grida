@@ -500,9 +500,9 @@ const safe_properties: Partial<
       (draft as UN).stroke_dash_array = value;
     },
   }),
-  feShadows: defineNodeProperty<"feShadows">({
+  fe_shadows: defineNodeProperty<"fe_shadows">({
     apply: (draft, value, prev) => {
-      (draft as UN).feShadows = value?.map((s) => ({
+      (draft as UN).fe_shadows = value?.map((s) => ({
         ...s,
         active: s.active ?? true,
         dx: ranged(
@@ -524,10 +524,10 @@ const safe_properties: Partial<
       }));
     },
   }),
-  feBlur: defineNodeProperty<"feBlur">({
+  fe_blur: defineNodeProperty<"fe_blur">({
     apply: (draft, value, prev) => {
       if (value) {
-        (draft as UN).feBlur = {
+        (draft as UN).fe_blur = {
           ...value,
           blur: {
             ...value.blur,
@@ -555,14 +555,14 @@ const safe_properties: Partial<
           active: value.active ?? true,
         };
       } else {
-        (draft as UN).feBlur = undefined;
+        (draft as UN).fe_blur = undefined;
       }
     },
   }),
-  feBackdropBlur: defineNodeProperty<"feBackdropBlur">({
+  fe_backdrop_blur: defineNodeProperty<"fe_backdrop_blur">({
     apply: (draft, value, prev) => {
       if (value) {
-        (draft as UN).feBackdropBlur = {
+        (draft as UN).fe_backdrop_blur = {
           ...value,
           blur: {
             ...value.blur,
@@ -590,11 +590,11 @@ const safe_properties: Partial<
           active: value.active ?? true,
         };
       } else {
-        (draft as UN).feBackdropBlur = undefined;
+        (draft as UN).fe_backdrop_blur = undefined;
       }
     },
   }),
-  feLiquidGlass: defineNodeProperty<"feLiquidGlass">({
+  fe_liquid_glass: defineNodeProperty<"fe_liquid_glass">({
     apply: (draft, value, prev) => {
       if (value) {
         value = {
@@ -618,12 +618,12 @@ const safe_properties: Partial<
           ),
         } satisfies cg.FeLiquidGlass;
       }
-      (draft as UN).feLiquidGlass = value;
+      (draft as UN).fe_liquid_glass = value;
     },
   }),
-  feNoises: defineNodeProperty<"feNoises">({
+  fe_noises: defineNodeProperty<"fe_noises">({
     apply: (draft, value, prev) => {
-      (draft as UN).feNoises = value?.map((n) => ({
+      (draft as UN).fe_noises = value?.map((n) => ({
         ...n,
         active: n.active ?? true,
         noiseSize: Math.max(0.001, n.noiseSize),

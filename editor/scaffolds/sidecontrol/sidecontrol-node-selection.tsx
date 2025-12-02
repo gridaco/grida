@@ -1726,11 +1726,11 @@ function SectionEffects({ node_id }: { node_id: string }) {
   const { type, feShadows, feBlur, feBackdropBlur, feLiquidGlass, feNoises } =
     useNodeState(node_id, (node) => ({
       type: node.type,
-      feShadows: node.feShadows,
-      feBlur: node.feBlur,
-      feBackdropBlur: node.feBackdropBlur,
-      feLiquidGlass: node.feLiquidGlass,
-      feNoises: node.feNoises,
+    feShadows: node.fe_shadows,
+    feBlur: node.fe_blur,
+    feBackdropBlur: node.fe_backdrop_blur,
+    feLiquidGlass: node.fe_liquid_glass,
+    feNoises: node.fe_noises,
     }));
 
   const effects = useMemo(() => {

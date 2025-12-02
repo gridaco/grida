@@ -2153,11 +2153,11 @@ class EditorDocumentStore
     );
 
     const i: grida.program.nodes.i.IEffects = {
-      feBackdropBlur: feBackdropBlur,
-      feBlur: feBlur,
-      feShadows: feShadows,
-      feLiquidGlass: feLiquidGlass,
-      feNoises: feNoises,
+      fe_backdrop_blur: feBackdropBlur,
+      fe_blur: feBlur,
+      fe_shadows: feShadows,
+      fe_liquid_glass: feLiquidGlass,
+      fe_noises: feNoises,
     };
 
     this.dispatch({
@@ -2171,7 +2171,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      feShadows: effects,
+      fe_shadows: effects,
     });
   }
 
@@ -2179,7 +2179,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      feBlur: effect,
+      fe_blur: effect,
     });
   }
 
@@ -2190,7 +2190,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      feBackdropBlur: effect,
+      fe_backdrop_blur: effect,
     });
   }
 
@@ -2198,7 +2198,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      feNoises: effects,
+      fe_noises: effects,
     });
   }
 
