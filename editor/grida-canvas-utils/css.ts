@@ -57,7 +57,7 @@ export namespace css {
       Partial<grida.program.nodes.i.IPadding> &
       Partial<grida.program.nodes.i.IEffects> &
       Partial<grida.program.nodes.i.IFlexContainer> &
-      Partial<{ maxLines?: number | null }>,
+      Partial<Pick<grida.program.nodes.TextNode, "max_lines">>,
     config: {
       hasTextStyle: boolean;
       fill: "color" | "background" | "fill" | "none";
@@ -96,7 +96,7 @@ export namespace css {
       main_axis_gap,
       cross_axis_gap,
       //
-      maxLines,
+      max_lines,
       //
       cursor,
       //
@@ -228,9 +228,9 @@ export namespace css {
       };
     }
 
-    if (config.hasTextStyle && maxLines && maxLines > 0) {
+    if (config.hasTextStyle && max_lines && max_lines > 0) {
       result.display = "-webkit-box";
-      (result as any).WebkitLineClamp = maxLines;
+      (result as any).WebkitLineClamp = max_lines;
       (result as any).WebkitBoxOrient = "vertical";
       result.overflow = "hidden";
     }
