@@ -1490,10 +1490,10 @@ export namespace grida.program.nodes {
       padding:
         | number
         | {
-            paddingTop: number;
-            paddingRight: number;
-            paddingBottom: number;
-            paddingLeft: number;
+            padding_top: number;
+            padding_right: number;
+            padding_bottom: number;
+            padding_left: number;
           };
     }
 

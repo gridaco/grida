@@ -943,10 +943,10 @@ function SingleSelectionOverlay({
                               left: padding,
                             }
                           : {
-                              top: padding.paddingTop,
-                              right: padding.paddingRight,
-                              bottom: padding.paddingBottom,
-                              left: padding.paddingLeft,
+                              top: padding.padding_top,
+                              right: padding.padding_right,
+                              bottom: padding.padding_bottom,
+                              left: padding.padding_left,
                             }
                       }
                       onPaddingGestureStart={(side) => {

@@ -834,16 +834,16 @@ function __self_start_gesture(
         // Padding is an object with per-side values
         switch (side) {
           case "top":
-            currentValue = currentPadding.paddingTop ?? 0;
+            currentValue = currentPadding.padding_top ?? 0;
             break;
           case "right":
-            currentValue = currentPadding.paddingRight ?? 0;
+            currentValue = currentPadding.padding_right ?? 0;
             break;
           case "bottom":
-            currentValue = currentPadding.paddingBottom ?? 0;
+            currentValue = currentPadding.padding_bottom ?? 0;
             break;
           case "left":
-            currentValue = currentPadding.paddingLeft ?? 0;
+            currentValue = currentPadding.padding_left ?? 0;
             break;
         }
       }

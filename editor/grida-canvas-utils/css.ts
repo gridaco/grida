@@ -435,7 +435,7 @@ export namespace css {
     if (typeof padding === "number") {
       return `${padding}px`;
     } else {
-      return `${padding.paddingTop}px ${padding.paddingRight}px ${padding.paddingBottom}px ${padding.paddingLeft}px`;
+      return `${padding.padding_top}px ${padding.padding_right}px ${padding.padding_bottom}px ${padding.padding_left}px`;
     }
   }
 

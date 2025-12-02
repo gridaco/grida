@@ -777,18 +777,18 @@ function __self_evt_on_drag(
           if (typeof currentPadding === "number") {
             // Convert uniform padding to individual sides
             newPadding = {
-              paddingTop: currentPadding,
-              paddingRight: currentPadding,
-              paddingBottom: currentPadding,
-              paddingLeft: currentPadding,
+              padding_top: currentPadding,
+              padding_right: currentPadding,
+              padding_bottom: currentPadding,
+              padding_left: currentPadding,
             };
           } else {
             // Use existing individual padding values
             newPadding = {
-              paddingTop: currentPadding.paddingTop,
-              paddingRight: currentPadding.paddingRight,
-              paddingBottom: currentPadding.paddingBottom,
-              paddingLeft: currentPadding.paddingLeft,
+              padding_top: currentPadding.padding_top,
+              padding_right: currentPadding.padding_right,
+              padding_bottom: currentPadding.padding_bottom,
+              padding_left: currentPadding.padding_left,
             };
           }
 
@@ -798,27 +798,27 @@ function __self_evt_on_drag(
           // Update the specific side
           switch (side) {
             case "top":
-              newPadding.paddingTop = padding;
+              newPadding.padding_top = padding;
               if (mirroringEnabled) {
-                newPadding.paddingBottom = padding;
+                newPadding.padding_bottom = padding;
               }
               break;
             case "right":
-              newPadding.paddingRight = padding;
+              newPadding.padding_right = padding;
               if (mirroringEnabled) {
-                newPadding.paddingLeft = padding;
+                newPadding.padding_left = padding;
               }
               break;
             case "bottom":
-              newPadding.paddingBottom = padding;
+              newPadding.padding_bottom = padding;
               if (mirroringEnabled) {
-                newPadding.paddingTop = padding;
+                newPadding.padding_top = padding;
               }
               break;
             case "left":
-              newPadding.paddingLeft = padding;
+              newPadding.padding_left = padding;
               if (mirroringEnabled) {
-                newPadding.paddingRight = padding;
+                newPadding.padding_right = padding;
               }
               break;
           }
