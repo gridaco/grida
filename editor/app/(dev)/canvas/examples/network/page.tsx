@@ -16,7 +16,7 @@ const document: editor.state.IEditorStateInit = {
         type: "scene",
         active: true,
         locked: false,
-        backgroundColor: kolor.colorformats.RGBA32F.TRANSPARENT,
+        background_color: kolor.colorformats.RGBA32F.TRANSPARENT,
         id: "main",
         name: "Main",
         constraints: { children: "multiple" },

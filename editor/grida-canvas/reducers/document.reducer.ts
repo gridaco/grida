@@ -134,7 +134,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         order: scene?.order ?? scene_count,
         guides: scene?.guides ?? [],
         edges: scene?.edges ?? [],
-        backgroundColor: scene?.backgroundColor,
+        background_color: scene?.background_color,
       };
 
       return updateState(state, (draft) => {
@@ -250,7 +250,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           scene
         ] as grida.program.nodes.SceneNode;
         if (scene_node?.type === "scene") {
-          scene_node.backgroundColor = action.backgroundColor;
+          scene_node.background_color = action.backgroundColor;
         }
       });
     }

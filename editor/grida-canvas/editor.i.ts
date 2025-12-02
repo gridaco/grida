@@ -1467,7 +1467,7 @@ export namespace editor.state {
             order: scene.order,
             guides: scene.guides,
             edges: scene.edges,
-            backgroundColor: scene.backgroundColor,
+            background_color: scene.background_color,
           };
           migrated_nodes[scene_id] = sceneNode;
         }
@@ -2643,7 +2643,7 @@ export namespace editor.api {
     renameScene(scene_id: string, name: string): void;
     changeSceneBackground(
       scene_id: string,
-      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+      backgroundColor: grida.program.document.ISceneBackground["background_color"]
     ): void;
 
     /**

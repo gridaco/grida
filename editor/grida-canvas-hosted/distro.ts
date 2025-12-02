@@ -30,7 +30,7 @@ export namespace distro {
             constraints: {
               children: "multiple",
             },
-            backgroundColor: kolor.colorformats.RGBA32F.WHITESMOKE,
+            background_color: kolor.colorformats.RGBA32F.WHITESMOKE,
           },
         },
       },

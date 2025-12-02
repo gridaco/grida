@@ -227,7 +227,7 @@ export interface ChangeSceneNameAction {
 export interface ChangeSceneBackgroundAction {
   type: "scenes/change/background-color";
   scene: string;
-  backgroundColor: grida.program.document.ISceneBackground["backgroundColor"];
+  backgroundColor: grida.program.document.ISceneBackground["background_color"];
 }
 
 export interface EditorSelectAction {

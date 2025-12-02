@@ -670,7 +670,7 @@ class EditorDocumentStore
 
   public changeSceneBackground(
     scene_id: string,
-    backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+    backgroundColor: grida.program.document.ISceneBackground["background_color"]
   ) {
     this.dispatch({
       type: "scenes/change/background-color",

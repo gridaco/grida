@@ -663,7 +663,7 @@ export namespace grida.program.document {
     /**
      * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
      */
-    backgroundColor?: kolor.colorformats.RGBA32F | null | undefined | "";
+    background_color?: kolor.colorformats.RGBA32F | null | undefined | "";
   }
 
   export interface Guide2D {
@@ -2716,7 +2716,7 @@ export namespace grida.program.nodes {
         order: scene.order,
         guides: scene.guides,
         edges: scene.edges,
-        backgroundColor: scene.backgroundColor,
+        background_color: scene.background_color,
       };
 
       // Add scene to nodes if not present
