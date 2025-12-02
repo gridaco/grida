@@ -31,7 +31,7 @@ describe("surface reducer - vector self remove", () => {
           type: "vector",
           left: 0,
           top: 0,
-          vectorNetwork: { vertices: [], segments: [] },
+          vector_network: { vertices: [], segments: [] },
         },
       },
       scenes: {

@@ -69,7 +69,7 @@ function getNextPaintForType(
 ): cg.Paint | null {
   const to = next;
 
-  const blendMode =
+  const blend_mode =
     (current && "blend_mode" in current ? current.blend_mode : undefined) ??
     cg.def.BLENDMODE;
 
@@ -103,7 +103,7 @@ function getNextPaintForType(
                 color: kolor.colorformats.RGBA32F.WHITE,
               },
             ],
-            blend_mode: blendMode,
+            blend_mode,
             opacity: opacity,
           } as cg.Paint;
         }
@@ -113,7 +113,7 @@ function getNextPaintForType(
         case "image": {
           return {
             ...DEFAULT_IMAGE_PAINT,
-            blend_mode: blendMode,
+            blend_mode,
             opacity: opacity,
           } satisfies cg.Paint;
         }
@@ -135,7 +135,7 @@ function getNextPaintForType(
               stopColor.b,
               opacity
             ),
-            blend_mode: blendMode,
+            blend_mode,
             active: true,
           } satisfies cg.Paint;
         }
@@ -147,14 +147,14 @@ function getNextPaintForType(
             type: to,
             stops: current.stops,
             transform,
-            blend_mode: blendMode,
+            blend_mode,
             opacity: current.opacity || 1,
           } as cg.Paint;
         }
         case "image": {
           return {
             ...DEFAULT_IMAGE_PAINT,
-            blend_mode: blendMode,
+            blend_mode,
             opacity: opacity,
           } satisfies cg.Paint;
         }
@@ -172,7 +172,7 @@ function getNextPaintForType(
               kolor.colorformats.RGBA32F.GRAY.b,
               opacity
             ),
-            blend_mode: blendMode,
+            blend_mode,
             active: true,
           };
         }
@@ -193,7 +193,7 @@ function getNextPaintForType(
                 color: kolor.colorformats.RGBA32F.WHITE,
               },
             ],
-            blend_mode: blendMode,
+            blend_mode,
             opacity: opacity,
           } as cg.Paint;
         }
@@ -738,11 +738,11 @@ function PaintTabsHeader({
         <BlendModeDropdown
           type="paint"
           value={value?.blend_mode || cg.def.BLENDMODE}
-          onValueChange={(blendMode) => {
+          onValueChange={(blend_mode) => {
             if (value) {
               onValueChange?.({
                 ...value,
-                blend_mode: blendMode,
+                blend_mode,
               } as any);
             }
           }}

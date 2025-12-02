@@ -52,8 +52,8 @@ import { BlendModeDropdown } from "./blend-mode";
  * <FeControl
  *   value={effect}
  *   constraints={{
- *     "filter-blur": !node.feBlur || effect.type === "filter-blur",
- *     "backdrop-filter-blur": !node.feBackdropBlur || effect.type === "backdrop-filter-blur",
+ *     "filter-blur": !node.fe_blur || effect.type === "filter-blur",
+ *     "backdrop-filter-blur": !node.fe_backdrop_blur || effect.type === "backdrop-filter-blur",
  *     shadow: true, // Always allow (multiple shadows supported)
  *   }}
  * />

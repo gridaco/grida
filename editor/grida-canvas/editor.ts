@@ -2136,28 +2136,28 @@ class EditorDocumentStore
     node_id: editor.NodeID,
     effects?: cg.FilterEffect[]
   ): void {
-    const feBlur = effects?.find((effect) => effect.type === "filter-blur") as
+    const fe_blur = effects?.find((effect) => effect.type === "filter-blur") as
       | cg.FeLayerBlur
       | undefined;
-    const feBackdropBlur = effects?.find(
+    const fe_backdrop_blur = effects?.find(
       (effect) => effect.type === "backdrop-filter-blur"
     ) as cg.FeBackdropBlur | undefined;
-    const feShadows = effects?.filter(
+    const fe_shadows = effects?.filter(
       (e): e is cg.FeShadow => e.type === "shadow"
     );
-    const feLiquidGlass = effects?.find((effect) => effect.type === "glass") as
-      | cg.FeLiquidGlass
-      | undefined;
-    const feNoises = effects?.filter(
+    const fe_liquid_glass = effects?.find(
+      (effect) => effect.type === "glass"
+    ) as cg.FeLiquidGlass | undefined;
+    const fe_noises = effects?.filter(
       (e): e is cg.FeNoise => e.type === "noise"
     );
 
     const i: grida.program.nodes.i.IEffects = {
-      fe_backdrop_blur: feBackdropBlur,
-      fe_blur: feBlur,
-      fe_shadows: feShadows,
-      fe_liquid_glass: feLiquidGlass,
-      fe_noises: feNoises,
+      fe_backdrop_blur,
+      fe_blur,
+      fe_shadows,
+      fe_liquid_glass,
+      fe_noises,
     };
 
     this.dispatch({

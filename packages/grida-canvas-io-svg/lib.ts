@@ -218,8 +218,8 @@ export namespace iosvg {
         const { transform, fill: fillAttr, stroke: strokeAttr, d } = node;
         const position = map.extractTranslation(transform);
 
-        const vectorNetwork = vn.fromSVGPathData(d);
-        const bbox = vn.getBBox(vectorNetwork);
+        const vector_network = vn.fromSVGPathData(d);
+        const bbox = vn.getBBox(vector_network);
         const {
           paint: fill,
           fill_rule,
@@ -228,25 +228,25 @@ export namespace iosvg {
         const {
           paint: stroke,
           opacity: _strokeOpacity,
-          strokeWidth,
-          strokeCap,
-          strokeJoin,
-          strokeMiterLimit,
-          strokeDashArray,
+          strokeWidth: stroke_width,
+          strokeCap: stroke_cap,
+          strokeJoin: stroke_join,
+          strokeMiterLimit: stroke_miter_limit,
+          strokeDashArray: stroke_dash_array,
         } = map.stroke(strokeAttr);
 
         // Use fill opacity as the primary node opacity (stroke opacity is applied to stroke paint)
         return {
           type: "vector",
           name: name,
-          vector_network: vectorNetwork,
+          vector_network,
           fill: fill,
           stroke: stroke,
-          stroke_width: strokeWidth,
-          stroke_cap: strokeCap,
-          stroke_join: strokeJoin,
-          stroke_miter_limit: strokeMiterLimit,
-          stroke_dash_array: strokeDashArray,
+          stroke_width,
+          stroke_cap,
+          stroke_join,
+          stroke_miter_limit,
+          stroke_dash_array,
           width: bbox.width,
           height: bbox.height,
           left: position.left,

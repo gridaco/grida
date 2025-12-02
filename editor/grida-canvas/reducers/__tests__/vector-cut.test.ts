@@ -107,7 +107,7 @@ describe("document reducer - vector cut", () => {
       top: 0,
       width: 10,
       height: 0,
-      vectorNetwork: {
+      vector_network: {
         vertices: [
           [0, 0],
           [10, 0],
@@ -163,7 +163,7 @@ describe("document reducer - vector cut", () => {
       ],
       segments: [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }],
     });
-    expect(next.document.nodes[node_id].vectorNetwork).toEqual({
+    expect(next.document.nodes[node_id].vector_network).toEqual({
       vertices: [],
       segments: [],
     });

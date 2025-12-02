@@ -324,10 +324,10 @@ function formatCornerRadius(node: Node): string | null {
   }
 
   const corners = [
-    readNumber(node, "cornerRadiusTopLeft"),
-    readNumber(node, "cornerRadiusTopRight"),
-    readNumber(node, "cornerRadiusBottomRight"),
-    readNumber(node, "cornerRadiusBottomLeft"),
+    readNumber(node, "corner_radius_top_left"),
+    readNumber(node, "corner_radius_top_right"),
+    readNumber(node, "corner_radius_bottom_right"),
+    readNumber(node, "corner_radius_bottom_left"),
   ];
 
   const defined = corners.filter((value) => value !== undefined);
