@@ -1,0 +1,8 @@
+# `.fig` test fixtures (mostly from figma community)
+
+| Name                   | File ID                                                                         | Link                                                             | License                                      |
+| ---------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------- |
+| Simple Design System   | [`1380235722331273046`](./1380235722331273046-figma-simple-design-system.fig)   | [View](https://www.figma.com/community/file/1380235722331273046) | CC BY 4.0                                    |
+| Auto Layout Playground | [`784448220678228461`](./784448220678228461-figma-auto-layout%20playground.fig) | [View](https://www.figma.com/community/file/784448220678228461)  | CC BY 4.0                                    |
+| Radix Icons            | [`1510053249065427020`](./1510053249065427020-workos-radix-icons.fig)           | [View](https://www.figma.com/community/file/1510053249065427020) | CC BY 4.0                                    |
+| Apple iOS 26           | [`1527721578857867021`](./1527721578857867021-apple-ios-26.fig)                 | [View](https://www.figma.com/community/file/1527721578857867021) | License Agreement for Apple Design Resources |
