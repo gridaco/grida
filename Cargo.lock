@@ -1078,9 +1078,9 @@ dependencies = [
 
 [[package]]
 name = "figma-api"
-version = "0.31.3"
+version = "0.31.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23256077c8160e009f3668de3dc68c41af8a97eee423fc09fd9396471f4da090"
+checksum = "2a1e5181f4fba15ad43c2bfe1803c9eb5ed86fd10c146fd8655c703010bf541d"
 dependencies = [
  "reqwest",
  "serde",
