@@ -1,3 +1,23 @@
+[profile.release]
+opt-level = 3           # optimize for size ("z" has runtime performance impact, keep this 3)
+lto = true              # use link time optimization
+codegen-units = 1       # allow cross-crate inlining & dedup
+panic = "abort"         # no unwinding machinery
+strip = "symbols"       # strip symbols from final artifact
+debug = false
+
+
+# region [opt-level "z"] - non-loop consumers (importer impls)
+[profile.release.package.figma-api]
+opt-level = "z"
+
+[profile.release.package.usvg]
+opt-level = "z"
+
+[profile.release.package.pulldown-cmark]
+opt-level = "z"
+
+
 # Grida Canvas WASM Build Configuration
 # This file configures the build settings for the wasm32-unknown-emscripten target
 

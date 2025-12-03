@@ -25,10 +25,10 @@ seahash = "4.1.0"
 # layout engine
 taffy = "0.9.1"
 # svg parsing
-# (+2mb wasm32-unknown-emscripten)
+# (+2mb wasm32-unknown-emscripten@opt-level=3)
 usvg = { path = "../../third_party/usvg" } 
 # markdown parsing
-# (+0.25mb wasm32-unknown-emscripten)
+# (+0.25mb wasm32-unknown-emscripten@opt-level=3)
 pulldown-cmark = "0.13.0"
 
 # toolings
@@ -36,6 +36,7 @@ async-trait = "0.1"
 futures = "0.3.31"
 
 # testing
+# (+3mb@opt-level=3 +1.7mb@opt-level=z wasm32-unknown-emscripten)
 figma-api = { version = "0.31.4", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
