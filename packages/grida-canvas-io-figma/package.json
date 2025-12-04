@@ -2,9 +2,17 @@
   "name": "@grida/io-figma",
   "description": "Figma I/O for Grida Canvas",
   "private": true,
+  "scripts": {
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@grida/cmath": "workspace:*",
-    "@grida/color": "workspace:*"
+    "@grida/color": "workspace:*",
+    "base64-js": "^1.5.1",
+    "fflate": "^0.8.2",
+    "fzstd": "^0.1.1",
+    "kiwi-schema": "^0.5.0"
   },
   "devDependencies": {
     "@figma/rest-api-spec": "^0.21.0",
