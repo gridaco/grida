@@ -297,20 +297,159 @@ export namespace iofigma {
         }
       }
 
+      function rectangleCornerRadius(
+        rectangleCornerRadii?: number[] | [number, number, number, number],
+        baseRadius: number = 0
+      ): grida.program.nodes.i.IRectangularCornerRadius {
+        // order: top-left, top-right, bottom-right, bottom-left (clockwise)
+        return {
+          corner_radius_top_left: rectangleCornerRadii?.[0] ?? baseRadius,
+          corner_radius_top_right: rectangleCornerRadii?.[1] ?? baseRadius,
+          corner_radius_bottom_right: rectangleCornerRadii?.[2] ?? baseRadius,
+          corner_radius_bottom_left: rectangleCornerRadii?.[3] ?? baseRadius,
+        };
+      }
+
       /**
-       * Convert Figma Effect to Grida effect properties
+       * Trait functions for composable node property mapping
+       * Each trait always returns a complete object (never undefined)
        */
-      function layer_effects_trait(effects: figrest.Effect[]): {
-        fe_blur?: cg.FeLayerBlur;
-        fe_backdrop_blur?: cg.FeBackdropBlur;
-        fe_shadows?: cg.FeShadow[];
-      } {
+
+      /**
+       * Base node properties - IBaseNode, ISceneNode, IBlend, IZIndex, IRotation
+       */
+      function base_node_trait(node: {
+        id: string;
+        name: string;
+        visible?: boolean;
+        locked?: boolean;
+        rotation?: number;
+        opacity?: number;
+        blendMode: figrest.BlendMode;
+      }) {
+        return {
+          id: node.id,
+          name: node.name,
+          active: node.visible ?? true,
+          locked: node.locked ?? false,
+          rotation: node.rotation ?? 0,
+          opacity: node.opacity ?? 1,
+          blend_mode: map.layerBlendModeMap[node.blendMode],
+          z_index: 0,
+        };
+      }
+
+      /**
+       * Positioning properties - IPositioning
+       */
+      function positioning_trait(node: {
+        relativeTransform?: any;
+        size?: any;
+      }) {
+        return {
+          position: "absolute" as const,
+          left: node.relativeTransform?.[0][2] ?? 0,
+          top: node.relativeTransform?.[1][2] ?? 0,
+          width: node.size?.x ?? 0,
+          height: node.size?.y ?? 0,
+        };
+      }
+
+      /**
+       * Fill properties - IFill
+       */
+      function fills_trait(fills: figrest.Paint[]) {
+        const fills_paints = fills
+          .map(paint)
+          .filter((p): p is cg.Paint => p !== undefined);
+        return {
+          fills: fills_paints.length > 0 ? fills_paints : undefined,
+        };
+      }
+
+      /**
+       * Stroke properties - IStroke
+       */
+      function stroke_trait(node: {
+        strokes?: figrest.Paint[];
+        strokeWeight?: number;
+        strokeCap?: figrest.LineNode["strokeCap"];
+        strokeJoin?: figrest.LineNode["strokeJoin"];
+        strokeDashes?: number[];
+        strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
+      }) {
+        const strokes_paints = (node.strokes ?? [])
+          .map(paint)
+          .filter((p): p is cg.Paint => p !== undefined);
+        return {
+          strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
+          stroke_width: node.strokeWeight ?? 0,
+          stroke_cap: node.strokeCap
+            ? (map.strokeCapMap[node.strokeCap] ?? "butt")
+            : "butt",
+          stroke_join: node.strokeJoin
+            ? (map.strokeJoinMap[node.strokeJoin] ?? "miter")
+            : "miter",
+          stroke_dash_array: node.strokeDashes,
+          stroke_align: node.strokeAlign
+            ? (map.strokeAlignMap[node.strokeAlign] ?? "center")
+            : undefined,
+        };
+      }
+
+      /**
+       * Text stroke properties - ITextStroke (simpler than IStroke)
+       */
+      function text_stroke_trait(node: {
+        strokes?: figrest.Paint[];
+        strokeWeight?: number;
+        strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
+      }) {
+        const strokes_paints = (node.strokes ?? [])
+          .map(paint)
+          .filter((p): p is cg.Paint => p !== undefined);
+        return {
+          strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
+          stroke_width: node.strokeWeight ?? 0,
+          stroke_align: node.strokeAlign
+            ? (map.strokeAlignMap[node.strokeAlign] ?? "inside")
+            : undefined,
+        };
+      }
+
+      /**
+       * Corner radius properties - ICornerRadius, IRectangularCornerRadius
+       */
+      function corner_radius_trait(node: {
+        cornerRadius?: number;
+        rectangleCornerRadii?: number[];
+      }) {
+        const baseRadius = node.cornerRadius ?? 0;
+        return {
+          corner_radius: baseRadius,
+          ...rectangleCornerRadius(node.rectangleCornerRadii, baseRadius),
+        };
+      }
+
+      /**
+       * Effects properties - IEffects
+       * Renamed from layer_effects_trait, ensures always returns object
+       */
+      function effects_trait(effects?: figrest.Effect[]) {
+        if (!effects || effects.length === 0) {
+          return {
+            fe_blur: undefined,
+            fe_backdrop_blur: undefined,
+            fe_shadows: undefined,
+          };
+        }
+
         const shadows: cg.FeShadow[] = [];
         let layerBlur: cg.FeLayerBlur | undefined;
         let backdropBlur: cg.FeBackdropBlur | undefined;
 
         effects.forEach((effect) => {
-          if (!effect.visible) return; // Skip inactive effects
+          if (!effect.visible) return;
 
           switch (effect.type) {
             case "DROP_SHADOW":
@@ -372,17 +511,65 @@ export namespace iofigma {
         };
       }
 
-      function rectangleCornerRadius(
-        rectangleCornerRadii?: number[] | [number, number, number, number],
-        baseRadius: number = 0
-      ): grida.program.nodes.i.IRectangularCornerRadius {
-        // order: top-left, top-right, bottom-right, bottom-left (clockwise)
+      /**
+       * Container layout properties - IExpandable, IPadding, IFlexContainer
+       */
+      function container_layout_trait(
+        node: {
+          paddingLeft?: number;
+          paddingRight?: number;
+          paddingTop?: number;
+          paddingBottom?: number;
+          itemSpacing?: number;
+          counterAxisSpacing?: number;
+        },
+        expanded: boolean
+      ) {
+        const { paddingLeft, paddingRight, paddingTop, paddingBottom } = node;
+        const padding =
+          paddingTop === paddingRight &&
+          paddingTop === paddingBottom &&
+          paddingTop === paddingLeft
+            ? (paddingTop ?? 0)
+            : {
+                padding_top: paddingTop ?? 0,
+                padding_right: paddingRight ?? 0,
+                padding_bottom: paddingBottom ?? 0,
+                padding_left: paddingLeft ?? 0,
+              };
+
         return {
-          corner_radius_top_left: rectangleCornerRadii?.[0] ?? baseRadius,
-          corner_radius_top_right: rectangleCornerRadii?.[1] ?? baseRadius,
-          corner_radius_bottom_right: rectangleCornerRadii?.[2] ?? baseRadius,
-          corner_radius_bottom_left: rectangleCornerRadii?.[3] ?? baseRadius,
+          expanded,
+          padding,
+          layout: "flow" as const,
+          direction: "horizontal" as const,
+          main_axis_alignment: "start" as const,
+          cross_axis_alignment: "start" as const,
+          main_axis_gap: node.itemSpacing ?? 0,
+          cross_axis_gap: node.counterAxisSpacing ?? node.itemSpacing ?? 0,
         };
+      }
+
+      /**
+       * Arc data properties - IEllipseArcData
+       */
+      function arc_data_trait(node: {
+        arcData: figrest.EllipseNode["arcData"];
+      }) {
+        return {
+          inner_radius: node.arcData.innerRadius,
+          angle_offset: cmath.rad2deg(node.arcData.startingAngle),
+          angle: cmath.rad2deg(
+            node.arcData.endingAngle - node.arcData.startingAngle
+          ),
+        };
+      }
+
+      /**
+       * Style properties - ICSSStylable
+       */
+      function style_trait(style: Record<string, any>) {
+        return { style };
       }
 
       type FigmaParentNode =
@@ -490,126 +677,35 @@ export namespace iofigma {
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
-            const { fills, strokes, strokeWeight, strokeAlign } = node;
-
-            const fills_paints = fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: 1,
-              blend_mode: "pass-through",
-              z_index: 0,
+              ...base_node_trait({
+                ...node,
+                opacity: 1,
+                blendMode: "PASS_THROUGH",
+              }),
+              ...positioning_trait(node),
+              ...fills_trait(node.fills),
+              ...style_trait({}),
+              ...corner_radius_trait({ cornerRadius: 0 }),
+              ...container_layout_trait({}, false),
               type: "container",
-              expanded: false,
-              //
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              //
-              style: {},
-              corner_radius: 0,
-              corner_radius_top_left: 0,
-              corner_radius_top_right: 0,
-              corner_radius_bottom_left: 0,
-              corner_radius_bottom_right: 0,
-              padding: 0,
-              // TODO:
-              layout: "flow",
-              direction: "horizontal",
-              main_axis_alignment: "start",
-              cross_axis_alignment: "start",
-              main_axis_gap: 0,
-              cross_axis_gap: 0,
             } satisfies grida.program.nodes.ContainerNode;
           }
           //
           case "COMPONENT":
           case "INSTANCE":
           case "FRAME": {
-            const {
-              clipsContent,
-              itemSpacing,
-              counterAxisSpacing,
-              paddingLeft,
-              paddingRight,
-              paddingTop,
-              paddingBottom,
-              layoutWrap,
-              fills,
-              strokes,
-              // strokeAlign, // ignored
-              strokeWeight,
-              strokeCap,
-              strokeDashes, // only checks if dashed or not
-              // strokeGeometry,
-              // strokeJoin, // ignored
-              // strokeMiterAngle,  // ignored
-              // strokesIncludedInLayout // ignored
-            } = node;
-
-            const fills_paints = fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait(node),
+              ...positioning_trait(node),
+              ...fills_trait(node.fills),
+              ...style_trait({
+                overflow: node.clipsContent ? "clip" : undefined,
+              }),
+              ...corner_radius_trait(node),
+              ...container_layout_trait(node, true),
+              ...effects_trait(node.effects),
               type: "container",
-              expanded: false,
-              //
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              //
-              style: {
-                overflow: clipsContent ? "clip" : undefined,
-              },
-              corner_radius: node.cornerRadius ?? 0,
-              ...rectangleCornerRadius(
-                node.rectangleCornerRadii,
-                node.cornerRadius ?? 0
-              ),
-              padding:
-                paddingTop === paddingRight &&
-                paddingTop === paddingBottom &&
-                paddingTop === paddingLeft
-                  ? (paddingTop ?? 0)
-                  : {
-                      padding_top: paddingTop ?? 0,
-                      padding_right: paddingRight ?? 0,
-                      padding_bottom: paddingBottom ?? 0,
-                      padding_left: paddingLeft ?? 0,
-                    },
-              // TODO:
-              layout: "flow",
-              direction: "horizontal",
-              main_axis_alignment: "start",
-              cross_axis_alignment: "start",
-              main_axis_gap: itemSpacing ?? 0,
-              cross_axis_gap: counterAxisSpacing ?? itemSpacing ?? 0,
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -617,47 +713,16 @@ export namespace iofigma {
             // Group -> Container is not a accurate transformation.
             // Since children of group has constraints relative to the parent of the group, nesting children of group to container will break some constraints.
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait(node),
+              ...positioning_trait(node),
+              ...style_trait({}),
+              ...corner_radius_trait({ cornerRadius: 0 }),
+              ...container_layout_trait({}, true),
               type: "container",
-              expanded: false,
-              //
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-              //
-              style: {},
-              corner_radius: 0,
-              ...rectangleCornerRadius([0, 0, 0, 0], 0),
-              padding: 0,
-              layout: "flow",
-              direction: "horizontal",
-              main_axis_alignment: "start",
-              cross_axis_alignment: "start",
-              main_axis_gap: 0,
-              cross_axis_gap: 0,
             } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }
           case "TEXT": {
-            const { fills, strokes, strokeWeight, strokeAlign, strokeDashes } =
-              node;
-
-            const fills_paints = fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-            const strokes_paints = (strokes ?? [])
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             const figma_text_resizing_model = node.style.textAutoResize;
             const figma_constraints_horizontal = node.constraints?.horizontal;
             const figma_constraints_vertical = node.constraints?.vertical;
@@ -690,14 +755,11 @@ export namespace iofigma {
             };
 
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait(node),
+              ...fills_trait(node.fills),
+              ...text_stroke_trait(node),
+              ...style_trait({}),
+              ...effects_trait(node.effects),
               type: "text",
               text: node.characters,
               position: "absolute",
@@ -705,8 +767,6 @@ export namespace iofigma {
               top: constraints.top,
               right: constraints.right,
               bottom: constraints.bottom,
-              // left: fixedleft,
-              // top: fixedtop,
               width:
                 figma_text_resizing_model === "WIDTH_AND_HEIGHT"
                   ? "auto"
@@ -716,14 +776,6 @@ export namespace iofigma {
                 figma_text_resizing_model === "HEIGHT"
                   ? "auto"
                   : fixedheight,
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              stroke_width: strokeWeight ?? 0,
-              stroke_align: strokeAlign
-                ? (map.strokeAlignMap[strokeAlign] ?? "inside")
-                : undefined,
-              //
-              style: {},
               text_align: node.style.textAlignHorizontal
                 ? (map.textAlignMap[node.style.textAlignHorizontal] ?? "left")
                 : "left",
@@ -735,165 +787,50 @@ export namespace iofigma {
                 : "none",
               line_height: node.style.lineHeightPercentFontSize
                 ? node.style.lineHeightPercentFontSize / 100
-                : // normal = 1.2
-                  1.2,
-
+                : 1.2,
               letter_spacing: node.style.letterSpacing,
               font_size: node.style.fontSize ?? 0,
               font_family: node.style.fontFamily,
               font_weight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
-              font_kerning: true, // TODO: parse from features (`kern`)
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
+              font_kerning: true,
             };
           }
           case "RECTANGLE": {
-            const {
-              fills,
-              strokes,
-              strokeDashes,
-              strokeWeight,
-              strokeCap,
-              strokeJoin,
-            } = node;
-
-            const fills_paints = fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-            const strokes_paints = (strokes ?? [])
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait(node),
+              ...positioning_trait(node),
+              ...fills_trait(node.fills),
+              ...stroke_trait(node),
+              ...corner_radius_trait(node),
+              ...effects_trait(node.effects),
               type: "rectangle",
-              //
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              stroke_width: strokeWeight ?? 0,
-              stroke_cap: strokeCap
-                ? (map.strokeCapMap[strokeCap] ?? "butt")
-                : "butt",
-              stroke_join: strokeJoin
-                ? (map.strokeJoinMap[strokeJoin] ?? "miter")
-                : "miter",
-              stroke_dash_array: strokeDashes,
-              corner_radius: node.cornerRadius ?? 0,
-              ...rectangleCornerRadius(
-                node.rectangleCornerRadii,
-                node.cornerRadius ?? 0
-              ),
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {
-            const { fills, strokes, strokeWeight, strokeCap, strokeJoin } =
-              node;
-
-            const fills_paints = fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-            const strokes_paints = (strokes ?? [])
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait(node),
+              ...positioning_trait(node),
+              ...fills_trait(node.fills),
+              ...stroke_trait(node),
+              ...arc_data_trait(node),
+              ...effects_trait(node.effects),
               type: "ellipse",
-              //
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              stroke_width: strokeWeight ?? 0,
-              stroke_cap: strokeCap
-                ? (map.strokeCapMap[strokeCap] ?? "butt")
-                : "butt",
-              stroke_join: strokeJoin
-                ? (map.strokeJoinMap[strokeJoin] ?? "miter")
-                : "miter",
-              // arc data
-              inner_radius: node.arcData.innerRadius,
-              angle_offset: cmath.rad2deg(node.arcData.startingAngle),
-              angle: cmath.rad2deg(
-                node.arcData.endingAngle - node.arcData.startingAngle
-              ),
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
-            const {
-              fills,
-              strokes,
-              strokeWeight,
-              strokeCap,
-              strokeAlign,
-              strokeJoin,
-            } = node;
-
-            const strokes_paints = (strokes ?? [])
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait(node),
+              ...stroke_trait(node),
+              ...effects_trait(node.effects),
               type: "line",
               position: "absolute",
-              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              stroke_width: strokeWeight ?? 0,
-              stroke_align: strokeAlign
-                ? (map.strokeAlignMap[strokeAlign] ?? "inside")
-                : "inside",
-              stroke_cap: strokeCap
-                ? (map.strokeCapMap[strokeCap] ?? "butt")
-                : "butt",
-              stroke_join: strokeJoin
-                ? (map.strokeJoinMap[strokeJoin] ?? "miter")
-                : "miter",
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: 0,
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
             } satisfies grida.program.nodes.LineNode;
           }
           case "SLICE": {
@@ -902,65 +839,12 @@ export namespace iofigma {
           case "REGULAR_POLYGON":
           case "STAR":
           case "VECTOR": {
-            const { fills, strokes, fillGeometry, strokeGeometry } = node;
-
-            // check if vector can be converted to line
-            // if (
-            //   (fillGeometry?.length ?? 0) === 0 &&
-            //   strokeGeometry?.length === 1
-            // ) {
-            //   const path = strokeGeometry[0].path;
-
-            //   if (linedata) {
-            //     return {
-            //       id: node.id,
-            //       name: node.name,
-            //       active: node.visible ?? true,
-            //       locked: node.locked ?? false,
-            //       rotation: node.rotation ?? 0,
-            //       opacity: node.opacity ?? 1,
-            //       zIndex: 0,
-            //       type: "line",
-            //       position: "absolute",
-            //       left: node.relativeTransform![0][2],
-            //       top: node.relativeTransform![1][2],
-            //       width: linedata.x2 - linedata.x1,
-            //       height: 0,
-            //     } satisfies grida.program.nodes.LineNode;
-            //   }
-            // }
-
-            const fills_paints = fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait(node),
+              ...positioning_trait(node),
+              ...fills_trait(node.fills),
+              ...effects_trait(node.effects),
               type: "svgpath",
-              //
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              // cornerRadius: node.cornerRadius
-              //   ? node.cornerRadius
-              //   : node.rectangleCornerRadii
-              //     ? {
-              //         topLeftRadius: node.rectangleCornerRadii[0],
-              //         topRightRadius: node.rectangleCornerRadii[1],
-              //         bottomRightRadius: node.rectangleCornerRadii[2],
-              //         bottomLeftRadius: node.rectangleCornerRadii[3],
-              //       }
-              //     : 0,
               paths: [
                 ...(node.fillGeometry?.map((p) => ({
                   d: p.path ?? "",
@@ -973,21 +857,11 @@ export namespace iofigma {
                   fill: "stroke" as const,
                 })) ?? []),
               ],
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
             } satisfies grida.program.nodes.SVGPathNode;
           }
 
           // IR nodes - extended types with additional data
           case "X_VECTOR": {
-            const fills_paints = node.fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-            const strokes_paints = (node.strokes ?? [])
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             // Convert Figma VectorNetwork to Grida vn.VectorNetwork format
             const gridaVectorNetwork: vn.VectorNetwork = {
               vertices: node.vectorNetwork.vertices.map((v) => [v.x, v.y]),
@@ -1000,120 +874,37 @@ export namespace iofigma {
             };
 
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait({ ...node, rotation: 0 }),
+              ...positioning_trait(node),
+              ...fills_trait(node.fills),
+              ...stroke_trait(node),
+              ...corner_radius_trait(node),
+              ...effects_trait(node.effects),
               type: "vector",
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              stroke_width: node.strokeWeight ?? 0,
-              stroke_align: node.strokeAlign
-                ? (map.strokeAlignMap[node.strokeAlign] ?? "center")
-                : undefined,
-              stroke_cap: node.strokeCap
-                ? (map.strokeCapMap[node.strokeCap] ?? "butt")
-                : "butt",
-              stroke_join: node.strokeJoin
-                ? (map.strokeJoinMap[node.strokeJoin] ?? "miter")
-                : "miter",
-              corner_radius: node.cornerRadius ?? 0,
               vector_network: gridaVectorNetwork,
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
             } satisfies grida.program.nodes.VectorNode;
           }
           case "X_STAR": {
-            const fills_paints = node.fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-            const strokes_paints = (node.strokes ?? [])
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait({ ...node, rotation: 0 }),
+              ...positioning_trait(node),
+              ...fills_trait(node.fills),
+              ...stroke_trait(node),
+              ...effects_trait(node.effects),
               type: "star",
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              stroke_width: node.strokeWeight ?? 0,
-              stroke_align: node.strokeAlign
-                ? (map.strokeAlignMap[node.strokeAlign] ?? "center")
-                : undefined,
-              stroke_cap: node.strokeCap
-                ? (map.strokeCapMap[node.strokeCap] ?? "butt")
-                : "butt",
-              stroke_join: node.strokeJoin
-                ? (map.strokeJoinMap[node.strokeJoin] ?? "miter")
-                : "miter",
               point_count: node.pointCount,
               inner_radius: node.innerRadius,
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
             } satisfies grida.program.nodes.RegularStarPolygonNode;
           }
           case "X_REGULAR_POLYGON": {
-            const fills_paints = node.fills
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-            const strokes_paints = (node.strokes ?? [])
-              .map(paint)
-              .filter((p): p is cg.Paint => p !== undefined);
-
             return {
-              id: node.id,
-              name: node.name,
-              active: node.visible ?? true,
-              locked: node.locked ?? false,
-              rotation: 0,
-              opacity: node.opacity ?? 1,
-              blend_mode: map.layerBlendModeMap[node.blendMode],
-              z_index: 0,
+              ...base_node_trait({ ...node, rotation: 0 }),
+              ...positioning_trait(node),
+              ...fills_trait(node.fills),
+              ...stroke_trait(node),
+              ...effects_trait(node.effects),
               type: "polygon",
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
-              fills: fills_paints.length > 0 ? fills_paints : undefined,
-              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
-              stroke_width: node.strokeWeight ?? 0,
-              stroke_align: node.strokeAlign
-                ? (map.strokeAlignMap[node.strokeAlign] ?? "center")
-                : undefined,
-              stroke_cap: node.strokeCap
-                ? (map.strokeCapMap[node.strokeCap] ?? "butt")
-                : "butt",
-              stroke_join: node.strokeJoin
-                ? (map.strokeJoinMap[node.strokeJoin] ?? "miter")
-                : "miter",
               point_count: node.pointCount,
-              ...(node.effects?.length
-                ? layer_effects_trait(node.effects)
-                : {}),
             } satisfies grida.program.nodes.RegularPolygonNode;
           }
 
