@@ -129,7 +129,8 @@ This section preserves our engineering path so future contributors understand _w
 
 ### Useful Resources
 
-- https://doc.rust-lang.org/cargo/reference/profiles.html
-- https://crates.io/crates/miniserde
 - https://github.com/johnthagen/min-sized-rust
+- https://doc.rust-lang.org/cargo/reference/profiles.html
+- https://rustwasm.github.io/docs/book/reference/code-size.html
+- https://crates.io/crates/miniserde
 - https://www.warp.dev/blog/reducing-wasm-binary-size
