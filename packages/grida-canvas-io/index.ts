@@ -191,6 +191,25 @@ export namespace io {
       );
     }
 
+    /**
+     * Detects if text content is SVG markup.
+     *
+     * Validates SVG by checking for:
+     * - SVG namespace (xmlns="http://www.w3.org/2000/svg")
+     * - Opening and closing svg tags
+     *
+     * @param text - The text string to check
+     * @returns true if the text contains valid SVG markup, false otherwise
+     */
+    export function isSvgText(text: string): boolean {
+      const trimmed = text.trim();
+      return (
+        trimmed.includes('xmlns="http://www.w3.org/2000/svg"') &&
+        trimmed.includes("<svg") &&
+        trimmed.includes("</svg>")
+      );
+    }
+
     export function filetype(
       file: File
     ): [true, ValidFileType] | [false, string] {
@@ -220,6 +239,7 @@ export namespace io {
           file: File;
         }
       | { type: "text"; text: string }
+      | { type: "svg-text"; svg: string }
       | { type: "clipboard"; clipboard: ClipboardPayload }
       | { type: "canbe-figma-clipboard"; html: string };
 
@@ -282,6 +302,10 @@ export namespace io {
           item.getAsString((data) => {
             if (config.noEmptyText && data.trim().length === 0) {
               return resolve(null);
+            }
+            // Check if text content is SVG
+            if (isSvgText(data)) {
+              return resolve({ type: "svg-text", svg: data });
             }
             return resolve({ type: "text", text: data });
           });

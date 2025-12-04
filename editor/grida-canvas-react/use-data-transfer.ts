@@ -133,12 +133,12 @@ async function tryInsertFromFigmaClipboardPayload(
  * Hook that provides data transfer event handlers for the Grida canvas editor.
  *
  * This hook handles drag and drop operations, clipboard paste events, and file insertion
- * for various content types including images, SVG files, and text. It creates appropriate
- * canvas nodes (rectangles with image fills, text nodes, or SVG nodes) based on the
- * dropped or pasted content.
+ * for various content types including images, SVG files, SVG text, and text. It creates
+ * appropriate canvas nodes (rectangles with image fills, text nodes, or SVG nodes) based
+ * on the dropped or pasted content.
  *
  * @returns An object containing event handlers and utility functions:
- * - `onpaste`: Handles clipboard paste events for text, images, and SVG content
+ * - `onpaste`: Handles clipboard paste events for text, images, SVG files, and SVG text
  * - `ondragover`: Prevents default drag behavior to allow drops
  * - `ondrop`: Handles file drops and creates appropriate canvas nodes
  * - `insertText`: Utility function to insert text nodes at specified positions
@@ -162,10 +162,11 @@ async function tryInsertFromFigmaClipboardPayload(
  *
  * @remarks
  * - For image files (PNG, JPEG, GIF), creates rectangle nodes with image fills
- * - For SVG files, creates vector nodes from SVG content
- * - For text content, creates text nodes with default styling
+ * - For SVG files and SVG text, creates vector nodes from SVG content
+ * - For plain text content, creates text nodes with default styling
  * - Handles both drag-and-drop and clipboard paste operations
  * - Supports Grida-specific clipboard formats for internal data transfer
+ * - Supports Figma clipboard format for cross-tool compatibility
  */
 export function useDataTransferEventTarget() {
   const instance = useCurrentEditor();
@@ -335,7 +336,7 @@ export function useDataTransferEventTarget() {
    *
    * 1. if the payload contains valid grida payload, insert it (or if identical to local clipboard, paste it)
    * 2. if the payload contains figma clipboard, convert and insert it
-   * 3. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
+   * 3. if the payload contains svg-text, text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
    * 4. if the payload contains no valid payload, fallback to local clipboard, and paste it
    *
    */
@@ -423,6 +424,15 @@ export function useDataTransferEventTarget() {
               const item = items[i];
               try {
                 switch (item.type) {
+                  case "svg-text": {
+                    const { svg } = item;
+                    insertSVG("SVG", svg, {
+                      clientX: window.innerWidth / 2,
+                      clientY: window.innerHeight / 2,
+                    });
+                    pasted_from_data_transfer = true;
+                    break;
+                  }
                   case "text": {
                     const { text } = item;
                     insertText(text, {
