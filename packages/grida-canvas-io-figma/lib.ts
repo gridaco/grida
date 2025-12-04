@@ -1,27 +1,77 @@
-import type {
-  SubcanvasNode,
-  Paint,
-  TypeStyle,
-  Path,
-  LineNode,
-  BooleanOperationNode,
-  InstanceNode,
-  GroupNode,
-  FrameNode,
-  BlendMode,
-  GradientPaint,
-  SolidPaint,
-} from "@figma/rest-api-spec";
 import type cg from "@grida/cg";
 import type grida from "@grida/schema";
+import type { vn } from "@grida/schema";
+import type * as figrest from "@figma/rest-api-spec";
+import type * as figkiwi from "./fig-kiwi/schema";
 import cmath from "@grida/cmath";
 import kolor from "@grida/color";
+import { getBlobBytes, parseVectorNetworkBlob } from "./fig-kiwi";
 
 export namespace iofigma {
+  /**
+   * custom structs for bridging difference between rest api spec, kiwi spec and plugin sdk spec.
+   */
+  export namespace __ir {
+    /**
+     * Vector network structure (vertices, segments, regions)
+     * Matches the output of parseVectorNetworkBlob from blob-parser
+     */
+    export type VectorNetwork = {
+      vertices: Array<{ styleID: number; x: number; y: number }>;
+      segments: Array<{
+        styleID: number;
+        start: { vertex: number; dx: number; dy: number };
+        end: { vertex: number; dx: number; dy: number };
+      }>;
+      regions: Array<{
+        styleID: number;
+        windingRule: "NONZERO" | "ODD";
+        loops: Array<{ segments: number[] }>;
+      }>;
+    };
+
+    /**
+     * - rest-api-spec - Not supported
+     * - kiwi-spec - Supported
+     * - plugin-sdk-spec - Supported
+     */
+    export type VectorNodeWithVectorNetworkDataPresent =
+      figrest.CornerRadiusShapeTraits &
+        figrest.AnnotationsTrait & {
+          type: "X_VECTOR";
+          vectorNetwork: VectorNetwork;
+        };
+
+    /**
+     * - rest-api-spec - Not supported
+     * - kiwi-spec - Supported
+     * - plugin-sdk-spec - Supported
+     */
+    export type RegularPolygonNodeWithPointsDataPresent =
+      figrest.CornerRadiusShapeTraits &
+        figrest.AnnotationsTrait & {
+          type: "X_REGULAR_POLYGON";
+          pointCount: number;
+        };
+
+    /**
+     * - rest-api-spec - Not supported
+     * - kiwi-spec - Supported
+     * - plugin-sdk-spec - Supported
+     */
+    export type StarNodeWithPointsDataPresent =
+      figrest.CornerRadiusShapeTraits &
+        figrest.AnnotationsTrait & {
+          type: "X_STAR";
+          pointCount: number;
+          innerRadius: number;
+        };
+  }
+
   export namespace restful {
     export namespace map {
       export const strokeCapMap: Record<
-        NonNullable<LineNode["strokeCap"]>,
+        NonNullable<figrest.LineNode["strokeCap"]>,
         cg.StrokeCap | undefined
       > = {
         NONE: "butt",
@@ -42,7 +92,7 @@ export namespace iofigma {
       };
 
       export const strokeJoinMap: Record<
-        NonNullable<LineNode["strokeJoin"]>,
+        NonNullable<figrest.LineNode["strokeJoin"]>,
         cg.StrokeJoin
       > = {
         MITER: "miter",
@@ -51,7 +101,7 @@ export namespace iofigma {
       };
 
       export const strokeAlignMap: Record<
-        NonNullable<LineNode["strokeAlign"]>,
+        NonNullable<figrest.LineNode["strokeAlign"]>,
         cg.StrokeAlign | undefined
       > = {
         CENTER: "center",
@@ -60,7 +110,7 @@ export namespace iofigma {
       };
 
       export const textAlignMap: Record<
-        NonNullable<TypeStyle["textAlignHorizontal"]>,
+        NonNullable<figrest.TypeStyle["textAlignHorizontal"]>,
         cg.TextAlign | undefined
       > = {
         CENTER: "center",
@@ -70,7 +120,7 @@ export namespace iofigma {
       };
 
       export const textAlignVerticalMap: Record<
-        NonNullable<TypeStyle["textAlignVertical"]>,
+        NonNullable<figrest.TypeStyle["textAlignVertical"]>,
         cg.TextAlignVertical
       > = {
         CENTER: "center",
@@ -79,7 +129,7 @@ export namespace iofigma {
       };
 
       export const textDecorationMap: Record<
-        NonNullable<TypeStyle["textDecoration"]>,
+        NonNullable<figrest.TypeStyle["textDecoration"]>,
         cg.TextDecorationLine | undefined
       > = {
         NONE: "none",
@@ -87,12 +137,15 @@ export namespace iofigma {
         UNDERLINE: "underline",
       };
 
-      export const windingRuleMap: Record<Path["windingRule"], cg.FillRule> = {
+      export const windingRuleMap: Record<
+        figrest.Path["windingRule"],
+        cg.FillRule
+      > = {
         EVENODD: "evenodd",
         NONZERO: "nonzero",
       };
 
-      export const blendModeMap: Record<BlendMode, cg.BlendMode> = {
+      export const blendModeMap: Record<figrest.BlendMode, cg.BlendMode> = {
         PASS_THROUGH: "normal", // no-op here
         NORMAL: "normal", // Matches the default blend mode.
         DARKEN: "darken",
@@ -114,14 +167,17 @@ export namespace iofigma {
         LUMINOSITY: "luminosity",
       };
 
-      export const layerBlendModeMap: Record<BlendMode, cg.LayerBlendMode> = {
+      export const layerBlendModeMap: Record<
+        figrest.BlendMode,
+        cg.LayerBlendMode
+      > = {
         ...blendModeMap,
         PASS_THROUGH: "pass-through",
       };
     }
 
     export namespace factory {
-      function toGradientPaint(paint: GradientPaint) {
+      function toGradientPaint(paint: figrest.GradientPaint) {
         const type_map = {
           GRADIENT_LINEAR: "linear_gradient",
           GRADIENT_RADIAL: "radial_gradient",
@@ -157,7 +213,7 @@ export namespace iofigma {
         } as cg.GradientPaint;
       }
 
-      function toSolidPaint(paint: SolidPaint): cg.SolidPaint {
+      function toSolidPaint(paint: figrest.SolidPaint): cg.SolidPaint {
         return {
           type: "solid",
           color: kolor.colorformats.RGBA32F.multiplyA32(
@@ -173,7 +229,7 @@ export namespace iofigma {
         };
       }
 
-      function paint(paint: Paint): cg.Paint | undefined {
+      function paint(paint: figrest.Paint): cg.Paint | undefined {
         switch (paint.type) {
           case "SOLID": {
             return toSolidPaint(paint);
@@ -220,29 +276,37 @@ export namespace iofigma {
       }
 
       function rectangleCornerRadius(
-        rectangleCornerRadii?: number[] | [number, number, number, number]
+        rectangleCornerRadii?: number[] | [number, number, number, number],
+        baseRadius: number = 0
       ): grida.program.nodes.i.IRectangularCornerRadius {
+        // order: top-left, top-right, bottom-right, bottom-left (clockwise)
         return {
-          corner_radius_top_left: rectangleCornerRadii?.[0] ?? 0,
-          corner_radius_top_right: rectangleCornerRadii?.[1] ?? 0,
-          corner_radius_bottom_left: rectangleCornerRadii?.[2] ?? 0,
-          corner_radius_bottom_right: rectangleCornerRadii?.[3] ?? 0,
+          corner_radius_top_left: rectangleCornerRadii?.[0] ?? baseRadius,
+          corner_radius_top_right: rectangleCornerRadii?.[1] ?? baseRadius,
+          corner_radius_bottom_right: rectangleCornerRadii?.[2] ?? baseRadius,
+          corner_radius_bottom_left: rectangleCornerRadii?.[3] ?? baseRadius,
         };
       }
 
       type FigmaParentNode =
-        | BooleanOperationNode
-        | InstanceNode
-        | FrameNode
-        | GroupNode;
+        | figrest.BooleanOperationNode
+        | figrest.InstanceNode
+        | figrest.FrameNode
+        | figrest.GroupNode;
 
       export type FactoryContext = {
         // node_id_generator: () => string;
         gradient_id_generator: () => string;
       };
 
+      type InputNode =
+        | figrest.SubcanvasNode
+        | __ir.VectorNodeWithVectorNetworkDataPresent
+        | __ir.StarNodeWithPointsDataPresent
+        | __ir.RegularPolygonNodeWithPointsDataPresent;
+
       export function document(
-        node: SubcanvasNode,
+        node: InputNode,
         images: { [key: string]: string },
         context: FactoryContext
       ): grida.program.document.IPackedSceneDocument {
@@ -250,7 +314,7 @@ export namespace iofigma {
         const graph: Record<string, string[]> = {};
 
         function processNode(
-          currentNode: SubcanvasNode,
+          currentNode: InputNode,
           parent?: FigmaParentNode
         ): grida.program.nodes.Node | undefined {
           const processedNode = node_without_children(
@@ -281,9 +345,10 @@ export namespace iofigma {
         }
 
         const rootNode = processNode(node) as grida.program.nodes.ContainerNode;
-        rootNode.position = "relative";
-        rootNode.left = 0;
-        rootNode.top = 0;
+        // Keep absolute positioning from Figma (all Figma nodes are absolute by default)
+        // rootNode.position = "relative";
+        // rootNode.left = 0;
+        // rootNode.top = 0;
 
         if (!rootNode) {
           throw new Error("Failed to process root node");
@@ -321,7 +386,7 @@ export namespace iofigma {
        * @returns
        */
       function node_without_children(
-        node: SubcanvasNode,
+        node: InputNode,
         images: { [key: string]: string },
         parent: FigmaParentNode | undefined,
         context: FactoryContext
@@ -362,7 +427,6 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
 
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
               //
               border:
@@ -448,7 +512,6 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
 
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
               //
               border:
@@ -465,7 +528,10 @@ export namespace iofigma {
                 overflow: clipsContent ? "clip" : undefined,
               },
               corner_radius: node.cornerRadius ?? 0,
-              ...rectangleCornerRadius(node.rectangleCornerRadii),
+              ...rectangleCornerRadius(
+                node.rectangleCornerRadii,
+                node.cornerRadius ?? 0
+              ),
               padding:
                 paddingTop === paddingRight &&
                 paddingTop === paddingBottom &&
@@ -507,13 +573,10 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-
-              fill: undefined,
-              border: undefined,
               //
               style: {},
               corner_radius: 0,
-              ...rectangleCornerRadius([0, 0, 0, 0]),
+              ...rectangleCornerRadius([0, 0, 0, 0], 0),
               padding: 0,
               layout: "flow",
               direction: "horizontal",
@@ -599,12 +662,7 @@ export namespace iofigma {
                 figma_text_resizing_model === "HEIGHT"
                   ? "auto"
                   : fixedheight,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
-              //
-              stroke: first_visible_stroke
-                ? paint(first_visible_stroke)
-                : undefined,
               strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
               stroke_width: strokeWeight ?? 0,
               border:
@@ -681,7 +739,10 @@ export namespace iofigma {
                 width: node.size!.x,
                 height: node.size!.y,
                 corner_radius: node.cornerRadius ?? 0,
-                ...rectangleCornerRadius(node.rectangleCornerRadii),
+                ...rectangleCornerRadius(
+                  node.rectangleCornerRadii,
+                  node.cornerRadius ?? 0
+                ),
                 fit: "cover",
                 //
                 border:
@@ -713,8 +774,8 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
+              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
               stroke_width: strokeWeight ?? 0,
               stroke_cap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
@@ -723,7 +784,10 @@ export namespace iofigma {
                 ? (map.strokeJoinMap[strokeJoin] ?? "miter")
                 : "miter",
               corner_radius: node.cornerRadius ?? 0,
-              ...rectangleCornerRadius(node.rectangleCornerRadii),
+              ...rectangleCornerRadius(
+                node.rectangleCornerRadii,
+                node.cornerRadius ?? 0
+              ),
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {
@@ -733,6 +797,9 @@ export namespace iofigma {
             const visible_fills = visible_paints(fills);
             const visible_strokes = strokes ? visible_paints(strokes) : [];
             const first_visible_fill = first_visible(fills);
+            const first_visible_stroke = strokes
+              ? first_visible(strokes)
+              : undefined;
 
             const fills_paints = visible_fills
               .map(paint)
@@ -757,8 +824,8 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
+              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
               stroke_width: strokeWeight ?? 0,
               stroke_cap: strokeCap
                 ? (map.strokeCapMap[strokeCap] ?? "butt")
@@ -803,9 +870,6 @@ export namespace iofigma {
               z_index: 0,
               type: "line",
               position: "absolute",
-              stroke: first_visible_stroke
-                ? paint(first_visible_stroke)
-                : undefined,
               strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
               stroke_width: strokeWeight ?? 0,
               stroke_align: strokeAlign
@@ -884,7 +948,6 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               fills: fills_paints.length > 0 ? fills_paints : undefined,
               // effects: [], // TODO:
               // cornerRadius: node.cornerRadius
@@ -912,6 +975,162 @@ export namespace iofigma {
             } satisfies grida.program.nodes.SVGPathNode;
           }
 
+          // IR nodes - extended types with additional data
+          case "X_VECTOR": {
+            const visible_fills = visible_paints(node.fills);
+            const visible_strokes = node.strokes
+              ? visible_paints(node.strokes)
+              : [];
+            const first_visible_fill = first_visible(node.fills);
+            const first_visible_stroke = node.strokes
+              ? first_visible(node.strokes)
+              : undefined;
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+
+            // Convert Figma VectorNetwork to Grida vn.VectorNetwork format
+            const gridaVectorNetwork: vn.VectorNetwork = {
+              vertices: node.vectorNetwork.vertices.map((v) => [v.x, v.y]),
+              segments: node.vectorNetwork.segments.map((seg) => ({
+                a: seg.start.vertex,
+                b: seg.end.vertex,
+                ta: [seg.start.dx, seg.start.dy],
+                tb: [seg.end.dx, seg.end.dy],
+              })),
+            };
+
+            return {
+              id: node.id,
+              name: node.name,
+              active: node.visible ?? true,
+              locked: node.locked ?? false,
+              rotation: 0,
+              opacity: node.opacity ?? 1,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
+              type: "vector",
+              position: "absolute",
+              left: node.relativeTransform![0][2],
+              top: node.relativeTransform![1][2],
+              width: node.size!.x,
+              height: node.size!.y,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
+              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
+              stroke_width: node.strokeWeight ?? 0,
+              stroke_align: node.strokeAlign
+                ? (map.strokeAlignMap[node.strokeAlign] ?? "center")
+                : undefined,
+              stroke_cap: node.strokeCap
+                ? (map.strokeCapMap[node.strokeCap] ?? "butt")
+                : "butt",
+              stroke_join: node.strokeJoin
+                ? (map.strokeJoinMap[node.strokeJoin] ?? "miter")
+                : "miter",
+              corner_radius: node.cornerRadius ?? 0,
+              vector_network: gridaVectorNetwork,
+            } satisfies grida.program.nodes.VectorNode;
+          }
+          case "X_STAR": {
+            const visible_fills = visible_paints(node.fills);
+            const visible_strokes = node.strokes
+              ? visible_paints(node.strokes)
+              : [];
+            const first_visible_fill = first_visible(node.fills);
+            const first_visible_stroke = node.strokes
+              ? first_visible(node.strokes)
+              : undefined;
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+
+            return {
+              id: node.id,
+              name: node.name,
+              active: node.visible ?? true,
+              locked: node.locked ?? false,
+              rotation: 0,
+              opacity: node.opacity ?? 1,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
+              type: "star",
+              position: "absolute",
+              left: node.relativeTransform![0][2],
+              top: node.relativeTransform![1][2],
+              width: node.size!.x,
+              height: node.size!.y,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
+              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
+              stroke_width: node.strokeWeight ?? 0,
+              stroke_align: node.strokeAlign
+                ? (map.strokeAlignMap[node.strokeAlign] ?? "center")
+                : undefined,
+              stroke_cap: node.strokeCap
+                ? (map.strokeCapMap[node.strokeCap] ?? "butt")
+                : "butt",
+              stroke_join: node.strokeJoin
+                ? (map.strokeJoinMap[node.strokeJoin] ?? "miter")
+                : "miter",
+              point_count: node.pointCount,
+              inner_radius: node.innerRadius,
+            } satisfies grida.program.nodes.RegularStarPolygonNode;
+          }
+          case "X_REGULAR_POLYGON": {
+            const visible_fills = visible_paints(node.fills);
+            const visible_strokes = node.strokes
+              ? visible_paints(node.strokes)
+              : [];
+            const first_visible_fill = first_visible(node.fills);
+            const first_visible_stroke = node.strokes
+              ? first_visible(node.strokes)
+              : undefined;
+
+            const fills_paints = visible_fills
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+            const strokes_paints = visible_strokes
+              .map(paint)
+              .filter((p): p is cg.Paint => p !== undefined);
+
+            return {
+              id: node.id,
+              name: node.name,
+              active: node.visible ?? true,
+              locked: node.locked ?? false,
+              rotation: 0,
+              opacity: node.opacity ?? 1,
+              blend_mode: map.layerBlendModeMap[node.blendMode],
+              z_index: 0,
+              type: "polygon",
+              position: "absolute",
+              left: node.relativeTransform![0][2],
+              top: node.relativeTransform![1][2],
+              width: node.size!.x,
+              height: node.size!.y,
+              fills: fills_paints.length > 0 ? fills_paints : undefined,
+              strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
+              stroke_width: node.strokeWeight ?? 0,
+              stroke_align: node.strokeAlign
+                ? (map.strokeAlignMap[node.strokeAlign] ?? "center")
+                : undefined,
+              stroke_cap: node.strokeCap
+                ? (map.strokeCapMap[node.strokeCap] ?? "butt")
+                : "butt",
+              stroke_join: node.strokeJoin
+                ? (map.strokeJoinMap[node.strokeJoin] ?? "miter")
+                : "miter",
+              point_count: node.pointCount,
+            } satisfies grida.program.nodes.RegularPolygonNode;
+          }
+
           // components
           case "COMPONENT_SET": {
             throw new Error(`Unsupported node type: ${node.type}`);
@@ -933,5 +1152,783 @@ export namespace iofigma {
     }
 
     //
+  }
+
+  /**
+   * Namespace for converting Kiwi format (from .fig files and clipboard) to Figma REST API types
+   */
+  export namespace kiwi {
+    /**
+     * Convert Kiwi GUID to string ID
+     * Format: `sessionID:localID`
+     */
+    export function guid(kiwi: { sessionID: number; localID: number }): string {
+      return `${kiwi.sessionID}:${kiwi.localID}`;
+    }
+
+    export namespace map {
+      /**
+       * Convert Kiwi figrest.BlendMode to Figma REST API BlendMode
+       * Defaults to "PASS_THROUGH"
+       */
+      export function blendMode(
+        kiwi: figkiwi.BlendMode | undefined
+      ): figrest.BlendMode {
+        return (kiwi ?? "PASS_THROUGH") as figrest.BlendMode; // They use the same names
+      }
+
+      /**
+       * Convert Kiwi StrokeAlign to Figma REST API StrokeAlign
+       */
+      export function strokeAlign(
+        kiwi: figkiwi.StrokeAlign
+      ): "INSIDE" | "OUTSIDE" | "CENTER" {
+        return kiwi as "INSIDE" | "OUTSIDE" | "CENTER";
+      }
+
+      /**
+       * Convert Kiwi StrokeCap to Figma REST API StrokeCap
+       */
+      export function strokeCap(
+        kiwi: figkiwi.StrokeCap
+      ): figrest.LineNode["strokeCap"] {
+        // Kiwi has more cap types than REST API, map what we can
+        switch (kiwi) {
+          case "NONE":
+            return "NONE";
+          case "ROUND":
+            return "ROUND";
+          case "SQUARE":
+            return "SQUARE";
+          case "ARROW_LINES":
+            return "LINE_ARROW";
+          case "ARROW_EQUILATERAL":
+            return "TRIANGLE_ARROW";
+          case "DIAMOND_FILLED":
+            return "DIAMOND_FILLED";
+          case "TRIANGLE_FILLED":
+            return "TRIANGLE_FILLED";
+          case "CIRCLE_FILLED":
+            return "CIRCLE_FILLED";
+          default:
+            return "NONE";
+        }
+      }
+
+      /**
+       * Convert Kiwi StrokeJoin to Figma REST API StrokeJoin
+       */
+      export function strokeJoin(
+        kiwi: figkiwi.StrokeJoin
+      ): "MITER" | "BEVEL" | "ROUND" {
+        return kiwi as "MITER" | "BEVEL" | "ROUND";
+      }
+    }
+
+    export namespace factory {
+      /**
+       * Convert Kiwi Color to Figma REST API Color
+       */
+      function color(kiwi: figkiwi.Color): {
+        r: number;
+        g: number;
+        b: number;
+        a: number;
+      } {
+        return {
+          r: kiwi.r,
+          g: kiwi.g,
+          b: kiwi.b,
+          a: kiwi.a,
+        };
+      }
+
+      /**
+       * Convert Kiwi Vector to Figma REST API Vector
+       */
+      function vector(kiwi: figkiwi.Vector): { x: number; y: number } {
+        return {
+          x: kiwi.x,
+          y: kiwi.y,
+        };
+      }
+
+      /**
+       * Convert Kiwi Matrix to Figma REST API Transform
+       */
+      function transform(
+        kiwi: figkiwi.Matrix
+      ): [[number, number, number], [number, number, number]] {
+        return [
+          [kiwi.m00, kiwi.m01, kiwi.m02],
+          [kiwi.m10, kiwi.m11, kiwi.m12],
+        ];
+      }
+
+      /**
+       * Convert Kiwi GUID to string ID
+       * @deprecated Use iofigma.kiwi.guid() instead
+       */
+      const guid = iofigma.kiwi.guid;
+
+      /**
+       * Calculate absolute bounding box from transform and size
+       */
+      function absoluteBounds(
+        relativeTransform: [[number, number, number], [number, number, number]],
+        size: { x: number; y: number }
+      ): { x: number; y: number; width: number; height: number } {
+        const x = relativeTransform[0][2];
+        const y = relativeTransform[1][2];
+        return {
+          x,
+          y,
+          width: size.x,
+          height: size.y,
+        };
+      }
+
+      /**
+       * Convert Kiwi figrest.Paint to Figma REST API Paint
+       */
+      function paint(kiwi: figkiwi.Paint): figrest.Paint | undefined {
+        if (!kiwi.type) return undefined;
+
+        switch (kiwi.type) {
+          case "SOLID": {
+            if (!kiwi.color) return undefined;
+            return {
+              type: "SOLID",
+              visible: kiwi.visible ?? true,
+              opacity: kiwi.opacity ?? 1,
+              blendMode: kiwi.blendMode
+                ? map.blendMode(kiwi.blendMode)
+                : "NORMAL",
+              color: color(kiwi.color),
+            } satisfies figrest.SolidPaint;
+          }
+          case "GRADIENT_LINEAR":
+          case "GRADIENT_RADIAL":
+          case "GRADIENT_ANGULAR":
+          case "GRADIENT_DIAMOND": {
+            const gradientStops =
+              kiwi.stops?.map((stop) => ({
+                color: color(stop.color),
+                position: stop.position,
+              })) ?? [];
+
+            const gradientHandlePositions = kiwi.transform
+              ? [
+                  { x: kiwi.transform.m02, y: kiwi.transform.m12 },
+                  {
+                    x: kiwi.transform.m00 + kiwi.transform.m02,
+                    y: kiwi.transform.m10 + kiwi.transform.m12,
+                  },
+                  {
+                    x: kiwi.transform.m01 + kiwi.transform.m02,
+                    y: kiwi.transform.m11 + kiwi.transform.m12,
+                  },
+                ]
+              : [
+                  { x: 0, y: 0 },
+                  { x: 1, y: 0 },
+                  { x: 0, y: 1 },
+                ];
+
+            return {
+              type: kiwi.type,
+              visible: kiwi.visible ?? true,
+              opacity: kiwi.opacity ?? 1,
+              blendMode: kiwi.blendMode
+                ? map.blendMode(kiwi.blendMode)
+                : "NORMAL",
+              gradientStops,
+              gradientHandlePositions,
+            } as figrest.GradientPaint;
+          }
+          case "IMAGE": {
+            // Image paint support would require image hash and storage
+            // For now, return undefined or fallback
+            return undefined;
+          }
+          default:
+            return undefined;
+        }
+      }
+
+      /**
+       * Convert array of Kiwi Paints to Figma REST API Paints
+       */
+      function paints(kiwiPaints?: figkiwi.Paint[]): figrest.Paint[] {
+        if (!kiwiPaints) return [];
+        return kiwiPaints
+          .map(paint)
+          .filter((p): p is figrest.Paint => p !== undefined);
+      }
+
+      /**
+       * Convert NodeChange to RECTANGLE node
+       */
+      function rectangle(
+        nc: figkiwi.NodeChange
+      ): figrest.SubcanvasNode | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "RECTANGLE",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          fills: nc.fillPaints ? paints(nc.fillPaints) : [],
+          strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+          strokeWeight: nc.strokeWeight ?? 0,
+          strokeAlign: nc.strokeAlign
+            ? map.strokeAlign(nc.strokeAlign)
+            : "INSIDE",
+          strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
+          strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
+          cornerRadius: nc.cornerRadius ?? 0,
+          rectangleCornerRadii: nc.rectangleCornerRadiiIndependent
+            ? [
+                nc.rectangleTopLeftCornerRadius ?? 0,
+                nc.rectangleTopRightCornerRadius ?? 0,
+                nc.rectangleBottomRightCornerRadius ?? 0,
+                nc.rectangleBottomLeftCornerRadius ?? 0,
+              ]
+            : undefined,
+          effects: [],
+        };
+      }
+
+      /**
+       * Convert NodeChange to ELLIPSE node
+       */
+      function ellipse(
+        nc: figkiwi.NodeChange
+      ): figrest.SubcanvasNode | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "ELLIPSE",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          fills: nc.fillPaints ? paints(nc.fillPaints) : [],
+          strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+          strokeWeight: nc.strokeWeight ?? 0,
+          strokeAlign: nc.strokeAlign
+            ? map.strokeAlign(nc.strokeAlign)
+            : "INSIDE",
+          arcData: nc.arcData
+            ? {
+                startingAngle: nc.arcData.startingAngle ?? 0,
+                endingAngle: nc.arcData.endingAngle ?? 2 * Math.PI,
+                innerRadius: nc.arcData.innerRadius ?? 0,
+              }
+            : {
+                startingAngle: 0,
+                endingAngle: 2 * Math.PI,
+                innerRadius: 0,
+              },
+          effects: [],
+        };
+      }
+
+      /**
+       * Convert NodeChange to LINE node
+       */
+      function line(nc: figkiwi.NodeChange): figrest.SubcanvasNode | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "LINE",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          fills: [],
+          strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+          strokeWeight: nc.strokeWeight ?? 0,
+          strokeAlign: nc.strokeAlign
+            ? map.strokeAlign(nc.strokeAlign)
+            : "CENTER",
+          strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
+          strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
+          effects: [],
+        };
+      }
+
+      /**
+       * Convert NodeChange to TEXT node
+       */
+      function text(nc: figkiwi.NodeChange): figrest.SubcanvasNode | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const characters = nc.textData?.characters ?? "";
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "TEXT",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          characters,
+          fills: nc.fillPaints ? paints(nc.fillPaints) : [],
+          strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+          strokeWeight: nc.strokeWeight ?? 0,
+          style: {
+            fontFamily: nc.fontName?.family ?? "Inter",
+            fontPostScriptName: nc.fontName?.postscript,
+            fontWeight: 400,
+            fontSize: nc.fontSize ?? 12,
+            textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
+            textAlignVertical: nc.textAlignVertical ?? "TOP",
+            letterSpacing: nc.letterSpacing?.value ?? 0,
+            lineHeightPx:
+              nc.lineHeight?.units === "PIXELS"
+                ? nc.lineHeight.value
+                : undefined,
+            lineHeightPercent:
+              nc.lineHeight?.units === "PERCENT"
+                ? nc.lineHeight.value
+                : undefined,
+            lineHeightPercentFontSize:
+              nc.lineHeight?.units === "PERCENT" ? nc.lineHeight.value : 100,
+            textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
+            textCase:
+              nc.textCase === "ORIGINAL"
+                ? undefined
+                : (nc.textCase ?? undefined),
+            textDecoration: nc.textDecoration ?? "NONE",
+          },
+          characterStyleOverrides: [],
+          styleOverrideTable: {},
+          lineTypes: [],
+          lineIndentations: [],
+          effects: [],
+        };
+      }
+
+      /**
+       * Convert NodeChange to FRAME node
+       */
+      function frame(
+        nc: figkiwi.NodeChange
+      ): figrest.SubcanvasNode | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "FRAME",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          fills: nc.fillPaints ? paints(nc.fillPaints) : [],
+          strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+          strokeWeight: nc.strokeWeight ?? 0,
+          strokeAlign: nc.strokeAlign
+            ? map.strokeAlign(nc.strokeAlign)
+            : "INSIDE",
+          cornerRadius: nc.cornerRadius ?? 0,
+          rectangleCornerRadii: nc.rectangleCornerRadiiIndependent
+            ? [
+                nc.rectangleTopLeftCornerRadius ?? 0,
+                nc.rectangleTopRightCornerRadius ?? 0,
+                nc.rectangleBottomRightCornerRadius ?? 0,
+                nc.rectangleBottomLeftCornerRadius ?? 0,
+              ]
+            : undefined,
+          clipsContent: true,
+          children: [], // Children will be populated by parent logic
+          effects: [],
+        };
+      }
+
+      /**
+       * Convert NodeChange to GROUP node
+       */
+      function group(
+        nc: figkiwi.NodeChange
+      ): figrest.SubcanvasNode | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "GROUP",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          children: [], // Children will be populated by parent logic
+          clipsContent: false,
+          fills: [],
+          effects: [],
+        };
+      }
+
+      /**
+       * Convert Kiwi WindingRule to Figma REST API windingRule
+       */
+      function windingRule(kiwi: "NONZERO" | "ODD"): "NONZERO" | "EVENODD" {
+        return kiwi === "ODD" ? "EVENODD" : "NONZERO";
+      }
+
+      /**
+       * Convert NodeChange to VECTOR node or X_VECTOR with parsed vector network
+       */
+      function vectorNode(
+        nc: figkiwi.NodeChange,
+        message: figkiwi.Message
+      ):
+        | figrest.SubcanvasNode
+        | __ir.VectorNodeWithVectorNetworkDataPresent
+        | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        // Try to parse vector network blob if available
+        if (nc.vectorData?.vectorNetworkBlob !== undefined) {
+          const blobBytes = getBlobBytes(
+            nc.vectorData.vectorNetworkBlob,
+            message
+          );
+
+          if (blobBytes) {
+            const vectorNetwork = parseVectorNetworkBlob(blobBytes);
+
+            if (vectorNetwork) {
+              // Return X_VECTOR with parsed network data
+              return {
+                id: guid(nc.guid),
+                name: nc.name,
+                type: "X_VECTOR",
+                visible: nc.visible ?? true,
+                locked: nc.locked ?? false,
+                opacity: nc.opacity ?? 1,
+                blendMode: map.blendMode(nc.blendMode),
+                scrollBehavior: "SCROLLS",
+                size: sz,
+                relativeTransform: relTrans,
+                absoluteBoundingBox: bounds,
+                absoluteRenderBounds: bounds,
+                fills: nc.fillPaints ? paints(nc.fillPaints) : [],
+                strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+                strokeWeight: nc.strokeWeight ?? 0,
+                strokeAlign: nc.strokeAlign
+                  ? map.strokeAlign(nc.strokeAlign)
+                  : "INSIDE",
+                strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
+                strokeJoin: nc.strokeJoin
+                  ? map.strokeJoin(nc.strokeJoin)
+                  : "MITER",
+                effects: [],
+                cornerRadius: nc.cornerRadius ?? 0,
+                vectorNetwork, // Parsed vector network data
+              } as __ir.VectorNodeWithVectorNetworkDataPresent;
+            }
+          }
+        }
+
+        // Fallback to regular VECTOR with fillGeometry/strokeGeometry
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "VECTOR",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          fills: nc.fillPaints ? paints(nc.fillPaints) : [],
+          strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+          strokeWeight: nc.strokeWeight ?? 0,
+          strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
+          strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
+          fillGeometry: nc.fillGeometry?.map((path) => ({
+            path: "", // Would need to decode from commandsBlob
+            windingRule: path.windingRule
+              ? windingRule(path.windingRule)
+              : "NONZERO",
+          })),
+          strokeGeometry: nc.strokeGeometry?.map((path) => ({
+            path: "", // Would need to decode from commandsBlob
+            windingRule: path.windingRule
+              ? windingRule(path.windingRule)
+              : "NONZERO",
+          })),
+          effects: [],
+        };
+      }
+
+      /**
+       * Convert NodeChange to X_STAR node with point count and inner radius
+       */
+      function star(
+        nc: figkiwi.NodeChange
+      ): __ir.StarNodeWithPointsDataPresent | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "X_STAR",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          fills: nc.fillPaints ? paints(nc.fillPaints) : [],
+          strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+          strokeWeight: nc.strokeWeight ?? 0,
+          strokeAlign: nc.strokeAlign
+            ? map.strokeAlign(nc.strokeAlign)
+            : "INSIDE",
+          strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
+          strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
+          effects: [],
+          cornerRadius: nc.cornerRadius ?? 0,
+          pointCount: nc.count ?? 5, // From Kiwi
+          innerRadius: nc.starInnerScale ?? 0.5, // From Kiwi
+        } as __ir.StarNodeWithPointsDataPresent;
+      }
+
+      /**
+       * Convert NodeChange to X_REGULAR_POLYGON node with point count
+       */
+      function regularPolygon(
+        nc: figkiwi.NodeChange
+      ): __ir.RegularPolygonNodeWithPointsDataPresent | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const relTrans = nc.transform
+          ? transform(nc.transform)
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+            ];
+        const sz = nc.size ? vector(nc.size) : { x: 0, y: 0 };
+        const bounds = absoluteBounds(
+          relTrans as [[number, number, number], [number, number, number]],
+          sz
+        );
+
+        return {
+          id: guid(nc.guid),
+          name: nc.name,
+          type: "X_REGULAR_POLYGON",
+          visible: nc.visible ?? true,
+          locked: nc.locked ?? false,
+          opacity: nc.opacity ?? 1,
+          blendMode: map.blendMode(nc.blendMode),
+          scrollBehavior: "SCROLLS",
+          size: sz,
+          relativeTransform: relTrans,
+          absoluteBoundingBox: bounds,
+          absoluteRenderBounds: bounds,
+          fills: nc.fillPaints ? paints(nc.fillPaints) : [],
+          strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
+          strokeWeight: nc.strokeWeight ?? 0,
+          strokeAlign: nc.strokeAlign
+            ? map.strokeAlign(nc.strokeAlign)
+            : "INSIDE",
+          strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
+          strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
+          effects: [],
+          cornerRadius: nc.cornerRadius ?? 0,
+          pointCount: nc.count ?? 3, // From Kiwi
+        } as __ir.RegularPolygonNodeWithPointsDataPresent;
+      }
+
+      /**
+       * Main converter: NodeChange → SubcanvasNode or IR node
+       *
+       * Converts a Kiwi NodeChange to Figma REST API SubcanvasNode or intermediate representation (IR) node.
+       * This enables the conversion pipeline: Kiwi → Figma IR → Grida
+       *
+       * @param nodeChange Kiwi NodeChange from .fig file or clipboard
+       * @param message Message containing blobs array (required for vector network parsing)
+       * @returns Figma REST API compatible node, IR node, or undefined if unsupported/invalid
+       */
+      export function node(
+        nodeChange: figkiwi.NodeChange,
+        message: figkiwi.Message
+      ):
+        | figrest.SubcanvasNode
+        | __ir.VectorNodeWithVectorNetworkDataPresent
+        | __ir.StarNodeWithPointsDataPresent
+        | __ir.RegularPolygonNodeWithPointsDataPresent
+        | undefined {
+        if (!nodeChange.type) return undefined;
+
+        switch (nodeChange.type) {
+          case "RECTANGLE":
+          case "ROUNDED_RECTANGLE":
+            return rectangle(nodeChange);
+          case "ELLIPSE":
+            return ellipse(nodeChange);
+          case "LINE":
+            return line(nodeChange);
+          case "TEXT":
+            return text(nodeChange);
+          case "FRAME":
+            return frame(nodeChange);
+          case "GROUP":
+            return group(nodeChange);
+          case "VECTOR":
+            return vectorNode(nodeChange, message);
+          case "REGULAR_POLYGON":
+            return regularPolygon(nodeChange);
+          case "STAR":
+            return star(nodeChange);
+          default:
+            return undefined;
+        }
+      }
+    }
   }
 }

@@ -164,6 +164,33 @@ export namespace io {
       }
     }
 
+    /**
+     * Detects if HTML payload is Figma clipboard format.
+     *
+     * Figma uses a custom HTML format with base64-encoded metadata and binary data:
+     * ```html
+     * <meta charset="utf-8" />
+     * <span data-metadata="<!--(figmeta)BASE64_METADATA(/figmeta)-->"></span>
+     * <span data-buffer="<!--(figma)BASE64_KIWI_DATA(/figma)-->"></span>
+     * ```
+     *
+     * This function only checks for Figma-specific markers without parsing the payload.
+     * Actual parsing happens in the editor layer where @grida/io-figma is available.
+     *
+     * @param html - The HTML string from clipboard
+     * @returns true if the HTML contains Figma clipboard markers, false otherwise
+     */
+    export function isFigmaClipboard(html: string): boolean {
+      // Check for Figma-specific HTML markers
+      // Based on spec: fixtures/test-fig/clipboard/README.md
+      return (
+        html.includes("data-metadata") &&
+        html.includes("data-buffer") &&
+        html.includes("<!--(figmeta)") &&
+        html.includes("<!--(figma)")
+      );
+    }
+
     export function filetype(
       file: File
     ): [true, ValidFileType] | [false, string] {
@@ -193,7 +220,8 @@ export namespace io {
           file: File;
         }
       | { type: "text"; text: string }
-      | { type: "clipboard"; clipboard: ClipboardPayload };
+      | { type: "clipboard"; clipboard: ClipboardPayload }
+      | { type: "canbe-figma-clipboard"; html: string };
 
     /**
      * Decodes a DataTransferItem from the clipboard into a structured payload.
@@ -259,12 +287,18 @@ export namespace io {
           });
         } else if (item.kind === "string" && item.type === "text/html") {
           item.getAsString((html) => {
+            // Try Grida clipboard first
             const data = io.clipboard.decodeClipboardHtml(html);
             if (data) {
               return resolve({ type: "clipboard", clipboard: data });
-            } else {
-              return reject(new Error("Unknown HTML payload"));
             }
+
+            // Check if it's Figma clipboard format (without parsing)
+            if (io.clipboard.isFigmaClipboard(html)) {
+              return resolve({ type: "canbe-figma-clipboard", html });
+            }
+
+            return reject(new Error("Unknown HTML payload"));
           });
         } else {
           return resolve(null);

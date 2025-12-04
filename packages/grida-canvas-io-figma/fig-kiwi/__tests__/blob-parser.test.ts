@@ -33,15 +33,15 @@ describe("blob parser", () => {
     // Parse vector network
     const vectorNetwork = parseVectorNetworkBlob(blobBytes!);
     expect(vectorNetwork).not.toBeNull();
-    
+
     // Verify structure
     expect(vectorNetwork!.vertices).toBeDefined();
     expect(vectorNetwork!.segments).toBeDefined();
     expect(vectorNetwork!.regions).toBeDefined();
-    
+
     // Should have at least some data
     expect(vectorNetwork!.vertices.length).toBeGreaterThan(0);
-    
+
     // Log the parsed data for inspection
     console.log("Vector network parsed:");
     console.log(`  Vertices: ${vectorNetwork!.vertices.length}`);
@@ -91,13 +91,13 @@ describe("blob parser", () => {
     const commands = parseCommandsBlob(blobBytes!);
     expect(commands).not.toBeNull();
     expect(Array.isArray(commands)).toBe(true);
-    
+
     // Should have at least some commands
     expect(commands!.length).toBeGreaterThan(0);
-    
+
     // First command should be a string (M, L, etc.)
     expect(typeof commands![0]).toBe("string");
-    
+
     console.log("Commands parsed:");
     console.log(`  Total elements: ${commands!.length}`);
     console.log(`  First few:`, commands!.slice(0, 10));
@@ -137,4 +137,3 @@ describe("blob parser", () => {
     expect(parseVectorNetworkBlob(bytes)).toBeNull();
   });
 });
-
