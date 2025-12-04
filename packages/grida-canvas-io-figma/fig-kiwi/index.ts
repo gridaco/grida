@@ -6,9 +6,39 @@ import {
   decodeBinarySchema,
   encodeBinarySchema,
 } from "kiwi-schema";
-import defaultSchema, { Schema, Message } from "./schema";
+import defaultSchema, {
+  Schema,
+  Message,
+  NodeChange,
+  Paint,
+  Color,
+  Matrix,
+  Vector,
+  BlendMode,
+  StrokeAlign,
+  StrokeCap,
+  StrokeJoin,
+} from "./schema";
 
-export { type Schema, type Message };
+export {
+  type Schema,
+  type Message,
+  type NodeChange,
+  type Paint,
+  type Color,
+  type Matrix,
+  type Vector,
+  type BlendMode,
+  type StrokeAlign,
+  type StrokeCap,
+  type StrokeJoin,
+};
+
+export {
+  parseCommandsBlob,
+  parseVectorNetworkBlob,
+  type VectorNetwork,
+} from "./blob-parser";
 
 // --- Constants ---
 
@@ -280,4 +310,34 @@ export function writeFigFile(settings: {
   if (preview) writer.files.push(preview);
 
   return writer.write();
+}
+
+/**
+ * Get blob data by blob ID from Message.blobs array
+ *
+ * Resolves a blob reference (e.g., from vectorNetworkBlob, commandsBlob)
+ * to the actual blob bytes using the blobBaseIndex offset.
+ *
+ * @param blobId - Blob reference ID (from vectorNetworkBlob, commandsBlob, etc.)
+ * @param message - Parsed Message containing blobs array
+ * @returns Blob bytes, or null if not found
+ *
+ * @example
+ * ```typescript
+ * const parsed = readFigFile(data);
+ * const vectorNode = parsed.message.nodeChanges.find(nc => nc.type === "VECTOR");
+ *
+ * if (vectorNode?.vectorData?.vectorNetworkBlob) {
+ *   const blobBytes = getBlobBytes(vectorNode.vectorData.vectorNetworkBlob, parsed.message);
+ *   const vectorNetwork = parseVectorNetworkBlob(blobBytes);
+ * }
+ * ```
+ */
+export function getBlobBytes(
+  blobId: number,
+  message: Message
+): Uint8Array | null {
+  const index = blobId - (message.blobBaseIndex ?? 0);
+  const blob = message.blobs?.[index];
+  return blob?.bytes ?? null;
 }
