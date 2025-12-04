@@ -275,6 +275,81 @@ export namespace iofigma {
         return arr.filter((f) => f.visible !== false);
       }
 
+      /**
+       * Convert Figma Effect to Grida effect properties
+       */
+      function layer_effects_trait(effects: figrest.Effect[]): {
+        fe_blur?: cg.FeLayerBlur;
+        fe_backdrop_blur?: cg.FeBackdropBlur;
+        fe_shadows?: cg.FeShadow[];
+      } {
+        const shadows: cg.FeShadow[] = [];
+        let layerBlur: cg.FeLayerBlur | undefined;
+        let backdropBlur: cg.FeBackdropBlur | undefined;
+
+        effects.forEach((effect) => {
+          if (!effect.visible) return; // Skip inactive effects
+
+          switch (effect.type) {
+            case "DROP_SHADOW":
+              shadows.push({
+                type: "shadow",
+                dx: effect.offset.x,
+                dy: effect.offset.y,
+                blur: effect.radius,
+                spread: effect.spread ?? 0,
+                color: kolor.colorformats.newRGBA32F(
+                  effect.color.r,
+                  effect.color.g,
+                  effect.color.b,
+                  effect.color.a
+                ),
+                inset: false,
+              });
+              break;
+
+            case "INNER_SHADOW":
+              shadows.push({
+                type: "shadow",
+                dx: effect.offset.x,
+                dy: effect.offset.y,
+                blur: effect.radius,
+                spread: effect.spread ?? 0,
+                color: kolor.colorformats.newRGBA32F(
+                  effect.color.r,
+                  effect.color.g,
+                  effect.color.b,
+                  effect.color.a
+                ),
+                inset: true,
+              });
+              break;
+
+            case "LAYER_BLUR":
+              layerBlur = {
+                type: "filter-blur",
+                blur: { type: "blur", radius: effect.radius },
+                active: true,
+              };
+              break;
+
+            case "BACKGROUND_BLUR":
+              backdropBlur = {
+                type: "backdrop-filter-blur",
+                blur: { type: "blur", radius: effect.radius },
+                active: true,
+              };
+              break;
+          }
+        });
+
+        return {
+          fe_shadows: shadows.length > 0 ? shadows : undefined,
+          fe_blur: layerBlur,
+          fe_backdrop_blur: backdropBlur,
+        };
+      }
+
       function rectangleCornerRadius(
         rectangleCornerRadii?: number[] | [number, number, number, number],
         baseRadius: number = 0
@@ -550,6 +625,9 @@ export namespace iofigma {
               cross_axis_alignment: "start",
               main_axis_gap: itemSpacing ?? 0,
               cross_axis_gap: counterAxisSpacing ?? itemSpacing ?? 0,
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -695,6 +773,9 @@ export namespace iofigma {
               font_weight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
               font_kerning: true, // TODO: parse from features (`kern`)
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             };
           }
           case "RECTANGLE": {
@@ -755,6 +836,9 @@ export namespace iofigma {
                     : undefined,
                 //
                 style: {},
+                ...(node.effects?.length
+                  ? layer_effects_trait(node.effects)
+                  : {}),
               } satisfies grida.program.nodes.ImageNode;
             }
 
@@ -788,6 +872,9 @@ export namespace iofigma {
                 node.rectangleCornerRadii,
                 node.cornerRadius ?? 0
               ),
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {
@@ -839,6 +926,9 @@ export namespace iofigma {
               angle: cmath.rad2deg(
                 node.arcData.endingAngle - node.arcData.startingAngle
               ),
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {
@@ -885,6 +975,9 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: 0,
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             } satisfies grida.program.nodes.LineNode;
           }
           case "SLICE": {
@@ -972,6 +1065,9 @@ export namespace iofigma {
                   fill: "stroke" as const,
                 })) ?? []),
               ],
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             } satisfies grida.program.nodes.SVGPathNode;
           }
 
@@ -1033,6 +1129,9 @@ export namespace iofigma {
                 : "miter",
               corner_radius: node.cornerRadius ?? 0,
               vector_network: gridaVectorNetwork,
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             } satisfies grida.program.nodes.VectorNode;
           }
           case "X_STAR": {
@@ -1081,6 +1180,9 @@ export namespace iofigma {
                 : "miter",
               point_count: node.pointCount,
               inner_radius: node.innerRadius,
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             } satisfies grida.program.nodes.RegularStarPolygonNode;
           }
           case "X_REGULAR_POLYGON": {
@@ -1128,6 +1230,9 @@ export namespace iofigma {
                 ? (map.strokeJoinMap[node.strokeJoin] ?? "miter")
                 : "miter",
               point_count: node.pointCount,
+              ...(node.effects?.length
+                ? layer_effects_trait(node.effects)
+                : {}),
             } satisfies grida.program.nodes.RegularPolygonNode;
           }
 
@@ -1367,6 +1472,73 @@ export namespace iofigma {
       }
 
       /**
+       * Convert Kiwi Effects to Figma REST API Effects
+       */
+      function effects(kiwiEffects?: figkiwi.Effect[]): figrest.Effect[] {
+        if (!kiwiEffects) return [];
+
+        return kiwiEffects
+          .map((effect): figrest.Effect | undefined => {
+            if (!effect.type) return undefined;
+
+            switch (effect.type) {
+              case "DROP_SHADOW":
+                return {
+                  type: "DROP_SHADOW",
+                  visible: effect.visible ?? true,
+                  color: effect.color
+                    ? color(effect.color)
+                    : { r: 0, g: 0, b: 0, a: 0.5 },
+                  blendMode: effect.blendMode
+                    ? map.blendMode(effect.blendMode)
+                    : "NORMAL",
+                  offset: effect.offset
+                    ? vector(effect.offset)
+                    : { x: 0, y: 0 },
+                  radius: effect.radius ?? 0,
+                  spread: effect.spread ?? 0,
+                  showShadowBehindNode: effect.showShadowBehindNode ?? false,
+                } satisfies figrest.DropShadowEffect;
+
+              case "INNER_SHADOW":
+                return {
+                  type: "INNER_SHADOW",
+                  visible: effect.visible ?? true,
+                  color: effect.color
+                    ? color(effect.color)
+                    : { r: 0, g: 0, b: 0, a: 0.5 },
+                  blendMode: effect.blendMode
+                    ? map.blendMode(effect.blendMode)
+                    : "NORMAL",
+                  offset: effect.offset
+                    ? vector(effect.offset)
+                    : { x: 0, y: 0 },
+                  radius: effect.radius ?? 0,
+                  spread: effect.spread ?? 0,
+                } satisfies figrest.InnerShadowEffect;
+
+              case "FOREGROUND_BLUR":
+                return {
+                  type: "LAYER_BLUR",
+                  visible: effect.visible ?? true,
+                  radius: effect.radius ?? 0,
+                } satisfies figrest.BlurEffect;
+
+              case "BACKGROUND_BLUR":
+                return {
+                  type: "BACKGROUND_BLUR",
+                  visible: effect.visible ?? true,
+                  radius: effect.radius ?? 0,
+                } satisfies figrest.BlurEffect;
+
+              default:
+                return undefined;
+            }
+          })
+          .filter((e): e is figrest.Effect => e !== undefined);
+      }
+
+      /**
        * Convert NodeChange to RECTANGLE node
        */
       function rectangle(
@@ -1416,7 +1588,7 @@ export namespace iofigma {
                 nc.rectangleBottomLeftCornerRadius ?? 0,
               ]
             : undefined,
-          effects: [],
+          effects: effects(nc.effects),
         };
       }
 
@@ -1470,7 +1642,7 @@ export namespace iofigma {
                 endingAngle: 2 * Math.PI,
                 innerRadius: 0,
               },
-          effects: [],
+          effects: effects(nc.effects),
         };
       }
 
@@ -1513,7 +1685,7 @@ export namespace iofigma {
             : "CENTER",
           strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
           strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
-          effects: [],
+          effects: effects(nc.effects),
         };
       }
 
@@ -1582,7 +1754,7 @@ export namespace iofigma {
           styleOverrideTable: {},
           lineTypes: [],
           lineIndentations: [],
-          effects: [],
+          effects: effects(nc.effects),
         };
       }
 
@@ -1636,7 +1808,7 @@ export namespace iofigma {
             : undefined,
           clipsContent: true,
           children: [], // Children will be populated by parent logic
-          effects: [],
+          effects: effects(nc.effects),
         };
       }
 
@@ -1676,7 +1848,7 @@ export namespace iofigma {
           children: [], // Children will be populated by parent logic
           clipsContent: false,
           fills: [],
-          effects: [],
+          effects: effects(nc.effects),
         };
       }
 
@@ -1746,7 +1918,7 @@ export namespace iofigma {
                 strokeJoin: nc.strokeJoin
                   ? map.strokeJoin(nc.strokeJoin)
                   : "MITER",
-                effects: [],
+                effects: effects(nc.effects),
                 cornerRadius: nc.cornerRadius ?? 0,
                 vectorNetwork, // Parsed vector network data
               } as __ir.VectorNodeWithVectorNetworkDataPresent;
@@ -1785,7 +1957,7 @@ export namespace iofigma {
               ? windingRule(path.windingRule)
               : "NONZERO",
           })),
-          effects: [],
+          effects: effects(nc.effects),
         };
       }
 
@@ -1830,7 +2002,7 @@ export namespace iofigma {
             : "INSIDE",
           strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
           strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
-          effects: [],
+          effects: effects(nc.effects),
           cornerRadius: nc.cornerRadius ?? 0,
           pointCount: nc.count ?? 5, // From Kiwi
           innerRadius: nc.starInnerScale ?? 0.5, // From Kiwi
@@ -1878,7 +2050,7 @@ export namespace iofigma {
             : "INSIDE",
           strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
           strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
-          effects: [],
+          effects: effects(nc.effects),
           cornerRadius: nc.cornerRadius ?? 0,
           pointCount: nc.count ?? 3, // From Kiwi
         } as __ir.RegularPolygonNodeWithPointsDataPresent;
