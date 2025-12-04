@@ -12,33 +12,45 @@
  *   - No package.json or dependencies to manage - Deno downloads them automatically
  *
  * USAGE:
- *   deno run --allow-read --allow-write --allow-net fig2kiwi.ts <input.fig> [output.kiwi]
+ *   deno run --allow-read --allow-write --allow-net fig2kiwi.ts <input.fig> [output-name] [--produce-cpp]
  *
  *   Or make it executable:
  *   chmod +x fig2kiwi.ts
- *   ./fig2kiwi.ts <input.fig> [output.kiwi]
+ *   ./fig2kiwi.ts <input.fig> [output-name] [--produce-cpp]
  *
  * EXAMPLES:
- *   # Extract schema, output to input.kiwi (default)
+ *   # Extract schema, output to fig.kiwi and fig.kiwi.d.ts (default)
  *   deno run --allow-read --allow-write --allow-net fig2kiwi.ts file.fig
  *
- *   # Extract schema to specific file
- *   deno run --allow-read --allow-write --allow-net fig2kiwi.ts file.fig schema.kiwi
+ *   # Extract schema to custom name
+ *   deno run --allow-read --allow-write --allow-net fig2kiwi.ts file.fig schema
+ *   # Outputs: schema.kiwi and schema.kiwi.d.ts
+ *
+ *   # Include C++ header (optional, produces large file ~1.8MB)
+ *   deno run --allow-read --allow-write --allow-net fig2kiwi.ts file.fig schema --produce-cpp
+ *   # Outputs: schema.kiwi, schema.kiwi.d.ts, and schema.kiwi.h
  *
  * WHAT IT DOES:
  *   1. Parses the .fig file (handles both raw archives and ZIP-wrapped files)
  *   2. Extracts the schema from the first chunk
  *   3. Converts it to human-readable Kiwi schema format
- *   4. Saves it as a .kiwi text file (or your specified extension)
+ *   4. Generates TypeScript definitions from the schema
+ *   5. Optionally generates C++ definitions (with --produce-cpp flag)
  *
- * OUTPUT FORMAT:
- *   The output format is the same as the schema text format used in kiwi-schema.
- *   It's a human-readable Kiwi schema definition with enums, structs, and messages.
+ * OUTPUT FILES:
+ *   - [name].kiwi - Human-readable Kiwi schema definition (enums, structs, messages)
+ *   - [name].kiwi.d.ts - TypeScript type definitions for the schema
+ *   - [name].kiwi.h - C++ header definitions (only with --produce-cpp flag)
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { inflateSync, unzipSync } from "npm:fflate@0.8.2";
-import { decodeBinarySchema, prettyPrintSchema } from "npm:kiwi-schema@0.5.0";
+import {
+  decodeBinarySchema,
+  prettyPrintSchema,
+  compileSchemaTypeScript,
+  compileSchemaCPP,
+} from "npm:kiwi-schema@0.5.0";
 
 // --- Constants ---
 
@@ -164,21 +176,25 @@ function main() {
 
   if (args.length === 0) {
     console.error(
-      "Usage: deno run --allow-read --allow-write --allow-net scripts/fig2kiwi.ts <input.fig> [output.kiwi]"
+      "Usage: deno run --allow-read --allow-write --allow-net fig2kiwi.ts <input.fig> [output-name] [--produce-cpp]"
     );
     console.error("");
     console.error("Examples:");
     console.error(
-      "  deno run --allow-read --allow-write --allow-net scripts/fig2kiwi.ts file.fig"
+      "  deno run --allow-read --allow-write --allow-net fig2kiwi.ts file.fig"
     );
     console.error(
-      "  deno run --allow-read --allow-write --allow-net scripts/fig2kiwi.ts file.fig schema.kiwi"
+      "  deno run --allow-read --allow-write --allow-net fig2kiwi.ts file.fig schema"
+    );
+    console.error(
+      "  deno run --allow-read --allow-write --allow-net fig2kiwi.ts file.fig schema --produce-cpp"
     );
     Deno.exit(1);
   }
 
   const inputFile = args[0];
-  const outputFile = args[1] || inputFile.replace(/\.fig$/, ".kiwi");
+  const outputName = args[1] && !args[1].startsWith("--") ? args[1] : "fig";
+  const produceCpp = args.includes("--produce-cpp");
 
   try {
     console.log(`Reading ${inputFile}...`);
@@ -189,15 +205,39 @@ function main() {
 
     console.log(`Extracting schema (version ${parsed.header.version})...`);
     const schemaText = prettyPrintSchema(parsed.schema);
+    const schemaTypescript = compileSchemaTypeScript(parsed.schema);
 
-    console.log(`Writing schema to ${outputFile}...`);
-    writeFileSync(outputFile, schemaText, "utf8");
+    const kiwiFile = `${outputName}.kiwi`;
+    const dtsFile = `${outputName}.kiwi.d.ts`;
+
+    console.log(`Writing schema to ${kiwiFile}...`);
+    writeFileSync(kiwiFile, schemaText, "utf8");
+
+    console.log(`Writing TypeScript definitions to ${dtsFile}...`);
+    writeFileSync(dtsFile, schemaTypescript, "utf8");
+
+    const outputs = [kiwiFile, dtsFile];
+
+    if (produceCpp) {
+      console.log(`Generating C++ definitions...`);
+      const schemaCpp = compileSchemaCPP(parsed.schema);
+      const cppFile = `${outputName}.kiwi.h`;
+
+      console.log(`Writing C++ definitions to ${cppFile}...`);
+      writeFileSync(cppFile, schemaCpp, "utf8");
+
+      outputs.push(cppFile);
+      console.log(`  C++ definitions: ${schemaCpp.length} characters`);
+    }
 
     console.log(`✓ Schema extracted successfully!`);
     console.log(`  Input:  ${inputFile}`);
-    console.log(`  Output: ${outputFile}`);
+    console.log(`  Output: ${outputs.join(", ")}`);
     console.log(`  Schema version: ${parsed.header.version}`);
     console.log(`  Schema size: ${schemaText.length} characters`);
+    console.log(
+      `  TypeScript definitions: ${schemaTypescript.length} characters`
+    );
   } catch (error) {
     console.error(
       `Error: ${error instanceof Error ? error.message : String(error)}`

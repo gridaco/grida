@@ -2180,6 +2180,7 @@ message NodeChange {
   AnnotationCategories annotationCategories = 453;
   ShapeWithTextType shapeWithTextType = 241;
   float shapeUserHeight = 247;
+  bool isStrokePaintDerived = 530;
   DerivedImmutableFrameData derivedImmutableFrameData = 254;
   MultiplayerFieldVersion derivedImmutableFrameDataVersion = 338;
   NodeGenerationData nodeGenerationData = 240;
