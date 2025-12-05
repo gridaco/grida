@@ -13,10 +13,7 @@ import {
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
-import {
-  ScenesGroup,
-  NodeHierarchyGroup,
-} from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
+import { DocumentHierarchy } from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
 import {
   StandaloneDocumentEditor,
   StandaloneSceneContent,
@@ -609,10 +606,8 @@ function SidebarLeft() {
                 </span>
               </header>
             </SidebarHeader>
-            <SidebarContent>
-              <ScenesGroup />
-              <hr />
-              <NodeHierarchyGroup />
+            <SidebarContent className="p-0 overflow-hidden">
+              <DocumentHierarchy />
             </SidebarContent>
           </Sidebar>
         </>
