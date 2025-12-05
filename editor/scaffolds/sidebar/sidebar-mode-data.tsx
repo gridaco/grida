@@ -112,12 +112,12 @@ export function ModeData() {
           <DropdownMenuGroup>
             <DropdownMenuLabel>CMS</DropdownMenuLabel>
             <DropdownMenuItem onSelect={newTableDialog.openDialog}>
-              <ResourceTypeIcon type="table" className="size-4 me-2" />
+              <ResourceTypeIcon type="table" className="size-4" />
               New Empty Table
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <ResourceTypeIcon type="table" className="size-4 me-2" />
+                <ResourceTypeIcon type="table" className="size-4" />
                 Examples
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
@@ -130,7 +130,7 @@ export function ModeData() {
                     });
                   }}
                 >
-                  <ResourceTypeIcon type="table" className="size-4 me-2" />
+                  <ResourceTypeIcon type="table" className="size-4" />
                   Blog
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -142,7 +142,7 @@ export function ModeData() {
                     });
                   }}
                 >
-                  <ResourceTypeIcon type="table" className="size-4 me-2" />
+                  <ResourceTypeIcon type="table" className="size-4" />
                   CMS Starter
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
@@ -152,7 +152,7 @@ export function ModeData() {
             <DropdownMenuLabel>Supabase</DropdownMenuLabel>
             {state.supabase_project && (
               <DropdownMenuItem onSelect={newXSBTableDialog.openDialog}>
-                <SupabaseLogo className="size-4 me-2" />
+                <SupabaseLogo className="size-4" />
                 Connect Table
               </DropdownMenuItem>
             )}
@@ -164,7 +164,7 @@ export function ModeData() {
               })}
             >
               <DropdownMenuItem>
-                <SupabaseLogo className="size-4 me-2" />
+                <SupabaseLogo className="size-4" />
                 {state.supabase_project ? "Settings" : "Connect"}
               </DropdownMenuItem>
             </Link>
