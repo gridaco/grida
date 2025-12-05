@@ -78,6 +78,7 @@ export interface ParsedFigmaHTML extends ParsedFigma {
 
 export interface ParsedFigmaArchive extends ParsedFigma {
   preview: Uint8Array;
+  zip_files?: { [key: string]: Uint8Array };
 }
 
 // --- Archive Handling ---
@@ -245,10 +246,14 @@ export function writeHTMLMessage(m: {
 
 export function readFigFile(data: Uint8Array): ParsedFigmaArchive {
   let archiveData = data;
+  let zipFiles: { [key: string]: Uint8Array } | undefined;
 
   if (isSignature(data, ZIP_SIGNATURE)) {
     const unzipped = unzipSync(data);
     const keys = Object.keys(unzipped);
+
+    // Store ZIP contents for utility functions
+    zipFiles = unzipped;
 
     // Find main figma file
     const mainFile =
@@ -271,7 +276,7 @@ export function readFigFile(data: Uint8Array): ParsedFigmaArchive {
     archiveData = unzipped[mainFile];
   }
 
-  return parseFigData(archiveData);
+  return { ...parseFigData(archiveData), zip_files: zipFiles };
 }
 
 function parseFigData(data: Uint8Array): ParsedFigmaArchive {
@@ -340,4 +345,69 @@ export function getBlobBytes(
   const index = blobId - (message.blobBaseIndex ?? 0);
   const blob = message.blobs?.[index];
   return blob?.bytes ?? null;
+}
+
+// --- Archive Utilities ---
+
+/**
+ * Convert image hash from Kiwi schema to hex string
+ * @param hash - SHA-1 hash as Uint8Array (20 bytes)
+ * @returns Hex string (40 characters)
+ */
+export function imageHashToString(hash: Uint8Array): string {
+  return Array.from(hash)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * Extract images from .fig ZIP archive
+ * @param zipFiles - Raw ZIP contents from ParsedFigmaArchive.zip_files
+ * @returns Map of hash (hex string) to image bytes
+ */
+export function extractImages(
+  zipFiles: { [key: string]: Uint8Array } | undefined
+): Map<string, Uint8Array> {
+  const images = new Map<string, Uint8Array>();
+
+  if (!zipFiles) return images;
+
+  Object.keys(zipFiles)
+    .filter((key) => key.startsWith("images/") && key !== "images/")
+    .forEach((key) => {
+      const hash = key.replace("images/", "");
+      images.set(hash, zipFiles[key]);
+    });
+
+  return images;
+}
+
+/**
+ * Extract thumbnail from .fig ZIP archive
+ * @param zipFiles - Raw ZIP contents from ParsedFigmaArchive.zip_files
+ * @returns Thumbnail image bytes or undefined
+ */
+export function getThumbnail(
+  zipFiles: { [key: string]: Uint8Array } | undefined
+): Uint8Array | undefined {
+  return zipFiles?.["thumbnail.png"];
+}
+
+/**
+ * Extract and parse meta.json from .fig ZIP archive
+ * @param zipFiles - Raw ZIP contents from ParsedFigmaArchive.zip_files
+ * @returns Parsed metadata object or undefined
+ */
+export function getMeta(
+  zipFiles: { [key: string]: Uint8Array } | undefined
+): any | undefined {
+  const metaBytes = zipFiles?.["meta.json"];
+  if (!metaBytes) return undefined;
+
+  try {
+    const metaText = new TextDecoder().decode(metaBytes);
+    return JSON.parse(metaText);
+  } catch {
+    return undefined;
+  }
 }
