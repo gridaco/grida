@@ -37,6 +37,7 @@ import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
   DownloadIcon,
+  UploadIcon,
   FigmaLogoIcon,
   FileIcon,
   GearIcon,
@@ -66,6 +67,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { saveAs } from "file-saver";
 import { v4 } from "uuid";
+import { nanoid } from "nanoid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
@@ -849,29 +851,68 @@ function PlaygroundMenuContent() {
             ),
           });
         }}
+        onImportFig={async (result) => {
+          const { FigImporter } = await import("@grida/io-figma");
+
+          // Parse the .fig file
+          const buffer = await result.file.arrayBuffer();
+          const figFile = FigImporter.parseFile(new Uint8Array(buffer));
+
+          // TODO: Future enhancement - support importing entire document as single operation
+          // Currently loops per-scene for simplicity and to avoid bugs
+
+          // Process each page as a separate scene
+          for (const page of figFile.pages) {
+            const sceneId = `scene-${nanoid()}`;
+            instance.doc.createScene({ id: sceneId, name: page.name });
+
+            if (page.rootNodes.length > 0) {
+              const packedDoc = FigImporter.convertPageToScene(page, {
+                gradient_id_generator: () => v4(),
+              });
+              instance.insert({ document: packedDoc });
+            }
+          }
+        }}
       />
 
       <SettingsDialog {...settingsDialog.props} />
 
       <DropdownMenuContent align="start" className="min-w-52">
-        <DropdownMenuItem
-          onClick={importFromJson.openDialog}
-          className="text-xs"
-        >
-          <FileIcon className="size-3.5" />
-          Open .grida
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onExport} className="text-xs">
-          <DownloadIcon className="size-3.5" />
-          Save as .grida
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={importFromFigmaDialog.openDialog}
-          className="text-xs"
-        >
-          <FigmaLogoIcon className="size-3.5" />
-          Import Figma
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            <FileIcon className="size-3.5" />
+            File
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuItem
+              onClick={importFromJson.openDialog}
+              className="text-xs"
+            >
+              <FileIcon className="size-3.5" />
+              Open .grida
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExport} className="text-xs">
+              <DownloadIcon className="size-3.5" />
+              Save as .grida
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs">
+                <UploadIcon className="size-3.5" />
+                Import
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  onClick={importFromFigmaDialog.openDialog}
+                  className="text-xs"
+                >
+                  <FigmaLogoIcon className="size-3.5" />
+                  Import Figma
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={settingsDialog.openDialog}
@@ -884,7 +925,7 @@ function PlaygroundMenuContent() {
         <DropdownMenuSeparator />
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="text-xs">
-            <OpenInNewWindowIcon className="size-3.5 me-2" />
+            <OpenInNewWindowIcon className="size-3.5" />
             Tools
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
@@ -916,7 +957,7 @@ function PlaygroundMenuContent() {
         </DropdownMenuSub>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="text-xs">
-            <MixIcon className="size-3.5 me-2" />
+            <MixIcon className="size-3.5" />
             Examples
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
