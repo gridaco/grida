@@ -15,7 +15,7 @@ This document describes how the Grida canvas handles SVG content throughout copy
 | -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------- |
 | Drag & drop SVG file | Drop `.svg` files from the desktop, downloads, or library assets onto the canvas | Converts the SVG into editable nodes positioned at the drop target.                   | ready   |
 | Paste SVG file       | `Cmd/Ctrl + V` when the system clipboard holds an SVG file item                  | Reads the SVG payload and inserts it at the viewport centre as editable vector nodes. | ready   |
-| Paste SVG text       | `Cmd/Ctrl + V` with raw `<svg>` markup in the clipboard                          | Parses the markup and inserts the resulting nodes at the viewport centre.             | planned |
+| Paste SVG text       | `Cmd/Ctrl + V` with raw `<svg>` markup in the clipboard                          | Parses the markup and inserts the resulting nodes at the viewport centre.             | ready   |
 | Copy as SVG          | context menu → Copy/Paste as… → Copy as SVG                                      | Exports the selection as optimised SVG markup and writes it to the system clipboard.  | planned |
 
 ---
@@ -61,19 +61,12 @@ Although the core insertion path exists, the feature is still considered partial
 
 ### 2. Paste SVG Text Payloads
 
-Designers often copy raw SVG markup from code editors or inspection tools. The editor should interpret plain-text payloads that describe an SVG document even when no file item exists:
+The editor now interprets plain-text clipboard payloads that contain SVG markup:
 
-- **Detection** – When the primary clipboard item is `text/plain`, trim whitespace and check if it starts with `<svg`. Only treat the payload as vector data if both opening and closing `<svg>` tags are present and a `viewBox` attribute exists (required for sizing).
-- **Minimal valid payload** – The parser should accept markup as small as:
-
-  ```xml
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>
-  ```
-
-  The `xmlns` attribute can be empty, and self-contained SVG documents with no children create empty container nodes.
-
-- **Fallback** – If validation fails, revert to the default text paste behaviour (inserting a text node that holds the clipboard string) so that standard clipboard expectations are preserved.
-- **Placement** – Insert the resulting vector nodes at the viewport centre with the same naming strategy used for file drops (e.g., `Pasted SVG` plus a counter).
+- **Detection** – Validates SVG by checking for the required SVG namespace (`xmlns="http://www.w3.org/2000/svg"`), opening `<svg` tag, and closing `</svg>` tag. This follows W3C SVG standards and works with XML declarations (`<?xml version="1.0"?>`).
+- **Conversion** – The SVG string is passed to `createNodeFromSvg`, which parses and optimizes the markup before converting it into native Grida nodes.
+- **Placement** – The resulting nodes are inserted at the viewport center, using "SVG" as the default node name.
+- **Fallback** – If the text doesn't match SVG format (missing xmlns or incomplete markup), it's handled as regular text and creates a text node as expected.
 
 ### 3. Copy as SVG
 

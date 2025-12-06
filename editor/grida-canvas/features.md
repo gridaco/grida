@@ -142,7 +142,8 @@ This document lists all implemented features including the ones that are not yet
 
 ### Uncategorised, TODOs & Suggestions.
 
-- [external] drop image / svg to insert
+- [x] drop image / svg to insert
+- [x] paste svg text from clipboard
 - [external] paste value from clipboard
 
 ### Known Limitations

@@ -25,6 +25,7 @@ use math2::transform::AffineTransform;
 use reqwest;
 use serde_json;
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -299,6 +300,12 @@ async fn load_scene_from_source(source: &str) -> Result<Scene> {
 }
 
 async fn load_figma_scene(args: &FigmaArgs) -> Result<(Scene, FigmaConverter)> {
+    let resolved_api_key = args
+        .api_key
+        .as_deref()
+        .map(String::from)
+        .or_else(|| env::var("X_FIGMA_TOKEN").ok());
+
     let file = if let Some(archive_dir) = args.archive_dir.as_deref() {
         let archive_path = Path::new(archive_dir);
         if !archive_path.exists() {
@@ -326,10 +333,12 @@ async fn load_figma_scene(args: &FigmaArgs) -> Result<(Scene, FigmaConverter)> {
         let file_key = args.file_key.as_deref().ok_or_else(|| {
             anyhow!("file-key is required when not using --file or --archive-dir")
         })?;
-        let api_key = args
-            .api_key
-            .as_deref()
-            .ok_or_else(|| anyhow!("api-key is required when not using --file or --archive-dir"))?;
+        let api_key = resolved_api_key.as_deref().ok_or_else(|| {
+            anyhow!(
+                "api-key is required when not using --file or --archive-dir. \
+                 Provide it via --api-key flag or X_FIGMA_TOKEN environment variable"
+            )
+        })?;
 
         let configuration = create_figma_configuration(api_key);
         get_file(
@@ -361,6 +370,12 @@ async fn load_figma_scene(args: &FigmaArgs) -> Result<(Scene, FigmaConverter)> {
 }
 
 async fn load_scene_images_from_source(args: &FigmaArgs) -> Result<HashMap<String, String>> {
+    let resolved_api_key = args
+        .api_key
+        .as_deref()
+        .map(String::from)
+        .or_else(|| env::var("X_FIGMA_TOKEN").ok());
+
     if args.no_image {
         println!("Skipping image loading (--no-image flag)");
         return Ok(HashMap::new());
@@ -419,10 +434,12 @@ async fn load_scene_images_from_source(args: &FigmaArgs) -> Result<HashMap<Strin
         .file_key
         .as_deref()
         .ok_or_else(|| anyhow!("file-key is required when not using --file or --archive-dir"))?;
-    let api_key = args
-        .api_key
-        .as_deref()
-        .ok_or_else(|| anyhow!("api-key is required when not using --file or --archive-dir"))?;
+    let api_key = resolved_api_key.as_deref().ok_or_else(|| {
+        anyhow!(
+            "api-key is required when not using --file or --archive-dir. \
+             Provide it via --api-key flag or X_FIGMA_TOKEN environment variable"
+        )
+    })?;
 
     println!("Loading images from Figma API");
     let configuration = create_figma_configuration(api_key);

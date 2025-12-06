@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Setup Node.js
@@ -25,4 +27,3 @@ jobs:
         run: pnpm turbo build --filter='./packages/*'
       - name: Run Tests
         run: pnpm turbo test --filter='!./crates/*'
-

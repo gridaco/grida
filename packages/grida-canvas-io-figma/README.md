@@ -1,14 +1,38 @@
 # @grida/io-figma
 
-Utilities for converting Figma REST API data into the Grida Canvas schema.
+Utilities for converting Figma data (clipboard and REST API) into the Grida Canvas schema.
 
-## Status
+> **⚠️ Stability Notice**
+>
+> Figma clipboard integration relies on Figma's internal "Kiwi" format, which is not a public API and may change without notice. If clipboard import stops working after a Figma update, please [report an issue](https://github.com/gridaco/grida/issues/new).
 
-This package is **under development** and its API may change without notice.
+## Features
+
+### Supported Formats
+
+- **Figma Clipboard (Kiwi)** - Internal format used in `.fig` files and clipboard
+- **Figma REST API** - Public API format
+
+### Supported Node Types
+
+- ✅ Containers (Frame, Component, Instance, Section, Group)
+- ✅ Shapes (Rectangle, Ellipse, Line, Polygon, Star)
+- ✅ Vectors (Vector paths, Boolean operations)
+- ✅ Text with full style support
+- ✅ Effects (shadows, blur, backdrop blur)
+- ✅ All stroke and fill properties
+
+### Conversion Pipeline
+
+```
+Kiwi Format → REST API Format → Grida Schema
+```
+
+The package uses trait-based conversion to ensure consistency and maintainability across all node types.
 
 ## Limitations
 
-- Supports only a subset of Figma node types.
-- Boolean operations, component nodes and FigJam specific nodes are not handled.
-- Gradient transforms, image fills and effects are not fully implemented.
-- Group conversion does not preserve constraints of child layers.
+- Component sets not supported
+- FigJam-specific nodes (STICKY, CONNECTOR, TABLE, etc.) not supported
+- Advanced auto-layout properties partially supported
+- Style and variable bindings not preserved
