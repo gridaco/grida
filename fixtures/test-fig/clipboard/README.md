@@ -64,8 +64,10 @@ Base64-encoded Kiwi binary data containing:
 - To detect a GROUP-originated FRAME, check:
   - `frameMaskDisabled === false` (real FRAMEs have `true`)
   - `resizeToFit === true` (real FRAMEs don't have this property)
+  - No paints: `fillPaints`, `strokePaints`, and `backgroundPaints` are all empty/undefined
+    (GROUPs don't have fills or strokes, so this is an additional safety check)
 
-This behavior is consistent in both clipboard payloads and `.fig` files. See [`docs/wg/feat-fig/glossary/fig.kiwi.md`](wg/feat-fig/glossary/fig.kiwi.md) for more details.
+This behavior is consistent in both clipboard payloads and `.fig` files. See [`docs/wg/feat-fig/glossary/fig.kiwi.md`](../../../docs/wg/feat-fig/glossary/fig.kiwi.md) for detailed detection logic and implementation.
 
 ## Usage
 

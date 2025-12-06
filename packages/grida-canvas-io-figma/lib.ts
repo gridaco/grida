@@ -1373,8 +1373,19 @@ export namespace iofigma {
 
       /**
        * HasFramePropertiesTrait - Clips content
+       * Maps frameMaskDisabled to clipsContent.
+       *
+       * Mapping:
+       * - frameMaskDisabled: true → clipsContent: true (mask disabled = clipping enabled)
+       * - frameMaskDisabled: false → clipsContent: false (mask enabled = clipping disabled)
+       * - frameMaskDisabled: undefined → clipsContent: false (default, no clipping)
+       *
+       * Note: This is separate from GROUP detection. GROUPs are handled separately
+       * in the frame() function and always have clipsContent: false.
        */
-      function kiwi_frame_clip_trait(clipsContent: boolean = true) {
+      function kiwi_frame_clip_trait(nc: figkiwi.NodeChange) {
+        // Map frameMaskDisabled directly to clipsContent, default to false
+        const clipsContent = nc.frameMaskDisabled ?? false;
         return { clipsContent };
       }
 
@@ -1519,20 +1530,69 @@ export namespace iofigma {
       }
 
       /**
+       * Detect if a FRAME node is actually a GROUP-originated FRAME
+       *
+       * Figma converts GROUP nodes to FRAME nodes in both clipboard and .fig files.
+       * We can detect GROUP-originated FRAMEs using:
+       * - frameMaskDisabled === false (real FRAMEs have true)
+       * - resizeToFit === true (real FRAMEs don't have this property)
+       * - No paints: fillPaints, strokePaints, and backgroundPaints are all empty/undefined
+       *   (GROUPs don't have fills or strokes, so this is an additional safety check)
+       *
+       * See: https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi.md for detailed documentation
+       */
+      function isGroupOriginatedFrame(nc: figkiwi.NodeChange): boolean {
+        if (nc.type !== "FRAME") {
+          return false;
+        }
+
+        // Check primary indicators
+        if (nc.frameMaskDisabled !== false || nc.resizeToFit !== true) {
+          return false;
+        }
+
+        // Additional safety check: GROUPs have no paints
+        const hasNoFills = !nc.fillPaints || nc.fillPaints.length === 0;
+        const hasNoStrokes = !nc.strokePaints || nc.strokePaints.length === 0;
+        const hasNoBackgroundPaints =
+          !nc.backgroundPaints || nc.backgroundPaints.length === 0;
+
+        return hasNoFills && hasNoStrokes && hasNoBackgroundPaints;
+      }
+
+      /**
        * Convert NodeChange to FRAME node
+       *
+       * Note: If the FRAME is detected as GROUP-originated (via frameMaskDisabled and resizeToFit),
+       * it will be converted to GroupNode instead of FrameNode.
        */
       function frame(
         nc: figkiwi.NodeChange
       ): figrest.SubcanvasNode | undefined {
         if (!nc.guid || !nc.name || !nc.size) return undefined;
 
+        // Check if this FRAME is actually a GROUP-originated FRAME
+        if (isGroupOriginatedFrame(nc)) {
+          // Convert to GroupNode instead of FrameNode
+          return {
+            ...kiwi_is_layer_trait(nc, "GROUP"),
+            ...kiwi_blend_opacity_trait(nc),
+            ...kiwi_layout_trait(nc),
+            ...kiwi_children_trait(),
+            clipsContent: false,
+            fills: [],
+            ...kiwi_effects_trait(nc),
+          } satisfies figrest.GroupNode;
+        }
+
+        // Regular FRAME node
         return {
           ...kiwi_is_layer_trait(nc, "FRAME"),
           ...kiwi_blend_opacity_trait(nc),
           ...kiwi_layout_trait(nc),
           ...kiwi_geometry_trait(nc),
           ...kiwi_corner_trait(nc),
-          ...kiwi_frame_clip_trait(true),
+          ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
         } satisfies figrest.FrameNode;
@@ -1569,7 +1629,7 @@ export namespace iofigma {
           ...kiwi_layout_trait(nc),
           ...kiwi_geometry_trait(nc),
           ...kiwi_corner_trait(nc),
-          ...kiwi_frame_clip_trait(true),
+          ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
         } satisfies figrest.ComponentNode;
@@ -1593,7 +1653,7 @@ export namespace iofigma {
           overrides: [],
           ...kiwi_geometry_trait(nc),
           ...kiwi_corner_trait(nc),
-          ...kiwi_frame_clip_trait(true),
+          ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
         } satisfies figrest.InstanceNode;
@@ -1781,11 +1841,10 @@ export namespace iofigma {
             return frame(nodeChange);
           case "SECTION":
             return section(nodeChange);
-          // TODO: need more sophisticated handling, need to construct nested sub tree to render properly in grida
-          // case "SYMBOL":
-          //   return component(nodeChange);
-          // case "INSTANCE":
-          //   return instance(nodeChange);
+          case "SYMBOL":
+            return component(nodeChange);
+          case "INSTANCE":
+            return instance(nodeChange);
           case "GROUP":
             return group(nodeChange);
           case "VECTOR":

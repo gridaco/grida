@@ -63,6 +63,9 @@ Properties we've analyzed and documented from the Kiwi schema:
 | `sortPosition`         | `string?`     | `NodeChange.sortPosition`      | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types          |
 | `frameMaskDisabled`    | `boolean?`    | `NodeChange.frameMaskDisabled` | Frame clipping mask setting            | `false` for GROUP-originated FRAMEs, `true` for real FRAMEs                       |
 | `resizeToFit`          | `boolean?`    | `NodeChange.resizeToFit`       | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                   |
+| `fillPaints`           | `Paint[]?`    | `NodeChange.fillPaints`        | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)        |
+| `strokePaints`         | `Paint[]?`    | `NodeChange.strokePaints`      | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)        |
+| `backgroundPaints`     | `Paint[]?`    | `NodeChange.backgroundPaints`  | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)        |
 
 ### parentIndex
 
@@ -130,25 +133,39 @@ const sortedChildren = children.sort((a, b) => {
 
 **Detection Properties:**
 
-| Property            | Real FRAME  | GROUP-originated FRAME | Reliability |
-| ------------------- | ----------- | ---------------------- | ----------- |
-| `frameMaskDisabled` | `true`      | `false`                | ✅ Reliable |
-| `resizeToFit`       | `undefined` | `true`                 | ✅ Reliable |
+| Property            | Real FRAME  | GROUP-originated FRAME | Reliability          |
+| ------------------- | ----------- | ---------------------- | -------------------- |
+| `frameMaskDisabled` | `true`      | `false`                | ✅ Reliable          |
+| `resizeToFit`       | `undefined` | `true`                 | ⚠️ Check with paints |
+| `fillPaints`        | May exist   | `undefined` or `[]`    | ✅ Safety check      |
+| `strokePaints`      | May exist   | `undefined` or `[]`    | ✅ Safety check      |
+| `backgroundPaints`  | May exist   | `undefined` or `[]`    | ✅ Safety check      |
 
 **Detection Logic:**
 
 ```typescript
 function isGroupOriginatedFrame(node: NodeChange): boolean {
-  // A FRAME is likely a GROUP if:
-  // 1. frameMaskDisabled is false (real FRAMEs have true)
-  // 2. resizeToFit is true (real FRAMEs don't have this property)
-  return (
-    node.type === "FRAME" &&
-    node.frameMaskDisabled === false &&
-    node.resizeToFit === true
-  );
+  if (node.type !== "FRAME") {
+    return false;
+  }
+
+  // Primary indicators
+  if (node.frameMaskDisabled !== false || node.resizeToFit !== true) {
+    return false;
+  }
+
+  // Additional safety check: GROUPs have no paints
+  // (GROUPs don't have fills or strokes, so this is an extra safeguard)
+  const hasNoFills = !node.fillPaints || node.fillPaints.length === 0;
+  const hasNoStrokes = !node.strokePaints || node.strokePaints.length === 0;
+  const hasNoBackgroundPaints =
+    !node.backgroundPaints || node.backgroundPaints.length === 0;
+
+  return hasNoFills && hasNoStrokes && hasNoBackgroundPaints;
 }
 ```
+
+**Note:** The paint checks (`fillPaints`, `strokePaints`, `backgroundPaints`) are used as additional safety checks since we can't be 100% confident in relying solely on `resizeToFit`. GROUPs never have fills or strokes, so this provides extra confidence in the detection.
 
 **Verification:**
 
