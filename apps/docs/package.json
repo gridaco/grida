@@ -29,8 +29,8 @@
     "prism-react-renderer": "^2.4.1",
     "rehype-katex": "^7.0.0",
     "remark-math": "^6.0.0",
-    "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react": "19.2.1",
+    "react-dom": "19.2.1"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.7.0",
