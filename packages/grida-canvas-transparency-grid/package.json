@@ -46,7 +46,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@webgpu/types": "^0.1.60",
-    "react": "19.0.0"
+    "react": "^19.0.0"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
