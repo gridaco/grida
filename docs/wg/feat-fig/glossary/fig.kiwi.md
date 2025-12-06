@@ -52,6 +52,121 @@ The schema defines over 50 node types, including:
 - `LayoutMode` - NONE, HORIZONTAL, VERTICAL
 - Auto-layout properties with padding, spacing, and alignment
 
+## Studied Properties
+
+Properties we've analyzed and documented from the Kiwi schema:
+
+| Property               | Type          | Location                       | Purpose                                | Usage                                                                             |
+| ---------------------- | ------------- | ------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------- |
+| `parentIndex`          | `ParentIndex` | `NodeChange.parentIndex`       | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering) |
+| `parentIndex.position` | `string`      | `ParentIndex.position`         | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                 |
+| `sortPosition`         | `string?`     | `NodeChange.sortPosition`      | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types          |
+| `frameMaskDisabled`    | `boolean?`    | `NodeChange.frameMaskDisabled` | Frame clipping mask setting            | `false` for GROUP-originated FRAMEs, `true` for real FRAMEs                       |
+| `resizeToFit`          | `boolean?`    | `NodeChange.resizeToFit`       | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                   |
+
+### parentIndex
+
+**Structure:**
+
+```typescript
+interface ParentIndex {
+  guid: GUID; // Parent node's GUID
+  position: string; // Fractional index string for ordering
+}
+```
+
+**Key Finding:** CANVAS nodes (pages) use `parentIndex.position` for ordering, **not** `sortPosition`.
+
+**Usage:**
+
+- **Page Ordering:** CANVAS nodes use `parentIndex.position` to determine their order within the document
+- **Child Ordering:** All child nodes use `parentIndex.position` to determine their order within their parent
+- **Parent Reference:** The `guid` field references the parent node's GUID
+
+**Fractional Index Strings:**
+
+Figma uses **fractional indexing** (also known as "orderable strings") for maintaining order in collaborative systems:
+
+- Allows insertion between items without renumbering
+- Strings are designed to sort correctly when compared lexicographically
+- Examples: `"!"`, `" ~\"`, `"Qd&"`, `"QeU"`, `"Qe7"`, `"QeO"`, `"Qf"`, `"Qi"`, `"Qir"`
+- These are **not** numeric values - they're special strings optimized for lexicographic sorting
+
+**Implementation:**
+
+```typescript
+// Sort pages by parentIndex.position
+const sortedPages = canvasNodes.sort((a, b) => {
+  const aPos = a.parentIndex?.position ?? "";
+  const bPos = b.parentIndex?.position ?? "";
+  return aPos.localeCompare(bPos); // Lexicographic comparison
+});
+
+// Sort children by parentIndex.position
+const sortedChildren = children.sort((a, b) => {
+  const aPos = a.parentIndex?.position ?? "";
+  const bPos = b.parentIndex?.position ?? "";
+  return aPos.localeCompare(bPos);
+});
+```
+
+**Important:** Always use lexicographic (string) comparison with `localeCompare()`. Never try to parse these as numbers - the strings are already in the correct format for sorting.
+
+### sortPosition
+
+**Type:** `string | undefined`
+
+**Location:** `NodeChange.sortPosition`
+
+**Usage:** The `sortPosition` field exists on `NodeChange` but is typically `undefined` for CANVAS nodes. It may be used for other node types or specific contexts. For page ordering, use `parentIndex.position` instead.
+
+### GROUP vs FRAME Detection
+
+**Critical Finding:** Figma converts GROUP nodes to FRAME nodes in both clipboard payloads and `.fig` files. This means:
+
+- **No `GROUP` node type exists** in parsed data - all groups are stored as `FRAME` nodes
+- The original group name is preserved in the `name` field
+- We can detect GROUP-originated FRAMEs using specific property combinations
+
+**Detection Properties:**
+
+| Property            | Real FRAME  | GROUP-originated FRAME | Reliability |
+| ------------------- | ----------- | ---------------------- | ----------- |
+| `frameMaskDisabled` | `true`      | `false`                | ✅ Reliable |
+| `resizeToFit`       | `undefined` | `true`                 | ✅ Reliable |
+
+**Detection Logic:**
+
+```typescript
+function isGroupOriginatedFrame(node: NodeChange): boolean {
+  // A FRAME is likely a GROUP if:
+  // 1. frameMaskDisabled is false (real FRAMEs have true)
+  // 2. resizeToFit is true (real FRAMEs don't have this property)
+  return (
+    node.type === "FRAME" &&
+    node.frameMaskDisabled === false &&
+    node.resizeToFit === true
+  );
+}
+```
+
+**Verification:**
+
+This behavior has been verified in:
+
+- Clipboard payloads (see `fixtures/test-fig/clipboard/group-with-r-g-b-rect.clipboard.html`)
+- `.fig` files (see `fixtures/test-fig/L0/frame.fig`)
+
+Both formats show the same pattern: GROUP nodes are stored as FRAME nodes with distinguishing properties.
+
+**Implementation Notes:**
+
+When converting from Figma to Grida:
+
+1. Check if a FRAME node has GROUP-like properties
+2. If detected, convert to `GroupNode` instead of `ContainerNode`
+3. This ensures proper semantic mapping: GROUP → GroupNode, FRAME → ContainerNode
+
 ## Usage in Implementation
 
 ### Rust Implementation

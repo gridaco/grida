@@ -77,6 +77,83 @@ test("able to write dummy files to a fig-kiwi archive", () => {
   expect(header).toEqual(encoder.header);
 });
 
+test.skip("inspect sortPosition values for CANVAS nodes", () => {
+  const testFiles = [
+    "L0/blank.fig",
+    "community/1380235722331273046-figma-simple-design-system.fig",
+    "community/1510053249065427020-workos-radix-icons.fig",
+    "community/1527721578857867021-apple-ios-26.fig",
+    "community/784448220678228461-figma-auto-layout playground.fig",
+  ];
+
+  testFiles.forEach((filename) => {
+    const filePath = __dirname + `/../../../../fixtures/test-fig/${filename}`;
+    try {
+      const data = readFileSync(filePath);
+      const parsed = readFigFile(data);
+      const nodeChanges = parsed.message.nodeChanges || [];
+
+      // Find DOCUMENT node
+      const documentNode = nodeChanges.find((nc) => nc.type === "DOCUMENT");
+      console.log(`\n[${filename}] DOCUMENT node:`, {
+        guid: documentNode?.guid,
+        sortPosition: documentNode?.sortPosition,
+        parentIndex: documentNode?.parentIndex,
+      });
+
+      // Find all CANVAS nodes
+      const canvasNodes = nodeChanges.filter(
+        (nc) => nc.type === "CANVAS" && !nc.internalOnly
+      );
+
+      if (canvasNodes.length > 0) {
+        console.log(
+          `\n[${filename}] Found ${canvasNodes.length} CANVAS node(s):`
+        );
+        canvasNodes.forEach((canvas, index) => {
+          const sortPos = canvas.sortPosition;
+          const parentIndex = canvas.parentIndex;
+          const name = canvas.name || "Untitled";
+          console.log(`  Canvas ${index + 1}: name="${name}"`);
+          console.log(
+            `    sortPosition=${JSON.stringify(sortPos)}, type=${typeof sortPos}`
+          );
+          console.log(`    parentIndex=${JSON.stringify(parentIndex)}`);
+
+          // Check if parentIndex.position exists and what it looks like
+          if (parentIndex?.position) {
+            const posValue = parentIndex.position;
+            console.log(
+              `    parentIndex.position="${posValue}", type=${typeof posValue}`
+            );
+            // If it's a string, try to parse as number
+            if (typeof posValue === "string") {
+              const numValue = parseFloat(posValue);
+              const isNumeric = !isNaN(numValue) && isFinite(numValue);
+              console.log(
+                `      -> As number: ${isNumeric ? numValue : "not numeric"}, length: ${posValue.length}`
+              );
+            }
+          }
+
+          // If sortPosition is a string, try to parse as number to see if it's numeric
+          if (typeof sortPos === "string") {
+            const numValue = parseFloat(sortPos);
+            const isNumeric = !isNaN(numValue) && isFinite(numValue);
+            console.log(
+              `    -> sortPosition as number: ${isNumeric ? numValue : "not numeric"}, length: ${sortPos.length}`
+            );
+          }
+        });
+      } else {
+        console.log(`\n[${filename}] No CANVAS nodes found`);
+      }
+    } catch (error) {
+      console.log(`\n[${filename}] Error: ${error}`);
+    }
+  });
+});
+
 // test.skip("able to write a Message to an archive", () => {
 //   // @ts-ignore
 //   const binSchema = encodeBinarySchema(schema);

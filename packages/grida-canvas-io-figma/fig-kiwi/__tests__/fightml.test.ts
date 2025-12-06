@@ -45,12 +45,29 @@ test("parses components from html string", () => {
 
 test("parses multiple clipboard formats", () => {
   const clipboardFiles = [
-    { file: "ellipse-circle-100x100-black.clipbaord.html", pasteID: 909736251 },
-    { file: "rect-square-100x100-black.clipboard.html", pasteID: 2041389239 },
-    { file: "star-5-40-100x100-black.clipboard.html", pasteID: 372157327 },
+    {
+      file: "ellipse-circle-100x100-black.clipbaord.html",
+      pasteID: 909736251,
+      fileKey: "YrxS8WHCD0GRbo3rfcrLsD",
+    },
+    {
+      file: "group-with-r-g-b-rect.clipboard.html",
+      pasteID: 1190960134,
+      fileKey: "BrJ3xTkG13Gbf5z1dSfAMY",
+    },
+    {
+      file: "rect-square-100x100-black.clipboard.html",
+      pasteID: 2041389239,
+      fileKey: "YrxS8WHCD0GRbo3rfcrLsD",
+    },
+    {
+      file: "star-5-40-100x100-black.clipboard.html",
+      pasteID: 372157327,
+      fileKey: "YrxS8WHCD0GRbo3rfcrLsD",
+    },
   ];
 
-  clipboardFiles.forEach(({ file, pasteID }) => {
+  clipboardFiles.forEach(({ file, pasteID, fileKey }) => {
     const str = readFileSync(
       __dirname + `/../../../../fixtures/test-fig/clipboard/${file}`,
       {
@@ -61,7 +78,7 @@ test("parses multiple clipboard formats", () => {
     const { figma, meta } = parseHTMLString(str);
 
     expect(meta).toEqual({
-      fileKey: "YrxS8WHCD0GRbo3rfcrLsD",
+      fileKey,
       pasteID,
       dataType: "scene",
     });

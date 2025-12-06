@@ -40,11 +40,13 @@ Base64-encoded Kiwi binary data containing:
 
 ## Contents
 
-| File                                          | Description                               | Paste ID   |
-| --------------------------------------------- | ----------------------------------------- | ---------- |
-| `ellipse-circle-100x100-black.clipboard.html` | Circle/ellipse, 100×100, black fill       | 909736251  |
-| `rect-square-100x100-black.clipboard.html`    | Rectangle/square, 100×100, black fill     | 2041389239 |
-| `star-5-40-100x100-black.clipboard.html`      | 5-pointed star, 40pt, 100×100, black fill | 372157327  |
+| File                                          | Description                                       | Usage          |
+| --------------------------------------------- | ------------------------------------------------- | -------------- |
+| `ellipse-circle-100x100-black.clipboard.html` | Circle/ellipse, 100×100, black fill               | basic          |
+| `frame-with-r-g-b-rect.clipboard.html`        | Frame node containing red, green, blue rectangles | basic          |
+| `group-with-r-g-b-rect.clipboard.html`        | Group node containing red, green, blue rectangles | group-is-frame |
+| `rect-square-100x100-black.clipboard.html`    | Rectangle/square, 100×100, black fill             | basic          |
+| `star-5-40-100x100-black.clipboard.html`      | 5-pointed star, 40pt, 100×100, black fill         | basic          |
 
 ## Capturing Clipboard Data
 
@@ -52,6 +54,18 @@ Base64-encoded Kiwi binary data containing:
 2. Run (project root) `swift .tools/pbdump.swift > dump.txt`
 3. Extract HTML content (UTI: `public.html`)
 4. Save as `*.clipboard.html` in this directory
+
+## group-is-frame ?
+
+**Important Finding:** Figma converts GROUP nodes to FRAME nodes when copying to clipboard. This means:
+
+- Clipboard payloads **do not contain** `GROUP` node types
+- Groups are stored as `FRAME` nodes with the original group name preserved
+- To detect a GROUP-originated FRAME, check:
+  - `frameMaskDisabled === false` (real FRAMEs have `true`)
+  - `resizeToFit === true` (real FRAMEs don't have this property)
+
+This behavior is consistent in both clipboard payloads and `.fig` files. See [`docs/wg/feat-fig/glossary/fig.kiwi.md`](wg/feat-fig/glossary/fig.kiwi.md) for more details.
 
 ## Usage
 
