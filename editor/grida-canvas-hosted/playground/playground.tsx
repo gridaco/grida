@@ -852,7 +852,8 @@ function PlaygroundMenuContent() {
           });
         }}
         onImportFig={async (result) => {
-          const { FigImporter } = await import("@grida/io-figma");
+          const iofigma = await import("@grida/io-figma");
+          const FigImporter = iofigma.default.kiwi.FigImporter;
 
           // Parse the .fig file
           const buffer = await result.file.arrayBuffer();

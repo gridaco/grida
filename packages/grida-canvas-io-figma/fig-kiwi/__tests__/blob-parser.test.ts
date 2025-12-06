@@ -41,12 +41,6 @@ describe("blob parser", () => {
 
     // Should have at least some data
     expect(vectorNetwork!.vertices.length).toBeGreaterThan(0);
-
-    // Log the parsed data for inspection
-    console.log("Vector network parsed:");
-    console.log(`  Vertices: ${vectorNetwork!.vertices.length}`);
-    console.log(`  Segments: ${vectorNetwork!.segments.length}`);
-    console.log(`  Regions: ${vectorNetwork!.regions.length}`);
   });
 
   test("parses commands blob from path geometry", () => {
@@ -79,7 +73,6 @@ describe("blob parser", () => {
 
     if (commandsBlobId === undefined) {
       // Skip if no commands blob found
-      console.log("No commands blob found in vector.fig");
       return;
     }
 
@@ -97,10 +90,6 @@ describe("blob parser", () => {
 
     // First command should be a string (M, L, etc.)
     expect(typeof commands![0]).toBe("string");
-
-    console.log("Commands parsed:");
-    console.log(`  Total elements: ${commands!.length}`);
-    console.log(`  First few:`, commands!.slice(0, 10));
   });
 
   test("getBlobBytes handles invalid blob IDs", () => {

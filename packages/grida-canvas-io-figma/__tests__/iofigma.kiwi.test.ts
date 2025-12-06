@@ -274,25 +274,13 @@ describe("iofigma.kiwi.factory.node", () => {
       expect(frameWithClipRest?.type).toBe("FRAME");
       expect(groupRest?.type).toBe("GROUP");
 
-      console.log("\n[frameMaskDisabled → clipsContent mapping]:");
-      console.log(
-        `  Regular FRAME: frameMaskDisabled=${regularFrame?.frameMaskDisabled} → clipsContent=${(regularRest as any)?.clipsContent}`
-      );
-      console.log(
-        `  FRAME with clip: frameMaskDisabled=${frameWithClip?.frameMaskDisabled} → clipsContent=${(frameWithClipRest as any)?.clipsContent}`
-      );
-      console.log(
-        `  GROUP-originated: frameMaskDisabled=${groupFrame?.frameMaskDisabled} → clipsContent=${(groupRest as any)?.clipsContent}`
-      );
-
-      // Regular FRAME should have clipping enabled by default
+      // Regular FRAME: frameMaskDisabled=true → clipsContent=true
       expect((regularRest as any)?.clipsContent).toBe(true);
 
-      // FRAME with clip checked should have clipping enabled
-      // Note: This test will reveal if our mapping is correct
-      expect((frameWithClipRest as any)?.clipsContent).toBeDefined();
+      // FRAME with clip: frameMaskDisabled=false → clipsContent=false
+      expect((frameWithClipRest as any)?.clipsContent).toBe(false);
 
-      // GROUP should have clipping disabled
+      // GROUP: handled separately, always clipsContent=false
       expect((groupRest as any)?.clipsContent).toBe(false);
     });
   });

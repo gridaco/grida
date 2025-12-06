@@ -5,7 +5,12 @@ import type * as figrest from "@figma/rest-api-spec";
 import type * as figkiwi from "./fig-kiwi/schema";
 import cmath from "@grida/cmath";
 import kolor from "@grida/color";
-import { getBlobBytes, parseVectorNetworkBlob } from "./fig-kiwi";
+import {
+  getBlobBytes,
+  parseVectorNetworkBlob,
+  readFigFile,
+  type ParsedFigmaArchive,
+} from "./fig-kiwi";
 
 const _GRIDA_SYSTEM_EMBEDDED_CHECKER =
   "system://images/checker-16-strip-L98L92.png";
@@ -1858,6 +1863,192 @@ export namespace iofigma {
           default:
             return undefined;
         }
+      }
+    }
+
+    /**
+     * Namespace for .fig file import functionality
+     */
+    export interface FigFileDocument {
+      pages: FigPage[];
+      metadata: {
+        version: number;
+      };
+    }
+
+    export interface FigPage {
+      name: string;
+      canvas: figkiwi.NodeChange;
+      rootNodes: any[]; // Converted REST API nodes with complete children
+      /**
+       * Sort key from parentIndex.position (fractional index string)
+       * Use this to sort pages to preserve original Figma order.
+       * Compare lexicographically: pageA.sortkey.localeCompare(pageB.sortkey)
+       * Examples: "!", "Qd&", "QeU", "Qf"
+       */
+      sortkey: string;
+    }
+
+    /**
+     * Parse and extract pages from a .fig file
+     * @param fileData - The .fig file as Uint8Array
+     * @returns Document with pages ready for import
+     */
+    export function parseFile(fileData: Uint8Array): FigFileDocument {
+      const figData = readFigFile(fileData);
+      const pages = extractPages(figData);
+
+      return {
+        pages,
+        metadata: {
+          version: figData.header.version,
+        },
+      };
+    }
+
+    /**
+     * Extract pages (CANVAS nodes) with their complete hierarchies
+     * Skips internal-only canvases (component libraries)
+     * Pages include sortkey property from parentIndex.position for sorting
+     * Note: CANVAS nodes use parentIndex.position (fractional index strings) for ordering,
+     * not sortPosition. These are lexicographically sortable strings like "!", "Qd&", "QeU", etc.
+     *
+     * To sort pages: pages.sort((a, b) => a.sortkey.localeCompare(b.sortkey))
+     */
+    function extractPages(figData: ParsedFigmaArchive): FigPage[] {
+      const nodeChanges = figData.message.nodeChanges || [];
+
+      // Find all CANVAS nodes, excluding internal-only ones
+      const canvasNodes = nodeChanges.filter(
+        (nc) => nc.type === "CANVAS" && !nc.internalOnly
+      );
+
+      // Extract pages with sortkey information (no sorting - consumers can sort by sortkey property)
+      return canvasNodes.map((canvas) => {
+        const rootNodes = buildPageTree(canvas, nodeChanges, figData);
+        const sortkey = canvas.parentIndex?.position ?? "";
+
+        return {
+          name: canvas.name || "Untitled Page",
+          canvas,
+          rootNodes,
+          sortkey, // Fractional index string for lexicographic sorting
+        };
+      });
+    }
+
+    /**
+     * Build complete tree for a single page (matches clipboard import logic)
+     */
+    function buildPageTree(
+      canvas: figkiwi.NodeChange,
+      allNodeChanges: figkiwi.NodeChange[],
+      figData: ParsedFigmaArchive
+    ): any[] {
+      const canvasGuid = canvas.guid;
+      if (!canvasGuid) return [];
+
+      const canvasGuidStr = guid(canvasGuid);
+
+      // Convert all Kiwi nodes to REST API nodes
+      const flatFigmaNodes = allNodeChanges
+        .map((nc) => factory.node(nc, figData.message))
+        .filter((node) => node !== undefined);
+
+      // Build GUID maps
+      const guidToNode = new Map<string, any>();
+      const guidToKiwi = new Map<string, figkiwi.NodeChange>();
+
+      allNodeChanges.forEach((nc) => {
+        if (nc.guid) guidToKiwi.set(guid(nc.guid), nc);
+      });
+
+      flatFigmaNodes.forEach((node) => {
+        guidToNode.set(node.id, node);
+      });
+
+      // Build parent-child relationships
+      flatFigmaNodes.forEach((node) => {
+        const kiwiNode = guidToKiwi.get(node.id);
+        if (kiwiNode?.parentIndex?.guid) {
+          const parentGuid = guid(kiwiNode.parentIndex.guid);
+          const parentNode = guidToNode.get(parentGuid);
+
+          if (parentNode && "children" in parentNode) {
+            if (!parentNode.children) parentNode.children = [];
+            (parentNode.children as any[]).push(node);
+          }
+        }
+      });
+
+      // Return root nodes (direct children of CANVAS)
+      return flatFigmaNodes.filter((node) => {
+        const kiwiNode = guidToKiwi.get(node.id);
+        if (!kiwiNode?.parentIndex?.guid) return false;
+        const parentGuid = guid(kiwiNode.parentIndex.guid);
+        return parentGuid === canvasGuidStr;
+      });
+    }
+
+    /**
+     * Convert page to single packed document (bulk insert to avoid reducer nesting)
+     */
+    export function convertPageToScene(
+      page: FigPage,
+      context: restful.factory.FactoryContext
+    ): grida.program.document.IPackedSceneDocument {
+      const individualDocs = page.rootNodes.map((rootNode) =>
+        restful.factory.document(rootNode, {}, context)
+      );
+
+      if (individualDocs.length === 1) return individualDocs[0];
+
+      // Merge multiple roots into single document
+      const merged: grida.program.document.IPackedSceneDocument = {
+        bitmaps: {},
+        images: {},
+        nodes: {},
+        links: {},
+        properties: {},
+        scene: {
+          type: "scene",
+          id: "tmp",
+          name: page.name,
+          children_refs: [],
+          guides: [],
+          edges: [],
+          constraints: { children: "multiple" },
+          // TODO: convert it to our format, number.
+          // order: page.sortkey,
+        },
+      };
+
+      individualDocs.forEach((doc) => {
+        Object.assign(merged.nodes, doc.nodes);
+        Object.assign(merged.links, doc.links);
+        Object.assign(merged.images, doc.images);
+        Object.assign(merged.bitmaps, doc.bitmaps);
+        Object.assign(merged.properties, doc.properties);
+        merged.scene.children_refs.push(...doc.scene.children_refs);
+      });
+
+      return merged;
+    }
+
+    /**
+     * @deprecated Use iofigma.kiwi.parseFile() instead
+     * Legacy class-based API for backward compatibility
+     */
+    export class FigImporter {
+      static parseFile(fileData: Uint8Array): FigFileDocument {
+        return parseFile(fileData);
+      }
+
+      static convertPageToScene(
+        page: FigPage,
+        context: restful.factory.FactoryContext
+      ): grida.program.document.IPackedSceneDocument {
+        return convertPageToScene(page, context);
       }
     }
   }
