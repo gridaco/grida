@@ -62,7 +62,7 @@
   "devDependencies": {
     "@types/react": "^19",
     "@use-gesture/react": "^10",
-    "react": "19.0.0"
+    "react": "^19.0.0"
   },
   "jest": {
     "preset": "ts-jest"
