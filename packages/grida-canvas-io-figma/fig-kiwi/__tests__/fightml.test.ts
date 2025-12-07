@@ -133,7 +133,7 @@ test("write html string", () => {
     },
     type: "ELLIPSE",
     name:
-      "Butterfucker " +
+      "Butterfly " +
       Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(
         Math.random() * 1000
       ),

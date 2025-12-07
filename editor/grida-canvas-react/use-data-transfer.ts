@@ -506,6 +506,7 @@ export function useDataTransferEventTarget() {
     [
       instance,
       insertFromFile,
+      insertSVG,
       insertText,
       current_clipboard,
       handleFigmaClipboard,
