@@ -7,7 +7,7 @@ import {
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Link from "next/link";
-import { CodeIcon, FrameIcon, ImageIcon } from "lucide-react";
+import { CodeIcon, FigmaIcon, FrameIcon, ImageIcon } from "lucide-react";
 
 const menus = [
   {
@@ -33,6 +33,12 @@ const menus = [
     description: "Format phone numbers to E.164 format.",
     link: "/tools/e164",
     icon: CodeIcon,
+  },
+  {
+    title: ".fig Inspector",
+    description: "Parse and inspect Figma .fig files and clipboard data",
+    link: "/tools/fig-parser",
+    icon: FigmaIcon,
   },
 ];
 
