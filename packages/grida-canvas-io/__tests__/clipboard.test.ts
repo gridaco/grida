@@ -94,4 +94,60 @@ describe("clipboard", () => {
     expect(io.clipboard.encode(payload)).toBeNull();
     expect(io.clipboard.encodeClipboardText(payload)).toBeNull();
   });
+
+  describe("isSvgText", () => {
+    it("should detect valid SVG with namespace", () => {
+      const svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" /></svg>';
+      expect(io.clipboard.isSvgText(svg)).toBe(true);
+    });
+
+    it("should detect SVG with XML declaration", () => {
+      const svg =
+        '<?xml version="1.0" encoding="utf-8"?>\n<svg xmlns="http://www.w3.org/2000/svg"><circle r="50" /></svg>';
+      expect(io.clipboard.isSvgText(svg)).toBe(true);
+    });
+
+    it("should detect multiline SVG", () => {
+      const svg = `<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <rect width="100" height="100" />
+</svg>`;
+      expect(io.clipboard.isSvgText(svg)).toBe(true);
+    });
+
+    it("should detect SVG with multiple namespaces", () => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="70" height="26">
+  <rect fill="#F5F5F5" width="70" height="26"/>
+</svg>`;
+      expect(io.clipboard.isSvgText(svg)).toBe(true);
+    });
+
+    it("should reject non-SVG text", () => {
+      expect(io.clipboard.isSvgText("Hello World")).toBe(false);
+      expect(io.clipboard.isSvgText("<div>Not SVG</div>")).toBe(false);
+      expect(io.clipboard.isSvgText("")).toBe(false);
+    });
+
+    it("should reject SVG without xmlns", () => {
+      const svg =
+        '<svg width="100" height="100"><rect width="100" height="100" /></svg>';
+      expect(io.clipboard.isSvgText(svg)).toBe(false);
+    });
+
+    it("should reject incomplete SVG", () => {
+      expect(
+        io.clipboard.isSvgText('<svg xmlns="http://www.w3.org/2000/svg">')
+      ).toBe(false);
+      expect(io.clipboard.isSvgText("</svg>")).toBe(false);
+    });
+
+    it("should reject text mentioning xmlns but not valid SVG", () => {
+      expect(
+        io.clipboard.isSvgText(
+          'This text mentions xmlns="http://www.w3.org/2000/svg" but is not SVG'
+        )
+      ).toBe(false);
+    });
+  });
 });

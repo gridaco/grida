@@ -1,24 +1,15 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { generate } from "@/app/(dev)/canvas/actions";
-import {
-  useCurrentEditor,
-  useDocumentState,
-  useEditorState,
-} from "@/grida-canvas-react";
+import { useState } from "react";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import grida from "@grida/schema";
 import kolor from "@grida/color";
 import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
-import { useLocalStorage } from "@uidotdev/usehooks";
-import { readStreamableValue } from "@ai-sdk/rsc";
-import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
@@ -43,112 +34,6 @@ import {
   useToolState,
 } from "@/grida-canvas-react/provider";
 import { RGBChip } from "@/scaffolds/sidecontrol/controls/utils/paint-chip";
-import red from "@/theme/palettes/red";
-
-function useGenerate() {
-  const streamGeneration = useCallback(
-    (
-      prompt: string,
-      streamdelta: (delta: {} | undefined) => void,
-      onComplete?: () => void
-    ) => {
-      generate(prompt)
-        .then(async ({ output }) => {
-          for await (const delta of readStreamableValue(output)) {
-            streamdelta(delta);
-          }
-        })
-        .finally(() => {
-          onComplete?.();
-        });
-    },
-    []
-  );
-
-  return streamGeneration;
-}
-
-function useTextRewriteDemo() {
-  const editor = useCurrentEditor();
-  const { document } = useDocumentState();
-  const [delta, setDelta] = useState<{} | undefined>();
-  const [loading, setLoading] = useState(false);
-  const [aiSettings] = useLocalStorage<string | undefined>(
-    CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY,
-    undefined
-  );
-
-  const generate = useGenerate();
-
-  // TODO: check if text is child of a component or instance.
-
-  const editableTextNodes: Array<grida.program.nodes.TextNode> = useMemo(() => {
-    return Object.values(document.nodes).filter(
-      (node) => node.type === "text" && node.locked === false
-    ) as Array<grida.program.nodes.TextNode>;
-  }, [document.nodes]);
-
-  const action = useCallback(
-    (userprompt: string) => {
-      setLoading(true);
-      const payload = editableTextNodes.map((node) => {
-        return {
-          id: node.id,
-          text: node.text,
-          maxLength: node.max_length,
-          usermetadata: node.userdata,
-        };
-      });
-
-      const prompt = `You are an AI in a canvas editor.
-
-Generate new text content for the following text nodes:
-
-\`\`\`json
-${JSON.stringify(payload, null, 2)}
-\`\`\`
-
-${
-  aiSettings
-    ? `
-------
-Additional developers provided prompt:
-\`\`\`
-${aiSettings}
-\`\`\`
-`
-    : ""
-}
-
-------
-Additional user provided prompt:
-\`\`\`
-${userprompt}
-\`\`\`
-
-    `;
-
-      generate(
-        prompt,
-        (d) => {
-          setDelta(d);
-          const { changes } = d as any;
-          changes?.forEach((change: { id: string; text: string }) => {
-            if (!(change.id && change.text)) return;
-            editor.commands.changeNodePropertyText(change.id, change.text);
-          });
-        },
-        () => {
-          setLoading(false);
-        }
-      );
-    },
-    [editor, generate, editableTextNodes]
-  );
-
-  return { action, delta, loading };
-}
-
 export function PlaygroundToolbar() {
   const editor = useCurrentEditor();
   const tool = useToolState();

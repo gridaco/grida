@@ -13,10 +13,7 @@ import {
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
-import {
-  ScenesGroup,
-  NodeHierarchyGroup,
-} from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
+import { DocumentHierarchy } from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
 import {
   StandaloneDocumentEditor,
   StandaloneSceneContent,
@@ -38,24 +35,9 @@ import {
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import {
-  DownloadIcon,
-  FigmaLogoIcon,
-  FileIcon,
-  GearIcon,
-  GitHubLogoIcon,
-  MixIcon,
-  OpenInNewWindowIcon,
-  PlusIcon,
-} from "@radix-ui/react-icons";
+import { PlusIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -71,8 +53,7 @@ import { saveAs } from "file-saver";
 import { v4 } from "uuid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
-import { PlaygroundToolbar } from "./toolbar";
-import Link from "next/link";
+import { PlaygroundToolbar } from "./uxhost-toolbar";
 import {
   Tabs,
   SidebarTabsContent,
@@ -87,7 +68,6 @@ import ErrorBoundary from "./error-boundary";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
-import { SlackIcon } from "lucide-react";
 import BrushToolbar from "@/grida-canvas-react-starter-kit/starterkit-toolbar/brush-toolbar";
 import ArtboardsList from "@/grida-canvas-react-starter-kit/starterkit-artboard-list";
 import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
@@ -95,16 +75,9 @@ import {
   PreviewButton,
   PreviewProvider,
 } from "@/grida-canvas-react-starter-kit/starterkit-preview";
-import {
-  ImportFromFigmaDialog,
-  ImportFromGridaFileJsonDialog,
-} from "@/grida-canvas-react-starter-kit/starterkit-import";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
-import { canvas_examples } from "./examples";
 import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
-import { sitemap } from "@/www/data/sitemap";
-import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
@@ -124,7 +97,7 @@ import { WithSize } from "@/grida-canvas-react/viewport/size";
 import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
-import { SettingsDialog } from "./settings";
+import { PlaygroundMenuContent } from "./uxhost-menu";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -439,7 +412,12 @@ function Consumer({
     <AgentChatProvider>
       <PreviewProvider>
         <div className="flex w-full h-full">
-          {ui.sidebar_left && <SidebarLeft />}
+          {ui.sidebar_left && (
+            <SidebarLeft
+              toggleVisibility={toggleVisibility}
+              toggleMinimal={toggleMinimal}
+            />
+          )}
           <EditorSurfaceClipboardSyncProvider />
           <EditorSurfaceDropzone>
             <EditorSurfaceContextMenu>
@@ -562,7 +540,13 @@ function LocalFakeCursorChat() {
   );
 }
 
-function SidebarLeft() {
+function SidebarLeft({
+  toggleVisibility,
+  toggleMinimal,
+}: {
+  toggleVisibility?: () => void;
+  toggleMinimal?: () => void;
+}) {
   const libraryDialog = useDialogState("library");
 
   return (
@@ -599,7 +583,10 @@ function SidebarLeft() {
                   <DropdownMenuTrigger className="me-2">
                     <GridaLogo className="inline-block size-4" />
                   </DropdownMenuTrigger>
-                  <PlaygroundMenuContent />
+                  <PlaygroundMenuContent
+                    toggleVisibility={toggleVisibility}
+                    toggleMinimal={toggleMinimal}
+                  />
                 </DropdownMenu>
                 <span className="font-bold text-xs">
                   Canvas
@@ -609,10 +596,8 @@ function SidebarLeft() {
                 </span>
               </header>
             </SidebarHeader>
-            <SidebarContent>
-              <ScenesGroup />
-              <hr />
-              <NodeHierarchyGroup />
+            <SidebarContent className="p-0 overflow-hidden">
+              <DocumentHierarchy />
             </SidebarContent>
           </Sidebar>
         </>
@@ -810,149 +795,4 @@ function Hotkyes() {
   useEditorHotKeys();
 
   return <></>;
-}
-
-function PlaygroundMenuContent() {
-  const instance = useCurrentEditor();
-  const importFromFigmaDialog = useDialogState("import-from-figma");
-  const importFromJson = useDialogState("import-from-json", {
-    refreshkey: true,
-  });
-  const settingsDialog = useDialogState("settings");
-
-  const onExport = () => {
-    const blob = instance.archive();
-    saveAs(blob, distro.snapshot_file_name());
-  };
-
-  return (
-    <>
-      <ImportFromGridaFileJsonDialog
-        key={importFromJson.refreshkey}
-        {...importFromJson.props}
-        onImport={(file) => {
-          instance.commands.reset(
-            editor.state.init({
-              editable: true,
-              document: file.document,
-            }),
-            Date.now() + ""
-          );
-        }}
-      />
-
-      <ImportFromFigmaDialog
-        {...importFromFigmaDialog.props}
-        onImport={(res) => {
-          instance.insert({
-            document: iofigma.restful.factory.document(
-              res.document as any,
-              res.images,
-              {
-                gradient_id_generator: () => v4(),
-              }
-            ),
-          });
-        }}
-      />
-
-      <SettingsDialog {...settingsDialog.props} />
-
-      <DropdownMenuContent align="start" className="min-w-52">
-        <DropdownMenuItem
-          onClick={importFromJson.openDialog}
-          className="text-xs"
-        >
-          <FileIcon className="size-3.5" />
-          Open .grida
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onExport} className="text-xs">
-          <DownloadIcon className="size-3.5" />
-          Save as .grida
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={importFromFigmaDialog.openDialog}
-          className="text-xs"
-        >
-          <FigmaLogoIcon className="size-3.5" />
-          Import Figma
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={settingsDialog.openDialog}
-          className="text-xs"
-        >
-          <GearIcon className="size-3.5" />
-          Settings
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            <OpenInNewWindowIcon className="size-3.5 me-2" />
-            Tools
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <Link href="/canvas/tools/ai" target="_blank">
-              <DropdownMenuItem className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                AI
-              </DropdownMenuItem>
-            </Link>
-            <Link href="/canvas/tools/io-figma" target="_blank">
-              <DropdownMenuItem className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                IO Figma
-              </DropdownMenuItem>
-            </Link>
-            <Link href="/canvas/tools/io-svg" target="_blank">
-              <DropdownMenuItem className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                IO SVG
-              </DropdownMenuItem>
-            </Link>
-            <Link href="https://github.com/gridaco/p666" target="_blank">
-              <DropdownMenuItem className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                P666 Daemon
-              </DropdownMenuItem>
-            </Link>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            <MixIcon className="size-3.5 me-2" />
-            Examples
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {canvas_examples.map((example) => (
-              <Link
-                key={example.id}
-                href={"/canvas/examples/" + example.id}
-                target="_blank"
-              >
-                <DropdownMenuItem className="text-xs">
-                  <OpenInNewWindowIcon className="size-3.5" />
-                  {example.name}
-                </DropdownMenuItem>
-              </Link>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <Link href={sitemap.links.github} target="_blank">
-          <DropdownMenuItem className="text-xs">
-            <GitHubLogoIcon className="size-3.5" />
-            GitHub
-          </DropdownMenuItem>
-        </Link>
-        <Link href={sitemap.links.slack} target="_blank">
-          <DropdownMenuItem className="text-xs">
-            <SlackIcon className="size-3.5" />
-            Slack Community
-          </DropdownMenuItem>
-        </Link>
-      </DropdownMenuContent>
-    </>
-  );
 }

@@ -72,7 +72,7 @@ export function StringValueControl({
           {schema && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <PropertyTypeIcon type="object" className="me-2 size-4" />
+                <PropertyTypeIcon type="object" className="size-4" />
                 props
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>

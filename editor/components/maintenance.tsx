@@ -12,8 +12,7 @@ import {
   InstagramLogoIcon,
   TwitterLogoIcon,
 } from "@radix-ui/react-icons";
-import { Button } from "./ui/button";
-import { SlackIcon } from "lucide-react";
+import { SlackLogoIcon } from "@/components/logos/slack";
 
 export default function Maintenance() {
   return (
@@ -54,7 +53,7 @@ export default function Maintenance() {
           <InstagramLogoIcon className="size-4" />
         </Link>
         <Link href="https://grida.co/join-slack" target="_blank">
-          <SlackIcon className="size-4" />
+          <SlackLogoIcon className="size-4" />
         </Link>
         <Link href="https://github.com/gridaco" target="_blank">
           <GitHubLogoIcon className="size-4" />

@@ -4,26 +4,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ThemedMonacoEditor } from "@/components/monaco";
-import { useLocalStorage } from "@uidotdev/usehooks";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { keysymbols } from "@/grida-canvas-react/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 import { keybindings_sheet } from "@/grida-canvas-react/viewport/hotkeys";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { Button } from "@/components/ui/button";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
-export function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
+export function SettingsDialog({
+  initialPage = "keybindings",
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  initialPage?: "keybindings" | "general";
+}) {
   const editor = useCurrentEditor();
-  const [aiSettings, setAiSettings] = useLocalStorage<string | undefined>(
-    CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY,
-    undefined
-  );
 
   return (
     <Dialog {...props}>
@@ -32,11 +30,10 @@ export function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
           <DialogTitle>Playground Settings</DialogTitle>
         </DialogHeader>
         <hr />
-        <Tabs defaultValue="keybindings" className="min-h-96">
+        <Tabs defaultValue={initialPage} className="min-h-96">
           <TabsList>
             <TabsTrigger value="keybindings">Keyboard Shortcuts</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="ai">AI</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <div className="py-4 space-y-2">
@@ -124,17 +121,6 @@ export function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
                 })}
               </div>
             </ScrollArea>
-          </TabsContent>
-          <TabsContent value="ai">
-            <div>
-              <ThemedMonacoEditor
-                value={aiSettings}
-                onChange={setAiSettings}
-                width="100%"
-                height={400}
-                language="txt"
-              />
-            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

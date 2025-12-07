@@ -137,5 +137,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.5,
     },
+    {
+      url: "https://grida.co/tools/fig",
+      changeFrequency: "yearly",
+      priority: 0.5,
+    },
   ];
 }

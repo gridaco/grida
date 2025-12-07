@@ -164,6 +164,81 @@ export namespace io {
       }
     }
 
+    /**
+     * Detects if HTML payload is Figma clipboard format.
+     *
+     * Figma uses a custom HTML format with base64-encoded metadata and binary data:
+     * ```html
+     * <meta charset="utf-8" />
+     * <span data-metadata="<!--(figmeta)BASE64_METADATA(/figmeta)-->"></span>
+     * <span data-buffer="<!--(figma)BASE64_KIWI_DATA(/figma)-->"></span>
+     * ```
+     *
+     * This function only checks for Figma-specific markers without parsing the payload.
+     * Actual parsing happens in the editor layer where @grida/io-figma is available.
+     *
+     * @param html - The HTML string from clipboard
+     * @returns true if the HTML contains Figma clipboard markers, false otherwise
+     */
+    export function isFigmaClipboard(html: string): boolean {
+      // Check for Figma-specific HTML markers
+      // Based on spec: fixtures/test-fig/clipboard/README.md
+      return (
+        html.includes("data-metadata") &&
+        html.includes("data-buffer") &&
+        html.includes("<!--(figmeta)") &&
+        html.includes("<!--(figma)")
+      );
+    }
+
+    /**
+     * Detects if text content is SVG markup.
+     *
+     * Validates SVG by checking for:
+     * - SVG namespace (xmlns="http://www.w3.org/2000/svg")
+     * - Opening and closing svg tags
+     *
+     * @param text - The text string to check
+     * @returns true if the text contains valid SVG markup, false otherwise
+     */
+    export function isSvgText(text: string): boolean {
+      const trimmed = text.trim();
+      return (
+        trimmed.includes('xmlns="http://www.w3.org/2000/svg"') &&
+        trimmed.includes("<svg") &&
+        trimmed.includes("</svg>")
+      );
+    }
+
+    /**
+     * Determines if a file is a valid file type that is directly supported by Grida core.
+     *
+     * This function only returns `true` for file types that can be directly inserted into the canvas
+     * (images and SVG files). Other file types like `.fig` are supported but use their own import
+     * pipeline and are not considered "valid file types" by this function.
+     *
+     * @param file - The File object to check
+     * @returns A tuple:
+     *   - `[true, ValidFileType]` if the file is a directly supported type (image or SVG)
+     *   - `[false, string]` if the file type is not directly supported (includes `.fig` files)
+     *
+     * @example
+     * ```typescript
+     * const [valid, type] = io.clipboard.filetype(file);
+     * if (valid) {
+     *   // File is an image or SVG - can be directly inserted
+     *   insertFromFile(type, file);
+     * } else {
+     *   // File type not directly supported (e.g., .fig files use separate import pipeline)
+     *   console.log(`Unsupported type: ${type}`);
+     * }
+     * ```
+     *
+     * @remarks
+     * - `.fig` files are supported but not returned as valid by this function.
+     *   They use their own import pipeline via the File > Import Figma menu.
+     * - This function checks both `file.type` (MIME type) and file extension as fallback.
+     */
     export function filetype(
       file: File
     ): [true, ValidFileType] | [false, string] {
@@ -176,24 +251,38 @@ export namespace io {
         return [true, "image/jpeg" as const];
       } else if (type === "image/gif") {
         return [true, "image/gif" as const];
+      } else if (type === "image/webp") {
+        return [true, "image/webp" as const];
       } else {
         return [false, type];
       }
     }
 
+    /**
+     * Valid file type that is direcly supported by grida core.
+     * e.g. .fig is also supported, but its not treated as valid file type. it uses its own pipeline to be imported.
+     */
     export type ValidFileType =
       | "image/svg+xml"
       | "image/png"
       | "image/jpeg"
-      | "image/gif";
+      | "image/gif"
+      | "image/webp";
 
     export type DecodedItem =
       | {
-          type: "image/svg+xml" | "image/png" | "image/jpeg" | "image/gif";
+          type:
+            | "image/svg+xml"
+            | "image/png"
+            | "image/jpeg"
+            | "image/gif"
+            | "image/webp";
           file: File;
         }
       | { type: "text"; text: string }
-      | { type: "clipboard"; clipboard: ClipboardPayload };
+      | { type: "svg-text"; svg: string }
+      | { type: "clipboard"; clipboard: ClipboardPayload }
+      | { type: "canbe-figma-clipboard"; html: string };
 
     /**
      * Decodes a DataTransferItem from the clipboard into a structured payload.
@@ -255,16 +344,26 @@ export namespace io {
             if (config.noEmptyText && data.trim().length === 0) {
               return resolve(null);
             }
+            // Check if text content is SVG
+            if (isSvgText(data)) {
+              return resolve({ type: "svg-text", svg: data });
+            }
             return resolve({ type: "text", text: data });
           });
         } else if (item.kind === "string" && item.type === "text/html") {
           item.getAsString((html) => {
+            // Try Grida clipboard first
             const data = io.clipboard.decodeClipboardHtml(html);
             if (data) {
               return resolve({ type: "clipboard", clipboard: data });
-            } else {
-              return reject(new Error("Unknown HTML payload"));
             }
+
+            // Check if it's Figma clipboard format (without parsing)
+            if (io.clipboard.isFigmaClipboard(html)) {
+              return resolve({ type: "canbe-figma-clipboard", html });
+            }
+
+            return reject(new Error("Unknown HTML payload"));
           });
         } else {
           return resolve(null);

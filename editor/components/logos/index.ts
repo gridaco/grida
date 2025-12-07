@@ -8,3 +8,5 @@ export * from "./stripe";
 export * from "./toss";
 export * from "./postgresql";
 export * from "./windows";
+export * from "./slack";
+export * from "./x";

@@ -122,3 +122,7 @@ Aliases are for migration only and should not introduce new variants.
 - **Goal:** clarity, neutrality, and long‑term compatibility
 
 This serves as the foundation for consistent schema evolution across the Grida ecosystem.
+
+## Notes
+
+- regexp for searching non-snake_case fields:`\b(?=[a-z]*[A-Z])[a-z][a-zA-Z0-9]*\??\s*:` (finds `fieldName: T` / `fieldName:? T`)
