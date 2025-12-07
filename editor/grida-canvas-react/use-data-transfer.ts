@@ -550,6 +550,13 @@ export function useDataTransferEventTarget() {
       const files = event.dataTransfer.files;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+
+        // Check for .fig files and show helpful message
+        if (file.name.toLowerCase().endsWith(".fig")) {
+          toast.info("Use [File] > [Import Figma] to import .fig files");
+          continue;
+        }
+
         const [valid, type] = io.clipboard.filetype(file);
         if (valid) {
           insertFromFile(type, file, event);

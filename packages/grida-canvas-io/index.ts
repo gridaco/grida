@@ -210,6 +210,35 @@ export namespace io {
       );
     }
 
+    /**
+     * Determines if a file is a valid file type that is directly supported by Grida core.
+     *
+     * This function only returns `true` for file types that can be directly inserted into the canvas
+     * (images and SVG files). Other file types like `.fig` are supported but use their own import
+     * pipeline and are not considered "valid file types" by this function.
+     *
+     * @param file - The File object to check
+     * @returns A tuple:
+     *   - `[true, ValidFileType]` if the file is a directly supported type (image or SVG)
+     *   - `[false, string]` if the file type is not directly supported (includes `.fig` files)
+     *
+     * @example
+     * ```typescript
+     * const [valid, type] = io.clipboard.filetype(file);
+     * if (valid) {
+     *   // File is an image or SVG - can be directly inserted
+     *   insertFromFile(type, file);
+     * } else {
+     *   // File type not directly supported (e.g., .fig files use separate import pipeline)
+     *   console.log(`Unsupported type: ${type}`);
+     * }
+     * ```
+     *
+     * @remarks
+     * - `.fig` files are supported but not returned as valid by this function.
+     *   They use their own import pipeline via the File > Import Figma menu.
+     * - This function checks both `file.type` (MIME type) and file extension as fallback.
+     */
     export function filetype(
       file: File
     ): [true, ValidFileType] | [false, string] {
@@ -229,6 +258,10 @@ export namespace io {
       }
     }
 
+    /**
+     * Valid file type that is direcly supported by grida core.
+     * e.g. .fig is also supported, but its not treated as valid file type. it uses its own pipeline to be imported.
+     */
     export type ValidFileType =
       | "image/svg+xml"
       | "image/png"
