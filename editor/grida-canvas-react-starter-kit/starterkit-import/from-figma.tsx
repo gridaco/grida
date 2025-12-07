@@ -28,6 +28,7 @@ import Link from "next/link";
 import iofigma from "@grida/io-figma";
 const FigImporter = iofigma.kiwi.FigImporter;
 import { readFigFile, getThumbnail } from "@grida/io-figma/fig-kiwi";
+import { Kbd } from "@/components/ui/kbd";
 
 async function fetchnode({
   filekey,
@@ -106,10 +107,14 @@ export function ImportFromFigmaDialog({
 
         <Alert>
           <InfoCircledIcon />
-          <AlertTitle>Quick Tip</AlertTitle>
+          <AlertTitle>
+            Quick Tip - You can use <Kbd>⌘C</Kbd> <Kbd>⌘V</Kbd>{" "}
+          </AlertTitle>
           <AlertDescription>
-            You can also simply copy content in Figma (Cmd/Ctrl + C) and paste
-            it directly into Grida (Cmd/Ctrl + V). No file or API needed!{" "}
+            <p>
+              You can also simply copy content in Figma <Kbd>⌘C</Kbd> and paste
+              it directly into Grida <Kbd>⌘V</Kbd>. No file or API needed!{" "}
+            </p>
             <Link
               href="/docs/editor/features/copy-paste-figma"
               target="_blank"
