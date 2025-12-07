@@ -6,11 +6,9 @@ import {
   FooterContent,
 } from "@/www/ui/footer";
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { XLogoIcon } from "@/components/logos/x";
-
+import { XLogoIcon, SlackLogoIcon } from "@/components/logos";
 import Link from "next/link";
 import { sitemap } from "./data/sitemap";
-import { SlackIcon } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -46,7 +44,7 @@ export default function Footer() {
                     className="text-muted-foreground"
                   >
                     <span className="sr-only">Slack Community</span>
-                    <SlackIcon className="size-5" />
+                    <SlackLogoIcon className="size-5" />
                   </Link>
                 </div>
               </FooterColumn>

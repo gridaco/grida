@@ -39,7 +39,8 @@ import { SettingsDialog } from "./uxhost-settings";
 import { useInsertFile } from "@/grida-canvas-react/use-data-transfer";
 import { io } from "@grida/io";
 import { useFilePicker } from "use-file-picker";
-import { ImageIcon, SlackIcon } from "lucide-react";
+import { ImageIcon } from "lucide-react";
+import { SlackLogoIcon } from "@/components/logos";
 import { distro } from "../distro";
 
 export function PlaygroundMenuContent({
@@ -457,7 +458,7 @@ export function PlaygroundMenuContent({
         </Link>
         <Link href={sitemap.links.slack} target="_blank">
           <DropdownMenuItem className="text-xs">
-            <SlackIcon className="size-3.5" />
+            <SlackLogoIcon className="size-3.5" />
             Slack Community
           </DropdownMenuItem>
         </Link>

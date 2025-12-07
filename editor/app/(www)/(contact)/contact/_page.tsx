@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState } from "react";
 import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";
 import Link from "next/link";
@@ -12,12 +13,10 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { Calendar, Mail, MessageSquare } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
-import Head from "next/head";
-import { SlackIcon } from "lucide-react";
+import { Calendar } from "lucide-react";
+import { SlackLogoIcon } from "@/components/logos";
 import { EnvelopeClosedIcon } from "@radix-ui/react-icons";
-
+import Head from "next/head";
 
 export default function ContactPage() {
   return (
@@ -59,7 +58,7 @@ function Contact() {
                   target="_blank"
                   className="hover:underline"
                 >
-                  <SlackIcon className="inline align-middle w-3.5 h-3.5 me-1" />
+                  <SlackLogoIcon className="inline align-middle w-3.5 h-3.5 me-1" />
                   Slack
                 </Link>{" "}
                 or email me at{" "}
@@ -78,7 +77,7 @@ function Contact() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
-            <SlackIcon className="size-8 mb-4" />
+            <SlackLogoIcon className="size-8 mb-4" />
             <CardTitle>Join Slack</CardTitle>
             <CardDescription>Connect with our community</CardDescription>
           </CardHeader>
