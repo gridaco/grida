@@ -62,8 +62,13 @@ interface FigFileImportResult {
   thumbnailUrl?: string;
 }
 
+/**
+ *
+ * @param nodeid - url encoded node id, "123-456" -> "123:456"
+ * @returns normalized node id
+ */
 function normalize_node_id(nodeid: string) {
-  return nodeid.replace("-", ":");
+  return nodeid.replaceAll("-", ":");
 }
 
 function useSessionStorage(key: string) {

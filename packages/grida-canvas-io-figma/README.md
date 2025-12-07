@@ -24,7 +24,7 @@ Utilities for converting Figma data (clipboard and REST API) into the Grida Canv
 
 ### Conversion Pipeline
 
-```
+```text
 Kiwi Format → REST API Format → Grida Schema
 ```
 

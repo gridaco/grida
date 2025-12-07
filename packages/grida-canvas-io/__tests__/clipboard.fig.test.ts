@@ -3,9 +3,9 @@ import { io } from "../index";
 
 /**
  * Tests for Figma clipboard detection and priority
- * 
+ *
  * This test verifies Figma clipboard format detection without parsing.
- * The actual parsing and conversion (HTML → Kiwi → Figma IR → Grida) 
+ * The actual parsing and conversion (HTML → Kiwi → Figma IR → Grida)
  * is tested in @grida/io-figma and the editor layer.
  */
 describe("figma clipboard", () => {
@@ -13,7 +13,7 @@ describe("figma clipboard", () => {
     it("should detect ellipse clipboard format", () => {
       const html = readFileSync(
         __dirname +
-          "/../../../fixtures/test-fig/clipboard/ellipse-circle-100x100-black.clipbaord.html",
+          "/../../../fixtures/test-fig/clipboard/ellipse-circle-100x100-black.clipboard.html",
         { encoding: "utf-8" }
       );
 
@@ -45,7 +45,7 @@ describe("figma clipboard", () => {
 
     it("should detect multiple Figma clipboard formats", () => {
       const fixtures = [
-        "ellipse-circle-100x100-black.clipbaord.html",
+        "ellipse-circle-100x100-black.clipboard.html",
         "rect-square-100x100-black.clipboard.html",
         "star-5-40-100x100-black.clipboard.html",
       ];
@@ -105,4 +105,3 @@ describe("figma clipboard", () => {
     });
   });
 });
-

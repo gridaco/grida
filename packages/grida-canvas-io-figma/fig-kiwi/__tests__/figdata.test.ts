@@ -31,7 +31,7 @@ test("realworld files assertion", () => {
     "1380235722331273046-figma-simple-design-system.fig",
     "1510053249065427020-workos-radix-icons.fig",
     "1527721578857867021-apple-ios-26.fig",
-    "784448220678228461-figma-auto-layout playground.fig",
+    "784448220678228461-figma-auto-layout-playground.fig",
   ];
 
   communityFiles.forEach((filename) => {
@@ -83,7 +83,7 @@ test.skip("inspect sortPosition values for CANVAS nodes", () => {
     "community/1380235722331273046-figma-simple-design-system.fig",
     "community/1510053249065427020-workos-radix-icons.fig",
     "community/1527721578857867021-apple-ios-26.fig",
-    "community/784448220678228461-figma-auto-layout playground.fig",
+    "community/784448220678228461-figma-auto-layout-playground.fig",
   ];
 
   testFiles.forEach((filename) => {

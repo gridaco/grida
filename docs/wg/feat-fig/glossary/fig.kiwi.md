@@ -219,7 +219,7 @@ A SYMBOL that is part of a component set has:
 
 **Structure:**
 
-```
+```text
 DOCUMENT "Document"
   └─ CANVAS "Internal Only Canvas" (component library)
      └─ FRAME "Button" (component set container)

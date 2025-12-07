@@ -13,7 +13,7 @@ import schema from "../schema";
 test("parses components from html string", () => {
   const str = readFileSync(
     __dirname +
-      "/../../../../fixtures/test-fig/clipboard/ellipse-circle-100x100-black.clipbaord.html",
+      "/../../../../fixtures/test-fig/clipboard/ellipse-circle-100x100-black.clipboard.html",
     {
       encoding: "utf-8",
     }
@@ -46,7 +46,7 @@ test("parses components from html string", () => {
 test("parses multiple clipboard formats", () => {
   const clipboardFiles = [
     {
-      file: "ellipse-circle-100x100-black.clipbaord.html",
+      file: "ellipse-circle-100x100-black.clipboard.html",
       pasteID: 909736251,
       fileKey: "YrxS8WHCD0GRbo3rfcrLsD",
     },

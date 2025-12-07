@@ -22,7 +22,7 @@ test("realworld files assertion", () => {
     "community/1380235722331273046-figma-simple-design-system.fig",
     "community/1510053249065427020-workos-radix-icons.fig",
     "community/1527721578857867021-apple-ios-26.fig",
-    "community/784448220678228461-figma-auto-layout playground.fig",
+    "community/784448220678228461-figma-auto-layout-playground.fig",
   ];
 
   communityFiles.forEach((filename) => {
