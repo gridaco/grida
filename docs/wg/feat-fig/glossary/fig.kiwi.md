@@ -28,10 +28,14 @@ This schema is extracted from real `.fig` files using our [fig2kiwi.ts][fig2kiwi
 
 The schema defines over 50 node types, including:
 
-- `DOCUMENT`, `CANVAS`, `FRAME`, `GROUP`
-- `VECTOR`, `STAR`, `LINE`, `ELLIPSE`, `RECTANGLE`
-- `TEXT`, `INSTANCE`, `COMPONENT`
-- Modern types: `SECTION`, `WIDGET`, `CODE_BLOCK`, `TABLE`
+- Basic: `DOCUMENT`, `CANVAS`, `FRAME`, `GROUP`
+- Shapes: `VECTOR`, `STAR`, `LINE`, `ELLIPSE`, `RECTANGLE`, `REGULAR_POLYGON`, `ROUNDED_RECTANGLE`, `BOOLEAN_OPERATION`
+- Content: `TEXT`, `INSTANCE`, `SYMBOL`, `SLICE`
+- Modern: `SECTION`, `SECTION_OVERLAY`, `WIDGET`, `CODE_BLOCK`, `TABLE`, `TABLE_CELL`
+- Variables: `VARIABLE`, `VARIABLE_SET`, `VARIABLE_OVERRIDE`
+- Slides: `SLIDE`, `SLIDE_GRID`, `SLIDE_ROW`
+- Code: `CODE_COMPONENT`, `CODE_INSTANCE`, `CODE_LIBRARY`, `CODE_FILE`, `CODE_LAYER`
+- Other: `STICKY`, `SHAPE_WITH_TEXT`, `CONNECTOR`, `STAMP`, `MEDIA`, `HIGHLIGHT`, `WASHI_TAPE`, `ASSISTED_LAYOUT`, `INTERACTIVE_SLIDE_ELEMENT`, `MODULE`, `RESPONSIVE_SET`, `TEXT_PATH`, `BRUSH`, `MANAGED_STRING`, `TRANSFORM`, `CMS_RICH_TEXT`, `REPEATER`, `JSX`, `EMBEDDED_PROTOTYPE`, `REACT_FIBER`, `RESPONSIVE_NODE_SET`, `WEBPAGE`, `KEYFRAME`, `KEYFRAME_TRACK`, `ANIMATION_PRESET_INSTANCE`
 
 ### Paint Types
 
@@ -56,16 +60,20 @@ The schema defines over 50 node types, including:
 
 Properties we've analyzed and documented from the Kiwi schema:
 
-| Property               | Type          | Location                       | Purpose                                | Usage                                                                             |
-| ---------------------- | ------------- | ------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------- |
-| `parentIndex`          | `ParentIndex` | `NodeChange.parentIndex`       | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering) |
-| `parentIndex.position` | `string`      | `ParentIndex.position`         | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                 |
-| `sortPosition`         | `string?`     | `NodeChange.sortPosition`      | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types          |
-| `frameMaskDisabled`    | `boolean?`    | `NodeChange.frameMaskDisabled` | Frame clipping mask setting            | `false` for GROUP-originated FRAMEs, `true` for real FRAMEs                       |
-| `resizeToFit`          | `boolean?`    | `NodeChange.resizeToFit`       | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                   |
-| `fillPaints`           | `Paint[]?`    | `NodeChange.fillPaints`        | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)        |
-| `strokePaints`         | `Paint[]?`    | `NodeChange.strokePaints`      | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)        |
-| `backgroundPaints`     | `Paint[]?`    | `NodeChange.backgroundPaints`  | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)        |
+| Property                        | Type                              | Location                                   | Purpose                                | Usage                                                                                 |
+| ------------------------------- | --------------------------------- | ------------------------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `parentIndex`                   | `ParentIndex`                     | `NodeChange.parentIndex`                   | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering)     |
+| `parentIndex.position`          | `string`                          | `ParentIndex.position`                     | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                     |
+| `sortPosition`                  | `string?`                         | `NodeChange.sortPosition`                  | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types              |
+| `frameMaskDisabled`             | `boolean?`                        | `NodeChange.frameMaskDisabled`             | Frame clipping mask setting            | `false` for GROUP-originated FRAMEs, `true` for real FRAMEs                           |
+| `resizeToFit`                   | `boolean?`                        | `NodeChange.resizeToFit`                   | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                       |
+| `fillPaints`                    | `Paint[]?`                        | `NodeChange.fillPaints`                    | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)            |
+| `strokePaints`                  | `Paint[]?`                        | `NodeChange.strokePaints`                  | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)            |
+| `backgroundPaints`              | `Paint[]?`                        | `NodeChange.backgroundPaints`              | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)            |
+| `isStateGroup`                  | `boolean?`                        | `NodeChange.isStateGroup`                  | Indicates state group/component set    | `true` for component set FRAMEs, `undefined` for regular FRAMEs                       |
+| `componentPropDefs`             | `ComponentPropDef[]?`             | `NodeChange.componentPropDefs`             | Component property definitions         | Present on component set FRAMEs, defines variant properties                           |
+| `stateGroupPropertyValueOrders` | `StateGroupPropertyValueOrder[]?` | `NodeChange.stateGroupPropertyValueOrders` | Variant property value orders          | Present on component set FRAMEs, defines order of variant values                      |
+| `variantPropSpecs`              | `VariantPropSpec[]?`              | `NodeChange.variantPropSpecs`              | Variant property specifications        | Present on SYMBOL nodes that are part of component sets, absent on standalone SYMBOLs |
 
 ### parentIndex
 
@@ -184,27 +192,76 @@ When converting from Figma to Grida:
 2. If detected, convert to `GroupNode` instead of `ContainerNode`
 3. This ensures proper semantic mapping: GROUP → GroupNode, FRAME → ContainerNode
 
-## Usage in Implementation
+### Component Sets
 
-### Rust Implementation
+**Critical Finding:** There is no `COMPONENT_SET` node type in the Kiwi schema. Component sets are represented as:
 
-The Rust implementation uses the schema to parse `.fig` files:
+- A `FRAME` node (the component set container)
+- Containing multiple `SYMBOL` nodes as children (the component variants)
 
-```rust
-// Located at: crates/grida-canvas/src/io/io_figma.rs
+**Component Set FRAME Properties:**
+
+A FRAME that is a component set has these distinguishing properties:
+
+| Property                        | Component Set FRAME | Regular FRAME | Reliability |
+| ------------------------------- | ------------------- | ------------- | ----------- |
+| `isStateGroup`                  | `true`              | `undefined`   | ✅ Reliable |
+| `componentPropDefs`             | Present             | `undefined`   | ✅ Reliable |
+| `stateGroupPropertyValueOrders` | Present             | `undefined`   | ✅ Reliable |
+
+**Component Set SYMBOL Properties:**
+
+A SYMBOL that is part of a component set has:
+
+| Property           | Component Set SYMBOL | Standalone SYMBOL | Reliability |
+| ------------------ | -------------------- | ----------------- | ----------- |
+| `variantPropSpecs` | Present              | `undefined`       | ✅ Reliable |
+
+**Structure:**
+
+```
+DOCUMENT "Document"
+  └─ CANVAS "Internal Only Canvas" (component library)
+     └─ FRAME "Button" (component set container)
+        ├─ SYMBOL "Variant=Primary, State=Default, Size=Small"
+        ├─ SYMBOL "Variant=Neutral, State=Default, Size=Small"
+        └─ ... (more SYMBOL variants)
 ```
 
-The implementation includes:
+**Detection Logic:**
 
-- Binary parsing of the Kiwi format
-- Schema-based decoding of messages
-- Translation to Grida's canvas format
+```typescript
+// Detect component set FRAME
+function isComponentSetFrame(node: NodeChange): boolean {
+  if (node.type !== "FRAME") {
+    return false;
+  }
+  return (
+    node.isStateGroup === true &&
+    node.componentPropDefs !== undefined &&
+    node.componentPropDefs.length > 0
+  );
+}
 
-### Related Files
+// Detect component set SYMBOL
+function isComponentSetSymbol(node: NodeChange): boolean {
+  if (node.type !== "SYMBOL") {
+    return false;
+  }
+  return (
+    node.variantPropSpecs !== undefined && node.variantPropSpecs.length > 0
+  );
+}
+```
 
-- [`/.ref/figma/fig.kiwi`][fig.kiwi-snapshot] - Schema definition (Dec 2025 snapshot)
-- [`/.ref/figma/fig2kiwi.ts`][fig2kiwi-snapshot] - Schema extraction tool (Dec 2025 snapshot)
-- `/crates/grida-canvas/src/io/io_figma.rs` - Rust parser implementation
+**Verification:**
+
+This structure has been verified in:
+
+- Clipboard payloads (see `fixtures/test-fig/clipboard/component-set-cards.clipboard.html`)
+- `.fig` files (see `fixtures/test-fig/L0/components.fig`)
+
+Both formats show the same pattern: component sets are FRAME nodes containing SYMBOL children, with distinguishing properties on both the FRAME and SYMBOL nodes.
 
 ## External Resources
 
