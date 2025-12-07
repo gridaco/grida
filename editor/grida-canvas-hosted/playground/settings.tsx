@@ -15,7 +15,12 @@ import { Button } from "@/components/ui/button";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
-export function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
+export function SettingsDialog({
+  initialPage = "keybindings",
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  initialPage?: "keybindings" | "general";
+}) {
   const editor = useCurrentEditor();
 
   return (
@@ -25,7 +30,7 @@ export function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
           <DialogTitle>Playground Settings</DialogTitle>
         </DialogHeader>
         <hr />
-        <Tabs defaultValue="keybindings" className="min-h-96">
+        <Tabs defaultValue={initialPage} className="min-h-96">
           <TabsList>
             <TabsTrigger value="keybindings">Keyboard Shortcuts</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>

@@ -31,6 +31,7 @@ import {
   useContentEditModeMinimalState,
   useCurrentSceneState,
   useToolState,
+  useBackendState,
 } from "@/grida-canvas-react/provider";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
@@ -48,9 +49,11 @@ import {
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -86,7 +89,7 @@ import ErrorBoundary from "./error-boundary";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
-import { SlackIcon, ImageIcon } from "lucide-react";
+import { SlackIcon, ImageIcon, EyeIcon } from "lucide-react";
 import BrushToolbar from "@/grida-canvas-react-starter-kit/starterkit-toolbar/brush-toolbar";
 import ArtboardsList from "@/grida-canvas-react-starter-kit/starterkit-artboard-list";
 import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
@@ -441,7 +444,12 @@ function Consumer({
     <AgentChatProvider>
       <PreviewProvider>
         <div className="flex w-full h-full">
-          {ui.sidebar_left && <SidebarLeft />}
+          {ui.sidebar_left && (
+            <SidebarLeft
+              toggleVisibility={toggleVisibility}
+              toggleMinimal={toggleMinimal}
+            />
+          )}
           <EditorSurfaceClipboardSyncProvider />
           <EditorSurfaceDropzone>
             <EditorSurfaceContextMenu>
@@ -564,7 +572,13 @@ function LocalFakeCursorChat() {
   );
 }
 
-function SidebarLeft() {
+function SidebarLeft({
+  toggleVisibility,
+  toggleMinimal,
+}: {
+  toggleVisibility?: () => void;
+  toggleMinimal?: () => void;
+}) {
   const libraryDialog = useDialogState("library");
 
   return (
@@ -601,7 +615,10 @@ function SidebarLeft() {
                   <DropdownMenuTrigger className="me-2">
                     <GridaLogo className="inline-block size-4" />
                   </DropdownMenuTrigger>
-                  <PlaygroundMenuContent />
+                  <PlaygroundMenuContent
+                    toggleVisibility={toggleVisibility}
+                    toggleMinimal={toggleMinimal}
+                  />
                 </DropdownMenu>
                 <span className="font-bold text-xs">
                   Canvas
@@ -812,18 +829,36 @@ function Hotkyes() {
   return <></>;
 }
 
-function PlaygroundMenuContent() {
+function PlaygroundMenuContent({
+  toggleVisibility,
+  toggleMinimal,
+}: {
+  toggleVisibility?: () => void;
+  toggleMinimal?: () => void;
+} = {}) {
   const instance = useCurrentEditor();
   const importFromFigmaDialog = useDialogState("import-from-figma");
   const importFromJson = useDialogState("import-from-json", {
     refreshkey: true,
   });
   const settingsDialog = useDialogState("settings");
+  const [settingsInitialPage, setSettingsInitialPage] = useState<
+    "keybindings" | "general"
+  >("keybindings");
   const { insertFromFile } = useInsertFile();
   const { openFilePicker, plainFiles } = useFilePicker({
     accept: "image/png,image/jpeg,image/webp,image/svg+xml",
     multiple: true,
   });
+
+  // Get editor state for View menu
+  const ruler = useEditorState(instance, (state) => state.ruler);
+  const pixelgrid = useEditorState(instance, (state) => state.pixelgrid);
+
+  // Get editor state for Edit menu
+  const selection = useEditorState(instance, (state) => state.selection);
+  const backend = useBackendState();
+  const hasSelection = selection.length > 0;
 
   const onExport = () => {
     const blob = instance.archive();
@@ -910,15 +945,17 @@ function PlaygroundMenuContent() {
         }}
       />
 
-      <SettingsDialog {...settingsDialog.props} />
+      <SettingsDialog
+        {...settingsDialog.props}
+        initialPage={settingsInitialPage}
+      />
 
       <DropdownMenuContent align="start" className="min-w-52">
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="text-xs">
-            <FileIcon className="size-3.5" />
             File
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
+          <DropdownMenuSubContent className="min-w-40">
             <DropdownMenuItem
               onClick={importFromJson.openDialog}
               className="text-xs"
@@ -930,90 +967,272 @@ function PlaygroundMenuContent() {
               <DownloadIcon className="size-3.5" />
               Save as .grida
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleImportImageClick}
+              className="text-xs"
+            >
+              <ImageIcon className="size-3.5" />
+              Import Image
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={importFromFigmaDialog.openDialog}
+              className="text-xs"
+            >
+              <FigmaLogoIcon className="size-3.5" />
+              Import Figma
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Edit
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            {/* History Section */}
+            <DropdownMenuItem
+              onClick={() => instance.commands.undo()}
+              className="text-xs"
+            >
+              Undo
+              <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => instance.commands.redo()}
+              className="text-xs"
+            >
+              Redo
+              <DropdownMenuShortcut>⌘⇧Z</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* Clipboard Section */}
+            <DropdownMenuItem
+              onClick={() => instance.surface.a11yCut()}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Cut
+              <DropdownMenuShortcut>⌘X</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => instance.surface.a11yCopy()}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Copy
+              <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                const task = instance.surface.a11yCopyAsImage("png");
+                toast.promise(task, {
+                  success: "Copied as PNG",
+                  error: "Failed to copy as PNG",
+                });
+              }}
+              disabled={!hasSelection || backend !== "canvas"}
+              className="text-xs"
+            >
+              Copy as PNG
+              <DropdownMenuShortcut>⇧⌘C</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                void instance.surface.a11yCopyAsSVG();
+              }}
+              disabled={!hasSelection || backend !== "canvas"}
+              className="text-xs"
+            >
+              Copy as SVG
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* Actions Section */}
+            <DropdownMenuItem
+              onClick={() => instance.commands.duplicate("selection")}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Duplicate
+              <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => instance.surface.a11yDelete()}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Delete
+              <DropdownMenuShortcut>⌫</DropdownMenuShortcut>
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            View
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            {/* Zoom Controls */}
+            <DropdownMenuCheckboxItem
+              checked={false}
+              onSelect={() => instance.camera.zoomIn()}
+              className="text-xs"
+            >
+              Zoom in
+              <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={false}
+              onSelect={() => instance.camera.zoomOut()}
+              className="text-xs"
+            >
+              Zoom out
+              <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={false}
+              onSelect={() => instance.camera.scale(1, "center")}
+              className="text-xs"
+            >
+              Zoom to 100%
+              <DropdownMenuShortcut>⌘0</DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={false}
+              onSelect={() => instance.camera.fit("*")}
+              className="text-xs"
+            >
+              Zoom to fit
+              <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={false}
+              onSelect={() => instance.camera.fit("selection")}
+              className="text-xs"
+            >
+              Zoom to selection
+              <DropdownMenuShortcut>⇧2</DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            {/* Display Options */}
+            <DropdownMenuCheckboxItem
+              checked={pixelgrid === "on"}
+              onSelect={() => {
+                instance.surface.surfaceTogglePixelGrid();
+              }}
+              className="text-xs"
+            >
+              Pixel grid
+              <DropdownMenuShortcut>⇧'</DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={ruler === "on"}
+              onSelect={() => {
+                instance.surface.surfaceToggleRuler();
+              }}
+              className="text-xs"
+            >
+              Ruler
+              <DropdownMenuShortcut>⇧R</DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            {/* UI Visibility */}
+            {toggleVisibility && toggleMinimal && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={toggleVisibility}
+                  className="text-xs"
+                >
+                  Show/Hide UI
+                  <DropdownMenuShortcut>⌘\</DropdownMenuShortcut>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={toggleMinimal} className="text-xs">
+                  Minimize UI
+                  <DropdownMenuShortcut>⇧⌘\</DropdownMenuShortcut>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Settings
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuItem
+              onClick={() => {
+                setSettingsInitialPage("general");
+                settingsDialog.openDialog();
+              }}
+              className="text-xs"
+            >
+              General
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setSettingsInitialPage("keybindings");
+                settingsDialog.openDialog();
+              }}
+              className="text-xs"
+            >
+              Keyboard shortcuts
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Developers
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="text-xs">
-                <UploadIcon className="size-3.5" />
-                Import From...
+                <OpenInNewWindowIcon className="size-3.5" />
+                Tools
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem
-                  onClick={handleImportImageClick}
-                  className="text-xs"
-                >
-                  <ImageIcon className="size-3.5" />
-                  Import Image
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={importFromFigmaDialog.openDialog}
-                  className="text-xs"
-                >
-                  <FigmaLogoIcon className="size-3.5" />
-                  Import Figma
-                </DropdownMenuItem>
+              <DropdownMenuSubContent className="min-w-40">
+                <Link href="/canvas/tools/ai" target="_blank">
+                  <DropdownMenuItem className="text-xs">
+                    <OpenInNewWindowIcon className="size-3.5" />
+                    AI
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/canvas/tools/io-figma" target="_blank">
+                  <DropdownMenuItem className="text-xs">
+                    <OpenInNewWindowIcon className="size-3.5" />
+                    IO Figma
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/canvas/tools/io-svg" target="_blank">
+                  <DropdownMenuItem className="text-xs">
+                    <OpenInNewWindowIcon className="size-3.5" />
+                    IO SVG
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="https://github.com/gridaco/p666" target="_blank">
+                  <DropdownMenuItem className="text-xs">
+                    <OpenInNewWindowIcon className="size-3.5" />
+                    P666 Daemon
+                  </DropdownMenuItem>
+                </Link>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={settingsDialog.openDialog}
-          className="text-xs"
-        >
-          <GearIcon className="size-3.5" />
-          Settings
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            <OpenInNewWindowIcon className="size-3.5" />
-            Tools
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <Link href="/canvas/tools/ai" target="_blank">
-              <DropdownMenuItem className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                AI
-              </DropdownMenuItem>
-            </Link>
-            <Link href="/canvas/tools/io-figma" target="_blank">
-              <DropdownMenuItem className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                IO Figma
-              </DropdownMenuItem>
-            </Link>
-            <Link href="/canvas/tools/io-svg" target="_blank">
-              <DropdownMenuItem className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                IO SVG
-              </DropdownMenuItem>
-            </Link>
-            <Link href="https://github.com/gridaco/p666" target="_blank">
-              <DropdownMenuItem className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                P666 Daemon
-              </DropdownMenuItem>
-            </Link>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            <MixIcon className="size-3.5" />
-            Examples
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {canvas_examples.map((example) => (
-              <Link
-                key={example.id}
-                href={"/canvas/examples/" + example.id}
-                target="_blank"
-              >
-                <DropdownMenuItem className="text-xs">
-                  <OpenInNewWindowIcon className="size-3.5" />
-                  {example.name}
-                </DropdownMenuItem>
-              </Link>
-            ))}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs">
+                <MixIcon className="size-3.5" />
+                Examples
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-40">
+                {canvas_examples.map((example) => (
+                  <Link
+                    key={example.id}
+                    href={"/canvas/examples/" + example.id}
+                    target="_blank"
+                  >
+                    <DropdownMenuItem className="text-xs">
+                      <OpenInNewWindowIcon className="size-3.5" />
+                      {example.name}
+                    </DropdownMenuItem>
+                  </Link>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSeparator />
