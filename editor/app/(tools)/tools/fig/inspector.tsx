@@ -2,24 +2,24 @@
 
 import * as React from "react";
 import { useMemo, useState } from "react";
-import { prettyPrintSchema } from "kiwi-schema";
 import {
-  type Schema as CompiledSchema,
   type FigmaMeta,
   type Header,
   type Message,
   type ParsedFigmaArchive,
   type ParsedFigmaHTML,
+  type Schema as CompiledSchema,
   getThumbnail,
+  compileSchema,
+  prettyPrintSchema,
 } from "@grida/io-figma/fig-kiwi";
+import type { GUID, NodeChange } from "@grida/io-figma/fig-kiwi/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { GUID, NodeChange } from "@grida/io-figma/fig-kiwi/schema";
 import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import { NodeTypeIcon } from "./node-type-icon";
-import { compileSchema } from "kiwi-schema";
 import { ThemedMonacoEditor } from "@/components/monaco";
 
 type FileContents = ParsedFigmaArchive | ParsedFigmaHTML;

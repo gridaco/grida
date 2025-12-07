@@ -24,7 +24,7 @@ import {
   type ParsedFigmaHTML,
   type ParsedFigmaArchive,
 } from "@grida/io-figma/fig-kiwi";
-import { FigmaFile } from "./file-viewer";
+import { FigmaFile } from "./inspector";
 import { toast } from "sonner";
 import { UploadIcon, ClipboardIcon } from "lucide-react";
 import { FigmaLogoIcon } from "@radix-ui/react-icons";

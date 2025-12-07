@@ -40,6 +40,9 @@ export {
   type VectorNetwork,
 } from "./blob-parser";
 
+// Re-export kiwi-schema utilities for consumers
+export { compileSchema, prettyPrintSchema } from "kiwi-schema";
+
 // --- Constants ---
 
 export type Header = { prelude: string; version: number };
