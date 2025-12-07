@@ -86,7 +86,7 @@ import ErrorBoundary from "./error-boundary";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
-import { SlackIcon } from "lucide-react";
+import { SlackIcon, ImageIcon } from "lucide-react";
 import BrushToolbar from "@/grida-canvas-react-starter-kit/starterkit-toolbar/brush-toolbar";
 import ArtboardsList from "@/grida-canvas-react-starter-kit/starterkit-artboard-list";
 import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
@@ -124,6 +124,9 @@ import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { SettingsDialog } from "./settings";
+import { useInsertFile } from "@/grida-canvas-react/use-data-transfer";
+import { io } from "@grida/io";
+import { useFilePicker } from "use-file-picker";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -816,11 +819,41 @@ function PlaygroundMenuContent() {
     refreshkey: true,
   });
   const settingsDialog = useDialogState("settings");
+  const { insertFromFile } = useInsertFile();
+  const { openFilePicker, plainFiles } = useFilePicker({
+    accept: "image/png,image/jpeg,image/webp,image/svg+xml",
+    multiple: true,
+  });
 
   const onExport = () => {
     const blob = instance.archive();
     saveAs(blob, distro.snapshot_file_name());
   };
+
+  const handleImportImageClick = () => {
+    openFilePicker();
+  };
+
+  // Handle files when they are selected
+  useEffect(() => {
+    if (plainFiles.length === 0) return;
+
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+
+    for (let i = 0; i < plainFiles.length; i++) {
+      const file = plainFiles[i];
+      const [valid, type] = io.clipboard.filetype(file);
+      if (valid) {
+        insertFromFile(type, file, {
+          clientX: centerX,
+          clientY: centerY,
+        });
+      } else {
+        toast.error(`File type '${type}' is not supported`);
+      }
+    }
+  }, [plainFiles, insertFromFile]);
 
   return (
     <>
@@ -900,9 +933,16 @@ function PlaygroundMenuContent() {
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="text-xs">
                 <UploadIcon className="size-3.5" />
-                Import
+                Import From...
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  onClick={handleImportImageClick}
+                  className="text-xs"
+                >
+                  <ImageIcon className="size-3.5" />
+                  Import Image
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={importFromFigmaDialog.openDialog}
                   className="text-xs"

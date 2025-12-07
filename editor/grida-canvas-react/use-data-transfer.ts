@@ -13,6 +13,147 @@ import { iofigma } from "@grida/io-figma";
 import { nanoid } from "nanoid";
 
 /**
+ * Hook that provides file insertion utilities for the Grida canvas editor.
+ *
+ * This hook handles inserting images (PNG, JPEG, GIF, WebP) and SVG files into the canvas.
+ * Images are inserted as rectangle nodes with image fills, while SVG files are converted
+ * to vector nodes.
+ *
+ * @returns An object containing file insertion functions:
+ * - `insertImage`: Inserts an image file as a rectangle node with image fill
+ * - `insertSVG`: Inserts an SVG string as a vector node
+ * - `insertFromFile`: Automatically routes file insertion based on file type
+ *
+ * @example
+ * ```tsx
+ * function FileImporter() {
+ *   const { insertFromFile } = useInsertFile();
+ *
+ *   const handleFileSelect = (file: File) => {
+ *     const [valid, type] = io.clipboard.filetype(file);
+ *     if (valid) {
+ *       insertFromFile(type, file, { clientX: 100, clientY: 100 });
+ *     }
+ *   };
+ *
+ *   return <input type="file" onChange={(e) => handleFileSelect(e.target.files[0])} />;
+ * }
+ * ```
+ */
+export function useInsertFile() {
+  const instance = useCurrentEditor();
+
+  const insertImage = useCallback(
+    async (
+      name: string,
+      file: File,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const [x, y] = instance.camera.clientPointToCanvasPoint(
+        position ? [position.clientX, position.clientY] : [0, 0]
+      );
+
+      const bytes = await file.arrayBuffer();
+      const image = await instance.createImage(new Uint8Array(bytes));
+
+      // Create rectangle node with image paint instead of image node
+      const node = instance.commands.createRectangleNode();
+      node.$.position = "absolute";
+      node.$.name = name;
+      node.$.left = x;
+      node.$.top = y;
+      node.$.width = image.width;
+      node.$.height = image.height;
+      node.$.fills = [
+        {
+          type: "image",
+          src: image.url,
+          fit: "cover",
+          transform: cmath.transform.identity,
+          filters: cg.def.IMAGE_FILTERS,
+          blend_mode: cg.def.BLENDMODE,
+          opacity: 1,
+          active: true,
+        } satisfies cg.ImagePaint,
+      ];
+    },
+    [instance]
+  );
+
+  const insertSVG = useCallback(
+    async (
+      name: string,
+      svg: string,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const node = await instance.commands.createNodeFromSvg(svg);
+
+      const center_dx =
+        typeof node.$.width === "number" && node.$.width > 0
+          ? node.$.width / 2
+          : 0;
+
+      const center_dy =
+        typeof node.$.height === "number" && node.$.height > 0
+          ? node.$.height / 2
+          : 0;
+
+      const [x, y] = instance.camera.clientPointToCanvasPoint(
+        cmath.vector2.sub(
+          position ? [position.clientX, position.clientY] : [0, 0],
+          [center_dx, center_dy]
+        )
+      );
+
+      node.$.name = name;
+      node.$.left = x;
+      node.$.top = y;
+    },
+    [instance]
+  );
+
+  const insertFromFile = useCallback(
+    (
+      type: io.clipboard.ValidFileType,
+      file: File,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      if (type === "image/svg+xml") {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const svgContent = e.target?.result as string;
+          const name = file.name.split(".svg")[0];
+          insertSVG(name, svgContent, position);
+        };
+        reader.readAsText(file);
+        return;
+      } else if (
+        type === "image/png" ||
+        type === "image/jpeg" ||
+        type === "image/gif" ||
+        type === "image/webp"
+      ) {
+        const name = file.name.split(".")[0];
+        insertImage(name, file, position);
+        return;
+      }
+    },
+    [insertImage, insertSVG]
+  );
+
+  return { insertImage, insertSVG, insertFromFile };
+}
+
+/**
  * Attempts to parse and insert Figma clipboard payload into the editor
  *
  * @param editor - The editor instance to insert nodes into
@@ -132,10 +273,10 @@ async function tryInsertFromFigmaClipboardPayload(
 /**
  * Hook that provides data transfer event handlers for the Grida canvas editor.
  *
- * This hook handles drag and drop operations, clipboard paste events, and file insertion
- * for various content types including images, SVG files, SVG text, and text. It creates
- * appropriate canvas nodes (rectangles with image fills, text nodes, or SVG nodes) based
- * on the dropped or pasted content.
+ * This hook handles drag and drop operations and clipboard paste events for various
+ * content types including images, SVG files, SVG text, and text. It creates appropriate
+ * canvas nodes (rectangles with image fills, text nodes, or SVG nodes) based on the
+ * dropped or pasted content.
  *
  * @returns An object containing event handlers and utility functions:
  * - `onpaste`: Handles clipboard paste events for text, images, SVG files, and SVG text
@@ -161,7 +302,7 @@ async function tryInsertFromFigmaClipboardPayload(
  * ```
  *
  * @remarks
- * - For image files (PNG, JPEG, GIF), creates rectangle nodes with image fills
+ * - For image files (PNG, JPEG, GIF, WebP), creates rectangle nodes with image fills
  * - For SVG files and SVG text, creates vector nodes from SVG content
  * - For plain text content, creates text nodes with default styling
  * - Handles both drag-and-drop and clipboard paste operations
@@ -171,6 +312,7 @@ async function tryInsertFromFigmaClipboardPayload(
 export function useDataTransferEventTarget() {
   const instance = useCurrentEditor();
   const current_clipboard = useEditorState(instance, (s) => s.user_clipboard);
+  const { insertFromFile, insertSVG } = useInsertFile();
 
   const insertText = useCallback(
     (
@@ -196,112 +338,6 @@ export function useDataTransferEventTarget() {
       } satisfies cg.Paint;
     },
     [instance]
-  );
-
-  const insertImage = useCallback(
-    async (
-      name: string,
-      file: File,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      const [x, y] = instance.camera.clientPointToCanvasPoint(
-        position ? [position.clientX, position.clientY] : [0, 0]
-      );
-
-      const bytes = await file.arrayBuffer();
-      const image = await instance.createImage(new Uint8Array(bytes));
-
-      // Create rectangle node with image paint instead of image node
-      const node = instance.commands.createRectangleNode();
-      node.$.position = "absolute";
-      node.$.name = name;
-      node.$.left = x;
-      node.$.top = y;
-      node.$.width = image.width;
-      node.$.height = image.height;
-      node.$.fills = [
-        {
-          type: "image",
-          src: image.url,
-          fit: "cover",
-          transform: cmath.transform.identity,
-          filters: cg.def.IMAGE_FILTERS,
-          blend_mode: cg.def.BLENDMODE,
-          opacity: 1,
-          active: true,
-        } satisfies cg.ImagePaint,
-      ];
-    },
-    [instance]
-  );
-
-  const insertSVG = useCallback(
-    async (
-      name: string,
-      svg: string,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      const node = await instance.commands.createNodeFromSvg(svg);
-
-      const center_dx =
-        typeof node.$.width === "number" && node.$.width > 0
-          ? node.$.width / 2
-          : 0;
-
-      const center_dy =
-        typeof node.$.height === "number" && node.$.height > 0
-          ? node.$.height / 2
-          : 0;
-
-      const [x, y] = instance.camera.clientPointToCanvasPoint(
-        cmath.vector2.sub(
-          position ? [position.clientX, position.clientY] : [0, 0],
-          [center_dx, center_dy]
-        )
-      );
-
-      node.$.name = name;
-      node.$.left = x;
-      node.$.top = y;
-    },
-    [instance]
-  );
-
-  const insertFromFile = useCallback(
-    (
-      type: io.clipboard.ValidFileType,
-      file: File,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      if (type === "image/svg+xml") {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const svgContent = e.target?.result as string;
-          const name = file.name.split(".svg")[0];
-          insertSVG(name, svgContent, position);
-        };
-        reader.readAsText(file);
-        return;
-      } else if (
-        type === "image/png" ||
-        type === "image/jpeg" ||
-        type === "image/gif"
-      ) {
-        const name = file.name.split(".")[0];
-        insertImage(name, file, position);
-        return;
-      }
-    },
-    [insertImage, insertSVG]
   );
 
   const handleFigmaClipboard = useCallback(
@@ -522,7 +558,7 @@ export function useDataTransferEventTarget() {
         }
       }
     },
-    [insertFromFile]
+    [insertFromFile, insertSVG]
   );
   //
 

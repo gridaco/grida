@@ -222,6 +222,8 @@ export namespace io {
         return [true, "image/jpeg" as const];
       } else if (type === "image/gif") {
         return [true, "image/gif" as const];
+      } else if (type === "image/webp") {
+        return [true, "image/webp" as const];
       } else {
         return [false, type];
       }
@@ -231,11 +233,17 @@ export namespace io {
       | "image/svg+xml"
       | "image/png"
       | "image/jpeg"
-      | "image/gif";
+      | "image/gif"
+      | "image/webp";
 
     export type DecodedItem =
       | {
-          type: "image/svg+xml" | "image/png" | "image/jpeg" | "image/gif";
+          type:
+            | "image/svg+xml"
+            | "image/png"
+            | "image/jpeg"
+            | "image/gif"
+            | "image/webp";
           file: File;
         }
       | { type: "text"; text: string }
