@@ -37,7 +37,7 @@ const menus = [
   {
     title: ".fig Inspector",
     description: "Parse and inspect Figma .fig files and clipboard data",
-    link: "/tools/fig-parser",
+    link: "/tools/fig",
     icon: FigmaIcon,
   },
 ];
