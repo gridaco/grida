@@ -174,20 +174,40 @@ export namespace io {
      * <span data-buffer="<!--(figma)BASE64_KIWI_DATA(/figma)-->"></span>
      * ```
      *
+     * This function handles Chrome Clipboard API bug where HTML entities are escaped
+     * (`&lt;` instead of `<`, `&gt;` instead of `>`). It first checks for the "(figma)" keyword,
+     * and if found, normalizes escaped entities before checking for all required markers.
+     *
      * This function only checks for Figma-specific markers without parsing the payload.
      * Actual parsing happens in the editor layer where @grida/io-figma is available.
      *
-     * @param html - The HTML string from clipboard
+     * @param html - The HTML string from clipboard (may contain escaped entities from Chrome)
      * @returns true if the HTML contains Figma clipboard markers, false otherwise
      */
     export function isFigmaClipboard(html: string): boolean {
+      // Check if "(figma)" keyword exists (the core identifier)
+      const hasFigmaKeyword = html.includes("(figma)");
+
+      if (!hasFigmaKeyword) {
+        return false;
+      }
+
+      // If keyword found, normalize HTML entities for Chrome Clipboard API bug
+      // Chrome escapes HTML entities: &lt; instead of <, &gt; instead of >
+      // Only normalize if we detected the keyword, allowing escaped chars
+      const normalized = html
+        .replace("&lt;!--(figmeta)", "<!--(figmeta)")
+        .replace("(/figmeta)--&gt;", "(/figmeta)-->")
+        .replace("&lt;!--(figma)", "<!--(figma)")
+        .replace("(/figma)--&gt;", "(/figma)-->");
+
       // Check for Figma-specific HTML markers
       // Based on spec: fixtures/test-fig/clipboard/README.md
       return (
-        html.includes("data-metadata") &&
-        html.includes("data-buffer") &&
-        html.includes("<!--(figmeta)") &&
-        html.includes("<!--(figma)")
+        normalized.includes("data-metadata") &&
+        normalized.includes("data-buffer") &&
+        normalized.includes("<!--(figmeta)") &&
+        normalized.includes("<!--(figma)")
       );
     }
 
@@ -359,8 +379,18 @@ export namespace io {
             }
 
             // Check if it's Figma clipboard format (without parsing)
+            // isFigmaClipboard handles Chrome Clipboard API bug internally
             if (io.clipboard.isFigmaClipboard(html)) {
-              return resolve({ type: "canbe-figma-clipboard", html });
+              // Normalize HTML for Figma clipboard (isFigmaClipboard already checked it's valid)
+              const normalized = html
+                .replace("&lt;!--(figmeta)", "<!--(figmeta)")
+                .replace("(/figmeta)--&gt;", "(/figmeta)-->")
+                .replace("&lt;!--(figma)", "<!--(figma)")
+                .replace("(/figma)--&gt;", "(/figma)-->");
+              return resolve({
+                type: "canbe-figma-clipboard",
+                html: normalized,
+              });
             }
 
             return reject(new Error("Unknown HTML payload"));
@@ -369,6 +399,167 @@ export namespace io {
           return resolve(null);
         }
       });
+    }
+
+    /**
+     * Decodes ClipboardItem[] from navigator.clipboard.read() to DecodedItem[].
+     *
+     * This function converts ClipboardItem[] (from Clipboard API) to the same DecodedItem[]
+     * format used by decode(), allowing unified paste handling for both ClipboardEvent and
+     * Clipboard API sources.
+     *
+     * Handles the Chrome bug where HTML entities are escaped in Clipboard API (handled
+     * automatically by isFigmaClipboard when detecting Figma clipboard).
+     *
+     * @param clipboardItems - Array of ClipboardItem from navigator.clipboard.read()
+     * @returns Promise resolving to array of DecodedItem
+     *
+     * @example
+     * ```typescript
+     * const clipboardItems = await navigator.clipboard.read();
+     * const decodedItems = await io.clipboard.decodeFromClipboardItems(clipboardItems);
+     * // decodedItems can now be used with the same paste logic as ClipboardEvent
+     * ```
+     */
+    export async function decodeFromClipboardItems(
+      clipboardItems: ClipboardItem[]
+    ): Promise<DecodedItem[]> {
+      const decodedItems: DecodedItem[] = [];
+
+      for (const clipboardItem of clipboardItems) {
+        const types = clipboardItem.types;
+
+        // Check for HTML first (Grida/Figma clipboard)
+        if (types.includes("text/html")) {
+          try {
+            const blob = await clipboardItem.getType("text/html");
+            const html = await blob.text();
+
+            // Try Grida clipboard first
+            const gridaData = decodeClipboardHtml(html);
+            if (gridaData) {
+              decodedItems.push({ type: "clipboard", clipboard: gridaData });
+              continue;
+            }
+
+            // Check if it's Figma clipboard format
+            // isFigmaClipboard handles Chrome Clipboard API bug internally
+            if (isFigmaClipboard(html)) {
+              // Normalize HTML for Figma clipboard (isFigmaClipboard already checked it's valid)
+              const normalized = html
+                .replace("&lt;!--(figmeta)", "<!--(figmeta)")
+                .replace("(/figmeta)--&gt;", "(/figmeta)-->")
+                .replace("&lt;!--(figma)", "<!--(figma)")
+                .replace("(/figma)--&gt;", "(/figma)-->");
+              decodedItems.push({
+                type: "canbe-figma-clipboard",
+                html: normalized,
+              });
+              continue;
+            }
+          } catch {}
+        }
+
+        // Check for image/svg+xml file
+        if (types.includes("image/svg+xml")) {
+          try {
+            const blob = await clipboardItem.getType("image/svg+xml");
+            const file = new File([blob], "clipboard.svg", {
+              type: "image/svg+xml",
+            });
+            decodedItems.push({ type: "image/svg+xml", file });
+            continue;
+          } catch {}
+        }
+
+        // Check for other image types
+        let imageFound = false;
+        for (const imageType of [
+          "image/png",
+          "image/jpeg",
+          "image/gif",
+          "image/webp",
+        ] as const) {
+          if (types.includes(imageType)) {
+            try {
+              const blob = await clipboardItem.getType(imageType);
+              const file = new File(
+                [blob],
+                `clipboard.${imageType.split("/")[1]}`,
+                {
+                  type: imageType,
+                }
+              );
+              decodedItems.push({ type: imageType, file });
+              imageFound = true;
+              break;
+            } catch {}
+          }
+        }
+        if (imageFound) continue;
+
+        // Check for text/plain (may be SVG text or plain text)
+        if (types.includes("text/plain")) {
+          try {
+            const blob = await clipboardItem.getType("text/plain");
+            const text = await blob.text();
+            if (text.trim().length === 0) continue;
+
+            // Check if text starts with grida:vn: (vector network)
+            if (text.startsWith("grida:vn:")) {
+              decodedItems.push({ type: "text", text });
+              continue;
+            }
+
+            // Check if text is SVG
+            if (isSvgText(text)) {
+              decodedItems.push({ type: "svg-text", svg: text });
+              continue;
+            }
+
+            // Regular text
+            decodedItems.push({ type: "text", text });
+          } catch {}
+        }
+      }
+
+      return decodedItems;
+    }
+
+    /**
+     * Testing utilities for clipboard functionality.
+     * These functions simulate browser-specific behaviors for testing purposes.
+     */
+    export namespace testing {
+      /**
+       * Mocks Chrome's attribute escaping behavior in Clipboard API.
+       *
+       * Chrome's Clipboard API (`navigator.clipboard.read()`) escapes HTML entities,
+       * converting `<` to `&lt;` and `>` to `&gt;` in HTML content, particularly in
+       * attribute values. This behavior is related to Chrome 138+ changes for preventing
+       * mutation XSS (mXSS) vulnerabilities.
+       *
+       * This function simulates that behavior for testing purposes.
+       *
+       * @see {@link https://developer.chrome.com/blog/escape-attributes | HTML spec change: escaping < and > in attributes}
+       * @see {@link https://developer.chrome.com/docs/web-platform/unsanitized-html-async-clipboard | Unsanitized HTML in the Async Clipboard API}
+       *
+       * @param html - The HTML string to transform (typically from a clipboard fixture)
+       * @returns HTML string with escaped entities matching Chrome's Clipboard API behavior
+       *
+       * @example
+       * ```typescript
+       * const original = '<!--comment-->';
+       * const chromeMocked = io.clipboard.testing.__testonly_mock_chrome_escape_attributes(original);
+       * // chromeMocked: '&lt;!--comment--&gt;'
+       * ```
+       */
+      export function __testonly_mock_chrome_escape_attributes(
+        html: string
+      ): string {
+        // Chrome escapes HTML entities: < becomes &lt; and > becomes &gt;
+        return html.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
     }
   }
 

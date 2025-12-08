@@ -13,7 +13,9 @@ type HexValueInputProps = Omit<
 > & {
   value: RGB;
   unit?: RGBUnit;
-  onValueChange?: (color: RGB) => void;
+  fuzz?: boolean;
+  onValueChange?: (hex: string) => void;
+  onValueCommit?: (rgb: RGB, opacity?: number) => void;
 };
 
 function RGBHexInputInner(
@@ -21,38 +23,50 @@ function RGBHexInputInner(
     className,
     value,
     unit = "u8",
+    fuzz,
     onValueChange,
+    onValueCommit,
     onFocus,
+    onBlur,
     ...props
   }: HexValueInputProps,
   ref: React.Ref<HTMLInputElement>
 ) {
-  const { inputRef, hex, handleKeyDown, handleChange, handleFocus } =
-    useHexValueInput({ value, unit, onValueChange });
+  const hexInput = useHexValueInput({
+    value,
+    unit,
+    fuzz,
+    onValueChange,
+    onValueCommit,
+  });
 
   const mergeRefs = React.useCallback(
     (node: HTMLInputElement) => {
-      inputRef.current = node;
+      if (hexInput.ref.current !== node) {
+        hexInput.ref.current = node;
+      }
       if (typeof ref === "function") {
         ref(node);
       } else if (ref) {
         (ref as React.RefObject<HTMLInputElement | null>).current = node;
       }
     },
-    [ref, inputRef]
+    [ref, hexInput.ref]
   );
 
   return (
     <input
       {...props}
+      {...hexInput}
       ref={mergeRefs}
       className={cn(WorkbenchUI.rawInputVariants({ size: "xs" }), className)}
-      value={hex}
-      onKeyDown={handleKeyDown}
-      onChange={handleChange}
       onFocus={(e) => {
-        handleFocus();
+        hexInput.onFocus();
         onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        hexInput.onBlur();
+        onBlur?.(e);
       }}
       spellCheck={false}
     />

@@ -31,3 +31,10 @@ export const MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE = 100;
  * ensuring the control stays within the node's bounds for the best user experience.
  */
 export const MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE = 100;
+
+/**
+ * Border width in pixels for the dropzone highlight indication.
+ * This controls the visual thickness of the border shown when dragging nodes
+ * to indicate the target dropzone where they will be placed.
+ */
+export const DROPZONE_BORDER_WIDTH = 2;

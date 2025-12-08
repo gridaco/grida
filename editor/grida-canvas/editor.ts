@@ -779,7 +779,7 @@ class EditorDocumentStore
   }
 
   public select(...selectors: grida.program.document.Selector[]) {
-    const { document_ctx, selection } = this.mstate;
+    const { document_ctx, selection, scene_id } = this.mstate;
     const ids = Array.from(
       new Set(
         selectors.flatMap((selector) =>
@@ -788,18 +788,32 @@ class EditorDocumentStore
       )
     );
 
-    if (ids.length === 0) {
+    // Filter to only include nodes within the current scene
+    // This prevents selecting nodes from other scenes when using CMD+A on an empty scene
+    const scene_scoped_ids = scene_id
+      ? ids.filter((node_id) => {
+          // Check if node belongs to the current scene
+          const top_id = dq.getTopIdWithinScene(
+            document_ctx,
+            node_id,
+            scene_id
+          );
+          return top_id !== null;
+        })
+      : ids;
+
+    if (scene_scoped_ids.length === 0) {
       // if no ids found, keep the current selection
       // e.g. this can happen whe `>` (select children) is used but no children found
       return false;
     } else {
       this.dispatch({
         type: "select",
-        selection: ids,
+        selection: scene_scoped_ids,
       });
     }
 
-    return ids;
+    return scene_scoped_ids;
   }
 
   public blur(debug_label?: string) {

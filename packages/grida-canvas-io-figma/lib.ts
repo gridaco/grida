@@ -322,9 +322,9 @@ export namespace iofigma {
 
       /**
        * Base node properties - IBaseNode, ISceneNode, IBlend, IZIndex, IRotation
+       * Note: id is handled separately and not included here
        */
       function base_node_trait(node: {
-        id: string;
         name: string;
         visible?: boolean;
         locked?: boolean;
@@ -333,7 +333,6 @@ export namespace iofigma {
         blendMode: figrest.BlendMode;
       }) {
         return {
-          id: node.id,
           name: node.name,
           active: node.visible ?? true,
           locked: node.locked ?? false,
@@ -603,7 +602,7 @@ export namespace iofigma {
         | figrest.GroupNode;
 
       export type FactoryContext = {
-        // node_id_generator: () => string;
+        node_id_generator?: () => string;
         gradient_id_generator: () => string;
       };
 
@@ -621,12 +620,33 @@ export namespace iofigma {
         const nodes: Record<string, grida.program.nodes.Node> = {};
         const graph: Record<string, string[]> = {};
 
+        // Map from Figma ID (ephemeral) to Grida ID (final)
+        const figma_id_to_grida_id = new Map<string, string>();
+
+        // ID generator function - use provided generator or fallback
+        let counter = 0;
+        const generateId =
+          context.node_id_generator ||
+          (() => `figma-import-${Date.now()}-${++counter}`);
+
+        // Helper to get or create Grida ID for a Figma ID
+        const getOrCreateGridaId = (figmaId: string): string => {
+          const existing = figma_id_to_grida_id.get(figmaId);
+          if (existing) return existing;
+          const gridaId = generateId();
+          figma_id_to_grida_id.set(figmaId, gridaId);
+          return gridaId;
+        };
+
         function processNode(
           currentNode: InputNode,
           parent?: FigmaParentNode
         ): grida.program.nodes.Node | undefined {
+          const gridaId = getOrCreateGridaId(currentNode.id);
+
           const processedNode = node_without_children(
             currentNode,
+            gridaId,
             images,
             parent,
             context
@@ -662,12 +682,15 @@ export namespace iofigma {
           throw new Error("Failed to process root node");
         }
 
+        // Generate a new scene ID
+        const sceneId = generateId();
+
         return {
           nodes,
           links: graph,
           scene: {
             type: "scene",
-            id: "scene-" + rootNode.id,
+            id: sceneId,
             name: rootNode.name,
             children_refs: [rootNode.id],
             guides: [],
@@ -689,12 +712,15 @@ export namespace iofigma {
        * It still follows the node structure and returns with empty array `{ children: [] }` if the node requires children property.
        *
        * @param node
+       * @param gridaId The generated Grida ID for this node (not the Figma ID)
        * @param images
        * @param parent
+       * @param context
        * @returns
        */
       function node_without_children(
         node: InputNode,
+        gridaId: string,
         images: { [key: string]: string },
         parent: FigmaParentNode | undefined,
         context: FactoryContext
@@ -702,8 +728,12 @@ export namespace iofigma {
         switch (node.type) {
           case "SECTION": {
             return {
+              id: gridaId,
               ...base_node_trait({
-                ...node,
+                name: node.name,
+                visible: node.visible,
+                locked: node.locked,
+                rotation: node.rotation,
                 opacity: 1,
                 blendMode: "PASS_THROUGH",
               }),
@@ -720,6 +750,7 @@ export namespace iofigma {
           case "INSTANCE":
           case "FRAME": {
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
@@ -737,6 +768,7 @@ export namespace iofigma {
             // Group is a transparent container without layout, fills, or strokes.
             // Children of group has constraints relative to the parent of the group.
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               type: "group",
@@ -776,6 +808,7 @@ export namespace iofigma {
             };
 
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...fills_trait(node.fills),
               ...text_stroke_trait(node),
@@ -819,6 +852,7 @@ export namespace iofigma {
           }
           case "RECTANGLE": {
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
@@ -830,6 +864,7 @@ export namespace iofigma {
           }
           case "ELLIPSE": {
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
@@ -841,6 +876,7 @@ export namespace iofigma {
           }
           case "BOOLEAN_OPERATION": {
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
@@ -853,6 +889,7 @@ export namespace iofigma {
           }
           case "LINE": {
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...stroke_trait(node),
               ...effects_trait(node.effects),
@@ -871,6 +908,7 @@ export namespace iofigma {
           case "STAR":
           case "VECTOR": {
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
@@ -905,6 +943,7 @@ export namespace iofigma {
             };
 
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
@@ -917,6 +956,7 @@ export namespace iofigma {
           }
           case "X_STAR": {
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
@@ -929,6 +969,7 @@ export namespace iofigma {
           }
           case "X_REGULAR_POLYGON": {
             return {
+              id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
