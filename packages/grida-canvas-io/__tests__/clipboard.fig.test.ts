@@ -61,6 +61,31 @@ describe("figma clipboard", () => {
       });
     });
 
+    it("should detect Figma clipboard format with Chrome Clipboard API escaped entities", () => {
+      const fixtures = [
+        "ellipse-circle-100x100-black.clipboard.html",
+        "rect-square-100x100-black.clipboard.html",
+        "star-5-40-100x100-black.clipboard.html",
+      ];
+
+      fixtures.forEach((fixture) => {
+        const originalHtml = readFileSync(
+          __dirname + `/../../../fixtures/test-fig/clipboard/${fixture}`,
+          { encoding: "utf-8" }
+        );
+
+        // Mock Chrome Clipboard API behavior (escapes HTML entities)
+        const chromeMockedHtml =
+          io.clipboard.testing.__testonly_mock_chrome_escape_attributes(
+            originalHtml
+          );
+
+        // Should still detect Figma clipboard even with escaped entities
+        const result = io.clipboard.isFigmaClipboard(chromeMockedHtml);
+        expect(result).toBe(true);
+      });
+    });
+
     it("should return false for non-Figma HTML", () => {
       const html = "<div>Just some HTML</div>";
       const result = io.clipboard.isFigmaClipboard(html);

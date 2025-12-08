@@ -279,7 +279,8 @@ async function tryInsertFromFigmaClipboardPayload(
  * dropped or pasted content.
  *
  * @returns An object containing event handlers and utility functions:
- * - `onpaste`: Handles clipboard paste events for text, images, SVG files, and SVG text
+ * - `onpaste`: Handles clipboard paste events (ClipboardEvent) for text, images, SVG files, and SVG text
+ * - `onpaste_external_event`: Handles external clipboard paste (Clipboard API) for context menus and other external triggers
  * - `ondragover`: Prevents default drag behavior to allow drops
  * - `ondrop`: Handles file drops and creates appropriate canvas nodes
  * - `insertText`: Utility function to insert text nodes at specified positions
@@ -287,7 +288,7 @@ async function tryInsertFromFigmaClipboardPayload(
  * @example
  * ```tsx
  * function CanvasEditor() {
- *   const { onpaste, ondragover, ondrop, insertText } = useDataTransferEventTarget();
+ *   const { onpaste, onpaste_external_event, ondragover, ondrop, insertText } = useDataTransferEventTarget();
  *
  *   return (
  *     <div
@@ -368,6 +369,112 @@ export function useDataTransferEventTarget() {
   );
 
   /**
+   * Core paste logic that handles decoded clipboard items.
+   * This function implements the paste priority order:
+   * 1. Grida vector network (grida:vn:)
+   * 2. Grida clipboard payload
+   * 3. Figma clipboard
+   * 4. SVG text, images, or plain text
+   * 5. Fallback to local clipboard
+   */
+  const handlePasteFromItems = useCallback(
+    async (
+      items: io.clipboard.DecodedItem[],
+      options?: {
+        position?: { clientX: number; clientY: number };
+        current_clipboard?: io.clipboard.ClipboardPayload | undefined;
+      }
+    ): Promise<boolean> => {
+      const position = options?.position || {
+        clientX: window.innerWidth / 2,
+        clientY: window.innerHeight / 2,
+      };
+      const current_clipboard_ref =
+        options?.current_clipboard || current_clipboard;
+
+      // Check for vector network payload (grida:vn:)
+      const vector_payload = items.find(
+        (item) => item.type === "text" && item.text.startsWith("grida:vn:")
+      );
+      if (vector_payload) {
+        try {
+          assert(vector_payload.type === "text");
+          const net = JSON.parse(
+            atob(vector_payload.text.slice("grida:vn:".length))
+          );
+          instance.commands.pasteVector(net);
+          return true;
+        } catch {}
+      }
+
+      // 1. Check for Grida clipboard payload
+      const grida_payload = items.find((item) => item.type === "clipboard");
+      if (grida_payload) {
+        if (grida_payload.type === "clipboard") {
+          if (
+            current_clipboard_ref?.payload_id ===
+            grida_payload.clipboard.payload_id
+          ) {
+            instance.commands.paste();
+            return true;
+          } else if (grida_payload.clipboard.type === "prototypes") {
+            instance.commands.pastePayload(grida_payload.clipboard);
+            return true;
+          } else {
+            instance.commands.paste();
+            return true;
+          }
+        }
+      }
+
+      // 2. Check for Figma clipboard
+      const figma_payload = items.find(
+        (item) => item.type === "canbe-figma-clipboard"
+      );
+      if (figma_payload) {
+        if (figma_payload.type === "canbe-figma-clipboard") {
+          await handleFigmaClipboard(figma_payload.html);
+          return true;
+        }
+      }
+
+      // 3. Handle SVG text, images, or plain text
+      for (const item of items) {
+        try {
+          switch (item.type) {
+            case "svg-text": {
+              insertSVG("SVG", item.svg, position);
+              return true;
+            }
+            case "text": {
+              insertText(item.text, position);
+              return true;
+            }
+            case "image/gif":
+            case "image/jpeg":
+            case "image/png":
+            case "image/svg+xml": {
+              insertFromFile(item.type, item.file, position);
+              return true;
+            }
+          }
+        } catch {}
+      }
+
+      // 4. No valid payload found, return false to allow fallback
+      return false;
+    },
+    [
+      instance,
+      insertFromFile,
+      insertSVG,
+      insertText,
+      current_clipboard,
+      handleFigmaClipboard,
+    ]
+  );
+
+  /**
    * pasting from os clipboard (or fallbacks to local clipboard)
    *
    * 1. if the payload contains valid grida payload, insert it (or if identical to local clipboard, paste it)
@@ -394,8 +501,6 @@ export function useDataTransferEventTarget() {
         return;
       }
 
-      let pasted_from_data_transfer = false;
-
       // NOTE: the read of the clipboard data should be non-blocking. (in safari, this will fail without any error)
       const items = (
         await Promise.all(
@@ -408,110 +513,61 @@ export function useDataTransferEventTarget() {
             }
           })
         )
-      ).filter((item) => item !== null);
+      ).filter((item): item is io.clipboard.DecodedItem => item !== null);
 
-      const vector_payload = items.find(
-        (item) => item.type === "text" && item.text.startsWith("grida:vn:")
-      );
-      if (vector_payload) {
-        try {
-          assert(vector_payload.type === "text");
-          const net = JSON.parse(
-            atob(vector_payload.text.slice("grida:vn:".length))
-          );
-          instance.commands.pasteVector(net);
-          pasted_from_data_transfer = true;
-        } catch {}
-      }
+      const handled = await handlePasteFromItems(items, {
+        position: {
+          clientX: window.innerWidth / 2,
+          clientY: window.innerHeight / 2,
+        },
+        current_clipboard,
+      });
 
-      if (pasted_from_data_transfer) {
+      if (handled) {
         event.preventDefault();
       } else {
-        const grida_payload = items.find((item) => item.type === "clipboard");
-
-        // 1. if there is a grida html clipboard, use it and ignore all others.
-        if (grida_payload) {
-          if (
-            current_clipboard?.payload_id === grida_payload.clipboard.payload_id
-          ) {
-            instance.commands.paste();
-            pasted_from_data_transfer = true;
-          } else if (grida_payload.clipboard.type === "prototypes") {
-            instance.commands.pastePayload(grida_payload.clipboard);
-            pasted_from_data_transfer = true;
-          } else {
-            instance.commands.paste();
-            pasted_from_data_transfer = true;
-          }
-        }
-        // 2. if there is a figma clipboard, convert and insert it
-        else {
-          const figma_payload = items.find(
-            (item) => item.type === "canbe-figma-clipboard"
-          );
-          if (figma_payload) {
-            assert(figma_payload.type === "canbe-figma-clipboard");
-            await handleFigmaClipboard(figma_payload.html);
-            pasted_from_data_transfer = true;
-          }
-          // 3. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
-          else {
-            for (let i = 0; i < items.length; i++) {
-              const item = items[i];
-              try {
-                switch (item.type) {
-                  case "svg-text": {
-                    const { svg } = item;
-                    insertSVG("SVG", svg, {
-                      clientX: window.innerWidth / 2,
-                      clientY: window.innerHeight / 2,
-                    });
-                    pasted_from_data_transfer = true;
-                    break;
-                  }
-                  case "text": {
-                    const { text } = item;
-                    insertText(text, {
-                      clientX: window.innerWidth / 2,
-                      clientY: window.innerHeight / 2,
-                    });
-                    pasted_from_data_transfer = true;
-                    break;
-                  }
-                  case "image/gif":
-                  case "image/jpeg":
-                  case "image/png":
-                  case "image/svg+xml": {
-                    const { type, file } = item;
-                    insertFromFile(type, file, {
-                      clientX: window.innerWidth / 2,
-                      clientY: window.innerHeight / 2,
-                    });
-                    pasted_from_data_transfer = true;
-                    break;
-                  }
-                }
-              } catch {}
-            }
-          }
-        }
-
-        // 4. if the payload contains no valid payload, fallback to local clipboard, and paste it
-        if (!pasted_from_data_transfer) {
-          instance.commands.paste();
-          event.preventDefault();
-        }
+        // Fallback to local clipboard if no valid payload found
+        instance.commands.paste();
+        event.preventDefault();
       }
     },
-    [
-      instance,
-      insertFromFile,
-      insertSVG,
-      insertText,
-      current_clipboard,
-      handleFigmaClipboard,
-    ]
+    [instance, handlePasteFromItems, current_clipboard]
   );
+
+  /**
+   * External paste handler for Clipboard API (navigator.clipboard.read())
+   * Used by context menus and other external triggers
+   */
+  const onpaste_external_event = useCallback(async () => {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      if (clipboardItems.length > 0) {
+        // Convert ClipboardItem[] to DecodedItem[] using IO module
+        const decodedItems =
+          await io.clipboard.decodeFromClipboardItems(clipboardItems);
+
+        // Use unified paste logic
+        const handled = await handlePasteFromItems(decodedItems, {
+          position: {
+            clientX: window.innerWidth / 2,
+            clientY: window.innerHeight / 2,
+          },
+          current_clipboard,
+        });
+
+        if (!handled) {
+          // Fallback to local clipboard if no valid payload found
+          instance.commands.paste();
+        }
+      } else {
+        // No clipboard items, fallback to local clipboard
+        instance.commands.paste();
+      }
+    } catch (e) {
+      // Clipboard API may fail (permissions, etc.), fallback to local clipboard
+      instance.commands.paste();
+    }
+  }, [instance, handlePasteFromItems, current_clipboard]);
 
   const ondragover = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -570,5 +626,11 @@ export function useDataTransferEventTarget() {
   );
   //
 
-  return { onpaste, ondragover, ondrop, insertText };
+  return {
+    onpaste,
+    onpaste_external_event,
+    ondragover,
+    ondrop,
+    insertText,
+  };
 }

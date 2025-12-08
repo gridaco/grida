@@ -36,7 +36,10 @@ import { sitemap } from "@/www/data/sitemap";
 import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import { SettingsDialog } from "./uxhost-settings";
-import { useInsertFile } from "@/grida-canvas-react/use-data-transfer";
+import {
+  useInsertFile,
+  useDataTransferEventTarget,
+} from "@/grida-canvas-react/use-data-transfer";
 import { io } from "@grida/io";
 import { useFilePicker } from "use-file-picker";
 import { ImageIcon } from "lucide-react";
@@ -60,6 +63,7 @@ export function PlaygroundMenuContent({
     "keybindings" | "general"
   >("keybindings");
   const { insertFromFile } = useInsertFile();
+  const { onpaste_external_event } = useDataTransferEventTarget();
   const { openFilePicker, plainFiles } = useFilePicker({
     accept: "image/png,image/jpeg,image/webp,image/svg+xml",
     multiple: true,
@@ -234,6 +238,15 @@ export function PlaygroundMenuContent({
             >
               Copy
               <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                void onpaste_external_event();
+              }}
+              className="text-xs"
+            >
+              Paste
+              <DropdownMenuShortcut>⌘V</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {

@@ -42,7 +42,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   assert(Array.isArray(ids), "ids must be an array");
   const editor = useCurrentEditor();
   const backend = useBackendState();
-  const { insertText } = useDataTransferEventTarget();
+  const { onpaste_external_event } = useDataTransferEventTarget();
 
   const nodes = useEditorState(editor, (s) => {
     const map: Record<string, { type: grida.program.nodes.NodeType }> = {};
@@ -79,26 +79,9 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
   const targetSingleOrSelection =
     ids.length === 1 ? (ids[0] as string) : "selection";
 
-  // FIXME: use global on paste
   const handlePaste = useCallback(async () => {
-    try {
-      const clipboardItems = await navigator.clipboard.read();
-      if (clipboardItems.length > 0) {
-        for (const clipboardItem of clipboardItems) {
-          if (clipboardItem.types.includes("text/plain")) {
-            const blob = await clipboardItem.getType("text/plain");
-            const text = await blob.text();
-            insertText(text, {
-              clientX: window.innerWidth / 2,
-              clientY: window.innerHeight / 2,
-            });
-            return;
-          }
-        }
-      }
-      editor.commands.paste();
-    } catch (e) {}
-  }, [editor, insertText]);
+    await onpaste_external_event();
+  }, [onpaste_external_event]);
 
   return useMemo<ContextMenuActions>(
     () => ({
