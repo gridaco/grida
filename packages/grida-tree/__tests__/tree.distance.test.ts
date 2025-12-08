@@ -216,13 +216,14 @@ describe("tree.distance", () => {
     test("handles complex selection scenario", () => {
       // Selection: a1
       // Candidates: a2 (sibling, distance 2), b (cousin, distance 4), root (ancestor, distance 2)
-      // Should prefer a2 or root (both distance 2), then prefer sibling
+      // Should prefer a2 or root (both distance 2), then prefer sibling via weights
       const result = tree.distance.findNearestByGraphDistance(
         lut,
         ["a2", "b", "root"],
-        ["a1"]
+        ["a1"],
+        { weights: { sibling: 1.9 } } // Make sibling slightly closer than ancestor (2)
       );
-      // a2 is sibling (distance 2), root is ancestor (distance 2)
+      // a2 is sibling (distance 1.9), root is ancestor (distance 2)
       // Sibling should be preferred
       expect(result).toBe("a2");
     });
@@ -250,6 +251,126 @@ describe("tree.distance", () => {
       );
       expect(["a", "c"]).toContain(result);
       expect(result).not.toBe("b");
+    });
+
+    test("prefers siblings when explicit weights favor them", () => {
+      // When root is selected, a and b are siblings (both distance 1 by default)
+      // With sibling weight 0.9, siblings become distance 0.9, while parent-child stays 1.0
+      const result = tree.distance.findNearestByGraphDistance(
+        lut,
+        ["a", "b"],
+        ["root"],
+        { weights: { sibling: 0.9 } }
+      );
+      // Both are siblings, so either is fine
+      expect(["a", "b"]).toContain(result);
+    });
+
+    test("weights trump default preferences", () => {
+      // When a is selected, a1 (child, distance 1) vs b (sibling, default distance 2)
+      // If we make sibling distance 0.5, it should win even over child
+      const result = tree.distance.findNearestByGraphDistance(
+        lut,
+        ["a1", "b"],
+        ["a"],
+        { weights: { sibling: 0.5 } }
+      );
+      // Should return b (distance 0.5), not a1 (distance 1)
+      expect(result).toBe("b");
+    });
+
+    test("useWeightedDistance makes siblings preferred over parents for measurement", () => {
+      // Tree: root -> a -> [a1, a2]
+      // When a1 is selected, candidates: a2 (sibling) and a (parent)
+      // Parent distance = 1.0
+      // Sibling weight = 0.9
+      // Sibling (0.9) < Parent (1.0), so sibling wins without tie-breaker
+      const siblingParentDoc = {
+        nodes: {
+          root: { id: "root" },
+          a: { id: "a" },
+          a1: { id: "a1" },
+          a2: { id: "a2" },
+        },
+        links: {
+          root: ["a"],
+          a: ["a1", "a2"],
+          a1: [],
+          a2: [],
+        },
+      } as any;
+      const siblingParentLUT = createLUT(siblingParentDoc);
+
+      const result = tree.distance.findNearestByGraphDistance(
+        siblingParentLUT,
+        ["a2", "a"], // sibling and parent
+        ["a1"], // selected
+        {
+          weights: { sibling: 0.9 }, // Sibling closer than parent
+        }
+      );
+      // Should return a2 (sibling), not a (parent)
+      expect(result).toBe("a2");
+    });
+  });
+
+  describe("getWeightedGraphDistance", () => {
+    test("returns 0 for same node", () => {
+      expect(tree.distance.getWeightedGraphDistance(lut, "a", "a")).toBe(0);
+      expect(tree.distance.getWeightedGraphDistance(lut, "a1", "a1")).toBe(0);
+    });
+
+    test("returns customized weight for siblings", () => {
+      // With sibling weight 1
+      expect(
+        tree.distance.getWeightedGraphDistance(lut, "a1", "a2", { sibling: 1 })
+      ).toBe(1);
+
+      // With sibling weight 0.5
+      expect(
+        tree.distance.getWeightedGraphDistance(lut, "a1", "a2", {
+          sibling: 0.5,
+        })
+      ).toBe(0.5);
+
+      // Without custom weight (defaults to standard graph distance: 2 * parentChild)
+      expect(tree.distance.getWeightedGraphDistance(lut, "a1", "a2", {})).toBe(
+        2
+      );
+    });
+
+    test("returns weighted distance for parent-child", () => {
+      // Default parentChild weight is 1
+      expect(tree.distance.getWeightedGraphDistance(lut, "root", "a")).toBe(1);
+
+      // Custom parentChild weight
+      expect(
+        tree.distance.getWeightedGraphDistance(lut, "root", "a", {
+          parentChild: 2,
+        })
+      ).toBe(2);
+    });
+
+    test("returns standard weighted distance for non-sibling relationships", () => {
+      // Grandparent-grandchild: distance 2 * parentChild weight 1 = 2
+      expect(
+        tree.distance.getWeightedGraphDistance(lut, "root", "a1", {
+          sibling: 1,
+        })
+      ).toBe(2);
+
+      // Cross-branch: standard distance 3 * parentChild weight 1 = 3
+      expect(
+        tree.distance.getWeightedGraphDistance(lut, "a1", "b", { sibling: 1 })
+      ).toBe(3);
+    });
+
+    test("handles nodes that are not siblings", () => {
+      // a1 and b are not siblings (different parents: a vs root)
+      // Should use standard graph distance
+      expect(
+        tree.distance.getWeightedGraphDistance(lut, "a1", "b", { sibling: 1 })
+      ).toBe(3);
     });
   });
 

@@ -592,6 +592,13 @@ export namespace tree {
       preferChildren?: boolean;
 
       /**
+       * Weights to use for graph distance calculation.
+       * Providing this enables weighted distance mode.
+       * If not provided, standard unweighted graph distance is used.
+       */
+      weights?: GraphWeights;
+
+      /**
        * Optional filter function to exclude candidates.
        * Return false to exclude a candidate from consideration.
        */
@@ -775,6 +782,76 @@ export namespace tree {
       return depthA + depthB - 2 * depthLCA;
     }
 
+    export interface GraphWeights {
+      /**
+       * Weight for the edge between two siblings.
+       * If provided, siblings are considered to have a direct connection with this weight.
+       * If undefined, siblings are connected via their parent (weight = parentChild * 2).
+       *
+       * @recommendation Use a fractional value (e.g., 0.9) to make siblings implicitly "closer"
+       * than parent/child nodes (distance 1.0) without needing tie-breakers.
+       */
+      sibling?: number;
+
+      /**
+       * Weight for the edge between a parent and its child.
+       * Defaults to 1.
+       */
+      parentChild?: number;
+    }
+
+    /**
+     * Calculate weighted graph distance between two nodes.
+     *
+     * Allows customizing the weights of graph edges (parent-child, siblings)
+     * to adjust distance calculations for specific use cases (e.g., measurement).
+     *
+     * Algorithm:
+     * - If nodes are siblings and sibling weight is provided: return sibling weight
+     * - Otherwise: use standard graph distance * parentChild weight
+     *
+     * @param lut - The tree lookup table
+     * @param nodeA - First node ID
+     * @param nodeB - Second node ID
+     * @param weights - Configuration for edge weights
+     * @returns The weighted distance
+     *
+     * @example
+     * ```ts
+     * // Tree: root -> a -> [a1, a2]
+     * // With sibling weight 1 (measurement mode):
+     * const w = { sibling: 1 };
+     * const d1 = tree.distance.getWeightedGraphDistance(lut, "a1", "a2", w); // 1
+     * const d2 = tree.distance.getWeightedGraphDistance(lut, "a", "a1", w);   // 1
+     * ```
+     */
+    export function getWeightedGraphDistance(
+      lut: lut.ITreeLUT,
+      nodeA: Key,
+      nodeB: Key,
+      weights: GraphWeights = {}
+    ): number {
+      // Same node: distance 0
+      if (nodeA === nodeB) {
+        return 0;
+      }
+
+      const { sibling, parentChild = 1 } = weights;
+
+      // Check if nodes are siblings (share the same parent)
+      const parentA = lut.lu_parent[nodeA];
+      const parentB = lut.lu_parent[nodeB];
+
+      if (sibling !== undefined && parentA !== null && parentA === parentB) {
+        // Siblings with custom weight
+        return sibling;
+      }
+
+      // Standard distance * parentChild weight
+      // Note: sibling distance without custom weight becomes 2 * parentChild
+      return getGraphDistance(lut, nodeA, nodeB) * parentChild;
+    }
+
     /**
      * Find the nearest node by graph distance from the current selection.
      *
@@ -808,7 +885,7 @@ export namespace tree {
       selection: Key[],
       options: IFindNearestOptions = {}
     ): Key | null {
-      const { preferChildren = false, filter } = options;
+      const { preferChildren = false, weights, filter } = options;
 
       // Handle edge cases
       if (candidates.length === 0) {
@@ -833,7 +910,9 @@ export namespace tree {
       // Find the minimum distance for each candidate
       const candidateDistances = filteredCandidates.map((candidate) => {
         const distances = selection.map((selected) =>
-          getGraphDistance(lut, candidate, selected)
+          weights
+            ? getWeightedGraphDistance(lut, candidate, selected, weights)
+            : getGraphDistance(lut, candidate, selected)
         );
         const minDistance = Math.min(...distances);
 
@@ -873,14 +952,6 @@ export namespace tree {
           if (!a.isChildOfSelection && b.isChildOfSelection) {
             return 1;
           }
-        }
-
-        // Then prefer siblings
-        if (a.isSiblingOfSelection && !b.isSiblingOfSelection) {
-          return -1;
-        }
-        if (!a.isSiblingOfSelection && b.isSiblingOfSelection) {
-          return 1;
         }
 
         // Finally, prefer shallower nodes (lower depth)

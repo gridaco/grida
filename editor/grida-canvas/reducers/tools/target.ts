@@ -23,48 +23,34 @@ function is_selectable_root_with_children(
 }
 
 /**
- * Find nearest node by pure graph distance only (no tie-breaking).
- * Editor-specific implementation for measurement mode.
+ * Find nearest node by graph distance for measurement mode.
+ * Uses the core tree module with sibling preference.
  *
  * This function works bidirectionally - it finds the shortest path from selection
  * to ANY candidate, regardless of parent/child relationship (parent->child, child->parent,
  * siblings, cousins, etc.).
  *
- * When multiple candidates have the same distance, prefers the deepest one (the one
- * actually being hovered at the mouse position).
+ * For measurement mode, siblings are treated as closer (preferred when distances are equal),
+ * as siblings are typically more relevant for measurement purposes.
  */
 function findNearestByPureGraphDistance(
   context: editor.state.IEditorState,
   candidates: string[],
   selection: string[]
 ): string | null {
-  if (candidates.length === 0 || selection.length === 0) {
-    return null;
-  }
-
-  // Calculate distance from each candidate to each selected node
-  const candidateDistances = candidates.map((candidate) => {
-    const distances = selection.map((selected) =>
-      tree.distance.getGraphDistance(context.document_ctx, candidate, selected)
-    );
-    const minDistance = Math.min(...distances);
-    const depth = dq.getDepth(context.document_ctx, candidate);
-    return { nodeId: candidate, distance: minDistance, depth };
-  });
-
-  // Find minimum distance
-  const minDist = Math.min(...candidateDistances.map((c) => c.distance));
-
-  // Find all candidates with minimum distance
-  const nearestCandidates = candidateDistances.filter(
-    (c) => c.distance === minDist
+  // Use weighted graph distance for measurement mode
+  // This makes siblings have weight 0.9 (instead of 2, and less than parent's 1),
+  // so they're preferred over parents without needing tie-breakers.
+  // This is mathematically sound using standard weighted graph distance concepts
+  return tree.distance.findNearestByGraphDistance(
+    context.document_ctx,
+    candidates,
+    selection,
+    {
+      weights: { sibling: 0.9 }, // Treat siblings as distance 0.9 (closer than parent-child 1)
+      preferChildren: true,
+    }
   );
-
-  // When distances are equal, prefer the deepest one (the one actually being hovered)
-  // Sort by depth descending (deepest first)
-  nearestCandidates.sort((a, b) => b.depth - a.depth);
-
-  return nearestCandidates[0]?.nodeId ?? null;
 }
 
 export function getRayTarget(
@@ -191,11 +177,15 @@ export function getRayTarget(
         }
 
         // Normal mode: use graph distance with tie-breaking
+        // Prioritize siblings for better hover UX (siblings are typically more relevant)
         const nearest = tree.distance.findNearestByGraphDistance(
           context.document_ctx,
           filtered,
           selection,
-          { preferChildren: nested_first }
+          {
+            weights: { sibling: 0.9 }, // Treat siblings as distance 0.9 (closer than parent-child 1)
+            preferChildren: nested_first,
+          }
         );
         // If graph distance found a result, return it
         // Otherwise fallback to depth-based (shouldn't happen, but safety check)
