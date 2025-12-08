@@ -633,19 +633,57 @@ function __self_update_gesture_transform_scale(
     }
 
     if (initial_node.type === "vector") {
-      // TODO: mrege with the above
+      // Get the final bounding box after transform (already respects aspect ratio)
+      // Vector network is in local coordinates, so we only need to compare dimensions
+      const vector_node = node as grida.program.nodes.VectorNode;
+      const initial_dimensions: cmath.Rectangle = {
+        x: 0,
+        y: 0,
+        width: initial_rect.width,
+        height: initial_rect.height,
+      };
+
+      const final_dimensions: cmath.Rectangle = {
+        x: 0,
+        y: 0,
+        width: vector_node.width ?? 0,
+        height: vector_node.height ?? 0,
+      };
+
+      // Calculate scale factors from initial to final dimensions
+      // This ensures vector network matches the bounding box transformation exactly
+      // Handle edge case: if initial dimensions are zero, preserve aspect ratio using non-zero dimension
+      let scale: cmath.Vector2;
+      if (initial_dimensions.width === 0 && initial_dimensions.height === 0) {
+        // Both dimensions are zero - no scaling
+        scale = [1, 1];
+      } else if (initial_dimensions.width === 0) {
+        // Width is zero - scale uniformly based on height
+        const factor =
+          initial_dimensions.height !== 0
+            ? final_dimensions.height / initial_dimensions.height
+            : 1;
+        scale = [factor, factor];
+      } else if (initial_dimensions.height === 0) {
+        // Height is zero - scale uniformly based on width
+        const factor =
+          initial_dimensions.width !== 0
+            ? final_dimensions.width / initial_dimensions.width
+            : 1;
+        scale = [factor, factor];
+      } else {
+        // Normal case: calculate scale factors from rect dimensions
+        scale = cmath.rect.getScaleFactors(
+          initial_dimensions,
+          final_dimensions
+        );
+      }
+
       const vne = new vn.VectorNetworkEditor(initial_node.vector_network);
-      const scale = cmath.rect.getScaleFactors(initial_rect, {
-        x: initial_rect.x,
-        y: initial_rect.y,
-        width: initial_rect.width + movement[0],
-        height: initial_rect.height + movement[1],
-      });
       vne.scale(scale);
       (
         draft.document.nodes[node_id] as grida.program.nodes.VectorNode
       ).vector_network = vne.value;
-      //
     }
   }
 }
