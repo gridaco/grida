@@ -18,16 +18,21 @@ export function self_updateSurfaceHoverState<
     return draft;
   }
 
-  const target = getRayTarget(draft.hits, {
-    config:
-      draft.surface_measurement_targeting === "on"
+  const isMeasurementMode = draft.surface_measurement_targeting === "on";
+  const target = getRayTarget(
+    draft.hits,
+    {
+      config: isMeasurementMode
         ? {
             ...draft.pointer_hit_testing_config,
             ...editor.config.MEASUREMENT_HIT_TESTING_CONFIG,
           }
         : draft.pointer_hit_testing_config,
-    context: draft,
-  });
+      context: draft,
+    },
+    false, // nested_first
+    isMeasurementMode // isMeasurementMode
+  );
 
   draft.hovered_node_id = target;
 

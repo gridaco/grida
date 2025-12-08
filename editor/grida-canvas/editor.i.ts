@@ -729,11 +729,10 @@ export namespace editor.state {
      * Determines how the target node is selected:
      * - `auto` => selects the shallowest, while selecting the siblings first
      * - `deepest` => Selects the deepest (nested) node.
-     * - `shallowest` => Selects the shallowest (root) node.
      *
      * @default "auto"
      */
-    target: "auto" | "deepest" | "shallowest";
+    target: "auto" | "deepest";
 
     /**
      * ignores the root node from the targeting (if not empty)

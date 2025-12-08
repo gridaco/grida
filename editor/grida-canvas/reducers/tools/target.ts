@@ -1,6 +1,7 @@
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
+import tree from "@grida/tree";
 
 /**
  * Determines if a node type should be treated as selectable even when it's a root node with children.
@@ -21,6 +22,51 @@ function is_selectable_root_with_children(
   }
 }
 
+/**
+ * Find nearest node by pure graph distance only (no tie-breaking).
+ * Editor-specific implementation for measurement mode.
+ *
+ * This function works bidirectionally - it finds the shortest path from selection
+ * to ANY candidate, regardless of parent/child relationship (parent->child, child->parent,
+ * siblings, cousins, etc.).
+ *
+ * When multiple candidates have the same distance, prefers the deepest one (the one
+ * actually being hovered at the mouse position).
+ */
+function findNearestByPureGraphDistance(
+  context: editor.state.IEditorState,
+  candidates: string[],
+  selection: string[]
+): string | null {
+  if (candidates.length === 0 || selection.length === 0) {
+    return null;
+  }
+
+  // Calculate distance from each candidate to each selected node
+  const candidateDistances = candidates.map((candidate) => {
+    const distances = selection.map((selected) =>
+      tree.distance.getGraphDistance(context.document_ctx, candidate, selected)
+    );
+    const minDistance = Math.min(...distances);
+    const depth = dq.getDepth(context.document_ctx, candidate);
+    return { nodeId: candidate, distance: minDistance, depth };
+  });
+
+  // Find minimum distance
+  const minDist = Math.min(...candidateDistances.map((c) => c.distance));
+
+  // Find all candidates with minimum distance
+  const nearestCandidates = candidateDistances.filter(
+    (c) => c.distance === minDist
+  );
+
+  // When distances are equal, prefer the deepest one (the one actually being hovered)
+  // Sort by depth descending (deepest first)
+  nearestCandidates.sort((a, b) => b.depth - a.depth);
+
+  return nearestCandidates[0]?.nodeId ?? null;
+}
+
 export function getRayTarget(
   hits: string[],
   {
@@ -30,7 +76,8 @@ export function getRayTarget(
     config: editor.state.HitTestingConfig;
     context: editor.state.IEditorState;
   },
-  nested_first: boolean = false
+  nested_first: boolean = false,
+  isMeasurementMode: boolean = false
 ): string | null {
   const {
     selection,
@@ -41,6 +88,14 @@ export function getRayTarget(
   const filtered = hits
     .filter((node_id) => {
       const node = nodes[node_id];
+
+      // Check if node exists first (before accessing node properties)
+      // This can happen since the hover is triggered from the event target,
+      // where the new document state is not applied yet
+      if (!node) {
+        return false; // Ignore nodes that don't exist
+      }
+
       const top_id = context.scene_id
         ? dq.getTopIdWithinScene(
             context.document_ctx,
@@ -61,11 +116,6 @@ export function getRayTarget(
         return false; // Ignore the root node if configured and not selectable
       }
 
-      if (!node) {
-        // ensure target exists in current document (this can happen since the hover is triggered from the event target, where the new document state is not applied yet)
-        return false; // Ignore nodes that don't exist
-      }
-
       if (config.ignores_locked && node.locked) {
         return false; // Ignore locked nodes if configured
       }
@@ -80,42 +130,117 @@ export function getRayTarget(
     });
 
   switch (config.target) {
-    // TODO: can use for loop for optimization
-    // TODO: this should also take relative depth into account (also moving up)
-    // BASED ON GRAPH-DISTANCE
     case "auto": {
-      const selection_sibling_ids = new Set(
-        selection
-          .map((node_id) => dq.getSiblings(context.document_ctx, node_id))
-          .flat()
-      );
+      // Use graph distance when selection is not empty
+      if (selection.length > 0) {
+        // Special case: when nested_first is true, we're looking for descendants only (double-click "go deeper")
+        // Filter to only descendants of the selected node(s), then find the nearest by graph distance
+        if (nested_first) {
+          const descendants = filtered.filter((candidate) => {
+            // Exclude the selected node itself (we want to go deeper, not stay at same level)
+            if (selection.includes(candidate)) {
+              return false;
+            }
+            // Check if candidate is a descendant of any selected node
+            return selection.some((selected) => {
+              const ancestors = dq.getAncestors(
+                context.document_ctx,
+                candidate
+              );
+              return ancestors.includes(selected);
+            });
+          });
 
-      const priority = (node_id: string) => {
-        if (selection.includes(node_id)) {
-          return -2;
+          // If we have descendants, find the nearest one by graph distance (not deepest)
+          if (descendants.length > 0) {
+            const nearest = tree.distance.findNearestByGraphDistance(
+              context.document_ctx,
+              descendants,
+              selection,
+              { preferChildren: false } // Don't use preferChildren here since we already filtered to descendants
+            );
+            if (nearest !== null) {
+              return nearest;
+            }
+          }
+          // If no descendants found, fall through to graph distance logic
         }
 
-        if (selection_sibling_ids.has(node_id)) {
-          return -1;
+        // Use pure shortest path for measurement mode (no tie-breaking, works bidirectionally)
+        if (isMeasurementMode) {
+          // In measurement mode, exclude selected nodes from candidates (we want to measure TO a different node)
+          const measurementCandidates = filtered.filter(
+            (candidate) => !selection.includes(candidate)
+          );
+          // If no candidates after filtering, return null
+          if (measurementCandidates.length === 0) {
+            return null;
+          }
+          // Find nearest by pure graph distance
+          const nearest = findNearestByPureGraphDistance(
+            context,
+            measurementCandidates,
+            selection
+          );
+          // If found, return it
+          if (nearest !== null) {
+            return nearest;
+          }
+          // Fallback: if no result, return null (shouldn't happen, but safety check)
+          return null;
         }
 
-        const a_parent = dq.getParentId(context.document_ctx, node_id);
-        if (a_parent && selection.includes(a_parent)) {
-          return nested_first ? -3 : 0;
+        // Normal mode: use graph distance with tie-breaking
+        const nearest = tree.distance.findNearestByGraphDistance(
+          context.document_ctx,
+          filtered,
+          selection,
+          { preferChildren: nested_first }
+        );
+        // If graph distance found a result, return it
+        // Otherwise fallback to depth-based (shouldn't happen, but safety check)
+        if (nearest !== null) {
+          return nearest;
         }
+      }
 
-        return 0;
-      };
-
-      filtered.sort((a, b) => {
-        return priority(a) - priority(b);
-      });
+      // Fallback to depth-based selection when selection is empty or graph distance failed
+      // This maintains backward compatibility
       return filtered[0]; // shallowest node
     }
-    case "deepest":
-      return filtered.reverse()[0]; // Deepest node (first in the array)
-    case "shallowest":
-      return filtered[0]; // Shallowest node (last in the array)
+    case "deepest": {
+      // Filter out scene nodes - scenes should not be selectable as deepest
+      const nonSceneNodes = filtered.filter((node_id) => {
+        const node = nodes[node_id];
+        return node?.type !== "scene";
+      });
+
+      // If all nodes are scenes, return null
+      if (nonSceneNodes.length === 0) {
+        return null;
+      }
+
+      // Find the deepest node among non-scene nodes
+      // The filtered array is already sorted by depth (shallowest first),
+      // so reverse to get deepest first
+      const deepest = nonSceneNodes.reverse()[0];
+
+      // Special case: If meta key is pressed and we're hovering a root container
+      // (container node directly under scene), ensure it's selectable
+      if (deepest) {
+        const parent_id = dq.getParentId(context.document_ctx, deepest);
+        const node = nodes[deepest];
+        const isRootContainer =
+          (parent_id === null || parent_id === context.scene_id) &&
+          node?.type === "container";
+
+        // Root containers are already included in nonSceneNodes, so just return deepest
+        // This ensures root containers can be selected when meta key is pressed
+        return deepest;
+      }
+
+      return null;
+    }
   }
 
   // If no valid node is found, return null

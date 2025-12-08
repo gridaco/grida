@@ -13,13 +13,14 @@ pnpm add @grida/tree
 
 ## Overview
 
-`@grida/tree` is a collection of tree data structure utilities and systems designed for efficient management of hierarchical data. It provides three main namespaces, each optimized for different use cases:
+`@grida/tree` is a collection of tree data structure utilities and systems designed for efficient management of hierarchical data. It provides four main namespaces, each optimized for different use cases:
 
 1. **`tree.graph`** - Graph-based tree structure with explicit node and link separation (✅ Production Ready)
-2. **`tree.flat_with_children`** - Flat tree operations where nodes contain their children references (🚧 WIP)
-3. **`tree.lut`** - Lookup table interface for efficient hierarchical queries (🚧 WIP)
+2. **`tree.distance`** - Pure mathematical functions for graph distance calculations (✅ Production Ready)
+3. **`tree.flat_with_children`** - Flat tree operations where nodes contain their children references (🚧 WIP)
+4. **`tree.lut`** - Lookup table interface for efficient hierarchical queries (✅ Production Ready)
 
-> **Note:** This documentation focuses on `tree.graph`, which is production-ready. Other namespaces are under active development.
+> **Note:** This documentation focuses on `tree.graph` and `tree.distance`, which are production-ready. Other namespaces are under active development.
 
 ## `tree.graph` - Graph-Based Tree System
 
@@ -956,15 +957,112 @@ Future enhancements planned for v2:
 - [ ] Performance optimizations for large trees
 - [ ] More policy examples and presets
 
+## `tree.distance` - Graph Distance Calculations
+
+### What is it?
+
+`tree.distance` provides pure, mathematical functions for calculating graph distance (shortest path) between nodes in a tree hierarchy. These functions are designed to be reusable, testable, and independent of any specific tree implementation.
+
+### Key Concepts
+
+**Graph Distance**: The shortest path between two nodes in a tree, measured as the number of edges that must be traversed:
+
+- Parent to child: distance 1
+- Siblings: distance 2 (through their common parent)
+- Same node: distance 0
+
+**Lowest Common Ancestor (LCA)**: The deepest node that is an ancestor of both nodes. Used to calculate graph distance efficiently using the formula: `distance = depth(A) + depth(B) - 2 * depth(LCA)`
+
+### Usage
+
+```ts
+import { tree } from "@grida/tree";
+
+// Create a tree lookup table (or use tree.lut.TreeLUT)
+const lut: tree.lut.ITreeLUT = {
+  lu_keys: ["root", "a", "b", "a1", "a2"],
+  lu_parent: { root: null, a: "root", b: "root", a1: "a", a2: "a" },
+  lu_children: { root: ["a", "b"], a: ["a1", "a2"], b: [], a1: [], a2: [] },
+};
+
+// Calculate distance between siblings
+const dist = tree.distance.getGraphDistance(lut, "a1", "a2");
+console.log(dist); // 2
+
+// Find LCA
+const lca = tree.distance.getLowestCommonAncestor(lut, "a1", "b");
+console.log(lca); // "root"
+
+// Find nearest node by graph distance
+const nearest = tree.distance.findNearestByGraphDistance(
+  lut,
+  ["a1", "a2", "b"],
+  ["a"],
+  { preferChildren: true }
+);
+console.log(nearest); // "a1" or "a2" (children, distance 1)
+```
+
+### API Reference
+
+#### `getLowestCommonAncestor(lut, nodeA, nodeB)`
+
+Finds the Lowest Common Ancestor (LCA) of two nodes.
+
+**Parameters:**
+
+- `lut: tree.lut.ITreeLUT` - The tree lookup table
+- `nodeA: Key` - First node ID
+- `nodeB: Key` - Second node ID
+
+**Returns:** `Key | null` - The LCA node ID, or null if nodes are not in the same tree
+
+#### `getGraphDistance(lut, nodeA, nodeB)`
+
+Calculates the graph distance (shortest path) between two nodes.
+
+**Parameters:**
+
+- `lut: tree.lut.ITreeLUT` - The tree lookup table
+- `nodeA: Key` - First node ID
+- `nodeB: Key` - Second node ID
+
+**Returns:** `number` - The graph distance, or `Infinity` if nodes are not in the same tree
+
+#### `findNearestByGraphDistance(lut, candidates, selection, options?)`
+
+Finds the nearest candidate node by graph distance from the current selection.
+
+**Parameters:**
+
+- `lut: tree.lut.ITreeLUT` - The tree lookup table
+- `candidates: Key[]` - Array of candidate node IDs to choose from
+- `selection: Key[]` - Array of currently selected node IDs
+- `options?: IFindNearestOptions` - Optional configuration:
+  - `preferChildren?: boolean` - If true, prefer children when distances are equal
+  - `filter?: (candidate: Key, lut: ITreeLUT) => boolean` - Optional filter function
+
+**Returns:** `Key | null` - The nearest candidate node ID, or null if no valid candidate found
+
+### Use Cases
+
+- **Hit Testing**: Select the nearest node when clicking on overlapping elements
+- **Selection Logic**: Choose the most relevant node based on current selection context
+- **Navigation**: Find the closest node for keyboard navigation
+- **UI Interactions**: Determine which element to interact with when multiple elements overlap
+
+### Design Principles
+
+- **Pure & Mathematical**: All functions are pure, deterministic, and side-effect free
+- **Minimal Interface**: Works with `tree.lut.ITreeLUT` interface (no custom types needed)
+- **Performance**: Efficient algorithms with minimal allocations
+- **Composable**: Functions can be combined for complex selection logic
+
 ### Related Namespaces (Coming Soon)
 
 #### `tree.flat_with_children` (🚧 WIP)
 
 Simple operations on flat trees where each node has a `children` array.
-
-#### `tree.lut` (🚧 WIP)
-
-Efficient lookup table for querying relationships with O(1) access to parents, children, ancestors, etc.
 
 ## Contributing
 

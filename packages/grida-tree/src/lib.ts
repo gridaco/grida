@@ -532,6 +532,366 @@ export namespace tree {
   }
 
   /**
+   * Graph distance calculations for tree hierarchies.
+   *
+   * The `distance` namespace provides pure, mathematical functions for calculating
+   * graph distance (shortest path) between nodes in a tree. These functions are
+   * designed to be reusable, testable, and independent of any specific tree
+   * implementation.
+   *
+   * ## Core Concepts
+   *
+   * **Graph Distance**: The shortest path between two nodes in a tree, measured as
+   * the number of edges that must be traversed. For example:
+   * - Parent to child: distance 1
+   * - Siblings: distance 2 (through their common parent)
+   * - Same node: distance 0
+   *
+   * **Lowest Common Ancestor (LCA)**: The deepest node that is an ancestor of both
+   * nodes. Used to calculate graph distance efficiently.
+   *
+   * ## Design Principles
+   *
+   * - **Pure & Mathematical**: All functions are pure, deterministic, and side-effect free
+   * - **Minimal Interface**: Works with `tree.lut.ITreeLUT` interface (no custom types needed)
+   * - **Performance**: Efficient algorithms with minimal allocations
+   * - **Composable**: Functions can be combined for complex selection logic
+   *
+   * @example
+   * ```ts
+   * import { tree } from "@grida/tree";
+   *
+   * const lut: tree.lut.ITreeLUT = {
+   *   lu_keys: ["root", "a", "b", "a1", "a2"],
+   *   lu_parent: { root: null, a: "root", b: "root", a1: "a", a2: "a" },
+   *   lu_children: { root: ["a", "b"], a: ["a1", "a2"], b: [], a1: [], a2: [] }
+   * };
+   *
+   * // Calculate distance between siblings
+   * const dist = tree.distance.getGraphDistance(lut, "a1", "a2");
+   * console.log(dist); // 2
+   *
+   * // Find nearest node by graph distance
+   * const nearest = tree.distance.findNearestByGraphDistance(
+   *   lut,
+   *   ["a1", "a2", "b"],
+   *   ["a"]
+   * );
+   * console.log(nearest); // "a1" or "a2" (children, distance 1)
+   * ```
+   */
+  export namespace distance {
+    /**
+     * Options for finding the nearest node by graph distance.
+     */
+    export interface IFindNearestOptions {
+      /**
+       * If true, prefer children of selected nodes when distances are equal.
+       * Useful for "nested first" selection behavior (e.g., double-click to go deeper).
+       */
+      preferChildren?: boolean;
+
+      /**
+       * Optional filter function to exclude candidates.
+       * Return false to exclude a candidate from consideration.
+       */
+      filter?: (candidate: Key, lut: lut.ITreeLUT) => boolean;
+    }
+
+    /**
+     * Get ancestors of a node as an array (root-first order).
+     *
+     * @param lut - The tree lookup table
+     * @param nodeId - The node ID to query
+     * @returns Array of ancestor IDs from root to immediate parent
+     */
+    function getAncestorsArray(lut: lut.ITreeLUT, nodeId: Key): Key[] {
+      const ancestors: Key[] = [];
+      let current: Key | null = nodeId;
+
+      while (current) {
+        const parent: Key | null = lut.lu_parent[current];
+        if (!parent) break; // Stop at root node
+        ancestors.unshift(parent); // Insert at beginning for root-first order
+        current = parent;
+      }
+
+      return ancestors;
+    }
+
+    /**
+     * Calculate the depth of a node in the tree.
+     *
+     * @param lut - The tree lookup table
+     * @param nodeId - The node ID to query
+     * @returns The depth of the node (number of ancestors)
+     */
+    function getDepth(lut: lut.ITreeLUT, nodeId: Key): number {
+      return getAncestorsArray(lut, nodeId).length;
+    }
+
+    /**
+     * Get siblings of a node.
+     *
+     * @param lut - The tree lookup table
+     * @param nodeId - The node ID to query
+     * @returns Array of sibling node IDs (excluding the node itself)
+     */
+    function getSiblings(lut: lut.ITreeLUT, nodeId: Key): Key[] {
+      const parentId = lut.lu_parent[nodeId];
+
+      if (parentId === null || parentId === undefined) {
+        // Root level - all nodes without parents are siblings
+        return Object.keys(lut.lu_parent).filter(
+          (key) => lut.lu_parent[key] === null && key !== nodeId
+        );
+      }
+
+      // Filter nodes that share the same parent
+      return Object.keys(lut.lu_parent).filter(
+        (key) => lut.lu_parent[key] === parentId && key !== nodeId
+      );
+    }
+
+    /**
+     * Check if a candidate node is a descendant of an ancestor node.
+     *
+     * @param lut - The tree lookup table
+     * @param candidate - The candidate node ID
+     * @param ancestor - The potential ancestor node ID
+     * @returns True if candidate is a descendant of ancestor
+     */
+    function isDescendantOf(
+      lut: lut.ITreeLUT,
+      candidate: Key,
+      ancestor: Key
+    ): boolean {
+      const ancestors = getAncestorsArray(lut, candidate);
+      return ancestors.includes(ancestor);
+    }
+
+    /**
+     * Find the Lowest Common Ancestor (LCA) of two nodes in a tree.
+     *
+     * @param lut - The tree lookup table
+     * @param nodeA - First node ID
+     * @param nodeB - Second node ID
+     * @returns The LCA node ID, or null if nodes are not in the same tree
+     *
+     * @example
+     * ```ts
+     * // Tree: root -> a -> a1, root -> b
+     * const lca = tree.distance.getLowestCommonAncestor(lut, "a1", "b");
+     * console.log(lca); // "root"
+     * ```
+     */
+    export function getLowestCommonAncestor(
+      lut: lut.ITreeLUT,
+      nodeA: Key,
+      nodeB: Key
+    ): Key | null {
+      // If nodes are the same, they are their own LCA
+      if (nodeA === nodeB) {
+        return nodeA;
+      }
+
+      // Get ancestor chains for both nodes (including the nodes themselves)
+      // Ancestors are in root-first order, so we append the node itself at the end
+      const ancestorsA = [...getAncestorsArray(lut, nodeA), nodeA];
+      const ancestorsB = [...getAncestorsArray(lut, nodeB), nodeB];
+
+      // Find the deepest common ancestor by traversing from root (start of arrays)
+      // The LCA is the last common node before the paths diverge
+      let lca: Key | null = null;
+      const minLength = Math.min(ancestorsA.length, ancestorsB.length);
+
+      for (let i = 0; i < minLength; i++) {
+        if (ancestorsA[i] === ancestorsB[i]) {
+          lca = ancestorsA[i];
+        } else {
+          // Once we find a difference, stop - the previous lca was the deepest common ancestor
+          break;
+        }
+      }
+
+      // If no common ancestor found, nodes are in different trees
+      if (lca === null) {
+        return null;
+      }
+
+      // Special case: if one node is an ancestor of the other, return the ancestor node
+      // Check if nodeA is an ancestor of nodeB
+      if (ancestorsA.includes(nodeB)) {
+        return nodeB;
+      }
+      // Check if nodeB is an ancestor of nodeA
+      if (ancestorsB.includes(nodeA)) {
+        return nodeA;
+      }
+
+      return lca;
+    }
+
+    /**
+     * Calculate the graph distance (shortest path) between two nodes in a tree.
+     *
+     * Algorithm: distance = depth(A) + depth(B) - 2 * depth(LCA)
+     *
+     * @param lut - The tree lookup table
+     * @param nodeA - First node ID
+     * @param nodeB - Second node ID
+     * @returns The graph distance between nodes, or Infinity if nodes are not in the same tree
+     *
+     * @example
+     * ```ts
+     * // Tree: root -> a -> a1
+     * const dist1 = tree.distance.getGraphDistance(lut, "root", "a"); // 1
+     * const dist2 = tree.distance.getGraphDistance(lut, "a", "a1");   // 1
+     * const dist3 = tree.distance.getGraphDistance(lut, "root", "a1"); // 2
+     * ```
+     */
+    export function getGraphDistance(
+      lut: lut.ITreeLUT,
+      nodeA: Key,
+      nodeB: Key
+    ): number {
+      // If nodes are the same, distance is 0
+      if (nodeA === nodeB) {
+        return 0;
+      }
+
+      const lca = getLowestCommonAncestor(lut, nodeA, nodeB);
+
+      // If no LCA found, nodes are in different trees
+      if (!lca) {
+        return Infinity;
+      }
+
+      const depthA = getDepth(lut, nodeA);
+      const depthB = getDepth(lut, nodeB);
+      const depthLCA = getDepth(lut, lca);
+
+      // Distance = depth(A) + depth(B) - 2 * depth(LCA)
+      return depthA + depthB - 2 * depthLCA;
+    }
+
+    /**
+     * Find the nearest node by graph distance from the current selection.
+     *
+     * Given candidate nodes and current selection, finds the candidate with minimum
+     * graph distance. For multiple selections, uses the minimum distance from any
+     * selected node.
+     *
+     * @param lut - The tree lookup table
+     * @param candidates - Array of candidate node IDs to choose from
+     * @param selection - Array of currently selected node IDs
+     * @param options - Optional configuration for selection behavior
+     * @returns The nearest candidate node ID, or null if no valid candidate found
+     *
+     * @example
+     * ```ts
+     * // Tree: root -> a -> [a1, a2], root -> b
+     * // Selection: ["a"]
+     * // Candidates: ["a1", "a2", "b"]
+     * const nearest = tree.distance.findNearestByGraphDistance(
+     *   lut,
+     *   ["a1", "a2", "b"],
+     *   ["a"],
+     *   { preferChildren: true }
+     * );
+     * // Returns "a1" or "a2" (children, distance 1) instead of "b" (sibling, distance 2)
+     * ```
+     */
+    export function findNearestByGraphDistance(
+      lut: lut.ITreeLUT,
+      candidates: Key[],
+      selection: Key[],
+      options: IFindNearestOptions = {}
+    ): Key | null {
+      const { preferChildren = false, filter } = options;
+
+      // Handle edge cases
+      if (candidates.length === 0) {
+        return null;
+      }
+
+      // If no selection, return null (caller should handle fallback)
+      if (selection.length === 0) {
+        return null;
+      }
+
+      // Apply filter if provided
+      const filteredCandidates = filter
+        ? candidates.filter((candidate) => filter(candidate, lut))
+        : candidates;
+
+      if (filteredCandidates.length === 0) {
+        return null;
+      }
+
+      // Calculate distance from each candidate to each selected node
+      // Find the minimum distance for each candidate
+      const candidateDistances = filteredCandidates.map((candidate) => {
+        const distances = selection.map((selected) =>
+          getGraphDistance(lut, candidate, selected)
+        );
+        const minDistance = Math.min(...distances);
+
+        // Check if candidate is a child of any selected node (for preferChildren)
+        const isChildOfSelection = selection.some((selected) =>
+          isDescendantOf(lut, candidate, selected)
+        );
+
+        // Check if candidate is a sibling of any selected node
+        const isSiblingOfSelection = selection.some((selected) => {
+          const siblings = getSiblings(lut, selected);
+          return siblings.includes(candidate);
+        });
+
+        return {
+          nodeId: candidate,
+          distance: minDistance,
+          isChildOfSelection,
+          isSiblingOfSelection,
+          depth: getDepth(lut, candidate),
+        };
+      });
+
+      // Sort by distance, then by preference rules
+      candidateDistances.sort((a, b) => {
+        // First, sort by distance
+        if (a.distance !== b.distance) {
+          return a.distance - b.distance;
+        }
+
+        // If distances are equal, apply preference rules
+        if (preferChildren) {
+          // Prefer children of selected nodes
+          if (a.isChildOfSelection && !b.isChildOfSelection) {
+            return -1;
+          }
+          if (!a.isChildOfSelection && b.isChildOfSelection) {
+            return 1;
+          }
+        }
+
+        // Then prefer siblings
+        if (a.isSiblingOfSelection && !b.isSiblingOfSelection) {
+          return -1;
+        }
+        if (!a.isSiblingOfSelection && b.isSiblingOfSelection) {
+          return 1;
+        }
+
+        // Finally, prefer shallower nodes (lower depth)
+        return a.depth - b.depth;
+      });
+
+      return candidateDistances[0]?.nodeId ?? null;
+    }
+  }
+
+  /**
    * Graph-based tree structure with explicit node and link separation.
    *
    * The `graph` namespace provides a data structure and system for managing tree hierarchies
