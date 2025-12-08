@@ -74,6 +74,7 @@ import {
   MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE,
   MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE,
   MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE,
+  DROPZONE_BORDER_WIDTH,
 } from "../ui-config";
 import {
   NodeOverlayCornerRadiusHandle,
@@ -564,7 +565,13 @@ function DropzoneOverlay(props: editor.state.DropzoneIndication) {
   const { transform } = useTransformState();
   switch (props.type) {
     case "node":
-      return <NodeOverlay node_id={props.node_id} readonly />;
+      return (
+        <NodeOverlay
+          node_id={props.node_id}
+          readonly
+          borderWidth={DROPZONE_BORDER_WIDTH}
+        />
+      );
     case "rect":
       const r = cmath.rect.transform(props.rect, transform);
       return (
@@ -576,6 +583,7 @@ function DropzoneOverlay(props: editor.state.DropzoneIndication) {
             height: r.height,
           }}
           readonly
+          borderWidth={DROPZONE_BORDER_WIDTH}
         />
       );
   }
