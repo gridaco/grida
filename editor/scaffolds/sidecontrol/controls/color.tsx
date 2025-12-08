@@ -129,7 +129,7 @@ export function RGBA32FColorControl({
           }}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
-          onValueChange={(color) => {
+          onValueCommit={(color) => {
             onValueChange?.(
               kolor.colorformats.newRGBA32F(color.r, color.g, color.b, value.a)
             );

@@ -549,7 +549,7 @@ function SolidPaintTrigger({
         }}
         onFocus={onInputFocus}
         onBlur={onInputBlur}
-        onValueChange={(color) => {
+        onValueCommit={(color) => {
           onValueChange?.({
             ...value,
             type: "solid",
