@@ -31,6 +31,13 @@ function SceneItemContextMenuWrapper({
   onStartRenaming?: () => void;
 }>) {
   const editor = useCurrentEditor();
+  const scenes_count = useEditorState(
+    editor,
+    (state) => state.document.scenes_ref.length
+  );
+
+  // a11y/bug prevent scene from being deleted if len === 1
+  const is_last_scene = scenes_count === 1;
 
   return (
     <ContextMenu>
@@ -60,6 +67,7 @@ function SceneItemContextMenuWrapper({
           onSelect={() => {
             editor.commands.deleteScene(scene_id);
           }}
+          disabled={is_last_scene}
           className="text-xs"
         >
           Delete

@@ -157,6 +157,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "scenes/delete": {
       const { scene: scene_id } = action;
+
+      // a11y/bug prevent scene from being deleted if len === 1
+      // Prevent deletion of the last remaining scene
+      if (state.document.scenes_ref.length === 1) {
+        return state;
+      }
+
       return updateState(state, (draft) => {
         // Use Graph.rm() to remove scene and all its children
         const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
@@ -747,7 +754,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         target === "selection" ? state.selection : [target];
 
       return updateState(state, (draft) => {
-        __self_delete_nodes(draft, target_node_ids);
+        __self_delete_nodes(draft, target_node_ids, "on");
       });
     }
     case "a11y/delete": {
@@ -823,8 +830,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         });
       }
 
+      // a11y/bug prevent scene from being deleted with a11y (DELETE)
+      // Scene deletion protection is handled by __self_delete_nodes with default 'on'
       return updateState(state, (draft) => {
-        __self_delete_nodes(draft, target_node_ids);
+        __self_delete_nodes(draft, target_node_ids, "on");
       });
     }
     case "insert": {
@@ -2174,7 +2183,7 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
   node.top! -= parent_rect.y;
 
   self_try_insert_node(draft, parent_id, node);
-  __self_delete_nodes(draft, group);
+  __self_delete_nodes(draft, group, "on");
   // Use scene_id instead of "<root>" since scenes are now nodes
   self_moveNode(draft, id, parent_id ?? draft.scene_id!, order);
 
@@ -2183,18 +2192,35 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
 
 function __self_delete_nodes<S extends editor.state.IEditorState>(
   draft: Draft<S>,
-  target_node_ids: string[]
+  target_node_ids: string[],
+  scene_deletion_protection: "on" | "off" = "on"
 ) {
+  // Filter out scene nodes if protection is enabled
+  // Scenes should only be deleted via the "scenes/delete" action, not through regular node deletion
+  let filtered_target_node_ids = target_node_ids;
+
+  if (scene_deletion_protection === "on") {
+    filtered_target_node_ids = target_node_ids.filter((node_id) => {
+      // Filter out scene nodes - scenes should never be deletable via regular deletion
+      return !draft.document.scenes_ref.includes(node_id);
+    });
+  }
+
+  // If filtering removed all nodes, return early
+  if (filtered_target_node_ids.length === 0) {
+    return;
+  }
+
   // Collect parent IDs before deletion
   const parent_ids_to_check = new Set<string>();
-  for (const node_id of target_node_ids) {
+  for (const node_id of filtered_target_node_ids) {
     const parent_id = dq.getParentId(draft.document_ctx, node_id);
     if (parent_id) {
       parent_ids_to_check.add(parent_id);
     }
   }
 
-  for (const node_id of target_node_ids) {
+  for (const node_id of filtered_target_node_ids) {
     if (
       // the deleting node cannot be.. in content edit mode
       node_id !== draft.content_edit_mode?.node_id

@@ -4,7 +4,30 @@ import assert from "assert";
 import { dq } from "@/grida-canvas/query";
 
 /**
- * TODO:
+ * Selects nodes within the current scene (scene content).
+ *
+ * **IMPORTANT**: This function is STRICTLY for selecting scene content nodes only.
+ * Scene nodes themselves are NEVER selectable and will be automatically filtered out.
+ *
+ * Scene nodes are organizational containers and should not be part of the selection
+ * state, which is used for:
+ * - Transform operations (move, resize, rotate)
+ * - Copy/paste operations
+ * - Delete operations
+ * - Content editing (text, vector, bitmap editing)
+ *
+ * All of these operations are intended for nodes WITHIN a scene, not the scene container itself.
+ *
+ * @param draft - The editor state draft
+ * @param mode - Selection mode: "reset" (replace), "add" (additive), or "toggle"
+ * @param node_ids - Node IDs to select. Scene node IDs will be automatically filtered out.
+ *
+ * @remarks
+ * - Scene nodes are identified by checking if they exist in `draft.document.scenes_ref`
+ * - If all provided node_ids are scene nodes, the selection will remain unchanged (for "add"/"toggle") or be cleared (for "reset")
+ * - This filtering ensures scenes cannot be accidentally selected via accessibility shortcuts (e.g., CMD+A)
+ *
+ * @todo
  * - validate the selection by config (which does not exists yet), to only select subset of children or a container, but not both. - when both container and children are selected, when transform, it will transform both, resulting in a weird behavior.
  */
 export function self_selectNode<S extends editor.state.IEditorState>(
@@ -12,7 +35,14 @@ export function self_selectNode<S extends editor.state.IEditorState>(
   mode: "reset" | "add" | "toggle",
   ...node_ids: string[]
 ) {
-  for (const node_id of node_ids) {
+  // Filter out scene nodes - scenes should never be selectable
+  // Scenes are organizational containers, not selectable content
+  const scenes_ref_set = new Set(draft.document.scenes_ref);
+  const filtered_node_ids = node_ids.filter(
+    (node_id) => !scenes_ref_set.has(node_id)
+  );
+
+  for (const node_id of filtered_node_ids) {
     assert(node_id, "Node ID must be provided");
     assert(
       dq.__getNodeById(draft, node_id),
@@ -22,14 +52,14 @@ export function self_selectNode<S extends editor.state.IEditorState>(
 
   switch (mode) {
     case "add": {
-      const set = new Set([...draft.selection, ...node_ids]);
+      const set = new Set([...draft.selection, ...filtered_node_ids]);
       const pruned = dq.pruneNestedNodes(draft.document_ctx, Array.from(set));
       draft.selection = pruned;
       break;
     }
     case "toggle": {
       const set = new Set(draft.selection);
-      for (const node_id of node_ids) {
+      for (const node_id of filtered_node_ids) {
         if (set.has(node_id)) {
           set.delete(node_id);
         } else {
@@ -42,8 +72,13 @@ export function self_selectNode<S extends editor.state.IEditorState>(
     }
     case "reset": {
       // only apply if actually changed
-      if (JSON.stringify(node_ids) !== JSON.stringify(draft.selection)) {
-        const pruned = dq.pruneNestedNodes(draft.document_ctx, node_ids);
+      if (
+        JSON.stringify(filtered_node_ids) !== JSON.stringify(draft.selection)
+      ) {
+        const pruned = dq.pruneNestedNodes(
+          draft.document_ctx,
+          filtered_node_ids
+        );
         draft.selection = pruned;
 
         // reset the active duplication as selection changed. see ActiveDuplication's note

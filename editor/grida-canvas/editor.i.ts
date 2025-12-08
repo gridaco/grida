@@ -2646,10 +2646,33 @@ export namespace editor.api {
     ): void;
 
     /**
-     * select the nodes by the given selectors.
+     * Selects nodes by the given selectors.
      *
-     * @param selectors - {@link grida.program.document.Selector}[]
-     * @returns the selected node ids. or `false` if ignored.
+     * **Scene Scoping**: All selection results are automatically scoped to the current scene.
+     * Nodes from other scenes are filtered out, ensuring that selection operations (e.g., CMD+A)
+     * only affect nodes within the active scene, even when the selector would otherwise match
+     * nodes across multiple scenes.
+     *
+     * @param selectors - Array of {@link grida.program.document.Selector} values to query nodes
+     * @returns The selected node IDs within the current scene, or `false` if no nodes were found
+     *
+     * @example
+     * ```typescript
+     * // Select all nodes in the current scene (CMD+A)
+     * const selected = editor.commands.select("~");
+     *
+     * // Select children of currently selected nodes
+     * editor.commands.select(">");
+     *
+     * // Select siblings of currently selected nodes
+     * editor.commands.select("~");
+     * ```
+     *
+     * @remarks
+     * - When selection is empty and selector is `"~"`, it defaults to `"*"` (all nodes)
+     * - Scene scoping ensures that even when selecting all nodes, only nodes within the
+     *   current scene are included in the result
+     * - Scene nodes themselves are never selectable and are automatically filtered out
      */
     select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
 

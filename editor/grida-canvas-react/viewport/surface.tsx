@@ -593,14 +593,16 @@ function RootFramesBarOverlay() {
   const { selection, hovered_node_id } = useSelectionState();
   const { document } = useDocumentState();
   const scene = useCurrentSceneState();
+
   const rootframes = useMemo(() => {
     const children = scene.children_refs.map((id) => document.nodes[id]);
     return children.filter(
       (n) =>
-        n.type === "container" ||
-        n.type === "template_instance" ||
-        n.type === "component" ||
-        n.type === "instance"
+        n &&
+        (n.type === "container" ||
+          n.type === "template_instance" ||
+          n.type === "component" ||
+          n.type === "instance")
     );
   }, [scene.children_refs, document.nodes]);
 
