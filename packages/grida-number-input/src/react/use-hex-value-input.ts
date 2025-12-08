@@ -132,9 +132,7 @@ export function useHexValueInput({
   // Normalize the initial value and memoize based on actual values (not reference)
   // This prevents recalculation when the same color comes in as a new object reference
   const normalizedInitialValue = useMemo(() => {
-    const normalized = normalizeRgbValue(initialValue, unit);
-    // Store in a ref to compare with previous value
-    return normalized;
+    return normalizeRgbValue(initialValue, unit);
   }, [initialValue.r, initialValue.g, initialValue.b, unit]);
 
   // Update internal value only when initialValue actually changes (ignoring reference equality)
