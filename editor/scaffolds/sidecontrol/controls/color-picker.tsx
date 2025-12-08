@@ -99,13 +99,13 @@ export function ColorPicker32F({
                 b: color.b,
                 // omit the alpha (handled by slider/picker)
               }}
-              onValueCommit={(newColor) => {
+              onValueCommit={(newColor, opacity) => {
                 onColorChange?.(
                   kolor.colorformats.newRGBA32F(
                     newColor.r,
                     newColor.g,
                     newColor.b,
-                    color.a
+                    opacity ?? color.a
                   )
                 );
               }}

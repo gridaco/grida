@@ -15,7 +15,7 @@ type UseHexValueInputOptions = {
   unit?: RGBUnit;
   fuzz?: boolean;
   onValueChange?: (hex: string) => void;
-  onValueCommit?: (color: RGB) => void;
+  onValueCommit?: (rgb: RGB, opacity?: number) => void;
 };
 
 const UNIT_STEPS: Record<RGBUnit, { fine: number; coarse: number }> = {
@@ -91,7 +91,8 @@ const areRgbEqual = (a: RGB, b: RGB): boolean =>
  *
  * ## Commit Behavior
  * - **onValueChange**: Called on every keystroke with raw hex string (allows invalid values)
- * - **onValueCommit**: Called on blur/Enter with validated RGB (only if hex is valid)
+ * - **onValueCommit**: Called on blur/Enter with validated RGB and optional opacity (only if hex is valid)
+ * - **Opacity handling**: When fuzzy parsing extracts alpha from RGBA formats (4 or 8 digits), it's passed as the second parameter
  * - **Blur/Enter**: If invalid hex, reverts to last valid value and blurs
  * - Enter key always blurs the input, similar to clicking outside
  *
@@ -100,7 +101,7 @@ const areRgbEqual = (a: RGB, b: RGB): boolean =>
  * @param options.unit - Color unit system (`u8` | `f32`)
  * @param options.fuzz - Enable fuzzy hex parsing (default: true, extracts and expands partial hex input)
  * @param options.onValueChange - Callback fired on every change with raw hex string
- * @param options.onValueCommit - Callback fired on blur/Enter with validated RGB
+ * @param options.onValueCommit - Callback fired on blur/Enter with validated RGB and optional opacity (0-1)
  * @returns Object containing standard input props (ref, value, onChange, onKeyDown, onFocus, onBlur)
  */
 export function useHexValueInput({
@@ -162,13 +163,16 @@ export function useHexValueInput({
     (hex: string) => {
       // If fuzz is enabled, try fuzzy parsing first
       let processedHex = hex;
+      let extractedOpacity: number | undefined = undefined;
       if (fuzz) {
         const fuzzyResult = parseFuzzyHex(hex);
         if (fuzzyResult) {
           // Use the RRGGBB value from fuzzy parsing result
           processedHex = fuzzyResult.RRGGBB;
-          // Note: alpha is extracted but not currently used in RGB commit
-          // The RGB value doesn't include alpha, which is handled separately in RGBA controls
+          // Extract opacity if present in the input (from RGBA or RRGGBBAA formats)
+          if (fuzzyResult.alpha !== undefined) {
+            extractedOpacity = fuzzyResult.alpha;
+          }
         }
       }
 
@@ -179,9 +183,8 @@ export function useHexValueInput({
         setEphemeralHex(null);
         const validHex = rgbToHex(normalized, unit);
         lastValidHexRef.current = validHex;
-        // Note: alpha is extracted but not stored in RGB value
-        // Consumer can use onValueChange callback if they need to track alpha separately
-        onValueCommitRef.current?.(normalized);
+        // Pass both RGB and extracted opacity (if present) to the commit callback
+        onValueCommitRef.current?.(normalized, extractedOpacity);
         return true;
       }
       return false;

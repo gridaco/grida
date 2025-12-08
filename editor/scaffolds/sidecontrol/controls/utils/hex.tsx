@@ -15,7 +15,7 @@ type HexValueInputProps = Omit<
   unit?: RGBUnit;
   fuzz?: boolean;
   onValueChange?: (hex: string) => void;
-  onValueCommit?: (color: RGB) => void;
+  onValueCommit?: (rgb: RGB, opacity?: number) => void;
 };
 
 function RGBHexInputInner(
