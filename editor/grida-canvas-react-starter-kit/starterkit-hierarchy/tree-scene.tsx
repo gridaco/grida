@@ -184,11 +184,11 @@ export function ScenesList() {
           >
             <TreeItem
               item={item}
-              className="group/item w-full py-0.5"
+              className="group/item h-7 max-h-7 w-full py-0.5"
               data-is-renaming={isRenaming}
             >
               <TreeItemLabel
-                className={cn("h-full bg-transparent p-0!")}
+                className={cn("h-full bg-transparent px-1!")}
                 onDoubleClick={() => {
                   item.startRenaming();
                 }}
@@ -200,7 +200,7 @@ export function ScenesList() {
                     editor.commands.renameScene(scene.id, name);
                     tree.abortRenaming();
                   }}
-                  className="font-normal h-8 text-xs! px-2! py-1.5!"
+                  className="px-1 py-0.5 text-[11px] font-normal"
                 />
               </TreeItemLabel>
             </TreeItem>
