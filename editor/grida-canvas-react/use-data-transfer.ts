@@ -244,7 +244,11 @@ async function tryInsertFromFigmaClipboardPayload(
     }
 
     // 4. Convert Figma REST API nodes to Grida nodes and insert
+    // Generate unique IDs for each paste operation to avoid conflicts
+    // Note: We use nanoid here since editor.idgen is not publicly accessible
+    // The IDs will be unique and won't conflict with existing nodes
     const context: iofigma.restful.factory.FactoryContext = {
+      node_id_generator: () => nanoid(),
       gradient_id_generator: () => nanoid(),
     };
 
