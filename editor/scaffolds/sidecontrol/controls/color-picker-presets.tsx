@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -51,6 +51,35 @@ const colorCategories: Array<{ value: ColorCategory; label: string }> = [
   { value: "tailwind", label: "Standard" },
   { value: "css-named", label: "CSS Colors" },
 ];
+
+function ColorChip({
+  color,
+  label,
+  onColorChange,
+  centered = false,
+}: {
+  color: RGBA32F;
+  label: string;
+  onColorChange?: (color: RGBA32F) => void;
+  centered?: boolean;
+}) {
+  const cssColor = kolor.colorformats.RGBA32F.intoCSSRGBA(color);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          className={`size-4 rounded-xs border border-border/50 transition-transform cursor-pointer hover:scale-110 ${
+            centered ? "block mx-auto" : ""
+          }`}
+          style={{ background: cssColor }}
+          onClick={() => onColorChange?.(color)}
+          aria-label={label}
+        />
+      </TooltipTrigger>
+      <TooltipContent className="pointer-events-none">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 function parseNamedColorToRGBA32F(name: string): RGBA32F {
   const lowerName = name.toLowerCase();
@@ -162,25 +191,20 @@ function ColorPickerPresetsTailwindCSSColors({
   }, []);
 
   return (
-    <table className="w-full border-collapse">
+    <table className="border-collapse min-w-full">
       <thead className="sticky top-0 bg-background z-20">
         <tr>
           <th className="text-left text-[10px] text-muted-foreground font-normal pr-2 py-1 sticky left-0 bg-background z-30">
             {/* Empty cell for color name column */}
           </th>
-          {shadeOrder.map((shade, index) => {
-            // Calculate left position: color name column (~60px) + previous shade columns (each ~24px)
-            const leftPosition = 60 + index * 24;
-            return (
-              <th
-                key={shade}
-                className="text-[8px] text-muted-foreground font-normal pb-1 text-center sticky bg-background z-20"
-                style={{ left: `${leftPosition}px` }}
-              >
-                {shade}
-              </th>
-            );
-          })}
+          {shadeOrder.map((shade) => (
+            <th
+              key={shade}
+              className="text-[8px] text-muted-foreground font-normal pb-1 text-center bg-background"
+            >
+              {shade}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
@@ -189,40 +213,17 @@ function ColorPickerPresetsTailwindCSSColors({
             <td className="text-[10px] text-muted-foreground font-normal pr-2 py-0.5 sticky left-0 bg-background z-10 whitespace-nowrap">
               {row.colorName}
             </td>
-            {shadeOrder.map((shade, index) => {
+            {shadeOrder.map((shade) => {
               const preset = row.shades[shade];
-              // Calculate left position: color name column (~60px) + previous shade columns (each ~24px)
-              const leftPosition = 60 + index * 24;
-              if (!preset)
-                return (
-                  <td
-                    key={shade}
-                    className="py-0.5 sticky bg-background z-10"
-                    style={{ left: `${leftPosition}px` }}
-                  />
-                );
-              const cssColor = kolor.colorformats.RGBA32F.intoCSSRGBA(
-                preset.color
-              );
+              if (!preset) return <td key={shade} className="py-0.5" />;
               return (
-                <td
-                  key={shade}
-                  className="py-0.5 px-0.5 sticky bg-background z-10"
-                  style={{ left: `${leftPosition}px` }}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className="size-4 rounded-xs border transition-transform cursor-pointer hover:scale-110 block mx-auto"
-                        style={{ background: cssColor }}
-                        onClick={() => onColorChange?.(preset.color)}
-                        aria-label={preset.label}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent className="pointer-events-none">
-                      {preset.label}
-                    </TooltipContent>
-                  </Tooltip>
+                <td key={shade} className="py-0.5 px-0.5">
+                  <ColorChip
+                    color={preset.color}
+                    label={preset.label}
+                    onColorChange={onColorChange}
+                    centered
+                  />
                 </td>
               );
             })}
@@ -267,24 +268,14 @@ function ColorPickerPresetsCSSNamedColors({
     <div className="space-y-2">
       {/* CSS Standard Named Colors: Grid */}
       <div className="grid grid-cols-10 gap-1.5">
-        {cssStandardNamedPresets.map((preset) => {
-          const cssColor = kolor.colorformats.RGBA32F.intoCSSRGBA(preset.color);
-          return (
-            <Tooltip key={preset.id}>
-              <TooltipTrigger asChild>
-                <button
-                  className="size-4 rounded-xs border transition-transform cursor-pointer hover:scale-110"
-                  style={{ background: cssColor }}
-                  onClick={() => onColorChange?.(preset.color)}
-                  aria-label={preset.label}
-                />
-              </TooltipTrigger>
-              <TooltipContent className="pointer-events-none">
-                {preset.label}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
+        {cssStandardNamedPresets.map((preset) => (
+          <ColorChip
+            key={preset.id}
+            color={preset.color}
+            label={preset.label}
+            onColorChange={onColorChange}
+          />
+        ))}
       </div>
 
       {/* Divider */}
@@ -292,24 +283,14 @@ function ColorPickerPresetsCSSNamedColors({
 
       {/* Other CSS Named Colors: Grid */}
       <div className="grid grid-cols-10 gap-1.5">
-        {otherCssNamedPresets.map((preset) => {
-          const cssColor = kolor.colorformats.RGBA32F.intoCSSRGBA(preset.color);
-          return (
-            <Tooltip key={preset.id}>
-              <TooltipTrigger asChild>
-                <button
-                  className="size-4 rounded-xs border transition-transform cursor-pointer hover:scale-110"
-                  style={{ background: cssColor }}
-                  onClick={() => onColorChange?.(preset.color)}
-                  aria-label={preset.label}
-                />
-              </TooltipTrigger>
-              <TooltipContent className="pointer-events-none">
-                {preset.label}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
+        {otherCssNamedPresets.map((preset) => (
+          <ColorChip
+            key={preset.id}
+            color={preset.color}
+            label={preset.label}
+            onColorChange={onColorChange}
+          />
+        ))}
       </div>
     </div>
   );
@@ -351,6 +332,7 @@ export function ColorPickerPresets({
               <ColorPickerPresetsCSSNamedColors onColorChange={onColorChange} />
             )}
           </div>
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </div>
     </div>
