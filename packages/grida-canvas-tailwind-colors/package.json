@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "generate": "deno run --allow-read --allow-write --allow-net scripts/generate.ts",
-    "prepublishOnly": "echo 'Ensure color files are generated before publishing. Run: pnpm generate'"
+    "prepublishOnly": "pnpm generate"
   },
   "files": [
     "css",
