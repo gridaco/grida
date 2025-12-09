@@ -84,7 +84,7 @@ fn compute_corner_params(radius: f32, smoothness: f32, shortest_side: f32) -> Co
 }
 
 pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) -> skia_safe::Path {
-    let mut path = skia_safe::Path::new();
+    let mut builder = skia_safe::PathBuilder::new();
 
     let w = shape.width;
     let h = shape.height;
@@ -105,14 +105,14 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
     let center_x = w / 2.0;
 
     // Start at top center
-    path.move_to((center_x, 0.0));
+    builder.move_to((center_x, 0.0));
 
     // Top-right section
-    path.line_to((f32::max(w / 2.0, w - tr.p), 0.0));
+    builder.line_to((f32::max(w / 2.0, w - tr.p), 0.0));
 
     if tr.radius > 0.0 {
         // Bézier transition into arc
-        path.cubic_to(
+        builder.cubic_to(
             (w - (tr.p - tr.a), 0.0),
             (w - (tr.p - tr.a - tr.b), 0.0),
             (w - (tr.p - tr.a - tr.b - tr.c), tr.d),
@@ -123,10 +123,10 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
             skia_safe::Rect::from_xywh(w - tr.radius * 2.0, 0.0, tr.radius * 2.0, tr.radius * 2.0);
         let start_angle = 270.0 + tr.angle_bezier;
         let sweep_angle = 90.0 - 2.0 * tr.angle_bezier;
-        path.arc_to(arc_rect, start_angle, sweep_angle, false);
+        builder.arc_to(arc_rect, start_angle, sweep_angle, false);
 
         // Bézier transition out of arc
-        path.cubic_to(
+        builder.cubic_to(
             (w, tr.p - tr.a - tr.b),
             (w, tr.p - tr.a),
             (w, f32::min(h / 2.0, tr.p)),
@@ -134,10 +134,10 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
     }
 
     // Right-bottom section
-    path.line_to((w, f32::max(h / 2.0, h - br.p)));
+    builder.line_to((w, f32::max(h / 2.0, h - br.p)));
 
     if br.radius > 0.0 {
-        path.cubic_to(
+        builder.cubic_to(
             (w, h - (br.p - br.a)),
             (w, h - (br.p - br.a - br.b)),
             (w - br.d, h - (br.p - br.a - br.b - br.c)),
@@ -151,9 +151,9 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
         );
         let start_angle = br.angle_bezier;
         let sweep_angle = 90.0 - 2.0 * br.angle_bezier;
-        path.arc_to(arc_rect, start_angle, sweep_angle, false);
+        builder.arc_to(arc_rect, start_angle, sweep_angle, false);
 
-        path.cubic_to(
+        builder.cubic_to(
             (w - (br.p - br.a - br.b), h),
             (w - (br.p - br.a), h),
             (f32::max(w / 2.0, w - br.p), h),
@@ -161,10 +161,10 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
     }
 
     // Bottom-left section
-    path.line_to((f32::min(w / 2.0, bl.p), h));
+    builder.line_to((f32::min(w / 2.0, bl.p), h));
 
     if bl.radius > 0.0 {
-        path.cubic_to(
+        builder.cubic_to(
             (bl.p - bl.a, h),
             (bl.p - bl.a - bl.b, h),
             (bl.p - bl.a - bl.b - bl.c, h - bl.d),
@@ -174,9 +174,9 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
             skia_safe::Rect::from_xywh(0.0, h - bl.radius * 2.0, bl.radius * 2.0, bl.radius * 2.0);
         let start_angle = 90.0 + bl.angle_bezier;
         let sweep_angle = 90.0 - 2.0 * bl.angle_bezier;
-        path.arc_to(arc_rect, start_angle, sweep_angle, false);
+        builder.arc_to(arc_rect, start_angle, sweep_angle, false);
 
-        path.cubic_to(
+        builder.cubic_to(
             (0.0, h - (bl.p - bl.a - bl.b)),
             (0.0, h - (bl.p - bl.a)),
             (0.0, f32::max(h / 2.0, h - bl.p)),
@@ -184,10 +184,10 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
     }
 
     // Left-top section
-    path.line_to((0.0, f32::min(h / 2.0, tl.p)));
+    builder.line_to((0.0, f32::min(h / 2.0, tl.p)));
 
     if tl.radius > 0.0 {
-        path.cubic_to(
+        builder.cubic_to(
             (0.0, tl.p - tl.a),
             (0.0, tl.p - tl.a - tl.b),
             (tl.d, tl.p - tl.a - tl.b - tl.c),
@@ -196,17 +196,17 @@ pub fn build_orthogonal_smooth_rrect_path(shape: &OrthogonalSmoothRRectShape) ->
         let arc_rect = skia_safe::Rect::from_xywh(0.0, 0.0, tl.radius * 2.0, tl.radius * 2.0);
         let start_angle = 180.0 + tl.angle_bezier;
         let sweep_angle = 90.0 - 2.0 * tl.angle_bezier;
-        path.arc_to(arc_rect, start_angle, sweep_angle, false);
+        builder.arc_to(arc_rect, start_angle, sweep_angle, false);
 
-        path.cubic_to(
+        builder.cubic_to(
             (tl.p - tl.a - tl.b, 0.0),
             (tl.p - tl.a, 0.0),
             (f32::min(w / 2.0, tl.p), 0.0),
         );
     }
 
-    path.close();
-    path
+    builder.close();
+    builder.detach()
 }
 
 pub fn build_orthogonal_smooth_rrect_vector_network(

@@ -13,11 +13,8 @@ pub struct SimplePolygonShape {
 
 /// Returns a polygon path from only points.
 pub fn build_path_from_points(points: &[CGPoint]) -> skia_safe::Path {
-    let mut path = skia_safe::Path::new();
     let skia_points: Vec<skia_safe::Point> = points.iter().map(|&p| p.into()).collect();
-    path.add_poly(&skia_points, true);
-
-    path
+    skia_safe::Path::polygon(&skia_points, true, None, None)
 }
 
 /// Given:

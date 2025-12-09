@@ -85,8 +85,8 @@ impl HitOverlay {
                             _ => shape.to_path(),
                         }
                     };
-                    path.transform(&sk::sk_matrix(transform.matrix));
-                    path.transform(&sk::sk_matrix(camera.view_matrix().matrix));
+                    path = path.make_transform(&sk::sk_matrix(transform.matrix));
+                    path = path.make_transform(&sk::sk_matrix(camera.view_matrix().matrix));
 
                     // background for hit text
                     let hit_text_rect = Rect::from_xywh(10.0, 80.0, 300.0, 40.0);

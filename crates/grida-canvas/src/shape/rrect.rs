@@ -36,9 +36,7 @@ pub fn build_rrect(shape: &RRectShape) -> skia_safe::RRect {
 }
 
 pub fn build_rrect_path(shape: &RRectShape) -> skia_safe::Path {
-    let mut path = skia_safe::Path::new();
-    path.add_rrect(build_rrect(shape), None);
-    path
+    skia_safe::Path::rrect(build_rrect(shape), None)
 }
 
 /// Build a [`VectorNetwork`] representing this rounded rectangle.

@@ -2,8 +2,7 @@ use skia_safe::{path_effect::PathEffect, surfaces, Color, Paint, PaintStyle, Pat
 
 fn main() {
     // Create a circle path
-    let mut path = Path::new();
-    path.add_circle((200.0, 200.0), 100.0, None);
+    let path = Path::circle((200.0, 200.0), 100.0, None);
 
     // Prepare a surface and clear with white background
     let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");

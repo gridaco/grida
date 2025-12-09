@@ -1,5 +1,5 @@
 use math2::bezier_a2c;
-use skia_safe::{Path, Rect};
+use skia_safe::{Path, PathBuilder, Rect};
 
 /// A Elliptical Arc shape (that can have irregular / elliptical dimensions)
 pub struct EllipticalRingSectorShape {
@@ -59,7 +59,7 @@ pub fn build_ring_sector_path(shape: &EllipticalRingSectorShape) -> Path {
 /// Build a closed arc path for [`EllipticalArcShape`] without corner radius.
 /// This uses `arc_to` to build the path.
 fn __build_ring_sector_path_no_corner_with_arc_to(shape: &EllipticalRingSectorShape) -> Path {
-    let mut path = Path::new();
+    let mut builder = PathBuilder::new();
 
     let cx = shape._cx();
     let cy = shape._cy();
@@ -76,25 +76,25 @@ fn __build_ring_sector_path_no_corner_with_arc_to(shape: &EllipticalRingSectorSh
     let end_rad = end_deg.to_radians();
 
     let start_point = (cx + rx * start_rad.cos(), cy + ry * start_rad.sin());
-    path.move_to(start_point);
+    builder.move_to(start_point);
 
     let outer_rect = Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);
-    path.arc_to(outer_rect, start_deg, sweep_deg, false);
+    builder.arc_to(outer_rect, start_deg, sweep_deg, false);
 
     if shape.inner_radius_ratio > 0.0 {
         let end_inner = (cx + inner_rx * end_rad.cos(), cy + inner_ry * end_rad.sin());
-        path.line_to(end_inner);
+        builder.line_to(end_inner);
 
         let inner_rect =
             Rect::from_xywh(cx - inner_rx, cy - inner_ry, inner_rx * 2.0, inner_ry * 2.0);
-        path.arc_to(inner_rect, end_deg, -sweep_deg, false);
+        builder.arc_to(inner_rect, end_deg, -sweep_deg, false);
     } else {
-        path.line_to((cx, cy));
+        builder.line_to((cx, cy));
     }
 
-    path.close();
+    builder.close();
 
-    path
+    builder.detach()
 }
 
 /// Build a closed arc path for [`EllipticalRingSectorShape`] with corner radius.
@@ -107,7 +107,7 @@ fn __build_ring_sector_path_no_corner_with_arc_to(shape: &EllipticalRingSectorSh
 /// - https://stackoverflow.com/a/57921952
 #[deprecated]
 fn __build_ring_sector_path_with_corner_6subpath(shape: &EllipticalRingSectorShape) -> Path {
-    let mut path = Path::new();
+    let mut builder = PathBuilder::new();
 
     let cx = shape._cx();
     let cy = shape._cy();
@@ -127,11 +127,11 @@ fn __build_ring_sector_path_with_corner_6subpath(shape: &EllipticalRingSectorSha
     // Start point on outer arc
     let start_x = cx + rx * start_rad.cos();
     let start_y = cy + ry * start_rad.sin();
-    path.move_to((start_x, start_y));
+    builder.move_to((start_x, start_y));
 
     // Outer arc
     let outer_rect = Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);
-    path.arc_to(outer_rect, start_deg, sweep_deg, false);
+    builder.arc_to(outer_rect, start_deg, sweep_deg, false);
 
     // Determine sweep direction sign
     let dir = if sweep_deg >= 0.0 { 1.0 } else { -1.0 };
@@ -140,33 +140,33 @@ fn __build_ring_sector_path_with_corner_6subpath(shape: &EllipticalRingSectorSha
     let ofc_x = cx + (rx - r) * end_rad.cos();
     let ofc_y = cy + (ry - r) * end_rad.sin();
     let ofc_rect = Rect::from_xywh(ofc_x - r, ofc_y - r, r * 2.0, r * 2.0);
-    path.arc_to(ofc_rect, end_deg, 90.0 * dir, false);
+    builder.arc_to(ofc_rect, end_deg, 90.0 * dir, false);
 
     // Inner finish corner
     let ifc_x = cx + (inner_rx + r) * end_rad.cos();
     let ifc_y = cy + (inner_ry + r) * end_rad.sin();
     let ifc_rect = Rect::from_xywh(ifc_x - r, ifc_y - r, r * 2.0, r * 2.0);
-    path.arc_to(ifc_rect, end_deg + 90.0 * dir, 90.0 * dir, false);
+    builder.arc_to(ifc_rect, end_deg + 90.0 * dir, 90.0 * dir, false);
 
     // Inner arc
     let inner_rect = Rect::from_xywh(cx - inner_rx, cy - inner_ry, inner_rx * 2.0, inner_ry * 2.0);
-    path.arc_to(inner_rect, end_deg, -sweep_deg, false);
+    builder.arc_to(inner_rect, end_deg, -sweep_deg, false);
 
     // Inner start corner
     let isc_x = cx + (inner_rx + r) * start_rad.cos();
     let isc_y = cy + (inner_ry + r) * start_rad.sin();
     let isc_rect = Rect::from_xywh(isc_x - r, isc_y - r, r * 2.0, r * 2.0);
-    path.arc_to(isc_rect, start_deg + 180.0 * dir, 90.0 * dir, false);
+    builder.arc_to(isc_rect, start_deg + 180.0 * dir, 90.0 * dir, false);
 
     // Outer start corner
     let osc_x = cx + (rx - r) * start_rad.cos();
     let osc_y = cy + (ry - r) * start_rad.sin();
     let osc_rect = Rect::from_xywh(osc_x - r, osc_y - r, r * 2.0, r * 2.0);
-    path.arc_to(osc_rect, start_deg + 270.0 * dir, 90.0 * dir, false);
+    builder.arc_to(osc_rect, start_deg + 270.0 * dir, 90.0 * dir, false);
 
-    path.close();
+    builder.close();
 
-    path
+    builder.detach()
 }
 
 /// Build a closed arc path for [`EllipticalArcShape`] without corner radius.
@@ -179,7 +179,7 @@ fn __build_ring_sector_path_with_corner_6subpath(shape: &EllipticalRingSectorSha
 ///
 /// FIXME: this needs to be revised, the path building does not aligns with the corner radius handling.
 fn __build_ring_sector_path_no_corner_with_cubic_to(shape: &EllipticalRingSectorShape) -> Path {
-    let mut path = Path::new();
+    let mut builder = PathBuilder::new();
 
     let cx = shape._cx();
     let cy = shape._cy();
@@ -202,7 +202,7 @@ fn __build_ring_sector_path_no_corner_with_cubic_to(shape: &EllipticalRingSector
     let end_y = cy + ry * end_rad.sin();
 
     // Move to start point
-    path.move_to((start_x, start_y));
+    builder.move_to((start_x, start_y));
 
     // Draw outer arc using cubic bezier curves
     let outer_bezier_points = bezier_a2c(
@@ -221,7 +221,7 @@ fn __build_ring_sector_path_no_corner_with_cubic_to(shape: &EllipticalRingSector
     // Add cubic bezier curves for outer arc
     for chunk in outer_bezier_points.chunks(6) {
         if let [c1x, c1y, c2x, c2y, x, y] = chunk {
-            path.cubic_to((*c1x, *c1y), (*c2x, *c2y), (*x, *y));
+            builder.cubic_to((*c1x, *c1y), (*c2x, *c2y), (*x, *y));
         }
     }
 
@@ -229,7 +229,7 @@ fn __build_ring_sector_path_no_corner_with_cubic_to(shape: &EllipticalRingSector
     if shape.inner_radius_ratio > 0.0 {
         let end_inner_x = cx + inner_rx * end_rad.cos();
         let end_inner_y = cy + inner_ry * end_rad.sin();
-        path.line_to((end_inner_x, end_inner_y));
+        builder.line_to((end_inner_x, end_inner_y));
 
         // Calculate start point for inner arc
         let start_inner_x = cx + inner_rx * start_rad.cos();
@@ -252,18 +252,18 @@ fn __build_ring_sector_path_no_corner_with_cubic_to(shape: &EllipticalRingSector
         // Add cubic bezier curves for inner arc
         for chunk in inner_bezier_points.chunks(6) {
             if let [c1x, c1y, c2x, c2y, x, y] = chunk {
-                path.cubic_to((*c1x, *c1y), (*c2x, *c2y), (*x, *y));
+                builder.cubic_to((*c1x, *c1y), (*c2x, *c2y), (*x, *y));
             }
         }
 
         // explicit closing line back to the outer start point helps
         // [`build_corner_radius_path`] apply the corner effect correctly.
-        path.line_to((start_x, start_y));
+        builder.line_to((start_x, start_y));
     } else {
         // If no inner radius, draw line to center
-        path.line_to((cx, cy));
+        builder.line_to((cx, cy));
     }
 
-    path.close();
-    path
+    builder.close();
+    builder.detach()
 }

@@ -119,22 +119,18 @@ impl PainterShape {
     }
 
     pub fn to_path(&self) -> Path {
-        let mut path = Path::new();
-
         if let Some(rect) = self.rect_shape {
-            path.add_rect(rect, None);
+            Path::rect(rect, None)
         } else if let Some(rrect) = &self.rrect {
-            path.add_rrect(rrect, None);
+            Path::rrect(rrect, None)
         } else if let Some(oval) = &self.oval {
-            path.add_oval(oval, None);
+            Path::oval(oval, None)
         } else if let Some(existing_path) = &self.path {
-            path = existing_path.clone();
+            existing_path.clone()
         } else {
             // Fallback to rect if no specific shape is set
-            path.add_rect(self.rect, None);
+            Path::rect(self.rect, None)
         }
-
-        path
     }
 
     pub fn is_closed(&self) -> bool {
@@ -164,12 +160,7 @@ pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
             let shape = n.to_shape();
             PainterShape::from_shape(&shape)
         }
-        Node::Line(n) => {
-            let mut path = Path::new();
-            path.move_to((0.0, 0.0));
-            path.line_to((n.size.width, 0.0));
-            PainterShape::from_path(path)
-        }
+        Node::Line(n) => PainterShape::from_path(Path::line((0.0, 0.0), (n.size.width, 0.0))),
         Node::Path(n) => {
             if let Some(path) = Path::from_svg(&n.data) {
                 PainterShape::from_path(path)
@@ -340,7 +331,7 @@ pub fn boolean_operation_path(
                 .get_world_transform(child_id)
                 .unwrap_or_else(AffineTransform::identity);
             let relative = inv.compose(&child_world);
-            path.transform(&sk::sk_matrix(relative.matrix));
+            path = path.make_transform(&sk::sk_matrix(relative.matrix));
 
             let op = if i == 0 {
                 BooleanPathOperation::Union

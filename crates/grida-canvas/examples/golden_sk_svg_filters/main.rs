@@ -1972,27 +1972,28 @@ fn usvg_linear_gradient_to_linear_gradient_paint(
 
 /// Convert a tiny_skia_path::Path to a Skia Path
 fn tiny_path_to_skia_path(path: &TinyPath) -> SkPath {
-    let mut sk_path = SkPath::new();
+    use skia_safe::PathBuilder;
+    let mut builder = PathBuilder::new();
     for segment in path.segments() {
         match segment {
             PathSegment::MoveTo(p) => {
-                sk_path.move_to((p.x, p.y));
+                builder.move_to((p.x, p.y));
             }
             PathSegment::LineTo(p) => {
-                sk_path.line_to((p.x, p.y));
+                builder.line_to((p.x, p.y));
             }
             PathSegment::QuadTo(p0, p1) => {
-                sk_path.quad_to((p0.x, p0.y), (p1.x, p1.y));
+                builder.quad_to((p0.x, p0.y), (p1.x, p1.y));
             }
             PathSegment::CubicTo(p0, p1, p2) => {
-                sk_path.cubic_to((p0.x, p0.y), (p1.x, p1.y), (p2.x, p2.y));
+                builder.cubic_to((p0.x, p0.y), (p1.x, p1.y), (p2.x, p2.y));
             }
             PathSegment::Close => {
-                sk_path.close();
+                builder.close();
             }
         }
     }
-    sk_path
+    builder.detach()
 }
 
 // ----------------------------------------------------------------------------

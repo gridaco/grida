@@ -17,13 +17,12 @@ use cg::vectornetwork::{StrokeOptions, VNPainter, VectorNetwork};
 use skia_safe::{
     self as sk,
     font_style::{Slant, Weight, Width},
-    path::AddPathMode,
     surfaces,
     textlayout::{
         FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, TextAlign, TextStyle,
         TypefaceFontProvider,
     },
-    Color, Data, FontMgr, Path, Point,
+    Color, Data, FontMgr, Matrix, Path, PathBuilder, Point,
 };
 
 fn main() {
@@ -500,7 +499,7 @@ fn scenario_variable_fonts(canvas: &sk::Canvas, y_offset: f32) -> f32 {
 }
 
 fn paragraph_to_path(paragraph: &mut Paragraph, origin: Point) -> Option<Path> {
-    let mut path = Path::new();
+    let mut builder = PathBuilder::new();
     paragraph.visit(|_, run| {
         if let Some(run) = run {
             let font = run.font();
@@ -513,11 +512,12 @@ fn paragraph_to_path(paragraph: &mut Paragraph, origin: Point) -> Option<Path> {
                         pos.x + run_origin.x + origin.x,
                         pos.y + run_origin.y + origin.y,
                     );
-                    path.add_path(&glyph_path, offset, AddPathMode::Append);
+                    builder.add_path_with_transform(&glyph_path, &Matrix::translate((offset.x, offset.y)), None);
                 }
             }
         }
     });
+    let path = builder.detach();
     if path.is_empty() {
         None
     } else {

@@ -272,10 +272,10 @@ fn build_path_from_segments(
     vertices: &[(f32, f32)],
     segments: &[VectorNetworkSegment],
 ) -> skia_safe::Path {
-    let mut path = skia_safe::Path::new();
+    let mut builder = skia_safe::PathBuilder::new();
 
     if segments.is_empty() {
-        return path;
+        return builder.detach();
     }
 
     let mut current_start: Option<usize> = None;
@@ -290,28 +290,28 @@ fn build_path_from_segments(
         let tb = segment.tb;
 
         if previous_end != Some(a_idx) {
-            path.move_to((a.0, a.1));
+            builder.move_to((a.0, a.1));
             current_start = Some(a_idx);
         }
 
         if is_zero(ta) && is_zero(tb) {
-            path.line_to((b.0, b.1));
+            builder.line_to((b.0, b.1));
         } else {
             let c1 = [a.0 + ta.0, a.1 + ta.1];
             let c2 = [b.0 + tb.0, b.1 + tb.1];
-            path.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
+            builder.cubic_to((c1[0], c1[1]), (c2[0], c2[1]), (b.0, b.1));
         }
 
         previous_end = Some(b_idx);
 
         if Some(b_idx) == current_start {
-            path.close();
+            builder.close();
             previous_end = None;
             current_start = None;
         }
     }
 
-    path
+    builder.detach()
 }
 
 // TODO: move to math2
@@ -361,7 +361,7 @@ impl VectorNetwork {
 
         let mut paths = Vec::with_capacity(self.regions.len());
         for region in &self.regions {
-            let mut path = skia_safe::Path::new();
+            let mut builder = skia_safe::PathBuilder::new();
             for VectorNetworkLoop(seg_indices) in &region.loops {
                 if seg_indices.is_empty() {
                     continue;
@@ -379,21 +379,21 @@ impl VectorNetwork {
                     let tb = seg.tb;
 
                     if previous_end != Some(a_idx) {
-                        path.move_to((a.0, a.1));
+                        builder.move_to((a.0, a.1));
                         current_start = Some(a_idx);
                     }
 
                     if is_zero(ta) && is_zero(tb) {
-                        path.line_to((b.0, b.1));
+                        builder.line_to((b.0, b.1));
                     } else {
                         let c1 = (a.0 + ta.0, a.1 + ta.1);
                         let c2 = (b.0 + tb.0, b.1 + tb.1);
-                        path.cubic_to(c1, c2, (b.0, b.1));
+                        builder.cubic_to(c1, c2, (b.0, b.1));
                     }
 
                     previous_end = Some(b_idx);
                     if Some(b_idx) == current_start {
-                        path.close();
+                        builder.close();
                         previous_end = None;
                         current_start = None;
                     }
@@ -404,8 +404,8 @@ impl VectorNetwork {
                 FillRule::NonZero => skia_safe::PathFillType::Winding,
                 FillRule::EvenOdd => skia_safe::PathFillType::EvenOdd,
             };
-            path.set_fill_type(fill_type);
-            paths.push(path);
+            builder.set_fill_type(fill_type);
+            paths.push(builder.detach());
         }
 
         paths
@@ -415,11 +415,11 @@ impl VectorNetwork {
     /// path. This is a temporary convenience and may not preserve fill rules
     /// across separate regions.
     pub fn to_appended_path(&self) -> skia_safe::Path {
-        let mut merged = skia_safe::Path::new();
+        let mut builder = skia_safe::PathBuilder::new();
         for p in self.to_paths() {
-            merged.add_path(&p, (0.0, 0.0), skia_safe::path::AddPathMode::Append);
+            builder.add_path(&p);
         }
-        merged
+        builder.detach()
     }
 
     /// Union all paths returned by [`to_union`](Self::to_union) into a single path.

@@ -1,6 +1,7 @@
 use cg::cg::prelude::*;
 use skia_safe::{
-    luma_color_filter, surfaces, BlendMode, Color, Paint, Path, Point, Rect, Shader, TileMode,
+    luma_color_filter, surfaces, BlendMode, Color, Paint, Path, PathBuilder, Point, Rect, Shader,
+    TileMode,
 };
 
 fn draw_demo_content(canvas: &skia_safe::Canvas, area: Rect) {
@@ -37,20 +38,20 @@ fn draw_demo_content(canvas: &skia_safe::Canvas, area: Rect) {
 
     // Diagonal band
     paint.set_color(Color::from_argb(180, 60, 179, 113));
-    let mut band = Path::new();
-    band.move_to(Point::new(area.left(), area.top() + area.height() * 0.25));
-    band.line_to(Point::new(area.right(), area.top() + area.height() * 0.05));
-    band.line_to(Point::new(area.right(), area.top() + area.height() * 0.35));
-    band.line_to(Point::new(area.left(), area.top() + area.height() * 0.55));
-    band.close();
+    let mut band_builder = PathBuilder::new();
+    band_builder.move_to(Point::new(area.left(), area.top() + area.height() * 0.25));
+    band_builder.line_to(Point::new(area.right(), area.top() + area.height() * 0.05));
+    band_builder.line_to(Point::new(area.right(), area.top() + area.height() * 0.35));
+    band_builder.line_to(Point::new(area.left(), area.top() + area.height() * 0.55));
+    band_builder.close();
+    let band = band_builder.detach();
     canvas.draw_path(&band, &paint);
 }
 
 fn draw_geometry_mask(canvas: &skia_safe::Canvas, area: Rect) {
     // Clip to a circular geometry path and draw content inside
     canvas.save();
-    let mut clip_path = Path::new();
-    clip_path.add_circle(
+    let clip_path = Path::circle(
         Point::new(area.center_x(), area.center_y()),
         (area.width().min(area.height())) * 0.4,
         None,
@@ -65,8 +66,7 @@ fn draw_geometry_mask(canvas: &skia_safe::Canvas, area: Rect) {
     outline.set_style(skia_safe::paint::Style::Stroke);
     outline.set_stroke_width(2.0);
     outline.set_color(Color::from_argb(255, 0, 0, 0));
-    let mut outline_path = Path::new();
-    outline_path.add_circle(
+    let outline_path = Path::circle(
         Point::new(area.center_x(), area.center_y()),
         (area.width().min(area.height())) * 0.4,
         None,

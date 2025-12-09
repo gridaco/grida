@@ -19,7 +19,7 @@ glutin = "0.32.0"
 glutin-winit = "0.5.0"
 raw-window-handle = "0.6.0"
 winit = "0.30.0"
-skia-safe = { version = "0.89.0", features = ["gpu", "gl", "textlayout"] }
+skia-safe = { version = "0.91.0", features = ["gpu", "gl", "textlayout"] }
 figma-api = "0.31.3"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }

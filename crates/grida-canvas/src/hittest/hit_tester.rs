@@ -88,7 +88,7 @@ impl<'a> HitTester<'a> {
                     } else {
                         entry.layer.shape().to_path()
                     };
-                    path.transform(&sk::sk_matrix(transform.matrix));
+                    path = path.make_transform(&sk::sk_matrix(transform.matrix));
                     if path.contains((point[0], point[1])) {
                         return Some(entry.id);
                     }
@@ -118,7 +118,7 @@ impl<'a> HitTester<'a> {
                     } else {
                         shape.to_path()
                     };
-                    path.transform(&sk::sk_matrix(transform.matrix));
+                    path = path.make_transform(&sk::sk_matrix(transform.matrix));
                     if path.contains((point[0], point[1])) {
                         out.push(entry.id);
                     }
@@ -139,7 +139,7 @@ impl<'a> HitTester<'a> {
             } else {
                 shape.to_path()
             };
-            path.transform(&sk::sk_matrix(transform.matrix));
+            path = path.make_transform(&sk::sk_matrix(transform.matrix));
             path.contains((point[0], point[1]))
         } else {
             false

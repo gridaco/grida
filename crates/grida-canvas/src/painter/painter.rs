@@ -14,7 +14,7 @@ use crate::vectornetwork::vn_painter::StrokeOptions;
 use crate::vectornetwork::VectorNetwork;
 use math2::transform::AffineTransform;
 use skia_safe::{
-    canvas::SaveLayerRec, path::AddPathMode, textlayout, Paint as SkPaint, Path, Point, Rect,
+    canvas::SaveLayerRec, textlayout, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
     Shader,
 };
 use std::cell::RefCell;
@@ -281,7 +281,7 @@ impl<'a> Painter<'a> {
         y_offset: f32,
     ) {
         // Build a path from all glyphs in the paragraph.
-        let mut path = Path::new();
+        let mut builder = PathBuilder::new();
         paragraph.borrow_mut().visit(|_, info| {
             if let Some(info) = info {
                 let glyphs = info.glyphs();
@@ -291,11 +291,18 @@ impl<'a> Painter<'a> {
                 for (glyph, pos) in glyphs.iter().zip(positions.iter()) {
                     if let Some(glyph_path) = font.get_path(*glyph) {
                         let offset = Point::new(pos.x + origin.x, pos.y + origin.y + y_offset);
-                        path.add_path(&glyph_path, offset, AddPathMode::Append);
+                        if offset.x != 0.0 || offset.y != 0.0 {
+                            let transformed =
+                                glyph_path.make_transform(&Matrix::translate((offset.x, offset.y)));
+                            builder.add_path(&transformed);
+                        } else {
+                            builder.add_path(&glyph_path);
+                        }
                     }
                 }
             }
         });
+        let path = builder.detach();
 
         if path.is_empty() {
             return;
@@ -947,26 +954,30 @@ impl<'a> Painter<'a> {
 
     /// Collect only mask geometry paths (ignoring content of nested groups).
     fn collect_mask_paths_for_masks(&self, commands: &[PainterRenderCommand], out_path: &mut Path) {
+        let mut builder = PathBuilder::new_path(out_path);
         for command in commands {
             match command {
                 PainterRenderCommand::Draw(layer) => {
                     if let Some(layer_path) = Self::layer_to_path(layer) {
-                        out_path.add_path(&layer_path, (0.0, 0.0), AddPathMode::Append);
+                        builder.add_path(&layer_path);
                     }
                 }
                 PainterRenderCommand::MaskGroup(group) => {
                     // Recurse only into further mask commands
-                    self.collect_mask_paths_for_masks(&group.mask_commands, out_path);
+                    let mut temp_path = builder.detach();
+                    self.collect_mask_paths_for_masks(&group.mask_commands, &mut temp_path);
+                    builder = PathBuilder::new_path(&temp_path);
                 }
             }
         }
+        *out_path = builder.detach();
     }
 
     fn layer_to_path(layer: &PainterPictureLayer) -> Option<Path> {
         let shape = layer.shape();
         let mut path = shape.to_path();
         let transform = layer.transform().matrix;
-        path.transform(&sk::sk_matrix(transform));
+        path = path.make_transform(&sk::sk_matrix(transform));
         Some(path)
     }
 

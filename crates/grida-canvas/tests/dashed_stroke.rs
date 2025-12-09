@@ -1,12 +1,13 @@
 use cg::cg::prelude::*;
 use cg::shape::*;
-use skia_safe::Path;
+use skia_safe::{Path, PathBuilder};
 
 #[test]
 fn dashed_stroke_has_more_segments() {
-    let mut path = Path::new();
-    path.move_to((0.0, 0.0));
-    path.line_to((100.0, 0.0));
+    let mut builder = PathBuilder::new();
+    builder.move_to((0.0, 0.0));
+    builder.line_to((100.0, 0.0));
+    let path = builder.detach();
 
     let solid = stroke_geometry(
         &path,

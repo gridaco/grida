@@ -78,8 +78,8 @@ impl StrokeOverlay {
                             _ => entry.layer.shape().to_path(),
                         }
                     };
-                    path.transform(&sk::sk_matrix(transform.matrix));
-                    path.transform(&sk::sk_matrix(camera.view_matrix().matrix));
+                    path = path.make_transform(&sk::sk_matrix(transform.matrix));
+                    path = path.make_transform(&sk::sk_matrix(camera.view_matrix().matrix));
 
                     canvas.draw_path(&path, &paint);
                 }

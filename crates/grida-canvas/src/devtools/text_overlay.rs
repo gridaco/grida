@@ -1,7 +1,7 @@
 use crate::cache::scene::SceneCache;
 use crate::cg::types::TextAlignVertical;
 use crate::painter::layer::PainterPictureTextLayer;
-use skia_safe::Path;
+use skia_safe::{Path, PathBuilder};
 
 pub struct TextOverlay;
 
@@ -30,14 +30,14 @@ impl TextOverlay {
             };
 
             // Create a path with just the baselines
-            let mut path = Path::new();
+            let mut builder = PathBuilder::new();
             for baseline in baseline_info {
                 // Add a line segment for the baseline with vertical offset
                 let y = baseline.baseline_y + y_offset;
-                path.move_to((baseline.left, y));
-                path.line_to((baseline.left + baseline.width, y));
+                builder.move_to((baseline.left, y));
+                builder.line_to((baseline.left + baseline.width, y));
             }
-            Some(path)
+            Some(builder.detach())
         } else {
             // Return None if text layer is not in cache
             None

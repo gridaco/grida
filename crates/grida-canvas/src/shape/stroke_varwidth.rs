@@ -1,6 +1,6 @@
 use crate::cg::varwidth::*;
 use crate::vectornetwork::vn::PiecewiseVectorNetworkGeometry;
-use skia_safe::Path;
+use skia_safe::{Path, PathBuilder};
 
 /// Adapter to keep the demo signature: capture a VarWidthSampler in a closure.
 /// Returns half-width r(u).
@@ -201,11 +201,9 @@ pub fn create_variable_width_stroke_from_geometry(
         if segment_idx == 0 {
             combined_path = segment_path;
         } else {
-            combined_path.add_path(
-                &segment_path,
-                (0.0, 0.0),
-                skia_safe::path::AddPathMode::Append,
-            );
+            let mut builder = PathBuilder::new_path(&combined_path);
+            builder.add_path(&segment_path);
+            combined_path = builder.detach();
         }
     }
 
@@ -279,12 +277,12 @@ where
     }
 
     // Build outline path using Catmull-Rom spline converted to cubic Beziers
-    let mut path = Path::new();
-    add_catmull_segments(&mut path, &left, false);
+    let mut builder = PathBuilder::new();
+    add_catmull_segments(&mut builder, &left, false);
     right.reverse();
-    add_catmull_segments(&mut path, &right, true);
-    path.close();
-    path
+    add_catmull_segments(&mut builder, &right, true);
+    builder.close();
+    builder.detach()
 }
 
 /// Calculate the Euclidean distance between two points.
@@ -390,15 +388,15 @@ fn u_to_t(ts: &[f32], us: &[f32], u: f32) -> f32 {
 ///
 /// # Arguments
 ///
-/// * `path` - The Skia path to add segments to
+/// * `builder` - The PathBuilder to add segments to
 /// * `pts` - Array of points to interpolate through
 /// * `continue_path` - Whether to continue from the current path position or start a new subpath
-fn add_catmull_segments(path: &mut Path, pts: &[(f32, f32)], continue_path: bool) {
+fn add_catmull_segments(builder: &mut PathBuilder, pts: &[(f32, f32)], continue_path: bool) {
     if pts.is_empty() {
         return;
     }
     if !continue_path {
-        path.move_to(pts[0]);
+        builder.move_to(pts[0]);
     }
     for i in 0..pts.len() - 1 {
         let p0 = if i == 0 { pts[0] } else { pts[i - 1] };
@@ -432,6 +430,6 @@ fn add_catmull_segments(path: &mut Path, pts: &[(f32, f32)], continue_path: bool
         c1 = clamp_handle(p1, c1);
         c2 = clamp_handle(p2, c2);
 
-        path.cubic_to(c1, c2, p2);
+        builder.cubic_to(c1, c2, p2);
     }
 }

@@ -11,7 +11,7 @@ pub struct EllipticalRingShape {
 }
 
 pub fn build_ring_path(shape: &EllipticalRingShape) -> skia_safe::Path {
-    let mut path = skia_safe::Path::new();
+    let mut builder = skia_safe::PathBuilder::new();
 
     let w = shape.width;
     let h = shape.height;
@@ -24,14 +24,14 @@ pub fn build_ring_path(shape: &EllipticalRingShape) -> skia_safe::Path {
 
     // Create outer ellipse (clockwise)
     let outer_rect = skia_safe::Rect::from_xywh(cx - rx, cy - ry, rx * 2.0, ry * 2.0);
-    path.add_oval(outer_rect, None);
+    builder.add_oval(outer_rect, None, None);
 
     // Create inner ellipse (counter-clockwise) to create the hole
     let inner_rect =
         skia_safe::Rect::from_xywh(cx - inner_rx, cy - inner_ry, inner_rx * 2.0, inner_ry * 2.0);
-    path.add_oval(inner_rect, Some((skia_safe::PathDirection::CCW, 0)));
+    builder.add_oval(inner_rect, Some(skia_safe::PathDirection::CCW), Some(0));
 
-    path
+    builder.detach()
 }
 
 /// Build a [`VectorNetwork`] representing an elliptical ring. The outer

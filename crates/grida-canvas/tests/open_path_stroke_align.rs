@@ -1,12 +1,13 @@
 use cg::cg::types::{StrokeAlign, StrokeCap, StrokeJoin, StrokeMiterLimit};
 use cg::shape::stroke::stroke_geometry;
-use skia_safe::Path;
+use skia_safe::{Path, PathBuilder};
 
 #[test]
 fn open_path_uses_center_alignment_for_inside_outside() {
-    let mut path = Path::new();
-    path.move_to((0.0, 0.0));
-    path.line_to((100.0, 0.0));
+    let mut builder = PathBuilder::new();
+    builder.move_to((0.0, 0.0));
+    builder.line_to((100.0, 0.0));
+    let path = builder.detach();
 
     let center = stroke_geometry(
         &path,

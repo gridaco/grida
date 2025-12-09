@@ -19,10 +19,9 @@
 use skia_safe::{
     self as sk,
     canvas::SaveLayerRec,
-    path::AddPathMode,
     surfaces,
     textlayout::{FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle},
-    Color, Data, FontMgr, Image, Matrix, Paint as SkPaint, Path, Point, Rect,
+    Color, Data, FontMgr, Image, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
 };
 
 use cg::cg::prelude::*;
@@ -184,7 +183,7 @@ fn paragraph_to_path(
     x: f32,
     y: f32,
 ) -> Option<Path> {
-    let mut path = Path::new();
+    let mut builder = PathBuilder::new();
 
     // Iterate through text runs and extract glyph paths
     paragraph.visit(|_, info| {
@@ -198,20 +197,20 @@ fn paragraph_to_path(
             for (glyph, position) in glyphs.iter().zip(positions.iter()) {
                 if let Some(glyph_path) = font.get_path(*glyph) {
                     let offset = Point::new(position.x + origin.x, position.y + origin.y);
-                    path.add_path(&glyph_path, offset, AddPathMode::Append);
+                    builder.add_path_with_transform(&glyph_path, &Matrix::translate((offset.x, offset.y)), None);
                 }
             }
         }
     });
 
+    let path = builder.detach();
     if path.is_empty() {
         return None;
     }
 
     // Transform path to correct position
-    let mut transformed_path = path.clone();
     let transform = Matrix::translate((x, y));
-    transformed_path.transform(&transform);
+    let transformed_path = path.make_transform(&transform);
 
     Some(transformed_path)
 }

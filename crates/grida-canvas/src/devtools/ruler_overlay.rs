@@ -1,6 +1,6 @@
 use crate::runtime::camera::Camera2D;
 use math2::{rect::Rectangle, vector2};
-use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, Path, Point};
+use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, Path, PathBuilder, Point};
 use std::cell::RefCell;
 
 pub struct Ruler;
@@ -64,7 +64,7 @@ impl Ruler {
             };
 
             if needs_update {
-                let mut path = Path::new();
+                let mut builder = PathBuilder::new();
                 let mut v_labels = Vec::new();
                 let mut h_labels = Vec::new();
 
@@ -72,8 +72,8 @@ impl Ruler {
                 while t <= world_rect.x + world_rect.width {
                     let p = vector2::transform([t, world_rect.y], &view);
                     let x = p[0];
-                    path.move_to(Point::new(x, 0.0));
-                    path.line_to(Point::new(x, height));
+                    builder.move_to(Point::new(x, 0.0));
+                    builder.line_to(Point::new(x, height));
                     v_labels.push((Point::new(x + 2.0, 12.0), format!("{:.0}", t)));
                     t += step;
                 }
@@ -82,8 +82,8 @@ impl Ruler {
                 while t <= world_rect.y + world_rect.height {
                     let p = vector2::transform([world_rect.x, t], &view);
                     let y = p[1];
-                    path.move_to(Point::new(0.0, y));
-                    path.line_to(Point::new(width, y));
+                    builder.move_to(Point::new(0.0, y));
+                    builder.line_to(Point::new(width, y));
                     h_labels.push((Point::new(2.0, y - 2.0), format!("{:.0}", t)));
                     t += step;
                 }
@@ -91,7 +91,7 @@ impl Ruler {
                 *cache = Some(Cache {
                     rect: world_rect,
                     zoom,
-                    path,
+                    path: builder.detach(),
                     v_labels,
                     h_labels,
                 });
