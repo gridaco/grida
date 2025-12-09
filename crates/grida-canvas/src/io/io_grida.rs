@@ -756,41 +756,41 @@ pub struct JSONUnknownNodeProperties {
     #[serde(rename = "corner_radius", alias = "cornerRadius", default)]
     pub corner_radius: Option<JSONCornerRadius>,
     #[serde(
-        rename = "corner_radius_top_left",
+        rename = "rectangular_corner_radius_top_left",
         alias = "cornerRadiusTopLeft",
         default,
         deserialize_with = "de_radius_option"
     )]
-    pub corner_radius_top_left: Option<Radius>,
+    pub rectangular_corner_radius_top_left: Option<Radius>,
     #[serde(
-        rename = "corner_radius_top_right",
+        rename = "rectangular_corner_radius_top_right",
         alias = "cornerRadiusTopRight",
         default,
         deserialize_with = "de_radius_option"
     )]
-    pub corner_radius_top_right: Option<Radius>,
+    pub rectangular_corner_radius_top_right: Option<Radius>,
     #[serde(
-        rename = "corner_radius_bottom_right",
+        rename = "rectangular_corner_radius_bottom_right",
         alias = "cornerRadiusBottomRight",
         default,
         deserialize_with = "de_radius_option"
     )]
-    pub corner_radius_bottom_right: Option<Radius>,
+    pub rectangular_corner_radius_bottom_right: Option<Radius>,
     #[serde(
-        rename = "corner_radius_bottom_left",
+        rename = "rectangular_corner_radius_bottom_left",
         alias = "cornerRadiusBottomLeft",
         default,
         deserialize_with = "de_radius_option"
     )]
-    pub corner_radius_bottom_left: Option<Radius>,
+    pub rectangular_corner_radius_bottom_left: Option<Radius>,
     #[serde(rename = "corner_smoothing", alias = "cornerSmoothing", default)]
     pub corner_smoothing: Option<f32>,
 
     // fill
     #[serde(rename = "fill")]
     pub fill: Option<JSONPaint>,
-    #[serde(rename = "fills")]
-    pub fills: Option<Vec<JSONPaint>>,
+    #[serde(rename = "fill_paints")]
+    pub fill_paints: Option<Vec<JSONPaint>>,
     // stroke
     #[serde(
         rename = "stroke_width",
@@ -800,14 +800,17 @@ pub struct JSONUnknownNodeProperties {
     pub stroke_width: f32,
     #[serde(rename = "stroke_width_profile", alias = "strokeWidthProfile")]
     pub stroke_width_profile: Option<JSONVariableWidthProfile>,
-    #[serde(rename = "stroke_left_width", alias = "strokeLeftWidth")]
-    pub stroke_left_width: Option<f32>,
-    #[serde(rename = "stroke_top_width", alias = "strokeTopWidth")]
-    pub stroke_top_width: Option<f32>,
-    #[serde(rename = "stroke_right_width", alias = "strokeRightWidth")]
-    pub stroke_right_width: Option<f32>,
-    #[serde(rename = "stroke_bottom_width", alias = "strokeBottomWidth")]
-    pub stroke_bottom_width: Option<f32>,
+    #[serde(rename = "rectangular_stroke_width_left", alias = "strokeLeftWidth")]
+    pub rectangular_stroke_width_left: Option<f32>,
+    #[serde(rename = "rectangular_stroke_width_top", alias = "strokeTopWidth")]
+    pub rectangular_stroke_width_top: Option<f32>,
+    #[serde(rename = "rectangular_stroke_width_right", alias = "strokeRightWidth")]
+    pub rectangular_stroke_width_right: Option<f32>,
+    #[serde(
+        rename = "rectangular_stroke_width_bottom",
+        alias = "strokeBottomWidth"
+    )]
+    pub rectangular_stroke_width_bottom: Option<f32>,
     #[serde(rename = "stroke_align", alias = "strokeAlign")]
     pub stroke_align: Option<StrokeAlign>,
     #[serde(rename = "stroke_cap", alias = "strokeCap")]
@@ -824,8 +827,8 @@ pub struct JSONUnknownNodeProperties {
     pub stroke_dash_array: Option<Vec<f32>>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
-    #[serde(rename = "strokes")]
-    pub strokes: Option<Vec<JSONPaint>>,
+    #[serde(rename = "stroke_paints")]
+    pub stroke_paints: Option<Vec<JSONPaint>>,
     // effects
     #[serde(rename = "fe_shadows", alias = "feShadows")]
     pub fe_shadows: Option<Vec<JSONFeShadow>>,
@@ -1301,14 +1304,14 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             ),
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
-                node.base.corner_radius_top_left,
-                node.base.corner_radius_top_right,
-                node.base.corner_radius_bottom_right,
-                node.base.corner_radius_bottom_left,
+                node.base.rectangular_corner_radius_top_left,
+                node.base.rectangular_corner_radius_top_right,
+                node.base.rectangular_corner_radius_bottom_right,
+                node.base.rectangular_corner_radius_bottom_left,
             ),
             corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
-            fills: merge_paints(node.base.fill, node.base.fills),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_style: StrokeStyle {
                 stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
                 stroke_cap: node.base.stroke_cap.unwrap_or_default(),
@@ -1441,8 +1444,8 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,
-            fills: merge_paints(node.base.fill, node.base.fills),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_width: node.base.stroke_width,
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             blend_mode: node.base.blend_mode.into(),
@@ -1489,8 +1492,8 @@ impl From<JSONEllipseNode> for Node {
                 width: node.base.width.length(0.0),
                 height: node.base.height.length(0.0),
             },
-            fills: merge_paints(node.base.fill, node.base.fills),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_style: StrokeStyle {
                 stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
                 stroke_cap: node.base.stroke_cap.unwrap_or_default(),
@@ -1543,14 +1546,14 @@ impl From<JSONRectangleNode> for Node {
             },
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
-                node.base.corner_radius_top_left,
-                node.base.corner_radius_top_right,
-                node.base.corner_radius_bottom_right,
-                node.base.corner_radius_bottom_left,
+                node.base.rectangular_corner_radius_top_left,
+                node.base.rectangular_corner_radius_top_right,
+                node.base.rectangular_corner_radius_bottom_right,
+                node.base.rectangular_corner_radius_bottom_left,
             ),
             corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
-            fills: merge_paints(node.base.fill, node.base.fills),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_style: StrokeStyle {
                 stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
                 stroke_cap: node.base.stroke_cap.unwrap_or_default(),
@@ -1651,14 +1654,14 @@ impl From<JSONImageNode> for Node {
             },
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
-                node.base.corner_radius_top_left,
-                node.base.corner_radius_top_right,
-                node.base.corner_radius_bottom_right,
-                node.base.corner_radius_bottom_left,
+                node.base.rectangular_corner_radius_top_left,
+                node.base.rectangular_corner_radius_top_right,
+                node.base.rectangular_corner_radius_bottom_right,
+                node.base.rectangular_corner_radius_bottom_left,
             ),
             corner_smoothing: CornerSmoothing::new(node.base.corner_smoothing.unwrap_or(0.0)),
             fill: fill.clone(),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_style: StrokeStyle {
                 stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
                 stroke_cap: node.base.stroke_cap.unwrap_or_default(),
@@ -1715,8 +1718,8 @@ impl From<JSONRegularPolygonNode> for Node {
                 .corner_radius
                 .and_then(JSONCornerRadius::into_uniform)
                 .unwrap_or(0.0),
-            fills: merge_paints(node.base.fill, node.base.fills),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_style: StrokeStyle {
                 stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
                 stroke_cap: node.base.stroke_cap.unwrap_or_default(),
@@ -1774,8 +1777,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
                 .and_then(JSONCornerRadius::into_uniform)
                 .unwrap_or(0.0),
             inner_radius: node.inner_radius,
-            fills: merge_paints(node.base.fill, node.base.fills),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_style: StrokeStyle {
                 stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
                 stroke_cap: node.base.stroke_cap.unwrap_or_default(),
@@ -1824,7 +1827,7 @@ impl From<JSONPathNode> for Node {
                 node.base.fe_noises,
             ),
             transform,
-            fills: merge_paints(node.base.fill, node.base.fills),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
             data: node.paths.map_or("".to_string(), |paths| {
                 paths
                     .iter()
@@ -1832,7 +1835,7 @@ impl From<JSONPathNode> for Node {
                     .collect::<Vec<String>>()
                     .join(" ")
             }),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_style: StrokeStyle {
                 stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
                 stroke_cap: node.base.stroke_cap.unwrap_or_default(),
@@ -1880,7 +1883,7 @@ impl From<JSONLineNode> for Node {
                 width: node.base.width.length(0.0),
                 height: 0.0,
             },
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_width: node.base.stroke_width,
             stroke_cap: node.base.stroke_cap.unwrap_or_default(),
             stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
@@ -1933,8 +1936,8 @@ impl From<JSONVectorNode> for Node {
                 .corner_radius
                 .and_then(JSONCornerRadius::into_uniform)
                 .unwrap_or(0.0),
-            fills: merge_paints(node.base.fill, node.base.fills),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_width: node.base.stroke_width,
             stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
@@ -1987,8 +1990,8 @@ impl From<JSONBooleanOperationNode> for Node {
                 .corner_radius
                 .and_then(JSONCornerRadius::into_uniform),
             // Children populated from links after conversion
-            fills: merge_paints(node.base.fill, node.base.fills),
-            strokes: merge_paints(node.base.stroke, node.base.strokes),
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_style: StrokeStyle {
                 stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
                 stroke_cap: node.base.stroke_cap.unwrap_or_default(),
@@ -2155,10 +2158,10 @@ fn merge_corner_radius(
 fn build_unknown_stroke_width(base: &JSONUnknownNodeProperties) -> UnknownStrokeWidth {
     UnknownStrokeWidth {
         stroke_width: Some(base.stroke_width),
-        stroke_top_width: base.stroke_top_width,
-        stroke_right_width: base.stroke_right_width,
-        stroke_bottom_width: base.stroke_bottom_width,
-        stroke_left_width: base.stroke_left_width,
+        stroke_top_width: base.rectangular_stroke_width_top,
+        stroke_right_width: base.rectangular_stroke_width_right,
+        stroke_bottom_width: base.rectangular_stroke_width_bottom,
+        stroke_left_width: base.rectangular_stroke_width_left,
     }
 }
 
@@ -2189,10 +2192,10 @@ mod corner_radius_tests {
         let props: JSONUnknownNodeProperties = serde_json::from_value(json_props).unwrap();
         let radius = merge_corner_radius(
             props.corner_radius,
-            props.corner_radius_top_left,
-            props.corner_radius_top_right,
-            props.corner_radius_bottom_right,
-            props.corner_radius_bottom_left,
+            props.rectangular_corner_radius_top_left,
+            props.rectangular_corner_radius_top_right,
+            props.rectangular_corner_radius_bottom_right,
+            props.rectangular_corner_radius_bottom_left,
         );
 
         assert_eq!(radius.tl.rx, 12.0);
@@ -3186,7 +3189,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.0.3-beta+20251202",
+            "version": "0.0.4-beta+20251209",
             "document": {
                 "nodes": {
                     "main": {
@@ -3243,7 +3246,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.0.3-beta+20251202",
+            "version": "0.0.4-beta+20251209",
             "document": {
                 "nodes": {
                     "main": {
@@ -3310,7 +3313,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.0.3-beta+20251202",
+            "version": "0.0.4-beta+20251209",
             "document": {
                 "nodes": {
                     "main": {

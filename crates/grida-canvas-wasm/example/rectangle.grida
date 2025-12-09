@@ -1,5 +1,5 @@
 {
-  "version": "0.0.3-beta+20251202",
+  "version": "0.0.4-beta+20251209",
   "document": {
     "nodes": {
       "rectangle": {
@@ -13,15 +13,6 @@
         "opacity": 1,
         "z_index": 0,
         "rotation": 0,
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 0.8509803921568627,
-            "g": 0.8509803921568627,
-            "b": 0.8509803921568627,
-            "a": 1.0
-          }
-        },
         "width": 100,
         "height": 100,
         "style": {},
@@ -29,7 +20,18 @@
         "corner_radius": 0,
         "effects": [],
         "stroke_width": 0,
-        "stroke_cap": "butt"
+        "stroke_cap": "butt",
+        "fill_paints": [
+          {
+            "type": "solid",
+            "color": {
+              "r": 0.8509803921568627,
+              "g": 0.8509803921568627,
+              "b": 0.8509803921568627,
+              "a": 1.0
+            }
+          }
+        ]
       },
       "main": {
         "type": "scene",

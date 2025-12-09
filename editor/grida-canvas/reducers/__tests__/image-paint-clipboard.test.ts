@@ -75,7 +75,7 @@ describe("document reducer - image paint clipboard", () => {
           top: 0,
           width: 100,
           height: 100,
-          fills: [paint],
+          fill_paints: [paint],
           fill: paint,
         },
       }),
@@ -139,7 +139,7 @@ describe("document reducer - image paint clipboard", () => {
           top: 0,
           width: 100,
           height: 100,
-          fills: [createImagePaint({ transform: [2, 0, 0, 2, 0, 0] })],
+          fill_paints: [createImagePaint({ transform: [2, 0, 0, 2, 0, 0] })],
           fill: createImagePaint({ transform: [2, 0, 0, 2, 0, 0] }),
         },
         [nodeWithoutPaint]: {
@@ -149,7 +149,7 @@ describe("document reducer - image paint clipboard", () => {
           top: 0,
           width: 80,
           height: 80,
-          fills: [],
+          fill_paints: [],
         },
       }),
       document_ctx: {},
@@ -172,20 +172,20 @@ describe("document reducer - image paint clipboard", () => {
 
     const first = next.document.nodes[nodeWithPaint];
     // With the new implementation, we push to the end, so there should be 2 paints
-    expect(first.fills).toHaveLength(2);
-    expect(first.fills[0]).toEqual(
+    expect(first.fill_paints).toHaveLength(2);
+    expect(first.fill_paints[0]).toEqual(
       createImagePaint({ transform: [2, 0, 0, 2, 0, 0] })
     ); // Original paint
-    expect(first.fills[1]).toEqual(clipboardPaint); // New pasted paint
-    expect(first.fills[1]).not.toBe(clipboardPaint);
-    expect(first.fill).toEqual(first.fills[0]); // fill should still point to the first paint
+    expect(first.fill_paints[1]).toEqual(clipboardPaint); // New pasted paint
+    expect(first.fill_paints[1]).not.toBe(clipboardPaint);
+    expect(first.fill).toEqual(first.fill_paints[0]); // fill should still point to the first paint
 
     const second = next.document.nodes[nodeWithoutPaint];
-    expect(Array.isArray(second.fills)).toBe(true);
-    expect(second.fills).toHaveLength(1);
-    expect(second.fills[0]).toEqual(clipboardPaint);
-    expect(second.fills[0]).not.toBe(clipboardPaint);
-    expect(second.fill).toEqual(second.fills[0]);
+    expect(Array.isArray(second.fill_paints)).toBe(true);
+    expect(second.fill_paints).toHaveLength(1);
+    expect(second.fill_paints[0]).toEqual(clipboardPaint);
+    expect(second.fill_paints[0]).not.toBe(clipboardPaint);
+    expect(second.fill).toEqual(second.fill_paints[0]);
   });
 
   test("pasting ignores clipboard from another document", () => {
@@ -211,7 +211,7 @@ describe("document reducer - image paint clipboard", () => {
           top: 0,
           width: 100,
           height: 100,
-          fills: [originalPaint],
+          fill_paints: [originalPaint],
           fill: originalPaint,
         },
       }),
@@ -231,7 +231,7 @@ describe("document reducer - image paint clipboard", () => {
 
     const next = documentReducer(state, { type: "paste" } as any, {} as any);
 
-    expect(next.document.nodes[nodeId].fills[0]).toBe(originalPaint);
+    expect(next.document.nodes[nodeId].fill_paints?.[0]).toBe(originalPaint);
     expect(next.user_clipboard).toEqual(state.user_clipboard);
   });
 });

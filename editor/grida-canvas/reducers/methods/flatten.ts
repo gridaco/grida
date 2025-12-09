@@ -112,12 +112,12 @@ function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {
     return node.corner_radius;
   }
 
-  if ("corner_radius_top_left" in node) {
+  if ("rectangular_corner_radius_top_left" in node) {
     const values: number[] = [
-      node.corner_radius_top_left,
-      node.corner_radius_top_right,
-      node.corner_radius_bottom_left,
-      node.corner_radius_bottom_right,
+      node.rectangular_corner_radius_top_left,
+      node.rectangular_corner_radius_top_right,
+      node.rectangular_corner_radius_bottom_left,
+      node.rectangular_corner_radius_bottom_right,
     ].filter((it) => it !== undefined);
 
     return cmath.mode(values);

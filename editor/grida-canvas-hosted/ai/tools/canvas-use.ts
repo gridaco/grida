@@ -339,7 +339,7 @@ export namespace canvas_use {
           node.$.name = params.name || "image";
           node.$.width = params.width || image_ref.width;
           node.$.height = params.height || image_ref.height;
-          node.$.fills = [
+          node.$.fill_paints = [
             {
               type: "image",
               src: image_ref.url,
@@ -360,7 +360,7 @@ export namespace canvas_use {
         } else {
           const node = editor.commands.createRectangleNode();
           node.$.position = "absolute";
-          node.$.fills = [
+          node.$.fill_paints = [
             {
               type: "image",
               src: "",
@@ -468,17 +468,17 @@ export namespace canvas_use {
 
 
       <properties>
-      - fills: similar to svg 'fill', can be stacked as many as needed. (fill Paint[])
-      - strokes: similar to svg 'stroke', can be stacked as many as needed. (stroke Paint[]) / Grida does not have dedicated 'border' stroke is the universal model we use.
-      - stroke_top_width: stroke rect's top width (applicable to rectangular shapes, otherwise ignored).
-      - stroke_right_width: stroke rect's right width (applicable to rectangular shapes, otherwise ignored).
-      - stroke_bottom_width: stroke rect's bottom width (applicable to rectangular shapes, otherwise ignored).
-      - stroke_left_width: stroke rect's left width (applicable to rectangular shapes, otherwise ignored).
+      - fill_paints: similar to svg 'fill', can be stacked as many as needed. (fill Paint[])
+      - stroke_paints: similar to svg 'stroke', can be stacked as many as needed. (stroke Paint[]) / Grida does not have dedicated 'border' stroke is the universal model we use.
       - corner_radius: corner radius of the node. (applicable to all shapes, including rectangular shapes).
-      - corner_radius_top_left: corner radius of the top left corner of the node. (applicable to rectangular shapes, otherwise ignored).
-      - corner_radius_top_right: corner radius of the top right corner of the node. (applicable to rectangular shapes, otherwise ignored).
-      - corner_radius_bottom_right: corner radius of the bottom right corner of the node. (applicable to rectangular shapes, otherwise ignored).
-      - corner_radius_bottom_left: corner radius of the bottom left corner of the node. (applicable to rectangular shapes, otherwise ignored).
+      - rectangular_stroke_width_top: stroke rect's top width (applicable to rectangular shapes, otherwise ignored).
+      - rectangular_stroke_width_right: stroke rect's right width (applicable to rectangular shapes, otherwise ignored).
+      - rectangular_stroke_width_bottom: stroke rect's bottom width (applicable to rectangular shapes, otherwise ignored).
+      - rectangular_stroke_width_left: stroke rect's left width (applicable to rectangular shapes, otherwise ignored).
+      - rectangular_corner_radius_top_left: corner radius of the top left corner of the node. (applicable to rectangular shapes, otherwise ignored).
+      - rectangular_corner_radius_top_right: corner radius of the top right corner of the node. (applicable to rectangular shapes, otherwise ignored).
+      - rectangular_corner_radius_bottom_right: corner radius of the bottom right corner of the node. (applicable to rectangular shapes, otherwise ignored).
+      - rectangular_corner_radius_bottom_left: corner radius of the bottom left corner of the node. (applicable to rectangular shapes, otherwise ignored).
       - effects: effects are array representation of filters (some filter can be applied only once. - e.g. layer blur can be used only once per node)
       </properties>
     </canvas>

@@ -12,12 +12,12 @@ function cornerRadius(
   for (const node of nodes) {
     if ("corner_radius" in node && node.corner_radius !== undefined) {
       values.push(node.corner_radius);
-    } else if ("corner_radius_top_left" in node) {
+    } else if ("rectangular_corner_radius_top_left" in node) {
       const cornerValues: number[] = [
-        node.corner_radius_top_left,
-        node.corner_radius_top_right,
-        node.corner_radius_bottom_left,
-        node.corner_radius_bottom_right,
+        node.rectangular_corner_radius_top_left,
+        node.rectangular_corner_radius_top_right,
+        node.rectangular_corner_radius_bottom_left,
+        node.rectangular_corner_radius_bottom_right,
       ].filter((it) => it !== undefined);
 
       if (cornerValues.length > 0) {
@@ -38,8 +38,8 @@ function cornerRadius(
 // TODO: LEGACY_PAINT_MODEL
 function fill(...nodes: grida.program.nodes.Node[]): any {
   for (const node of nodes) {
-    if (Array.isArray((node as any).fills) && (node as any).fills.length > 0) {
-      return (node as any).fills[0];
+    if (Array.isArray((node as any).fill_paints) && (node as any).fill_paints.length > 0) {
+      return (node as any).fill_paints[0];
     }
     if ("fill" in node && node.fill !== undefined) {
       return node.fill;
@@ -56,10 +56,10 @@ function fill(...nodes: grida.program.nodes.Node[]): any {
 function stroke(...nodes: grida.program.nodes.Node[]): any {
   for (const node of nodes) {
     if (
-      Array.isArray((node as any).strokes) &&
-      (node as any).strokes.length > 0
+      Array.isArray((node as any).stroke_paints) &&
+      (node as any).stroke_paints.length > 0
     ) {
-      return (node as any).strokes[0];
+      return (node as any).stroke_paints[0];
     }
     if ("stroke" in node && node.stroke !== undefined) {
       return node.stroke;

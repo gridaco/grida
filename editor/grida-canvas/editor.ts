@@ -476,8 +476,8 @@ class EditorDocumentStore
       backend: this.backend,
       // TODO: LEGACY_PAINT_MODEL
       paint_constraints: {
-        fill: this.backend === "dom" ? "fill" : "fills",
-        stroke: this.backend === "dom" ? "stroke" : "strokes",
+        fill: this.backend === "dom" ? "fill" : "fill_paints",
+        stroke: this.backend === "dom" ? "stroke" : "stroke_paints",
       },
       idgen: this.idgen,
       logger: this.log.bind(this),
@@ -1544,7 +1544,7 @@ class EditorDocumentStore
       node_ids.map((node_id) => ({
         type: "node/change/*",
         node_id,
-        fills,
+        fill_paints: fills,
       }))
     );
   }
@@ -1555,7 +1555,7 @@ class EditorDocumentStore
       node_ids.map((node_id) => ({
         type: "node/change/*",
         node_id,
-        strokes,
+        stroke_paints: strokes,
       }))
     );
   }
@@ -1569,8 +1569,8 @@ class EditorDocumentStore
     this.dispatch(
       node_ids.map((node_id) => {
         const current = this.getNodeSnapshotById(node_id);
-        const currentFills = Array.isArray((current as any).fills)
-          ? ((current as any).fills as cg.Paint[])
+        const currentFills = Array.isArray((current as any).fill_paints)
+          ? ((current as any).fill_paints as cg.Paint[])
           : (current as any).fill
             ? [(current as any).fill as cg.Paint]
             : [];
@@ -1581,7 +1581,7 @@ class EditorDocumentStore
         return {
           type: "node/change/*",
           node_id,
-          fills: newFills,
+          fill_paints: newFills,
         };
       })
     );
@@ -1596,8 +1596,8 @@ class EditorDocumentStore
     this.dispatch(
       node_ids.map((node_id) => {
         const current = this.getNodeSnapshotById(node_id);
-        const currentStrokes = Array.isArray((current as any).strokes)
-          ? ((current as any).strokes as cg.Paint[])
+        const currentStrokes = Array.isArray((current as any).stroke_paints)
+          ? ((current as any).stroke_paints as cg.Paint[])
           : (current as any).stroke
             ? [(current as any).stroke as cg.Paint]
             : [];
@@ -1610,7 +1610,7 @@ class EditorDocumentStore
         return {
           type: "node/change/*",
           node_id,
-          strokes: newStrokes,
+          stroke_paints: newStrokes,
         };
       })
     );
@@ -1645,7 +1645,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      stroke_top_width,
+      rectangular_stroke_width_top: stroke_top_width,
     });
   }
 
@@ -1656,7 +1656,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      stroke_right_width,
+      rectangular_stroke_width_right: stroke_right_width,
     });
   }
 
@@ -1667,7 +1667,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      stroke_bottom_width,
+      rectangular_stroke_width_bottom: stroke_bottom_width,
     });
   }
 
@@ -1678,7 +1678,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      stroke_left_width,
+      rectangular_stroke_width_left: stroke_left_width,
     });
   }
 
@@ -1751,19 +1751,19 @@ class EditorDocumentStore
         type: "node/change/*",
         node_id: node_id,
         corner_radius: cornerRadius,
-        corner_radius_top_left: cornerRadius,
-        corner_radius_top_right: cornerRadius,
-        corner_radius_bottom_right: cornerRadius,
-        corner_radius_bottom_left: cornerRadius,
+        rectangular_corner_radius_top_left: cornerRadius,
+        rectangular_corner_radius_top_right: cornerRadius,
+        rectangular_corner_radius_bottom_right: cornerRadius,
+        rectangular_corner_radius_bottom_left: cornerRadius,
       });
     } else {
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        corner_radius_top_left: cornerRadius[0],
-        corner_radius_top_right: cornerRadius[1],
-        corner_radius_bottom_right: cornerRadius[2],
-        corner_radius_bottom_left: cornerRadius[3],
+        rectangular_corner_radius_top_left: cornerRadius[0],
+        rectangular_corner_radius_top_right: cornerRadius[1],
+        rectangular_corner_radius_bottom_right: cornerRadius[2],
+        rectangular_corner_radius_bottom_left: cornerRadius[3],
       });
     }
   }
@@ -1798,14 +1798,20 @@ class EditorDocumentStore
 
     const next = {
       corner_radius: applyDelta(node.corner_radius, delta),
-      corner_radius_top_left: applyDelta(node.corner_radius_top_left, delta),
-      corner_radius_top_right: applyDelta(node.corner_radius_top_right, delta),
-      corner_radius_bottom_right: applyDelta(
-        node.corner_radius_bottom_right,
+      rectangular_corner_radius_top_left: applyDelta(
+        node.rectangular_corner_radius_top_left,
         delta
       ),
-      corner_radius_bottom_left: applyDelta(
-        node.corner_radius_bottom_left,
+      rectangular_corner_radius_top_right: applyDelta(
+        node.rectangular_corner_radius_top_right,
+        delta
+      ),
+      rectangular_corner_radius_bottom_right: applyDelta(
+        node.rectangular_corner_radius_bottom_right,
+        delta
+      ),
+      rectangular_corner_radius_bottom_left: applyDelta(
+        node.rectangular_corner_radius_bottom_left,
         delta
       ),
     };
@@ -2557,7 +2563,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.3-beta+20251202",
+      version: "0.0.4-beta+20251209",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -2719,7 +2725,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.0.3-beta+20251202",
+          version: "0.0.4-beta+20251209",
           document: payloadDocument,
         });
         surface.loadScene(p);

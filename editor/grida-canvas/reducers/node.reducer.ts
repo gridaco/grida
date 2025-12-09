@@ -38,7 +38,7 @@ function readPaints(
   draft: grida.program.nodes.UnknownNodeProperties,
   key: "fill" | "stroke"
 ): PaintValue[] {
-  const pluralKey = key === "fill" ? "fills" : "strokes";
+  const pluralKey = key === "fill" ? "fill_paints" : "stroke_paints";
   const paints: PaintValue[] = [];
   const existing = (draft as any)[pluralKey] as PaintValue[] | undefined;
 
@@ -65,7 +65,7 @@ function writePaints(
   key: "fill" | "stroke",
   paints: PaintValue[]
 ) {
-  const pluralKey = key === "fill" ? "fills" : "strokes";
+  const pluralKey = key === "fill" ? "fill_paints" : "stroke_paints";
 
   if (!paints || paints.length === 0) {
     (draft as any)[pluralKey] = undefined;
@@ -288,7 +288,7 @@ const safe_properties: Partial<
       writePaints(target, "fill", [next]);
     },
   }),
-  fills: defineNodeProperty<"fills">({
+  fill_paints: defineNodeProperty<"fill_paints">({
     apply: (draft, value, prev) => {
       const target = draft as grida.program.nodes.UnknownNodeProperties;
       const paints = Array.isArray(value)
@@ -309,24 +309,24 @@ const safe_properties: Partial<
       (draft as UN).corner_radius = value;
     },
   }),
-  corner_radius_top_left: defineNodeProperty<"corner_radius_top_left">({
+  rectangular_corner_radius_top_left: defineNodeProperty<"rectangular_corner_radius_top_left">({
     apply: (draft, value, prev) => {
-      (draft as UN).corner_radius_top_left = value;
+      (draft as UN).rectangular_corner_radius_top_left = value;
     },
   }),
-  corner_radius_top_right: defineNodeProperty<"corner_radius_top_right">({
+  rectangular_corner_radius_top_right: defineNodeProperty<"rectangular_corner_radius_top_right">({
     apply: (draft, value, prev) => {
-      (draft as UN).corner_radius_top_right = value;
+      (draft as UN).rectangular_corner_radius_top_right = value;
     },
   }),
-  corner_radius_bottom_right: defineNodeProperty<"corner_radius_bottom_right">({
+  rectangular_corner_radius_bottom_right: defineNodeProperty<"rectangular_corner_radius_bottom_right">({
     apply: (draft, value, prev) => {
-      (draft as UN).corner_radius_bottom_right = value;
+      (draft as UN).rectangular_corner_radius_bottom_right = value;
     },
   }),
-  corner_radius_bottom_left: defineNodeProperty<"corner_radius_bottom_left">({
+  rectangular_corner_radius_bottom_left: defineNodeProperty<"rectangular_corner_radius_bottom_left">({
     apply: (draft, value, prev) => {
-      (draft as UN).corner_radius_bottom_left = value;
+      (draft as UN).rectangular_corner_radius_bottom_left = value;
     },
   }),
   corner_smoothing: defineNodeProperty<"corner_smoothing">({
@@ -388,7 +388,7 @@ const safe_properties: Partial<
       writePaints(target, "stroke", [next]);
     },
   }),
-  strokes: defineNodeProperty<"strokes">({
+  stroke_paints: defineNodeProperty<"stroke_paints">({
     apply: (draft, value, prev) => {
       const target = draft as grida.program.nodes.UnknownNodeProperties;
       const paints = Array.isArray(value)
@@ -418,40 +418,40 @@ const safe_properties: Partial<
       );
     },
   }),
-  stroke_top_width: defineNodeProperty<"stroke_top_width">({
+  rectangular_stroke_width_top: defineNodeProperty<"rectangular_stroke_width_top">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).stroke_top_width = ranged(
+      (draft as UN).rectangular_stroke_width_top = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  stroke_right_width: defineNodeProperty<"stroke_right_width">({
+  rectangular_stroke_width_right: defineNodeProperty<"rectangular_stroke_width_right">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).stroke_right_width = ranged(
+      (draft as UN).rectangular_stroke_width_right = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  stroke_bottom_width: defineNodeProperty<"stroke_bottom_width">({
+  rectangular_stroke_width_bottom: defineNodeProperty<"rectangular_stroke_width_bottom">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).stroke_bottom_width = ranged(
+      (draft as UN).rectangular_stroke_width_bottom = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH
       );
     },
   }),
-  stroke_left_width: defineNodeProperty<"stroke_left_width">({
+  rectangular_stroke_width_left: defineNodeProperty<"rectangular_stroke_width_left">({
     assert: (node) => node.type === "rectangle",
     apply: (draft, value, prev) => {
-      (draft as UN).stroke_left_width = ranged(
+      (draft as UN).rectangular_stroke_width_left = ranged(
         0,
         value,
         editor.config.DEFAULT_MAX_STROKE_WIDTH

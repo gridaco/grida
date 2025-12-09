@@ -9,17 +9,17 @@ export function RectangleWidget({
   fill,
   stroke,
   stroke_width,
-  corner_radius_top_left,
-  corner_radius_top_right,
-  corner_radius_bottom_left,
-  corner_radius_bottom_right,
+  rectangular_corner_radius_top_left,
+  rectangular_corner_radius_top_right,
+  rectangular_corner_radius_bottom_left,
+  rectangular_corner_radius_bottom_right,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RectangleNode>) {
   const isZero =
-    corner_radius_top_left === 0 &&
-    corner_radius_top_right === 0 &&
-    corner_radius_bottom_left === 0 &&
-    corner_radius_bottom_right === 0;
+    rectangular_corner_radius_top_left === 0 &&
+    rectangular_corner_radius_top_right === 0 &&
+    rectangular_corner_radius_bottom_left === 0 &&
+    rectangular_corner_radius_bottom_right === 0;
 
   const { defs: fillDefs, ref: fillDef } = fill
     ? svg.paint.defs(fill)
@@ -61,10 +61,10 @@ export function RectangleWidget({
       ) : (
         <path
           d={svg.d.generateRoundedRectPath(width, height, [
-            corner_radius_top_left ?? 0,
-            corner_radius_top_right ?? 0,
-            corner_radius_bottom_right ?? 0,
-            corner_radius_bottom_left ?? 0,
+            rectangular_corner_radius_top_left ?? 0,
+            rectangular_corner_radius_top_right ?? 0,
+            rectangular_corner_radius_bottom_right ?? 0,
+            rectangular_corner_radius_bottom_left ?? 0,
           ])}
           fill={fillDef}
           strokeWidth={stroke_width}

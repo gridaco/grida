@@ -1,5 +1,5 @@
 {
-  "version": "0.0.3-beta+20251202",
+  "version": "0.0.4-beta+20251209",
   "document": {
     "nodes": {
       "component": {
@@ -17,15 +17,6 @@
         "top": 0,
         "width": 960,
         "height": 540,
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 1.0,
-            "g": 1.0,
-            "b": 1.0,
-            "a": 1.0
-          }
-        },
         "style": {
           "overflow": "clip",
           "padding": "0px 0px 0px 0px"
@@ -40,7 +31,18 @@
             "type": "string",
             "default": "Welcome to Grida Canvas V0"
           }
-        }
+        },
+        "fill_paints": [
+          {
+            "type": "solid",
+            "color": {
+              "r": 1.0,
+              "g": 1.0,
+              "b": 1.0,
+              "a": 1.0
+            }
+          }
+        ]
       },
       "title": {
         "id": "title",
@@ -57,15 +59,6 @@
         "top": 251,
         "width": "auto",
         "height": "auto",
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 0,
-            "g": 0,
-            "b": 0,
-            "a": 1
-          }
-        },
         "style": {},
         "text_align": "left",
         "text_align_vertical": "top",
@@ -74,7 +67,18 @@
         "letter_spacing": 0,
         "font_size": 32,
         "font_family": "Pretendard",
-        "font_weight": 600
+        "font_weight": 600,
+        "fill_paints": [
+          {
+            "type": "solid",
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            }
+          }
+        ]
       },
       "description": {
         "id": "description",
@@ -91,15 +95,6 @@
         "top": 305,
         "width": "auto",
         "height": "auto",
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 0,
-            "g": 0,
-            "b": 0,
-            "a": 1
-          }
-        },
         "style": {},
         "text_align": "left",
         "text_align_vertical": "top",
@@ -108,7 +103,18 @@
         "letter_spacing": 0,
         "font_size": 16,
         "font_family": "Pretendard",
-        "font_weight": 400
+        "font_weight": 400,
+        "fill_paints": [
+          {
+            "type": "solid",
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            }
+          }
+        ]
       },
       "454:344": {
         "id": "454:344",
@@ -143,32 +149,34 @@
         "top": 67,
         "width": 140,
         "height": 406,
-        "fill": {
-          "type": "linear_gradient",
-          "id": "ee2883cd-716c-49ce-a08d-1179381ce91c",
-          "stops": [
-            {
-              "offset": 0,
-              "color": {
-                "r": 0.8509803921568627,
-                "g": 0.8509803921568627,
-                "b": 0.8509803921568627,
-                "a": 1.0
-              }
-            },
-            {
-              "offset": 1,
-              "color": {
-                "r": 0.45098039215686275,
-                "g": 0.45098039215686275,
-                "b": 0.45098039215686275,
-                "a": 1.0
-              }
-            }
-          ]
-        },
         "effects": [],
-        "corner_radius": 40
+        "corner_radius": 40,
+        "fill_paints": [
+          {
+            "type": "linear_gradient",
+            "id": "ee2883cd-716c-49ce-a08d-1179381ce91c",
+            "stops": [
+              {
+                "offset": 0,
+                "color": {
+                  "r": 0.8509803921568627,
+                  "g": 0.8509803921568627,
+                  "b": 0.8509803921568627,
+                  "a": 1.0
+                }
+              },
+              {
+                "offset": 1,
+                "color": {
+                  "r": 0.45098039215686275,
+                  "g": 0.45098039215686275,
+                  "b": 0.45098039215686275,
+                  "a": 1.0
+                }
+              }
+            ]
+          }
+        ]
       },
       "454:346": {
         "id": "454:346",
@@ -184,16 +192,18 @@
         "top": 231,
         "width": 140,
         "height": 140,
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 0,
-            "g": 0,
-            "b": 0,
-            "a": 1
+        "effects": [],
+        "fill_paints": [
+          {
+            "type": "solid",
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            }
           }
-        },
-        "effects": []
+        ]
       },
       "demo": {
         "type": "scene",

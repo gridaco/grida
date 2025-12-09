@@ -654,10 +654,10 @@ function __self_evt_on_drag(
 
         if (anchor) {
           const keyMap = {
-            nw: "corner_radius_top_left",
-            ne: "corner_radius_top_right",
-            se: "corner_radius_bottom_right",
-            sw: "corner_radius_bottom_left",
+            nw: "rectangular_corner_radius_top_left",
+            ne: "rectangular_corner_radius_top_right",
+            se: "rectangular_corner_radius_bottom_right",
+            sw: "rectangular_corner_radius_bottom_left",
           } as const;
 
           const key = keyMap[anchor];
@@ -681,10 +681,10 @@ function __self_evt_on_drag(
           draft.document.nodes[node_id] = nodeReducer(node, {
             type: "node/change/*",
             corner_radius: nextRadiusClamped,
-            corner_radius_top_left: nextRadiusClamped,
-            corner_radius_top_right: nextRadiusClamped,
-            corner_radius_bottom_right: nextRadiusClamped,
-            corner_radius_bottom_left: nextRadiusClamped,
+            rectangular_corner_radius_top_left: nextRadiusClamped,
+            rectangular_corner_radius_top_right: nextRadiusClamped,
+            rectangular_corner_radius_bottom_right: nextRadiusClamped,
+            rectangular_corner_radius_bottom_left: nextRadiusClamped,
             node_id,
           });
         }
@@ -940,7 +940,7 @@ function __before_end_insert_and_resize(
 
   // UX: for container, the fill is set after insertion
   if (pending.prototype.type === "container") {
-    node.fills = pending.prototype.fills;
+    node.fill_paints = pending.prototype.fill_paints;
   }
 
   if (cmath.vector2.isZero(draft.gesture.movement)) return;

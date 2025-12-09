@@ -4,9 +4,9 @@ title: Grida document schema naming conventions
 
 # `.grida` Naming Conventions
 
-| feature id                    | status | description                                                | PRs                                               |
-| ----------------------------- | ------ | ---------------------------------------------------------- | ------------------------------------------------- |
-| `.grida (naming conventions)` | draft  | Naming conventions internals for the `.grida` file format. | [#456](https://github.com/gridaco/grida/pull/456) |
+| feature id                    | status | description                                                | PRs                                                                                                  |
+| ----------------------------- | ------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `.grida (naming conventions)` | draft  | Naming conventions internals for the `.grida` file format. | [#456](https://github.com/gridaco/grida/pull/456), [#462](https://github.com/gridaco/grida/pull/462) |
 
 ## Purpose
 
@@ -51,12 +51,34 @@ corner_radius
 corner_smoothing
 ```
 
+### Rectangular Geometry
+
+```
+rectangular_corner_radius_top_left
+rectangular_corner_radius_top_right
+rectangular_corner_radius_bottom_left
+rectangular_corner_radius_bottom_right
+rectangular_stroke_width_top
+rectangular_stroke_width_right
+rectangular_stroke_width_bottom
+rectangular_stroke_width_left
+```
+
 ### Stroke
 
 ```
 stroke_width
 stroke_align
 stroke_join
+stroke_cap
+stroke_miter_limit
+```
+
+### Paints
+
+```
+fill_paints
+stroke_paints
 ```
 
 ### Typography

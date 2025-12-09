@@ -1,5 +1,5 @@
 {
-  "version": "0.0.3-beta+20251202",
+  "version": "0.0.4-beta+20251209",
   "document": {
     "nodes": {
       "root": {
@@ -17,16 +17,18 @@
         "top": 0,
         "width": 960,
         "height": 540,
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 1.0,
-            "g": 1.0,
-            "b": 1.0,
-            "a": 1.0
+        "corner_radius": 0,
+        "fill_paints": [
+          {
+            "type": "solid",
+            "color": {
+              "r": 1.0,
+              "g": 1.0,
+              "b": 1.0,
+              "a": 1.0
+            }
           }
-        },
-        "corner_radius": 0
+        ]
       },
       "text": {
         "id": "text",
@@ -43,15 +45,6 @@
         "top": 251,
         "width": "auto",
         "height": "auto",
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 0,
-            "g": 0,
-            "b": 0,
-            "a": 1
-          }
-        },
         "style": {},
         "text_align": "left",
         "text_align_vertical": "top",
@@ -60,7 +53,18 @@
         "letter_spacing": 0,
         "font_size": 32,
         "font_family": "Pretendard",
-        "font_weight": 600
+        "font_weight": 600,
+        "fill_paints": [
+          {
+            "type": "solid",
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            }
+          }
+        ]
       },
       "demo": {
         "type": "scene",

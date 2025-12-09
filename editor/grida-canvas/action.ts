@@ -147,7 +147,7 @@ interface GradientStopQuery extends IGradientStopIdx {
    */
   node_id: NodeID;
   /**
-   * index of the paint under fills/strokes
+   * index of the paint under fill_paints/stroke_paints
    */
   paint_index?: number;
   /**

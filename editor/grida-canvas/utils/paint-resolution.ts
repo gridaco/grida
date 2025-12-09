@@ -26,7 +26,7 @@ export function resolvePaints(
     `Invalid paint_index: ${paintIndex}. Must be a non-negative number.`
   );
 
-  const pluralKey = target === "stroke" ? "strokes" : "fills";
+  const pluralKey = target === "stroke" ? "stroke_paints" : "fill_paints";
   const singularKey = target === "stroke" ? "stroke" : "fill";
 
   // Get paints array, handling both legacy and new paint models
