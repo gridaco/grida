@@ -204,7 +204,8 @@ function __has_image_paint(
     case "fill": {
       // Check fills
       const fills = Array.isArray((node as any).fill_paints)
-        ? ((node as any).fill_paints as grida.program.nodes.i.props.PropsPaintValue[])
+        ? ((node as any)
+            .fill_paints as grida.program.nodes.i.props.PropsPaintValue[])
         : (node as any).fill
           ? [(node as any).fill as grida.program.nodes.i.props.PropsPaintValue]
           : [];
@@ -448,6 +449,16 @@ function __self_start_gesture(
 
   switch (gesture.type) {
     case "guide": {
+      // Prevent guide gestures when canvas input is eager (CEM or insert mode)
+      if (
+        editor.state.eager_canvas_input({
+          content_edit_mode: draft.content_edit_mode,
+          tool: draft.tool,
+        })
+      ) {
+        return;
+      }
+
       const { axis, idx } = gesture;
 
       assert(draft.scene_id, "scene_id is not set");

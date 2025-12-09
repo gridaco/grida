@@ -67,7 +67,7 @@ import {
 import grida from "@grida/schema";
 import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
-import type { editor } from "@/grida-canvas";
+import { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
 import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
 import {
@@ -1755,25 +1755,34 @@ function PixelGridOverlay() {
 }
 
 function RulerGuideOverlay() {
-  const editor = useCurrentEditor();
+  const editorInstance = useCurrentEditor();
   const { guides = [] } = useCurrentSceneState();
   const { scaleX, scaleY, transform } = useTransformState();
   const viewport = useViewport();
   const d = useSurfaceSelectionGroups();
+  const eager_canvas_input = useEditorState(editorInstance, (state) =>
+    editor.state.eager_canvas_input(state)
+  );
 
-  const bindX = useSurfaceGesture({
-    onDragStart: ({ event }) => {
-      editor.surface.surfaceStartGuideGesture("y", -1);
-      event.preventDefault();
+  const bindX = useSurfaceGesture(
+    {
+      onDragStart: ({ event }) => {
+        editorInstance.surface.surfaceStartGuideGesture("y", -1);
+        event.preventDefault();
+      },
     },
-  });
+    { enabled: !eager_canvas_input }
+  );
 
-  const bindY = useSurfaceGesture({
-    onDragStart: ({ event }) => {
-      editor.surface.surfaceStartGuideGesture("x", -1);
-      event.preventDefault();
+  const bindY = useSurfaceGesture(
+    {
+      onDragStart: ({ event }) => {
+        editorInstance.surface.surfaceStartGuideGesture("x", -1);
+        event.preventDefault();
+      },
     },
-  });
+    { enabled: !eager_canvas_input }
+  );
 
   const ranges = useMemo(() => {
     const flat = d.flatMap((g) => g.objects);
@@ -1811,10 +1820,11 @@ function RulerGuideOverlay() {
 
   return (
     <div className="fixed w-full h-full pointer-events-none z-50">
-      <RulerContextMenu editor={editor}>
+      <RulerContextMenu editor={editorInstance}>
         <div
           {...bindX()}
           className="z-30 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+          style={eager_canvas_input ? { pointerEvents: "none" } : undefined}
         >
           <AxisRuler
             axis="x"
@@ -1841,10 +1851,11 @@ function RulerGuideOverlay() {
           />
         </div>
       </RulerContextMenu>
-      <RulerContextMenu editor={editor}>
+      <RulerContextMenu editor={editorInstance}>
         <div
           {...bindY()}
           className="z-20 fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
+          style={eager_canvas_input ? { pointerEvents: "none" } : undefined}
         >
           <AxisRuler
             axis="y"
@@ -1913,44 +1924,50 @@ function Guide({
   offset,
   idx,
 }: grida.program.document.Guide2D & { idx: number }) {
-  const editor = useCurrentEditor();
+  const editorInstance = useCurrentEditor();
   const { transform } = useTransformState();
+  const eager_canvas_input = useEditorState(editorInstance, (state) =>
+    editor.state.eager_canvas_input(state)
+  );
   const o = cmath.delta.transform(offset, axis, transform);
   const [hover, setHover] = useState(false);
   const [focused, setFocused] = useState(false);
 
-  const bind = useSurfaceGesture({
-    onFocus: ({ event }) => {
-      event.stopPropagation();
-      setFocused(true);
+  const bind = useSurfaceGesture(
+    {
+      onFocus: ({ event }) => {
+        event.stopPropagation();
+        setFocused(true);
+      },
+      onBlur: ({ event }) => {
+        event.stopPropagation();
+        setFocused(false);
+      },
+      onHover: (s) => {
+        if (s.first) setHover(true);
+        if (s.last) setHover(false);
+      },
+      onPointerDown: ({ event }) => {
+        // ensure the div focuses
+        (event.currentTarget as HTMLElement)?.focus();
+        event.preventDefault();
+      },
+      onKeyDown: ({ event }) => {
+        if (event.key === "Delete" || event.key === "Backspace") {
+          editorInstance.commands.deleteGuide(idx);
+        }
+        if (event.key === "Escape") {
+          (event.currentTarget as HTMLElement)?.blur();
+        }
+        event.stopPropagation();
+      },
+      onDragStart: ({ event }) => {
+        editorInstance.surface.surfaceStartGuideGesture(axis, idx);
+        event.preventDefault();
+      },
     },
-    onBlur: ({ event }) => {
-      event.stopPropagation();
-      setFocused(false);
-    },
-    onHover: (s) => {
-      if (s.first) setHover(true);
-      if (s.last) setHover(false);
-    },
-    onPointerDown: ({ event }) => {
-      // ensure the div focuses
-      (event.currentTarget as HTMLElement)?.focus();
-      event.preventDefault();
-    },
-    onKeyDown: ({ event }) => {
-      if (event.key === "Delete" || event.key === "Backspace") {
-        editor.commands.deleteGuide(idx);
-      }
-      if (event.key === "Escape") {
-        (event.currentTarget as HTMLElement)?.blur();
-      }
-      event.stopPropagation();
-    },
-    onDragStart: ({ event }) => {
-      editor.surface.surfaceStartGuideGesture(axis, idx);
-      event.preventDefault();
-    },
-  });
+    { enabled: !eager_canvas_input }
+  );
 
   return (
     <div
@@ -1959,6 +1976,7 @@ function Guide({
       {...bind()}
       data-axis={axis}
       className="pointer-events-auto touch-none cursor-pointer data-[axis='x']:cursor-ew-resize data-[axis='y']:cursor-ns-resize"
+      style={eager_canvas_input ? { pointerEvents: "none" } : undefined}
     >
       <Rule
         width={hover || focused ? 1 : 0.5}

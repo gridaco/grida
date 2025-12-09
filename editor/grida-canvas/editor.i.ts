@@ -1073,6 +1073,21 @@ export namespace editor.state {
     __tool_previous: editor.state.ToolMode | null;
   }
 
+  /**
+   * Computes whether the editor is in eager canvas input mode, meaning guidelines should not handle events.
+   * Returns true when content edit mode (CEM) is active or when insert tool is selected.
+   *
+   * @param state - The editor state
+   * @returns true if guidelines should not handle events, false otherwise
+   */
+  export function eager_canvas_input(
+    state: Pick<IEditorState, "content_edit_mode" | "tool">
+  ): boolean {
+    return (
+      state.content_edit_mode !== undefined || state.tool.type === "insert"
+    );
+  }
+
   export type ContentEditModeState =
     | TextContentEditMode
     | VariableWidthContentEditMode
