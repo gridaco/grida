@@ -6,29 +6,19 @@ import { cn } from "@/components/lib/utils";
 import { PipetteIcon } from "lucide-react";
 import { Button } from "@/components/ui-editor/button";
 import { useEyeDropper } from "./utils/eyedropper";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
+import { ColorPickerPresets } from "./color-picker-presets";
 import kolor from "@grida/color";
 import "./color-picker.css";
 
 type RGBA32F = kolor.colorformats.RGBA32F;
 
-type PickerOption = {
-  id: string;
-  color: RGBA32F;
-};
-
 export function ColorPicker32F({
   color,
   onColorChange,
-  options,
 }: {
   color: RGBA32F;
   onColorChange?: (color: RGBA32F) => void;
-  options?: PickerOption[];
 }) {
   const { isSupported, open } = useEyeDropper();
 
@@ -60,7 +50,7 @@ export function ColorPicker32F({
   }, [isSupported, open, onColorChange]);
 
   return (
-    <div>
+    <div data-testid="color-picker-solid-editor">
       <div className="cusom">
         <RgbaColorPicker
           color={pickerColor}
@@ -112,35 +102,23 @@ export function ColorPicker32F({
             />
           </div>
         </div>
-        {options && options.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {options.map((option) => {
-              // Convert RGBA32F to CSS rgba for display
-              const cssColor = kolor.colorformats.RGBA32F.intoCSSRGBA(
-                option.color
-              );
-              return (
-                <Tooltip key={option.id}>
-                  <TooltipTrigger>
-                    <div
-                      className="size-4"
-                      onClick={() => onColorChange?.(option.color)}
-                    >
-                      <div
-                        className="size-5 rounded-xs border"
-                        style={{
-                          background: cssColor,
-                        }}
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>{option.id}</TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </div>
-        )}
       </div>
     </div>
+  );
+}
+
+export function ColorPicker32FWithOptions({
+  color,
+  onColorChange,
+}: {
+  color: RGBA32F;
+  onColorChange?: (color: RGBA32F) => void;
+}) {
+  return (
+    <>
+      <ColorPicker32F color={color} onColorChange={onColorChange} />
+      <Separator className="my-3" />
+      <ColorPickerPresets onColorChange={onColorChange} />
+    </>
   );
 }
