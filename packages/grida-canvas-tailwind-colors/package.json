@@ -1,7 +1,7 @@
 {
   "name": "@grida/tailwindcss-colors",
   "description": "Tailwind CSS color data package - provides color values in multiple formats (RGBA, HEX, OKLCH) for programmatic use. Not intended for direct CSS import in production.",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
   "license": "MIT",

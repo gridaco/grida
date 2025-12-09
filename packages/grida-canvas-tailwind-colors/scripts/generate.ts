@@ -111,18 +111,24 @@ function hexToRgbfArray(hex: string): [number, number, number] {
 }
 
 /**
- * Convert hex color to RGBA array [r, g, b, a]
+ * Convert hex color to RGBA array [r, g, b, a] using exact integer parsing
  */
-function hexToRgbaArray(hex: string): [number, number, number, number] {
-  try {
-    const color = new Color(hex);
-    const [r, g, b] = color
-      .to("srgb")
-      .coords.map((n: number) => Math.round(Math.max(0, Math.min(1, n)) * 255));
-    return [r, g, b, 1];
-  } catch {
-    return [0, 0, 0, 1];
-  }
+function hexToRgbaArrayExact(hex: string): [number, number, number, number] {
+  const cleanHex = hex.replace(/^#/, "");
+  const fullHex =
+    cleanHex.length === 3
+      ? cleanHex
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : cleanHex;
+  if (fullHex.length !== 6) return [0, 0, 0, 1];
+  return [
+    parseInt(fullHex.substring(0, 2), 16),
+    parseInt(fullHex.substring(2, 4), 16),
+    parseInt(fullHex.substring(4, 6), 16),
+    1,
+  ];
 }
 
 /**
@@ -179,14 +185,19 @@ for (const colorName in colors) {
   for (const [name, hex] of entries) {
     try {
       const normalizedHex = normalizeHex(hex);
+      // Use exact hex parsing for rgbaArray to avoid floating point rounding errors
+      // (possibly a bug with the colorjs.io module)
+      const rgbaArray = hexToRgbaArrayExact(normalizedHex);
+      // Derive rgbArray from rgbaArray to ensure consistency between rgb.json and rgba.json
+      // This avoids floating point rounding problems that occur when using colorjs.io directly
       colorEntries.push({
         name,
         hex: normalizedHex,
         rgb: hexToRgb(hex),
         rgba: hexToRgba(hex),
-        rgbArray: hexToRgbArray(hex),
+        rgbArray: [rgbaArray[0], rgbaArray[1], rgbaArray[2]],
         rgbfArray: hexToRgbfArray(hex),
-        rgbaArray: hexToRgbaArray(hex),
+        rgbaArray,
         oklch: hexToOklch(hex),
         oklchArray: hexToOklchArray(hex),
       });
@@ -197,6 +208,7 @@ for (const colorName in colors) {
 }
 
 // Sort by color family first, then by numeric shade value
+// Use deterministic tie-breaking: if shade numbers are equal, compare hex values
 colorEntries.sort((a, b) => {
   const aParts = a.name.split("-");
   const bParts = b.name.split("-");
@@ -212,7 +224,11 @@ colorEntries.sort((a, b) => {
   // Then compare by numeric shade value
   const aShadeNum = parseInt(aShade, 10);
   const bShadeNum = parseInt(bShade, 10);
-  return aShadeNum - bShadeNum;
+  const shadeCompare = aShadeNum - bShadeNum;
+  if (shadeCompare !== 0) return shadeCompare;
+
+  // Tie-breaking: compare hex values for deterministic ordering
+  return a.hex.localeCompare(b.hex);
 });
 
 // Generate CSS content
@@ -265,13 +281,20 @@ function generateJSON(
   });
 
   // Sort shades within each family by numeric value
+  // Use deterministic tie-breaking: if shade numbers are equal, compare values
   const sortedObj: typeof obj = {};
   for (const family in obj) {
     sortedObj[family] = {};
     const shades = Object.keys(obj[family]).sort((a, b) => {
       const aNum = parseInt(a, 10);
       const bNum = parseInt(b, 10);
-      return aNum - bNum;
+      const numCompare = aNum - bNum;
+      if (numCompare !== 0) return numCompare;
+
+      // Tie-breaking: compare string representation of values for deterministic ordering
+      const aVal = JSON.stringify(obj[family][a]);
+      const bVal = JSON.stringify(obj[family][b]);
+      return aVal.localeCompare(bVal);
     });
     for (const shade of shades) {
       sortedObj[family][shade] = obj[family][shade];
