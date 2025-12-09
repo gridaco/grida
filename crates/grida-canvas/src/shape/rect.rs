@@ -16,9 +16,7 @@ impl Into<skia_safe::Rect> for &RectShape {
 impl Into<skia_safe::Path> for &RectShape {
     fn into(self) -> skia_safe::Path {
         let rect: skia_safe::Rect = self.into();
-        let mut path = skia_safe::Path::new();
-        path.add_rect(&rect, None);
-        path
+        skia_safe::Path::rect(&rect, None)
     }
 }
 

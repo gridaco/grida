@@ -217,9 +217,9 @@ fn extract_relative_transform(
     CGTransform2D::from(relative_affine)
 }
 
-fn normalize_skia_path(mut path: SkPath, bounds: &CGRect) -> (f32, f32, String) {
+fn normalize_skia_path(path: SkPath, bounds: &CGRect) -> (f32, f32, String) {
     if bounds.x != 0.0 || bounds.y != 0.0 {
-        path.offset((-bounds.x, -bounds.y));
+        let path = path.make_offset((-bounds.x, -bounds.y));
         let data = path.to_svg();
         return (bounds.x, bounds.y, data);
     }
