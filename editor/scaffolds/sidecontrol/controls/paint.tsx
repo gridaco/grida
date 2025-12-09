@@ -400,7 +400,7 @@ function ContextVariableColors({
 
 function NewPaintTrigger({ onAddPaint }: { onAddPaint: () => void }) {
   return (
-    <PopoverTrigger className="w-full">
+    <PopoverTrigger className="w-full" data-testid="trigger-paint-new">
       <PaintInputContainer onClick={onAddPaint}>
         <PaintChip paint={cg.paints.transparent} className="rounded-sm" />
         <span className="ms-2 text-xs">Add</span>
@@ -536,7 +536,10 @@ function SolidPaintTrigger({
 }) {
   return (
     <PaintInputContainer isFocused={isFocused} tabIndex={-1}>
-      <PopoverTrigger className="flex-shrink-0">
+      <PopoverTrigger
+        className="flex-shrink-0"
+        data-testid="trigger-paint-solid"
+      >
         <PaintChip paint={value} className="rounded-sm" />
       </PopoverTrigger>
       <RGBHexInput
@@ -605,7 +608,10 @@ function GradientPaintTrigger({
 }) {
   return (
     <PaintInputContainer isFocused={isFocused}>
-      <PopoverTrigger className="flex flex-1 items-center">
+      <PopoverTrigger
+        className="flex flex-1 items-center"
+        data-testid="trigger-paint-gradient"
+      >
         <PaintChip paint={value} className="rounded-sm" />
         <span className="ms-2 text-start text-xs capitalize">
           {paint_label[value.type]}
@@ -642,7 +648,10 @@ function ImagePaintTrigger({
 }) {
   return (
     <PaintInputContainer isFocused={isFocused}>
-      <PopoverTrigger className="flex flex-1 items-center">
+      <PopoverTrigger
+        className="flex flex-1 items-center"
+        data-testid="trigger-paint-image"
+      >
         <PaintChip paint={value} className="rounded-sm" />
         <span className="ms-2 text-start text-xs capitalize">
           {paint_label[value.type]}
@@ -687,6 +696,7 @@ function PaintPopoverContent({
         // prevent popover content from causing dnd
         e.stopPropagation()
       }
+      data-testid="popover-paint-editor"
     >
       <Tabs
         value={
@@ -719,7 +729,10 @@ function PaintTabsHeader({
   onValueChange?: (value: ComputedPaint | null) => void;
 }) {
   return (
-    <div className="flex items-center justify-between m-2">
+    <div
+      className="flex items-center justify-between m-2"
+      data-testid="paint-editor-tabs-header"
+    >
       <TabsList>
         <TabsTrigger value="solid">
           <SolidPaintIcon active={value?.type === "solid"} />
@@ -784,7 +797,7 @@ function PaintTabsContent({
 }) {
   if (value?.type === "solid") {
     return (
-      <div>
+      <div data-testid="view-paint-solid">
         <ColorPicker32F
           color={value.color}
           onColorChange={(color) => {
@@ -813,7 +826,7 @@ function PaintTabsContent({
 
   if (isGradientPaint(value)) {
     return (
-      <div className="p-2 space-y-4">
+      <div className="p-2 space-y-4" data-testid="view-paint-gradient">
         <GradientControls
           value={value}
           onValueChange={onValueChange}
@@ -826,7 +839,7 @@ function PaintTabsContent({
 
   if (value?.type === "image") {
     return (
-      <div className="p-2">
+      <div className="p-2" data-testid="view-paint-image">
         <ImagePaintControl value={value} onValueChange={onValueChange} />
       </div>
     );

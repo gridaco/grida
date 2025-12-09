@@ -12,11 +12,17 @@ Welcome to the Grida frontend contribution guide. Grida is a high-performance, c
 
 This project uses `data-testid` selectively to improve the reliability of automated tests and the debuggability of large UI surfaces.
 
-These attributes should be added only to high-level, purpose-built UI components — not to generic or reusable UI primitives.
+Our primary goal with `data-testid` is **Component Locality**: being able to quickly trace a rendered DOM element back to its source component in the codebase.
+
+### Core Principle: One ID Per Component Root
+
+**Do not overuse or abuse `data-testid`.**
+
+Ideally, if you have a component defined as `function MyComponent() {}`, you should add **one** `data-testid` to its root element (or the most significant wrapper). Avoid scattering test IDs on internal children unless absolutely necessary for complex interactions that cannot be targeted otherwise.
 
 ### When to Add `data-testid`
 
-Add a `data-testid` only when the component represents a meaningful UI region or functional unit in the application.
+Add a `data-testid` only when the component represents a meaningful, distinct UI region or functional unit.
 
 Examples include:
 
@@ -26,54 +32,52 @@ Examples include:
   - `LayersPanel`, `PropertiesPanel`, `AssetsPanel`
 - **High-level workflows**
   - `ExportDialog`, `ColorPicker`, `DocumentSettingsModal`
-- **UI that appears conditionally or asynchronously**
-  - Snackbars, toasts, context menus, floating toolbars
+- **Complex, isolated Modules**
+  - A specialized controls group, a visualization widget, etc.
 
-These components are frequently interacted with in tests or are difficult to locate through semantic queries alone.
-
-#### ✅ GOOD — Add `data-testid`
+#### ✅ GOOD — One ID at the Component Root
 
 ```tsx
-<div data-testid="sidebar-right-layers-panel">
-  ...
-</div>
-
-<section data-testid="canvas-view-main">
-  ...
-</section>
-
-<aside data-testid="sidebar-right-properties-panel">
-  ...
-</aside>
+export function LayersPanel() {
+  return (
+    // Single ID identifying this component's existence in the DOM
+    <aside data-testid="sidebar-right-layers-panel">
+      <Header />
+      <Content />
+      <Footer />
+    </aside>
+  );
+}
 ```
 
 ### When NOT to Add `data-testid`
 
 Do not add `data-testid` to:
 
-- **Primitive UI elements**
-  - `Button`, `Input`, `Icon`, `Checkbox`, `Text`, etc.
-- **Pure layout primitives**
-  - `Box`, `Flex`, `Stack`
-- **Components whose identity should be determined by semantics**
-  - e.g., a `<button>` is already identifiable
+- **Primitive UI elements** (`Button`, `Input`, `Icon`, `Text`)
+- **Pure layout primitives** (`Box`, `Flex`, `Stack`)
+- **Internal children** of a component that can be easily found via standard queries (role, text, or by their parent's test ID).
 
-**Reason:** Over-tagging makes the DOM noisy and reduces the value of test IDs.
+**Reason:** Over-tagging makes the DOM noisy, encourages brittle tests that rely on implementation details, and reduces the value of "landmark" IDs.
 
-#### ❌ BAD — Do NOT add `data-testid`
+#### ❌ BAD — Overuse / Abuse
 
 ```tsx
-<button data-testid="button">Click</button>
-
-<input data-testid="input" />
+// ❌ Don't do this: granular IDs for everything
+export function LayersPanel() {
+  return (
+    <aside data-testid="layers-panel">
+      <div data-testid="layers-panel-header">...</div>
+      <ul data-testid="layers-list">
+        <li data-testid="layer-item-1">...</li>
+      </ul>
+      <button data-testid="add-layer-btn">...</button>
+    </aside>
+  );
+}
 ```
 
-For primitives, tests should rely on:
-
-- text queries
-- role queries
-- label queries
-- aria attributes
+Tests should find the root `layers-panel` and then use semantic queries (e.g., `findByRole('button', { name: 'Add Layer' })`) to interact with internals.
 
 ### Naming Convention
 
@@ -96,28 +100,18 @@ Avoid names tied to:
 - component internals
 - styling concerns
 
-### Example: High-Level Component With Test ID
-
-```tsx
-export function LayersPanel() {
-  return <aside data-testid="sidebar-right-layers-panel">{/* ... */}</aside>;
-}
-```
-
 ### Why We Do This
 
-- Makes high-level UI stable to reference in tests
-- Helps debugging complex UIs (inspect DOM → find component quickly)
-- Keeps test code robust when UI copy or layout changes
-- Avoids polluting low-level reusable components
-- Ensures consistency across contributors
+- **Traceability:** Helps developers inspect the DOM and immediately know which React component is responsible.
+- **Stability:** Makes high-level UI stable to reference in tests.
+- **Cleanliness:** Avoids polluting low-level reusable components.
 
 ### Summary
 
-| Component Type                      | Should Have `data-testid`? | Reason                                     |
-| :---------------------------------- | :------------------------- | :----------------------------------------- |
-| Panels (layers, properties, assets) | ✅ Yes                     | High-level, stable test targets            |
-| Canvas / workspace / inspectors     | ✅ Yes                     | Core workflow surfaces                     |
-| Dialogs / modals / pickers          | ✅ Yes                     | Conditional UI hard to select semantically |
-| Buttons / Inputs / Icons            | ❌ No                      | Should use semantic queries                |
-| UI primitives (Flex, Box, Stack)    | ❌ No                      | Too generic; pollutes DOM                  |
+| Component Type                    | Should Have `data-testid`? | Reason                              |
+| :-------------------------------- | :------------------------- | :---------------------------------- |
+| **High-level Components / Roots** | ✅ Yes                     | Identifies the component boundaries |
+| Panels (layers, properties)       | ✅ Yes                     | Stable landmarks                    |
+| Dialogs / Modals / Popovers       | ✅ Yes                     | Hard to locate contextually         |
+| Buttons / Inputs / Icons          | ❌ No                      | Use semantic queries (role, label)  |
+| Internal implementation div/span  | ❌ No                      | Implementation detail               |

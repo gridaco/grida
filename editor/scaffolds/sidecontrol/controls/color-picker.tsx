@@ -60,7 +60,7 @@ export function ColorPicker32F({
   }, [isSupported, open, onColorChange]);
 
   return (
-    <div>
+    <div data-testid="color-picker-solid-editor">
       <div className="cusom">
         <RgbaColorPicker
           color={pickerColor}
