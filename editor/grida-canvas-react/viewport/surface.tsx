@@ -1271,6 +1271,15 @@ function NodeOverlay({
     }
   };
 
+  // NW (northwest) handle is intentionally omitted - only NE, SE, SW handles support double-click resize-to-fit
+  const handleDiagonalDoubleClick_NE_SE_SW = () => {
+    // feat: text-node-auto-size
+    if (node.type === "text") {
+      editor.autoSizeTextNode(node_id, "width");
+      editor.autoSizeTextNode(node_id, "height");
+    }
+  };
+
   return (
     <>
       <LayerOverlay
@@ -1400,6 +1409,7 @@ function NodeOverlay({
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "ne");
                       }}
+                      onDoubleClick={handleDiagonalDoubleClick_NE_SE_SW}
                     />
                     <LayerOverlayResizeHandle
                       anchor="sw"
@@ -1407,6 +1417,7 @@ function NodeOverlay({
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "sw");
                       }}
+                      onDoubleClick={handleDiagonalDoubleClick_NE_SE_SW}
                     />
                     <LayerOverlayResizeHandle
                       anchor="se"
@@ -1414,6 +1425,7 @@ function NodeOverlay({
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "se");
                       }}
+                      onDoubleClick={handleDiagonalDoubleClick_NE_SE_SW}
                     />
                   </>
                 )}
@@ -1509,12 +1521,14 @@ function LayerOverlayResizeHandle({
   size = 8,
   zIndex,
   onDragStart,
+  onDoubleClick,
   disabled = false,
 }: {
   anchor: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
   size?: number;
   zIndex: number;
   onDragStart?: () => void;
+  onDoubleClick?: () => void;
   disabled?: boolean;
 }) {
   const bind = useSurfaceGesture(
@@ -1525,6 +1539,11 @@ function LayerOverlayResizeHandle({
       onDragStart: ({ event }) => {
         event.preventDefault();
         onDragStart?.();
+      },
+      onDoubleClick: ({ event }) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onDoubleClick?.();
       },
     },
     {
