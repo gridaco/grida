@@ -216,7 +216,7 @@ export namespace editor.config {
      * or multiple paint arrays based on the rendering backend.
      *
      * - For DOM backend: Uses single paint properties (`"fill"`, `"stroke"`) for compatibility
-     * - For Canvas backend: Uses multiple paint arrays (`"fills"`, `"strokes"`) for advanced rendering
+     * - For Canvas backend: Uses multiple paint arrays (`"fill_paints"`, `"stroke_paints"`) for advanced rendering
      *
      * @example
      * ```typescript
@@ -228,14 +228,14 @@ export namespace editor.config {
      *
      * // Canvas backend constraints
      * paint_constraints: {
-     *   fill: "fills",    // Creates nodes with fills array
-     *   stroke: "strokes" // Creates nodes with strokes array
+     *   fill: "fill_paints",    // Creates nodes with fill_paints array
+     *   stroke: "stroke_paints" // Creates nodes with stroke_paints array
      * }
      * ```
      */
     paint_constraints: {
-      fill: "fill" | "fills";
-      stroke: "stroke" | "strokes";
+      fill: "fill" | "fill_paints";
+      stroke: "stroke" | "stroke_paints";
     };
   }
 
@@ -1265,7 +1265,7 @@ export namespace editor.state {
     /**
      * Index of the paint being edited within the paint array
      *
-     * For nodes with multiple fills/strokes, this specifies which one to edit.
+     * For nodes with multiple fill_paints/stroke_paints, this specifies which one to edit.
      * Will be clamped to valid range [0, paints.length-1].
      *
      * @default 0

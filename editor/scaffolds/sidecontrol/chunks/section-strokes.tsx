@@ -39,12 +39,12 @@ export function SectionStrokes({
   const backend = useBackendState();
   const {
     stroke,
-    strokes,
+    stroke_paints,
     stroke_width,
-    stroke_top_width,
-    stroke_right_width,
-    stroke_bottom_width,
-    stroke_left_width,
+    rectangular_stroke_width_top,
+    rectangular_stroke_width_right,
+    rectangular_stroke_width_bottom,
+    rectangular_stroke_width_left,
     stroke_align,
     stroke_cap,
     stroke_join,
@@ -53,12 +53,12 @@ export function SectionStrokes({
     type,
   } = useNodeState(node_id, (node) => ({
     stroke: node.stroke,
-    strokes: node.strokes,
+    stroke_paints: node.stroke_paints,
     stroke_width: node.stroke_width,
-    stroke_top_width: node.stroke_top_width,
-    stroke_right_width: node.stroke_right_width,
-    stroke_bottom_width: node.stroke_bottom_width,
-    stroke_left_width: node.stroke_left_width,
+    rectangular_stroke_width_top: node.rectangular_stroke_width_top,
+    rectangular_stroke_width_right: node.rectangular_stroke_width_right,
+    rectangular_stroke_width_bottom: node.rectangular_stroke_width_bottom,
+    rectangular_stroke_width_left: node.rectangular_stroke_width_left,
     stroke_align: node.stroke_align,
     stroke_cap: node.stroke_cap,
     stroke_join: node.stroke_join,
@@ -75,32 +75,32 @@ export function SectionStrokes({
   const strokeWidthValue = React.useMemo(() => {
     // Check if any individual side widths are defined
     const hasIndividualWidths =
-      stroke_top_width !== undefined ||
-      stroke_right_width !== undefined ||
-      stroke_bottom_width !== undefined ||
-      stroke_left_width !== undefined;
+      rectangular_stroke_width_top !== undefined ||
+      rectangular_stroke_width_right !== undefined ||
+      rectangular_stroke_width_bottom !== undefined ||
+      rectangular_stroke_width_left !== undefined;
 
     if (hasIndividualWidths) {
       const fallbackWidth = stroke_width ?? 1;
       return {
-        top: stroke_top_width ?? fallbackWidth,
-        right: stroke_right_width ?? fallbackWidth,
-        bottom: stroke_bottom_width ?? fallbackWidth,
-        left: stroke_left_width ?? fallbackWidth,
+        top: rectangular_stroke_width_top ?? fallbackWidth,
+        right: rectangular_stroke_width_right ?? fallbackWidth,
+        bottom: rectangular_stroke_width_bottom ?? fallbackWidth,
+        left: rectangular_stroke_width_left ?? fallbackWidth,
       };
     }
 
     return stroke_width ?? 1;
   }, [
     stroke_width,
-    stroke_top_width,
-    stroke_right_width,
-    stroke_bottom_width,
-    stroke_left_width,
+    rectangular_stroke_width_top,
+    rectangular_stroke_width_right,
+    rectangular_stroke_width_bottom,
+    rectangular_stroke_width_left,
   ]);
   const paints = isCanvasBackend
-    ? Array.isArray(strokes) && strokes.length > 0
-      ? strokes
+    ? Array.isArray(stroke_paints) && stroke_paints.length > 0
+      ? stroke_paints
       : stroke
         ? [stroke]
         : []
@@ -157,22 +157,22 @@ export function SectionStrokes({
 
   const handleUpdateStrokes = React.useCallback(
     (paints: any[]) => {
-      actions.strokes(paints);
+      actions.stroke_paints(paints);
     },
     [actions]
   );
 
   const handleRemoveStroke = React.useCallback(
     (index: number) => {
-      const currentStrokes = Array.isArray(strokes)
-        ? [...strokes]
+      const currentStrokes = Array.isArray(stroke_paints)
+        ? [...stroke_paints]
         : stroke
           ? [stroke]
           : [];
       currentStrokes.splice(index, 1);
-      actions.strokes(currentStrokes);
+      actions.stroke_paints(currentStrokes);
     },
-    [actions, stroke, strokes]
+    [actions, stroke, stroke_paints]
   );
 
   const additionalContent = has_stroke_paint && (

@@ -67,7 +67,7 @@ export function useInsertFile() {
       node.$.top = y;
       node.$.width = image.width;
       node.$.height = image.height;
-      node.$.fills = [
+      node.$.fill_paints = [
         {
           type: "image",
           src: image.url,

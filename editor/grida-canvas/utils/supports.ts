@@ -15,9 +15,9 @@ type NodeFeatureProperty =
   | "border"
   | "children"
   | "fill"
-  | "fills"
+  | "fill_paints"
   | "stroke"
-  | "strokes"
+  | "stroke_paints"
   | "feDropShadow"
   | "strokeCap"
   | "strokeWidth"
@@ -68,7 +68,7 @@ const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
     "container",
     "component",
   ],
-  fills: [],
+  fill_paints: [],
   cornerRadius: [
     "rectangle",
     "image",
@@ -88,7 +88,7 @@ const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
   stroke: ["vector", "line", "rectangle", "ellipse", "polygon", "star"],
-  strokes: [],
+  stroke_paints: [],
   strokeWidth: [
     "rectangle",
     "image",
@@ -123,7 +123,7 @@ const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
 const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: ["ellipse"],
   fill: [],
-  fills: [
+  fill_paints: [
     "svgpath",
     "vector",
     "image",
@@ -174,7 +174,7 @@ const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
     "instance",
     "boolean",
   ],
-  strokes: [
+  stroke_paints: [
     "container",
     "rectangle",
     "image",
@@ -308,9 +308,9 @@ export namespace supports {
   export const fills = (type: NodeType, context: Context) => {
     switch (context.backend) {
       case "dom":
-        return dom_supports.fills.includes(type);
+        return dom_supports.fill_paints.includes(type);
       case "canvas":
-        return canvas_supports.fills.includes(type);
+        return canvas_supports.fill_paints.includes(type);
     }
   };
   export const stroke = (type: NodeType, context: Context) => {
@@ -324,9 +324,9 @@ export namespace supports {
   export const strokes = (type: NodeType, context: Context) => {
     switch (context.backend) {
       case "dom":
-        return dom_supports.strokes.includes(type);
+        return dom_supports.stroke_paints.includes(type);
       case "canvas":
-        return canvas_supports.strokes.includes(type);
+        return canvas_supports.stroke_paints.includes(type);
     }
   };
   export const strokeWidth = (type: NodeType, context: Context) => {

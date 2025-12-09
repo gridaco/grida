@@ -159,7 +159,7 @@ async function saveHostedGridaCanvasDocument(
     .update({
       data: document
         ? ({
-            __schema_version: "0.0.3-beta+20251202",
+            __schema_version: "0.0.4-beta+20251209",
             ...document,
           } satisfies CanvasDocumentSnapshotSchema as {})
         : null,

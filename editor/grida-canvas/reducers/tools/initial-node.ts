@@ -35,13 +35,13 @@ export const black: cg.Paint = {
  * const rect = initialNode("rectangle", {}, { fill: "fill" });
  *
  * // Create a rectangle with multiple fills
- * const rectMulti = initialNode("rectangle", {}, { fill: "fills" });
+ * const rectMulti = initialNode("rectangle", {}, { fill: "fill_paints" });
  *
  * // Create a line with single stroke
  * const line = initialNode("line", {}, { stroke: "stroke" });
  *
  * // Create a line with multiple strokes
- * const lineMulti = initialNode("line", {}, { stroke: "strokes" });
+ * const lineMulti = initialNode("line", {}, { stroke: "stroke_paints" });
  * ```
  */
 export default function initialNode(
@@ -60,8 +60,8 @@ export default function initialNode(
   idfac: () => string,
   seed: Partial<Omit<grida.program.nodes.UnknwonNode, "type">> = {},
   constraints: {
-    fill?: "fill" | "fills";
-    stroke?: "stroke" | "strokes";
+    fill?: "fill" | "fill_paints";
+    stroke?: "stroke" | "stroke_paints";
   } = {}
 ): grida.program.nodes.Node {
   const id = idfac();
@@ -86,8 +86,8 @@ export default function initialNode(
     blend_mode: cg.def.LAYER_BLENDMODE,
     z_index: 0,
     rotation: 0,
-    fill: constraints.fill === "fills" ? undefined : gray,
-    fills: constraints.fill === "fills" ? [gray] : undefined,
+    fill: constraints.fill === "fill_paints" ? undefined : gray,
+    fill_paints: constraints.fill === "fill_paints" ? [gray] : undefined,
     width: 100,
     height: 100,
     position: "absolute",
@@ -105,13 +105,13 @@ export default function initialNode(
         type: "text",
         text_align: "left",
         text_align_vertical: "top",
-        fill: constraints.fill === "fills" ? undefined : black,
-        fills: constraints.fill === "fills" ? [black] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : black,
+        fill_paints: constraints.fill === "fill_paints" ? [black] : undefined,
         width: "auto",
         height: "auto",
         text: "Text",
-        stroke: constraints.stroke === "strokes" ? undefined : undefined,
-        strokes: constraints.stroke === "strokes" ? [] : undefined,
+        stroke: constraints.stroke === "stroke_paints" ? undefined : undefined,
+        stroke_paints: constraints.stroke === "stroke_paints" ? [] : undefined,
         letter_spacing: 0,
         line_height: undefined, // normal
         stroke_width: 0,
@@ -127,8 +127,8 @@ export default function initialNode(
         style: {
           overflow: "clip",
         },
-        fill: constraints.fill === "fills" ? undefined : white,
-        fills: constraints.fill === "fills" ? [white] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : white,
+        fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
         type: "container",
         expanded: false,
         corner_radius: 0,
@@ -147,8 +147,8 @@ export default function initialNode(
         ...base,
         ...position,
         ...styles,
-        fill: constraints.fill === "fills" ? undefined : white,
-        fills: constraints.fill === "fills" ? [white] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : white,
+        fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
         type: "iframe",
         corner_radius: 0,
         ...seed,
@@ -159,8 +159,8 @@ export default function initialNode(
         ...base,
         ...position,
         ...styles,
-        fill: constraints.fill === "fills" ? undefined : white,
-        fills: constraints.fill === "fills" ? [white] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : white,
+        fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
         type: "richtext",
         width: "auto",
         height: "auto",
@@ -178,8 +178,8 @@ export default function initialNode(
         width: 100,
         height: 100,
         fit: "cover",
-        fill: constraints.fill === "fills" ? undefined : undefined,
-        fills: constraints.fill === "fills" ? [] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : undefined,
+        fill_paints: constraints.fill === "fill_paints" ? [] : undefined,
         // TODO: replace with static url
         src: "/dummy/image/png/png-square-transparent-1k.png",
         ...seed,
@@ -194,8 +194,8 @@ export default function initialNode(
         corner_radius: 0,
         width: 100,
         height: 100,
-        fill: constraints.fill === "fills" ? undefined : undefined,
-        fills: constraints.fill === "fills" ? [] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : undefined,
+        fill_paints: constraints.fill === "fill_paints" ? [] : undefined,
         fit: "cover",
         // TODO: replace with static url
         src: "/dummy/video/mp4/mp4-30s-5mb.mp4",
@@ -216,8 +216,8 @@ export default function initialNode(
         stroke_width: 0,
         stroke_cap: "butt",
         stroke_join: "miter",
-        fill: constraints.fill === "fills" ? undefined : gray,
-        fills: constraints.fill === "fills" ? [gray] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : gray,
+        fill_paints: constraints.fill === "fill_paints" ? [gray] : undefined,
         angle: 360,
         angle_offset: 0,
         inner_radius: 0,
@@ -231,17 +231,17 @@ export default function initialNode(
         ...styles,
         type: "rectangle",
         corner_radius: 0,
-        corner_radius_top_left: 0,
-        corner_radius_top_right: 0,
-        corner_radius_bottom_right: 0,
-        corner_radius_bottom_left: 0,
+        rectangular_corner_radius_top_left: 0,
+        rectangular_corner_radius_top_right: 0,
+        rectangular_corner_radius_bottom_right: 0,
+        rectangular_corner_radius_bottom_left: 0,
         width: 100,
         height: 100,
         stroke_width: 0,
         stroke_cap: "butt",
         stroke_join: "miter",
-        fill: constraints.fill === "fills" ? undefined : gray,
-        fills: constraints.fill === "fills" ? [gray] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : gray,
+        fill_paints: constraints.fill === "fill_paints" ? [gray] : undefined,
         ...seed,
       } satisfies grida.program.nodes.RectangleNode;
     }
@@ -258,8 +258,8 @@ export default function initialNode(
         stroke_width: 0,
         stroke_cap: "butt",
         stroke_join: "miter",
-        fill: constraints.fill === "fills" ? undefined : gray,
-        fills: constraints.fill === "fills" ? [gray] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : gray,
+        fill_paints: constraints.fill === "fill_paints" ? [gray] : undefined,
         ...seed,
       } satisfies grida.program.nodes.RegularPolygonNode;
     }
@@ -277,8 +277,8 @@ export default function initialNode(
         stroke_width: 0,
         stroke_cap: "butt",
         stroke_join: "miter",
-        fill: constraints.fill === "fills" ? undefined : gray,
-        fills: constraints.fill === "fills" ? [gray] : undefined,
+        fill: constraints.fill === "fill_paints" ? undefined : gray,
+        fill_paints: constraints.fill === "fill_paints" ? [gray] : undefined,
         ...seed,
       } satisfies grida.program.nodes.RegularStarPolygonNode;
     }
@@ -288,8 +288,9 @@ export default function initialNode(
         ...position,
         ...styles,
         type: "line",
-        stroke: constraints.stroke === "strokes" ? undefined : black,
-        strokes: constraints.stroke === "strokes" ? [black] : undefined,
+        stroke: constraints.stroke === "stroke_paints" ? undefined : black,
+        stroke_paints:
+          constraints.stroke === "stroke_paints" ? [black] : undefined,
         stroke_width: 1,
         stroke_cap: "butt",
         stroke_join: "miter",

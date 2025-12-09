@@ -137,9 +137,9 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyInnerRadius(node_id, value),
       arcData: (value: grida.program.nodes.i.IEllipseArcData) =>
         instance.commands.changeNodePropertyArcData(node_id, value),
-      fills: (fills: cg.Paint[]) =>
+      fill_paints: (fills: cg.Paint[]) =>
         instance.commands.changeNodePropertyFills(node_id, fills),
-      strokes: (strokes: cg.Paint[]) =>
+      stroke_paints: (strokes: cg.Paint[]) =>
         instance.commands.changeNodePropertyStrokes(node_id, strokes),
       addFill: (fill: cg.Paint, at?: "start" | "end") =>
         instance.commands.addNodeFill(node_id, fill, at),

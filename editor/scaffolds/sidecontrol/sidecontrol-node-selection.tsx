@@ -282,10 +282,10 @@ function ModeMixedNodeProperties({
     locked,
     opacity,
     corner_radius,
-    corner_radius_top_left,
-    corner_radius_top_right,
-    corner_radius_bottom_right,
-    corner_radius_bottom_left,
+    rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left,
     fill,
     stroke,
     stroke_width,
@@ -497,21 +497,21 @@ function ModeMixedNodeProperties({
               ) : (
                 <CornerRadius4Control
                   value={{
-                    corner_radius_top_left:
-                      typeof corner_radius_top_left?.value === "number"
-                        ? corner_radius_top_left?.value
+                    rectangular_corner_radius_top_left:
+                      typeof rectangular_corner_radius_top_left?.value === "number"
+                        ? rectangular_corner_radius_top_left?.value
                         : undefined,
-                    corner_radius_top_right:
-                      typeof corner_radius_top_right?.value === "number"
-                        ? corner_radius_top_right?.value
+                    rectangular_corner_radius_top_right:
+                      typeof rectangular_corner_radius_top_right?.value === "number"
+                        ? rectangular_corner_radius_top_right?.value
                         : undefined,
-                    corner_radius_bottom_right:
-                      typeof corner_radius_bottom_right?.value === "number"
-                        ? corner_radius_bottom_right?.value
+                    rectangular_corner_radius_bottom_right:
+                      typeof rectangular_corner_radius_bottom_right?.value === "number"
+                        ? rectangular_corner_radius_bottom_right?.value
                         : undefined,
-                    corner_radius_bottom_left:
-                      typeof corner_radius_bottom_left?.value === "number"
-                        ? corner_radius_bottom_left?.value
+                    rectangular_corner_radius_bottom_left:
+                      typeof rectangular_corner_radius_bottom_left?.value === "number"
+                        ? rectangular_corner_radius_bottom_left?.value
                         : undefined,
                   }}
                   onValueCommit={change.corner_radius}
@@ -890,10 +890,10 @@ function ModeNodeProperties({
     type: node.type,
     blend_mode: node.blend_mode,
     corner_radius: node.corner_radius,
-    corner_radius_top_left: node.corner_radius_top_left,
-    corner_radius_top_right: node.corner_radius_top_right,
-    corner_radius_bottom_right: node.corner_radius_bottom_right,
-    corner_radius_bottom_left: node.corner_radius_bottom_left,
+    rectangular_corner_radius_top_left: node.rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right: node.rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right: node.rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left: node.rectangular_corner_radius_bottom_left,
     point_count: node.point_count,
     inner_radius: node.inner_radius,
     angle: node.angle,
@@ -933,10 +933,10 @@ function ModeNodeProperties({
     type,
     blend_mode,
     corner_radius,
-    corner_radius_top_left,
-    corner_radius_top_right,
-    corner_radius_bottom_right,
-    corner_radius_bottom_left,
+    rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left,
     point_count,
     inner_radius,
     angle,
@@ -1137,10 +1137,10 @@ function ModeNodeProperties({
                   </PropertyLineLabelWithNumberGesture>
                   <CornerRadius4Control
                     value={{
-                      corner_radius_top_left,
-                      corner_radius_top_right,
-                      corner_radius_bottom_right,
-                      corner_radius_bottom_left,
+                      rectangular_corner_radius_top_left,
+                      rectangular_corner_radius_top_right,
+                      rectangular_corner_radius_bottom_right,
+                      rectangular_corner_radius_bottom_left,
                     }}
                     onValueCommit={actions.corner_radius}
                   />

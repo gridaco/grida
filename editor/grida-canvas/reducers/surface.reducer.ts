@@ -203,8 +203,8 @@ function __has_image_paint(
   switch (paint_target) {
     case "fill": {
       // Check fills
-      const fills = Array.isArray((node as any).fills)
-        ? ((node as any).fills as grida.program.nodes.i.props.PropsPaintValue[])
+      const fills = Array.isArray((node as any).fill_paints)
+        ? ((node as any).fill_paints as grida.program.nodes.i.props.PropsPaintValue[])
         : (node as any).fill
           ? [(node as any).fill as grida.program.nodes.i.props.PropsPaintValue]
           : [];
@@ -223,9 +223,9 @@ function __has_image_paint(
     }
     case "stroke": {
       // Check strokes
-      const strokes = Array.isArray((node as any).strokes)
+      const strokes = Array.isArray((node as any).stroke_paints)
         ? ((node as any)
-            .strokes as grida.program.nodes.i.props.PropsPaintValue[])
+            .stroke_paints as grida.program.nodes.i.props.PropsPaintValue[])
         : (node as any).stroke
           ? [
               (node as any)

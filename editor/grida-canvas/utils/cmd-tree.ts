@@ -309,7 +309,7 @@ function resolvePaint(node: Node): any | null {
   const fill = (node as any).fill;
   if (fill && typeof fill === "object") return fill;
 
-  const fills = (node as any).fills;
+  const fills = (node as any).fill_paints;
   if (Array.isArray(fills) && fills.length) {
     return fills.find((entry: any) => entry?.active !== false) ?? fills[0];
   }
@@ -324,10 +324,10 @@ function formatCornerRadius(node: Node): string | null {
   }
 
   const corners = [
-    readNumber(node, "corner_radius_top_left"),
-    readNumber(node, "corner_radius_top_right"),
-    readNumber(node, "corner_radius_bottom_right"),
-    readNumber(node, "corner_radius_bottom_left"),
+    readNumber(node, "rectangular_corner_radius_top_left"),
+    readNumber(node, "rectangular_corner_radius_top_right"),
+    readNumber(node, "rectangular_corner_radius_bottom_right"),
+    readNumber(node, "rectangular_corner_radius_bottom_left"),
   ];
 
   const defined = corners.filter((value) => value !== undefined);

@@ -530,7 +530,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.0.3-beta+20251202";
+  export const SCHEMA_VERSION = "0.0.4-beta+20251209";
 
   /**
    * Simple Node Selector
@@ -1476,10 +1476,10 @@ export namespace grida.program.nodes {
      * Rectangle Corner
      */
     export interface IRectangularCornerRadius {
-      corner_radius_top_left?: number;
-      corner_radius_top_right?: number;
-      corner_radius_bottom_left?: number;
-      corner_radius_bottom_right?: number;
+      rectangular_corner_radius_top_left?: number;
+      rectangular_corner_radius_top_right?: number;
+      rectangular_corner_radius_bottom_left?: number;
+      rectangular_corner_radius_bottom_right?: number;
       corner_smoothing?: number;
     }
 
@@ -1580,7 +1580,7 @@ export namespace grida.program.nodes {
        * single {@link fill} value for backwards compatibility with DOM
        * backends that only support a single fill.
        */
-      fills?: T[] | undefined;
+      fill_paints?: T[] | undefined;
     }
 
     export interface IEffects {
@@ -1622,10 +1622,10 @@ export namespace grida.program.nodes {
     export interface IStroke {
       stroke?: cg.Paint;
       /**
-       * Multiple stroke paints. Similar to {@link IFill.fills}, the first
+       * Multiple stroke paints. Similar to {@link IFill.fill_paints}, the first
        * stroke is mirrored via {@link stroke} for single-stroke backends.
        */
-      strokes?: cg.Paint[];
+      stroke_paints?: cg.Paint[];
 
       /**
        * stroke width - 0 or greater
@@ -1679,19 +1679,19 @@ export namespace grida.program.nodes {
       /**
        * sets or overrides the top stroke width
        */
-      stroke_top_width?: number;
+      rectangular_stroke_width_top?: number;
       /**
        * sets or overrides the right stroke width
        */
-      stroke_right_width?: number;
+      rectangular_stroke_width_right?: number;
       /**
        * sets or overrides the bottom stroke width
        */
-      stroke_bottom_width?: number;
+      rectangular_stroke_width_bottom?: number;
       /**
        * sets or overrides the left stroke width
        */
-      stroke_left_width?: number;
+      rectangular_stroke_width_left?: number;
     }
 
     /**
@@ -1699,7 +1699,7 @@ export namespace grida.program.nodes {
      */
     export interface ITextStroke {
       stroke?: cg.Paint;
-      strokes?: cg.Paint[];
+      stroke_paints?: cg.Paint[];
       /**
        * stroke width - 0 or greater
        */
@@ -2570,10 +2570,10 @@ export namespace grida.program.nodes {
             top: 0,
             left: 0,
             corner_radius: 0,
-            corner_radius_top_left: 0,
-            corner_radius_top_right: 0,
-            corner_radius_bottom_left: 0,
-            corner_radius_bottom_right: 0,
+            rectangular_corner_radius_top_left: 0,
+            rectangular_corner_radius_top_right: 0,
+            rectangular_corner_radius_bottom_left: 0,
+            rectangular_corner_radius_bottom_right: 0,
             stroke_width: 0,
             stroke_cap: "butt",
             stroke_join: "miter",
@@ -2796,10 +2796,10 @@ export namespace grida.program.nodes {
         width: 100,
         height: 100,
         corner_radius: 0,
-        corner_radius_top_left: 0,
-        corner_radius_top_right: 0,
-        corner_radius_bottom_left: 0,
-        corner_radius_bottom_right: 0,
+        rectangular_corner_radius_top_left: 0,
+        rectangular_corner_radius_top_right: 0,
+        rectangular_corner_radius_bottom_left: 0,
+        rectangular_corner_radius_bottom_right: 0,
         style: {},
         // children_refs: [],
         ...partial,

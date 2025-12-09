@@ -405,7 +405,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             return;
           }
           const target = payload.paint_target;
-          const pluralKey = target === "stroke" ? "strokes" : "fills";
+          const pluralKey =
+            target === "stroke" ? "stroke_paints" : "fill_paints";
           const singularKey = target === "stroke" ? "stroke" : "fill";
           let applied = false;
 

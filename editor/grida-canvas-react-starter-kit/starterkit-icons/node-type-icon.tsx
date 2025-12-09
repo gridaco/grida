@@ -63,9 +63,9 @@ export function NodeTypeIcon({
         return <ImageIcon className={className} />;
       }
       if (
-        node.fills &&
-        node.fills.length === 1 &&
-        node.fills[0].type === "image"
+        node.fill_paints &&
+        node.fill_paints.length === 1 &&
+        node.fill_paints[0].type === "image"
       ) {
         return <ImageIcon className={className} />;
       }

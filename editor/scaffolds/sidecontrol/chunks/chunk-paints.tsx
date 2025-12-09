@@ -149,12 +149,12 @@ export function ChunkPaints({
     if (paintTarget === "fill") {
       return {
         paint: node.fill as cg.Paint,
-        paints: node.fills as cg.Paint[],
+        paints: node.fill_paints as cg.Paint[],
       };
     } else {
       return {
         paint: node.stroke as cg.Paint,
-        paints: node.strokes as cg.Paint[],
+        paints: node.stroke_paints as cg.Paint[],
       };
     }
   });
@@ -241,8 +241,8 @@ export function ChunkPaints({
         onUpdatePaints(nextPaints);
       } else {
         paintTarget === "fill"
-          ? actions.fills(nextPaints as any)
-          : actions.strokes(nextPaints as any);
+          ? actions.fill_paints(nextPaints as any)
+          : actions.stroke_paints(nextPaints as any);
       }
     },
     [actions, onUpdatePaints, paintTarget]

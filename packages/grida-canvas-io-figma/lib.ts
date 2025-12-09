@@ -308,10 +308,14 @@ export namespace iofigma {
       ): grida.program.nodes.i.IRectangularCornerRadius {
         // order: top-left, top-right, bottom-right, bottom-left (clockwise)
         return {
-          corner_radius_top_left: rectangleCornerRadii?.[0] ?? baseRadius,
-          corner_radius_top_right: rectangleCornerRadii?.[1] ?? baseRadius,
-          corner_radius_bottom_right: rectangleCornerRadii?.[2] ?? baseRadius,
-          corner_radius_bottom_left: rectangleCornerRadii?.[3] ?? baseRadius,
+          rectangular_corner_radius_top_left:
+            rectangleCornerRadii?.[0] ?? baseRadius,
+          rectangular_corner_radius_top_right:
+            rectangleCornerRadii?.[1] ?? baseRadius,
+          rectangular_corner_radius_bottom_right:
+            rectangleCornerRadii?.[2] ?? baseRadius,
+          rectangular_corner_radius_bottom_left:
+            rectangleCornerRadii?.[3] ?? baseRadius,
         };
       }
 
@@ -367,7 +371,7 @@ export namespace iofigma {
           .map(paint)
           .filter((p): p is cg.Paint => p !== undefined);
         return {
-          fills: fills_paints.length > 0 ? fills_paints : undefined,
+          fill_paints: fills_paints.length > 0 ? fills_paints : undefined,
         };
       }
 
@@ -387,7 +391,7 @@ export namespace iofigma {
           .map(paint)
           .filter((p): p is cg.Paint => p !== undefined);
         return {
-          strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
+          stroke_paints: strokes_paints.length > 0 ? strokes_paints : undefined,
           stroke_width: node.strokeWeight ?? 0,
           stroke_cap: node.strokeCap
             ? (map.strokeCapMap[node.strokeCap] ?? "butt")
@@ -415,7 +419,7 @@ export namespace iofigma {
           .map(paint)
           .filter((p): p is cg.Paint => p !== undefined);
         return {
-          strokes: strokes_paints.length > 0 ? strokes_paints : undefined,
+          stroke_paints: strokes_paints.length > 0 ? strokes_paints : undefined,
           stroke_width: node.strokeWeight ?? 0,
           stroke_align: node.strokeAlign
             ? (map.strokeAlignMap[node.strokeAlign] ?? "inside")
