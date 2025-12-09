@@ -22,7 +22,7 @@ import {
 import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
 import RGBHexInput from "./utils/hex";
-import { ColorPicker32F } from "./color-picker";
+import { ColorPicker32FWithOptions } from "./color-picker";
 import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
@@ -691,6 +691,7 @@ function PaintPopoverContent({
       align="start"
       side="right"
       sideOffset={8}
+      collisionPadding={8}
       className="p-0"
       onPointerDown={(e) =>
         // prevent popover content from causing dnd
@@ -798,7 +799,7 @@ function PaintTabsContent({
   if (value?.type === "solid") {
     return (
       <div data-testid="view-paint-solid">
-        <ColorPicker32F
+        <ColorPicker32FWithOptions
           color={value.color}
           onColorChange={(color) => {
             onValueChange?.({
