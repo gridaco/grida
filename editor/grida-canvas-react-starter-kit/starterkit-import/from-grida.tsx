@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -11,9 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useFilePicker } from "use-file-picker";
-import { Card } from "@/components/ui/card";
 import { io } from "@grida/io";
+import { FileDropzone } from "./file-dropzone";
 
 export function ImportFromGridaFileJsonDialog({
   onImport,
@@ -21,19 +20,23 @@ export function ImportFromGridaFileJsonDialog({
 }: React.ComponentProps<typeof Dialog> & {
   onImport?: (document: io.LoadedDocument) => void;
 }) {
-  const { openFilePicker, loading, plainFiles } = useFilePicker({
-    accept: ".grida,.json",
-    multiple: false,
-  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const validateFile = (file: File) => {
+    return (
+      file.name.toLowerCase().endsWith(".grida") ||
+      file.name.toLowerCase().endsWith(".json")
+    );
+  };
 
   const handleFileImport = async () => {
-    if (plainFiles.length > 0) {
+    if (selectedFile) {
       try {
-        const f = plainFiles[0];
-        const doc = await io.load(f);
+        const doc = await io.load(selectedFile);
         onImport?.(doc);
         toast.success("File successfully imported!");
         props.onOpenChange?.(false); // Close the dialog
+        setSelectedFile(null);
       } catch (error) {
         toast.error("Failed to parse the file. Please check the format.");
         console.error(error);
@@ -56,19 +59,17 @@ export function ImportFromGridaFileJsonDialog({
         </DialogHeader>
         <div className="space-y-4">
           <Label>Select a .grida file</Label>
-          <Card className="flex items-center justify-center p-0">
-            <Button
-              onClick={openFilePicker}
-              disabled={loading}
-              variant="ghost"
-              className="w-full h-full p-10 "
-            >
-              {loading ? "Loading..." : "Select File"}
-            </Button>
-          </Card>
-          {plainFiles.length > 0 && (
+          <FileDropzone
+            accept=".grida,.json"
+            onFileSelected={setSelectedFile}
+            buttonText="Select File or Drag & Drop"
+            dragText="Drop file here"
+            errorMessage="Please drop a .grida or .json file"
+            validateFile={validateFile}
+          />
+          {selectedFile && (
             <p>
-              <small>Selected File: {plainFiles[0].name}</small>
+              <small>Selected File: {selectedFile.name}</small>
             </p>
           )}
         </div>
@@ -80,7 +81,7 @@ export function ImportFromGridaFileJsonDialog({
           <Button
             type="button"
             onClick={handleFileImport}
-            disabled={plainFiles.length === 0}
+            disabled={!selectedFile}
           >
             Import
           </Button>
@@ -89,4 +90,3 @@ export function ImportFromGridaFileJsonDialog({
     </Dialog>
   );
 }
-

@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useFilePicker } from "use-file-picker";
 import { Card } from "@/components/ui/card";
+import { FileDropzone } from "./file-dropzone";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -169,23 +169,24 @@ function FigFileImportTab({
   onImportFig?: (result: FigFileImportResult) => Promise<void>;
   onClose: () => void;
 }) {
-  const { openFilePicker, loading, plainFiles, clear } = useFilePicker({
-    accept: ".fig",
-    multiple: false,
-  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [step, setStep] = useState<"select" | "confirm">("select");
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<FigFileImportResult | null>(null);
   const [progress, setProgress] = useState(0);
 
+  const validateFile = (file: File) => {
+    return file.name.toLowerCase().endsWith(".fig");
+  };
+
   const handleParse = useCallback(async () => {
-    if (plainFiles.length === 0) return;
+    if (!selectedFile) return;
 
     setParsing(true);
     setProgress(0);
 
     try {
-      const file = plainFiles[0];
+      const file = selectedFile;
 
       // Read file with progress tracking
       const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
@@ -247,17 +248,17 @@ function FigFileImportTab({
     } finally {
       setParsing(false);
     }
-  }, [plainFiles]);
+  }, [selectedFile]);
 
   // Auto-parse when file is selected
   useEffect(() => {
-    if (plainFiles.length > 0 && !parsed && !parsing) {
+    if (selectedFile && !parsed && !parsing) {
       handleParse();
     }
-  }, [plainFiles, parsed, parsing, handleParse]);
+  }, [selectedFile, parsed, parsing, handleParse]);
 
   const handleImport = async () => {
-    if (!parsed || plainFiles.length === 0 || !onImportFig) return;
+    if (!parsed || !selectedFile || !onImportFig) return;
 
     const importPromise = onImportFig(parsed);
 
@@ -274,7 +275,7 @@ function FigFileImportTab({
       URL.revokeObjectURL(parsed.thumbnailUrl);
     }
 
-    clear();
+    setSelectedFile(null);
     setParsed(null);
     setStep("select");
     onClose();
@@ -309,21 +310,21 @@ function FigFileImportTab({
               </p>
             </div>
 
-            <Card className="flex items-center justify-center p-0">
-              <Button
-                onClick={openFilePicker}
-                disabled={loading || parsing}
-                variant="ghost"
-                className="w-full h-full p-12"
-              >
-                {loading || parsing ? "Processing..." : "Select .fig File"}
-              </Button>
-            </Card>
+            <FileDropzone
+              accept=".fig"
+              onFileSelected={setSelectedFile}
+              buttonText="Select .fig File or Drag & Drop"
+              loadingText="Processing..."
+              dragText="Drop .fig file here"
+              errorMessage="Please drop a .fig file"
+              validateFile={validateFile}
+              disabled={parsing}
+            />
 
-            {plainFiles.length > 0 && (
+            {selectedFile && (
               <div className="space-y-2">
                 <p className="text-sm">
-                  <strong>Selected:</strong> {plainFiles[0].name}
+                  <strong>Selected:</strong> {selectedFile.name}
                 </p>
                 {parsing && <Progress value={progress} className="w-full" />}
               </div>
@@ -337,7 +338,7 @@ function FigFileImportTab({
               <Label className="text-sm">Confirm Import</Label>
               <p className="text-xs text-muted-foreground mt-1">
                 Review the scenes that will be imported from{" "}
-                <strong>{plainFiles[0]?.name}</strong>
+                <strong>{selectedFile?.name}</strong>
               </p>
             </div>
 
