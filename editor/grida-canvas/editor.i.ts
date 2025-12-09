@@ -2791,12 +2791,17 @@ export namespace editor.api {
      * - **Parent grouping**: Nodes with different parents are wrapped into separate containers
      * - **Visual preservation**: Maintains the exact visual appearance after wrapping
      * - **Smart defaults**: Applies contextual padding (16px for single child, 0 for multiple)
+     * - **Direct application**: When `prefersDirectApplication` is true and selection is a single container
+     *   without layout, applies layout directly to that container instead of wrapping
      *
      * **Bound to**: SHIFT+A
      *
      * @param target - The nodes to wrap:
      *   - `"selection"` - Wraps currently selected nodes
      *   - `NodeID[]` - Wraps specific node IDs
+     * @param prefersDirectApplication - When `true` (default), if the selection is a single container
+     *   without a layout, applies layout directly to that container instead of wrapping it in a new one.
+     *   When `false`, disables direct application and always wraps nodes in new containers.
      *
      * @example
      * ```typescript
@@ -2805,6 +2810,9 @@ export namespace editor.api {
      *
      * // Wrap specific nodes
      * editor.commands.autoLayout(["node-1", "node-2", "node-3"]);
+     *
+     * // Disable direct application, always wrap in new containers
+     * editor.commands.autoLayout("selection", false);
      * ```
      *
      * @remarks
@@ -2814,6 +2822,13 @@ export namespace editor.api {
      * - **Spacing**: Gap between nodes (mainAxisGap and crossAxisGap)
      * - **Alignment**: Main and cross axis alignment based on distribution
      * - **Order**: Maintains visual order of nodes within the container
+     *
+     * **Direct Application Behavior:**
+     * When `prefersDirectApplication` is `true` and the selection is exactly one container node without
+     * a flex layout, the command applies flex layout properties directly to that container. The system
+     * analyzes the container's children's spatial arrangement to infer optimal flex direction, spacing,
+     * and alignment, preserving the container's identity and hierarchy without introducing additional
+     * nesting levels.
      *
      * **Parent Grouping:**
      * Nodes are automatically grouped by their parent container. For example:
@@ -2838,7 +2853,10 @@ export namespace editor.api {
      * @see {@link reLayout} - To change an existing container's layout mode
      * @see {@link contain} - To wrap nodes in a basic container without auto-layout
      */
-    autoLayout(target: "selection" | NodeID[]): void;
+    autoLayout(
+      target: "selection" | NodeID[],
+      prefersDirectApplication?: boolean
+    ): void;
 
     /**
      * Re-applies layout mode to an existing container and automatically configures its children.
