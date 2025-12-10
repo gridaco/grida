@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useFilePicker } from "use-file-picker";
 import { Card } from "@/components/ui/card";
+import { FileDropzone } from "./file-dropzone";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -169,29 +169,32 @@ function FigFileImportTab({
   onImportFig?: (result: FigFileImportResult) => Promise<void>;
   onClose: () => void;
 }) {
-  const { openFilePicker, loading, plainFiles, clear } = useFilePicker({
-    accept: ".fig",
-    multiple: false,
-  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [step, setStep] = useState<"select" | "confirm">("select");
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<FigFileImportResult | null>(null);
   const [progress, setProgress] = useState(0);
+  const parseRunIdRef = useRef(0);
 
-  const handleParse = useCallback(async () => {
-    if (plainFiles.length === 0) return;
+  const validateFile = (file: File) => {
+    return file.name.toLowerCase().endsWith(".fig");
+  };
+
+  const handleParse = useCallback(async (file: File, runId: number) => {
+    const isStale = () => parseRunIdRef.current !== runId;
 
     setParsing(true);
+    setParsed(null);
+    setStep("select");
     setProgress(0);
 
     try {
-      const file = plainFiles[0];
-
       // Read file with progress tracking
       const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
         const reader = new FileReader();
 
         reader.onprogress = (e) => {
+          if (isStale()) return;
           if (e.lengthComputable) {
             const fileProgress = Math.round((e.loaded / e.total) * 100);
             setProgress(fileProgress);
@@ -199,6 +202,7 @@ function FigFileImportTab({
         };
 
         reader.onload = () => {
+          if (isStale()) return;
           setProgress(100);
           resolve(reader.result as ArrayBuffer);
         };
@@ -207,6 +211,8 @@ function FigFileImportTab({
 
         reader.readAsArrayBuffer(file);
       });
+
+      if (isStale()) return;
 
       const fileBytes = new Uint8Array(buffer);
 
@@ -227,7 +233,16 @@ function FigFileImportTab({
         console.debug("Could not extract thumbnail:", e);
       }
 
+      if (isStale()) {
+        if (thumbnailUrl) {
+          URL.revokeObjectURL(thumbnailUrl);
+        }
+        return;
+      }
+
       const figFile = FigImporter.parseFile(fileBytes);
+
+      if (isStale()) return;
 
       const result = {
         file,
@@ -244,20 +259,34 @@ function FigFileImportTab({
     } catch (error) {
       toast.error("Failed to parse .fig file");
       console.error(error);
+      if (!isStale()) {
+        // Mark failure to prevent repeated attempts for the same file
+        setParsed({
+          file,
+          sceneCount: 0,
+          scenes: [],
+          thumbnailUrl: undefined,
+        });
+      }
     } finally {
-      setParsing(false);
+      if (!isStale()) {
+        setParsing(false);
+      }
     }
-  }, [plainFiles]);
+  }, []);
 
   // Auto-parse when file is selected
   useEffect(() => {
-    if (plainFiles.length > 0 && !parsed && !parsing) {
-      handleParse();
-    }
-  }, [plainFiles, parsed, parsing, handleParse]);
+    if (!selectedFile) return;
+
+    const nextRunId = parseRunIdRef.current + 1;
+    parseRunIdRef.current = nextRunId;
+
+    handleParse(selectedFile, nextRunId);
+  }, [selectedFile, handleParse]);
 
   const handleImport = async () => {
-    if (!parsed || plainFiles.length === 0 || !onImportFig) return;
+    if (!parsed || !selectedFile || !onImportFig) return;
 
     const importPromise = onImportFig(parsed);
 
@@ -274,7 +303,7 @@ function FigFileImportTab({
       URL.revokeObjectURL(parsed.thumbnailUrl);
     }
 
-    clear();
+    setSelectedFile(null);
     setParsed(null);
     setStep("select");
     onClose();
@@ -309,21 +338,21 @@ function FigFileImportTab({
               </p>
             </div>
 
-            <Card className="flex items-center justify-center p-0">
-              <Button
-                onClick={openFilePicker}
-                disabled={loading || parsing}
-                variant="ghost"
-                className="w-full h-full p-12"
-              >
-                {loading || parsing ? "Processing..." : "Select .fig File"}
-              </Button>
-            </Card>
+            <FileDropzone
+              accept=".fig"
+              onFileSelected={setSelectedFile}
+              buttonText="Select .fig File or Drag & Drop"
+              loadingText="Processing..."
+              dragText="Drop .fig file here"
+              errorMessage="Please drop a .fig file"
+              validateFile={validateFile}
+              disabled={parsing}
+            />
 
-            {plainFiles.length > 0 && (
+            {selectedFile && (
               <div className="space-y-2">
                 <p className="text-sm">
-                  <strong>Selected:</strong> {plainFiles[0].name}
+                  <strong>Selected:</strong> {selectedFile.name}
                 </p>
                 {parsing && <Progress value={progress} className="w-full" />}
               </div>
@@ -337,7 +366,7 @@ function FigFileImportTab({
               <Label className="text-sm">Confirm Import</Label>
               <p className="text-xs text-muted-foreground mt-1">
                 Review the scenes that will be imported from{" "}
-                <strong>{plainFiles[0]?.name}</strong>
+                <strong>{selectedFile?.name}</strong>
               </p>
             </div>
 

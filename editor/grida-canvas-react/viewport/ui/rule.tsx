@@ -23,7 +23,6 @@ export function Rule({
       {...props}
       style={{
         position: "absolute",
-        pointerEvents: "auto",
         zIndex,
         width: axis === "x" ? "100%" : `${totalSize}px`,
         height: axis === "y" ? "100%" : `${totalSize}px`,

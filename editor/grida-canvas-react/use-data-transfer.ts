@@ -618,6 +618,12 @@ export function useDataTransferEventTarget() {
           continue;
         }
 
+        // Check for .grida files and show helpful message
+        if (file.name.toLowerCase().endsWith(".grida")) {
+          toast.info("Use [File] > [Open .grida] to import .grida files");
+          continue;
+        }
+
         const [valid, type] = io.clipboard.filetype(file);
         if (valid) {
           insertFromFile(type, file, event);

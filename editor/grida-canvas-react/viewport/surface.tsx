@@ -67,13 +67,14 @@ import {
 import grida from "@grida/schema";
 import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
-import type { editor } from "@/grida-canvas";
+import { editor } from "@/grida-canvas";
 import { useFollowPlugin } from "../plugins/use-follow";
 import { SurfaceVariableWidthEditor } from "./ui/surface-varwidth-editor";
 import {
   MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE,
   MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE,
   MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE,
+  MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE,
   DROPZONE_BORDER_WIDTH,
 } from "../ui-config";
 import {
@@ -903,20 +904,16 @@ function SingleSelectionOverlay({
     node.type === "container" && "padding" in node ? node.padding : undefined;
 
   // Calculate measurement rect for visibility checks
-  const measurement_rect = {
-    x: 0,
-    y: 0,
-    width: size[0] * scaleX,
-    height: size[1] * scaleY,
-  };
+  const rect_ui_width = size[0] * scaleX;
+  const rect_ui_height = size[1] * scaleY;
 
   const show_gap_overlay =
-    measurement_rect.width >= MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE &&
-    measurement_rect.height >= MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE;
+    rect_ui_width >= MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE &&
+    rect_ui_height >= MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE;
 
   const show_padding_overlay =
-    measurement_rect.width >= MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE &&
-    measurement_rect.height >= MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE;
+    rect_ui_width >= MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE &&
+    rect_ui_height >= MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE;
 
   return (
     <>
@@ -1015,6 +1012,7 @@ function SelectionGroupOverlay({
 }) {
   const editor = useCurrentEditor();
   const tool = useToolState();
+  const { scaleX, scaleY } = useTransformState();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
@@ -1049,6 +1047,14 @@ function SelectionGroupOverlay({
 
   const { preferredDistributeEvenlyActionAxis } = distribution;
 
+  // Calculate handle size in viewport space for z-index determination
+  const handleSizeInViewport = Math.min(size[0] * scaleX, size[1] * scaleY);
+  const show_side_handles_as_important =
+    handleSizeInViewport < MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE;
+
+  const nsweZIndex = show_side_handles_as_important ? 22 : 11;
+  const diagonalZIndex = 21;
+
   return (
     <>
       <LayerOverlay
@@ -1057,18 +1063,94 @@ function SelectionGroupOverlay({
         transform={style}
         zIndex={10}
       >
-        <LayerOverlayResizeSide anchor="n" selection={ids} />
-        <LayerOverlayResizeSide anchor="s" selection={ids} />
-        <LayerOverlayResizeSide anchor="e" selection={ids} />
-        <LayerOverlayResizeSide anchor="w" selection={ids} />
-        <LayerOverlayResizeHandle anchor="n" selection={ids} />
-        <LayerOverlayResizeHandle anchor="s" selection={ids} />
-        <LayerOverlayResizeHandle anchor="e" selection={ids} />
-        <LayerOverlayResizeHandle anchor="w" selection={ids} />
-        <LayerOverlayResizeHandle anchor="nw" selection={ids} />
-        <LayerOverlayResizeHandle anchor="ne" selection={ids} />
-        <LayerOverlayResizeHandle anchor="sw" selection={ids} />
-        <LayerOverlayResizeHandle anchor="se" selection={ids} />
+        <LayerOverlayResizeSide
+          anchor="n"
+          zIndex={nsweZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "n");
+          }}
+        />
+        <LayerOverlayResizeSide
+          anchor="s"
+          zIndex={nsweZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "s");
+          }}
+        />
+        <LayerOverlayResizeSide
+          anchor="e"
+          zIndex={nsweZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "e");
+          }}
+        />
+        <LayerOverlayResizeSide
+          anchor="w"
+          zIndex={nsweZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "w");
+          }}
+        />
+        <LayerOverlayResizeHandle
+          anchor="n"
+          zIndex={nsweZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "n");
+          }}
+          disabled={true}
+        />
+        <LayerOverlayResizeHandle
+          anchor="s"
+          zIndex={nsweZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "s");
+          }}
+          disabled={true}
+        />
+        <LayerOverlayResizeHandle
+          anchor="e"
+          zIndex={nsweZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "e");
+          }}
+          disabled={true}
+        />
+        <LayerOverlayResizeHandle
+          anchor="w"
+          zIndex={nsweZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "w");
+          }}
+          disabled={true}
+        />
+        <LayerOverlayResizeHandle
+          anchor="nw"
+          zIndex={diagonalZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "nw");
+          }}
+        />
+        <LayerOverlayResizeHandle
+          anchor="ne"
+          zIndex={diagonalZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "ne");
+          }}
+        />
+        <LayerOverlayResizeHandle
+          anchor="sw"
+          zIndex={diagonalZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "sw");
+          }}
+        />
+        <LayerOverlayResizeHandle
+          anchor="se"
+          zIndex={diagonalZIndex}
+          onDragStart={() => {
+            editor.surface.surfaceStartScaleGesture(ids, "se");
+          }}
+        />
         {/*  */}
         <DistributeButton
           axis={preferredDistributeEvenlyActionAxis}
@@ -1111,6 +1193,7 @@ function NodeOverlay({
   borderColor?: string;
   borderWidth?: number;
 }>) {
+  const editor = useCurrentEditor();
   const { scaleX, scaleY } = useTransformState();
   const backend = useBackendState();
   const tool = useToolState();
@@ -1155,19 +1238,47 @@ function NodeOverlay({
   const { is_component_consumer, is_flex_parent } = node.meta;
   // readonly = readonly || is_component_consumer;
 
-  const measurement_rect = {
-    x: 0,
-    y: 0,
-    width: size[0] * scaleX,
-    height: size[1] * scaleY,
-  };
+  const rect_ui_width = size[0] * scaleX;
+  const rect_ui_height = size[1] * scaleY;
 
   const show_corner_radius_handle =
-    measurement_rect.width >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE &&
-    measurement_rect.height >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE;
+    rect_ui_width >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE &&
+    rect_ui_height >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE;
 
   // TODO: resize for bitmap is not supported */
   const is_resizable_node = node.type !== "bitmap";
+
+  // Calculate handle size in viewport space for z-index determination
+  const handleSizeInViewport = Math.min(rect_ui_width, rect_ui_height);
+  const show_side_handles_as_important =
+    handleSizeInViewport < MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE;
+
+  const nsweZIndex = show_side_handles_as_important ? 22 : 11;
+  const diagonalZIndex = 21;
+
+  // Helper functions for side double-click handlers
+  const handleSideDoubleClickVertical = () => {
+    // feat: text-node-auto-size
+    if (node.type === "text") {
+      editor.autoSizeTextNode(node_id, "height");
+    }
+  };
+
+  const handleSideDoubleClickHorizontal = () => {
+    // feat: text-node-auto-size
+    if (node.type === "text") {
+      editor.autoSizeTextNode(node_id, "width");
+    }
+  };
+
+  // NW (northwest) handle is intentionally omitted - only NE, SE, SW handles support double-click resize-to-fit
+  const handleDiagonalDoubleClick_NE_SE_SW = () => {
+    // feat: text-node-auto-size
+    if (node.type === "text") {
+      editor.autoSizeTextNode(node_id, "width");
+      editor.autoSizeTextNode(node_id, "height");
+    }
+  };
 
   return (
     <>
@@ -1186,25 +1297,136 @@ function NodeOverlay({
               <>
                 {node.type === "line" ? (
                   <>
-                    <LayerOverlayResizeSide anchor="e" selection={node_id} />
-                    <LayerOverlayResizeSide anchor="w" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+                    <LayerOverlayResizeSide
+                      anchor="e"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "e");
+                      }}
+                      onDoubleClick={handleSideDoubleClickHorizontal}
+                    />
+                    <LayerOverlayResizeSide
+                      anchor="w"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "w");
+                      }}
+                      onDoubleClick={handleSideDoubleClickHorizontal}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="e"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "e");
+                      }}
+                      disabled={true}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="w"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "w");
+                      }}
+                      disabled={true}
+                    />
                   </>
                 ) : (
                   <>
-                    <LayerOverlayResizeSide anchor="n" selection={node_id} />
-                    <LayerOverlayResizeSide anchor="s" selection={node_id} />
-                    <LayerOverlayResizeSide anchor="e" selection={node_id} />
-                    <LayerOverlayResizeSide anchor="w" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="n" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="s" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
-                    <LayerOverlayResizeHandle anchor="se" selection={node_id} />
+                    <LayerOverlayResizeSide
+                      anchor="n"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "n");
+                      }}
+                      onDoubleClick={handleSideDoubleClickVertical}
+                    />
+                    <LayerOverlayResizeSide
+                      anchor="s"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "s");
+                      }}
+                      onDoubleClick={handleSideDoubleClickVertical}
+                    />
+                    <LayerOverlayResizeSide
+                      anchor="e"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "e");
+                      }}
+                      onDoubleClick={handleSideDoubleClickHorizontal}
+                    />
+                    <LayerOverlayResizeSide
+                      anchor="w"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "w");
+                      }}
+                      onDoubleClick={handleSideDoubleClickHorizontal}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="n"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "n");
+                      }}
+                      disabled={true}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="s"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "s");
+                      }}
+                      disabled={true}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="e"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "e");
+                      }}
+                      disabled={true}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="w"
+                      zIndex={nsweZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "w");
+                      }}
+                      disabled={true}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="nw"
+                      zIndex={diagonalZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "nw");
+                      }}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="ne"
+                      zIndex={diagonalZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "ne");
+                      }}
+                      onDoubleClick={handleDiagonalDoubleClick_NE_SE_SW}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="sw"
+                      zIndex={diagonalZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "sw");
+                      }}
+                      onDoubleClick={handleDiagonalDoubleClick_NE_SE_SW}
+                    />
+                    <LayerOverlayResizeHandle
+                      anchor="se"
+                      zIndex={diagonalZIndex}
+                      onDragStart={() => {
+                        editor.surface.surfaceStartScaleGesture(node_id, "se");
+                      }}
+                      onDoubleClick={handleDiagonalDoubleClick_NE_SE_SW}
+                    />
                   </>
                 )}
               </>
@@ -1227,7 +1449,7 @@ function NodeOverlay({
           <SizeMeterLabel
             offset={16}
             size={size}
-            rect={{ ...measurement_rect, x: 0, y: 0 }}
+            rect={{ x: 0, y: 0, width: rect_ui_width, height: rect_ui_height }}
             className="bg-workbench-accent-sky group-data-[layer-is-component-consumer='true']:bg-workbench-accent-violet text-white"
           />
         )}
@@ -1295,42 +1517,20 @@ function LayerOverlayRotationHandle({
 }
 
 function LayerOverlayResizeHandle({
-  selection,
   anchor,
   size = 8,
+  zIndex,
+  onDragStart,
+  onDoubleClick,
+  disabled = false,
 }: {
-  selection: string | string[];
   anchor: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
   size?: number;
+  zIndex: number;
+  onDragStart?: () => void;
+  onDoubleClick?: () => void;
+  disabled?: boolean;
 }) {
-  const editor = useCurrentEditor();
-
-  const zIndex = ["n", "e", "s", "w"].includes(anchor) ? 11 : 21;
-
-  const bind = useSurfaceGesture({
-    onPointerDown: ({ event }) => {
-      event.preventDefault();
-    },
-    onDragStart: ({ event }) => {
-      event.preventDefault();
-      editor.surface.surfaceStartScaleGesture(selection, anchor);
-    },
-  });
-
-  return <Knob size={size} {...bind()} anchor={anchor} zIndex={zIndex} />;
-}
-
-function LayerOverlayResizeSide({
-  selection,
-  anchor,
-  thickness = 8,
-}: {
-  selection: string | string[];
-  anchor: "n" | "e" | "s" | "w";
-  thickness?: number;
-}) {
-  const editor = useCurrentEditor();
-
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
@@ -1338,24 +1538,65 @@ function LayerOverlayResizeSide({
       },
       onDragStart: ({ event }) => {
         event.preventDefault();
-        editor.surface.surfaceStartScaleGesture(selection, anchor);
+        onDragStart?.();
       },
       onDoubleClick: ({ event }) => {
         event.preventDefault();
         event.stopPropagation();
-
-        // feat: text-node-auto-size
-        if (
-          typeof selection === "string" &&
-          editor.commands.getNodeSnapshotById(selection)?.type === "text"
-        ) {
-          const axis = anchor === "e" || anchor === "w" ? "width" : "height";
-          editor.autoSizeTextNode(selection, axis);
-        }
+        onDoubleClick?.();
       },
     },
     {
       drag: {
+        enabled: !disabled && !!onDragStart,
+      },
+    }
+  );
+
+  return (
+    <Knob
+      size={size}
+      {...bind()}
+      anchor={anchor}
+      zIndex={zIndex}
+      transform={disabled ? { pointerEvents: "none" } : undefined}
+    />
+  );
+}
+
+function LayerOverlayResizeSide({
+  anchor,
+  thickness = 8,
+  zIndex,
+  onDragStart,
+  onDoubleClick,
+  disabled = false,
+}: {
+  anchor: "n" | "e" | "s" | "w";
+  thickness?: number;
+  zIndex: number;
+  onDragStart?: () => void;
+  onDoubleClick?: () => void;
+  disabled?: boolean;
+}) {
+  const bind = useSurfaceGesture(
+    {
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+      },
+      onDragStart: ({ event }) => {
+        event.preventDefault();
+        onDragStart?.();
+      },
+      onDoubleClick: ({ event }) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onDoubleClick?.();
+      },
+    },
+    {
+      drag: {
+        enabled: !disabled && !!onDragStart,
         threshold: DRAG_THRESHOLD,
         keyboardDisplacement: 0,
       },
@@ -1389,7 +1630,7 @@ function LayerOverlayResizeSide({
         background: "transparent",
         cursor: cursors.resize_handle_cursor_map[anchor],
         touchAction: "none",
-        zIndex: 20,
+        zIndex,
         ...positionalStyle,
       }}
     />
@@ -1514,25 +1755,34 @@ function PixelGridOverlay() {
 }
 
 function RulerGuideOverlay() {
-  const editor = useCurrentEditor();
+  const editorInstance = useCurrentEditor();
   const { guides = [] } = useCurrentSceneState();
   const { scaleX, scaleY, transform } = useTransformState();
   const viewport = useViewport();
   const d = useSurfaceSelectionGroups();
+  const eager_canvas_input = useEditorState(editorInstance, (state) =>
+    editor.state.eager_canvas_input(state)
+  );
 
-  const bindX = useSurfaceGesture({
-    onDragStart: ({ event }) => {
-      editor.surface.surfaceStartGuideGesture("y", -1);
-      event.preventDefault();
+  const bindX = useSurfaceGesture(
+    {
+      onDragStart: ({ event }) => {
+        editorInstance.surface.surfaceStartGuideGesture("y", -1);
+        event.preventDefault();
+      },
     },
-  });
+    { enabled: !eager_canvas_input }
+  );
 
-  const bindY = useSurfaceGesture({
-    onDragStart: ({ event }) => {
-      editor.surface.surfaceStartGuideGesture("x", -1);
-      event.preventDefault();
+  const bindY = useSurfaceGesture(
+    {
+      onDragStart: ({ event }) => {
+        editorInstance.surface.surfaceStartGuideGesture("x", -1);
+        event.preventDefault();
+      },
     },
-  });
+    { enabled: !eager_canvas_input }
+  );
 
   const ranges = useMemo(() => {
     const flat = d.flatMap((g) => g.objects);
@@ -1570,10 +1820,11 @@ function RulerGuideOverlay() {
 
   return (
     <div className="fixed w-full h-full pointer-events-none z-50">
-      <RulerContextMenu editor={editor}>
+      <RulerContextMenu editor={editorInstance}>
         <div
           {...bindX()}
           className="z-30 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+          style={eager_canvas_input ? { pointerEvents: "none" } : undefined}
         >
           <AxisRuler
             axis="x"
@@ -1600,10 +1851,11 @@ function RulerGuideOverlay() {
           />
         </div>
       </RulerContextMenu>
-      <RulerContextMenu editor={editor}>
+      <RulerContextMenu editor={editorInstance}>
         <div
           {...bindY()}
           className="z-20 fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
+          style={eager_canvas_input ? { pointerEvents: "none" } : undefined}
         >
           <AxisRuler
             axis="y"
@@ -1672,44 +1924,50 @@ function Guide({
   offset,
   idx,
 }: grida.program.document.Guide2D & { idx: number }) {
-  const editor = useCurrentEditor();
+  const editorInstance = useCurrentEditor();
   const { transform } = useTransformState();
+  const eager_canvas_input = useEditorState(editorInstance, (state) =>
+    editor.state.eager_canvas_input(state)
+  );
   const o = cmath.delta.transform(offset, axis, transform);
   const [hover, setHover] = useState(false);
   const [focused, setFocused] = useState(false);
 
-  const bind = useSurfaceGesture({
-    onFocus: ({ event }) => {
-      event.stopPropagation();
-      setFocused(true);
+  const bind = useSurfaceGesture(
+    {
+      onFocus: ({ event }) => {
+        event.stopPropagation();
+        setFocused(true);
+      },
+      onBlur: ({ event }) => {
+        event.stopPropagation();
+        setFocused(false);
+      },
+      onHover: (s) => {
+        if (s.first) setHover(true);
+        if (s.last) setHover(false);
+      },
+      onPointerDown: ({ event }) => {
+        // ensure the div focuses
+        (event.currentTarget as HTMLElement)?.focus();
+        event.preventDefault();
+      },
+      onKeyDown: ({ event }) => {
+        if (event.key === "Delete" || event.key === "Backspace") {
+          editorInstance.commands.deleteGuide(idx);
+        }
+        if (event.key === "Escape") {
+          (event.currentTarget as HTMLElement)?.blur();
+        }
+        event.stopPropagation();
+      },
+      onDragStart: ({ event }) => {
+        editorInstance.surface.surfaceStartGuideGesture(axis, idx);
+        event.preventDefault();
+      },
     },
-    onBlur: ({ event }) => {
-      event.stopPropagation();
-      setFocused(false);
-    },
-    onHover: (s) => {
-      if (s.first) setHover(true);
-      if (s.last) setHover(false);
-    },
-    onPointerDown: ({ event }) => {
-      // ensure the div focuses
-      (event.currentTarget as HTMLElement)?.focus();
-      event.preventDefault();
-    },
-    onKeyDown: ({ event }) => {
-      if (event.key === "Delete" || event.key === "Backspace") {
-        editor.commands.deleteGuide(idx);
-      }
-      if (event.key === "Escape") {
-        (event.currentTarget as HTMLElement)?.blur();
-      }
-      event.stopPropagation();
-    },
-    onDragStart: ({ event }) => {
-      editor.surface.surfaceStartGuideGesture(axis, idx);
-      event.preventDefault();
-    },
-  });
+    { enabled: !eager_canvas_input }
+  );
 
   return (
     <div
@@ -1718,6 +1976,7 @@ function Guide({
       {...bind()}
       data-axis={axis}
       className="pointer-events-auto touch-none cursor-pointer data-[axis='x']:cursor-ew-resize data-[axis='y']:cursor-ns-resize"
+      style={eager_canvas_input ? { pointerEvents: "none" } : undefined}
     >
       <Rule
         width={hover || focused ? 1 : 0.5}
