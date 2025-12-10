@@ -174,25 +174,27 @@ function FigFileImportTab({
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<FigFileImportResult | null>(null);
   const [progress, setProgress] = useState(0);
+  const parseRunIdRef = useRef(0);
 
   const validateFile = (file: File) => {
     return file.name.toLowerCase().endsWith(".fig");
   };
 
-  const handleParse = useCallback(async () => {
-    if (!selectedFile) return;
+  const handleParse = useCallback(async (file: File, runId: number) => {
+    const isStale = () => parseRunIdRef.current !== runId;
 
     setParsing(true);
+    setParsed(null);
+    setStep("select");
     setProgress(0);
 
     try {
-      const file = selectedFile;
-
       // Read file with progress tracking
       const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
         const reader = new FileReader();
 
         reader.onprogress = (e) => {
+          if (isStale()) return;
           if (e.lengthComputable) {
             const fileProgress = Math.round((e.loaded / e.total) * 100);
             setProgress(fileProgress);
@@ -200,6 +202,7 @@ function FigFileImportTab({
         };
 
         reader.onload = () => {
+          if (isStale()) return;
           setProgress(100);
           resolve(reader.result as ArrayBuffer);
         };
@@ -208,6 +211,8 @@ function FigFileImportTab({
 
         reader.readAsArrayBuffer(file);
       });
+
+      if (isStale()) return;
 
       const fileBytes = new Uint8Array(buffer);
 
@@ -228,7 +233,16 @@ function FigFileImportTab({
         console.debug("Could not extract thumbnail:", e);
       }
 
+      if (isStale()) {
+        if (thumbnailUrl) {
+          URL.revokeObjectURL(thumbnailUrl);
+        }
+        return;
+      }
+
       const figFile = FigImporter.parseFile(fileBytes);
+
+      if (isStale()) return;
 
       const result = {
         file,
@@ -245,17 +259,31 @@ function FigFileImportTab({
     } catch (error) {
       toast.error("Failed to parse .fig file");
       console.error(error);
+      if (!isStale()) {
+        // Mark failure to prevent repeated attempts for the same file
+        setParsed({
+          file,
+          sceneCount: 0,
+          scenes: [],
+          thumbnailUrl: undefined,
+        });
+      }
     } finally {
-      setParsing(false);
+      if (!isStale()) {
+        setParsing(false);
+      }
     }
-  }, [selectedFile]);
+  }, []);
 
   // Auto-parse when file is selected
   useEffect(() => {
-    if (selectedFile && !parsed && !parsing) {
-      handleParse();
-    }
-  }, [selectedFile, parsed, parsing, handleParse]);
+    if (!selectedFile) return;
+
+    const nextRunId = parseRunIdRef.current + 1;
+    parseRunIdRef.current = nextRunId;
+
+    handleParse(selectedFile, nextRunId);
+  }, [selectedFile, handleParse]);
 
   const handleImport = async () => {
     if (!parsed || !selectedFile || !onImportFig) return;
