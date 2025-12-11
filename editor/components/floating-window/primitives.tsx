@@ -10,6 +10,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useDrag } from "@use-gesture/react";
 
 export type BoundsRenderProps = {
@@ -21,6 +22,33 @@ export type FloatingWindowBoundsProps = {
   style?: CSSProperties;
   children: React.ReactNode | ((props: BoundsRenderProps) => React.ReactNode);
 };
+
+export function FloatingWindowPortal({
+  children,
+  container,
+}: {
+  children: React.ReactNode;
+  container?: HTMLElement | null;
+}) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const target =
+    mounted && typeof document !== "undefined"
+      ? (container ?? document.body)
+      : null;
+  if (!target) return null;
+
+  return createPortal(
+    <div className="pointer-events-none fixed inset-0 z-[9999]">
+      {children}
+    </div>,
+    target
+  );
+}
 
 export function FloatingWindowBounds({
   className,
@@ -116,6 +144,8 @@ export type FloatingWindowRootProps = {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   controls?: FloatingWindowControls;
+  portal?: boolean;
+  portalContainer?: HTMLElement | null;
   render?: (helpers: FloatingWindowRenderProps) => React.ReactNode;
   children?:
     | React.ReactNode
@@ -140,6 +170,8 @@ export function FloatingWindowRoot({
   defaultOpen = true,
   onOpenChange,
   controls: providedControls,
+  portal = true,
+  portalContainer,
 }: FloatingWindowRootProps) {
   const windowRef = useRef<HTMLDivElement | null>(null);
   const registry = useContext(FloatingWindowRegistryContext);
@@ -150,6 +182,7 @@ export function FloatingWindowRoot({
   });
   const controls = providedControls ?? localControls;
   const boundarySize = useElementSize(boundaryRef);
+  const boundaryRect = useElementRect(boundaryRef);
   const windowSize = useElementSize(windowRef);
   const [dragging, setDragging] = useState(false);
   const positionRef = useRef<{ x: number; y: number }>({
@@ -163,8 +196,10 @@ export function FloatingWindowRoot({
   const applyPosition = (pos: { x: number; y: number }) => {
     const el = windowRef.current;
     if (!el) return;
-    el.style.setProperty("--floating-window-x", `${pos.x}px`);
-    el.style.setProperty("--floating-window-y", `${pos.y}px`);
+    const offsetX = boundaryRect?.left ?? 0;
+    const offsetY = boundaryRect?.top ?? 0;
+    el.style.setProperty("--floating-window-x", `${pos.x + offsetX}px`);
+    el.style.setProperty("--floating-window-y", `${pos.y + offsetY}px`);
   };
 
   useLayoutEffect(() => {
@@ -222,8 +257,9 @@ export function FloatingWindowRoot({
   ]);
 
   const clampToBoundary = (x: number, y: number) => {
+    // If boundary metrics aren't ready yet, allow movement freely.
     if (!boundarySize || !windowSize) {
-      return positionRef.current;
+      return { x, y };
     }
 
     const boundaryW = boundarySize.width;
@@ -287,7 +323,7 @@ export function FloatingWindowRoot({
     return null;
   }
 
-  return (
+  const content = (
     <div
       ref={windowRef}
       data-floating-window
@@ -308,6 +344,16 @@ export function FloatingWindowRoot({
     >
       {renderContent}
     </div>
+  );
+
+  if (!portal) {
+    return content;
+  }
+
+  return (
+    <FloatingWindowPortal container={portalContainer}>
+      {content}
+    </FloatingWindowPortal>
   );
 }
 
@@ -505,4 +551,37 @@ function useElementSize(
   }, [ref]);
 
   return size;
+}
+
+function useElementRect(
+  ref: React.RefObject<HTMLElement | null>
+): DOMRect | null {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      const next = el.getBoundingClientRect();
+      setRect(next);
+    };
+
+    update();
+
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+
+    const onScrollOrResize = () => update();
+    window.addEventListener("resize", onScrollOrResize);
+    window.addEventListener("scroll", onScrollOrResize, true);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", onScrollOrResize);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+    };
+  }, [ref]);
+
+  return rect;
 }

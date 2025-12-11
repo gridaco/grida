@@ -42,13 +42,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
+  FloatingWindowHost,
+  FloatingWindowBounds,
+  FloatingWindowRoot,
+  FloatingWindowTitleBar,
+  FloatingWindowBody,
+  FloatingWindowClose,
+  FloatingWindowTrigger,
+  useFloatingWindowControls,
+} from "@/components/floating-window";
+import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { saveAs } from "file-saver";
 import { v4 } from "uuid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
@@ -81,7 +90,6 @@ import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import { editor } from "@/grida-canvas";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
-import { LibraryContent } from "./library";
 import { EditorYSyncPlugin } from "@/grida-canvas/plugins/yjs";
 import { Editor } from "@/grida-canvas/editor";
 import { PlayerAvatar } from "@/components/multiplayer/avatar";
@@ -98,6 +106,8 @@ import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { PlaygroundMenuContent } from "./uxhost-menu";
+import { IconsBrowser, type IconsBrowserItem } from "./icons-browser";
+import { X } from "lucide-react";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -356,6 +366,31 @@ function Consumer({
   } = useUILayout();
   const instance = useCurrentEditor();
   const debug = useEditorState(instance, (state) => state.debug);
+  const iconsWindowControls = useFloatingWindowControls({
+    defaultOpen: false,
+  });
+  const handleInsertIcon = useCallback(
+    async (icon: IconsBrowserItem) => {
+      const task = fetch(icon.download, { cache: "no-store" })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error("Failed to fetch icon");
+          }
+          return res.text();
+        })
+        .then((svg) => instance.commands.createNodeFromSvg(svg))
+        .then((node) => {
+          node.$.name = icon.name || node.$.name;
+        });
+
+      toast.promise(task, {
+        loading: "Loading icon...",
+        success: "Icon inserted",
+        error: "Failed to insert icon",
+      });
+    },
+    [instance.commands]
+  );
 
   // Check if there are selected nodes for conditional sidebar display
   const hasSelection = useEditorState(
@@ -411,56 +446,99 @@ function Consumer({
   return (
     <AgentChatProvider>
       <PreviewProvider>
-        <div className="flex w-full h-full">
-          {ui.sidebar_left && (
-            <SidebarLeft
-              toggleVisibility={toggleVisibility}
-              toggleMinimal={toggleMinimal}
-            />
-          )}
-          <EditorSurfaceClipboardSyncProvider />
-          <EditorSurfaceDropzone>
-            <EditorSurfaceContextMenu>
-              <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
-                <ViewportRoot className="relative w-full h-full overflow-hidden">
-                  <Hotkyes />
-                  <EditorSurface />
-                  <LocalFakeCursorChat />
-                  {/* {backend === "canvas" && (
+        <FloatingWindowHost>
+          <FloatingWindowBounds>
+            {({ boundaryRef }) => (
+              <>
+                <div className="flex w-full h-full">
+                  {ui.sidebar_left && (
+                    <SidebarLeft
+                      toggleVisibility={toggleVisibility}
+                      toggleMinimal={toggleMinimal}
+                      iconsWindowControls={iconsWindowControls}
+                    />
+                  )}
+                  <EditorSurfaceClipboardSyncProvider />
+                  <EditorSurfaceDropzone>
+                    <EditorSurfaceContextMenu>
+                      <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+                        <ViewportRoot className="relative w-full h-full overflow-hidden">
+                          <Hotkyes />
+                          <EditorSurface />
+                          <LocalFakeCursorChat />
+                          {/* {backend === "canvas" && (
                     <__WIP_UNSTABLE_WasmContent editor={instance} />
                   )} */}
-                  {backend === "canvas" && <Canvas ref={canvasRef} />}
-                  {backend === "dom" && (
-                    <AutoInitialFitTransformer>
-                      <StandaloneSceneContent />
-                    </AutoInitialFitTransformer>
+                          {backend === "canvas" && <Canvas ref={canvasRef} />}
+                          {backend === "dom" && (
+                            <AutoInitialFitTransformer>
+                              <StandaloneSceneContent />
+                            </AutoInitialFitTransformer>
+                          )}
+                          {ui.toolbar_bottom && (
+                            <>
+                              <BrushToolbarPosition>
+                                <BrushToolbar />
+                              </BrushToolbarPosition>
+                              <PathToolbarPosition>
+                                <PathToolbar />
+                              </PathToolbarPosition>
+                              <ToolbarPosition>
+                                <PlaygroundToolbar />
+                              </ToolbarPosition>
+                            </>
+                          )}
+                        </ViewportRoot>
+                        {debug && <DevtoolsPanel />}
+                      </StandaloneSceneBackground>
+                    </EditorSurfaceContextMenu>
+                  </EditorSurfaceDropzone>
+                  {should_show_sidebar_right && (
+                    <SidebarRight
+                      variant={sidebar_right_variant}
+                      tab={rightSidebarTab}
+                      setTab={setRightSidebarTab}
+                    />
                   )}
-                  {ui.toolbar_bottom && (
+                </div>
+                <FloatingWindowRoot
+                  windowId="icons-browser"
+                  boundaryRef={boundaryRef}
+                  initialX={260}
+                  initialY={120}
+                  width={360}
+                  height={560}
+                  defaultOpen={false}
+                  controls={iconsWindowControls}
+                  className="z-[999] max-h-[calc(100vh-48px)] overflow-hidden flex flex-col"
+                  render={({ dragHandleProps, controls }) => (
                     <>
-                      <BrushToolbarPosition>
-                        <BrushToolbar />
-                      </BrushToolbarPosition>
-                      <PathToolbarPosition>
-                        <PathToolbar />
-                      </PathToolbarPosition>
-                      <ToolbarPosition>
-                        <PlaygroundToolbar />
-                      </ToolbarPosition>
+                      <FloatingWindowTitleBar dragHandleProps={dragHandleProps}>
+                        <span className="font-medium text-sm">
+                          Icons Browser
+                        </span>
+                        <span className="text-[10px] text-muted-foreground ml-2">
+                          Powered by icons.grida.co
+                        </span>
+                        <FloatingWindowClose
+                          windowId="icons-browser"
+                          controls={controls}
+                          className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" aria-hidden />
+                          <span className="sr-only">Close</span>
+                        </FloatingWindowClose>
+                      </FloatingWindowTitleBar>
+                      <FloatingWindowBody className="p-0 text-sm h-full flex flex-col overflow-hidden">
+                        <IconsBrowser onInsert={handleInsertIcon} />
+                      </FloatingWindowBody>
                     </>
                   )}
-                </ViewportRoot>
-                {debug && <DevtoolsPanel />}
-              </StandaloneSceneBackground>
-            </EditorSurfaceContextMenu>
-          </EditorSurfaceDropzone>
-          {should_show_sidebar_right && (
-            <SidebarRight
-              variant={sidebar_right_variant}
-              tab={rightSidebarTab}
-              setTab={setRightSidebarTab}
-            />
-          )}
-        </div>
+                />
+              </>
+            )}
+          </FloatingWindowBounds>
+        </FloatingWindowHost>
       </PreviewProvider>
 
       {ui.help_fab && rightSidebarTab !== "agent" && (
@@ -543,65 +621,50 @@ function LocalFakeCursorChat() {
 function SidebarLeft({
   toggleVisibility,
   toggleMinimal,
+  iconsWindowControls,
 }: {
   toggleVisibility?: () => void;
   toggleMinimal?: () => void;
+  iconsWindowControls?: ReturnType<typeof useFloatingWindowControls>;
 }) {
-  const libraryDialog = useDialogState("library");
-
   return (
     <aside className="relative">
       <div className="absolute top-4 -right-14 z-50">
-        <Button
-          variant={libraryDialog.open ? "default" : "outline"}
-          className="size-8 rounded-full p-0"
-          onClick={libraryDialog.openDialog}
+        <FloatingWindowTrigger
+          windowId="icons-browser"
+          controls={iconsWindowControls}
+          asChild
         >
-          <PlusIcon className="size-4" />
-        </Button>
+          <Button variant="outline" className="size-8 rounded-full p-0">
+            <PlusIcon className="size-4" />
+          </Button>
+        </FloatingWindowTrigger>
       </div>
-      {libraryDialog.open ? (
-        <>
-          <DialogPrimitive.Root {...libraryDialog.props}>
-            <DialogPrimitive.Content className="h-full">
-              <DialogPrimitive.Title className="sr-only">
-                Library
-              </DialogPrimitive.Title>
-              <SidebarRoot>
-                <LibraryContent />
-              </SidebarRoot>
-            </DialogPrimitive.Content>
-          </DialogPrimitive.Root>
-        </>
-      ) : (
-        <>
-          <Sidebar>
-            <SidebarHeader className="p-0">
-              <DarwinSidebarHeaderDragArea />
-              <header className="h-11 min-h-11 flex items-center px-4 border-b">
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="me-2">
-                    <GridaLogo className="inline-block size-4" />
-                  </DropdownMenuTrigger>
-                  <PlaygroundMenuContent
-                    toggleVisibility={toggleVisibility}
-                    toggleMinimal={toggleMinimal}
-                  />
-                </DropdownMenu>
-                <span className="font-bold text-xs">
-                  Canvas
-                  <Badge variant="outline" className="ms-2 text-xs">
-                    BETA
-                  </Badge>
-                </span>
-              </header>
-            </SidebarHeader>
-            <SidebarContent className="p-0 overflow-hidden">
-              <DocumentHierarchy />
-            </SidebarContent>
-          </Sidebar>
-        </>
-      )}
+      <Sidebar>
+        <SidebarHeader className="p-0">
+          <DarwinSidebarHeaderDragArea />
+          <header className="h-11 min-h-11 flex items-center px-4 border-b">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="me-2">
+                <GridaLogo className="inline-block size-4" />
+              </DropdownMenuTrigger>
+              <PlaygroundMenuContent
+                toggleVisibility={toggleVisibility}
+                toggleMinimal={toggleMinimal}
+              />
+            </DropdownMenu>
+            <span className="font-bold text-xs">
+              Canvas
+              <Badge variant="outline" className="ms-2 text-xs">
+                BETA
+              </Badge>
+            </span>
+          </header>
+        </SidebarHeader>
+        <SidebarContent className="p-0 overflow-hidden">
+          <DocumentHierarchy />
+        </SidebarContent>
+      </Sidebar>
     </aside>
   );
 }

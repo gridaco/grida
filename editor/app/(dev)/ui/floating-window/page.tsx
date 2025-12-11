@@ -10,6 +10,11 @@ import {
   FloatingWindowTrigger,
 } from "@/components/floating-window";
 import { X } from "lucide-react";
+import {
+  IconsBrowser,
+  type IconsBrowserItem,
+} from "@/grida-canvas-hosted/playground/icons-browser";
+import { toast } from "sonner";
 
 export default function FloatingWindowDemoPage() {
   return (
@@ -43,10 +48,10 @@ export default function FloatingWindowDemoPage() {
                 Open Console
               </FloatingWindowTrigger>
               <FloatingWindowTrigger
-                windowId="emoji"
+                windowId="icons"
                 className="text-sm text-primary hover:underline"
               >
-                Open Emoji
+                Open Icons Browser
               </FloatingWindowTrigger>
             </div>
             <FloatingWindowBounds>
@@ -121,20 +126,24 @@ export default function FloatingWindowDemoPage() {
                   />
 
                   <FloatingWindowRoot
-                    windowId="emoji"
+                    windowId="icons"
                     boundaryRef={boundaryRef}
                     initialX={320}
                     initialY={80}
-                    width={320}
-                    height={280}
+                    width={420}
+                    height={520}
+                    className="max-h-[calc(100vh-48px)] overflow-hidden flex flex-col"
                     render={({ dragHandleProps, controls }) => (
                       <>
                         <FloatingWindowTitleBar
                           dragHandleProps={dragHandleProps}
                         >
-                          <span className="font-medium">Emoji Search</span>
+                          <span className="font-medium">Icons Browser</span>
+                          <span className="text-[10px] text-muted-foreground ml-2">
+                            Powered by icons.grida.co
+                          </span>
                           <FloatingWindowClose
-                            windowId="emoji"
+                            windowId="icons"
                             controls={controls}
                             className="ml-auto text-xs text-muted-foreground hover:text-foreground"
                           >
@@ -142,47 +151,12 @@ export default function FloatingWindowDemoPage() {
                             <span className="sr-only">Close</span>
                           </FloatingWindowClose>
                         </FloatingWindowTitleBar>
-                        <FloatingWindowBody className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <input
-                              placeholder="Search emoji"
-                              className="w-full rounded-md border px-2 py-1 text-sm"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                              ⌘K
-                            </span>
-                          </div>
-                          <div className="space-y-1.5 max-h-48 overflow-auto">
-                            {[
-                              "😀 Grinning",
-                              "😎 Cool",
-                              "🤣 ROFL",
-                              "😍 Heart Eyes",
-                              "🤔 Thinking",
-                              "🔥 Fire",
-                              "✨ Sparkles",
-                              "🎉 Party Popper",
-                              "✅ Check",
-                              "❌ Cross",
-                              "👍 Thumbs Up",
-                              "🙏 Thanks",
-                              "🚀 Rocket",
-                              "🌙 Moon",
-                              "⭐ Star",
-                              "🍕 Pizza",
-                              "🍔 Burger",
-                              "☕ Coffee",
-                              "💡 Idea",
-                              "🔍 Search",
-                            ].map((label) => (
-                              <button
-                                key={label}
-                                className="w-full text-left px-2 py-1 rounded-md hover:bg-muted transition"
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </div>
+                        <FloatingWindowBody className="text-sm p-0 h-full flex flex-col overflow-hidden">
+                          <IconsBrowser
+                            onInsert={(icon: IconsBrowserItem) => {
+                              toast.success(`Selected ${icon.name}`);
+                            }}
+                          />
                         </FloatingWindowBody>
                       </>
                     )}

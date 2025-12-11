@@ -10,6 +10,7 @@ import {
   FloatingWindowBody as PrimitiveBody,
   FloatingWindowTrigger as PrimitiveTrigger,
   FloatingWindowClose as PrimitiveClose,
+  FloatingWindowPortal as PrimitivePortal,
   useFloatingWindowControls,
   type FloatingWindowRootProps,
   type TitleBarProps,
@@ -85,4 +86,10 @@ export function FloatingWindowTrigger(props: TriggerProps) {
 
 export function FloatingWindowClose(props: CloseProps) {
   return <PrimitiveClose {...props} />;
+}
+
+export function FloatingWindowPortal(
+  props: React.ComponentProps<typeof PrimitivePortal>
+) {
+  return <PrimitivePortal {...props} />;
 }
