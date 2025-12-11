@@ -8,7 +8,6 @@ import React, {
   useState,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
@@ -517,12 +516,7 @@ export function IconsBrowser({ onInsert }: IconsBrowserProps) {
   const handleInsert = useCallback(
     async (icon: IconsBrowserItem) => {
       if (!onInsert) return;
-      const task = Promise.resolve(onInsert(icon));
-      toast.promise(task, {
-        loading: "Loading icon...",
-        success: "Icon inserted",
-        error: "Failed to insert icon",
-      });
+      await onInsert(icon);
     },
     [onInsert]
   );
