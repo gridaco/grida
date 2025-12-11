@@ -43,9 +43,7 @@ export function FloatingWindowPortal({
   if (!target) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[9999]">
-      {children}
-    </div>,
+    <div className="pointer-events-none fixed inset-0 z-50">{children}</div>,
     target
   );
 }
