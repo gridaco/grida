@@ -13,7 +13,7 @@ import { X } from "lucide-react";
 import {
   IconsBrowser,
   type IconsBrowserItem,
-} from "@/grida-canvas-hosted/playground/icons-browser";
+} from "@/grida-canvas-hosted/library/icons-browser";
 import { toast } from "sonner";
 
 export default function FloatingWindowDemoPage() {

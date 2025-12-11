@@ -106,7 +106,7 @@ import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { PlaygroundMenuContent } from "./uxhost-menu";
-import { IconsBrowser, type IconsBrowserItem } from "./icons-browser";
+import { IconsBrowser, type IconsBrowserItem } from "../library/icons-browser";
 import { X } from "lucide-react";
 
 // Custom hook for managing UI layout state
