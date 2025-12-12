@@ -1,7 +1,18 @@
 "use server";
 
 import { createApi } from "unsplash-js";
-import type { Basic as PhotoBasic } from "unsplash-js/dist/methods/photos/types";
+import type { Basic as _PhotoBasic } from "unsplash-js/dist/methods/photos/types";
+
+type UnsplashPhoto = _PhotoBasic & {
+  /**
+   * if the photo is from Unsplash+, it will be true - this should be filtered out
+   */
+  plus: boolean;
+  /**
+   * if the photo is premium, it will be true - this should be filtered out
+   */
+  premium: boolean;
+};
 
 export type PhotoAsset = {
   id: string;
@@ -12,6 +23,7 @@ export type PhotoAsset = {
   color?: string;
   blurHash?: string;
   premium?: boolean;
+  plus?: boolean;
   urls: {
     raw: string;
     full: string;
@@ -92,7 +104,7 @@ const getClient = () => {
   return clientCache;
 };
 
-const normalizePhoto = (photo: PhotoBasic): PhotoAsset => {
+const normalizePhoto = (photo: _PhotoBasic | UnsplashPhoto): PhotoAsset => {
   return {
     id: photo.id,
     alt: photo.alt_description || photo.description || "Untitled photo",
@@ -101,7 +113,8 @@ const normalizePhoto = (photo: PhotoBasic): PhotoAsset => {
     height: photo.height,
     color: photo.color || undefined,
     blurHash: photo.blur_hash || undefined,
-    premium: false,
+    premium: "premium" in photo ? photo.premium : false,
+    plus: "plus" in photo ? photo.plus : false,
     urls: photo.urls,
     link: photo.links.html,
     author: {
@@ -120,7 +133,7 @@ const normalizePhoto = (photo: PhotoBasic): PhotoAsset => {
  * Filters out premium (Unsplash+) photos, keeping only free photos
  */
 const filterFreePhotos = (photos: PhotoAsset[]): PhotoAsset[] => {
-  return photos.filter((photo) => !photo.premium);
+  return photos.filter((photo) => !photo.premium && !photo.plus);
 };
 
 async function getRandomPhotos(
@@ -164,6 +177,8 @@ async function getTopicPhotos({
   if (!res.response) {
     throw new Error("No response from Unsplash topic photos API.");
   }
+
+  console.log("res.response", res.response.results);
 
   const normalized = res.response.results.map(normalizePhoto);
   const freeResults = filterFreePhotos(normalized);
