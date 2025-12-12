@@ -109,7 +109,8 @@ export function Library() {
       const task = (async () => {
         try {
           // raw might be too big?
-          const imageUrl = photo.urls.full || photo.urls.raw;
+          // const imageUrl = photo.urls.full || photo.urls.raw;
+          const imageUrl = photo.urls.regular;
           if (!imageUrl) {
             throw new Error("No image URL available");
           }
