@@ -178,8 +178,6 @@ async function getTopicPhotos({
     throw new Error("No response from Unsplash topic photos API.");
   }
 
-  console.log("res.response", res.response.results);
-
   const normalized = res.response.results.map(normalizePhoto);
   const freeResults = filterFreePhotos(normalized);
 
