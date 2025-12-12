@@ -35,7 +35,7 @@ import {
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { PlusIcon, Cross1Icon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -106,8 +106,7 @@ import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { PlaygroundMenuContent } from "./uxhost-menu";
-import { IconsBrowser, type IconsBrowserItem } from "../library/icons-browser";
-import { X } from "lucide-react";
+import { Library } from "../library/library";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -366,31 +365,9 @@ function Consumer({
   } = useUILayout();
   const instance = useCurrentEditor();
   const debug = useEditorState(instance, (state) => state.debug);
-  const iconsWindowControls = useFloatingWindowControls({
+  const libraryWindowControls = useFloatingWindowControls({
     defaultOpen: false,
   });
-  const handleInsertIcon = useCallback(
-    async (icon: IconsBrowserItem) => {
-      const task = fetch(icon.download, { cache: "no-store" })
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error("Failed to fetch icon");
-          }
-          return res.text();
-        })
-        .then((svg) => instance.commands.createNodeFromSvg(svg))
-        .then((node) => {
-          node.$.name = icon.name || node.$.name;
-        });
-
-      toast.promise(task, {
-        loading: "Loading icon...",
-        success: "Icon inserted",
-        error: "Failed to insert icon",
-      });
-    },
-    [instance.commands]
-  );
 
   // Check if there are selected nodes for conditional sidebar display
   const hasSelection = useEditorState(
@@ -455,7 +432,7 @@ function Consumer({
                     <SidebarLeft
                       toggleVisibility={toggleVisibility}
                       toggleMinimal={toggleMinimal}
-                      iconsWindowControls={iconsWindowControls}
+                      libraryWindowControls={libraryWindowControls}
                     />
                   )}
                   <EditorSurfaceClipboardSyncProvider />
@@ -502,35 +479,29 @@ function Consumer({
                   )}
                 </div>
                 <FloatingWindowRoot
-                  windowId="icons-browser"
+                  windowId="library"
                   boundaryRef={boundaryRef}
                   initialX={260}
                   initialY={120}
                   width={360}
                   height={560}
-                  defaultOpen={false}
-                  controls={iconsWindowControls}
+                  controls={libraryWindowControls}
                   className="z-[999] max-h-[calc(100vh-48px)] overflow-hidden flex flex-col"
                   render={({ dragHandleProps, controls }) => (
                     <>
                       <FloatingWindowTitleBar dragHandleProps={dragHandleProps}>
-                        <span className="font-medium text-sm">
-                          Icons Browser
-                        </span>
-                        <span className="text-[10px] text-muted-foreground ml-2">
-                          Powered by icons.grida.co
-                        </span>
+                        <span className="font-medium text-sm">Library</span>
                         <FloatingWindowClose
-                          windowId="icons-browser"
+                          windowId="library"
                           controls={controls}
                           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
                         >
-                          <X className="h-4 w-4" aria-hidden />
+                          <Cross1Icon className="size-4" aria-hidden />
                           <span className="sr-only">Close</span>
                         </FloatingWindowClose>
                       </FloatingWindowTitleBar>
                       <FloatingWindowBody className="p-0 text-sm h-full flex flex-col overflow-hidden">
-                        <IconsBrowser onInsert={handleInsertIcon} />
+                        <Library />
                       </FloatingWindowBody>
                     </>
                   )}
@@ -621,18 +592,18 @@ function LocalFakeCursorChat() {
 function SidebarLeft({
   toggleVisibility,
   toggleMinimal,
-  iconsWindowControls,
+  libraryWindowControls,
 }: {
   toggleVisibility?: () => void;
   toggleMinimal?: () => void;
-  iconsWindowControls?: ReturnType<typeof useFloatingWindowControls>;
+  libraryWindowControls?: ReturnType<typeof useFloatingWindowControls>;
 }) {
   return (
     <aside className="relative">
       <div className="absolute top-4 -right-14 z-50">
         <FloatingWindowTrigger
-          windowId="icons-browser"
-          controls={iconsWindowControls}
+          windowId="library"
+          controls={libraryWindowControls}
           asChild
         >
           <Button variant="outline" className="size-8 rounded-full p-0">

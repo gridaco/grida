@@ -14,13 +14,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui-editor/button";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui-editor/progress";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,
@@ -36,7 +29,10 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { CaretDownIcon, DotIcon } from "@radix-ui/react-icons";
-import { CheckIcon, Search as SearchIcon } from "lucide-react";
+import { CheckIcon } from "lucide-react";
+import { SearchInput } from "./components/search-input";
+import { Pill, PillsList } from "./components/pills";
+import { LoadingIndicator } from "./components/loading-indicator";
 import { cn } from "@/components/lib/utils";
 import {
   ANY_VARIANT,
@@ -49,6 +45,8 @@ import {
   getDefaultVariants,
 } from "./lib-icons";
 
+export type { IconsBrowserItem } from "./lib-icons";
+
 const COLUMN_COUNT = 5;
 const GRID_GAP_PX = 12; // tailwind gap-3
 const GRID_PADDING_X_PX = 4; // tailwind px-1 per side
@@ -59,6 +57,10 @@ type IconFilters = {
 
 export type IconsBrowserProps = {
   onInsert?: (icon: IconsBrowserItem) => Promise<void> | void;
+  onDragStart?: (
+    icon: IconsBrowserItem,
+    event: React.DragEvent<HTMLButtonElement>
+  ) => void;
 };
 
 function useIcons() {
@@ -278,9 +280,18 @@ type IconGridCellProps = {
   icon: IconsBrowserItem;
   cellSize: number;
   onClick: (icon: IconsBrowserItem) => void;
+  onDragStart?: (
+    icon: IconsBrowserItem,
+    event: React.DragEvent<HTMLButtonElement>
+  ) => void;
 };
 
-const IconGridCell = ({ icon, cellSize, onClick }: IconGridCellProps) => {
+const IconGridCell = ({
+  icon,
+  cellSize,
+  onClick,
+  onDragStart,
+}: IconGridCellProps) => {
   const [loaded, setLoaded] = useState(false);
 
   return (
@@ -289,8 +300,14 @@ const IconGridCell = ({ icon, cellSize, onClick }: IconGridCellProps) => {
         <TooltipTrigger asChild>
           <button
             className="relative flex aspect-square w-full flex-col items-center justify-center gap-1 p-1.5 hover:bg-muted transition text-foreground/80 rounded-sm"
+            draggable={!!onDragStart}
             onClick={() => {
               void onClick(icon);
+            }}
+            onDragStart={(e) => {
+              if (onDragStart) {
+                onDragStart(icon, e);
+              }
             }}
             style={{ maxHeight: cellSize }}
           >
@@ -321,7 +338,7 @@ const IconGridCell = ({ icon, cellSize, onClick }: IconGridCellProps) => {
   );
 };
 
-export function IconsBrowser({ onInsert }: IconsBrowserProps) {
+export function IconsBrowser({ onInsert, onDragStart }: IconsBrowserProps) {
   const {
     filteredIcons,
     loading,
@@ -390,53 +407,29 @@ export function IconsBrowser({ onInsert }: IconsBrowserProps) {
     <div className="text-sm pointer-events-auto bg-background h-full flex flex-col">
       <header className="space-y-2 border-b">
         <div className="flex gap-2 pt-2 px-2">
-          <InputGroup className="h-7">
-            <InputGroupAddon align="inline-start" className="ps-2">
-              <SearchIcon className="size-3 " />
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="Search icons"
-              className="!text-xs placeholder:text-xs"
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </InputGroup>
+          <SearchInput
+            placeholder="Search icons"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
         <div className="w-full space-y-1 pb-2">
           {vendors.length > 0 && (
-            <div className="relative">
-              <ScrollArea type="scroll" className="w-full">
-                <div className="flex gap-1 px-2">
-                  <button
-                    className={`rounded-full border px-2.5 py-1 text-[11px] whitespace-nowrap ${
-                      selectedVendor === null
-                        ? "bg-primary text-primary-foreground"
-                        : "text-foreground/80 hover:bg-muted"
-                    }`}
-                    onClick={() => selectVendor(null)}
-                  >
-                    All
-                  </button>
-                  {vendors.map((vendor) => (
-                    <button
-                      key={vendor.id}
-                      className={`h-7 rounded-full border px-2.5 py-1 text-[11px] whitespace-nowrap ${
-                        selectedVendor === vendor.vendor
-                          ? "bg-primary text-primary-foreground"
-                          : "text-foreground/80 hover:bg-muted"
-                      }`}
-                      onClick={() => selectVendor(vendor.vendor)}
-                    >
-                      {vendor.name} ({vendor.count})
-                    </button>
-                  ))}
-                </div>
-                <ScrollBar orientation="horizontal" className="hidden" />
-              </ScrollArea>
-              <div className="pointer-events-none absolute inset-y-0 left-0 w-2 bg-gradient-to-r from-background to-transparent" />
-              <div className="pointer-events-none absolute inset-y-0 right-0 w-2 bg-gradient-to-l from-background to-transparent" />
-            </div>
+            <PillsList>
+              <Pill
+                label="All"
+                active={selectedVendor === null}
+                onClick={() => selectVendor(null)}
+              />
+              {vendors.map((vendor) => (
+                <Pill
+                  key={vendor.id}
+                  label={`${vendor.name} (${vendor.count})`}
+                  active={selectedVendor === vendor.vendor}
+                  onClick={() => selectVendor(vendor.vendor)}
+                />
+              ))}
+            </PillsList>
           )}
           {currentVendor && Object.keys(currentVendor.variants).length > 0 && (
             <div className="flex items-center gap-2 px-2">
@@ -468,9 +461,7 @@ export function IconsBrowser({ onInsert }: IconsBrowserProps) {
           )}
         </div>
       </header>
-      <div className="w-full overflow-visible" style={{ height: 0 }}>
-        {loading && <Progress className="h-px" indeterminate />}
-      </div>
+      <LoadingIndicator loading={loading} />
       {error && (
         <div className="text-xs text-destructive">Failed to load: {error}</div>
       )}
@@ -523,6 +514,7 @@ export function IconsBrowser({ onInsert }: IconsBrowserProps) {
                       icon={icon}
                       cellSize={cellSize}
                       onClick={handleInsert}
+                      onDragStart={onDragStart}
                     />
                   );
                 })}
