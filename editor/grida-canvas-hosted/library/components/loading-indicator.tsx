@@ -15,10 +15,10 @@ export function LoadingIndicator({
 }: LoadingIndicatorProps) {
   return (
     <div
-      className="w-full overflow-visible"
+      className={cn("w-full overflow-visible z-10", className)}
       style={{ height: 0, opacity: loading ? 1 : 0 }}
     >
-      <Progress className={cn("rounded-none h-0.5", className)} indeterminate />
+      <Progress className={"rounded-none h-0.5"} indeterminate />
     </div>
   );
 }
