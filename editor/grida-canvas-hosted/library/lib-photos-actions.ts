@@ -168,12 +168,18 @@ async function getTopicPhotos({
   const normalized = res.response.results.map(normalizePhoto);
   const freeResults = filterFreePhotos(normalized);
 
+  // Use the actual API total, but note that after filtering premium photos,
+  // the actual available results may be less. We'll use the API total as an estimate.
+  const apiTotal = res.response.total ?? 0;
+  // Calculate totalPages from total and perPage (API may not provide total_pages directly)
+  const apiTotalPages = Math.ceil(apiTotal / perPage);
+
   return {
     query: topicSlug,
     page,
     perPage,
-    total: freeResults.length,
-    totalPages: Math.ceil(freeResults.length / perPage),
+    total: apiTotal,
+    totalPages: apiTotalPages,
     results: freeResults,
   };
 }
@@ -205,12 +211,18 @@ async function searchPhotos({
   const normalized = res.response.results.map(normalizePhoto);
   const freeResults = filterFreePhotos(normalized);
 
+  // Use the actual API total, but note that after filtering premium photos,
+  // the actual available results may be less. We'll use the API total as an estimate.
+  const apiTotal = res.response.total ?? 0;
+  // Calculate totalPages from total and perPage (API may not provide total_pages directly)
+  const apiTotalPages = Math.ceil(apiTotal / perPage);
+
   return {
     query: trimmedQuery,
     page,
     perPage,
-    total: freeResults.length,
-    totalPages: Math.ceil(freeResults.length / perPage),
+    total: apiTotal,
+    totalPages: apiTotalPages,
     results: freeResults,
   };
 }
@@ -239,11 +251,13 @@ export async function fetchPhotosAction({
   query,
   perPage = 18,
   topicSlug,
+  page = 1,
 }: {
   mode: PhotoActionState["mode"];
   query: string;
   perPage?: number;
   topicSlug?: string;
+  page?: number;
 }): Promise<PhotoActionState> {
   const safeQuery = query?.trim() ?? "";
   try {
@@ -266,7 +280,7 @@ export async function fetchPhotosAction({
       }
       const topicResult = await getTopicPhotos({
         topicSlug,
-        page: 1,
+        page,
         perPage: perPage || 18,
       });
       return {
@@ -282,7 +296,7 @@ export async function fetchPhotosAction({
 
     const searchResult = await searchPhotos({
       query: safeQuery,
-      page: 1,
+      page,
       perPage: perPage || 18,
     });
     return {
