@@ -8,20 +8,12 @@ import React, {
   useState,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui-editor/button";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui-editor/progress";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,
@@ -37,98 +29,38 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { CaretDownIcon, DotIcon } from "@radix-ui/react-icons";
-import { CheckIcon, Search as SearchIcon } from "lucide-react";
+import { CheckIcon } from "lucide-react";
+import { SearchInput } from "./components/search-input";
+import { Pill, PillsList } from "./components/pills";
+import { LoadingIndicator } from "./components/loading-indicator";
 import { cn } from "@/components/lib/utils";
+import {
+  ANY_VARIANT,
+  IconVendor,
+  IconVendorId,
+  IconsBrowserItem,
+  VendorVariantSpec,
+  fetchIconVendors,
+  fetchIcons as fetchIconsFromApi,
+  getDefaultVariants,
+} from "./lib-icons";
 
-export type IconsBrowserItem = {
-  id: string;
-  name: string;
-  download: string;
-  tags?: string[];
-  vendor?: string;
-};
+export type { IconsBrowserItem } from "./lib-icons";
 
-type IconVendor = {
-  id: string;
-  name: string;
-  vendor: IconVendorId;
-  count: number;
-  categories: GridaIconsLibraryCategory[];
-  variants: Record<string, VendorVariantSpec>;
-};
-
-type VendorVariantSpec = {
-  title: string;
-  default: string;
-  enum: string[];
-};
-
-const ICONS_API_URL = "https://icons.grida.co/api";
-const ICONS_VENDORS_API_URL = "https://icons.grida.co/api/vendors";
 const COLUMN_COUNT = 5;
 const GRID_GAP_PX = 12; // tailwind gap-3
 const GRID_PADDING_X_PX = 4; // tailwind px-1 per side
-const ALLOWED_CATEGORY: GridaIconsLibraryCategory =
-  "grida://library/categories/icons-ui";
-type IconVendorId = string;
-const ANY_VARIANT = "__any";
 type IconFilters = {
   vendor: IconVendorId | null;
   variants: Record<string, string>;
 };
 
-export type GridaIconsLibraryCategory =
-  | "grida://library/categories/logos"
-  | "grida://library/categories/icons-ui"
-  | (string & {});
-
-const toTitleCase = (value: string) => {
-  return value
-    .replace(/[-_]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
-
-function buildVariants(
-  v?: Record<
-    string,
-    {
-      title?: string;
-      default?: string;
-      enum?: string[];
-    }
-  >
-): Record<string, VendorVariantSpec> {
-  if (!v) return {};
-  const entries = Object.entries(v).flatMap(([key, spec]) => {
-    if (!spec?.enum || !Array.isArray(spec.enum) || spec.enum.length === 0) {
-      return [];
-    }
-    return [
-      [
-        key,
-        {
-          title: spec.title ?? key,
-          default: spec.default ?? spec.enum[0],
-          enum: spec.enum,
-        } satisfies VendorVariantSpec,
-      ] as const,
-    ];
-  });
-  return Object.fromEntries(entries);
-}
-
-const getDefaultVariants = (vendor?: IconVendor): Record<string, string> => {
-  if (!vendor) return {};
-  return Object.fromEntries(
-    Object.entries(vendor.variants).map(([key]) => [key, ANY_VARIANT])
-  );
-};
-
 export type IconsBrowserProps = {
   onInsert?: (icon: IconsBrowserItem) => Promise<void> | void;
+  onDragStart?: (
+    icon: IconsBrowserItem,
+    event: React.DragEvent<HTMLButtonElement>
+  ) => void;
 };
 
 function useIcons() {
@@ -152,92 +84,19 @@ function useIcons() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      if (filters.vendor) {
-        params.set("vendor", filters.vendor);
-      }
-      Object.entries(filters.variants).forEach(([key, value]) => {
-        if (value && value !== ANY_VARIANT) {
-          params.set(`variant:${key}`, value);
-        }
+      const allowedVendors = new Set(vendors.map((v) => v.vendor));
+      const list = await fetchIconsFromApi({
+        vendor: filters.vendor,
+        variants: filters.variants,
+        allowedVendors,
       });
-      const url =
-        params.size > 0
-          ? `${ICONS_API_URL}?${params.toString()}`
-          : ICONS_API_URL;
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) {
-        throw new Error(`Failed to load icons (${res.status})`);
-      }
-      const payload = await res.json();
-      const rawList: any[] =
-        (Array.isArray(payload) && payload) ||
-        payload?.items ||
-        payload?.icons ||
-        payload?.data ||
-        [];
-      const allowedVendors = new Set(
-        vendors
-          .filter((v) => v.categories.includes(ALLOWED_CATEGORY))
-          .map((v) => v.vendor)
-      );
-      const hasAllowed = allowedVendors.size > 0;
-      const normalized = rawList
-        .map((item, index) => {
-          const download = item?.download;
-          if (!download) return null;
-          const vendor = item?.vendor || item?.host || item?.family || "";
-          if (hasAllowed && !allowedVendors.has(vendor)) return null;
-          const baseName =
-            item?.name ||
-            item?.title ||
-            item?.id ||
-            item?.family ||
-            `icon-${index}`;
-          const variant =
-            item?.variant ||
-            item?.properties?.style ||
-            item?.style ||
-            item?.properties?.variant;
-          const size = item?.properties?.size || item?.size;
-          const friendlyBase = toTitleCase(baseName);
-          const metaParts = [variant, size ? `${size}px` : null]
-            .filter(Boolean)
-            .join(", ");
-          const name =
-            metaParts.length > 0
-              ? `${friendlyBase} (${metaParts})`
-              : friendlyBase;
-          const tags = Array.isArray(item?.tags)
-            ? item.tags
-            : Array.isArray(item?.keywords)
-              ? item.keywords
-              : [];
-          return {
-            id: String(
-              [vendor, baseName, variant, size].filter(Boolean).join(":") ||
-                item?.id ||
-                index
-            ),
-            name: String(name),
-            download: String(download),
-            tags: [
-              vendor,
-              variant,
-              size ? `${size}px` : null,
-              ...tags.map((t: any) => String(t)),
-            ].filter(Boolean) as string[],
-            vendor,
-          } satisfies IconsBrowserItem;
-        })
-        .filter(Boolean) as IconsBrowserItem[];
-      setIcons(normalized);
+      setIcons(list);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load icons");
     } finally {
       setLoading(false);
     }
-  }, [filters, vendorsLoaded, vendors]);
+  }, [filters.vendor, filters.variants, vendorsLoaded, vendors]);
 
   useEffect(() => {
     void fetchIcons();
@@ -246,39 +105,15 @@ function useIcons() {
   useEffect(() => {
     const loadVendors = async () => {
       try {
-        const res = await fetch(ICONS_VENDORS_API_URL, {
-          cache: "force-cache",
-        });
-        if (!res.ok) throw new Error(`Failed to load vendors (${res.status})`);
-        const payload = await res.json();
-        const list: IconVendor[] =
-          (payload?.items as any[])?.flatMap((v) => {
-            const rawVendor = v?.vendor ?? v?.id ?? "";
-            if (!rawVendor) return [];
-            return [
-              {
-                id: v?.id ?? rawVendor,
-                name: v?.name ?? rawVendor,
-                vendor: rawVendor as IconVendorId,
-                count: Number(v?.count ?? 0),
-                categories: Array.isArray(v?.categories)
-                  ? (v.categories as GridaIconsLibraryCategory[])
-                  : [],
-                variants: buildVariants(v?.variants),
-              },
-            ];
-          }) ?? [];
-        const filtered = list.filter(
-          (v) => v.id && v.categories.includes(ALLOWED_CATEGORY)
-        );
-        setVendors(filtered);
+        const vendorList = await fetchIconVendors();
+        setVendors(vendorList);
         setFilters((prev) => {
           const nextVendor =
-            prev.vendor && filtered.some((v) => v.vendor === prev.vendor)
+            prev.vendor && vendorList.some((v) => v.vendor === prev.vendor)
               ? prev.vendor
               : null;
           const nextVendorObj =
-            filtered.find((v) => v.vendor === nextVendor) ?? undefined;
+            vendorList.find((v) => v.vendor === nextVendor) ?? undefined;
           return {
             vendor: nextVendor,
             variants: getDefaultVariants(nextVendorObj),
@@ -445,9 +280,18 @@ type IconGridCellProps = {
   icon: IconsBrowserItem;
   cellSize: number;
   onClick: (icon: IconsBrowserItem) => void;
+  onDragStart?: (
+    icon: IconsBrowserItem,
+    event: React.DragEvent<HTMLButtonElement>
+  ) => void;
 };
 
-const IconGridCell = ({ icon, cellSize, onClick }: IconGridCellProps) => {
+const IconGridCell = ({
+  icon,
+  cellSize,
+  onClick,
+  onDragStart,
+}: IconGridCellProps) => {
   const [loaded, setLoaded] = useState(false);
 
   return (
@@ -456,8 +300,14 @@ const IconGridCell = ({ icon, cellSize, onClick }: IconGridCellProps) => {
         <TooltipTrigger asChild>
           <button
             className="relative flex aspect-square w-full flex-col items-center justify-center gap-1 p-1.5 hover:bg-muted transition text-foreground/80 rounded-sm"
+            draggable={!!onDragStart}
             onClick={() => {
               void onClick(icon);
+            }}
+            onDragStart={(e) => {
+              if (onDragStart) {
+                onDragStart(icon, e);
+              }
             }}
             style={{ maxHeight: cellSize }}
           >
@@ -488,7 +338,7 @@ const IconGridCell = ({ icon, cellSize, onClick }: IconGridCellProps) => {
   );
 };
 
-export function IconsBrowser({ onInsert }: IconsBrowserProps) {
+export function IconsBrowser({ onInsert, onDragStart }: IconsBrowserProps) {
   const {
     filteredIcons,
     loading,
@@ -517,12 +367,7 @@ export function IconsBrowser({ onInsert }: IconsBrowserProps) {
   const handleInsert = useCallback(
     async (icon: IconsBrowserItem) => {
       if (!onInsert) return;
-      const task = Promise.resolve(onInsert(icon));
-      toast.promise(task, {
-        loading: "Loading icon...",
-        success: "Icon inserted",
-        error: "Failed to insert icon",
-      });
+      await onInsert(icon);
     },
     [onInsert]
   );
@@ -562,53 +407,29 @@ export function IconsBrowser({ onInsert }: IconsBrowserProps) {
     <div className="text-sm pointer-events-auto bg-background h-full flex flex-col">
       <header className="space-y-2 border-b">
         <div className="flex gap-2 pt-2 px-2">
-          <InputGroup className="h-7">
-            <InputGroupAddon align="inline-start" className="ps-2">
-              <SearchIcon className="size-3 " />
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="Search icons"
-              className="!text-xs placeholder:text-xs"
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </InputGroup>
+          <SearchInput
+            placeholder="Search icons"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
         <div className="w-full space-y-1 pb-2">
           {vendors.length > 0 && (
-            <div className="relative">
-              <ScrollArea type="scroll" className="w-full">
-                <div className="flex gap-1 px-2">
-                  <button
-                    className={`rounded-full border px-2.5 py-1 text-[11px] whitespace-nowrap ${
-                      selectedVendor === null
-                        ? "bg-primary text-primary-foreground"
-                        : "text-foreground/80 hover:bg-muted"
-                    }`}
-                    onClick={() => selectVendor(null)}
-                  >
-                    All
-                  </button>
-                  {vendors.map((vendor) => (
-                    <button
-                      key={vendor.id}
-                      className={`h-7 rounded-full border px-2.5 py-1 text-[11px] whitespace-nowrap ${
-                        selectedVendor === vendor.vendor
-                          ? "bg-primary text-primary-foreground"
-                          : "text-foreground/80 hover:bg-muted"
-                      }`}
-                      onClick={() => selectVendor(vendor.vendor)}
-                    >
-                      {vendor.name} ({vendor.count})
-                    </button>
-                  ))}
-                </div>
-                <ScrollBar orientation="horizontal" className="hidden" />
-              </ScrollArea>
-              <div className="pointer-events-none absolute inset-y-0 left-0 w-2 bg-gradient-to-r from-background to-transparent" />
-              <div className="pointer-events-none absolute inset-y-0 right-0 w-2 bg-gradient-to-l from-background to-transparent" />
-            </div>
+            <PillsList>
+              <Pill
+                label="All"
+                active={selectedVendor === null}
+                onClick={() => selectVendor(null)}
+              />
+              {vendors.map((vendor) => (
+                <Pill
+                  key={vendor.id}
+                  label={`${vendor.name} (${vendor.count})`}
+                  active={selectedVendor === vendor.vendor}
+                  onClick={() => selectVendor(vendor.vendor)}
+                />
+              ))}
+            </PillsList>
           )}
           {currentVendor && Object.keys(currentVendor.variants).length > 0 && (
             <div className="flex items-center gap-2 px-2">
@@ -640,9 +461,7 @@ export function IconsBrowser({ onInsert }: IconsBrowserProps) {
           )}
         </div>
       </header>
-      <div className="w-full overflow-visible" style={{ height: 0 }}>
-        {loading && <Progress className="h-px" indeterminate />}
-      </div>
+      <LoadingIndicator loading={loading} />
       {error && (
         <div className="text-xs text-destructive">Failed to load: {error}</div>
       )}
@@ -695,6 +514,7 @@ export function IconsBrowser({ onInsert }: IconsBrowserProps) {
                       icon={icon}
                       cellSize={cellSize}
                       onClick={handleInsert}
+                      onDragStart={onDragStart}
                     />
                   );
                 })}

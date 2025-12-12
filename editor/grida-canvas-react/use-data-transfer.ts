@@ -11,6 +11,7 @@ import kolor from "@grida/color";
 import { toast } from "sonner";
 import { iofigma } from "@grida/io-figma";
 import { nanoid } from "nanoid";
+import { datatransfer } from "@/grida-canvas/data-transfer";
 
 /**
  * Hook that provides file insertion utilities for the Grida canvas editor.
@@ -583,7 +584,7 @@ export function useDataTransferEventTarget() {
 
       const knwondata = event.dataTransfer.getData("x-grida-data-transfer");
       if (knwondata) {
-        const data = JSON.parse(knwondata);
+        const data = datatransfer.decode(knwondata);
         switch (data.type) {
           case "svg":
             const { name, src } = data;
@@ -601,6 +602,42 @@ export function useDataTransferEventTarget() {
               error: "Failed to insert SVG",
             });
             break;
+          case "image": {
+            const { name, src, width, height } = data;
+            const task = (async () => {
+              const imageRef = await instance.createImageAsync(src);
+              const [x, y] = instance.camera.clientPointToCanvasPoint([
+                event.clientX,
+                event.clientY,
+              ]);
+              const node = instance.commands.createRectangleNode();
+              node.$.position = "absolute";
+              node.$.name = name || "Photo";
+              node.$.left = x;
+              node.$.top = y;
+              node.$.width = width || imageRef.width;
+              node.$.height = height || imageRef.height;
+              node.$.fill_paints = [
+                {
+                  type: "image",
+                  src: imageRef.url,
+                  fit: "cover",
+                  transform: cmath.transform.identity,
+                  filters: cg.def.IMAGE_FILTERS,
+                  blend_mode: cg.def.BLENDMODE,
+                  opacity: 1,
+                  active: true,
+                } satisfies cg.ImagePaint,
+              ];
+            })();
+
+            toast.promise(task, {
+              loading: "Loading image...",
+              success: "Image inserted",
+              error: "Failed to insert image",
+            });
+            break;
+          }
           default:
             // unknown
             break;

@@ -9,14 +9,34 @@ import {
   FloatingWindowClose,
   FloatingWindowTrigger,
 } from "@/components/floating-window";
+import { useCallback, useMemo } from "react";
 import { X } from "lucide-react";
 import {
   IconsBrowser,
   type IconsBrowserItem,
-} from "@/grida-canvas-hosted/playground/icons-browser";
+} from "@/grida-canvas-hosted/library/icons-browser";
+import { PhotosBrowser } from "@/grida-canvas-hosted/library/photos-browser";
 import { toast } from "sonner";
 
 export default function FloatingWindowDemoPage() {
+  const handleIconInsert = useCallback((icon: IconsBrowserItem) => {
+    toast.success(`Selected ${icon.name}`);
+  }, []);
+
+  const handlePhotoInsert = useCallback((photo: { alt?: string }) => {
+    toast.success(`Selected ${photo.alt || "Photo"}`);
+  }, []);
+
+  const iconsPane = useMemo(
+    () => <IconsBrowser onInsert={handleIconInsert} />,
+    [handleIconInsert]
+  );
+
+  const photosPane = useMemo(
+    () => <PhotosBrowser onInsert={handlePhotoInsert} />,
+    [handlePhotoInsert]
+  );
+
   return (
     <main className="min-h-screen bg-slate-50/60 p-8">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -52,6 +72,12 @@ export default function FloatingWindowDemoPage() {
                 className="text-sm text-primary hover:underline"
               >
                 Open Icons Browser
+              </FloatingWindowTrigger>
+              <FloatingWindowTrigger
+                windowId="photos"
+                className="text-sm text-primary hover:underline"
+              >
+                Open Photos Browser
               </FloatingWindowTrigger>
             </div>
             <FloatingWindowBounds>
@@ -152,11 +178,40 @@ export default function FloatingWindowDemoPage() {
                           </FloatingWindowClose>
                         </FloatingWindowTitleBar>
                         <FloatingWindowBody className="text-sm p-0 h-full flex flex-col overflow-hidden">
-                          <IconsBrowser
-                            onInsert={(icon: IconsBrowserItem) => {
-                              toast.success(`Selected ${icon.name}`);
-                            }}
-                          />
+                          {iconsPane}
+                        </FloatingWindowBody>
+                      </>
+                    )}
+                  />
+
+                  <FloatingWindowRoot
+                    windowId="photos"
+                    boundaryRef={boundaryRef}
+                    initialX={220}
+                    initialY={220}
+                    width={420}
+                    height={520}
+                    className="max-h-[calc(100vh-48px)] overflow-hidden flex flex-col"
+                    render={({ dragHandleProps, controls }) => (
+                      <>
+                        <FloatingWindowTitleBar
+                          dragHandleProps={dragHandleProps}
+                        >
+                          <span className="font-medium">Photos Browser</span>
+                          <span className="text-[10px] text-muted-foreground ml-2">
+                            Unsplash
+                          </span>
+                          <FloatingWindowClose
+                            windowId="photos"
+                            controls={controls}
+                            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-4 w-4" aria-hidden />
+                            <span className="sr-only">Close</span>
+                          </FloatingWindowClose>
+                        </FloatingWindowTitleBar>
+                        <FloatingWindowBody className="text-sm p-0 h-full flex flex-col overflow-hidden">
+                          {photosPane}
                         </FloatingWindowBody>
                       </>
                     )}

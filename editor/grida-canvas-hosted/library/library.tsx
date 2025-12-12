@@ -1,0 +1,188 @@
+"use client";
+
+import React, { useCallback } from "react";
+import { useCurrentEditor } from "@/grida-canvas-react";
+import { IconsBrowser, type IconsBrowserItem } from "./icons-browser";
+import { PhotosBrowser } from "./photos-browser";
+import type { PhotoAsset } from "./lib-photos-actions";
+import { useLocalStorage } from "@uidotdev/usehooks";
+import { toast } from "sonner";
+import { cn } from "@/components/lib/utils";
+import cg from "@grida/cg";
+import cmath from "@grida/cmath";
+import { datatransfer } from "@/grida-canvas/data-transfer";
+
+function TabButton({
+  value,
+  active,
+  onClick,
+  children,
+}: {
+  value: string;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "px-2 py-1 text-xs rounded",
+        active
+          ? "font-semibold text-foreground"
+          : "font-normal text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Unified Library UI Component
+ *
+ * Provides a tabbed interface for browsing and inserting Icons and Photos
+ * directly into the editor. This component handles insertion automatically.
+ */
+export function Library() {
+  const instance = useCurrentEditor();
+  const [tab, setTab] = useLocalStorage("grida-library-tab", "icons");
+
+  const handleInsertIcon = useCallback(
+    async (icon: IconsBrowserItem) => {
+      const task = fetch(icon.download, { cache: "no-store" })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error("Failed to fetch icon");
+          }
+          return res.text();
+        })
+        .then((svg) => instance.commands.createNodeFromSvg(svg))
+        .then((node) => {
+          node.$.name = icon.name || node.$.name;
+        });
+
+      toast.promise(task, {
+        loading: "Loading icon...",
+        success: "Icon inserted",
+        error: "Failed to insert icon",
+      });
+    },
+    [instance.commands]
+  );
+
+  const handleIconDragStart = useCallback(
+    (icon: IconsBrowserItem, event: React.DragEvent<HTMLButtonElement>) => {
+      event.dataTransfer.setData(
+        datatransfer.key,
+        datatransfer.encode({
+          type: "svg",
+          name: icon.name,
+          src: icon.download,
+        })
+      );
+    },
+    []
+  );
+
+  const handlePhotoDragStart = useCallback(
+    (photo: PhotoAsset, event: React.DragEvent<HTMLElement>) => {
+      const imageUrl = photo.urls.regular || photo.urls.full || photo.urls.raw;
+      if (imageUrl) {
+        event.dataTransfer.setData(
+          datatransfer.key,
+          datatransfer.encode({
+            type: "image",
+            name: photo.alt || "Photo",
+            src: imageUrl,
+            width: photo.width,
+            height: photo.height,
+          })
+        );
+      }
+    },
+    []
+  );
+
+  const handleInsertPhoto = useCallback(
+    async (photo: PhotoAsset) => {
+      const task = (async () => {
+        try {
+          // raw might be too big?
+          // const imageUrl = photo.urls.full || photo.urls.raw;
+          const imageUrl = photo.urls.regular;
+          if (!imageUrl) {
+            throw new Error("No image URL available");
+          }
+
+          const imageRef = await instance.createImageAsync(imageUrl);
+          const node = instance.commands.createRectangleNode();
+
+          node.$.position = "absolute";
+          node.$.name = photo.alt || "Photo";
+          node.$.width = imageRef.width;
+          node.$.height = imageRef.height;
+
+          node.$.fill_paints = [
+            {
+              type: "image",
+              src: imageRef.url,
+              fit: "cover",
+              transform: cmath.transform.identity,
+              filters: cg.def.IMAGE_FILTERS,
+              blend_mode: cg.def.BLENDMODE,
+              opacity: 1,
+              active: true,
+            } satisfies cg.ImagePaint,
+          ];
+        } catch (error) {
+          throw error instanceof Error
+            ? error
+            : new Error("Failed to insert photo");
+        }
+      })();
+
+      toast.promise(task, {
+        loading: "Loading photo...",
+        success: "Photo inserted",
+        error: "Failed to insert photo",
+      });
+    },
+    [instance]
+  );
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex gap-1 px-2 pt-2">
+        <TabButton
+          value="icons"
+          active={tab === "icons"}
+          onClick={() => setTab("icons")}
+        >
+          Icons
+        </TabButton>
+        <TabButton
+          value="photos"
+          active={tab === "photos"}
+          onClick={() => setTab("photos")}
+        >
+          Photos
+        </TabButton>
+      </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {tab === "icons" && (
+          <IconsBrowser
+            onInsert={handleInsertIcon}
+            onDragStart={handleIconDragStart}
+          />
+        )}
+        {tab === "photos" && (
+          <PhotosBrowser
+            onInsert={handleInsertPhoto}
+            onDragStart={handlePhotoDragStart}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
