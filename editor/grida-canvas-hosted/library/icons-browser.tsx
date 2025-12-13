@@ -295,7 +295,7 @@ const IconGridCell = ({
   const [loaded, setLoaded] = useState(false);
 
   return (
-    <Tooltip key={icon.id}>
+    <Tooltip key={icon.id} disableHoverableContent>
       <div className="h-full">
         <TooltipTrigger asChild>
           <button

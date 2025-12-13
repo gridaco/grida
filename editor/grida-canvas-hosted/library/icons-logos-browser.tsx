@@ -130,7 +130,7 @@ const LogoGridCell = ({
   const [loaded, setLoaded] = useState(false);
 
   return (
-    <Tooltip key={logo.id}>
+    <Tooltip key={logo.id} disableHoverableContent>
       <div className="h-full">
         <TooltipTrigger asChild>
           <button

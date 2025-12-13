@@ -120,7 +120,7 @@ const ShapeGridCell = ({
   const [loaded, setLoaded] = useState(false);
 
   return (
-    <Tooltip key={shape.name}>
+    <Tooltip key={shape.name} disableHoverableContent>
       <div className="h-full">
         <TooltipTrigger asChild>
           <button
