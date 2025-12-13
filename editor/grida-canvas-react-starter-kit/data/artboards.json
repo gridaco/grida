@@ -11,24 +11,45 @@
       "height": 840
     },
     {
-      "name": "iPhone 16",
-      "width": 393,
-      "height": 852
-    },
-    {
-      "name": "iPhone 16 Pro",
+      "name": "iPhone 17 & 17 Pro",
       "width": 402,
       "height": 874
     },
     {
+      "name": "iPhone 17 Pro Max",
+      "width": 440,
+      "height": 956,
+      "year": 2025
+    },
+    {
+      "name": "iPhone Air",
+      "width": 420,
+      "height": 912,
+      "year": 2025
+    },
+    {
+      "name": "iPhone 16",
+      "width": 393,
+      "height": 852,
+      "year": 2024
+    },
+    {
+      "name": "iPhone 16 Pro",
+      "width": 402,
+      "height": 874,
+      "year": 2024
+    },
+    {
       "name": "iPhone 16 Pro Max",
       "width": 440,
-      "height": 956
+      "height": 956,
+      "year": 2024
     },
     {
       "name": "iPhone 16 Plus",
       "width": 430,
-      "height": 932
+      "height": 932,
+      "year": 2024
     },
     {
       "name": "iPhone 14 & 15 Pro Max",
@@ -48,17 +69,87 @@
     {
       "name": "iPhone 14 Plus",
       "width": 428,
-      "height": 926
+      "height": 926,
+      "year": 2022
     },
     {
       "name": "iPhone 13 mini",
       "width": 375,
-      "height": 812
+      "height": 812,
+      "year": 2021
     },
     {
       "name": "iPhone SE",
       "width": 320,
       "height": 568
+    }
+  ],
+  "tablet": [
+    {
+      "name": "iPad mini",
+      "width": 744,
+      "height": 1133
+    },
+    {
+      "name": "iPad",
+      "width": 820,
+      "height": 1180
+    },
+    {
+      "name": "iPad Air 11\"",
+      "width": 820,
+      "height": 1180,
+      "year": 2024
+    },
+    {
+      "name": "iPad Pro 11\"",
+      "width": 834,
+      "height": 1210,
+      "year": 2024
+    },
+    {
+      "name": "iPad Air 13\"",
+      "width": 1024,
+      "height": 1366,
+      "year": 2024
+    },
+    {
+      "name": "iPad Pro 13\"",
+      "width": 1032,
+      "height": 1376,
+      "year": 2024
+    }
+  ],
+  "watch": [
+    {
+      "name": "Apple Watch (40mm)",
+      "width": 162,
+      "height": 197,
+      "year": 2018
+    },
+    {
+      "name": "Apple Watch (42mm)",
+      "width": 187,
+      "height": 223,
+      "year": 2024
+    },
+    {
+      "name": "Apple Watch (44mm)",
+      "width": 184,
+      "height": 224,
+      "year": 2018
+    },
+    {
+      "name": "Apple Watch (46mm)",
+      "width": 208,
+      "height": 248,
+      "year": 2024
+    },
+    {
+      "name": "Apple Watch Ultra (49mm)",
+      "width": 211,
+      "height": 257,
+      "year": 2022
     }
   ],
   "desktop": [
@@ -70,12 +161,14 @@
     {
       "name": "MacBook Pro 14\"",
       "width": 1512,
-      "height": 982
+      "height": 982,
+      "year": 2021
     },
     {
       "name": "MacBook Pro 16\"",
       "width": 1728,
-      "height": 1117
+      "height": 1117,
+      "year": 2021
     },
     {
       "name": "Desktop",

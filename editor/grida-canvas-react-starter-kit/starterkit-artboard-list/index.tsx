@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import kolor from "@grida/color";
 import artboardData from "../data/artboards.json";
 import { useSessionStorage } from "@uidotdev/usehooks";
@@ -61,9 +61,12 @@ const ArtboardList = () => {
             setOpenCategory(open ? categoryName : OPEN_CATEGORY_NONE);
           }}
         >
-          <CollapsibleTrigger className="p-2 my-1 focus:outline-none">
+          <CollapsibleTrigger className="group p-2 my-1 focus:outline-none">
             <div className="flex items-center justify-between cursor-pointer">
-              <ChevronDown size={16} className="text-muted-foreground me-2" />
+              <ChevronRight
+                size={16}
+                className="text-muted-foreground me-2 transition-transform duration-200 group-data-[state=open]:rotate-90"
+              />
               <span className="font-medium capitalize text-xs">
                 {categoryName}
               </span>

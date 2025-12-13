@@ -267,18 +267,18 @@ export function Library() {
           Photos
         </TabButton>
         <TabButton
-          value="shapes"
-          active={tab === "shapes"}
-          onClick={() => setTab("shapes")}
-        >
-          Shapes
-        </TabButton>
-        <TabButton
           value="logos"
           active={tab === "logos"}
           onClick={() => setTab("logos")}
         >
           Logos
+        </TabButton>
+        <TabButton
+          value="shapes"
+          active={tab === "shapes"}
+          onClick={() => setTab("shapes")}
+        >
+          Shapes
         </TabButton>
         {/* <TabButton
           value="widgets"
