@@ -12,6 +12,7 @@ export namespace sitemap {
     sdk: "/sdk",
     tools: "/tools",
     library: "/library",
+    brand: "/brand",
     releases_latest: "https://github.com/gridaco/grida/releases/latest",
     issues_new: "https://github.com/gridaco/grida/issues/new/choose",
     pricing: "/pricing",
@@ -57,6 +58,11 @@ export namespace sitemap {
       title: "Downloads",
       href: links.downlaods,
       description: "Get Grida Desktop App",
+    } satisfies Item,
+    brand: {
+      title: "Brand",
+      href: links.brand,
+      description: "Logos and brand assets",
     } satisfies Item,
     docs: {
       title: "Docs",
