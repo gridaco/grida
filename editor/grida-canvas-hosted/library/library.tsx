@@ -6,6 +6,7 @@ import { IconsBrowser, type IconsBrowserItem } from "./icons-browser";
 import { PhotosBrowser } from "./photos-browser";
 import type { PhotoAsset } from "./lib-photos-actions";
 import { ShapesBrowser, type ShapeAsset } from "./shapes-browser";
+import { WidgetsBrowser } from "./widgets-browser";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
@@ -42,7 +43,7 @@ function TabButton({
 /**
  * Unified Library UI Component
  *
- * Provides a tabbed interface for browsing and inserting Icons, Photos, and Shapes
+ * Provides a tabbed interface for browsing and inserting Icons, Photos, Shapes, and Widgets
  * directly into the editor. This component handles insertion automatically.
  */
 export function Library() {
@@ -213,6 +214,13 @@ export function Library() {
         >
           Shapes
         </TabButton>
+        {/* <TabButton
+          value="widgets"
+          active={tab === "widgets"}
+          onClick={() => setTab("widgets")}
+        >
+          Widgets
+        </TabButton> */}
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         {tab === "icons" && (
@@ -233,6 +241,7 @@ export function Library() {
             onDragStart={handleShapeDragStart}
           />
         )}
+        {tab === "widgets" && <WidgetsBrowser />}
       </div>
     </div>
   );
