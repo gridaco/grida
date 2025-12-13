@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState, useRef, useEffect } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { IconsBrowser, type IconsBrowserItem } from "./icons-browser";
 import { PhotosBrowser } from "./photos-browser";

@@ -9,7 +9,7 @@ import {
   FloatingWindowClose,
   FloatingWindowTrigger,
 } from "@/components/floating-window";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import {
   IconsBrowser,
@@ -17,6 +17,35 @@ import {
 } from "@/grida-canvas-hosted/library/icons-browser";
 import { PhotosBrowser } from "@/grida-canvas-hosted/library/photos-browser";
 import { toast } from "sonner";
+
+function InspectorExample() {
+  const [shouldThrow, setShouldThrow] = useState(false);
+
+  // Throw during render so ErrorBoundary can catch it.
+  if (shouldThrow) {
+    throw new Error("Inspector example crashed (test error boundary)");
+  }
+
+  return (
+    <div className="space-y-2 text-sm text-muted-foreground">
+      <p>Use this window to show properties.</p>
+      <ul className="list-disc list-inside space-y-1">
+        <li>Drag handle wired via render-prop.</li>
+        <li>Transform driven by CSS vars.</li>
+        <li>Boundary clamps motion.</li>
+      </ul>
+      <div className="pt-2">
+        <button
+          type="button"
+          className="rounded-md border px-2 py-1 text-xs text-foreground hover:bg-muted"
+          onClick={() => setShouldThrow(true)}
+        >
+          Throw error
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function FloatingWindowDemoPage() {
   const handleIconInsert = useCallback((icon: IconsBrowserItem) => {
@@ -104,13 +133,8 @@ export default function FloatingWindowDemoPage() {
                             <span className="sr-only">Close</span>
                           </FloatingWindowClose>
                         </FloatingWindowTitleBar>
-                        <FloatingWindowBody className="space-y-2 text-sm text-muted-foreground">
-                          <p>Use this window to show properties.</p>
-                          <ul className="list-disc list-inside space-y-1">
-                            <li>Drag handle wired via render-prop.</li>
-                            <li>Transform driven by CSS vars.</li>
-                            <li>Boundary clamps motion.</li>
-                          </ul>
+                        <FloatingWindowBody>
+                          <InspectorExample />
                         </FloatingWindowBody>
                       </>
                     )}
