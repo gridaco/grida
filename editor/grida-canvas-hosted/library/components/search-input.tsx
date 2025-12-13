@@ -30,7 +30,7 @@ export function SearchInput({
       </InputGroupAddon>
       <InputGroupInput
         placeholder={placeholder}
-        className="!text-xs placeholder:text-xs"
+        className="!text-xs placeholder:text-xs text-foreground"
         type="search"
         value={value}
         onChange={onChange}

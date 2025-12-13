@@ -207,3 +207,34 @@ export const getDefaultVariants = (vendor?: IconVendor) => {
     Object.entries(vendor.variants).map(([key]) => [key, ANY_VARIANT])
   );
 };
+
+export async function fetchLogos({
+  query,
+  variants,
+}: {
+  query?: string;
+  variants?: IconVariantFilters;
+}): Promise<IconsBrowserItem[]> {
+  const params = new URLSearchParams();
+  if (query?.trim()) {
+    params.set("q", query.trim());
+  }
+  Object.entries(variants ?? {}).forEach(([key, value]) => {
+    if (!value || value === ANY_VARIANT) return;
+    params.set(`variant:${key}`, value);
+  });
+  const url = `${ICONS_API_URL}/logos${params.size > 0 ? `?${params.toString()}` : ""}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Failed to load logos (${res.status})`);
+  }
+  const payload = await res.json();
+  const rawList: any[] =
+    (Array.isArray(payload) && payload) ||
+    payload?.items ||
+    payload?.logos ||
+    payload?.icons ||
+    payload?.data ||
+    [];
+  return normalizeIcons(rawList);
+}
