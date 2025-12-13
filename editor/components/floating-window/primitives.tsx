@@ -13,6 +13,97 @@ import React, {
 import { createPortal } from "react-dom";
 import { useDrag } from "@use-gesture/react";
 
+export type ErrorBoundaryFallbackProps = {
+  error: unknown;
+  reset: () => void;
+};
+
+export type ErrorBoundaryProps = {
+  children: React.ReactNode;
+  /**
+   * If provided, renders when an error is caught.
+   * - ReactNode: static fallback
+   * - function: receives the error + reset()
+   */
+  fallback?:
+    | React.ReactNode
+    | ((props: ErrorBoundaryFallbackProps) => React.ReactNode);
+  /**
+   * When any of these values change, the boundary is reset automatically.
+   */
+  resetKeys?: readonly unknown[];
+  onError?: (error: unknown, info: React.ErrorInfo) => void;
+  onReset?: () => void;
+};
+
+type ErrorBoundaryState = { error: unknown | null };
+
+export class ErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
+  state: ErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+    this.props.onError?.(error, info);
+  }
+
+  componentDidUpdate(prevProps: Readonly<ErrorBoundaryProps>) {
+    const prev = prevProps.resetKeys;
+    const next = this.props.resetKeys;
+    if (!prev || !next) return;
+    if (prev.length !== next.length) {
+      this.reset();
+      return;
+    }
+    for (let i = 0; i < next.length; i++) {
+      if (!Object.is(prev[i], next[i])) {
+        this.reset();
+        return;
+      }
+    }
+  }
+
+  reset = () => {
+    if (this.state.error !== null) {
+      this.setState({ error: null });
+    }
+    this.props.onReset?.();
+  };
+
+  render() {
+    const { error } = this.state;
+    const { children, fallback } = this.props;
+
+    if (error !== null) {
+      if (typeof fallback === "function") {
+        return (fallback as (p: ErrorBoundaryFallbackProps) => React.ReactNode)(
+          {
+            error,
+            reset: this.reset,
+          }
+        );
+      }
+      return (
+        fallback ?? (
+          <div>
+            <p>Something went wrong.</p>
+            <button type="button" onClick={this.reset}>
+              Reload
+            </button>
+          </div>
+        )
+      );
+    }
+
+    return children;
+  }
+}
+
 export type BoundsRenderProps = {
   boundaryRef: React.RefObject<HTMLDivElement | null>;
 };
@@ -296,26 +387,19 @@ export function FloatingWindowRoot({
     }
   );
 
-  const renderContent = useMemo(() => {
-    const helpers = {
-      dragHandleProps: dragBindings({}),
-      windowRef,
-      controls,
-    };
+  // Intentionally render content directly (no inner component types).
+  // This prevents accidental remounts of window content during drag lifecycle.
+  const helpers: FloatingWindowRenderProps = {
+    dragHandleProps: dragBindings({}),
+    windowRef,
+    controls,
+  };
 
-    if (render) {
-      return render(helpers);
-    }
-
-    if (typeof children === "function") {
-      return (children as (h: FloatingWindowRenderProps) => React.ReactNode)(
-        helpers
-      );
-    }
-
-    return children;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [render, children, dragBindings]);
+  const rendered =
+    render?.(helpers) ??
+    (typeof children === "function"
+      ? (children as (h: FloatingWindowRenderProps) => React.ReactNode)(helpers)
+      : children);
 
   if (!controls.open) {
     return null;
@@ -340,7 +424,7 @@ export function FloatingWindowRoot({
         ...style,
       }}
     >
-      {renderContent}
+      {rendered}
     </div>
   );
 

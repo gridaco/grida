@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { cn } from "@/components/lib/utils";
 import {
   FloatingWindowHost as PrimitiveHost,
@@ -11,8 +11,10 @@ import {
   FloatingWindowTrigger as PrimitiveTrigger,
   FloatingWindowClose as PrimitiveClose,
   FloatingWindowPortal as PrimitivePortal,
+  ErrorBoundary as PrimitiveErrorBoundary,
   useFloatingWindowControls,
   type FloatingWindowRootProps,
+  type FloatingWindowRenderProps,
   type TitleBarProps,
   type FloatingWindowBoundsProps,
   type TriggerProps,
@@ -27,6 +29,41 @@ export {
   type TriggerProps,
   type CloseProps,
 };
+
+function DefaultWindowCrashFallback({
+  onReload,
+  onClose,
+}: {
+  onReload: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="h-full w-full p-3">
+      <div className="rounded-md border bg-background p-3">
+        <div className="text-sm font-medium">Panel crashed</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          Something went wrong inside this floating window.
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+            onClick={onReload}
+          >
+            Reload panel
+          </button>
+          <button
+            type="button"
+            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function FloatingWindowHost(props: React.PropsWithChildren<{}>) {
   return <PrimitiveHost {...props} />;
@@ -45,15 +82,54 @@ export function FloatingWindowBounds(props: FloatingWindowBoundsProps) {
 }
 
 export function FloatingWindowRoot(props: FloatingWindowRootProps) {
-  const { className, transition = "transform 160ms ease", ...rest } = props;
+  const {
+    className,
+    transition = "transform 160ms ease",
+    render,
+    children,
+    windowId,
+    ...rest
+  } = props;
+  const [contentResetKey, setContentResetKey] = useState(0);
+
   return (
     <PrimitiveRoot
       {...rest}
+      windowId={windowId}
       transition={transition}
       className={cn(
         "absolute pointer-events-auto shadow-lg rounded-md bg-background border",
         className
       )}
+      render={(helpers) => {
+        const rendered =
+          render?.(helpers) ??
+          (typeof children === "function"
+            ? (children as (h: FloatingWindowRenderProps) => React.ReactNode)(
+                helpers
+              )
+            : children);
+
+        return (
+          <PrimitiveErrorBoundary
+            resetKeys={[windowId, contentResetKey]}
+            onError={(error) => {
+              console.error(`[FloatingWindow:${windowId}] crashed`, error);
+            }}
+            fallback={({ reset }) => (
+              <DefaultWindowCrashFallback
+                onReload={() => {
+                  setContentResetKey((k) => k + 1);
+                  reset();
+                }}
+                onClose={() => helpers.controls.closeWindow()}
+              />
+            )}
+          >
+            {rendered}
+          </PrimitiveErrorBoundary>
+        );
+      }}
     />
   );
 }
