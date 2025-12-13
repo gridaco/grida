@@ -42,6 +42,7 @@ const resources: Item[] = [
   sitemap.items.fonts,
   sitemap.items.tools,
   sitemap.items.downloads,
+  sitemap.items.brand,
   sitemap.items.docs,
   sitemap.items.thebundle,
   sitemap.items.joinslack,

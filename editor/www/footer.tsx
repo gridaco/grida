@@ -57,6 +57,12 @@ export default function Footer() {
                   Downloads
                 </Link>
                 <Link
+                  href={sitemap.links.brand}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Brand
+                </Link>
+                <Link
                   href={sitemap.links.changelog}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
