@@ -52,7 +52,6 @@ function usePhotos(perPage: number) {
   const [currentMode, setCurrentMode] = useState<PhotoMode>("random");
   const [currentQuery, setCurrentQuery] = useState("");
   const [currentTopicSlug, setCurrentTopicSlug] = useState<string | null>(null);
-  const [totalPages, setTotalPages] = useState(1);
 
   // Scroll detection for infinite scrolling
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -76,22 +75,32 @@ function usePhotos(perPage: number) {
         setCurrentQuery(queryToUse);
         setCurrentTopicSlug(params.topicSlug ?? null);
 
-        const next = await fetchPhotosAction({
-          mode: params.mode,
-          query: queryToUse,
-          perPage,
-          topicSlug: params.topicSlug,
-          page: 1,
-        });
+        let next;
+        try {
+          next = await fetchPhotosAction({
+            mode: params.mode,
+            query: queryToUse,
+            perPage,
+            topicSlug: params.topicSlug,
+            page: 1,
+          });
+          if (!next) {
+            throw new Error("Failed to load photos");
+          }
+        } catch (e) {
+          setPhotos([]);
+          setError(e instanceof Error ? e.message : "Failed to load photos");
+          setHasMore(false);
+          return;
+        }
+
         if (next.status === "error") {
           setPhotos([]);
           setError(next.message ?? "Failed to load photos");
           setHasMore(false);
-          setTotalPages(0);
           return;
         }
         setPhotos(next.results);
-        setTotalPages(next.totalPages ?? 1);
         setHasMore((next.totalPages ?? 1) > 1);
       });
     },
@@ -111,6 +120,9 @@ function usePhotos(perPage: number) {
           perPage,
           page: 1,
         });
+        if (!next) {
+          throw new Error("Failed to load more photos");
+        }
 
         if (next.status === "error") {
           setError(next.message ?? "Failed to load more photos");
@@ -131,6 +143,9 @@ function usePhotos(perPage: number) {
           topicSlug: currentTopicSlug ?? undefined,
           page: nextPage,
         });
+        if (!next) {
+          throw new Error("Failed to load more photos");
+        }
 
         if (next.status === "error") {
           setError(next.message ?? "Failed to load more photos");

@@ -92,7 +92,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@react-email/components": "^0.0.38",
-    "@sentry/nextjs": "^9.17.0",
+    "@sentry/nextjs": "^10.30.0",
     "@stepperize/react": "^3.1.1",
     "@supabase/postgrest-js": "^1.19.4",
     "@supabase/ssr": "^0.6.1",

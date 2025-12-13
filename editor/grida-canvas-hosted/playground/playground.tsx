@@ -72,7 +72,13 @@ import {
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import ErrorBoundary from "./error-boundary";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
@@ -369,6 +375,25 @@ function Consumer({
     defaultOpen: false,
   });
 
+  useHotkeys(
+    "shift+i",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      // open-only behavior (don't toggle/close if already open)
+      if (!libraryWindowControls.open) {
+        libraryWindowControls.openWindow();
+      }
+    },
+    {
+      // keep shortcut disabled while typing (library default, made explicit here)
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
   // Check if there are selected nodes for conditional sidebar display
   const hasSelection = useEditorState(
     instance,
@@ -601,15 +626,32 @@ function SidebarLeft({
   return (
     <aside className="relative">
       <div className="absolute top-4 -right-14 z-50">
-        <FloatingWindowTrigger
-          windowId="library"
-          controls={libraryWindowControls}
-          asChild
-        >
-          <Button variant="outline" className="size-8 rounded-full p-0">
-            <PlusIcon className="size-4" />
-          </Button>
-        </FloatingWindowTrigger>
+        <Tooltip>
+          <FloatingWindowTrigger
+            windowId="library"
+            controls={libraryWindowControls}
+            asChild
+          >
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                className="size-8 rounded-full p-0"
+                aria-label="Open Library"
+              >
+                <PlusIcon className="size-4" aria-hidden />
+              </Button>
+            </TooltipTrigger>
+          </FloatingWindowTrigger>
+          <TooltipContent side="right" sideOffset={8}>
+            <div className="flex items-center gap-2">
+              <span>Open Library</span>
+              <KbdGroup>
+                <Kbd>Shift</Kbd>
+                <Kbd>I</Kbd>
+              </KbdGroup>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       </div>
       <Sidebar>
         <SidebarHeader className="p-0">
