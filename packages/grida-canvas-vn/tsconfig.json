@@ -4,7 +4,6 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "target": "ES2020",
-    "noImplicitAny": true,
     "strict": true
   },
   "exclude": ["dist", "node_modules"]

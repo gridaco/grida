@@ -280,7 +280,7 @@ export namespace schema.parametric_scale {
 
     // Text
     if (node.type === "text") {
-      node.font_size = node.font_size * s;
+      scale_number_in_place(node, "font_size", s);
     }
 
     // Effects

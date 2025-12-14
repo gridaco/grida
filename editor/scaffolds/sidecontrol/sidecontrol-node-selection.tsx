@@ -287,7 +287,6 @@ function ModeMixedNodeProperties({
   ids: string[];
   config?: ControlsConfig;
 }) {
-  const instance = useCurrentEditor();
   const backend = useBackendState();
   const mp = useMixedProperties(ids);
   const { nodes, properties, actions: change } = mp;

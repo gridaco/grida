@@ -101,14 +101,14 @@ export namespace cursors {
     "/assets/css-cursors-grida/nwse-resize-scale-64-x32y32-000000.png";
 
   export const resize_handle_scale_cursor_map = {
-    nw: pngsetcss(_nwse_resize_scale_png_url, 32, 32, "auto"),
-    n: pngsetcss(_ns_resize_scale_png_url, 32, 32, "auto"),
-    ne: pngsetcss(_nesw_resize_scale_png_url, 32, 32, "auto"),
-    e: pngsetcss(_ew_resize_scale_png_url, 32, 32, "auto"),
-    se: pngsetcss(_nwse_resize_scale_png_url, 32, 32, "auto"),
-    s: pngsetcss(_ns_resize_scale_png_url, 32, 32, "auto"),
-    sw: pngsetcss(_nesw_resize_scale_png_url, 32, 32, "auto"),
-    w: pngsetcss(_ew_resize_scale_png_url, 32, 32, "auto"),
+    nw: pngsetcss(_nwse_resize_scale_png_url, 32, 32, "nwse-resize"),
+    n: pngsetcss(_ns_resize_scale_png_url, 32, 32, "ns-resize"),
+    ne: pngsetcss(_nesw_resize_scale_png_url, 32, 32, "nesw-resize"),
+    e: pngsetcss(_ew_resize_scale_png_url, 32, 32, "ew-resize"),
+    se: pngsetcss(_nwse_resize_scale_png_url, 32, 32, "nwse-resize"),
+    s: pngsetcss(_ns_resize_scale_png_url, 32, 32, "ns-resize"),
+    sw: pngsetcss(_nesw_resize_scale_png_url, 32, 32, "nesw-resize"),
+    w: pngsetcss(_ew_resize_scale_png_url, 32, 32, "ew-resize"),
   } as const;
 
   export const resize_handle_cursor_map = {

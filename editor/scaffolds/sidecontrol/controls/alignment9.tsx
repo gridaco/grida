@@ -35,6 +35,9 @@ export function Alignment9Control({
 }) {
   const isMixed = value === grida.mixed;
   const selected = !isMixed ? value : undefined;
+  const selectedIndex =
+    selected != null ? ALIGNMENTS.findIndex((o) => o.key === selected) : -1;
+  const rovingTabIndex = selectedIndex >= 0 ? selectedIndex : 0;
 
   return (
     <div
@@ -42,10 +45,11 @@ export function Alignment9Control({
         "grid grid-cols-3 grid-rows-3 px-0.5 py-1 aspect-video min-h-15 rounded-md border border-input bg-transparent dark:bg-input/30 shadow-xs",
         className
       )}
+      role="radiogroup"
       aria-label="Alignment"
       data-mixed={isMixed ? "true" : "false"}
     >
-      {ALIGNMENTS.map((o) => {
+      {ALIGNMENTS.map((o, index) => {
         const isSelected = selected === o.key;
         return (
           <Tooltip key={o.key} disableHoverableContent>
@@ -53,6 +57,10 @@ export function Alignment9Control({
               <button
                 type="button"
                 onClick={() => onValueChange?.(o.key)}
+                role="radio"
+                aria-checked={isSelected}
+                aria-label={o.label}
+                tabIndex={index === rovingTabIndex ? 0 : -1}
                 data-focused={isSelected}
                 className={cn(
                   "group/alignment9-cell flex items-center justify-center transition-colors",
