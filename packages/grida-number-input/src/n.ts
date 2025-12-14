@@ -105,8 +105,13 @@ namespace n {
     type: NumberType,
     precision: number = 1
   ): string {
-    // Apply precision first
-    const precisionValue = applyPrecision(value, precision);
+    // IMPORTANT:
+    // `precision` is a display/rounding clamp, but it must NEVER reduce precision
+    // below what `step` requires. Otherwise values like 0.25 with step=0.01 would
+    // be rounded to 0.3 before formatting, which is incorrect for step-based UIs.
+    const stepDecimals = countDecimalPlaces(step);
+    const effectivePrecision = Math.max(stepDecimals, precision);
+    const precisionValue = applyPrecision(value, effectivePrecision);
 
     switch (type) {
       case "integer":
@@ -115,7 +120,6 @@ namespace n {
 
       case "number":
         // For number type, preserve natural precision when step allows it
-        const stepDecimals = countDecimalPlaces(step);
         if (stepDecimals === 0) {
           // For integer steps, preserve the decimal places if they exist naturally
           return precisionValue.toString();

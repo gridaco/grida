@@ -415,6 +415,15 @@ describe("n.formatValueWithSuffix", () => {
       n.formatValueWithSuffix(1.234, "%", undefined, 0.1, "number", 1)
     ).toBe("1.2%");
   });
+
+  test("step precision wins over precision clamp (0.25 with step=0.01)", () => {
+    // Editor case:
+    // `ScaleFactorControl` uses step=0.01 and `InputPropertyNumber` passes precision=1.
+    // The step (2 decimals) must win, so 0.25 displays as 0.25 (not 0.3).
+    expect(
+      n.formatValueWithSuffix(0.25, "x", undefined, 0.01, "number", 1)
+    ).toBe("0.25x");
+  });
 });
 
 describe("n.parseValueWithScaling", () => {
