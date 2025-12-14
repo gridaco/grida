@@ -8,12 +8,16 @@ import grida from "@grida/schema";
 
 const VECTOR_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "cursor",
+  "scale",
   "hand",
   "bend",
   "path",
   "lasso",
 ];
-const TEXT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = ["cursor"];
+const TEXT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
+  "cursor",
+  "scale",
+];
 const BITMAP_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "brush",
   "eraser",
@@ -21,6 +25,7 @@ const BITMAP_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
 ];
 const NO_CONTENT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
   "cursor",
+  "scale",
   "hand",
   "zoom",
   "insert",
@@ -29,7 +34,7 @@ const NO_CONTENT_EDIT_MODE_VALID_TOOL_MODES: editor.state.ToolModeType[] = [
 ];
 // when reverting a tool while no content edit mode is active, path is invalid
 const NO_CONTENT_EDIT_MODE_VALID_REVERT_TOOL_MODES: editor.state.ToolModeType[] =
-  ["cursor", "hand", "zoom", "insert", "draw"];
+  ["cursor", "scale", "hand", "zoom", "insert", "draw"];
 
 function validToolsForContentEditMode(
   mode: editor.state.ContentEditModeState["type"] | undefined,

@@ -14,13 +14,12 @@ import {
   StarIcon,
 } from "@radix-ui/react-icons";
 import { BrushIcon, LassoIcon, PenToolIcon, TriangleIcon } from "lucide-react";
+import { UpscaleIcon } from "../starterkit-icons/upscale";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuCheckboxItem,
-  DropdownMenuItem,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -148,6 +147,7 @@ export default function Toolbar() {
           options={[
             { value: "cursor", label: "Cursor", shortcut: "V" },
             { value: "hand", label: "Hand tool", shortcut: "H" },
+            { value: "scale", label: "Scale tool", shortcut: "K" },
           ]}
           onValueChange={(v) => {
             editor.surface.surfaceSetTool(
@@ -258,7 +258,7 @@ export function ToolsGroup({
               {options.map((option) => (
                 <DropdownMenuRadioItem value={option.value} key={option.value}>
                   {/* <div className="w-full flex items-center gap-2"> */}
-                  <ToolIcon type={option.value} />
+                  <ToolIcon type={option.value} className="size-4" />
                   <span>{option.label}</span>
                   {option.shortcut && (
                     <DropdownMenuShortcut>
@@ -283,6 +283,8 @@ export function ToolIcon({
   switch (type) {
     case "cursor":
       return <CursorArrowIcon {...props} />;
+    case "scale":
+      return <UpscaleIcon {...props} />;
     case "hand":
       return <HandIcon {...props} />;
     case "container":

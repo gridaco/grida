@@ -72,6 +72,7 @@ import {
   useSelectionState,
   useBackendState,
   useContentEditModeMinimalState,
+  useToolState,
 } from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -99,6 +100,7 @@ import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
 import { ModeVectorEditModeProperties } from "./chunks/mode-vector";
+import { ScaleToolSection } from "./chunks/scale-tool";
 import { SectionFills } from "./chunks/section-fills";
 import { SectionStrokes } from "./chunks/section-strokes";
 import { OpsControl } from "./controls/ext-ops";
@@ -206,8 +208,10 @@ export function Selection({
     (state) => state.document.properties
   );
   const cem = useContentEditModeMinimalState();
+  const tool = useToolState();
 
   const is_vector_edit_mode = cem?.type === "vector";
+  const is_scale_tool = tool.type === "scale";
   const selection_length = selection.length;
   const is_empty = selection_length === 0 && !is_vector_edit_mode;
 
@@ -221,17 +225,27 @@ export function Selection({
         properties: documentProperties,
       }}
     >
-      <Header />
-      {is_vector_edit_mode ? (
-        <ModeVectorEditModeProperties node_id={cem.node_id} />
+      {is_scale_tool ? (
+        <ScaleToolSection
+          visible={true}
+          selection={selection}
+          editor={instance}
+        />
       ) : (
         <>
-          {selection_length === 0 && empty && empty}
-          {selection_length === 1 && (
-            <ModeNodeProperties config={config} node_id={selection[0]} />
-          )}
-          {selection_length > 1 && (
-            <ModeMixedNodeProperties ids={selection} config={config} />
+          {is_vector_edit_mode ? (
+            <ModeVectorEditModeProperties node_id={cem.node_id} />
+          ) : (
+            <>
+              <Header />
+              {selection_length === 0 && empty && empty}
+              {selection_length === 1 && (
+                <ModeNodeProperties config={config} node_id={selection[0]} />
+              )}
+              {selection_length > 1 && (
+                <ModeMixedNodeProperties ids={selection} config={config} />
+              )}
+            </>
           )}
         </>
       )}
@@ -498,19 +512,23 @@ function ModeMixedNodeProperties({
                 <CornerRadius4Control
                   value={{
                     rectangular_corner_radius_top_left:
-                      typeof rectangular_corner_radius_top_left?.value === "number"
+                      typeof rectangular_corner_radius_top_left?.value ===
+                      "number"
                         ? rectangular_corner_radius_top_left?.value
                         : undefined,
                     rectangular_corner_radius_top_right:
-                      typeof rectangular_corner_radius_top_right?.value === "number"
+                      typeof rectangular_corner_radius_top_right?.value ===
+                      "number"
                         ? rectangular_corner_radius_top_right?.value
                         : undefined,
                     rectangular_corner_radius_bottom_right:
-                      typeof rectangular_corner_radius_bottom_right?.value === "number"
+                      typeof rectangular_corner_radius_bottom_right?.value ===
+                      "number"
                         ? rectangular_corner_radius_bottom_right?.value
                         : undefined,
                     rectangular_corner_radius_bottom_left:
-                      typeof rectangular_corner_radius_bottom_left?.value === "number"
+                      typeof rectangular_corner_radius_bottom_left?.value ===
+                      "number"
                         ? rectangular_corner_radius_bottom_left?.value
                         : undefined,
                   }}
@@ -891,9 +909,12 @@ function ModeNodeProperties({
     blend_mode: node.blend_mode,
     corner_radius: node.corner_radius,
     rectangular_corner_radius_top_left: node.rectangular_corner_radius_top_left,
-    rectangular_corner_radius_top_right: node.rectangular_corner_radius_top_right,
-    rectangular_corner_radius_bottom_right: node.rectangular_corner_radius_bottom_right,
-    rectangular_corner_radius_bottom_left: node.rectangular_corner_radius_bottom_left,
+    rectangular_corner_radius_top_right:
+      node.rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right:
+      node.rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left:
+      node.rectangular_corner_radius_bottom_left,
     point_count: node.point_count,
     inner_radius: node.inner_radius,
     angle: node.angle,

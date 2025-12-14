@@ -233,6 +233,11 @@ export const keybindings_sheet = [
     keys: ["v"],
   },
   {
+    name: "scale",
+    description: "Scale tool (parametric scaling)",
+    keys: ["k"],
+  },
+  {
     name: "lasso",
     description: "Lasso tool (vector mode)",
     keys: ["q"],
@@ -896,6 +901,19 @@ export function useEditorHotKeys() {
   useHotkeys("v", () => {
     editor.surface.surfaceSetTool({ type: "cursor" });
   });
+
+  useHotkeys(
+    "k",
+    () => {
+      editor.surface.surfaceSetTool({ type: "scale" });
+    },
+    // need below, k might open a ui with autofocus input, below prevents "k" being typed in to the input.
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
 
   useHotkeys("q", () => {
     if (content_edit_mode?.type === "vector") {

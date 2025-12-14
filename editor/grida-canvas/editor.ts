@@ -930,6 +930,31 @@ class EditorDocumentStore
     });
   }
 
+  public applyScale(
+    target: ReadonlyArray<editor.NodeID> | "selection",
+    factor: number,
+    options?: {
+      origin?: "center" | cmath.CardinalDirection;
+      include_subtree?: boolean;
+      space?: "auto" | "global";
+    }
+  ) {
+    const targets = (target === "selection" ? this.state.selection : target) as
+      | ReadonlyArray<editor.NodeID>
+      | undefined;
+    if (!targets || targets.length === 0) return;
+    if (!Number.isFinite(factor) || factor === 1) return;
+
+    this.dispatch({
+      type: "apply-scale",
+      targets: Array.from(targets),
+      factor,
+      origin: options?.origin ?? "center",
+      include_subtree: options?.include_subtree ?? true,
+      space: options?.space ?? "auto",
+    });
+  }
+
   //
   public selectVertex(
     node_id: editor.NodeID,

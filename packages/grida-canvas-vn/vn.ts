@@ -2308,12 +2308,12 @@ export namespace vn {
             const end: Vector2 = [command.x, command.y];
 
             const cubicControl1: Vector2 = [
-              lastPoint[0] + ((2 / 3) * (control[0] - lastPoint[0])),
-              lastPoint[1] + ((2 / 3) * (control[1] - lastPoint[1])),
+              lastPoint[0] + (2 / 3) * (control[0] - lastPoint[0]),
+              lastPoint[1] + (2 / 3) * (control[1] - lastPoint[1]),
             ];
             const cubicControl2: Vector2 = [
-              end[0] + ((2 / 3) * (control[0] - end[0])),
-              end[1] + ((2 / 3) * (control[1] - end[1])),
+              end[0] + (2 / 3) * (control[0] - end[0]),
+              end[1] + (2 / 3) * (control[1] - end[1]),
             ];
 
             const ta: Vector2 = [
@@ -2346,12 +2346,12 @@ export namespace vn {
               : [lastPoint[0], lastPoint[1]];
 
             const cubicControl1: Vector2 = [
-              lastPoint[0] + ((2 / 3) * (control[0] - lastPoint[0])),
-              lastPoint[1] + ((2 / 3) * (control[1] - lastPoint[1])),
+              lastPoint[0] + (2 / 3) * (control[0] - lastPoint[0]),
+              lastPoint[1] + (2 / 3) * (control[1] - lastPoint[1]),
             ];
             const cubicControl2: Vector2 = [
-              end[0] + ((2 / 3) * (control[0] - end[0])),
-              end[1] + ((2 / 3) * (control[1] - end[1])),
+              end[0] + (2 / 3) * (control[0] - end[0]),
+              end[1] + (2 / 3) * (control[1] - end[1]),
             ];
 
             const ta: Vector2 = [
@@ -2375,7 +2375,8 @@ export namespace vn {
           const { rX, rY, xRot, lArcFlag, sweepFlag, x, y } = command;
 
           if (lastPoint) {
-            const [x1, y1] = lastPoint;
+            let currentPoint: Vector2 = lastPoint;
+            const [x1, y1] = currentPoint;
 
             // Convert arc to cubic Bézier curves
             const bezierCurves = cmath.bezier.a2c(
@@ -2407,16 +2408,18 @@ export namespace vn {
                 previousIndex,
                 endIndex,
                 [
-                  controlPoint1[0] - lastPoint[0],
-                  controlPoint1[1] - lastPoint[1],
+                  controlPoint1[0] - currentPoint[0],
+                  controlPoint1[1] - currentPoint[1],
                 ], // ta (relative to start)
                 [controlPoint2[0] - endPoint[0], controlPoint2[1] - endPoint[1]] // tb (relative to end)
               );
 
               // Update lastPoint and previousIndex for the next curve
-              lastPoint = endPoint;
+              currentPoint = endPoint;
               previousIndex = endIndex;
             }
+
+            lastPoint = currentPoint;
           }
           lastQuadraticControl = null;
           break;

@@ -69,6 +69,7 @@ export function PlaygroundToolbar() {
             options={[
               { value: "cursor", label: "Cursor", shortcut: "V" },
               { value: "hand", label: "Hand tool", shortcut: "H" },
+              { value: "scale", label: "Scale tool", shortcut: "K" },
             ]}
             onValueChange={(v) => {
               editor.surface.surfaceSetTool(

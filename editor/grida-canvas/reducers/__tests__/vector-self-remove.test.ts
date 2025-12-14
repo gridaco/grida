@@ -1,21 +1,9 @@
-jest.mock("@/grida-canvas", () => ({
-  editor: { config: {} },
-}));
-
-jest.mock("@grida/cmath", () => ({}), { virtual: true });
-jest.mock("@grida/schema", () => ({}), { virtual: true });
-jest.mock("svg-pathdata", () => ({}), { virtual: true });
-
 jest.mock("../methods", () => ({
   self_optimizeVectorNetwork: jest.fn(),
   self_try_remove_node: jest.fn((draft: any, id: string) => {
     delete draft.document.nodes[id];
   }),
   self_revert_tool: jest.fn(),
-}));
-
-jest.mock("../tools/gesture", () => ({
-  getInitialCurveGesture: jest.fn(),
 }));
 
 import surfaceReducer from "../surface.reducer";

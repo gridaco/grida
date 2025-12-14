@@ -45,7 +45,7 @@ export function FontSizeControl({
           }}
         >
           <SelectPrimitive.SelectTrigger asChild>
-            <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-2 opacity-50">
+            <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-1 opacity-50">
               <ChevronDownIcon />
             </button>
           </SelectPrimitive.SelectTrigger>

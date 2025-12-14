@@ -47,6 +47,7 @@ export type DocumentAction =
   | EditorDeleteAction
   | EditorFlattenAction
   | EditorA11yDeleteAction
+  | EditorApplyParametricScaleAction
   | EditorHierarchyAction
   | EditorVectorEditorAction
   | EditorVariableWidthAction
@@ -565,6 +566,29 @@ export interface EditorBooleanOperationAction {
 export interface EditorUngroupAction {
   type: "ungroup";
   target: NodeID[] | "selection";
+}
+
+export interface EditorApplyParametricScaleAction {
+  type: "apply-scale";
+  /**
+   * root targets (selection roots)
+   */
+  targets: NodeID[];
+  /**
+   * delta scale factor to apply for this command (e.g. 1.5).
+   */
+  factor: number;
+  origin: "center" | cmath.CardinalDirection;
+  include_subtree: boolean;
+
+  /**
+   * Coordinate space interpretation for layout geometry (`left/top/...`).
+   *
+   * - `auto` (default): best-effort UX semantics; may override selection-root `left/top`
+   *   so origin behaves selection-local for root-level nodes (scene direct children).
+   * - `global`: purely multiply numeric layout fields by factor (developer/math usage).
+   */
+  space?: "auto" | "global";
 }
 
 export type EditorConfigAction =

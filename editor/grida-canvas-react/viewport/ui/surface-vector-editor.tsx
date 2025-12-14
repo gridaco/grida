@@ -100,7 +100,9 @@ export function SurfaceVectorEditor({
         )}
       </div>
 
-      {tool.type === "cursor" && <Loops ve={ve} transform={transform} />}
+      {(tool.type === "cursor" || tool.type === "scale") && (
+        <Loops ve={ve} transform={transform} />
+      )}
 
       {/* Render all segments */}
       {segments.map((s, i) => {

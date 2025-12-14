@@ -611,12 +611,7 @@ function RootFramesBarOverlay() {
     const rootframe = rootframes[0];
     if (!rootframe) return null;
     return (
-      <NodeTitleBar
-        node={rootframe}
-        node_id={rootframe.id}
-        state={"active"}
-        sideOffset={8}
-      >
+      <NodeTitleBar node={rootframe} node_id={rootframe.id} state={"active"}>
         <FloatingBarContent>
           <NodeTitleBarTitle node={rootframe}>
             {" (single mode)"}
@@ -652,11 +647,9 @@ function NodeTitleBar({
   node,
   node_id,
   state,
-  sideOffset,
   children,
 }: React.PropsWithChildren<{
   node: grida.program.nodes.Node;
-  sideOffset?: number;
   node_id: string;
   state: "idle" | "hover" | "active";
 }>) {
@@ -698,10 +691,9 @@ function NodeTitleBar({
     <FloatingBar
       node_id={node_id}
       state={state}
-      sideOffset={sideOffset}
       isComponentConsumer={is_direct_component_consumer(node.type)}
     >
-      <div {...bind()} style={{ touchAction: "none" }}>
+      <div {...bind()} style={{ touchAction: "none" }} className="pb-1">
         {children}
       </div>
     </FloatingBar>
@@ -1016,7 +1008,8 @@ function SelectionGroupOverlay({
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
-  const enabled = !readonly && tool.type === "cursor";
+  const enabled =
+    !readonly && (tool.type === "cursor" || tool.type === "scale");
 
   const bind = useSurfaceGesture(
     {
@@ -1199,7 +1192,8 @@ function NodeOverlay({
   const tool = useToolState();
 
   // enable overlay dragging only when the cursor tool is active and editable
-  const enabled = !readonly && tool.type === "cursor";
+  const enabled =
+    !readonly && (tool.type === "cursor" || tool.type === "scale");
 
   const bind = useSurfaceGesture(
     {
@@ -1531,6 +1525,7 @@ function LayerOverlayResizeHandle({
   onDoubleClick?: () => void;
   disabled?: boolean;
 }) {
+  const tool = useToolState();
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
@@ -1559,7 +1554,16 @@ function LayerOverlayResizeHandle({
       {...bind()}
       anchor={anchor}
       zIndex={zIndex}
-      transform={disabled ? { pointerEvents: "none" } : undefined}
+      transform={
+        tool.type === "scale"
+          ? {
+              cursor: cursors.resize_handle_scale_cursor_map[anchor],
+              ...(disabled ? { pointerEvents: "none" } : undefined),
+            }
+          : disabled
+            ? { pointerEvents: "none" }
+            : undefined
+      }
     />
   );
 }
@@ -1579,6 +1583,7 @@ function LayerOverlayResizeSide({
   onDoubleClick?: () => void;
   disabled?: boolean;
 }) {
+  const tool = useToolState();
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
@@ -1628,7 +1633,10 @@ function LayerOverlayResizeSide({
       style={{
         position: "absolute",
         background: "transparent",
-        cursor: cursors.resize_handle_cursor_map[anchor],
+        cursor:
+          tool.type === "scale"
+            ? cursors.resize_handle_scale_cursor_map[anchor]
+            : cursors.resize_handle_cursor_map[anchor],
         touchAction: "none",
         zIndex,
         ...positionalStyle,

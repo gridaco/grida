@@ -96,6 +96,7 @@ function __self_evt_on_click(
   draft.hits = node_ids_from_point;
   switch (draft.tool.type) {
     case "cursor":
+    case "scale":
     case "hand":
       // ignore
       break;
@@ -206,6 +207,35 @@ function __self_evt_on_double_click(draft: editor.state.IEditorState) {
   //
 }
 
+function __self_pointer_down_selection_like_cursor(
+  draft: editor.state.IEditorState,
+  shiftKey: boolean
+) {
+  const { hovered_node_id } = self_updateSurfaceHoverState(draft);
+
+  if (draft.content_edit_mode?.type === "vector") {
+    if (!shiftKey && draft.content_edit_mode.snapped_vertex_idx === null) {
+      // clear the selection for vector content edit mode
+      self_clearSelection(draft);
+    }
+    return;
+  }
+
+  if (shiftKey) {
+    if (hovered_node_id) {
+      self_selectNode(draft, "toggle", hovered_node_id);
+    } else {
+      // do nothing (when shift key is pressed)
+    }
+  } else {
+    if (hovered_node_id) {
+      self_selectNode(draft, "reset", hovered_node_id);
+    } else {
+      self_clearSelection(draft);
+    }
+  }
+}
+
 function __self_evt_on_pointer_down(
   draft: editor.state.IEditorState,
   action: EditorEventTarget_PointerDown,
@@ -218,30 +248,12 @@ function __self_evt_on_pointer_down(
 
   switch (draft.tool.type) {
     case "cursor": {
-      const { hovered_node_id } = self_updateSurfaceHoverState(draft);
-
-      if (draft.content_edit_mode?.type === "vector") {
-        if (!shiftKey && draft.content_edit_mode.snapped_vertex_idx === null) {
-          // clear the selection for vector content edit mode
-          self_clearSelection(draft);
-        }
-        break;
-      }
-
-      if (shiftKey) {
-        if (hovered_node_id) {
-          self_selectNode(draft, "toggle", hovered_node_id);
-        } else {
-          // do nothing (when shift key is pressed)
-        }
-      } else {
-        if (hovered_node_id) {
-          self_selectNode(draft, "reset", hovered_node_id);
-        } else {
-          self_clearSelection(draft);
-        }
-      }
-
+      __self_pointer_down_selection_like_cursor(draft, shiftKey);
+      break;
+    }
+    case "scale": {
+      // Scale tool behaves like cursor for selection interactions.
+      __self_pointer_down_selection_like_cursor(draft, shiftKey);
       break;
     }
     case "insert": {
@@ -278,6 +290,47 @@ function __self_evt_on_pointer_up(draft: editor.state.IEditorState) {
   draft.gesture = { type: "idle" };
 }
 
+function __self_drag_start_selection_like_cursor(
+  draft: editor.state.IEditorState,
+  shiftKey: boolean,
+  context: ReducerContext
+) {
+  // when vector content edit mode is active, dragging should marquee select
+  if (draft.content_edit_mode?.type === "vector") {
+    draft.marquee = {
+      a: draft.pointer.position,
+      b: draft.pointer.position,
+      additive: shiftKey,
+    };
+    return;
+  }
+
+  // TODO: improve logic
+  if (shiftKey) {
+    if (draft.hovered_node_id) {
+      __self_start_gesture_translate(draft, context);
+    } else {
+      // marquee selection
+      draft.marquee = {
+        a: draft.pointer.position,
+        b: draft.pointer.position,
+        additive: shiftKey,
+      };
+    }
+  } else {
+    if (draft.selection.length === 0) {
+      // marquee selection
+      draft.marquee = {
+        a: draft.pointer.position,
+        b: draft.pointer.position,
+        additive: shiftKey,
+      };
+    } else {
+      __self_start_gesture_translate(draft, context);
+    }
+  }
+}
+
 function __self_evt_on_drag_start(
   draft: editor.state.IEditorState,
   action: EditorEventTarget_DragStart,
@@ -298,39 +351,12 @@ function __self_evt_on_drag_start(
 
   switch (draft.tool.type) {
     case "cursor": {
-      // when vector content edit mode is active, dragging should marquee select
-      if (draft.content_edit_mode?.type === "vector") {
-        draft.marquee = {
-          a: draft.pointer.position,
-          b: draft.pointer.position,
-          additive: shiftKey,
-        };
-      } else {
-        // TODO: improve logic
-        if (shiftKey) {
-          if (draft.hovered_node_id) {
-            __self_start_gesture_translate(draft, context);
-          } else {
-            // marquee selection
-            draft.marquee = {
-              a: draft.pointer.position,
-              b: draft.pointer.position,
-              additive: shiftKey,
-            };
-          }
-        } else {
-          if (draft.selection.length === 0) {
-            // marquee selection
-            draft.marquee = {
-              a: draft.pointer.position,
-              b: draft.pointer.position,
-              additive: shiftKey,
-            };
-          } else {
-            __self_start_gesture_translate(draft, context);
-          }
-        }
-      }
+      __self_drag_start_selection_like_cursor(draft, shiftKey, context);
+      break;
+    }
+    case "scale": {
+      // Scale tool behaves like cursor for selection drag interactions.
+      __self_drag_start_selection_like_cursor(draft, shiftKey, context);
       break;
     }
     case "zoom": {
@@ -417,6 +443,17 @@ function __self_evt_on_drag_start(
   }
 }
 
+function __self_drag_end_marquee_select(
+  draft: editor.state.IEditorState,
+  node_ids_from_area: string[] | undefined,
+  shiftKey: boolean
+) {
+  if (draft.content_edit_mode?.type !== "vector" && node_ids_from_area) {
+    const target_node_ids = getMarqueeSelection(draft, node_ids_from_area);
+    self_selectNode(draft, shiftKey ? "toggle" : "reset", ...target_node_ids);
+  }
+}
+
 function __self_evt_on_drag_end(
   draft: editor.state.IEditorState,
   action: EditorEventTarget_DragEnd,
@@ -460,18 +497,15 @@ function __self_evt_on_drag_end(
       break;
     }
     case "cursor": {
-      if (draft.content_edit_mode?.type !== "vector" && node_ids_from_area) {
-        const target_node_ids = getMarqueeSelection(draft, node_ids_from_area);
-
-        self_selectNode(
-          draft,
-          shiftKey ? "toggle" : "reset",
-          ...target_node_ids
-        );
-      }
-
+      __self_drag_end_marquee_select(draft, node_ids_from_area, shiftKey);
       // cancel to default
       self_select_tool(draft, { type: "cursor" }, context);
+      break;
+    }
+    case "scale": {
+      __self_drag_end_marquee_select(draft, node_ids_from_area, shiftKey);
+      // keep scale tool active
+      self_select_tool(draft, { type: "scale" }, context);
       break;
     }
     case "insert":

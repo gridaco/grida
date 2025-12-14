@@ -2,9 +2,19 @@
 title: Scale tool (K) — parameter-space scaling (A.k.a Apply Scale or K-Scale)
 ---
 
-| feature id           | status   | description                                  | PRs |
-| -------------------- | -------- | -------------------------------------------- | --- |
-| `parametric-scaling` | proposed | Parameter-space scaling operation for Grida. | -   |
+| feature id           | status   | description                                  | PRs                                               |
+| -------------------- | -------- | -------------------------------------------- | ------------------------------------------------- |
+| `parametric-scaling` | proposed | Parameter-space scaling operation for Grida. | [#471](https://github.com/gridaco/grida/pull/471) |
+
+## Key principles
+
+- **Visual accuracy over “clean” values**: Scale (K) is an authoring-time operation whose primary goal is that the post-scale render is visually consistent with a uniform similarity transform. As a result, it is normal (and expected) for authored values to become fractional / “dirty” after repeated scaling.
+
+- **No extra quantization / optimization in the core rewrite**: The core scaling rules should apply the exact factor $s$ to existing numeric values without “cleaning up” the result. Any additional rounding/optimization risks accumulating error over repeated operations or round trips. (Gesture-input quantization may exist for UX stability, but is intentionally out of scope for this specification.)
+
+- **Round-trip consistency (best-effort)**: Perfect round-trip guarantees are not always possible across multi-step edits, but for simple numeric cases the rewrite should behave consistently within the limits of JavaScript number precision. Example: $1 \\to 0.01x \\to 100x \\to 1$ should return to (approximately) the original value.
+
+- **Deterministic, minimal rewrite (do not change the nature of properties)**: Scaling MUST NOT reinterpret or “bake” non-numeric authored intent into numeric values. For example, a property that is `auto`, `undefined`, or otherwise non-numeric must remain so. Scale (K) **bakes existing length values**, not “bake-all”.
 
 ## Context
 
@@ -55,7 +65,7 @@ Simple resize is insufficient because it changes box geometry but leaves geometr
 
 When applied with multiplier $s$:
 
-- **I1. Geometry update**: box geometry parameters MUST be updated as described under “Anchor / origin”.
+- **I1. Layout geometry update**: numeric layout geometry fields (e.g. `left/top/right/bottom/width/height`) MUST be scaled by $s$ without reinterpreting author intent (non-numeric values like `"auto"` MUST be preserved).
 - **I2. Parameter rewrite**: all tracked, geometry-contributing parameters MUST be multiplied by $s$ (or scaled according to their field-level rules).
 - **I3. Invariants preserved**: unitless ratios, enums, IDs, and content MUST remain unchanged.
 - **I4. No layout reflow**: the operation MUST NOT attempt to resolve constraints or reflow layout. It only scales stored values.
@@ -73,27 +83,19 @@ This specification defines **uniform parameter-space scaling** as the baseline b
 
 (If we later support non-uniform scaling $s_x, s_y$, we must define how to map two factors into a single “thickness scale” for strokes/effects; see “Future extensions”.)
 
-### Anchor / origin
+### Layout geometry (coordinate-space; no anchor)
 
-Scaling is performed around an **anchor point** in the selection bounds (e.g. top-left, center, etc.).
+For parameter-space scaling we treat layout geometry fields as authored numeric values, and scale them **just like other length values**.
 
-For a node with an absolute box (`left`, `top`, `width`, `height`):
+For a node with layout fields (`left`, `top`, `right`, `bottom`, `width`, `height`):
 
-- Compute the anchor point $A$ in parent coordinates.
-- Compute the node’s reference point $P$ (typically its top-left corner at (`left`,`top`)).
-- Scale the vector $\overrightarrow{AP}$ by $s$:
-
-$$
-P' = A + (P - A) \cdot s
-$$
-
-- Set `left/top` from $P'$
-- Set `width/height` to `width * s`, `height * s`
+- If a field is a **number**, multiply it by $s$.
+- If a field is **non-numeric** (e.g. `"auto"`), preserve it as-is (do not bake or resolve it).
 
 Notes:
 
-- For nodes using `position: "relative"`, `left/top/right/bottom` are still lengths but their meaning depends on layout context. K-scale should still scale the stored values when present, but should not attempt to reflow layout.
-- For container flex layout, K-scale ignores constraints/reflow (matching the intent of a proportional scale tool).
+- For nodes using `position: "relative"`, offsets (`left/top/right/bottom`) are still lengths but their meaning depends on layout context. K-scale scales the stored values when present, but does not attempt to reflow layout.
+- The editor UI may expose an “origin” control for interactive workflows, but anchor-based geometry rewriting is an implementation detail and is not required for the core parameter-space rewrite.
 
 ## Examples
 

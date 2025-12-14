@@ -42,6 +42,15 @@ export namespace cursors {
     css: pngsetcss(_default_png_url, 28, 28),
   };
 
+  const _ew_resize_png_url =
+    "/assets/css-cursors-grida/ew-resize-64-x32y32-000000.png";
+  const _ns_resize_png_url =
+    "/assets/css-cursors-grida/ns-resize-64-x32y32-000000.png";
+  const _nesw_resize_png_url =
+    "/assets/css-cursors-grida/nesw-resize-64-x32y32-000000.png";
+  const _nwse_resize_png_url =
+    "/assets/css-cursors-grida/nwse-resize-64-x32y32-000000.png";
+
   export const default_svg = {
     data: (
       width: number = 32,
@@ -77,16 +86,41 @@ export namespace cursors {
     return `data:image/svg+xml;base64,${btoa(svgData)}`;
   };
 
+  /**
+   * Scale tool (K) cursor set — uses designed resize cursors.
+   *
+   * Files live under `editor/public/assets/css-cursors-grida/`.
+   */
+  const _ew_resize_scale_png_url =
+    "/assets/css-cursors-grida/ew-resize-scale-64-x32y32-000000.png";
+  const _ns_resize_scale_png_url =
+    "/assets/css-cursors-grida/ns-resize-scale-64-x32y32-000000.png";
+  const _nesw_resize_scale_png_url =
+    "/assets/css-cursors-grida/nesw-resize-scale-64-x32y32-000000.png";
+  const _nwse_resize_scale_png_url =
+    "/assets/css-cursors-grida/nwse-resize-scale-64-x32y32-000000.png";
+
+  export const resize_handle_scale_cursor_map = {
+    nw: pngsetcss(_nwse_resize_scale_png_url, 32, 32, "nwse-resize"),
+    n: pngsetcss(_ns_resize_scale_png_url, 32, 32, "ns-resize"),
+    ne: pngsetcss(_nesw_resize_scale_png_url, 32, 32, "nesw-resize"),
+    e: pngsetcss(_ew_resize_scale_png_url, 32, 32, "ew-resize"),
+    se: pngsetcss(_nwse_resize_scale_png_url, 32, 32, "nwse-resize"),
+    s: pngsetcss(_ns_resize_scale_png_url, 32, 32, "ns-resize"),
+    sw: pngsetcss(_nesw_resize_scale_png_url, 32, 32, "nesw-resize"),
+    w: pngsetcss(_ew_resize_scale_png_url, 32, 32, "ew-resize"),
+  } as const;
+
   export const resize_handle_cursor_map = {
-    nw: "nwse-resize",
-    n: "ns-resize",
-    ne: "nesw-resize",
-    e: "ew-resize",
-    se: "nwse-resize",
-    s: "ns-resize",
-    sw: "nesw-resize",
-    w: "ew-resize",
-  };
+    nw: pngsetcss(_nwse_resize_png_url, 32, 32, "nwse-resize"),
+    n: pngsetcss(_ns_resize_png_url, 32, 32, "ns-resize"),
+    ne: pngsetcss(_nesw_resize_png_url, 32, 32, "nesw-resize"),
+    e: pngsetcss(_ew_resize_png_url, 32, 32, "ew-resize"),
+    se: pngsetcss(_nwse_resize_png_url, 32, 32, "nwse-resize"),
+    s: pngsetcss(_ns_resize_png_url, 32, 32, "ns-resize"),
+    sw: pngsetcss(_nesw_resize_png_url, 32, 32, "nesw-resize"),
+    w: pngsetcss(_ew_resize_png_url, 32, 32, "ew-resize"),
+  } as const;
 
   function pngsetcss(
     url: string,

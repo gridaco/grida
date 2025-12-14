@@ -18,6 +18,7 @@ import {
   self_try_remove_node,
   self_select_tool,
   self_revert_tool,
+  self_start_gesture_scale,
 } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { ReducerContext } from ".";
@@ -529,7 +530,7 @@ function __self_start_gesture(
       draft.content_edit_mode = undefined;
       draft.hovered_node_id = null;
 
-      __self_start_gesture_scale(draft, {
+      self_start_gesture_scale(draft, {
         selection: selection,
         direction: direction,
         context,
@@ -872,87 +873,6 @@ function __self_start_gesture(
       };
 
       break;
-    }
-  }
-}
-
-function __self_start_gesture_scale(
-  draft: Draft<editor.state.IEditorState>,
-  {
-    selection,
-    direction,
-    context,
-  }: {
-    selection: string[];
-    direction: cmath.CardinalDirection;
-    context: ReducerContext;
-  }
-) {
-  if (selection.length === 0) return;
-  const rects = selection.map(
-    (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
-  );
-
-  draft.gesture = {
-    type: "scale",
-    initial_snapshot: editor.state.snapshot(draft),
-    initial_rects: rects,
-    movement: cmath.vector2.zero,
-    first: cmath.vector2.zero,
-    last: cmath.vector2.zero,
-    selection: selection,
-    direction: direction,
-  };
-
-  let i = 0;
-  for (const node_id of selection) {
-    const node = dq.__getNodeById(draft, node_id);
-    const rect = rects[i++];
-
-    // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
-    // need to assign a fixed size if width or height is a variable length
-    const _node = node as grida.program.nodes.i.ICSSDimension;
-
-    // needs to set width
-    if (
-      direction === "e" ||
-      direction === "w" ||
-      direction === "ne" ||
-      direction === "se" ||
-      direction === "nw" ||
-      direction === "sw"
-    ) {
-      if (typeof _node.width !== "number") {
-        // For text nodes, use ceil to ensure we don't cut off content
-        if (node.type === "text") {
-          _node.width = Math.ceil(rect.width);
-        } else {
-          _node.width = cmath.quantize(rect.width, 1);
-        }
-      }
-    }
-
-    // needs to set height
-    if (
-      direction === "n" ||
-      direction === "s" ||
-      direction === "ne" ||
-      direction === "nw" ||
-      direction === "se" ||
-      direction === "sw"
-    ) {
-      if (typeof _node.height !== "number") {
-        if (node.type === "line") {
-          _node.height = 0;
-        } else {
-          // For text nodes, use ceil to ensure we don't cut off content
-          if (node.type === "text") {
-            _node.height = Math.ceil(rect.height);
-          } else {
-            _node.height = cmath.quantize(rect.height, 1);
-          }
-        }
-      }
     }
   }
 }

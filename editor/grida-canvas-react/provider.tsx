@@ -453,6 +453,7 @@ export function useEventTargetCSSCursor() {
     }
     switch (tool.type) {
       case "cursor":
+      case "scale":
         return cursors.default_png.css;
       case "hand":
         return "grab";

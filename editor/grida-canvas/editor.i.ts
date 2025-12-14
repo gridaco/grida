@@ -673,6 +673,14 @@ export namespace editor.state {
         type: "cursor";
       }
     | {
+        /**
+         * Scale tool (K) — parametric scaling.
+         *
+         * Note: this is a tool mode, distinct from the transform gesture type `"scale"`.
+         */
+        type: "scale";
+      }
+    | {
         type: "hand";
       }
     | {
@@ -1799,6 +1807,51 @@ export namespace editor.gesture {
     readonly initial_snapshot: editor.state.IMinimalDocumentState;
     readonly initial_rects: cmath.Rectangle[];
     readonly direction: cmath.CardinalDirection;
+
+    /**
+     * Gesture mode.
+     * - `resize`: regular resize behavior (default)
+     * - `parametric`: Scale tool (K) — parameter-space scaling
+     */
+    readonly mode?: "resize" | "parametric";
+
+    /**
+     * Initial selection bounding rectangle (union of `initial_rects`).
+     * Used as the reference for parametric scaling.
+     */
+    readonly initial_bounding_rect?: cmath.Rectangle;
+
+    /**
+     * Affected node ids for parametric scaling (selection + descendants).
+     */
+    readonly affected_ids?: string[];
+
+    /**
+     * Initial absolute rectangles (canvas space) cached at gesture start.
+     * Keyed by node id.
+     */
+    readonly initial_abs_rects_by_id?: Record<string, cmath.Rectangle>;
+
+    /**
+     * For nodes whose parent is outside `affected_ids`, this caches the parent's
+     * initial absolute rect (canvas space), keyed by node id.
+     */
+    readonly initial_external_parent_abs_rects_by_id?: Record<
+      string,
+      cmath.Rectangle
+    >;
+
+    /**
+     * Uniform similarity scale factor for the current gesture update.
+     *
+     * For Scale tool (K) parametric scaling, this is the canonical scale factor
+     * derived from the gesture movement and the initial bounds.
+     *
+     * This is tracked in **0.01 precision** (quantized) for gesture stability / UI.
+     * For `editor.commands.applyScale(...)`, the factor is used as-is (developer intent).
+     * (Unset for non-uniform resize gestures.)
+     */
+    uniform_scale?: number;
   };
 
   export type GestureInsertAndResize = Omit<GestureScale, "type"> & {
@@ -2705,6 +2758,22 @@ export namespace editor.api {
     intersect(target: ReadonlyArray<NodeID>): void;
     exclude(target: ReadonlyArray<NodeID>): void;
     groupMask(target: ReadonlyArray<NodeID>): void;
+
+    /**
+     * Apply parameter-space scaling (Scale tool K) as a one-shot command.
+     *
+     * This applies a delta factor to the current authored state (not a persistent transform),
+     * scaling tracked geometry-contributing parameters while preserving visual identity.
+     */
+    applyScale(
+      target: ReadonlyArray<NodeID> | "selection",
+      factor: number,
+      options?: {
+        origin?: "center" | cmath.CardinalDirection;
+        include_subtree?: boolean;
+        space?: "auto" | "global";
+      }
+    ): void;
 
     // vector editor
     selectVertex(
