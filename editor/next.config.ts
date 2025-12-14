@@ -235,6 +235,7 @@ const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
       silent: !process.env.CI, // Only print logs for uploading source maps in CI
+      telemetry: false,
       widenClientFileUpload: false,
       sourcemaps: {
         disable: true,
