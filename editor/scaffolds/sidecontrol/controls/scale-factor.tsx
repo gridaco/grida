@@ -15,11 +15,13 @@ export function ScaleFactorControl({
   onValueCommit,
   presets = DEFAULT_SCALE_PRESETS,
   autoFocus,
+  onInputBlur,
 }: {
   value: number;
   onValueCommit: (value: number) => void;
   presets?: ReadonlyArray<number>;
   autoFocus?: boolean;
+  onInputBlur?: React.FocusEventHandler<HTMLInputElement>;
 }) {
   const hasPreset = presets.some((p) => Math.abs(p - value) < 1e-9);
 
@@ -35,6 +37,7 @@ export function ScaleFactorControl({
         min={0.01}
         step={0.01}
         onValueCommit={onValueCommit}
+        onBlur={onInputBlur}
         className={cn(
           "overflow-hidden",
           "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

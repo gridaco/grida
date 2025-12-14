@@ -101,6 +101,13 @@ export function ScaleToolSection({
   const [sessionOrigin, setSessionOrigin] =
     React.useState<cmath.Alignment9>("center");
 
+  // UX:
+  // The Scale tool panel auto-focuses the scale factor input when the user enters the tool (K).
+  // We should auto-exit the tool only if the user commits *directly* from that initial focus
+  // state (e.g. K -> type -> Enter). If the user interacted elsewhere (the auto-focused input
+  // ever blurred), we do NOT auto-exit on commit.
+  const didAutofocusScaleFactorEverBlur = React.useRef(false);
+
   useScaleToolSessionScale({
     editor,
     visible,
@@ -108,6 +115,11 @@ export function ScaleToolSection({
     sessionScale,
     setSessionScale,
   });
+
+  React.useEffect(() => {
+    if (!visible) return;
+    didAutofocusScaleFactorEverBlur.current = false;
+  }, [visible]);
 
   React.useEffect(() => {
     if (!visible) return;
@@ -144,6 +156,14 @@ export function ScaleToolSection({
           origin: cmath.compass.fromAlignment9(sessionOrigin),
           include_subtree: true,
         });
+
+        // Auto-exit only if the user committed directly from the initial autofocus.
+        if (!didAutofocusScaleFactorEverBlur.current) {
+          editor.surface.surfaceSetTool(
+            { type: "cursor" },
+            "scale-tool/applyScale"
+          );
+        }
       }
 
       // keep panel-internal scale as display state (ephemeral session memory)
@@ -214,6 +234,9 @@ export function ScaleToolSection({
                 value={sessionScale}
                 onValueCommit={applyNewScale}
                 autoFocus
+                onInputBlur={() => {
+                  didAutofocusScaleFactorEverBlur.current = true;
+                }}
               />
             </div>
             <Alignment9Control
