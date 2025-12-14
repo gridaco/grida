@@ -1,19 +1,29 @@
 {
   "name": "@grida/vn",
   "description": "Vector Network Spec",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "jest"
+    "dev": "tsup index.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts --format cjs,esm --dts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
   },
   "dependencies": {
     "@grida/cmath": "workspace:*",
     "svg-pathdata": "^7.2.0"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "moduleNameMapper": {
-      "^@grida/cmath$": "<rootDir>/../grida-cmath/index.ts",
-      "^svg-pathdata$": "<rootDir>/__mocks__/svg-pathdata.ts"
-    }
   }
 }

@@ -1,5 +1,11 @@
 {
   "compilerOptions": {
-    "esModuleInterop": true
-  }
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2020",
+    "noImplicitAny": true,
+    "strict": true
+  },
+  "exclude": ["dist", "node_modules"]
 }
