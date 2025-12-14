@@ -5,16 +5,12 @@ import { cn } from "@/components/lib/utils";
 interface BarProps {
   node_id: string;
   state: "idle" | "hover" | "active";
-  side?: "top" | "bottom" | "left" | "right";
-  sideOffset?: number;
   isComponentConsumer?: boolean;
 }
 
 export function FloatingBar({
   className,
   children,
-  side = "top",
-  sideOffset = 4,
   state,
   isComponentConsumer,
   ...porps
@@ -29,10 +25,7 @@ export function FloatingBar({
       style={data?.style}
     >
       {/* Title bar positioned above the parent using a percentage transform */}
-      <div
-        className="absolute left-0 right-0"
-        style={{ transform: `translateY(calc(-100% - ${sideOffset}px))` }}
-      >
+      <div className="absolute left-0 right-0 -translate-y-full">
         <div {...porps} className={cn("max-w-full overflow-hidden", className)}>
           {children}
         </div>

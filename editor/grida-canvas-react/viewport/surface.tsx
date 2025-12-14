@@ -611,12 +611,7 @@ function RootFramesBarOverlay() {
     const rootframe = rootframes[0];
     if (!rootframe) return null;
     return (
-      <NodeTitleBar
-        node={rootframe}
-        node_id={rootframe.id}
-        state={"active"}
-        sideOffset={8}
-      >
+      <NodeTitleBar node={rootframe} node_id={rootframe.id} state={"active"}>
         <FloatingBarContent>
           <NodeTitleBarTitle node={rootframe}>
             {" (single mode)"}
@@ -652,11 +647,9 @@ function NodeTitleBar({
   node,
   node_id,
   state,
-  sideOffset,
   children,
 }: React.PropsWithChildren<{
   node: grida.program.nodes.Node;
-  sideOffset?: number;
   node_id: string;
   state: "idle" | "hover" | "active";
 }>) {
@@ -698,10 +691,9 @@ function NodeTitleBar({
     <FloatingBar
       node_id={node_id}
       state={state}
-      sideOffset={sideOffset}
       isComponentConsumer={is_direct_component_consumer(node.type)}
     >
-      <div {...bind()} style={{ touchAction: "none" }}>
+      <div {...bind()} style={{ touchAction: "none" }} className="pb-1">
         {children}
       </div>
     </FloatingBar>
