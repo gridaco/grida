@@ -356,7 +356,7 @@ impl ApplicationApi for UnknownTargetApplication {
                             text::paragraph_to_path(&mut para_ref)
                         };
                         if y_offset != 0.0 {
-                            path.transform(&Matrix::translate((0.0, y_offset)));
+                            path = path.make_transform(&Matrix::translate((0.0, y_offset)));
                         }
                         Some(VectorNetwork::from(&path))
                     }
