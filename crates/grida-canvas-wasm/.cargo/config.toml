@@ -2,7 +2,14 @@
 opt-level = 3           # optimize for size ("z" has runtime performance impact, keep this 3)
 lto = true              # use link time optimization
 codegen-units = 1       # allow cross-crate inlining & dedup
-panic = "abort"         # no unwinding machinery
+# NOTE:
+# Newer Rust stable toolchains ship `wasm32-unknown-emscripten` std/core built
+# with `panic=unwind`. If we force `panic=abort` here, rustc fails with:
+#   "core requires panic strategy unwind ... incompatible with this crate's abort"
+# If we ever want `panic=abort` back for this target, we'd need to rebuild std
+# with nightly `-Z build-std` (core + panic_abort) for wasm32-unknown-emscripten.
+# `panic=unwind` increases the wasm size by 0.5mb compared to `panic=abort`
+panic = "unwind"
 strip = "symbols"       # strip symbols from final artifact
 debug = false
 
