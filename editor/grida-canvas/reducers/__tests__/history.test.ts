@@ -1,6 +1,3 @@
-jest.mock("@grida/vn", () => ({}), { virtual: true });
-jest.mock("svg-pathdata", () => ({}), { virtual: true });
-
 import reducer, { type ReducerContext } from "../index";
 import { DocumentHistoryManager } from "../../history-manager";
 import { editor } from "@/grida-canvas";

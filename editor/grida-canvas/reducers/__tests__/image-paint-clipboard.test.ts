@@ -1,19 +1,6 @@
 import documentReducer from "../document.reducer";
 import grida from "@grida/schema";
 
-jest.mock("@grida/vn", () => {
-  class VectorNetworkEditor {
-    constructor(_net: any) {}
-  }
-  return {
-    __esModule: true,
-    default: { VectorNetworkEditor },
-    VectorNetworkEditor,
-  };
-});
-
-jest.mock("svg-pathdata", () => ({}), { virtual: true });
-
 jest.mock("../surface.reducer", () => ({
   __esModule: true,
   default: jest.fn(),
