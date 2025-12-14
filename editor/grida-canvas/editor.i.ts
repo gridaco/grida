@@ -2747,6 +2747,21 @@ export namespace editor.api {
     exclude(target: ReadonlyArray<NodeID>): void;
     groupMask(target: ReadonlyArray<NodeID>): void;
 
+    /**
+     * Apply parameter-space scaling (Scale tool K) as a one-shot command.
+     *
+     * This applies a delta factor to the current authored state (not a persistent transform),
+     * scaling tracked geometry-contributing parameters while preserving visual identity.
+     */
+    applyScale(
+      target: ReadonlyArray<NodeID> | "selection",
+      factor: number,
+      options?: {
+        origin?: "center" | cmath.CardinalDirection;
+        include_subtree?: boolean;
+      }
+    ): void;
+
     // vector editor
     selectVertex(
       node_id: NodeID,
