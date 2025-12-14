@@ -15,6 +15,10 @@ type NumericPropertyControlProps = Omit<
   value?: TMixed<number | "">;
   /** Step size for increment/decrement operations */
   step?: number;
+  /** Optional suffix to append to the displayed value (e.g., "%", "px", "x") */
+  suffix?: string;
+  /** Optional scale factor for display (e.g., 100 for percentages: 0.01 -> 1%) */
+  scale?: number;
   /** Whether to automatically select all text when the input is focused */
   autoSelect?: boolean;
   /** Minimum allowed value */
@@ -129,6 +133,8 @@ export default function InputPropertyNumber({
   onValueChange,
   onValueCommit,
   step = 1,
+  suffix,
+  scale,
   autoSelect = true,
   min,
   max,
@@ -160,6 +166,8 @@ export default function InputPropertyNumber({
     onValueChange,
     onValueCommit,
     commitOnBlur,
+    suffix,
+    scale,
   });
 
   // Track focus state for data-focus attribute

@@ -173,6 +173,17 @@ namespace cmath {
 
   export type IntercardinalDirection = "ne" | "se" | "sw" | "nw";
 
+  export type Alignment9 =
+    | "bottom-center"
+    | "bottom-left"
+    | "bottom-right"
+    | "center"
+    | "center-left"
+    | "center-right"
+    | "top-center"
+    | "top-left"
+    | "top-right";
+
   /**
    * Quantizes a value to the nearest multiple of a specified step.
    *
@@ -1147,6 +1158,37 @@ namespace cmath {
       direction: CardinalDirection
     ): CardinalDirection {
       return __inverted_cardinal_directions[direction];
+    }
+
+    /**
+     * Converts a 9-point alignment to a cardinal direction.
+     *
+     * @param alignment - The 9-point alignment to convert.
+     * @returns The corresponding cardinal direction, or "center" if the alignment is "center".
+     */
+    export function fromAlignment9(
+      alignment: Alignment9
+    ): CardinalDirection | "center" {
+      switch (alignment) {
+        case "center":
+          return "center";
+        case "top-left":
+          return "nw";
+        case "top-center":
+          return "n";
+        case "top-right":
+          return "ne";
+        case "center-left":
+          return "w";
+        case "center-right":
+          return "e";
+        case "bottom-left":
+          return "sw";
+        case "bottom-center":
+          return "s";
+        case "bottom-right":
+          return "se";
+      }
     }
 
     /**
