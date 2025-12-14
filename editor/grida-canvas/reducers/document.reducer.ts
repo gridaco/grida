@@ -44,6 +44,7 @@ import {
   getVectorSelectionStartPoint,
   self_nudge_transform,
 } from "./methods";
+import { self_apply_scale_by_factor } from "./methods/scale";
 import {
   getPackedSubtreeBoundingRect,
   getViewportAwareDelta,
@@ -1568,6 +1569,17 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         self_selectNode(draft, "reset", ...insertions);
       });
       break;
+    }
+    case "apply-scale": {
+      const { targets, factor, origin, include_subtree } = action;
+      return updateState(state, (draft) => {
+        self_apply_scale_by_factor(draft, context, {
+          targets,
+          factor,
+          origin,
+          include_subtree,
+        });
+      });
     }
     //
     case "select-vertex":

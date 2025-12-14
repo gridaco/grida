@@ -47,6 +47,7 @@ export type DocumentAction =
   | EditorDeleteAction
   | EditorFlattenAction
   | EditorA11yDeleteAction
+  | EditorApplyParametricScaleAction
   | EditorHierarchyAction
   | EditorVectorEditorAction
   | EditorVariableWidthAction
@@ -565,6 +566,20 @@ export interface EditorBooleanOperationAction {
 export interface EditorUngroupAction {
   type: "ungroup";
   target: NodeID[] | "selection";
+}
+
+export interface EditorApplyParametricScaleAction {
+  type: "apply-scale";
+  /**
+   * root targets (selection roots)
+   */
+  targets: NodeID[];
+  /**
+   * delta scale factor to apply for this command (e.g. 1.5).
+   */
+  factor: number;
+  origin: "center" | cmath.CardinalDirection;
+  include_subtree: boolean;
 }
 
 export type EditorConfigAction =
