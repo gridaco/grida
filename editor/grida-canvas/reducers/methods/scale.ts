@@ -407,15 +407,9 @@ function self_update_gesture_parametric_scale(
     movement: rawMovement,
     initial_bounding_rect: _initial_bounding_rect,
     affected_ids,
-    initial_abs_rects_by_id,
-    initial_external_parent_abs_rects_by_id,
   } = draft.gesture;
 
   assert(affected_ids, "parametric scale requires affected_ids");
-  assert(
-    initial_abs_rects_by_id,
-    "parametric scale requires initial_abs_rects_by_id"
-  );
 
   const initial_bounding_rect =
     _initial_bounding_rect ?? cmath.rect.union(initial_rects);
@@ -509,14 +503,6 @@ function self_update_gesture_parametric_scale(
   // Expose canonical uniform scale factor on gesture state (used by UI).
   draft.gesture.uniform_scale = s;
 
-  const scaled_abs_rects_by_id: Record<string, cmath.Rectangle> = {};
-  for (const id of affected_ids) {
-    const r = initial_abs_rects_by_id[id];
-    if (!r) continue;
-    scaled_abs_rects_by_id[id] =
-      schema.parametric_scale.scale_rect_about_anchor(r, origin, s);
-  }
-
   // Reset affected nodes to the initial snapshot (prevents accumulation).
   for (const id of affected_ids) {
     const initial = initial_snapshot.document.nodes[id] as
@@ -527,66 +513,12 @@ function self_update_gesture_parametric_scale(
     }
   }
 
-  const affected_set = new Set(affected_ids);
-
   for (const id of affected_ids) {
     const node = draft.document.nodes[id] as
       | grida.program.nodes.Node
       | undefined;
     if (!node) continue;
     if (node.type === "scene") continue;
-
-    const abs = scaled_abs_rects_by_id[id];
-    if (!abs) continue;
-
-    const parent_id = dq.getParentId(draft.document_ctx, id);
-    let parent_abs: cmath.Rectangle | undefined = undefined;
-    if (parent_id) {
-      if (affected_set.has(parent_id)) {
-        parent_abs = scaled_abs_rects_by_id[parent_id];
-      } else {
-        parent_abs = initial_external_parent_abs_rects_by_id?.[id];
-      }
-    }
-
-    const is_scene_parent = parent_id
-      ? (
-          draft.document.nodes[parent_id] as
-            | grida.program.nodes.Node
-            | undefined
-        )?.type === "scene"
-      : false;
-
-    const local_x =
-      parent_id && parent_abs && !is_scene_parent
-        ? abs.x - parent_abs.x
-        : abs.x;
-    const local_y =
-      parent_id && parent_abs && !is_scene_parent
-        ? abs.y - parent_abs.y
-        : abs.y;
-
-    const positioning = node as grida.program.nodes.i.IPositioning &
-      grida.program.nodes.i.ICSSDimension;
-
-    if ("position" in positioning && positioning.position === "absolute") {
-      // Preserve authoring intent: only update if already numeric (don't create new constraints).
-      if (typeof positioning.left === "number") {
-        positioning.left = cmath.quantize(local_x, 1);
-      }
-      if (typeof positioning.top === "number") {
-        positioning.top = cmath.quantize(local_y, 1);
-      }
-    }
-
-    if (typeof positioning.width === "number") {
-      positioning.width = cmath.quantize(Math.max(abs.width, 0), 1);
-    }
-
-    if (typeof positioning.height === "number") {
-      positioning.height =
-        node.type === "line" ? 0 : cmath.quantize(Math.max(abs.height, 0), 1);
-    }
 
     schema.parametric_scale.apply_node(node, s);
   }
@@ -627,101 +559,12 @@ export function self_apply_scale_by_factor(
   }
   const affected_ids = Array.from(affected);
 
-  const root_rects = targets
-    .map((id) => context.geometry.getNodeAbsoluteBoundingRect(id))
-    .filter((r): r is cmath.Rectangle => !!r);
-  if (!root_rects.length) return;
-
-  const root_bounds = cmath.rect.union(root_rects);
-  const origin =
-    opts.origin === "center"
-      ? cmath.rect.getCenter(root_bounds)
-      : cmath.rect.getCardinalPoint(root_bounds, opts.origin);
-
-  const initial_abs_rects_by_id: Record<string, cmath.Rectangle> = {};
-  for (const id of affected_ids) {
-    const r = context.geometry.getNodeAbsoluteBoundingRect(id);
-    if (r) initial_abs_rects_by_id[id] = r;
-  }
-
-  const initial_external_parent_abs_rects_by_id: Record<
-    string,
-    cmath.Rectangle
-  > = {};
-  for (const id of affected_ids) {
-    const parent_id = dq.getParentId(draft.document_ctx, id);
-    if (!parent_id) continue;
-    if (affected.has(parent_id)) continue;
-    const pr = context.geometry.getNodeAbsoluteBoundingRect(parent_id);
-    if (pr) initial_external_parent_abs_rects_by_id[id] = pr;
-  }
-
-  const scaled_abs_rects_by_id: Record<string, cmath.Rectangle> = {};
-  for (const id of affected_ids) {
-    const r = initial_abs_rects_by_id[id];
-    if (!r) continue;
-    scaled_abs_rects_by_id[id] =
-      schema.parametric_scale.scale_rect_about_anchor(r, origin, s);
-  }
-
   for (const id of affected_ids) {
     const node = draft.document.nodes[id] as
       | grida.program.nodes.Node
       | undefined;
     if (!node) continue;
     if (node.type === "scene") continue;
-
-    const abs = scaled_abs_rects_by_id[id];
-    if (!abs) continue;
-
-    const parent_id = dq.getParentId(draft.document_ctx, id);
-    let parent_abs: cmath.Rectangle | undefined = undefined;
-    if (parent_id) {
-      if (affected.has(parent_id)) {
-        parent_abs = scaled_abs_rects_by_id[parent_id];
-      } else {
-        parent_abs = initial_external_parent_abs_rects_by_id[id];
-      }
-    }
-
-    const is_scene_parent = parent_id
-      ? (
-          draft.document.nodes[parent_id] as
-            | grida.program.nodes.Node
-            | undefined
-        )?.type === "scene"
-      : false;
-
-    const local_x =
-      parent_id && parent_abs && !is_scene_parent
-        ? abs.x - parent_abs.x
-        : abs.x;
-    const local_y =
-      parent_id && parent_abs && !is_scene_parent
-        ? abs.y - parent_abs.y
-        : abs.y;
-
-    const positioning = node as grida.program.nodes.i.IPositioning &
-      grida.program.nodes.i.ICSSDimension;
-
-    if ("position" in positioning && positioning.position === "absolute") {
-      // Preserve authoring intent: only update if already numeric (don't create new constraints).
-      if (typeof positioning.left === "number") {
-        positioning.left = cmath.quantize(local_x, 1);
-      }
-      if (typeof positioning.top === "number") {
-        positioning.top = cmath.quantize(local_y, 1);
-      }
-    }
-
-    if (typeof positioning.width === "number") {
-      positioning.width = cmath.quantize(Math.max(abs.width, 0), 1);
-    }
-
-    if (typeof positioning.height === "number") {
-      positioning.height =
-        node.type === "line" ? 0 : cmath.quantize(Math.max(abs.height, 0), 1);
-    }
 
     schema.parametric_scale.apply_node(node, s);
   }

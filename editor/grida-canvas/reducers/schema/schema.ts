@@ -23,6 +23,8 @@ export namespace schema.parametric_scale {
   type NodeScaleProps = Partial<
     grida.program.nodes.i.ICornerRadius &
       grida.program.nodes.i.IRectangularCornerRadius &
+      grida.program.nodes.i.IPositioning &
+      grida.program.nodes.i.ICSSDimension &
       grida.program.nodes.i.IPadding &
       grida.program.nodes.i.IFlexContainer &
       grida.program.nodes.i.IStroke &
@@ -227,7 +229,15 @@ export namespace schema.parametric_scale {
   export function apply_node(node: grida.program.nodes.Node, s: number) {
     const n = node as NodeScaleProps;
 
-    // General layout-ish lengths
+    // Layout-ish lengths (treat as regular numeric fields; do not bake non-numeric values)
+    scale_number_in_place(n, "left", s);
+    scale_number_in_place(n, "top", s);
+    scale_number_in_place(n, "right", s);
+    scale_number_in_place(n, "bottom", s);
+    scale_number_in_place(n, "width", s);
+    scale_number_in_place(n, "height", s);
+
+    // General geometry-ish lengths
     scale_number_in_place(n, "corner_radius", s);
     scale_number_in_place(n, "rectangular_corner_radius_top_left", s);
     scale_number_in_place(n, "rectangular_corner_radius_top_right", s);
