@@ -2,9 +2,19 @@
 title: Scale tool (K) — parameter-space scaling (A.k.a Apply Scale or K-Scale)
 ---
 
-| feature id           | status   | description                                  | PRs |
-| -------------------- | -------- | -------------------------------------------- | --- |
-| `parametric-scaling` | proposed | Parameter-space scaling operation for Grida. | -   |
+| feature id           | status   | description                                  | PRs                                               |
+| -------------------- | -------- | -------------------------------------------- | ------------------------------------------------- |
+| `parametric-scaling` | proposed | Parameter-space scaling operation for Grida. | [#471](https://github.com/gridaco/grida/pull/471) |
+
+## Key principles
+
+- **Visual accuracy over “clean” values**: Scale (K) is an authoring-time operation whose primary goal is that the post-scale render is visually consistent with a uniform similarity transform. As a result, it is normal (and expected) for authored values to become fractional / “dirty” after repeated scaling.
+
+- **No extra quantization / optimization in the core rewrite**: The core scaling rules should apply the exact factor $s$ to existing numeric values without “cleaning up” the result. Any additional rounding/optimization risks accumulating error over repeated operations or round trips. (Gesture-input quantization may exist for UX stability, but is intentionally out of scope for this specification.)
+
+- **Round-trip consistency (best-effort)**: Perfect round-trip guarantees are not always possible across multi-step edits, but for simple numeric cases the rewrite should behave consistently within the limits of JavaScript number precision. Example: $1 \\to 0.01x \\to 100x \\to 1$ should return to (approximately) the original value.
+
+- **Deterministic, minimal rewrite (do not change the nature of properties)**: Scaling MUST NOT reinterpret or “bake” non-numeric authored intent into numeric values. For example, a property that is `auto`, `undefined`, or otherwise non-numeric must remain so. Scale (K) **bakes existing length values**, not “bake-all”.
 
 ## Context
 
