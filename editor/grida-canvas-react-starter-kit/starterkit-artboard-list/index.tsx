@@ -1,7 +1,8 @@
 import React from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import kolor from "@grida/color";
 import artboardData from "../data/artboards.json";
+import { useSessionStorage } from "@uidotdev/usehooks";
 import {
   Collapsible,
   CollapsibleContent,
@@ -13,10 +14,20 @@ type ArtboardData = {
   name: string;
   width: number;
   height: number;
+  year?: number;
 };
 
 const ArtboardList = () => {
   const editor = useCurrentEditor();
+
+  const SESSION_STORAGE_KEY = "grida.starterkit.artboard_list.open_category";
+  const OPEN_CATEGORY_UNSET = "__unset__";
+  const OPEN_CATEGORY_NONE = "__none__";
+
+  const [openCategory, setOpenCategory] = useSessionStorage(
+    SESSION_STORAGE_KEY,
+    OPEN_CATEGORY_UNSET
+  );
 
   const onClickItem = (item: ArtboardData) => {
     editor.commands.insertNode({
@@ -34,14 +45,28 @@ const ArtboardList = () => {
     });
   };
 
-  // TODO: have a session storage to store the last opened state
   return (
     <div className="w-full divide-y overflow-hidden">
       {Object.entries(artboardData).map(([categoryName, items], index) => (
-        <Collapsible key={index} defaultOpen={index === 0}>
-          <CollapsibleTrigger className="p-2 my-1 focus:outline-none">
+        <Collapsible
+          key={categoryName}
+          open={
+            openCategory === OPEN_CATEGORY_UNSET
+              ? index === 0
+              : openCategory === OPEN_CATEGORY_NONE
+                ? false
+                : openCategory === categoryName
+          }
+          onOpenChange={(open) => {
+            setOpenCategory(open ? categoryName : OPEN_CATEGORY_NONE);
+          }}
+        >
+          <CollapsibleTrigger className="group p-2 my-1 focus:outline-none">
             <div className="flex items-center justify-between cursor-pointer">
-              <ChevronDown size={16} className="text-muted-foreground me-2" />
+              <ChevronRight
+                size={16}
+                className="text-muted-foreground me-2 transition-transform duration-200 group-data-[state=open]:rotate-90"
+              />
               <span className="font-medium capitalize text-xs">
                 {categoryName}
               </span>
@@ -57,8 +82,8 @@ const ArtboardList = () => {
                       onClickItem(item);
                     }}
                   >
-                    <span className="text-xs truncate">{item.name}</span>
-                    <span className="text-xs text-muted-foreground opacity-50">
+                    <span className="text-[11px] truncate">{item.name}</span>
+                    <span className="text-[10px] text-muted-foreground opacity-50">
                       {item.width}×{item.height}
                     </span>
                   </button>

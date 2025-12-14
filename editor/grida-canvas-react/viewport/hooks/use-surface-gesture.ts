@@ -9,8 +9,9 @@ export function useSurfaceGesture(
     onDragEnd,
     ...handlers
   }: Parameters<typeof useGesture>[0],
-  config?: Parameters<typeof useGesture>[1]
+  config?: Parameters<typeof useGesture>[1] & { enabled?: boolean }
 ) {
+  const enabled = config?.enabled !== false; // default to true
   // click / double click triggers when drag ends (if double pointer down) - it might be a better idea to prevent it with the displacement, not by delayed flag
   const should_prevent_click = useRef(false);
 
@@ -40,6 +41,9 @@ export function useSurfaceGesture(
         }, 100);
       },
     },
-    config
+    {
+      ...config,
+      enabled: enabled,
+    }
   );
 }

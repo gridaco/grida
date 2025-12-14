@@ -1,0 +1,37 @@
+{
+  "name": "@grida/tailwindcss-colors",
+  "description": "Tailwind CSS color data package - provides color values in multiple formats (RGBA, HEX, OKLCH) for programmatic use. Not intended for direct CSS import in production.",
+  "version": "4.0.1",
+  "homepage": "https://grida.co",
+  "repository": "https://github.com/gridaco/grida",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "private": false,
+  "keywords": [
+    "grida",
+    "tailwind",
+    "colors",
+    "tailwindcss",
+    "data"
+  ],
+  "scripts": {
+    "generate": "deno run --allow-read --allow-write --allow-net scripts/generate.ts",
+    "prepublishOnly": "pnpm generate"
+  },
+  "files": [
+    "css",
+    "json",
+    "README.md"
+  ],
+  "exports": {
+    "./css/rgb.css": "./css/rgb.css",
+    "./css/rgba.css": "./css/rgba.css",
+    "./css/hex.css": "./css/hex.css",
+    "./css/oklch.css": "./css/oklch.css",
+    "./json/rgb.json": "./json/rgb.json",
+    "./json/rgbf.json": "./json/rgbf.json",
+    "./json/rgba.json": "./json/rgba.json",
+    "./json/hex.json": "./json/hex.json",
+    "./json/oklch.json": "./json/oklch.json"
+  }
+}

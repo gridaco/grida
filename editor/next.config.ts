@@ -44,9 +44,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "backgrounds.grida.co",
       },
+      // allow all Unsplash subdomains (covers images.unsplash.com, plus.unsplash.com, etc.)
       {
         protocol: "https",
-        hostname: "images.unsplash.com",
+        hostname: "*.unsplash.com",
       },
     ],
   },

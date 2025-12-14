@@ -35,12 +35,22 @@ import {
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { PlusIcon, Cross1Icon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import {
+  FloatingWindowHost,
+  FloatingWindowBounds,
+  FloatingWindowRoot,
+  FloatingWindowTitleBar,
+  FloatingWindowBody,
+  FloatingWindowClose,
+  FloatingWindowTrigger,
+  useFloatingWindowControls,
+} from "@/components/floating-window";
 import {
   Sidebar,
   SidebarContent,
@@ -48,7 +58,6 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { saveAs } from "file-saver";
 import { v4 } from "uuid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
@@ -63,7 +72,13 @@ import {
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import ErrorBoundary from "./error-boundary";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
@@ -81,7 +96,6 @@ import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import { editor } from "@/grida-canvas";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
-import { LibraryContent } from "./library";
 import { EditorYSyncPlugin } from "@/grida-canvas/plugins/yjs";
 import { Editor } from "@/grida-canvas/editor";
 import { PlayerAvatar } from "@/components/multiplayer/avatar";
@@ -98,6 +112,7 @@ import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { PlaygroundMenuContent } from "./uxhost-menu";
+import { Library } from "../library/library";
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -356,6 +371,28 @@ function Consumer({
   } = useUILayout();
   const instance = useCurrentEditor();
   const debug = useEditorState(instance, (state) => state.debug);
+  const libraryWindowControls = useFloatingWindowControls({
+    defaultOpen: false,
+  });
+
+  useHotkeys(
+    "shift+i",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      // open-only behavior (don't toggle/close if already open)
+      if (!libraryWindowControls.open) {
+        libraryWindowControls.openWindow();
+      }
+    },
+    {
+      // keep shortcut disabled while typing (library default, made explicit here)
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
 
   // Check if there are selected nodes for conditional sidebar display
   const hasSelection = useEditorState(
@@ -411,56 +448,93 @@ function Consumer({
   return (
     <AgentChatProvider>
       <PreviewProvider>
-        <div className="flex w-full h-full">
-          {ui.sidebar_left && (
-            <SidebarLeft
-              toggleVisibility={toggleVisibility}
-              toggleMinimal={toggleMinimal}
-            />
-          )}
-          <EditorSurfaceClipboardSyncProvider />
-          <EditorSurfaceDropzone>
-            <EditorSurfaceContextMenu>
-              <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
-                <ViewportRoot className="relative w-full h-full overflow-hidden">
-                  <Hotkyes />
-                  <EditorSurface />
-                  <LocalFakeCursorChat />
-                  {/* {backend === "canvas" && (
+        <FloatingWindowHost>
+          <FloatingWindowBounds>
+            {({ boundaryRef }) => (
+              <>
+                <div className="flex w-full h-full">
+                  {ui.sidebar_left && (
+                    <SidebarLeft
+                      toggleVisibility={toggleVisibility}
+                      toggleMinimal={toggleMinimal}
+                      libraryWindowControls={libraryWindowControls}
+                    />
+                  )}
+                  <EditorSurfaceClipboardSyncProvider />
+                  <EditorSurfaceDropzone>
+                    <EditorSurfaceContextMenu>
+                      <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+                        <ViewportRoot className="relative w-full h-full overflow-hidden">
+                          <Hotkyes />
+                          <EditorSurface />
+                          <LocalFakeCursorChat />
+                          {/* {backend === "canvas" && (
                     <__WIP_UNSTABLE_WasmContent editor={instance} />
                   )} */}
-                  {backend === "canvas" && <Canvas ref={canvasRef} />}
-                  {backend === "dom" && (
-                    <AutoInitialFitTransformer>
-                      <StandaloneSceneContent />
-                    </AutoInitialFitTransformer>
+                          {backend === "canvas" && <Canvas ref={canvasRef} />}
+                          {backend === "dom" && (
+                            <AutoInitialFitTransformer>
+                              <StandaloneSceneContent />
+                            </AutoInitialFitTransformer>
+                          )}
+                          {ui.toolbar_bottom && (
+                            <>
+                              <BrushToolbarPosition>
+                                <BrushToolbar />
+                              </BrushToolbarPosition>
+                              <PathToolbarPosition>
+                                <PathToolbar />
+                              </PathToolbarPosition>
+                              <ToolbarPosition>
+                                <PlaygroundToolbar />
+                              </ToolbarPosition>
+                            </>
+                          )}
+                        </ViewportRoot>
+                        {debug && <DevtoolsPanel />}
+                      </StandaloneSceneBackground>
+                    </EditorSurfaceContextMenu>
+                  </EditorSurfaceDropzone>
+                  {should_show_sidebar_right && (
+                    <SidebarRight
+                      variant={sidebar_right_variant}
+                      tab={rightSidebarTab}
+                      setTab={setRightSidebarTab}
+                    />
                   )}
-                  {ui.toolbar_bottom && (
+                </div>
+                <FloatingWindowRoot
+                  windowId="library"
+                  boundaryRef={boundaryRef}
+                  initialX={260}
+                  initialY={120}
+                  width={360}
+                  height={560}
+                  controls={libraryWindowControls}
+                  className="z-[999] max-h-[calc(100vh-48px)] overflow-hidden flex flex-col"
+                  render={({ dragHandleProps, controls }) => (
                     <>
-                      <BrushToolbarPosition>
-                        <BrushToolbar />
-                      </BrushToolbarPosition>
-                      <PathToolbarPosition>
-                        <PathToolbar />
-                      </PathToolbarPosition>
-                      <ToolbarPosition>
-                        <PlaygroundToolbar />
-                      </ToolbarPosition>
+                      <FloatingWindowTitleBar dragHandleProps={dragHandleProps}>
+                        <span className="font-medium text-sm">Library</span>
+                        <FloatingWindowClose
+                          windowId="library"
+                          controls={controls}
+                          className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <Cross1Icon className="size-4" aria-hidden />
+                          <span className="sr-only">Close</span>
+                        </FloatingWindowClose>
+                      </FloatingWindowTitleBar>
+                      <FloatingWindowBody className="p-0 text-sm h-full flex flex-col overflow-hidden">
+                        <Library />
+                      </FloatingWindowBody>
                     </>
                   )}
-                </ViewportRoot>
-                {debug && <DevtoolsPanel />}
-              </StandaloneSceneBackground>
-            </EditorSurfaceContextMenu>
-          </EditorSurfaceDropzone>
-          {should_show_sidebar_right && (
-            <SidebarRight
-              variant={sidebar_right_variant}
-              tab={rightSidebarTab}
-              setTab={setRightSidebarTab}
-            />
-          )}
-        </div>
+                />
+              </>
+            )}
+          </FloatingWindowBounds>
+        </FloatingWindowHost>
       </PreviewProvider>
 
       {ui.help_fab && rightSidebarTab !== "agent" && (
@@ -543,65 +617,67 @@ function LocalFakeCursorChat() {
 function SidebarLeft({
   toggleVisibility,
   toggleMinimal,
+  libraryWindowControls,
 }: {
   toggleVisibility?: () => void;
   toggleMinimal?: () => void;
+  libraryWindowControls?: ReturnType<typeof useFloatingWindowControls>;
 }) {
-  const libraryDialog = useDialogState("library");
-
   return (
     <aside className="relative">
       <div className="absolute top-4 -right-14 z-50">
-        <Button
-          variant={libraryDialog.open ? "default" : "outline"}
-          className="size-8 rounded-full p-0"
-          onClick={libraryDialog.openDialog}
-        >
-          <PlusIcon className="size-4" />
-        </Button>
+        <Tooltip>
+          <FloatingWindowTrigger
+            windowId="library"
+            controls={libraryWindowControls}
+            asChild
+          >
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                className="size-8 rounded-full p-0"
+                aria-label="Open Library"
+              >
+                <PlusIcon className="size-4" aria-hidden />
+              </Button>
+            </TooltipTrigger>
+          </FloatingWindowTrigger>
+          <TooltipContent side="right" sideOffset={8}>
+            <div className="flex items-center gap-2">
+              <span>Open Library</span>
+              <KbdGroup>
+                <Kbd>Shift</Kbd>
+                <Kbd>I</Kbd>
+              </KbdGroup>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       </div>
-      {libraryDialog.open ? (
-        <>
-          <DialogPrimitive.Root {...libraryDialog.props}>
-            <DialogPrimitive.Content className="h-full">
-              <DialogPrimitive.Title className="sr-only">
-                Library
-              </DialogPrimitive.Title>
-              <SidebarRoot>
-                <LibraryContent />
-              </SidebarRoot>
-            </DialogPrimitive.Content>
-          </DialogPrimitive.Root>
-        </>
-      ) : (
-        <>
-          <Sidebar>
-            <SidebarHeader className="p-0">
-              <DarwinSidebarHeaderDragArea />
-              <header className="h-11 min-h-11 flex items-center px-4 border-b">
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="me-2">
-                    <GridaLogo className="inline-block size-4" />
-                  </DropdownMenuTrigger>
-                  <PlaygroundMenuContent
-                    toggleVisibility={toggleVisibility}
-                    toggleMinimal={toggleMinimal}
-                  />
-                </DropdownMenu>
-                <span className="font-bold text-xs">
-                  Canvas
-                  <Badge variant="outline" className="ms-2 text-xs">
-                    BETA
-                  </Badge>
-                </span>
-              </header>
-            </SidebarHeader>
-            <SidebarContent className="p-0 overflow-hidden">
-              <DocumentHierarchy />
-            </SidebarContent>
-          </Sidebar>
-        </>
-      )}
+      <Sidebar>
+        <SidebarHeader className="p-0">
+          <DarwinSidebarHeaderDragArea />
+          <header className="h-11 min-h-11 flex items-center px-4 border-b">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="me-2">
+                <GridaLogo className="inline-block size-4" />
+              </DropdownMenuTrigger>
+              <PlaygroundMenuContent
+                toggleVisibility={toggleVisibility}
+                toggleMinimal={toggleMinimal}
+              />
+            </DropdownMenu>
+            <span className="font-bold text-xs">
+              Canvas
+              <Badge variant="outline" className="ms-2 text-xs">
+                BETA
+              </Badge>
+            </span>
+          </header>
+        </SidebarHeader>
+        <SidebarContent className="p-0 overflow-hidden">
+          <DocumentHierarchy />
+        </SidebarContent>
+      </Sidebar>
     </aside>
   );
 }

@@ -38,3 +38,11 @@ export const MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE = 100;
  * to indicate the target dropzone where they will be placed.
  */
 export const DROPZONE_BORDER_WIDTH = 2;
+
+/**
+ * Minimum resize handle size in UI space (pixels) required for diagonal handles to have priority over NSWE handles.
+ * When handles are smaller than this threshold in viewport space, NSWE handles (n/e/s/w) get higher z-order
+ * for better accessibility, especially for W/E handles which serve as double-click hotspots for resize-to-fit.
+ * When handles are larger than this threshold, diagonal handles maintain priority (current default behavior).
+ */
+export const MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE = 36;

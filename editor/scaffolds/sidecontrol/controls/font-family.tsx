@@ -8,12 +8,9 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui-editor/native-select";
 import {
   Popover,
   PopoverContent,
@@ -187,23 +184,37 @@ function FontFamilyCommand({
         onKeyDown={handleKeyDown}
       />
       <div className="border-b p-1">
-        <Select value={category} onValueChange={setCategory as any}>
-          <SelectTrigger
-            className={cn(
-              WorkbenchUI.selectVariants({ variant: "trigger", size: "sm" }),
-              "w-full"
-            )}
+        <div className="w-full [&>div]:w-full">
+          <NativeSelect
+            size="xs"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as any)}
+            className="w-full"
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all-fonts">All fonts</SelectItem>
-            <SelectItem value="with-axes">Variable fonts</SelectItem>
-            <SelectItem value="non-variable">Non variable fonts</SelectItem>
-            <SelectItem value="used-in-document">In this file</SelectItem>
-          </SelectContent>
-        </Select>
+            <NativeSelectOption value="all-fonts">
+              All fonts ({fonts.length})
+            </NativeSelectOption>
+            <NativeSelectOption value="with-axes">
+              Variable fonts (
+              {fonts.filter((f) => f.axes && f.axes.length > 0).length})
+            </NativeSelectOption>
+            <NativeSelectOption value="non-variable">
+              Non variable fonts (
+              {fonts.filter((f) => !f.axes || f.axes.length === 0).length})
+            </NativeSelectOption>
+            <NativeSelectOption value="used-in-document">
+              In this file (
+              {fonts.filter((f) => usedFonts.includes(f.family)).length})
+            </NativeSelectOption>
+          </NativeSelect>
+        </div>
       </div>
+      {query && filteredFontFamilies.length > 0 && (
+        <div className="px-2 py-1 text-xs text-muted-foreground border-b">
+          {filteredFontFamilies.length} font
+          {filteredFontFamilies.length !== 1 ? "s" : ""} found
+        </div>
+      )}
       <CommandEmpty>No font found.</CommandEmpty>
       <CommandGroup
         ref={parentRef}

@@ -85,6 +85,7 @@ function GradientStop({
       <div className="flex-[2]">
         <RGBA32FColorControl
           value={stop.color}
+          variant="with-opacity"
           onValueChange={(color) => {
             onValueChange?.({ ...stop, color });
           }}

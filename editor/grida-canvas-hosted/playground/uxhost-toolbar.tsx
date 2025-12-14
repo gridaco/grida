@@ -21,7 +21,7 @@ import {
   ToolsGroup,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
-import { ColorPicker32F } from "@/scaffolds/sidecontrol/controls/color-picker";
+import { ColorPicker32FWithOptions } from "@/scaffolds/sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { PaintBucketIcon } from "lucide-react";
 import {
@@ -194,50 +194,12 @@ function BitmapEditModeAuxiliaryToolbar() {
   );
 }
 
-const defaultColors: Record<string, kolor.colorformats.RGBA32F> =
-  Object.fromEntries(
-    [
-      ["red", kolor.names.red],
-      ["greenred", kolor.names.green],
-      ["bluered", kolor.names.blue],
-      ["yellowred", kolor.names.yellow],
-      ["orangered", kolor.names.orange],
-      ["purplered", kolor.names.purple],
-      ["pinkred", kolor.names.pink],
-      ["cyanred", kolor.names.cyan],
-      ["magentared", kolor.names.magenta],
-      ["blackred", kolor.names.black],
-      ["whitered", kolor.names.white],
-      ["grayred", kolor.names.gray],
-      ["silverred", kolor.names.silver],
-      ["brownred", kolor.names.brown],
-      ["olivered", kolor.names.olive],
-      ["navyred", kolor.names.navy],
-      ["tealred", kolor.names.teal],
-      ["maroonred", kolor.names.maroon],
-      ["goldred", kolor.names.gold],
-      ["indigored", kolor.names.indigo],
-    ].map(([id, rgb]) => {
-      const [r, g, b] = rgb as [number, number, number];
-      return [id, kolor.colorformats.newRGBA32F(r / 255, g / 255, b / 255, 1)];
-    })
-  );
-
 function ClipboardColor() {
   const editor = useCurrentEditor();
   const clipboardColor = useEditorState(editor, (s) => s.user_clipboard_color);
 
   const color: kolor.colorformats.RGBA32F =
     clipboardColor ?? kolor.colorformats.RGBA32F.BLACK;
-
-  // TODO:
-  // - recent colors
-  // - document colors
-  // - named colors
-  const options = Object.entries(defaultColors).map(([id, color]) => ({
-    id,
-    color,
-  }));
 
   return (
     <Popover>
@@ -257,12 +219,11 @@ function ClipboardColor() {
         sideOffset={16}
         className="p-0"
       >
-        <ColorPicker32F
+        <ColorPicker32FWithOptions
           color={color}
           onColorChange={editor.surface.a11ySetClipboardColor.bind(
             editor.surface
           )}
-          options={options}
         />
       </PopoverContent>
     </Popover>

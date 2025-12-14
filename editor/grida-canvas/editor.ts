@@ -1186,7 +1186,36 @@ class EditorDocumentStore
     });
   }
 
-  public autoLayout(target: "selection" | editor.NodeID[]) {
+  public autoLayout(
+    target: "selection" | editor.NodeID[],
+    prefersDirectApplication: boolean = true
+  ) {
+    // Check if we should apply layout directly to a single container without layout
+    if (
+      prefersDirectApplication &&
+      target === "selection" &&
+      this.state.selection.length === 1
+    ) {
+      const node_id = this.state.selection[0]!;
+      const node = this.getNodeSnapshotById(node_id);
+
+      // If it's a container without a layout, apply layout directly
+      // The reducer will analyze the container's children's spatial arrangement
+      // to infer the optimal flex direction, spacing, and alignment (same as wrapping)
+      if (
+        node.type === "container" &&
+        (node as grida.program.nodes.ContainerNode).layout !== "flex"
+      ) {
+        this.dispatch({
+          type: "autolayout",
+          contain: false,
+          target: node_id,
+        });
+        return;
+      }
+    }
+
+    // Default behavior: wrap nodes in new container(s)
     this.dispatch({
       type: "autolayout",
       contain: true,
