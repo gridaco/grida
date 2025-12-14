@@ -22,14 +22,14 @@ Other folders under `/docs` are **not actively managed**.
 
 ## Structure
 
-| directory                        | name          | description                                                      | active |
-| -------------------------------- | ------------- | ---------------------------------------------------------------- | ------ |
-| [/docs/wg](./wg)                 | working group | working group documents, architecture documents, todo list, etc  | yes    |
-| [/docs/reference](./reference)   | reference     | glossary and references (technical documents)                    | yes    |
-| [/docs/math](./math)             | math          | Math reference, used for internal docs referencing               | yes    |
-| [/docs/platform](./platform)     | platform      | Grida Platform (API/Spec) documents                              | yes    |
-| [/docs/editor](./editor)         | editor        | Grida Editor - User Documentation                                | yes    |
-| [/docs/canvas](./canvas)         | canvas        | Grida Canvas SDK - User Documentation                            | no     |
-| [/docs/cli](./cli)               | cli           | Grida CLI - User Documentation                                   | yes    |
-| [/docs/together](./together)     | together      | Contributing, Support, Community, etc                            | yes    |
-| [/docs/with-figma](./with-figma) | with-figma    | Grida with Figma - Grida <-> Figma compatilibity and user guides | yes    |
+| directory                        | name          | description                                                            | active |
+| -------------------------------- | ------------- | ---------------------------------------------------------------------- | ------ |
+| [/docs/wg](./wg)                 | working group | working group documents, architecture documents, todo list, etc        | yes    |
+| [/docs/reference](./reference)   | reference     | glossary and references (technical documents)                          | yes    |
+| [/docs/math](./math)             | math          | Math reference, used for internal docs referencing                     | yes    |
+| [/docs/platform](./platform)     | platform      | Grida Platform (API/Spec) documents                                    | yes    |
+| [/docs/editor](./editor)         | editor        | Grida Editor - User Documentation                                      | yes    |
+| [/docs/canvas](./canvas)         | canvas        | Grida Canvas SDK - User Documentation                                  | no     |
+| [/docs/cli](./cli)               | cli           | Grida CLI - User Documentation                                         | yes    |
+| [/docs/together](./together)     | together      | Contributing, Support, Community, etc                                  | yes    |
+| [/docs/with-figma](./with-figma) | with-figma    | Grida with Figma - Grida &lt;-&gt; Figma compatibility and user guides | yes    |
