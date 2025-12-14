@@ -1571,13 +1571,14 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       break;
     }
     case "apply-scale": {
-      const { targets, factor, origin, include_subtree } = action;
+      const { targets, factor, origin, include_subtree, space } = action;
       return updateState(state, (draft) => {
         self_apply_scale_by_factor(draft, context, {
           targets,
           factor,
           origin,
           include_subtree,
+          space,
         });
       });
     }

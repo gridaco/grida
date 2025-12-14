@@ -2771,6 +2771,7 @@ export namespace editor.api {
       options?: {
         origin?: "center" | cmath.CardinalDirection;
         include_subtree?: boolean;
+        space?: "auto" | "global";
       }
     ): void;
 

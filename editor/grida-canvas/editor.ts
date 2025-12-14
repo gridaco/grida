@@ -936,6 +936,7 @@ class EditorDocumentStore
     options?: {
       origin?: "center" | cmath.CardinalDirection;
       include_subtree?: boolean;
+      space?: "auto" | "global";
     }
   ) {
     const targets = (target === "selection" ? this.state.selection : target) as
@@ -950,6 +951,7 @@ class EditorDocumentStore
       factor,
       origin: options?.origin ?? "center",
       include_subtree: options?.include_subtree ?? true,
+      space: options?.space ?? "auto",
     });
   }
 

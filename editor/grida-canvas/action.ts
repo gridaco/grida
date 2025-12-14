@@ -580,6 +580,15 @@ export interface EditorApplyParametricScaleAction {
   factor: number;
   origin: "center" | cmath.CardinalDirection;
   include_subtree: boolean;
+
+  /**
+   * Coordinate space interpretation for layout geometry (`left/top/...`).
+   *
+   * - `auto` (default): best-effort UX semantics; may override selection-root `left/top`
+   *   so origin behaves selection-local for root-level nodes (scene direct children).
+   * - `global`: purely multiply numeric layout fields by factor (developer/math usage).
+   */
+  space?: "auto" | "global";
 }
 
 export type EditorConfigAction =

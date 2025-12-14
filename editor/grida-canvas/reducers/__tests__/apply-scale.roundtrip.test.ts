@@ -512,3 +512,139 @@ describe("apply-scale round-trip (accuracy)", () => {
     }
   );
 });
+
+it("origin semantics: auto overrides root left/top but global does not", () => {
+  const scene_id = "scene1";
+  const doc: grida.program.document.Document = {
+    scenes_ref: [scene_id],
+    entry_scene_id: scene_id,
+    links: { [scene_id]: ["rect1"] },
+    bitmaps: {},
+    images: {},
+    properties: {},
+    nodes: {
+      [scene_id]: {
+        type: "scene",
+        id: scene_id,
+        name: "Scene",
+        active: true,
+        locked: false,
+        constraints: { children: "multiple" },
+        guides: [],
+        edges: [],
+        background_color: null,
+      },
+      rect1: {
+        id: "rect1",
+        type: "rectangle",
+        name: "Rect",
+        active: true,
+        locked: false,
+        position: "absolute",
+        left: 10,
+        top: 20,
+        width: 100,
+        height: 50,
+        rotation: 0,
+        opacity: 1,
+        z_index: 0,
+        stroke_width: 0,
+        stroke_cap: "butt",
+        stroke_join: "miter",
+        fill_paints: [],
+        stroke_paints: [],
+      },
+    },
+  };
+
+  let state = editor.state.init({
+    editable: true,
+    debug: false,
+    document: doc,
+    templates: {},
+  });
+  state = dispatch(
+    state,
+    { type: "load", scene: scene_id } as any,
+    createContext(() => state)
+  );
+
+  const ctx = createContext(() => state);
+
+  const state_auto = dispatch(
+    state,
+    {
+      type: "apply-scale",
+      targets: ["rect1"],
+      factor: 2,
+      origin: "center",
+      include_subtree: false,
+      space: "auto",
+    } as any,
+    ctx
+  );
+
+  const state_global = dispatch(
+    state,
+    {
+      type: "apply-scale",
+      targets: ["rect1"],
+      factor: 2,
+      origin: "center",
+      include_subtree: false,
+      space: "global",
+    } as any,
+    ctx
+  );
+
+  const a: any = state_auto.document.nodes.rect1;
+  const g: any = state_global.document.nodes.rect1;
+
+  // both scale sizes
+  expect(a.width).toBe(200);
+  expect(g.width).toBe(200);
+
+  // but only `auto` keeps the center fixed by shifting left/top
+  expect(a.left).toBe(-40); // center at x=60, new half-width=100 => 60-100=-40
+  expect(a.top).toBe(-5); // center at y=45, new half-height=50 => 45-50=-5
+
+  // `global` simply multiplies coordinates
+  expect(g.left).toBe(20);
+  expect(g.top).toBe(40);
+});
+
+it.skip("UB/TODO: origin semantics for depth=2 selection root (scene -> container -> node)", () => {
+  /**
+   * ## Scenario (un-studied / undefined behavior)
+   *
+   * We currently implement `space: "auto"` origin semantics by overriding `left/top`
+   * only for selection roots that are **direct children of the scene**.
+   *
+   * This test documents the missing case:
+   *
+   * - Scene
+   *   - Container A (absolute, numeric box)
+   *     - Rect B (absolute, numeric left/top/width/height)
+   *
+   * User selects **Rect B** (selection root at depth=2) and applies parametric scale
+   * with `origin: "center"` in `space: "auto"`.
+   *
+   * ### What needs to be defined / handled
+   *
+   * For depth>1 roots, "selection-local" origin is ambiguous because:
+   * - `left/top` are in the **parent local coordinate space** (Container A),
+   * - but our origin is derived from **selection bounds** (which are typically in
+   *   scene/global space in the editor UX),
+   * - and the parent may be in layout contexts (flex/grid/auto) where writing `left/top`
+   *   could be incorrect or meaningless.
+   *
+   * A correct implementation likely needs an explicit rule, e.g.:
+   * - compute origin in the same space as the node's authored `left/top` (parent-local),
+   * - or only apply the override when the parent is scene (current behavior),
+   * - or introduce a more complete "auto" layout strategy for non-scene parents.
+   *
+   * Until that is specified, we intentionally do **not** assert behavior here.
+   */
+  // TODO: once semantics are decided, construct a minimal document for:
+  // scene -> container -> rect, then assert whether `auto` should shift rect's left/top.
+});

@@ -387,6 +387,151 @@ function dominantAxisByMovement(m: cmath.Vector2): "x" | "y" {
   return locked[0] === null ? "y" : "x";
 }
 
+type AutoSpaceRoot = {
+  id: string;
+  initialRect: cmath.Rectangle;
+  hasLeft: boolean;
+  hasTop: boolean;
+};
+
+function resolveScaleOriginPoint(
+  bounds: cmath.Rectangle,
+  origin: "center" | cmath.CardinalDirection
+): cmath.Vector2 {
+  return origin === "center"
+    ? cmath.rect.getCenter(bounds)
+    : cmath.rect.getCardinalPoint(bounds, origin);
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object")
+    return value as Record<string, unknown>;
+  return null;
+}
+
+function collectAutoSpaceRootsFromGesture(args: {
+  draft: Draft<editor.state.IEditorState>;
+  selection: string[];
+  initial_rects: cmath.Rectangle[];
+  initial_snapshot: ReturnType<typeof editor.state.snapshot>;
+}): AutoSpaceRoot[] {
+  const initial_rect_by_root_id: Record<string, cmath.Rectangle> = {};
+  for (let i = 0; i < args.selection.length; i++) {
+    const id = args.selection[i];
+    const r = args.initial_rects[i];
+    if (r) initial_rect_by_root_id[id] = r;
+  }
+
+  const roots: AutoSpaceRoot[] = [];
+  for (const root_id of args.selection) {
+    const parent_id = dq.getParentId(args.draft.document_ctx, root_id);
+    if (parent_id !== args.draft.scene_id) continue;
+
+    const initial_node = args.initial_snapshot.document.nodes[root_id] as
+      | grida.program.nodes.Node
+      | undefined;
+    if (!initial_node || initial_node.type === "scene") continue;
+
+    const o = toRecord(initial_node);
+    if (!o) continue;
+    if (o["position"] !== "absolute") continue;
+    if (typeof o["width"] !== "number" || typeof o["height"] !== "number")
+      continue;
+
+    const initialRect = initial_rect_by_root_id[root_id];
+    if (!initialRect) continue;
+
+    roots.push({
+      id: root_id,
+      initialRect,
+      hasLeft: typeof o["left"] === "number",
+      hasTop: typeof o["top"] === "number",
+    });
+  }
+
+  return roots;
+}
+
+function collectAutoSpaceRootsForCommand(args: {
+  draft: Draft<editor.state.IEditorState>;
+  context: ReducerContext;
+  targets: string[];
+}): AutoSpaceRoot[] {
+  const roots: AutoSpaceRoot[] = [];
+
+  for (const root_id of args.targets) {
+    const parent_id = dq.getParentId(args.draft.document_ctx, root_id);
+    if (parent_id !== args.draft.scene_id) continue;
+
+    const node = args.draft.document.nodes[root_id] as
+      | grida.program.nodes.Node
+      | undefined;
+    if (!node || node.type === "scene") continue;
+
+    const o = toRecord(node);
+    if (!o) continue;
+    if (o["position"] !== "absolute") continue;
+    if (typeof o["width"] !== "number" || typeof o["height"] !== "number")
+      continue;
+
+    const rect =
+      args.context.geometry.getNodeAbsoluteBoundingRect(root_id) ??
+      (typeof o["left"] === "number" && typeof o["top"] === "number"
+        ? {
+            x: o["left"],
+            y: o["top"],
+            width: o["width"],
+            height: o["height"],
+          }
+        : null);
+
+    if (!rect) continue;
+
+    roots.push({
+      id: root_id,
+      initialRect: rect,
+      hasLeft: typeof o["left"] === "number",
+      hasTop: typeof o["top"] === "number",
+    });
+  }
+
+  return roots;
+}
+
+function applyAutoSpaceRootLeftTopOverride(args: {
+  draft: Draft<editor.state.IEditorState>;
+  roots: ReadonlyArray<AutoSpaceRoot>;
+  origin: cmath.Vector2;
+  factor: number;
+}) {
+  for (const root of args.roots) {
+    if (!root.hasLeft && !root.hasTop) continue;
+
+    const scaled = schema.parametric_scale.scale_rect_about_anchor(
+      root.initialRect,
+      args.origin,
+      args.factor
+    );
+
+    const node = args.draft.document.nodes[root.id] as
+      | grida.program.nodes.Node
+      | undefined;
+    if (!node || node.type === "scene") continue;
+
+    const o = toRecord(node);
+    if (!o) continue;
+
+    if (root.hasLeft) {
+      // selection-root override (only if authored as numeric)
+      o["left"] = scaled.x;
+    }
+    if (root.hasTop) {
+      // selection-root override (only if authored as numeric)
+      o["top"] = scaled.y;
+    }
+  }
+}
+
 function self_update_gesture_parametric_scale(
   draft: Draft<editor.state.IEditorState>,
   context: ReducerContext
@@ -522,6 +667,24 @@ function self_update_gesture_parametric_scale(
 
     schema.parametric_scale.apply_node(node, s);
   }
+
+  // `auto` origin semantics for selection roots (scene-direct only):
+  // after applying raw numeric scaling, override selection-root `left/top` so the
+  // anchor behaves selection-local (resize-like) without forcing layout resolution.
+  const auto_roots = collectAutoSpaceRootsFromGesture({
+    draft,
+    selection,
+    initial_rects: initial_rects,
+    initial_snapshot,
+  });
+  if (auto_roots.length) {
+    applyAutoSpaceRootLeftTopOverride({
+      draft,
+      roots: auto_roots,
+      origin,
+      factor: s,
+    });
+  }
 }
 
 /**
@@ -539,14 +702,30 @@ export function self_apply_scale_by_factor(
     factor: number;
     origin: "center" | cmath.CardinalDirection;
     include_subtree: boolean;
+    space?: "auto" | "global";
   }
 ) {
   assert(draft.scene_id, "scene_id is not set");
   const s = schema.parametric_scale._clamp_scale(opts.factor);
   if (s === 1) return;
 
+  const space = opts.space ?? "auto";
   const targets = opts.targets;
   if (!targets.length) return;
+
+  const auto_roots =
+    space === "auto"
+      ? collectAutoSpaceRootsForCommand({ draft, context, targets })
+      : [];
+
+  const auto_bounds =
+    space === "auto" && auto_roots.length
+      ? cmath.rect.union(auto_roots.map((r) => r.initialRect))
+      : null;
+  const auto_origin =
+    space === "auto" && auto_bounds
+      ? resolveScaleOriginPoint(auto_bounds, opts.origin)
+      : null;
 
   const affected = new Set<string>();
   for (const root_id of targets) {
@@ -567,5 +746,14 @@ export function self_apply_scale_by_factor(
     if (node.type === "scene") continue;
 
     schema.parametric_scale.apply_node(node, s);
+  }
+
+  if (space === "auto" && auto_origin && auto_roots.length) {
+    applyAutoSpaceRootLeftTopOverride({
+      draft,
+      roots: auto_roots,
+      origin: auto_origin,
+      factor: s,
+    });
   }
 }
