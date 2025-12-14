@@ -3,18 +3,18 @@ use cg::shape::stroke::stroke_geometry;
 
 /// Helper to create a horizontal line path
 fn create_horizontal_line(x1: f32, y1: f32, x2: f32, y2: f32) -> skia_safe::Path {
-    let mut path = skia_safe::Path::new();
-    path.move_to((x1, y1));
-    path.line_to((x2, y2));
-    path
+    let mut builder = skia_safe::PathBuilder::new();
+    builder.move_to((x1, y1));
+    builder.line_to((x2, y2));
+    builder.detach()
 }
 
 /// Helper to create a vertical line path
 fn create_vertical_line(x1: f32, y1: f32, x2: f32, y2: f32) -> skia_safe::Path {
-    let mut path = skia_safe::Path::new();
-    path.move_to((x1, y1));
-    path.line_to((x2, y2));
-    path
+    let mut builder = skia_safe::PathBuilder::new();
+    builder.move_to((x1, y1));
+    builder.line_to((x2, y2));
+    builder.detach()
 }
 
 #[test]

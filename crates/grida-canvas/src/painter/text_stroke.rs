@@ -2,7 +2,7 @@ use crate::cg::types::{Paint, StrokeAlign, StrokeCap, StrokeJoin, StrokeMiterLim
 use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
 use crate::shape::stroke::stroke_geometry;
-use skia_safe::{self, path::AddPathMode, Canvas, Font, GlyphId, Matrix, PaintStyle, Path, Point};
+use skia_safe::{self, Canvas, Font, GlyphId, Matrix, PaintStyle, PathBuilder, Point};
 
 /// Draw stroked text with custom stroke alignment using `SkTextBlob`.
 ///
@@ -25,13 +25,20 @@ pub fn draw_text_stroke(
     }
 
     // Build a path from individual glyphs and their positions.
-    let mut path = Path::new();
+    let mut builder = PathBuilder::new();
     for (glyph, position) in glyphs.iter().zip(positions.iter()) {
         if let Some(glyph_path) = font.get_path(*glyph) {
             let offset = Point::new(position.x + origin.x, position.y + origin.y);
-            path.add_path(&glyph_path, offset, AddPathMode::Append);
+            if offset.x != 0.0 || offset.y != 0.0 {
+                let transformed =
+                    glyph_path.make_transform(&Matrix::translate((offset.x, offset.y)));
+                builder.add_path(&transformed);
+            } else {
+                builder.add_path(&glyph_path);
+            }
         }
     }
+    let path = builder.detach();
     if path.is_empty() {
         return;
     }

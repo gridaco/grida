@@ -366,8 +366,7 @@ fn draw_stacked(
     let size_tuple = (size, size);
 
     // Create a path from the rectangle to match production code behavior
-    let mut path = skia_safe::Path::new();
-    path.add_rect(rect, None);
+    let path = skia_safe::Path::rect(rect, None);
 
     // Paint order semantics:
     // - `fills` is bottom → top. We pass as-is to the stacker, which composes

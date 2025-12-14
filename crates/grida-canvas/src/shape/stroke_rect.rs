@@ -1,6 +1,6 @@
 use crate::cg::prelude::*;
 use skia_safe::{
-    path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, RRect, Rect, StrokeRec, Vector,
+    path_effect::PathEffect, stroke_rec::InitStyle, Path, PathBuilder, PathOp, RRect, Rect, StrokeRec, Vector,
 };
 
 /// Builds an RRect from a Skia Rect and RectangularCornerRadius.
@@ -262,11 +262,13 @@ pub fn stroke_geometry_rectangular(
 
     if !has_dash {
         // Solid stroke: fill DRRect ring directly
-        let mut outer_path = Path::new();
-        outer_path.add_rrect(rr_outer, None);
+        let mut outer_builder = PathBuilder::new();
+        outer_builder.add_rrect(rr_outer, None, None);
+        let outer_path = outer_builder.detach();
 
-        let mut inner_path = Path::new();
-        inner_path.add_rrect(rr_inner, None);
+        let mut inner_builder = PathBuilder::new();
+        inner_builder.add_rrect(rr_inner, None, None);
+        let inner_path = inner_builder.detach();
 
         if let Some(ring) = skia_safe::op(&outer_path, &inner_path, PathOp::Difference) {
             ring
@@ -316,8 +318,9 @@ fn stroke_geometry_rectangular_dashed_rrect(
         compute_centerline_rrect(node_bounds, rect_stroke, corner_radius, stroke_align);
 
     // Create path from centerline
-    let mut centerline_path = Path::new();
-    centerline_path.add_rrect(centerline_rrect, None);
+    let mut centerline_builder = PathBuilder::new();
+    centerline_builder.add_rrect(centerline_rrect, None, None);
+    let centerline_path = centerline_builder.detach();
 
     // Stroke with max width
     let max_width = rect_stroke.max();
@@ -350,11 +353,13 @@ fn stroke_geometry_rectangular_dashed_rrect(
     let stroked_path = stroked_path_builder.snapshot();
 
     // Clip to DRRect ring (outer - inner)
-    let mut outer_path = Path::new();
-    outer_path.add_rrect(rr_outer, None);
+    let mut outer_builder = PathBuilder::new();
+    outer_builder.add_rrect(rr_outer, None, None);
+    let outer_path = outer_builder.detach();
 
-    let mut inner_path = Path::new();
-    inner_path.add_rrect(rr_inner, None);
+    let mut inner_builder = PathBuilder::new();
+    inner_builder.add_rrect(rr_inner, None, None);
+    let inner_path = inner_builder.detach();
 
     if let Some(ring) = skia_safe::op(&outer_path, &inner_path, PathOp::Difference) {
         // Intersect stroke with ring

@@ -1072,7 +1072,7 @@ impl LayerList {
                             let shape = build_shape(node, &bounds);
                             let mut path = shape.to_path();
                             let relative_transform = current_inv.compose(&world_transform);
-                            path.transform(&sk::sk_matrix(relative_transform.matrix));
+                            path = path.make_transform(&sk::sk_matrix(relative_transform.matrix));
 
                             clip_shapes.push((
                                 PainterShape::from_path(path),
@@ -1089,7 +1089,7 @@ impl LayerList {
                                 .get_world_transform(&id)
                                 .unwrap_or_else(AffineTransform::identity);
                             let relative_transform = current_inv.compose(&world_transform);
-                            path.transform(&sk::sk_matrix(relative_transform.matrix));
+                            path = path.make_transform(&sk::sk_matrix(relative_transform.matrix));
 
                             clip_shapes.push((
                                 PainterShape::from_path(path),
