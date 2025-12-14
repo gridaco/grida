@@ -3,7 +3,6 @@ import assert from "assert";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
 import vn from "@grida/vn";
-
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import type { ReducerContext } from "..";
@@ -382,6 +381,11 @@ function self_update_gesture_resize_scale(
     }
   }
 }
+function dominantAxisByMovement(m: cmath.Vector2): "x" | "y" {
+  // Reuse cmath's dominance logic (ties resolve to "y").
+  const locked = cmath.ext.movement.axisLockedByDominance([m[0], m[1]]);
+  return locked[0] === null ? "y" : "x";
+}
 
 function self_update_gesture_parametric_scale(
   draft: Draft<editor.state.IEditorState>,
@@ -473,16 +477,37 @@ function self_update_gesture_parametric_scale(
   }
   // #endregion
 
-  const movement = cmath.vector2.multiply(
-    cmath.compass.cardinal_direction_vector[direction],
-    adjusted_raw_movement,
-    transform_with_center_origin === "on" ? [2, 2] : [1, 1]
+  const direction_vector = cmath.compass.cardinal_direction_vector[direction];
+  const center_multiplier: cmath.Vector2 =
+    transform_with_center_origin === "on" ? [2, 2] : [1, 1];
+
+  // Scale tool (K) prioritizes visual consistency (uniform similarity scale).
+  // To avoid "snapping/quantizing both axes" jitter, we only use the dominant
+  // movement axis to derive the uniform scale factor, then apply it uniformly.
+  const unadjusted = cmath.vector2.multiply(
+    direction_vector,
+    rawMovement,
+    center_multiplier
   );
+  const dominant_axis = dominantAxisByMovement(unadjusted);
+
+  const movement = cmath.vector2.multiply(
+    direction_vector,
+    adjusted_raw_movement,
+    center_multiplier
+  );
+
+  const movement_for_factor: cmath.Vector2 =
+    dominant_axis === "x" ? [movement[0], 0] : [0, movement[1]];
 
   const s = schema.parametric_scale._uniform_scale_factor(
     initial_bounding_rect,
-    movement
+    movement_for_factor,
+    0.01
   );
+
+  // Expose canonical uniform scale factor on gesture state (used by UI).
+  draft.gesture.uniform_scale = s;
 
   const scaled_abs_rects_by_id: Record<string, cmath.Rectangle> = {};
   for (const id of affected_ids) {

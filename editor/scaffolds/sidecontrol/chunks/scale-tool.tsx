@@ -16,6 +16,75 @@ import { PropertyLine, PropertyLineLabel } from "../ui";
 import InputPropertyNumber from "../ui/number";
 import { ScaleFactorControl } from "../controls/scale-factor";
 import { Alignment9Control } from "../controls/alignment9";
+import { useEditorState } from "@/grida-canvas-react";
+
+/**
+ * Manages the Scale tool's *session-scale* value.
+ *
+ * Why this exists:
+ * - The Scale tool (K) can be driven by **two sources**:
+ *   1) direct UI edits (typing a scale value)
+ *   2) an interactive canvas gesture (drag scale handles)
+ * - During a gesture, the reducer tracks a `gesture.uniform_scale` that is
+ *   relative to the gesture's own start (1 → ...).
+ * - The panel's `sessionScale` is an **ephemeral, per-panel baseline** that can
+ *   already be != 1 before a new gesture begins (e.g. user typed 2x, then drags).
+ *
+ * Contract:
+ * - On gesture start, capture the current `sessionScale` as baseline.
+ * - While gesture is active, keep `sessionScale = baseline * uniform_scale`.
+ * - When the panel is re-initialized (selection/tool changes), reset gesture baseline.
+ */
+function useScaleToolSessionScale({
+  editor,
+  visible,
+  selection_key,
+  sessionScale,
+  setSessionScale,
+}: {
+  editor: Editor;
+  visible: boolean;
+  selection_key: string;
+  sessionScale: number;
+  setSessionScale: (v: number) => void;
+}) {
+  const isParametricScaling = useEditorState(editor, (state) => {
+    const g = state.gesture;
+    return g.type === "scale" && g.mode === "parametric";
+  });
+
+  const uniformScale = useEditorState(editor, (state) => {
+    const g = state.gesture;
+    if (g.type !== "scale" || g.mode !== "parametric") return null;
+    return g.uniform_scale ?? 1;
+  });
+
+  const session_scale_at_gesture_start = React.useRef(1);
+  const was_parametric_scaling = React.useRef(false);
+
+  React.useEffect(() => {
+    // Capture the session scale baseline when a new drag gesture begins.
+    if (isParametricScaling && !was_parametric_scaling.current) {
+      session_scale_at_gesture_start.current = sessionScale;
+    }
+    was_parametric_scaling.current = isParametricScaling;
+  }, [isParametricScaling, sessionScale]);
+
+  React.useEffect(() => {
+    if (!isParametricScaling) return;
+    if (uniformScale === null) return;
+    if (!Number.isFinite(uniformScale)) return;
+
+    const next = session_scale_at_gesture_start.current * uniformScale;
+    setSessionScale(next);
+  }, [isParametricScaling, uniformScale, setSessionScale]);
+
+  React.useEffect(() => {
+    // If the panel is re-initialized, also reset the gesture baseline.
+    session_scale_at_gesture_start.current = 1;
+    was_parametric_scaling.current = false;
+  }, [visible, selection_key]);
+}
 
 export function ScaleToolSection({
   visible,
@@ -31,6 +100,14 @@ export function ScaleToolSection({
   const [sessionScale, setSessionScale] = React.useState<number>(1);
   const [sessionOrigin, setSessionOrigin] =
     React.useState<cmath.Alignment9>("center");
+
+  useScaleToolSessionScale({
+    editor,
+    visible,
+    selection_key,
+    sessionScale,
+    setSessionScale,
+  });
 
   React.useEffect(() => {
     if (!visible) return;

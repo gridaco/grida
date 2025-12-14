@@ -1840,6 +1840,18 @@ export namespace editor.gesture {
       string,
       cmath.Rectangle
     >;
+
+    /**
+     * Uniform similarity scale factor for the current gesture update.
+     *
+     * For Scale tool (K) parametric scaling, this is the canonical scale factor
+     * derived from the gesture movement and the initial bounds.
+     *
+     * This is tracked in **0.01 precision** (quantized) for gesture stability / UI.
+     * For `editor.commands.applyScale(...)`, the factor is used as-is (developer intent).
+     * (Unset for non-uniform resize gestures.)
+     */
+    uniform_scale?: number;
   };
 
   export type GestureInsertAndResize = Omit<GestureScale, "type"> & {

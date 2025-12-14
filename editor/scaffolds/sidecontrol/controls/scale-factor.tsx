@@ -22,7 +22,6 @@ export function ScaleFactorControl({
   autoFocus?: boolean;
 }) {
   const hasPreset = presets.some((p) => Math.abs(p - value) < 1e-9);
-  const options = hasPreset ? presets : [value, ...presets];
 
   return (
     <div className="relative">
@@ -43,7 +42,7 @@ export function ScaleFactorControl({
       />
       <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
         <Select
-          value={String(value)}
+          value={hasPreset ? String(value) : undefined}
           onValueChange={(_v) => {
             const next = parseFloat(_v);
             onValueCommit(next);
@@ -55,7 +54,7 @@ export function ScaleFactorControl({
             </button>
           </SelectPrimitive.SelectTrigger>
           <SelectContent align="end">
-            {options.map((s) => (
+            {presets.map((s) => (
               <SelectItem key={String(s)} value={String(s)}>
                 {s}x
               </SelectItem>

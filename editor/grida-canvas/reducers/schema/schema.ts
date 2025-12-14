@@ -1,5 +1,5 @@
 import type cg from "@grida/cg";
-import type cmath from "@grida/cmath";
+import cmath from "@grida/cmath";
 import type grida from "@grida/schema";
 import vn from "@grida/vn";
 
@@ -35,9 +35,21 @@ export namespace schema.parametric_scale {
     return Math.max(0.01, s);
   }
 
+  /**
+   * Calculates a uniform similarity scale factor from a movement delta.
+   *
+   * - Always returns a clamped scale \(s \ge 0.01\)
+   * - If `q` is provided, the return value is quantized to `q` precision
+   *
+   * Intended usage:
+   * - **Interactive gestures / UI**: pass `q = 0.01` to keep stable `0.00x` precision.
+   * - **Programmatic commands / API** (e.g. `applyScale(factor)`): use the factor as-is
+   *   (developer intent) and do not route it through this helper.
+   */
   export function _uniform_scale_factor(
     initial_bounds: cmath.Rectangle,
-    movement: cmath.Vector2
+    movement: cmath.Vector2,
+    q?: number
   ) {
     const w = initial_bounds.width;
     const h = initial_bounds.height;
@@ -62,7 +74,11 @@ export namespace schema.parametric_scale {
       }
     }
 
-    return _clamp_scale(s);
+    const clamped = _clamp_scale(s);
+    if (typeof q === "number" && Number.isFinite(q) && q > 0) {
+      return cmath.quantize(clamped, q);
+    }
+    return clamped;
   }
 
   export function scale_rect_about_anchor(
