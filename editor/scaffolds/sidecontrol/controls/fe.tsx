@@ -534,6 +534,7 @@ function FeShadowProperties({
       <PropertyLine>
         <PropertyLineLabel>Color</PropertyLineLabel>
         <RGBA32FColorControl
+          variant="with-opacity"
           value={value.color}
           onValueChange={(v) => onValueChange?.({ ...value, color: v })}
         />
