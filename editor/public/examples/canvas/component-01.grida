@@ -35,6 +35,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -71,6 +72,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0,
               "g": 0,
@@ -107,6 +109,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0,
               "g": 0,
@@ -154,6 +157,7 @@
         "fill_paints": [
           {
             "type": "linear_gradient",
+            "active": true,
             "id": "ee2883cd-716c-49ce-a08d-1179381ce91c",
             "stops": [
               {
@@ -196,6 +200,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0,
               "g": 0,
