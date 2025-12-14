@@ -2,6 +2,7 @@ import type { editor } from "@/grida-canvas";
 
 export type ToolbarToolType =
   | "cursor"
+  | "scale"
   | "hand"
   | "rectangle"
   | "ellipse"
@@ -27,6 +28,8 @@ export function toolmode_to_toolbar_value(
     case "cursor":
     case "zoom":
       return "cursor";
+    case "scale":
+      return "scale";
     case "hand":
       return "hand";
     case "insert":
@@ -56,6 +59,8 @@ export function toolbar_value_to_cursormode(
   switch (tt) {
     case "cursor":
       return { type: "cursor" };
+    case "scale":
+      return { type: "scale" };
     case "hand":
       return { type: "hand" };
     case "container":

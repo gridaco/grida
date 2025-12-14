@@ -1016,7 +1016,8 @@ function SelectionGroupOverlay({
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
-  const enabled = !readonly && tool.type === "cursor";
+  const enabled =
+    !readonly && (tool.type === "cursor" || tool.type === "scale");
 
   const bind = useSurfaceGesture(
     {
@@ -1199,7 +1200,8 @@ function NodeOverlay({
   const tool = useToolState();
 
   // enable overlay dragging only when the cursor tool is active and editable
-  const enabled = !readonly && tool.type === "cursor";
+  const enabled =
+    !readonly && (tool.type === "cursor" || tool.type === "scale");
 
   const bind = useSurfaceGesture(
     {
@@ -1531,6 +1533,7 @@ function LayerOverlayResizeHandle({
   onDoubleClick?: () => void;
   disabled?: boolean;
 }) {
+  const tool = useToolState();
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
@@ -1559,7 +1562,16 @@ function LayerOverlayResizeHandle({
       {...bind()}
       anchor={anchor}
       zIndex={zIndex}
-      transform={disabled ? { pointerEvents: "none" } : undefined}
+      transform={
+        tool.type === "scale"
+          ? {
+              cursor: cursors.resize_handle_scale_cursor_map[anchor],
+              ...(disabled ? { pointerEvents: "none" } : undefined),
+            }
+          : disabled
+            ? { pointerEvents: "none" }
+            : undefined
+      }
     />
   );
 }
@@ -1579,6 +1591,7 @@ function LayerOverlayResizeSide({
   onDoubleClick?: () => void;
   disabled?: boolean;
 }) {
+  const tool = useToolState();
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
@@ -1628,7 +1641,10 @@ function LayerOverlayResizeSide({
       style={{
         position: "absolute",
         background: "transparent",
-        cursor: cursors.resize_handle_cursor_map[anchor],
+        cursor:
+          tool.type === "scale"
+            ? cursors.resize_handle_scale_cursor_map[anchor]
+            : cursors.resize_handle_cursor_map[anchor],
         touchAction: "none",
         zIndex,
         ...positionalStyle,

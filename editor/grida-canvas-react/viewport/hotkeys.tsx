@@ -233,6 +233,11 @@ export const keybindings_sheet = [
     keys: ["v"],
   },
   {
+    name: "scale",
+    description: "Scale tool (parametric scaling)",
+    keys: ["k"],
+  },
+  {
     name: "lasso",
     description: "Lasso tool (vector mode)",
     keys: ["q"],
@@ -895,6 +900,10 @@ export function useEditorHotKeys() {
 
   useHotkeys("v", () => {
     editor.surface.surfaceSetTool({ type: "cursor" });
+  });
+
+  useHotkeys("k", () => {
+    editor.surface.surfaceSetTool({ type: "scale" });
   });
 
   useHotkeys("q", () => {

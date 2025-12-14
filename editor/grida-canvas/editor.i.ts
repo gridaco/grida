@@ -673,6 +673,14 @@ export namespace editor.state {
         type: "cursor";
       }
     | {
+        /**
+         * Scale tool (K) — parametric scaling.
+         *
+         * Note: this is a tool mode, distinct from the transform gesture type `"scale"`.
+         */
+        type: "scale";
+      }
+    | {
         type: "hand";
       }
     | {
@@ -1799,6 +1807,39 @@ export namespace editor.gesture {
     readonly initial_snapshot: editor.state.IMinimalDocumentState;
     readonly initial_rects: cmath.Rectangle[];
     readonly direction: cmath.CardinalDirection;
+
+    /**
+     * Gesture mode.
+     * - `resize`: regular resize behavior (default)
+     * - `parametric`: Scale tool (K) — parameter-space scaling
+     */
+    readonly mode?: "resize" | "parametric";
+
+    /**
+     * Initial selection bounding rectangle (union of `initial_rects`).
+     * Used as the reference for parametric scaling.
+     */
+    readonly initial_bounding_rect?: cmath.Rectangle;
+
+    /**
+     * Affected node ids for parametric scaling (selection + descendants).
+     */
+    readonly affected_ids?: string[];
+
+    /**
+     * Initial absolute rectangles (canvas space) cached at gesture start.
+     * Keyed by node id.
+     */
+    readonly initial_abs_rects_by_id?: Record<string, cmath.Rectangle>;
+
+    /**
+     * For nodes whose parent is outside `affected_ids`, this caches the parent's
+     * initial absolute rect (canvas space), keyed by node id.
+     */
+    readonly initial_external_parent_abs_rects_by_id?: Record<
+      string,
+      cmath.Rectangle
+    >;
   };
 
   export type GestureInsertAndResize = Omit<GestureScale, "type"> & {

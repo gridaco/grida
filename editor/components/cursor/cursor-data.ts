@@ -77,6 +77,31 @@ export namespace cursors {
     return `data:image/svg+xml;base64,${btoa(svgData)}`;
   };
 
+  /**
+   * Scale tool (K) cursor set — uses designed resize cursors.
+   *
+   * Files live under `editor/public/assets/css-cursors-grida/`.
+   */
+  const _ew_resize_scale_png_url =
+    "/assets/css-cursors-grida/ew-resize-scale-64-x32y32-000000.png";
+  const _ns_resize_scale_png_url =
+    "/assets/css-cursors-grida/ns-resize-scale-64-x32y32-000000.png";
+  const _nesw_resize_scale_png_url =
+    "/assets/css-cursors-grida/nesw-resize-scale-64-x32y32-000000.png";
+  const _nwse_resize_scale_png_url =
+    "/assets/css-cursors-grida/nwse-resize-scale-64-x32y32-000000.png";
+
+  export const resize_handle_scale_cursor_map = {
+    nw: pngsetcss(_nwse_resize_scale_png_url, 32, 32, "auto"),
+    n: pngsetcss(_ns_resize_scale_png_url, 32, 32, "auto"),
+    ne: pngsetcss(_nesw_resize_scale_png_url, 32, 32, "auto"),
+    e: pngsetcss(_ew_resize_scale_png_url, 32, 32, "auto"),
+    se: pngsetcss(_nwse_resize_scale_png_url, 32, 32, "auto"),
+    s: pngsetcss(_ns_resize_scale_png_url, 32, 32, "auto"),
+    sw: pngsetcss(_nesw_resize_scale_png_url, 32, 32, "auto"),
+    w: pngsetcss(_ew_resize_scale_png_url, 32, 32, "auto"),
+  } as const;
+
   export const resize_handle_cursor_map = {
     nw: "nwse-resize",
     n: "ns-resize",
