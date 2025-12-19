@@ -322,32 +322,85 @@ pub struct UnknownNodeProperties {
 ///
 #[derive(Debug, Clone)]
 pub struct UniformNodeLayout {
-    // position
-    pub position: LayoutPositioningBasis,
+    // -------------------------------------------------------------------------
+    // Position
+    // -------------------------------------------------------------------------
+    /// Positioning basis for this node within its parent or layout context.
+    pub layout_position: LayoutPositioningBasis,
 
-    // dimensions
-    pub width: Option<f32>,
-    pub height: Option<f32>,
-    pub min_width: Option<f32>,
-    pub max_width: Option<f32>,
-    pub min_height: Option<f32>,
-    pub max_height: Option<f32>,
-    /// Layout target aspect ratio constraint (w, h).
+    // -------------------------------------------------------------------------
+    // Size targets and constraints
+    // -------------------------------------------------------------------------
+    /// Preferred layout target width.
     ///
-    /// Stored as a ratio pair and interpreted by layout engines as `w / h`.
+    /// Acts as a sizing *preference* and may be overridden or resolved differently
+    /// by layout engines depending on context.
+    pub layout_target_width: Option<f32>,
+
+    /// Preferred layout target height.
+    ///
+    /// Acts as a sizing *preference* and may be overridden or resolved differently
+    /// by layout engines depending on context.
+    pub layout_target_height: Option<f32>,
+
+    /// Minimum allowed width (hard constraint).
+    pub layout_min_width: Option<f32>,
+
+    /// Maximum allowed width (hard constraint).
+    pub layout_max_width: Option<f32>,
+
+    /// Minimum allowed height (hard constraint).
+    pub layout_min_height: Option<f32>,
+
+    /// Maximum allowed height (hard constraint).
+    pub layout_max_height: Option<f32>,
+
+    /// Preferred layout aspect ratio expressed as `(width, height)`.
+    ///
+    /// Stored as a normalized ratio pair and interpreted by layout engines as
+    /// `width / height`.
+    ///
+    /// This value is advisory:
+    /// - It may be used to resolve an under-specified dimension
+    ///   (e.g. width known, height `auto`).
+    /// - It must not override explicit width/height targets.
+    /// - It must not violate min/max size constraints.
+    ///
+    /// Layout engines that do not support aspect-ratio-aware sizing may ignore
+    /// this value entirely.
     pub layout_target_aspect_ratio: Option<(f32, f32)>,
 
-    // layout container
+    // -------------------------------------------------------------------------
+    // Layout container properties
+    // -------------------------------------------------------------------------
+    /// Layout mode applied to this node when acting as a container.
     pub layout_mode: LayoutMode,
+
+    /// Primary layout axis (horizontal or vertical).
     pub layout_direction: Axis,
+
+    /// Wrapping behavior for child elements.
     pub layout_wrap: Option<LayoutWrap>,
+
+    /// Alignment of children along the main axis.
     pub layout_main_axis_alignment: Option<MainAxisAlignment>,
+
+    /// Alignment of children along the cross axis.
     pub layout_cross_axis_alignment: Option<CrossAxisAlignment>,
+
+    /// Padding applied inside the container.
     pub layout_padding: Option<EdgeInsets>,
+
+    /// Gap between child elements.
     pub layout_gap: Option<LayoutGap>,
 
-    // layout child
+    // -------------------------------------------------------------------------
+    // Layout child properties
+    // -------------------------------------------------------------------------
+    /// Positioning mode when this node participates as a child in a layout.
     pub layout_positioning: LayoutPositioning,
+
+    /// Growth factor used by flexible layout engines (e.g. flexbox).
     pub layout_grow: Option<f32>,
 }
 
@@ -357,13 +410,13 @@ impl UniformNodeLayout {
         Self {
             layout_mode: LayoutMode::Normal,
             layout_positioning: LayoutPositioning::Auto,
-            position: LayoutPositioningBasis::Cartesian(CGPoint::default()),
-            width: None,
-            height: None,
-            min_width: None,
-            max_width: None,
-            min_height: None,
-            max_height: None,
+            layout_position: LayoutPositioningBasis::Cartesian(CGPoint::default()),
+            layout_target_width: None,
+            layout_target_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
             layout_direction: Axis::Horizontal,
             layout_wrap: None,
@@ -395,12 +448,12 @@ impl UniformNodeLayout {
     }
 
     pub fn merge_from_dimensions(mut self, dimensions: LayoutDimensionStyle) -> Self {
-        self.width = dimensions.width;
-        self.height = dimensions.height;
-        self.min_width = dimensions.min_width;
-        self.max_width = dimensions.max_width;
-        self.min_height = dimensions.min_height;
-        self.max_height = dimensions.max_height;
+        self.layout_target_width = dimensions.width;
+        self.layout_target_height = dimensions.height;
+        self.layout_min_width = dimensions.min_width;
+        self.layout_max_width = dimensions.max_width;
+        self.layout_min_height = dimensions.min_height;
+        self.layout_max_height = dimensions.max_height;
         self.layout_target_aspect_ratio = dimensions.layout_target_aspect_ratio;
         self
     }
@@ -419,24 +472,24 @@ impl UniformNodeLayout {
 
     /// Sets both x and y position.
     pub fn with_position(mut self, position: LayoutPositioningBasis) -> Self {
-        self.position = position;
+        self.layout_position = position;
         self
     }
 
     pub fn with_position_cartesian(mut self, x: f32, y: f32) -> Self {
-        self.position = LayoutPositioningBasis::Cartesian(CGPoint::new(x, y));
+        self.layout_position = LayoutPositioningBasis::Cartesian(CGPoint::new(x, y));
         self
     }
 
     pub fn with_position_inset(mut self, inset: EdgeInsets) -> Self {
-        self.position = LayoutPositioningBasis::Inset(inset);
+        self.layout_position = LayoutPositioningBasis::Inset(inset);
         self
     }
 
     /// Sets both width and height.
     pub fn with_size(mut self, width: f32, height: f32) -> Self {
-        self.width = Some(width);
-        self.height = Some(height);
+        self.layout_target_width = Some(width);
+        self.layout_target_height = Some(height);
         self
     }
 

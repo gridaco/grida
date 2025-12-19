@@ -218,7 +218,7 @@ impl From<UniformNodeLayout> for Style {
 
         // Size constraints
         style.size = Size {
-            width: if let Some(w) = layout.width {
+            width: if let Some(w) = layout.layout_target_width {
                 if w > 0.0 {
                     Dimension::length(w)
                 } else {
@@ -227,7 +227,7 @@ impl From<UniformNodeLayout> for Style {
             } else {
                 Dimension::auto()
             },
-            height: if let Some(h) = layout.height {
+            height: if let Some(h) = layout.layout_target_height {
                 if h > 0.0 {
                     Dimension::length(h)
                 } else {
@@ -246,16 +246,16 @@ impl From<UniformNodeLayout> for Style {
         }
 
         // Min/Max size constraints
-        if let Some(min_w) = layout.min_width {
+        if let Some(min_w) = layout.layout_min_width {
             style.min_size.width = Dimension::length(min_w);
         }
-        if let Some(max_w) = layout.max_width {
+        if let Some(max_w) = layout.layout_max_width {
             style.max_size.width = Dimension::length(max_w);
         }
-        if let Some(min_h) = layout.min_height {
+        if let Some(min_h) = layout.layout_min_height {
             style.min_size.height = Dimension::length(min_h);
         }
-        if let Some(max_h) = layout.max_height {
+        if let Some(max_h) = layout.layout_max_height {
             style.max_size.height = Dimension::length(max_h);
         }
 
@@ -265,7 +265,7 @@ impl From<UniformNodeLayout> for Style {
         }
 
         // Position - Taffy handles positioning automatically
-        style.inset = layout.position.into();
+        style.inset = layout.layout_position.into();
         style.position = layout.layout_positioning.into();
 
         style
