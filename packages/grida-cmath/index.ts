@@ -13,6 +13,61 @@ namespace cmath {
   export const tan = Math.tan;
 
   /**
+   * Computes the greatest common divisor (GCD) of two integers.
+   *
+   * - Inputs are treated as integers and reduced via `Math.abs`.
+   * - If one input is `0`, this returns `abs(other)` (and returns `1` for `(0, 0)`).
+   *
+   * @example
+   * ```ts
+   * cmath.gcd(12, 8); // 4
+   * cmath.gcd(-12, 8); // 4
+   * ```
+   */
+  export function gcd(a: number, b: number): number {
+    a = Math.abs(a);
+    b = Math.abs(b);
+    while (b !== 0) {
+      const t = a % b;
+      a = b;
+      b = t;
+    }
+    return a || 1;
+  }
+
+  /**
+   * Computes a normalized integer aspect ratio pair from `(width, height)`.
+   *
+   * This is useful for stable aspect ratios, e.g. `(1920, 1080)` → `[16, 9]`.
+   *
+   * @param width - Width-like quantity (must be finite and > 0).
+   * @param height - Height-like quantity (must be finite and > 0).
+   * @param max_denominator - Upper bound for the returned denominator (default: 1000).
+   */
+  export function aspectRatio(
+    width: number,
+    height: number,
+    max_denominator: number = 1000
+  ): [number, number] | undefined {
+    if (
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      return undefined;
+    }
+    const r = width / height;
+    const frac = rational.approximateFraction(r, max_denominator);
+    if (!frac) return undefined;
+    const [p, q] = frac;
+    if (!Number.isFinite(p) || !Number.isFinite(q) || q === 0) {
+      return undefined;
+    }
+    return [Math.abs(p), Math.abs(q)];
+  }
+
+  /**
    * Approximation constant used to convert a circular arc into a cubic Bézier
    * curve. Commonly known as KAPPA, defined as `4 * (sqrt(2) - 1) / 3`.
    *
@@ -587,6 +642,72 @@ namespace cmath {
       // row[0]*x + row[1]*y + row[2],
       // but x=offset when i=0, y=offset when i=1
       return row[i] * offset + row[2];
+    }
+  }
+
+  /**
+   * Rational / fraction helpers.
+   */
+  export namespace rational {
+    /**
+     * Approximates a real number with a reduced fraction using continued fractions.
+     *
+     * @param x - Real value to approximate.
+     * @param max_denominator - Upper bound for the returned denominator (default: 1000).
+     * @param epsilon - Convergence threshold (default: 1e-12).
+     * @returns `[numerator, denominator]` (denominator > 0), or `undefined` if input is invalid.
+     */
+    export function approximateFraction(
+      x: number,
+      max_denominator: number = 1000,
+      epsilon: number = 1e-12
+    ): [number, number] | undefined {
+      if (!Number.isFinite(x)) return undefined;
+      if (!Number.isFinite(max_denominator) || max_denominator <= 0) {
+        return undefined;
+      }
+      if (x === 0) return [0, 1];
+
+      const sign = x < 0 ? -1 : 1;
+      x = Math.abs(x);
+
+      // Continued fraction approximation with denominator clamp
+      let n0 = 0,
+        d0 = 1;
+      let n1 = 1,
+        d1 = 0;
+      let a = Math.floor(x);
+
+      while (true) {
+        const n2 = a * n1 + n0;
+        const d2 = a * d1 + d0;
+
+        if (d2 > max_denominator) {
+          // Clamp: choose t so that (t*d1 + d0) <= max_denominator
+          const t = d1 === 0 ? 0 : Math.floor((max_denominator - d0) / d1);
+          const n = t * n1 + n0;
+          const d = t * d1 + d0;
+          const g = gcd(n, d);
+          return [sign * (n / g), d / g];
+        }
+
+        const g = gcd(n2, d2);
+        const n2r = n2 / g;
+        const d2r = d2 / g;
+
+        const frac = x - a;
+        if (Math.abs(frac) < epsilon) {
+          return [sign * n2r, d2r];
+        }
+
+        n0 = n1;
+        d0 = d1;
+        n1 = n2;
+        d1 = d2;
+
+        x = 1 / frac;
+        a = Math.floor(x);
+      }
     }
   }
 
