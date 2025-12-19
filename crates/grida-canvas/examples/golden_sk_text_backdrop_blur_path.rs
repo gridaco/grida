@@ -197,7 +197,11 @@ fn paragraph_to_path(
             for (glyph, position) in glyphs.iter().zip(positions.iter()) {
                 if let Some(glyph_path) = font.get_path(*glyph) {
                     let offset = Point::new(position.x + origin.x, position.y + origin.y);
-                    builder.add_path_with_transform(&glyph_path, &Matrix::translate((offset.x, offset.y)), None);
+                    builder.add_path_with_transform(
+                        &glyph_path,
+                        &Matrix::translate((offset.x, offset.y)),
+                        None,
+                    );
                 }
             }
         }

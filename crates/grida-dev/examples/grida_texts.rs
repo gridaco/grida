@@ -101,8 +101,8 @@ async fn demo_texts() -> Scene {
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
-    root_container_node.layout_dimensions.width = Some(1080.0);
-    root_container_node.layout_dimensions.height = Some(1080.0);
+    root_container_node.layout_dimensions.layout_target_width = Some(1080.0);
+    root_container_node.layout_dimensions.layout_target_height = Some(1080.0);
 
     // Create a node repository and add all nodes
     let mut graph = SceneGraph::new();

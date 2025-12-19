@@ -31,8 +31,8 @@ async fn demo_nested() -> Scene {
         // Each level is centered in its parent with rotation
         container.position = CGPoint::new(current_size * 0.075, current_size * 0.075).into();
         container.rotation = rotation;
-        container.layout_dimensions.width = Some(current_size);
-        container.layout_dimensions.height = Some(current_size);
+        container.layout_dimensions.layout_target_width = Some(current_size);
+        container.layout_dimensions.layout_target_height = Some(current_size);
         container.corner_radius = RectangularCornerRadius::circular(8.0);
 
         // Color gradient from blue (outer) to red (inner)

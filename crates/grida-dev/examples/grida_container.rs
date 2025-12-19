@@ -12,8 +12,8 @@ async fn demo_clip() -> Scene {
     let mut container = nf.create_container_node();
     container.position = CGPoint::new(100.0, 100.0).into();
     container.rotation = 0.0;
-    container.layout_dimensions.width = Some(300.0);
-    container.layout_dimensions.height = Some(300.0);
+    container.layout_dimensions.layout_target_width = Some(300.0);
+    container.layout_dimensions.layout_target_height = Some(300.0);
     container.corner_radius = RectangularCornerRadius::circular(20.0);
     container.set_fill(Paint::from(CGColor::from_rgba(240, 100, 100, 255)));
     container.strokes = Paints::new([Paint::from(CGColor::from_rgba(200, 50, 50, 255))]);

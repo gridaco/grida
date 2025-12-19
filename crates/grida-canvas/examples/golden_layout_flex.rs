@@ -54,13 +54,9 @@ fn create_container_with_gap(id: &str, width: f32, height: f32, gap: f32) -> Con
             }),
         },
         layout_dimensions: LayoutDimensionStyle {
-            width: Some(width),
-            height: Some(height),
-            min_width: None,
-            max_width: None,
-            min_height: None,
-            max_height: None,
-            layout_target_aspect_ratio: None,
+            layout_target_width: Some(width),
+            layout_target_height: Some(height),
+            ..Default::default()
         },
         layout_child: None,
     }

@@ -11,8 +11,8 @@ async fn scene() -> Scene {
     let mut graph = SceneGraph::new();
 
     let mut container = nf.create_container_node();
-    container.layout_dimensions.width = Some(400.0);
-    container.layout_dimensions.height = Some(400.0);
+    container.layout_dimensions.layout_target_width = Some(400.0);
+    container.layout_dimensions.layout_target_height = Some(400.0);
     container.stroke_width = 10.0.into();
     container.stroke_style.stroke_align = StrokeAlign::Outside;
     container.strokes = Paints::new([Paint::from(CGColor::RED)]);

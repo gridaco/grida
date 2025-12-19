@@ -11,8 +11,8 @@ async fn demo_gradients() -> Scene {
 
     // root container
     let mut root = nf.create_container_node();
-    root.layout_dimensions.width = Some(1200.0);
-    root.layout_dimensions.height = Some(800.0);
+    root.layout_dimensions.layout_target_width = Some(1200.0);
+    root.layout_dimensions.layout_target_height = Some(800.0);
 
     let root_id = graph.append_child(Node::Container(root), Parent::Root);
 

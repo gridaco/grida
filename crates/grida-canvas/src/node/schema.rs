@@ -448,12 +448,12 @@ impl UniformNodeLayout {
     }
 
     pub fn merge_from_dimensions(mut self, dimensions: LayoutDimensionStyle) -> Self {
-        self.layout_target_width = dimensions.width;
-        self.layout_target_height = dimensions.height;
-        self.layout_min_width = dimensions.min_width;
-        self.layout_max_width = dimensions.max_width;
-        self.layout_min_height = dimensions.min_height;
-        self.layout_max_height = dimensions.max_height;
+        self.layout_target_width = dimensions.layout_target_width;
+        self.layout_target_height = dimensions.layout_target_height;
+        self.layout_min_width = dimensions.layout_min_width;
+        self.layout_max_width = dimensions.layout_max_width;
+        self.layout_min_height = dimensions.layout_min_height;
+        self.layout_max_height = dimensions.layout_max_height;
         self.layout_target_aspect_ratio = dimensions.layout_target_aspect_ratio;
         self
     }
@@ -807,13 +807,27 @@ impl Default for LayoutPositioningBasis {
 
 #[derive(Debug, Clone)]
 pub struct LayoutDimensionStyle {
-    pub width: Option<f32>,
-    pub height: Option<f32>,
-    pub min_width: Option<f32>,
-    pub max_width: Option<f32>,
-    pub min_height: Option<f32>,
-    pub max_height: Option<f32>,
+    pub layout_target_width: Option<f32>,
+    pub layout_target_height: Option<f32>,
+    pub layout_min_width: Option<f32>,
+    pub layout_max_width: Option<f32>,
+    pub layout_min_height: Option<f32>,
+    pub layout_max_height: Option<f32>,
     pub layout_target_aspect_ratio: Option<(f32, f32)>,
+}
+
+impl Default for LayoutDimensionStyle {
+    fn default() -> Self {
+        Self {
+            layout_target_width: None,
+            layout_target_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
+            layout_target_aspect_ratio: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1064,8 +1078,8 @@ impl ContainerNodeRec {
 
     pub fn to_own_shape(&self) -> RRectShape {
         RRectShape {
-            width: self.layout_dimensions.width.unwrap_or(0.0),
-            height: self.layout_dimensions.height.unwrap_or(0.0),
+            width: self.layout_dimensions.layout_target_width.unwrap_or(0.0),
+            height: self.layout_dimensions.layout_target_height.unwrap_or(0.0),
             corner_radius: self.corner_radius,
         }
     }

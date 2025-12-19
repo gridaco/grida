@@ -9,8 +9,8 @@ async fn demo_lines() -> Scene {
     let nf = NodeFactory::new();
 
     let mut root = nf.create_container_node();
-    root.layout_dimensions.width = Some(1000.0);
-    root.layout_dimensions.height = Some(600.0);
+    root.layout_dimensions.layout_target_width = Some(1000.0);
+    root.layout_dimensions.layout_target_height = Some(600.0);
 
     let mut graph = SceneGraph::new();
 

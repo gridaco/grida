@@ -58,13 +58,9 @@ fn create_container_with_padding(
             layout_gap: None,
         },
         layout_dimensions: LayoutDimensionStyle {
-            width: Some(width),
-            height: Some(height),
-            min_width: None,
-            max_width: None,
-            min_height: None,
-            max_height: None,
-            layout_target_aspect_ratio: None,
+            layout_target_width: Some(width),
+            layout_target_height: Some(height),
+            ..Default::default()
         },
         layout_child: None,
     }
@@ -388,7 +384,7 @@ fn main() {
                 let mut container = create_container(&format!("child-7-{}", i), *w, *h);
                 if *flexible {
                     // Auto width to allow flex-grow - set width to None to indicate auto
-                    container.layout_dimensions.width = None;
+                    container.layout_dimensions.layout_target_width = None;
                     container.layout_child = Some(LayoutChildStyle {
                         layout_grow: 1.0,
                         layout_positioning: LayoutPositioning::Auto,

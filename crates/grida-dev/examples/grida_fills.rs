@@ -11,8 +11,8 @@ async fn demo_fills() -> Scene {
 
     // Root container
     let mut root = nf.create_container_node();
-    root.layout_dimensions.width = Some(1200.0);
-    root.layout_dimensions.height = Some(800.0);
+    root.layout_dimensions.layout_target_width = Some(1200.0);
+    root.layout_dimensions.layout_target_height = Some(800.0);
 
     let root_id = graph.append_child(Node::Container(root), Parent::Root);
 
@@ -345,8 +345,8 @@ async fn demo_fills() -> Scene {
     // 8. Container with multiple fills (demonstrating container fill capability)
     let mut multi_fill_container = nf.create_container_node();
     multi_fill_container.position = CGPoint::new(start_x + spacing * 3.0, base_y + spacing).into();
-    multi_fill_container.layout_dimensions.width = Some(150.0);
-    multi_fill_container.layout_dimensions.height = Some(150.0);
+    multi_fill_container.layout_dimensions.layout_target_width = Some(150.0);
+    multi_fill_container.layout_dimensions.layout_target_height = Some(150.0);
     multi_fill_container.fills = Paints::new([
         Paint::from(CGColor::from_rgba(128, 0, 128, 255)),
         Paint::RadialGradient(RadialGradientPaint {

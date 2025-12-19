@@ -41,8 +41,8 @@ impl SceneBuilder {
         let mut root = self.factory.create_container_node();
         root.fills = Paints::default();
         root.strokes = Paints::default();
-        root.layout_dimensions.width = Some(scene.svg.width);
-        root.layout_dimensions.height = Some(scene.svg.height);
+        root.layout_dimensions.layout_target_width = Some(scene.svg.width);
+        root.layout_dimensions.layout_target_height = Some(scene.svg.height);
         let root_id = self.graph.append_child(Node::Container(root), Parent::Root);
 
         for child in &scene.svg.children {

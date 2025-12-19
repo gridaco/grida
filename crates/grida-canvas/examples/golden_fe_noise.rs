@@ -30,7 +30,7 @@ fn main() {
                 num_octaves: 3,
                 seed: 8539.0,
                 coloring: NoiseEffectColors::Duo {
-                    color1: CGColor::from_rgba(255, 0, 4, 255),    // red pattern
+                    color1: CGColor::from_rgba(255, 0, 4, 255), // red pattern
                     color2: CGColor::from_rgba(255, 255, 255, 64), // 25% opacity white base
                 },
                 active: true,

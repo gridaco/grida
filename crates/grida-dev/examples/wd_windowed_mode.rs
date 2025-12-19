@@ -31,8 +31,8 @@ fn create_flex_demo_scene() -> Scene {
 
     for (_name, color) in colors.iter() {
         let mut box_node = nf.create_container_node();
-        box_node.layout_dimensions.width = Some(100.0);
-        box_node.layout_dimensions.height = Some(100.0);
+        box_node.layout_dimensions.layout_target_width = Some(100.0);
+        box_node.layout_dimensions.layout_target_height = Some(100.0);
         // Participate in parent's flex layout
         box_node.layout_child = Some(LayoutChildStyle {
             layout_grow: 0.0,
@@ -49,8 +49,8 @@ fn create_flex_demo_scene() -> Scene {
 
     // ROOT 2: Fixed Container (doesn't resize with window) - positioned above ICB
     let mut fixed_container = nf.create_container_node();
-    fixed_container.layout_dimensions.width = Some(250.0); // Fixed width
-    fixed_container.layout_dimensions.height = Some(150.0); // Fixed height
+    fixed_container.layout_dimensions.layout_target_width = Some(250.0); // Fixed width
+    fixed_container.layout_dimensions.layout_target_height = Some(150.0); // Fixed height
     fixed_container.layout_container = LayoutContainerStyle {
         layout_mode: LayoutMode::Flex,
         layout_direction: Axis::Vertical,
@@ -75,8 +75,8 @@ fn create_flex_demo_scene() -> Scene {
 
     for (_name, color) in fixed_colors.iter() {
         let mut box_node = nf.create_container_node();
-        box_node.layout_dimensions.width = Some(80.0);
-        box_node.layout_dimensions.height = Some(50.0);
+        box_node.layout_dimensions.layout_target_width = Some(80.0);
+        box_node.layout_dimensions.layout_target_height = Some(50.0);
         box_node.layout_child = Some(LayoutChildStyle {
             layout_grow: 0.0,
             layout_positioning: LayoutPositioning::Auto,
