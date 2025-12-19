@@ -13,7 +13,7 @@
   "dependencies": {
     "@uidotdev/usehooks": "^2.4.1",
     "lucide-react": "^0.511.0",
-    "next": "15.3.6",
+    "next": "15.3.8",
     "pdfjs-dist": "4.8.69",
     "react": "19.2.1",
     "react-dom": "19.2.1",
@@ -27,7 +27,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.3.6",
+    "eslint-config-next": "15.3.8",
     "postcss": "^8",
     "tailwindcss": "^4",
     "typescript": "^5"
