@@ -263,6 +263,98 @@ This structure has been verified in:
 
 Both formats show the same pattern: component sets are FRAME nodes containing SYMBOL children, with distinguishing properties on both the FRAME and SYMBOL nodes.
 
+### Vector
+
+**Node Type:** `VECTOR`
+
+VECTOR nodes represent vector graphics (paths/shapes) in Figma. The vector geometry is stored in a binary format within the `.fig` file.
+
+**VectorData Structure:**
+
+VECTOR nodes contain a `vectorData` field of type `VectorData`:
+
+| Field                | Type            | Description                                    |
+| -------------------- | --------------- | ---------------------------------------------- |
+| `vectorNetworkBlob`  | `number?`       | Blob ID referencing binary vector network data |
+| `normalizedSize`     | `Vector?`       | Normalized size (x, y)                         |
+| `styleOverrideTable` | `NodeChange[]?` | Style overrides                                |
+
+**Vector Network Blob Format:**
+
+The `vectorNetworkBlob` field contains a blob ID (number) that references binary data stored in the message's `blobs` array. This binary data encodes the vector network in a specific little-endian format:
+
+**Header (12 bytes total):**
+
+| Field          | Type | Offset | Description        |
+| -------------- | ---- | ------ | ------------------ |
+| `vertexCount`  | u32  | 0      | Number of vertices |
+| `segmentCount` | u32  | 4      | Number of segments |
+| `regionCount`  | u32  | 8      | Number of regions  |
+
+**Vertices (12 bytes each):**
+
+| Field     | Type | Offset | Description                     |
+| --------- | ---- | ------ | ------------------------------- |
+| `styleID` | u32  | 0      | Style identifier for the vertex |
+| `x`       | f32  | 4      | X coordinate                    |
+| `y`       | f32  | 8      | Y coordinate                    |
+
+**Segments (28 bytes each):**
+
+| Field         | Type | Offset | Description                      |
+| ------------- | ---- | ------ | -------------------------------- |
+| `styleID`     | u32  | 0      | Style identifier for the segment |
+| `startVertex` | u32  | 4      | Index of the start vertex        |
+| `start.dx`    | f32  | 8      | Start tangent X component        |
+| `start.dy`    | f32  | 12     | Start tangent Y component        |
+| `endVertex`   | u32  | 16     | Index of the end vertex          |
+| `end.dx`      | f32  | 20     | End tangent X component          |
+| `end.dy`      | f32  | 24     | End tangent Y component          |
+
+**Regions:**
+
+| Field                 | Type   | Description                                                     |
+| --------------------- | ------ | --------------------------------------------------------------- |
+| `styleID+windingRule` | u32    | Style ID (bits 1-31) and winding rule (bit 0: 0=ODD, 1=NONZERO) |
+| `loopCount`           | u32    | Number of loops in this region                                  |
+| `loops`               | Loop[] | Array of loops, where each loop contains:                       |
+| `loops[].indexCount`  | u32    | Number of segment indices in this loop                          |
+| `loops[].indices`     | u32[]  | Array of segment indices forming the closed loop                |
+
+**Parsed VectorNetwork Structure:**
+
+After parsing, the binary blob is converted to a structured `VectorNetwork` object:
+
+| Field      | Type                                                                                                                             | Description                                                |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `vertices` | `Array<{ styleID: number; x: number; y: number }>`                                                                               | Array of vertex positions and style IDs                    |
+| `segments` | `Array<{ styleID: number; start: { vertex: number; dx: number; dy: number }; end: { vertex: number; dx: number; dy: number } }>` | Array of segments connecting vertices with tangent handles |
+| `regions`  | `Array<{ styleID: number; windingRule: "NONZERO" \| "ODD"; loops: Array<{ segments: number[] }> }>`                              | Array of regions defining closed shapes                    |
+
+**Parsing Example:**
+
+```typescript
+// Get the blob bytes from the message
+const blobBytes = getBlobBytes(vectorData.vectorNetworkBlob, message);
+
+// Parse the vector network
+const vectorNetwork = parseVectorNetworkBlob(blobBytes);
+// Returns: {
+//   vertices: [{ styleID: number, x: number, y: number }],
+//   segments: [{ styleID: number, start: { vertex: number, dx: number, dy: number }, end: { vertex: number, dx: number, dy: number } }],
+//   regions: [{ styleID: number, windingRule: "NONZERO" | "ODD", loops: [{ segments: number[] }] }]
+// }
+```
+
+**Key Points:**
+
+- The vector network uses a **graph-based representation** with vertices, segments (edges with tangent handles), and regions (closed loops of segments)
+- Segments connect vertices and include tangent handle information (`dx`, `dy`) for curved paths
+- Regions define closed shapes using loops of segment indices
+- Winding rules determine fill behavior: `NONZERO` or `ODD` (even-odd)
+- Style IDs reference styles from the style system for fills, strokes, and effects
+- The `normalizedSize` field provides the coordinate space dimensions for the vector
+
 ## External Resources
 
 - [kiwi-schema][kiwi-schema] - The Kiwi protocol by Evan Wallace
