@@ -217,6 +217,11 @@ const safe_properties: Partial<
       }
     },
   }),
+  layout_target_aspect_ratio: defineNodeProperty<"layout_target_aspect_ratio">({
+    apply: (draft, value, prev) => {
+      (draft as UN).layout_target_aspect_ratio = value;
+    },
+  }),
   rotation: defineNodeProperty<"rotation">({
     assert: (node) => typeof node.rotation === "number",
     apply: (draft, value, prev) => {

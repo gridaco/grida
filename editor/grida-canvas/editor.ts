@@ -1473,6 +1473,40 @@ class EditorDocumentStore
     return next;
   }
 
+  lockAspectRatio(node_id: string) {
+    const rect = this.geometry.getNodeAbsoluteBoundingRect(node_id);
+    assert(
+      rect,
+      `Measured rect not found for node: ${node_id} (geometry not ready?)`
+    );
+    const w = rect.width;
+    const h = rect.height;
+    assert(
+      typeof w === "number" && Number.isFinite(w) && w > 0,
+      `Invalid measured width for node: ${node_id}`
+    );
+    assert(
+      typeof h === "number" && Number.isFinite(h) && h > 0,
+      `Invalid measured height for node: ${node_id}`
+    );
+    const pair = cmath.aspectRatio(w, h, 1000);
+    if (!pair) return;
+
+    this.dispatch({
+      type: "node/change/*",
+      node_id,
+      layout_target_aspect_ratio: pair,
+    });
+  }
+
+  unlockAspectRatio(node_id: string) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id,
+      layout_target_aspect_ratio: undefined,
+    });
+  }
+
   toggleTextNodeUnderline(node_id: string) {
     this.dispatch({
       type: "node/toggle/underline",

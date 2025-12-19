@@ -21,6 +21,32 @@ export namespace iofigma {
    */
   export namespace __ir {
     /**
+     * ## HasLayoutTraitIR (extended layout trait)
+     *
+     * Figma’s REST API spec (`@figma/rest-api-spec`) defines `HasLayoutTrait` and includes
+     * `preserveRatio?: boolean`, but it **does not** carry the richer aspect-ratio payload that
+     * exists in other Figma sources (notably the Plugin SDK and the `.fig` Kiwi schema).
+     *
+     * - **REST API**: `preserveRatio?: boolean` (flag only; no target ratio vector)
+     * - **Kiwi (.fig / clipboard)**: `proportionsConstrained?: boolean` and `targetAspectRatio?: OptionalVector`
+     * - **Plugin SDK**: `targetAspectRatio?: Vector` (but `constrainProportions` is deprecated)
+     *
+     * We keep the REST surface area as the baseline, and extend it with `targetAspectRatio`
+     * so downstream conversion can use a single aligned shape:
+     *
+     * - Use **`preserveRatio`** (REST field) as the normalized “locked” flag.
+     * - Use **`targetAspectRatio`** (IR-only) as the normalized ratio vector when available.
+     */
+    export type HasLayoutTraitIR = figrest.HasLayoutTrait & {
+      /**
+       * Normalized target aspect ratio vector (w, h) when the source provides it.
+       *
+       * NOTE: This is **not** part of the REST API spec as of `@figma/rest-api-spec@0.35.0`.
+       */
+      targetAspectRatio?: figrest.Vector;
+    };
+
+    /**
      * Vector network structure (vertices, segments, regions)
      * Matches the output of parseVectorNetworkBlob from blob-parser
      */
@@ -350,16 +376,35 @@ export namespace iofigma {
       /**
        * Positioning properties - IPositioning
        */
-      function positioning_trait(node: {
-        relativeTransform?: any;
-        size?: any;
-      }) {
+      function positioning_trait(
+        node:
+          | (figrest.HasLayoutTrait & Partial<__ir.HasLayoutTraitIR>)
+          | {
+              relativeTransform?: any;
+              size?: any;
+            }
+      ) {
+        const szx = node.size?.x ?? 0;
+        const szy = node.size?.y ?? 0;
+
+        // Align spec: use REST `preserveRatio` as the canonical flag.
+        const constrained =
+          (node as figrest.HasLayoutTrait).preserveRatio === true;
+
+        // Align spec: `targetAspectRatio` only exists in IR.
+        const tar = (node as __ir.HasLayoutTraitIR).targetAspectRatio;
+
+        const layout_target_aspect_ratio = constrained
+          ? cmath.aspectRatio(tar?.x ?? szx, tar?.y ?? szy, 1000)
+          : undefined;
+
         return {
           position: "absolute" as const,
           left: node.relativeTransform?.[0][2] ?? 0,
           top: node.relativeTransform?.[1][2] ?? 0,
-          width: node.size?.x ?? 0,
-          height: node.size?.y ?? 0,
+          width: szx,
+          height: szy,
+          layout_target_aspect_ratio,
         };
       }
 
@@ -611,7 +656,7 @@ export namespace iofigma {
       };
 
       type InputNode =
-        | figrest.SubcanvasNode
+        | (figrest.SubcanvasNode & Partial<__ir.HasLayoutTraitIR>)
         | __ir.VectorNodeWithVectorNetworkDataPresent
         | __ir.StarNodeWithPointsDataPresent
         | __ir.RegularPolygonNodeWithPointsDataPresent;
@@ -1360,12 +1405,20 @@ export namespace iofigma {
           relTrans as [[number, number, number], [number, number, number]],
           sz
         );
+        const preserveRatio =
+          nc.proportionsConstrained === true ? true : undefined;
+        const targetAspectRatio = nc.targetAspectRatio?.value
+          ? vector(nc.targetAspectRatio.value)
+          : undefined;
+
         return {
           size: sz,
           relativeTransform: relTrans,
           absoluteBoundingBox: bounds,
           absoluteRenderBounds: bounds,
-        };
+          preserveRatio,
+          targetAspectRatio,
+        } satisfies __ir.HasLayoutTraitIR;
       }
 
       /**
