@@ -17,6 +17,7 @@ namespace cmath {
    *
    * - Inputs are treated as integers and reduced via `Math.abs`.
    * - If one input is `0`, this returns `abs(other)` (and returns `1` for `(0, 0)`).
+   * - Throws `TypeError` if either input is not finite.
    *
    * @example
    * ```ts
@@ -25,8 +26,13 @@ namespace cmath {
    * ```
    */
   export function gcd(a: number, b: number): number {
-    a = Math.abs(a);
-    b = Math.abs(b);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      throw new TypeError(
+        `gcd: both arguments must be finite numbers, got (${a}, ${b})`
+      );
+    }
+    a = Math.abs(Math.trunc(a));
+    b = Math.abs(Math.trunc(b));
     while (b !== 0) {
       const t = a % b;
       a = b;
