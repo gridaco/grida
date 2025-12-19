@@ -12,6 +12,7 @@ export type PillProps = {
   disabled?: boolean;
   className?: string;
   thumbnail?: string;
+  unoptimized?: boolean;
 };
 
 export function Pill({
@@ -21,6 +22,7 @@ export function Pill({
   disabled = false,
   className,
   thumbnail,
+  unoptimized = false,
 }: PillProps) {
   return (
     <button
@@ -45,6 +47,7 @@ export function Pill({
             fill
             sizes="24px"
             className="object-cover"
+            unoptimized={unoptimized}
           />
         </span>
       )}

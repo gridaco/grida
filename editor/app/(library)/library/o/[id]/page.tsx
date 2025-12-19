@@ -65,6 +65,8 @@ export default async function ObjectPage(props: {
     <div>
       <section className="container max-w-4xl mx-auto flex flex-col items-center justify-center text-center min-h-screen p-8">
         <Image
+          // intentionally not optimized for cost savings
+          unoptimized
           src={object.url}
           alt={
             object.alt ||
