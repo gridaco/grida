@@ -64,6 +64,7 @@ fn create_container_with_padding(
             max_width: None,
             min_height: None,
             max_height: None,
+            layout_target_aspect_ratio: None,
         },
         layout_child: None,
     }

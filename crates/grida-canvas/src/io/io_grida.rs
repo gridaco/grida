@@ -753,6 +753,13 @@ pub struct JSONUnknownNodeProperties {
     )]
     pub height: CSSDimension,
 
+    /// Layout target aspect ratio constraint (w, h).
+    ///
+    /// This is stored in Grida documents as a JSON tuple/array like `[16, 9]`.
+    /// When present, it is mapped into `LayoutDimensionStyle.layout_target_aspect_ratio`.
+    #[serde(rename = "layout_target_aspect_ratio", alias = "aspectRatio")]
+    pub layout_target_aspect_ratio: Option<(f32, f32)>,
+
     #[serde(rename = "corner_radius", alias = "cornerRadius", default)]
     pub corner_radius: Option<JSONCornerRadius>,
     #[serde(
@@ -1355,6 +1362,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 max_width: None,
                 min_height: None,
                 max_height: None,
+                layout_target_aspect_ratio: node.base.layout_target_aspect_ratio,
             },
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node

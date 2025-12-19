@@ -53,6 +53,7 @@ fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec
             max_width: None,
             min_height: None,
             max_height: None,
+            layout_target_aspect_ratio: None,
         },
         layout_child: None,
     }

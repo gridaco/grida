@@ -238,6 +238,13 @@ impl From<UniformNodeLayout> for Style {
             },
         };
 
+        // Target aspect ratio constraint (w / h)
+        if let Some((w, h)) = layout.layout_target_aspect_ratio {
+            if w.is_finite() && h.is_finite() && w > 0.0 && h > 0.0 {
+                style.aspect_ratio = Some(w / h);
+            }
+        }
+
         // Min/Max size constraints
         if let Some(min_w) = layout.min_width {
             style.min_size.width = Dimension::length(min_w);

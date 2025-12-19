@@ -332,6 +332,10 @@ pub struct UniformNodeLayout {
     pub max_width: Option<f32>,
     pub min_height: Option<f32>,
     pub max_height: Option<f32>,
+    /// Layout target aspect ratio constraint (w, h).
+    ///
+    /// Stored as a ratio pair and interpreted by layout engines as `w / h`.
+    pub layout_target_aspect_ratio: Option<(f32, f32)>,
 
     // layout container
     pub layout_mode: LayoutMode,
@@ -360,6 +364,7 @@ impl UniformNodeLayout {
             max_width: None,
             min_height: None,
             max_height: None,
+            layout_target_aspect_ratio: None,
             layout_direction: Axis::Horizontal,
             layout_wrap: None,
             layout_main_axis_alignment: None,
@@ -396,6 +401,7 @@ impl UniformNodeLayout {
         self.max_width = dimensions.max_width;
         self.min_height = dimensions.min_height;
         self.max_height = dimensions.max_height;
+        self.layout_target_aspect_ratio = dimensions.layout_target_aspect_ratio;
         self
     }
 
@@ -754,6 +760,7 @@ pub struct LayoutDimensionStyle {
     pub max_width: Option<f32>,
     pub min_height: Option<f32>,
     pub max_height: Option<f32>,
+    pub layout_target_aspect_ratio: Option<(f32, f32)>,
 }
 
 #[derive(Debug, Clone)]

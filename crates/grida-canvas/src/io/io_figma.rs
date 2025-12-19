@@ -841,6 +841,7 @@ impl FigmaConverter {
                 max_width: None,
                 min_height: None,
                 max_height: None,
+                layout_target_aspect_ratio: None,
             },
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: component
@@ -965,6 +966,7 @@ impl FigmaConverter {
                 max_width: None,
                 min_height: None,
                 max_height: None,
+                layout_target_aspect_ratio: None,
             },
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: instance
@@ -1033,6 +1035,7 @@ impl FigmaConverter {
                     max_width: None,
                     min_height: None,
                     max_height: None,
+                    layout_target_aspect_ratio: None,
                 },
                 layout_child: Some(LayoutChildStyle {
                     layout_positioning: section
@@ -1195,6 +1198,7 @@ impl FigmaConverter {
                 max_width: None,
                 min_height: None,
                 max_height: None,
+                layout_target_aspect_ratio: None,
             },
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: origin
@@ -1442,6 +1446,7 @@ impl FigmaConverter {
                     max_width: None,
                     min_height: None,
                     max_height: None,
+                    layout_target_aspect_ratio: None,
                 },
                 layout_child: Some(LayoutChildStyle {
                     layout_positioning: origin
