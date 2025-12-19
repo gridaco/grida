@@ -55,7 +55,6 @@ fn main() {
                     let type_name = match node {
                         cg::io::io_grida::JSONNode::Group(_) => "group",
                         cg::io::io_grida::JSONNode::Container(_) => "container",
-                        cg::io::io_grida::JSONNode::Path(_) => "svgpath",
                         cg::io::io_grida::JSONNode::Vector(_) => "vector",
                         cg::io::io_grida::JSONNode::Ellipse(_) => "ellipse",
                         cg::io::io_grida::JSONNode::Rectangle(_) => "rectangle",

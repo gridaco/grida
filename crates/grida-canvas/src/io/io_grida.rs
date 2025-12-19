@@ -147,14 +147,6 @@ pub struct CSSBorder {
     pub border_style: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct JSONSVGPath {
-    pub d: String,
-    #[serde(rename = "fill_rule", alias = "fillRule", default)]
-    pub fill_rule: FillRule,
-    pub fill: Option<String>,
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct JSONVariableWidthProfile {
     pub stops: Vec<WidthStop>,
@@ -868,8 +860,6 @@ pub enum JSONNode {
     Group(JSONGroupNode),
     #[serde(rename = "container", alias = "component")]
     Container(JSONContainerNode),
-    #[serde(rename = "path", alias = "svgpath")]
-    Path(JSONPathNode),
     #[serde(rename = "vector")]
     Vector(JSONVectorNode),
     #[serde(rename = "ellipse")]
@@ -1063,14 +1053,6 @@ pub struct JSONTextNode {
 
     #[serde(rename = "text_transform", alias = "textTransform", default)]
     pub text_transform: TextTransform,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct JSONPathNode {
-    #[serde(flatten)]
-    pub base: JSONUnknownNodeProperties,
-
-    pub paths: Option<Vec<JSONSVGPath>>,
 }
 
 pub type JSONVectorNetworkVertex = (f32, f32);
@@ -1798,62 +1780,6 @@ impl From<JSONRegularStarPolygonNode> for Node {
     }
 }
 
-impl From<JSONPathNode> for Node {
-    fn from(node: JSONPathNode) -> Self {
-        // Build stroke width early before any moves
-        let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
-
-        let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
-            node.base.width.length(0.0),
-            node.base.height.length(0.0),
-            node.base.rotation,
-        );
-
-        // For vector nodes, we'll create a path node with the path data
-        Node::Path(PathNodeRec {
-            active: node.base.active,
-            opacity: node.base.opacity,
-            blend_mode: node.base.blend_mode.into(),
-            mask: node.base.mask.map(|m| m.into()),
-            effects: merge_effects(
-                node.base.fe_shadows,
-                node.base.fe_blur,
-                node.base.fe_backdrop_blur,
-                node.base.fe_liquid_glass,
-                node.base.fe_noises,
-            ),
-            transform,
-            fills: merge_paints(node.base.fill, node.base.fill_paints),
-            data: node.paths.map_or("".to_string(), |paths| {
-                paths
-                    .iter()
-                    .map(|path| path.d.clone())
-                    .collect::<Vec<String>>()
-                    .join(" ")
-            }),
-            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
-            stroke_style: StrokeStyle {
-                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
-                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
-                stroke_join: node.base.stroke_join.unwrap_or_default(),
-                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
-                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
-            },
-            stroke_width,
-            layout_child: Some(LayoutChildStyle {
-                layout_positioning: node
-                    .base
-                    .position
-                    .map(|position| position.into())
-                    .unwrap_or_default(),
-                layout_grow: 0.0,
-            }),
-        })
-    }
-}
-
 impl From<JSONLineNode> for Node {
     fn from(node: JSONLineNode) -> Self {
         let transform = AffineTransform::from_box_center(
@@ -2008,8 +1934,7 @@ impl From<JSONNode> for Node {
             JSONNode::Group(group) => Node::Group(group.into()),
             JSONNode::Container(container) => Node::Container(container.into()),
             JSONNode::Text(text) => Node::TextSpan(text.into()),
-            JSONNode::Path(vector) => vector.into(),
-            JSONNode::Vector(path) => path.into(),
+            JSONNode::Vector(vector) => vector.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),
             JSONNode::RegularPolygon(rpolygon) => rpolygon.into(),
