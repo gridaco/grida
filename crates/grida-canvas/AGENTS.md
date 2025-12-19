@@ -70,10 +70,6 @@ cargo run --example tool_io_grida <path-to-grida-file>
 
 **Example:**
 
-```sh
-cargo run --example tool_io_grida ../../editor/public/examples/canvas/instagram-post-01.grida
-```
-
 See [examples/tool_io_grida.rs](./examples/tool_io_grida.rs) for full documentation.
 
 ## Package Docs

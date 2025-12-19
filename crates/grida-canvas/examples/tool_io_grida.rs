@@ -9,12 +9,6 @@
 //! cargo run --example tool_io_grida <path-to-grida-file>
 //! ```
 //!
-//! ## Example
-//!
-//! ```bash
-//! cargo run --example tool_io_grida ../../editor/public/examples/canvas/instagram-post-01.grida
-//! ```
-//!
 //! ## Output
 //!
 //! On success, the tool prints:
