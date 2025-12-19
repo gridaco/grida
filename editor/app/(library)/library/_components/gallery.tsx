@@ -154,6 +154,8 @@ function ImageCard({
     >
       <Link href={`/library/o/${object.id}`}>
         <Image
+          // intentionally not optimized for cost savings
+          unoptimized={true}
           src={object.url}
           alt={
             object.alt ||

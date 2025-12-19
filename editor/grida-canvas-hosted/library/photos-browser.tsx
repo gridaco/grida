@@ -620,6 +620,7 @@ function PhotosTopics({
                 key={topic.slug}
                 active={selectedTopic === topic.slug}
                 label={topic.title}
+                unoptimized
                 thumbnail={topic.coverUrl}
                 onClick={() => onSelectTopic(topic.slug)}
               />
@@ -690,6 +691,7 @@ function PhotoCard({ data, width, onInsert, onDragStart }: PhotoCardProps) {
           height={data.height ?? Math.round(imageHeight)}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="h-auto w-full object-cover"
+          unoptimized
         />
       </div>
       <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/40 via-40% to-transparent p-2 text-xs text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">

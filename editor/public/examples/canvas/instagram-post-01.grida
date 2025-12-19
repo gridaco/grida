@@ -25,6 +25,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.18823529411764706,
               "g": 0.19607843137254902,
@@ -80,6 +81,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -136,6 +138,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -172,6 +175,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -208,6 +212,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -244,6 +249,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -317,6 +323,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 0.30196078431372547,
@@ -353,6 +360,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,

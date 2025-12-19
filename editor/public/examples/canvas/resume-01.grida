@@ -32,6 +32,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0,
               "g": 0,
@@ -130,6 +131,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -164,6 +166,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -224,6 +227,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -258,6 +262,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -292,6 +297,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -404,6 +410,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -500,6 +507,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -536,6 +544,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -572,6 +581,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -648,6 +658,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -684,6 +695,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -720,6 +732,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -776,6 +789,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -892,6 +906,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -944,6 +959,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -980,6 +996,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1016,6 +1033,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1112,6 +1130,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1164,6 +1183,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1200,6 +1220,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1236,6 +1257,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1332,6 +1354,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1384,6 +1407,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1420,6 +1444,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1456,6 +1481,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1552,6 +1578,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1604,6 +1631,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1640,6 +1668,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1676,6 +1705,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1768,6 +1798,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1844,6 +1875,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1880,6 +1912,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -1936,6 +1969,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -1972,6 +2006,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
@@ -2028,6 +2063,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 1.0,
               "g": 1.0,
@@ -2064,6 +2100,7 @@
         "fill_paints": [
           {
             "type": "solid",
+            "active": true,
             "color": {
               "r": 0.6823529411764706,
               "g": 0.6823529411764706,
