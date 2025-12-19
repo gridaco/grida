@@ -1139,6 +1139,9 @@ importers:
       '@grida/color':
         specifier: workspace:*
         version: link:../grida-canvas-color
+      '@grida/vn':
+        specifier: workspace:*
+        version: link:../grida-canvas-vn
       base64-js:
         specifier: ^1.5.1
         version: 1.5.1

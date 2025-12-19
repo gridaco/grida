@@ -58,7 +58,6 @@ const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
 const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: [],
   fill: [
-    "svgpath",
     "vector",
     "image",
     "rectangle",
@@ -124,7 +123,6 @@ const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: ["ellipse"],
   fill: [],
   fill_paints: [
-    "svgpath",
     "vector",
     "image",
     "rectangle",

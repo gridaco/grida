@@ -72,7 +72,6 @@ export function NodeTypeIcon({
       return <BoxIcon className={className} />;
     case "ellipse":
       return <CircleIcon className={className} />;
-    case "svgpath":
     case "line":
     case "vector":
       return <TransformIcon className={className} />;

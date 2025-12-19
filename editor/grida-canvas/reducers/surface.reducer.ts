@@ -270,7 +270,6 @@ function __self_try_enter_content_edit_mode_auto(
       };
       break;
     }
-    // case "svgpath":
     case "vector":
     // primitive shapes
     case "rectangle":

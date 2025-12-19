@@ -46,7 +46,6 @@ export const EDITOR_GRAPH_POLICY: tree.graph.IGraphPolicy<grida.program.nodes.No
           "iframe",
           "richtext",
           "bitmap",
-          "svgpath",
           "vector",
           "line",
           "rectangle",

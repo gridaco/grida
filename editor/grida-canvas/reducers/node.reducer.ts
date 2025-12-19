@@ -272,7 +272,6 @@ const safe_properties: Partial<
   }),
   fill: defineNodeProperty<"fill">({
     assert: (node) =>
-      node.type === "svgpath" ||
       node.type === "vector" ||
       node.type === "image" ||
       node.type === "rectangle" ||
@@ -505,7 +504,6 @@ const safe_properties: Partial<
       node.type === "ellipse" ||
       node.type === "polygon" ||
       node.type === "star" ||
-      node.type === "svgpath" ||
       node.type === "image" ||
       node.type === "container" ||
       node.type === "boolean",

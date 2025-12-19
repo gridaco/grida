@@ -292,8 +292,5 @@ export namespace schema.parametric_scale {
     if (node.type === "vector") {
       node.vector_network = _vector_network(node.vector_network, s);
     }
-
-    // NOTE: `svgpath.paths` scaling is intentionally not implemented here yet.
-    // The `svgpath` node type is deprecated and rarely used in production.
   }
 }

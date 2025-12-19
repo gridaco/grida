@@ -1,6 +1,6 @@
 import cg from "@grida/cg";
 import type grida from "@grida/schema";
-import type { vn } from "@grida/schema";
+import vn from "@grida/vn";
 import type * as figrest from "@figma/rest-api-spec";
 import type * as figkiwi from "./fig-kiwi/schema";
 import cmath from "@grida/cmath";
@@ -687,6 +687,213 @@ export namespace iofigma {
           return gridaId;
         };
 
+        /**
+         * Type guard to check if a node implements HasGeometryTrait.
+         * Nodes with fillGeometry or strokeGeometry need special handling.
+         */
+        function hasGeometryTrait(
+          node: InputNode
+        ): node is InputNode & figrest.HasGeometryTrait {
+          return "fillGeometry" in node || "strokeGeometry" in node;
+        }
+
+        /**
+         * Creates a VectorNode from SVG path data.
+         * Used for converting nodes with HasGeometryTrait (REST API with geometry=paths).
+         * Applies to VECTOR, STAR, REGULAR_POLYGON, and other shape nodes.
+         */
+        function createVectorNodeFromPath(
+          pathData: string,
+          geometry: {
+            windingRule: figrest.Path["windingRule"];
+          },
+          parentNode: InputNode & figrest.HasGeometryTrait,
+          childId: string,
+          name: string,
+          options: {
+            useFill: boolean;
+            useStroke: boolean;
+          }
+        ): grida.program.nodes.VectorNode | null {
+          if (!pathData) return null;
+
+          try {
+            const vectorNetwork = vn.fromSVGPathData(pathData);
+            const bbox = vn.getBBox(vectorNetwork);
+
+            // Note: In test environment with mocked svg-pathdata, vector networks may be empty.
+            // This is expected and the positioning logic will still work correctly.
+
+            // The SVG path coordinates are already in the parent VECTOR node's coordinate space.
+            // We keep the vector network coordinates as-is and position the child at its bbox origin
+            // relative to the parent GroupNode. This preserves the correct spatial relationships
+            // between fill and stroke geometries.
+            return {
+              id: childId,
+              ...base_node_trait({
+                name,
+                visible: "visible" in parentNode ? parentNode.visible : true,
+                locked: "locked" in parentNode ? parentNode.locked : false,
+                rotation: 0,
+                opacity:
+                  "opacity" in parentNode && parentNode.opacity !== undefined
+                    ? parentNode.opacity
+                    : 1,
+                blendMode:
+                  "blendMode" in parentNode && parentNode.blendMode
+                    ? parentNode.blendMode
+                    : "NORMAL",
+              }),
+              ...positioning_trait({
+                relativeTransform: [
+                  [1, 0, bbox.x],
+                  [0, 1, bbox.y],
+                ],
+                size: { x: bbox.width, y: bbox.height },
+              }),
+              ...(options.useFill ? fills_trait(parentNode.fills) : {}),
+              ...(options.useStroke
+                ? stroke_trait(parentNode)
+                : stroke_trait({
+                    strokes: [],
+                    strokeWeight: 0,
+                  })),
+              ...("effects" in parentNode && parentNode.effects
+                ? effects_trait(parentNode.effects)
+                : effects_trait(undefined)),
+              type: "vector",
+              vector_network: vectorNetwork,
+              width: bbox.width,
+              height: bbox.height,
+              fill_rule: map.windingRuleMap[geometry.windingRule] ?? "nonzero",
+            };
+          } catch (e) {
+            console.warn(
+              `Failed to convert path to vector network (${name}):`,
+              e
+            );
+            return null;
+          }
+        }
+
+        /**
+         * Processes fill geometries from a node with HasGeometryTrait.
+         * Returns array of child node IDs that were successfully created.
+         */
+        function processFillGeometries(
+          node: InputNode & figrest.HasGeometryTrait,
+          parentGridaId: string,
+          nodeTypeName: string
+        ): string[] {
+          if (!node.fillGeometry?.length) return [];
+
+          const childIds: string[] = [];
+
+          node.fillGeometry.forEach((geometry, idx) => {
+            const childId = `${parentGridaId}_fill_${idx}`;
+            const name = `${node.name || nodeTypeName} Fill ${idx + 1}`;
+
+            const childNode = createVectorNodeFromPath(
+              geometry.path ?? "",
+              geometry,
+              node,
+              childId,
+              name,
+              { useFill: true, useStroke: false }
+            );
+
+            if (childNode) {
+              nodes[childId] = childNode;
+              childIds.push(childId);
+            }
+          });
+
+          return childIds;
+        }
+
+        /**
+         * Processes stroke geometries from a node with HasGeometryTrait.
+         * Returns array of child node IDs that were successfully created.
+         */
+        function processStrokeGeometries(
+          node: InputNode & figrest.HasGeometryTrait,
+          parentGridaId: string,
+          nodeTypeName: string
+        ): string[] {
+          if (!node.strokeGeometry?.length) return [];
+
+          const childIds: string[] = [];
+
+          node.strokeGeometry.forEach((geometry, idx) => {
+            const childId = `${parentGridaId}_stroke_${idx}`;
+            const name = `${node.name || nodeTypeName} Stroke ${idx + 1}`;
+
+            const childNode = createVectorNodeFromPath(
+              geometry.path ?? "",
+              geometry,
+              node,
+              childId,
+              name,
+              { useFill: false, useStroke: true }
+            );
+
+            if (childNode) {
+              nodes[childId] = childNode;
+              childIds.push(childId);
+            }
+          });
+
+          return childIds;
+        }
+
+        /**
+         * Processes nodes with HasGeometryTrait from REST API (with geometry=paths parameter).
+         * Converts fill/stroke geometries to child VectorNodes under a GroupNode.
+         * Applies to VECTOR, STAR, REGULAR_POLYGON, and other shape nodes.
+         */
+        function processNodeWithGeometryTrait(
+          node: InputNode & figrest.HasGeometryTrait,
+          groupNode: grida.program.nodes.GroupNode
+        ): void {
+          const nodeTypeName =
+            "type" in node ? node.type.replace("_", " ") : "Shape";
+
+          const fillChildIds = processFillGeometries(
+            node,
+            groupNode.id,
+            nodeTypeName
+          );
+          const strokeChildIds = processStrokeGeometries(
+            node,
+            groupNode.id,
+            nodeTypeName
+          );
+
+          const allChildIds = [...fillChildIds, ...strokeChildIds];
+
+          if (allChildIds.length > 0) {
+            graph[groupNode.id] = allChildIds;
+          }
+        }
+
+        function attachGeometryChildrenIfPresent(
+          currentNode: InputNode,
+          processedNode: grida.program.nodes.Node
+        ): void {
+          if (processedNode.type !== "group") return;
+          if (!hasGeometryTrait(currentNode)) return;
+
+          const hasAnyGeometry =
+            (currentNode.fillGeometry?.length ?? 0) > 0 ||
+            (currentNode.strokeGeometry?.length ?? 0) > 0;
+          if (!hasAnyGeometry) return;
+
+          processNodeWithGeometryTrait(
+            currentNode,
+            processedNode as grida.program.nodes.GroupNode
+          );
+        }
+
         function processNode(
           currentNode: InputNode,
           parent?: FigmaParentNode
@@ -707,6 +914,8 @@ export namespace iofigma {
 
           // Add the node to the flat structure
           nodes[processedNode.id] = processedNode;
+
+          attachGeometryChildrenIfPresent(currentNode, processedNode);
 
           // If the node has children, process them recursively
           if ("children" in currentNode && currentNode.children?.length) {
@@ -956,26 +1165,16 @@ export namespace iofigma {
           case "REGULAR_POLYGON":
           case "STAR":
           case "VECTOR": {
+            // Nodes with HasGeometryTrait (REST API with geometry=paths) don't have
+            // vector network data, only fillGeometry and strokeGeometry (SVG path strings).
+            // We'll create a GroupNode with child VectorNodes in processNode.
             return {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...effects_trait(node.effects),
-              type: "svgpath",
-              paths: [
-                ...(node.fillGeometry?.map((p) => ({
-                  d: p.path ?? "",
-                  fill_rule: map.windingRuleMap[p.windingRule],
-                  fill: "fill" as const,
-                })) ?? []),
-                ...(node.strokeGeometry?.map((p) => ({
-                  d: p.path ?? "",
-                  fill_rule: map.windingRuleMap[p.windingRule],
-                  fill: "stroke" as const,
-                })) ?? []),
-              ],
-            } satisfies grida.program.nodes.SVGPathNode;
+              type: "group",
+              expanded: false,
+            } satisfies grida.program.nodes.GroupNode;
           }
 
           // IR nodes - extended types with additional data

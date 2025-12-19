@@ -88,7 +88,6 @@ export function NodeElement<P extends Record<string, any>>({
       case "video":
       case "text":
       case "bitmap":
-      case "svgpath":
       case "vector":
       case "line":
       case "rectangle":
@@ -136,7 +135,6 @@ export function NodeElement<P extends Record<string, any>>({
     loop: node.loop,
     muted: node.muted,
     autoplay: node.autoplay,
-    paths: node.paths,
     vector_network: node.vector_network,
     opacity: node.opacity,
     z_index: DEFAULT_ZINDEX ?? node.z_index,
@@ -226,7 +224,6 @@ const fillings = {
   star: "none",
   template_instance: "none",
   instance: "none",
-  svgpath: "none",
   line: "none",
   vector: "none",
   polyline: "none",

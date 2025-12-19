@@ -1,5 +1,4 @@
 import { ContainerWidget } from "./container";
-import { SVGPathWidget } from "./svg-path";
 import { TextWidget } from "./text";
 import { ImageWidget } from "./image";
 import { VideoWidget } from "./video";
@@ -18,7 +17,6 @@ export namespace ReactNodeRenderers {
   export const container = ContainerWidget;
   export const component = ContainerWidget; // TODO:
   export const iframe = IFrameWidget;
-  export const svgpath = SVGPathWidget;
   export const vector = VectorWidget;
   export const line = SVGLineWidget;
   export const polyline = SVGPolyLineWidget;

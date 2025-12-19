@@ -1112,7 +1112,6 @@ export namespace grida.program.nodes {
     | HTMLIFrameNode
     | HTMLRichTextNode
     | BitmapNode
-    | SVGPathNode
     | VectorNode
     | LineNode
     | RectangleNode
@@ -1131,7 +1130,6 @@ export namespace grida.program.nodes {
     | ComputedContainerNode
     | ComputedHTMLIFrameNode
     | ComputedHTMLRichTextNode
-    | ComputedSVGPathNode
     | ComputedVectorNode
     | ComputedLineNode
     | ComputedRectangleNode
@@ -1151,7 +1149,6 @@ export namespace grida.program.nodes {
       Partial<ComputedContainerNode> &
       Partial<ComputedHTMLIFrameNode> &
       Partial<ComputedHTMLRichTextNode> &
-      Partial<ComputedSVGPathNode> &
       Partial<ComputedVectorNode> &
       Partial<ComputedLineNode> &
       Partial<ComputedRectangleNode> &
@@ -1178,7 +1175,6 @@ export namespace grida.program.nodes {
       Partial<ContainerNode> &
       Partial<HTMLIFrameNode> &
       Partial<HTMLRichTextNode> &
-      Partial<SVGPathNode> &
       Partial<VectorNode> &
       Partial<LineNode> &
       Partial<RectangleNode> &
@@ -1261,7 +1257,6 @@ export namespace grida.program.nodes {
         Omit<Partial<HTMLRichTextNode>, __base_scene_node_properties>
       >
     | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<SVGPathNode>, __base_scene_node_properties>>
     | PathNodePrototype
     | LineNodePrototype
     | RectangleNodePrototype
@@ -2268,44 +2263,6 @@ export namespace grida.program.nodes {
 
   export type ComputedBitmapNode = BitmapNode;
 
-  /**
-   * @deprecated - not ready - do not use in production
-   */
-  export interface SVGPathNode
-    extends i.IBaseNode,
-      i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IPositioning,
-      // i.ICSSDimension,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.ILayerMaskType,
-      i.IZIndex,
-      i.IRotation,
-      i.IFill<cg.Paint> {
-    type: "svgpath";
-
-    /**
-     * @deprecated - use vectorNetwork instead
-     */
-    paths: (cg.Path & {
-      /**
-       * specifies which property to use to fill the path
-       * this is to support compatibility with figma rest api, where it returns a vector stroke as a path individually
-       *
-       * @default "fill"
-       */
-      fill: "fill" | "stroke";
-    })[];
-  }
-
-  /**
-   * @deprecated - not ready - do not use in production
-   */
-  export type ComputedSVGPathNode = SVGPathNode;
-
   export interface RegularPolygonNode
     extends i.IBaseNode,
       i.ISceneNode,
@@ -2656,7 +2613,6 @@ export namespace grida.program.nodes {
         case "richtext":
         case "text":
         case "vector":
-        case "svgpath":
         case "polygon":
         case "star":
         case "video": {
