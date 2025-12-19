@@ -244,23 +244,11 @@ export namespace schema.parametric_scale {
     scale_number_in_place(n, "rectangular_corner_radius_bottom_left", s);
     scale_number_in_place(n, "rectangular_corner_radius_bottom_right", s);
 
-    // Padding (number or per-side)
-    const padding = n.padding;
-    if (typeof padding === "number") {
-      n.padding = padding * s;
-    } else if (padding && typeof padding === "object") {
-      n.padding = {
-        ...padding,
-        padding_top:
-          scale_number(padding.padding_top, s) ?? padding.padding_top,
-        padding_right:
-          scale_number(padding.padding_right, s) ?? padding.padding_right,
-        padding_bottom:
-          scale_number(padding.padding_bottom, s) ?? padding.padding_bottom,
-        padding_left:
-          scale_number(padding.padding_left, s) ?? padding.padding_left,
-      };
-    }
+    // Padding (flat properties)
+    scale_number_in_place(n, "padding_top", s);
+    scale_number_in_place(n, "padding_right", s);
+    scale_number_in_place(n, "padding_bottom", s);
+    scale_number_in_place(n, "padding_left", s);
 
     scale_number_in_place(n, "main_axis_gap", s);
     scale_number_in_place(n, "cross_axis_gap", s);

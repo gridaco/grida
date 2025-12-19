@@ -1484,17 +1484,31 @@ export namespace grida.program.nodes {
     }
 
     /**
-     * padding
+     * padding - flat properties (no shorthand)
+     *
+     * All properties default to 0 when not specified.
      */
     export interface IPadding {
-      padding:
-        | number
-        | {
-            padding_top: number;
-            padding_right: number;
-            padding_bottom: number;
-            padding_left: number;
-          };
+      /**
+       * Padding on the top edge.
+       * @default 0
+       */
+      padding_top: number;
+      /**
+       * Padding on the right edge.
+       * @default 0
+       */
+      padding_right: number;
+      /**
+       * Padding on the bottom edge.
+       * @default 0
+       */
+      padding_bottom: number;
+      /**
+       * Padding on the left edge.
+       * @default 0
+       */
+      padding_left: number;
     }
 
     /**
@@ -2195,7 +2209,7 @@ export namespace grida.program.nodes {
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IRectangularStrokeWidth,
-      i.IPadding,
+      Partial<i.IPadding>,
       i.IFlexContainer {
     readonly type: "container";
     //
@@ -2481,7 +2495,7 @@ export namespace grida.program.nodes {
       i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
-      i.IPadding,
+      Partial<i.IPadding>,
       i.IFlexContainer,
       i.IProperties {
     readonly type: "component";
@@ -2822,7 +2836,10 @@ export namespace grida.program.nodes {
         main_axis_gap: 0,
         cross_axis_alignment: "start",
         cross_axis_gap: 0,
-        padding: 0,
+        padding_top: 0,
+        padding_right: 0,
+        padding_bottom: 0,
+        padding_left: 0,
         width: 100,
         height: 100,
         corner_radius: 0,

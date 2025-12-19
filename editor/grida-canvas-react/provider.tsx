@@ -235,7 +235,7 @@ export function useNodeActions(node_id: string | undefined) {
       border: (value: grida.program.css.Border | undefined) =>
         instance.commands.changeNodePropertyBorder(node_id, value),
 
-      padding: (value: grida.program.nodes.i.IPadding["padding"]) =>
+      padding: (value: grida.program.nodes.i.IPadding) =>
         instance.commands.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),

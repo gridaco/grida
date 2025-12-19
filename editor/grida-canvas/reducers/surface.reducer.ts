@@ -834,30 +834,22 @@ function __self_start_gesture(
         "the selection is not a container"
       );
 
-      const currentPadding = container.padding;
+      // Read padding from flat properties
       let currentValue: number = 0; // Default to 0 if padding is undefined
 
-      if (currentPadding === undefined || currentPadding === null) {
-        // Padding is not defined, use default
-        currentValue = 0;
-      } else if (typeof currentPadding === "number") {
-        currentValue = currentPadding;
-      } else {
-        // Padding is an object with per-side values
-        switch (side) {
-          case "top":
-            currentValue = currentPadding.padding_top ?? 0;
-            break;
-          case "right":
-            currentValue = currentPadding.padding_right ?? 0;
-            break;
-          case "bottom":
-            currentValue = currentPadding.padding_bottom ?? 0;
-            break;
-          case "left":
-            currentValue = currentPadding.padding_left ?? 0;
-            break;
-        }
+      switch (side) {
+        case "top":
+          currentValue = container.padding_top ?? 0;
+          break;
+        case "right":
+          currentValue = container.padding_right ?? 0;
+          break;
+        case "bottom":
+          currentValue = container.padding_bottom ?? 0;
+          break;
+        case "left":
+          currentValue = container.padding_left ?? 0;
+          break;
       }
 
       draft.gesture = {

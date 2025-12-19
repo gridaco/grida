@@ -944,44 +944,6 @@ impl From<JSONAxis> for Axis {
     }
 }
 
-/// JSON representation of padding - supports both uniform and non-uniform values
-#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
-#[serde(untagged)]
-pub enum JSONPadding {
-    /// Uniform padding (all sides equal)
-    Uniform(f32),
-    /// Non-uniform padding with individual sides
-    NonUniform {
-        #[serde(rename = "padding_top", alias = "paddingTop")]
-        padding_top: f32,
-        #[serde(rename = "padding_right", alias = "paddingRight")]
-        padding_right: f32,
-        #[serde(rename = "padding_bottom", alias = "paddingBottom")]
-        padding_bottom: f32,
-        #[serde(rename = "padding_left", alias = "paddingLeft")]
-        padding_left: f32,
-    },
-}
-
-impl From<JSONPadding> for EdgeInsets {
-    fn from(padding: JSONPadding) -> Self {
-        match padding {
-            JSONPadding::Uniform(value) => EdgeInsets::all(value),
-            JSONPadding::NonUniform {
-                padding_top,
-                padding_right,
-                padding_bottom,
-                padding_left,
-            } => EdgeInsets {
-                top: padding_top,
-                right: padding_right,
-                bottom: padding_bottom,
-                left: padding_left,
-            },
-        }
-    }
-}
-
 #[derive(Debug, Deserialize)]
 pub struct JSONContainerNode {
     #[serde(flatten)]
@@ -993,8 +955,15 @@ pub struct JSONContainerNode {
     // layout
     #[serde(rename = "layout", default)]
     pub layout: JSONLayoutMode,
-    #[serde(rename = "padding")]
-    pub padding: Option<JSONPadding>,
+    // Flat padding properties
+    #[serde(rename = "padding_top", alias = "paddingTop", default)]
+    pub padding_top: f32,
+    #[serde(rename = "padding_right", alias = "paddingRight", default)]
+    pub padding_right: f32,
+    #[serde(rename = "padding_bottom", alias = "paddingBottom", default)]
+    pub padding_bottom: f32,
+    #[serde(rename = "padding_left", alias = "paddingLeft", default)]
+    pub padding_left: f32,
     #[serde(rename = "direction", default)]
     pub direction: JSONAxis,
     #[serde(rename = "layout_wrap", alias = "layoutWrap")]
@@ -1354,7 +1323,19 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 layout_wrap: node.layout_wrap,
                 layout_main_axis_alignment: node.main_axis_alignment,
                 layout_cross_axis_alignment: node.cross_axis_alignment,
-                layout_padding: node.padding.map(|p| p.into()),
+                layout_padding: {
+                    let padding = EdgeInsets {
+                        top: node.padding_top,
+                        right: node.padding_right,
+                        bottom: node.padding_bottom,
+                        left: node.padding_left,
+                    };
+                    if padding.is_zero() {
+                        None
+                    } else {
+                        Some(padding)
+                    }
+                },
                 layout_gap: if node.main_axis_gap > 0.0 || node.cross_axis_gap > 0.0 {
                     Some(LayoutGap {
                         main_axis_gap: node.main_axis_gap,
@@ -2228,36 +2209,8 @@ mod padding_tests {
     use serde_json::json;
 
     #[test]
-    fn test_uniform_padding_deserialize() {
-        let json = json!(20.0);
-        let padding: JSONPadding = serde_json::from_value(json).unwrap();
-
-        let edge_insets: EdgeInsets = padding.into();
-        assert_eq!(edge_insets.top, 20.0);
-        assert_eq!(edge_insets.right, 20.0);
-        assert_eq!(edge_insets.bottom, 20.0);
-        assert_eq!(edge_insets.left, 20.0);
-    }
-
-    #[test]
-    fn test_non_uniform_padding_deserialize() {
-        let json = json!({
-            "padding_top": 10.0,
-            "padding_right": 20.0,
-            "padding_bottom": 30.0,
-            "padding_left": 40.0
-        });
-        let padding: JSONPadding = serde_json::from_value(json).unwrap();
-
-        let edge_insets: EdgeInsets = padding.into();
-        assert_eq!(edge_insets.top, 10.0);
-        assert_eq!(edge_insets.right, 20.0);
-        assert_eq!(edge_insets.bottom, 30.0);
-        assert_eq!(edge_insets.left, 40.0);
-    }
-
-    #[test]
-    fn test_container_with_uniform_padding() {
+    fn test_container_with_flat_padding_properties() {
+        // Test flat properties format
         let json = json!({
             "type": "container",
             "id": "container-1",
@@ -2273,7 +2226,10 @@ mod padding_tests {
             "rotation": 0,
             "width": 200,
             "height": 200,
-            "padding": 16.0,
+            "padding_top": 10.0,
+            "padding_right": 15.0,
+            "padding_bottom": 20.0,
+            "padding_left": 25.0,
             "layout": "flex"
         });
 
@@ -2281,14 +2237,15 @@ mod padding_tests {
         let container_rec: ContainerNodeRec = container.into();
 
         let padding = container_rec.layout_container.layout_padding.unwrap();
-        assert_eq!(padding.top, 16.0);
-        assert_eq!(padding.right, 16.0);
-        assert_eq!(padding.bottom, 16.0);
-        assert_eq!(padding.left, 16.0);
+        assert_eq!(padding.top, 10.0);
+        assert_eq!(padding.right, 15.0);
+        assert_eq!(padding.bottom, 20.0);
+        assert_eq!(padding.left, 25.0);
     }
 
     #[test]
-    fn test_container_with_non_uniform_padding() {
+    fn test_container_with_partial_padding() {
+        // Test that partial padding values default to 0
         let json = json!({
             "type": "container",
             "id": "container-2",
@@ -2304,12 +2261,8 @@ mod padding_tests {
             "rotation": 0,
             "width": 200,
             "height": 200,
-            "padding": {
-                "padding_top": 10.0,
-                "padding_right": 15.0,
-                "padding_bottom": 20.0,
-                "padding_left": 25.0
-            },
+            "padding_top": 10.0,
+            "padding_left": 20.0,
             "layout": "flex"
         });
 
@@ -2318,9 +2271,9 @@ mod padding_tests {
 
         let padding = container_rec.layout_container.layout_padding.unwrap();
         assert_eq!(padding.top, 10.0);
-        assert_eq!(padding.right, 15.0);
-        assert_eq!(padding.bottom, 20.0);
-        assert_eq!(padding.left, 25.0);
+        assert_eq!(padding.right, 0.0);
+        assert_eq!(padding.bottom, 0.0);
+        assert_eq!(padding.left, 20.0);
     }
 
     #[test]
@@ -3924,7 +3877,10 @@ mod tests {
             "width": 400.0,
             "height": 300.0,
             "layout": "flex",
-            "padding": 20.0
+            "padding_top": 20.0,
+            "padding_right": 20.0,
+            "padding_bottom": 20.0,
+            "padding_left": 20.0
         }"#;
 
         let node: JSONNode =
@@ -3932,8 +3888,11 @@ mod tests {
 
         match node {
             JSONNode::Container(container) => {
-                // Verify padding field
-                assert_eq!(container.padding, Some(JSONPadding::Uniform(20.0)));
+                // Verify padding fields
+                assert_eq!(container.padding_top, 20.0);
+                assert_eq!(container.padding_right, 20.0);
+                assert_eq!(container.padding_bottom, 20.0);
+                assert_eq!(container.padding_left, 20.0);
 
                 // Verify conversion to EdgeInsets
                 let converted: ContainerNodeRec = container.into();
@@ -3962,7 +3921,10 @@ mod tests {
             "height": 400.0,
             "layout": "flex",
             "direction": "vertical",
-            "padding": 15.0,
+            "padding_top": 15.0,
+            "padding_right": 15.0,
+            "padding_bottom": 15.0,
+            "padding_left": 15.0,
             "main_axis_alignment": "center",
             "cross_axis_alignment": "stretch"
         }"#;
@@ -3975,7 +3937,10 @@ mod tests {
                 // Verify all properties
                 assert!(matches!(container.layout, JSONLayoutMode::Flex));
                 assert!(matches!(container.direction, JSONAxis::Vertical));
-                assert_eq!(container.padding, Some(JSONPadding::Uniform(15.0)));
+                assert_eq!(container.padding_top, 15.0);
+                assert_eq!(container.padding_right, 15.0);
+                assert_eq!(container.padding_bottom, 15.0);
+                assert_eq!(container.padding_left, 15.0);
                 assert!(matches!(
                     container.main_axis_alignment,
                     Some(MainAxisAlignment::Center)
@@ -4212,7 +4177,10 @@ mod tests {
             "layout": "flex",
             "direction": "horizontal",
             "layout_wrap": "wrap",
-            "padding": 20.0,
+            "padding_top": 20.0,
+            "padding_right": 20.0,
+            "padding_bottom": 20.0,
+            "padding_left": 20.0,
             "main_axis_gap": 30.0,
             "cross_axis_gap": 15.0,
             "main_axis_alignment": "space-between",
@@ -4228,7 +4196,10 @@ mod tests {
                 assert!(matches!(container.layout, JSONLayoutMode::Flex));
                 assert!(matches!(container.direction, JSONAxis::Horizontal));
                 assert!(matches!(container.layout_wrap, Some(LayoutWrap::Wrap)));
-                assert_eq!(container.padding, Some(JSONPadding::Uniform(20.0)));
+                assert_eq!(container.padding_top, 20.0);
+                assert_eq!(container.padding_right, 20.0);
+                assert_eq!(container.padding_bottom, 20.0);
+                assert_eq!(container.padding_left, 20.0);
                 assert_eq!(container.main_axis_gap, 30.0);
                 assert_eq!(container.cross_axis_gap, 15.0);
                 assert!(matches!(

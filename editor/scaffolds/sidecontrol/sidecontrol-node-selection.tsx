@@ -926,9 +926,6 @@ function ModeNodeProperties({
     //
     border: node.border,
     //
-    padding: node.padding,
-
-    //
     layout: node.layout,
     direction: node.direction,
     main_axis_alignment: node.main_axis_alignment,
@@ -968,8 +965,6 @@ function ModeNodeProperties({
 
     //
     border,
-    //
-    padding,
     //
     layout,
     direction,
@@ -1120,10 +1115,7 @@ function ModeNodeProperties({
               onValueCommit={actions.gap}
             />
           </PropertyLine>
-          <PropertyLine hidden={!is_flex_container}>
-            <PropertyLineLabel>Padding</PropertyLineLabel>
-            <PaddingControl value={padding!} onValueCommit={actions.padding} />
-          </PropertyLine>
+          <PropertyPaddingLine node_id={node_id} />
         </SidebarMenuSectionContent>
       </SidebarSection>
 
@@ -1655,6 +1647,42 @@ function SectionText({ node_id }: { node_id: string }) {
         </SidebarMenuSectionContent>
       </SidebarSection>
     </CurrentFontProvider>
+  );
+}
+
+function PropertyPaddingLine({ node_id }: { node_id: string }) {
+  const actions = useNodeActions(node_id)!;
+  const {
+    padding_top,
+    padding_right,
+    padding_bottom,
+    padding_left,
+    type,
+    layout,
+  } = useNodeState(node_id, (node) => ({
+    padding_top: node.padding_top ?? 0,
+    padding_right: node.padding_right ?? 0,
+    padding_bottom: node.padding_bottom ?? 0,
+    padding_left: node.padding_left ?? 0,
+    type: node.type,
+    layout: node.layout,
+  }));
+
+  const is_flex_container = type === "container" && layout === "flex";
+
+  return (
+    <PropertyLine hidden={!is_flex_container}>
+      <PropertyLineLabel>Padding</PropertyLineLabel>
+      <PaddingControl
+        value={{
+          padding_top,
+          padding_right,
+          padding_bottom,
+          padding_left,
+        }}
+        onValueCommit={actions.padding}
+      />
+    </PropertyLine>
   );
 }
 

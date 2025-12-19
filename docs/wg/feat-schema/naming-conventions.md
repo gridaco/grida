@@ -93,6 +93,9 @@ line_height
 
 ```
 padding_top
+padding_right
+padding_bottom
+padding_left
 main_axis_alignment
 cross_axis_gap
 ```

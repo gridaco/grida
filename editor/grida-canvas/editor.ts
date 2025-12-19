@@ -2231,12 +2231,12 @@ class EditorDocumentStore
   //
   changeContainerNodePadding(
     node_id: string,
-    padding: grida.program.nodes.i.IPadding["padding"]
+    padding: grida.program.nodes.i.IPadding
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      padding,
+      ...padding,
     });
   }
 

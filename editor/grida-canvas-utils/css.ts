@@ -85,7 +85,10 @@ export namespace css {
       //
       border,
       //
-      padding,
+      padding_top,
+      padding_right,
+      padding_bottom,
+      padding_left,
       //
       fe_shadows,
       //
@@ -135,7 +138,12 @@ export namespace css {
         rectangular_corner_radius_bottom_right,
       }),
       //
-      padding: padding ? paddingToPaddingCSS(padding) : undefined,
+      padding: paddingToPaddingCSS({
+        padding_top: padding_top ?? 0,
+        padding_right: padding_right ?? 0,
+        padding_bottom: padding_bottom ?? 0,
+        padding_left: padding_left ?? 0,
+      }),
       //
       boxShadow: _fb_first_boxShadow
         ? boxShadowToCSS(
@@ -429,14 +437,28 @@ export namespace css {
   }
 
   export function paddingToPaddingCSS(
-    padding: grida.program.nodes.i.IPadding["padding"]
+    padding:
+      | {
+          padding_top?: number;
+          padding_right?: number;
+          padding_bottom?: number;
+          padding_left?: number;
+        }
+      | null
+      | undefined
   ): string {
     if (!padding) return "0";
-    if (typeof padding === "number") {
-      return `${padding}px`;
-    } else {
-      return `${padding.padding_top}px ${padding.padding_right}px ${padding.padding_bottom}px ${padding.padding_left}px`;
+    const top = padding.padding_top ?? 0;
+    const right = padding.padding_right ?? 0;
+    const bottom = padding.padding_bottom ?? 0;
+    const left = padding.padding_left ?? 0;
+
+    // If all sides are equal, return single value
+    if (top === right && right === bottom && bottom === left) {
+      return `${top}px`;
     }
+
+    return `${top}px ${right}px ${bottom}px ${left}px`;
   }
 
   export function axisToFlexDirection(axis: cg.Axis): "row" | "column" {

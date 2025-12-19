@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import InputPropertyNumber from "../ui/number";
 import { WorkbenchUI } from "@/components/workbench";
 import { AllSidesIcon } from "@radix-ui/react-icons";
@@ -6,61 +6,41 @@ import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
 
-type Padding = grida.program.nodes.i.IPadding["padding"];
+type Padding = grida.program.nodes.i.IPadding;
 
 export function PaddingControl({
-  value = 0,
+  value,
   onValueCommit,
 }: {
-  value: Padding;
+  value?: Padding;
   onValueCommit?: (value: Padding) => void;
 }) {
   const [showIndividual, setShowIndividual] = useState(false);
 
-  // Determine if current value is uniform or individual
-  const isUniform = typeof value === "number";
+  const paddingValues = {
+    top: value?.padding_top ?? 0,
+    right: value?.padding_right ?? 0,
+    bottom: value?.padding_bottom ?? 0,
+    left: value?.padding_left ?? 0,
+  };
 
-  // Get individual padding values
-  const paddingValues = useMemo(() => {
-    if (typeof value === "number") {
-      return {
-        top: value,
-        right: value,
-        bottom: value,
-        left: value,
-      };
-    }
-    return {
-      top: value.padding_top ?? 0,
-      right: value.padding_right ?? 0,
-      bottom: value.padding_bottom ?? 0,
-      left: value.padding_left ?? 0,
-    };
-  }, [value]);
+  const { top, right, bottom, left } = paddingValues;
+  const uniformValue =
+    top === right && right === bottom && bottom === left ? top : undefined;
 
-  // Get uniform value (if all sides are equal)
-  const uniformValue = useMemo(() => {
-    if (isUniform) return value as number;
-    const { top, right, bottom, left } = paddingValues;
-    if (top === right && right === bottom && bottom === left) {
-      return top;
-    }
-    return undefined;
-  }, [isUniform, value, paddingValues]);
-
-  const placeholder = useMemo(() => {
-    if (isUniform) return String(uniformValue ?? 0);
-    return [
-      paddingValues.left ?? 0,
-      paddingValues.top ?? 0,
-      paddingValues.right ?? 0,
-      paddingValues.bottom ?? 0,
-    ].join(", ");
-  }, [isUniform, uniformValue, paddingValues]);
+  const placeholder =
+    uniformValue !== undefined
+      ? String(uniformValue)
+      : [left, top, right, bottom].join(", ");
 
   const handleUniformChange = (newValue: number | undefined) => {
     if (newValue === undefined) return;
-    onValueCommit?.(newValue);
+    onValueCommit?.({
+      padding_top: newValue,
+      padding_right: newValue,
+      padding_bottom: newValue,
+      padding_left: newValue,
+    });
   };
 
   const handleIndividualChange = (

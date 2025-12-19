@@ -21,7 +21,10 @@ export namespace prototypes {
     expanded: true,
     main_axis_gap: 16,
     cross_axis_gap: 16,
-    padding: 0,
+    padding_top: 0,
+    padding_right: 0,
+    padding_bottom: 0,
+    padding_left: 0,
     children: [
       {
         type: "rectangle",
@@ -151,7 +154,10 @@ export namespace prototypes {
     expanded: true,
     main_axis_gap: 8,
     cross_axis_gap: 8,
-    padding: 8,
+    padding_top: 8,
+    padding_right: 8,
+    padding_bottom: 8,
+    padding_left: 8,
     fill: {
       type: "solid",
       color: kolor.colorformats.RGBA32F.BLACK,
@@ -203,7 +209,10 @@ export namespace prototypes {
     expanded: true,
     main_axis_gap: 8,
     cross_axis_gap: 8,
-    padding: 0,
+    padding_top: 0,
+    padding_right: 0,
+    padding_bottom: 0,
+    padding_left: 0,
     fill: {
       type: "solid",
       color: kolor.colorformats.RGBA32F.WHITE,
