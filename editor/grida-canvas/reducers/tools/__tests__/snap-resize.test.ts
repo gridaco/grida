@@ -248,8 +248,6 @@ describe("adjustMovementForSnap", () => {
     const snapDelta: cmath.Vector2 = [5, 0]; // Need to move 5px more
     const adjusted = adjustMovementForSnap(
       snapDelta,
-      "e",
-      [0, 0],
       { x: 0, y: 0, width: 100, height: 100 },
       {}
     );
@@ -261,8 +259,6 @@ describe("adjustMovementForSnap", () => {
     const snapDelta: cmath.Vector2 = [-5, 0];
     const adjusted = adjustMovementForSnap(
       snapDelta,
-      "w",
-      [100, 0],
       { x: 0, y: 0, width: 100, height: 100 },
       {}
     );
@@ -274,8 +270,6 @@ describe("adjustMovementForSnap", () => {
     const snapDelta: cmath.Vector2 = [0, 5];
     const adjusted = adjustMovementForSnap(
       snapDelta,
-      "s",
-      [0, 0],
       { x: 0, y: 0, width: 100, height: 100 },
       {}
     );
@@ -288,8 +282,6 @@ describe("adjustMovementForSnap", () => {
     const originalMovement: cmath.Vector2 = [47, 30]; // Original movement
     const adjusted = adjustMovementForSnap(
       snapDelta,
-      "se",
-      [0, 0],
       { x: 0, y: 0, width: 100, height: 100 },
       { preserveAspectRatio: true, originalMovement }
     );
@@ -304,8 +296,6 @@ describe("adjustMovementForSnap", () => {
     const originalMovement: cmath.Vector2 = [40, 15]; // Original movement
     const adjusted = adjustMovementForSnap(
       snapDelta,
-      "se",
-      [0, 0],
       { x: 0, y: 0, width: 100, height: 50 }, // 2:1 ratio
       { preserveAspectRatio: true, originalMovement }
     );
@@ -319,8 +309,6 @@ describe("adjustMovementForSnap", () => {
     const snapDelta: cmath.Vector2 = [0, 0];
     const adjusted = adjustMovementForSnap(
       snapDelta,
-      "e",
-      [0, 0],
       { x: 0, y: 0, width: 100, height: 100 },
       {}
     );
