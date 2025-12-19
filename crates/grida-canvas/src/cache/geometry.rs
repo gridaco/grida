@@ -311,8 +311,8 @@ impl GeometryCache {
                     (
                         n.position.x().unwrap_or(0.0),
                         n.position.y().unwrap_or(0.0),
-                        n.layout_dimensions.width.unwrap_or(0.0),
-                        n.layout_dimensions.height.unwrap_or(0.0),
+                        n.layout_dimensions.layout_target_width.unwrap_or(0.0),
+                        n.layout_dimensions.layout_target_height.unwrap_or(0.0),
                     )
                 };
                 let local_transform = AffineTransform::new(x, y, n.rotation);

@@ -61,7 +61,6 @@ use markup5ever::serialize::TraversalScope;
 use markup5ever::serialize::TraversalScope::{ChildrenOnly, IncludeNode};
 use markup5ever::serialize::{Serialize, Serializer};
 
-
 /// Empty marker trait so other modules can depend on rcdom without pulling in all details.
 pub trait RcDomLike {}
 

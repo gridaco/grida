@@ -41,6 +41,82 @@ describe("cmath.quantize", () => {
   });
 });
 
+describe("cmath.gcd", () => {
+  test("should compute gcd for typical integer pairs", () => {
+    expect(cmath.gcd(12, 8)).toBe(4);
+    expect(cmath.gcd(16, 9)).toBe(1);
+    expect(cmath.gcd(0, 8)).toBe(8);
+    expect(cmath.gcd(12, 0)).toBe(12);
+  });
+
+  test("should ignore sign", () => {
+    expect(cmath.gcd(-12, 8)).toBe(4);
+    expect(cmath.gcd(12, -8)).toBe(4);
+    expect(cmath.gcd(-12, -8)).toBe(4);
+  });
+
+  test("should return 1 for (0, 0)", () => {
+    expect(cmath.gcd(0, 0)).toBe(1);
+  });
+
+  test("should coerce non-integer inputs to integers", () => {
+    expect(cmath.gcd(12.7, 8.3)).toBe(4);
+    expect(cmath.gcd(12.2, 8.9)).toBe(4);
+    expect(cmath.gcd(1.5, 0.5)).toBe(1); // Math.trunc(1.5) = 1, Math.trunc(0.5) = 0, gcd(1, 0) = 1
+    expect(cmath.gcd(3.7, 2.1)).toBe(1); // Math.trunc(3.7) = 3, Math.trunc(2.1) = 2, gcd(3, 2) = 1
+    expect(cmath.gcd(15.9, 9.1)).toBe(3); // Math.trunc(15.9) = 15, Math.trunc(9.1) = 9, gcd(15, 9) = 3
+  });
+
+  test("should throw TypeError for NaN inputs", () => {
+    expect(() => cmath.gcd(NaN, 8)).toThrow(TypeError);
+    expect(() => cmath.gcd(12, NaN)).toThrow(TypeError);
+    expect(() => cmath.gcd(NaN, NaN)).toThrow(TypeError);
+  });
+
+  test("should throw TypeError for Infinity inputs", () => {
+    expect(() => cmath.gcd(Infinity, 8)).toThrow(TypeError);
+    expect(() => cmath.gcd(12, Infinity)).toThrow(TypeError);
+    expect(() => cmath.gcd(-Infinity, 8)).toThrow(TypeError);
+    expect(() => cmath.gcd(12, -Infinity)).toThrow(TypeError);
+    expect(() => cmath.gcd(Infinity, Infinity)).toThrow(TypeError);
+  });
+
+  test("should handle large integers", () => {
+    expect(cmath.gcd(1000000, 1000001)).toBe(1);
+    expect(cmath.gcd(1000000, 500000)).toBe(500000);
+  });
+});
+
+describe("cmath.aspectRatio", () => {
+  test("should normalize typical aspect ratios", () => {
+    expect(cmath.aspectRatio(1920, 1080)).toEqual([16, 9]);
+    expect(cmath.aspectRatio(1024, 1024)).toEqual([1, 1]);
+    expect(cmath.aspectRatio(4, 3)).toEqual([4, 3]);
+  });
+
+  test("should be robust to scaled inputs", () => {
+    expect(cmath.aspectRatio(1600, 900)).toEqual([16, 9]);
+    expect(cmath.aspectRatio(3200, 1800)).toEqual([16, 9]);
+  });
+
+  test("should return undefined for invalid ratios", () => {
+    expect(cmath.aspectRatio(0, 1)).toBeUndefined();
+    expect(cmath.aspectRatio(1, 0)).toBeUndefined();
+    expect(cmath.aspectRatio(-1, 1)).toBeUndefined();
+    expect(cmath.aspectRatio(1, -1)).toBeUndefined();
+    expect(cmath.aspectRatio(NaN, 1)).toBeUndefined();
+    expect(cmath.aspectRatio(1, NaN)).toBeUndefined();
+  });
+
+  test("should respect max_denominator for difficult ratios", () => {
+    const result = cmath.aspectRatio(1, Math.PI, 8);
+    expect(result).toBeDefined();
+    const [p, q] = result!;
+    expect(q).toBeLessThanOrEqual(8);
+    expect(Math.abs(p / q - 1 / Math.PI)).toBeLessThan(0.1);
+  });
+});
+
 describe("cmath.powerset", () => {
   test("should return the full powerset when k is -1 or not provided", () => {
     const input = [1, 2, 3];

@@ -195,12 +195,9 @@ impl NodeFactory {
                 layout_gap: None,
             },
             layout_dimensions: LayoutDimensionStyle {
-                width: Some(Self::DEFAULT_SIZE.width),
-                height: Some(Self::DEFAULT_SIZE.height),
-                min_width: None,
-                max_width: None,
-                min_height: None,
-                max_height: None,
+                layout_target_width: Some(Self::DEFAULT_SIZE.width),
+                layout_target_height: Some(Self::DEFAULT_SIZE.height),
+                ..Default::default()
             },
             layout_child: None,
         }

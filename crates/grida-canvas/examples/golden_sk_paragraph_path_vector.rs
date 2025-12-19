@@ -512,7 +512,11 @@ fn paragraph_to_path(paragraph: &mut Paragraph, origin: Point) -> Option<Path> {
                         pos.x + run_origin.x + origin.x,
                         pos.y + run_origin.y + origin.y,
                     );
-                    builder.add_path_with_transform(&glyph_path, &Matrix::translate((offset.x, offset.y)), None);
+                    builder.add_path_with_transform(
+                        &glyph_path,
+                        &Matrix::translate((offset.x, offset.y)),
+                        None,
+                    );
                 }
             }
         }

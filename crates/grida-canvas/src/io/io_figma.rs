@@ -835,12 +835,13 @@ impl FigmaConverter {
                 layout_gap: None,
             },
             layout_dimensions: LayoutDimensionStyle {
-                width: Some(size.width),
-                height: Some(size.height),
-                min_width: None,
-                max_width: None,
-                min_height: None,
-                max_height: None,
+                layout_target_width: Some(size.width),
+                layout_target_height: Some(size.height),
+                layout_min_width: component.min_width.map(|x| x as f32),
+                layout_max_width: component.max_width.map(|x| x as f32),
+                layout_min_height: component.min_height.map(|x| x as f32),
+                layout_max_height: component.max_height.map(|x| x as f32),
+                layout_target_aspect_ratio: None,
             },
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: component
@@ -959,12 +960,13 @@ impl FigmaConverter {
                 layout_gap: None,
             },
             layout_dimensions: LayoutDimensionStyle {
-                width: Some(size.width),
-                height: Some(size.height),
-                min_width: None,
-                max_width: None,
-                min_height: None,
-                max_height: None,
+                layout_target_width: Some(size.width),
+                layout_target_height: Some(size.height),
+                layout_min_width: instance.min_width.map(|x| x as f32),
+                layout_max_width: instance.max_width.map(|x| x as f32),
+                layout_min_height: instance.min_height.map(|x| x as f32),
+                layout_max_height: instance.max_height.map(|x| x as f32),
+                layout_target_aspect_ratio: None,
             },
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: instance
@@ -1027,12 +1029,13 @@ impl FigmaConverter {
                     layout_gap: None,
                 },
                 layout_dimensions: LayoutDimensionStyle {
-                    width: Some(size.width),
-                    height: Some(size.height),
-                    min_width: None,
-                    max_width: None,
-                    min_height: None,
-                    max_height: None,
+                    layout_target_width: Some(size.width),
+                    layout_target_height: Some(size.height),
+                    layout_min_width: section.min_width.map(|x| x as f32),
+                    layout_max_width: section.max_width.map(|x| x as f32),
+                    layout_min_height: section.min_height.map(|x| x as f32),
+                    layout_max_height: section.max_height.map(|x| x as f32),
+                    layout_target_aspect_ratio: None,
                 },
                 layout_child: Some(LayoutChildStyle {
                     layout_positioning: section
@@ -1189,12 +1192,13 @@ impl FigmaConverter {
                 layout_gap: None,
             },
             layout_dimensions: LayoutDimensionStyle {
-                width: Some(size.width),
-                height: Some(size.height),
-                min_width: None,
-                max_width: None,
-                min_height: None,
-                max_height: None,
+                layout_target_width: Some(size.width),
+                layout_target_height: Some(size.height),
+                layout_min_width: origin.min_width.map(|x| x as f32),
+                layout_max_width: origin.max_width.map(|x| x as f32),
+                layout_min_height: origin.min_height.map(|x| x as f32),
+                layout_max_height: origin.max_height.map(|x| x as f32),
+                layout_target_aspect_ratio: None,
             },
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: origin
@@ -1436,12 +1440,13 @@ impl FigmaConverter {
                     layout_gap: None,
                 },
                 layout_dimensions: LayoutDimensionStyle {
-                    width: Some(size.width),
-                    height: Some(size.height),
-                    min_width: None,
-                    max_width: None,
-                    min_height: None,
-                    max_height: None,
+                    layout_target_width: Some(size.width),
+                    layout_target_height: Some(size.height),
+                    layout_min_width: origin.min_width.map(|x| x as f32),
+                    layout_max_width: origin.max_width.map(|x| x as f32),
+                    layout_min_height: origin.min_height.map(|x| x as f32),
+                    layout_max_height: origin.max_height.map(|x| x as f32),
+                    layout_target_aspect_ratio: None,
                 },
                 layout_child: Some(LayoutChildStyle {
                     layout_positioning: origin

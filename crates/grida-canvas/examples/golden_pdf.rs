@@ -14,8 +14,8 @@ async fn demo_scene() -> Scene {
 
     // Create a root container
     let mut root_container = nf.create_container_node();
-    root_container.layout_dimensions.width = Some(900.0);
-    root_container.layout_dimensions.height = Some(700.0);
+    root_container.layout_dimensions.layout_target_width = Some(900.0);
+    root_container.layout_dimensions.layout_target_height = Some(700.0);
 
     // Title text
     let mut title_text = nf.create_text_span_node();

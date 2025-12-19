@@ -114,8 +114,8 @@ impl LayoutEngine {
     fn get_schema_size(node: &Node) -> (f32, f32) {
         match node {
             Node::Container(n) => (
-                n.layout_dimensions.width.unwrap_or(0.0),
-                n.layout_dimensions.height.unwrap_or(0.0),
+                n.layout_dimensions.layout_target_width.unwrap_or(0.0),
+                n.layout_dimensions.layout_target_height.unwrap_or(0.0),
             ),
             Node::Rectangle(n) => (n.size.width, n.size.height),
             Node::Ellipse(n) => (n.size.width, n.size.height),
@@ -352,8 +352,8 @@ mod tests {
             layout_gap: Some(LayoutGap::uniform(10.0)),
             ..Default::default()
         };
-        container.layout_dimensions.width = Some(300.0);
-        container.layout_dimensions.height = Some(200.0);
+        container.layout_dimensions.layout_target_width = Some(300.0);
+        container.layout_dimensions.layout_target_height = Some(200.0);
 
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
@@ -416,8 +416,8 @@ mod tests {
             layout_direction: Axis::Vertical,
             ..Default::default()
         };
-        container.layout_dimensions.width = Some(200.0);
-        container.layout_dimensions.height = Some(150.0);
+        container.layout_dimensions.layout_target_width = Some(200.0);
+        container.layout_dimensions.layout_target_height = Some(150.0);
 
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
@@ -512,8 +512,8 @@ mod tests {
             layout_direction: Axis::Horizontal,
             ..Default::default()
         };
-        outer.layout_dimensions.width = Some(400.0);
-        outer.layout_dimensions.height = Some(200.0);
+        outer.layout_dimensions.layout_target_width = Some(400.0);
+        outer.layout_dimensions.layout_target_height = Some(200.0);
         let outer_id = graph.append_child(Node::Container(outer), Parent::Root);
 
         // Inner container (vertical)
@@ -523,8 +523,8 @@ mod tests {
             layout_direction: Axis::Vertical,
             ..Default::default()
         };
-        inner.layout_dimensions.width = Some(200.0);
-        inner.layout_dimensions.height = Some(150.0);
+        inner.layout_dimensions.layout_target_width = Some(200.0);
+        inner.layout_dimensions.layout_target_height = Some(150.0);
         let inner_id = graph.append_child(Node::Container(inner), Parent::NodeId(outer_id));
 
         // Rectangle in inner container
@@ -578,13 +578,13 @@ mod tests {
 
         // Add container children
         let mut container1 = nf.create_container_node();
-        container1.layout_dimensions.width = Some(100.0);
-        container1.layout_dimensions.height = Some(100.0);
+        container1.layout_dimensions.layout_target_width = Some(100.0);
+        container1.layout_dimensions.layout_target_height = Some(100.0);
         let container1_id = graph.append_child(Node::Container(container1), Parent::NodeId(icb_id));
 
         let mut container2 = nf.create_container_node();
-        container2.layout_dimensions.width = Some(100.0);
-        container2.layout_dimensions.height = Some(100.0);
+        container2.layout_dimensions.layout_target_width = Some(100.0);
+        container2.layout_dimensions.layout_target_height = Some(100.0);
         let container2_id = graph.append_child(Node::Container(container2), Parent::NodeId(icb_id));
 
         let scene = Scene {
@@ -633,8 +633,8 @@ mod tests {
             layout_direction: Axis::Horizontal,
             ..Default::default()
         };
-        container.layout_dimensions.width = Some(300.0);
-        container.layout_dimensions.height = Some(100.0);
+        container.layout_dimensions.layout_target_width = Some(300.0);
+        container.layout_dimensions.layout_target_height = Some(100.0);
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         // Add text child
@@ -673,14 +673,14 @@ mod tests {
 
         // First root container
         let mut container1 = nf.create_container_node();
-        container1.layout_dimensions.width = Some(200.0);
-        container1.layout_dimensions.height = Some(100.0);
+        container1.layout_dimensions.layout_target_width = Some(200.0);
+        container1.layout_dimensions.layout_target_height = Some(100.0);
         let container1_id = graph.append_child(Node::Container(container1), Parent::Root);
 
         // Second root container
         let mut container2 = nf.create_container_node();
-        container2.layout_dimensions.width = Some(150.0);
-        container2.layout_dimensions.height = Some(80.0);
+        container2.layout_dimensions.layout_target_width = Some(150.0);
+        container2.layout_dimensions.layout_target_height = Some(80.0);
         let container2_id = graph.append_child(Node::Container(container2), Parent::Root);
 
         let scene = Scene {
@@ -719,8 +719,8 @@ mod tests {
 
         // Create container with no children
         let mut container = nf.create_container_node();
-        container.layout_dimensions.width = Some(200.0);
-        container.layout_dimensions.height = Some(100.0);
+        container.layout_dimensions.layout_target_width = Some(200.0);
+        container.layout_dimensions.layout_target_height = Some(100.0);
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         let scene = Scene {
@@ -782,8 +782,8 @@ mod tests {
             layout_direction: Axis::Horizontal,
             ..Default::default()
         };
-        container.layout_dimensions.width = Some(200.0);
-        container.layout_dimensions.height = Some(100.0);
+        container.layout_dimensions.layout_target_width = Some(200.0);
+        container.layout_dimensions.layout_target_height = Some(100.0);
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         // Add three 100px wide children (total: 300px > 200px container)
@@ -844,8 +844,8 @@ mod tests {
             }),
             ..Default::default()
         };
-        container.layout_dimensions.width = Some(150.0);
-        container.layout_dimensions.height = Some(300.0); // Tall enough to see vertical gap
+        container.layout_dimensions.layout_target_width = Some(150.0);
+        container.layout_dimensions.layout_target_height = Some(300.0); // Tall enough to see vertical gap
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         // Add two 100px wide items (will wrap because 200px > 150px container)
@@ -914,8 +914,8 @@ mod tests {
             layout_cross_axis_alignment: Some(CrossAxisAlignment::Center),
             ..Default::default()
         };
-        container.layout_dimensions.width = Some(1000.0);
-        container.layout_dimensions.height = Some(1000.0);
+        container.layout_dimensions.layout_target_width = Some(1000.0);
+        container.layout_dimensions.layout_target_height = Some(1000.0);
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         // Add a single 100x100 child
@@ -973,8 +973,8 @@ mod tests {
             layout_gap: Some(LayoutGap::uniform(10.0)),
             ..Default::default()
         };
-        container.layout_dimensions.width = Some(400.0);
-        container.layout_dimensions.height = Some(200.0);
+        container.layout_dimensions.layout_target_width = Some(400.0);
+        container.layout_dimensions.layout_target_height = Some(200.0);
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         // Add a normal (relative) child
@@ -1055,8 +1055,8 @@ mod tests {
         // Create a root container at position (100, 50)
         let mut container = nf.create_container_node();
         container.position = LayoutPositioningBasis::Cartesian(CGPoint::new(100.0, 50.0));
-        container.layout_dimensions.width = Some(200.0);
-        container.layout_dimensions.height = Some(150.0);
+        container.layout_dimensions.layout_target_width = Some(200.0);
+        container.layout_dimensions.layout_target_height = Some(150.0);
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         let scene = Scene {
@@ -1146,8 +1146,8 @@ mod tests {
             layout_gap: Some(LayoutGap::uniform(20.0)),
             ..Default::default()
         };
-        container.layout_dimensions.width = Some(300.0);
-        container.layout_dimensions.height = Some(500.0);
+        container.layout_dimensions.layout_target_width = Some(300.0);
+        container.layout_dimensions.layout_target_height = Some(500.0);
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         // Relative child 1
@@ -1263,8 +1263,8 @@ mod tests {
         // Root container at (100, 50)
         let mut container = nf.create_container_node();
         container.position = LayoutPositioningBasis::Cartesian(CGPoint::new(100.0, 50.0));
-        container.layout_dimensions.width = Some(200.0);
-        container.layout_dimensions.height = Some(100.0);
+        container.layout_dimensions.layout_target_width = Some(200.0);
+        container.layout_dimensions.layout_target_height = Some(100.0);
         let container_id = graph.append_child(Node::Container(container), Parent::Root);
 
         // Root rectangle at (300, 150)

@@ -47,12 +47,9 @@ fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec
             layout_gap: None,
         },
         layout_dimensions: LayoutDimensionStyle {
-            width: Some(width),
-            height: Some(height),
-            min_width: None,
-            max_width: None,
-            min_height: None,
-            max_height: None,
+            layout_target_width: Some(width),
+            layout_target_height: Some(height),
+            ..Default::default()
         },
         layout_child: None,
     }

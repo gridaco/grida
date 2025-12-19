@@ -55,6 +55,13 @@ type NodeTransformAction =
        * whether to preserve the aspect ratio while scaling
        */
       preserveAspectRatio: boolean;
+
+      /**
+       * optional target aspect ratio [width, height] to enforce.
+       * When provided, this ratio is used instead of the current rect's aspect ratio.
+       * This is used when the node has layout_target_aspect_ratio set.
+       */
+      targetAspectRatio?: [number, number];
     }
   | {
       // resize only changes right, bottom, width, height
@@ -99,7 +106,8 @@ export default function updateNodeTransform(
       break;
     }
     case "scale": {
-      const { rect, origin, movement, preserveAspectRatio } = action;
+      const { rect, origin, movement, preserveAspectRatio, targetAspectRatio } =
+        action;
 
       let scale: cmath.Vector2;
 
@@ -110,16 +118,36 @@ export default function updateNodeTransform(
         const dominantAxis =
           Math.abs(movement[0]) > Math.abs(movement[1]) ? "x" : "y";
 
-        switch (dominantAxis) {
-          case "x": {
-            const factor = (rect.width + movement[0]) / rect.width;
-            scale = [factor, factor];
-            break;
+        if (targetAspectRatio) {
+          // Use target aspect ratio instead of current rect's ratio
+          const targetRatio = targetAspectRatio[0] / targetAspectRatio[1];
+          switch (dominantAxis) {
+            case "x": {
+              const newWidth = rect.width + movement[0];
+              const newHeight = newWidth / targetRatio;
+              scale = [newWidth / rect.width, newHeight / rect.height];
+              break;
+            }
+            case "y": {
+              const newHeight = rect.height + movement[1];
+              const newWidth = newHeight * targetRatio;
+              scale = [newWidth / rect.width, newHeight / rect.height];
+              break;
+            }
           }
-          case "y": {
-            const factor = (rect.height + movement[1]) / rect.height;
-            scale = [factor, factor];
-            break;
+        } else {
+          // Use current rect's aspect ratio
+          switch (dominantAxis) {
+            case "x": {
+              const factor = (rect.width + movement[0]) / rect.width;
+              scale = [factor, factor];
+              break;
+            }
+            case "y": {
+              const factor = (rect.height + movement[1]) / rect.height;
+              scale = [factor, factor];
+              break;
+            }
           }
         }
       } else {

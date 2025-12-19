@@ -962,9 +962,6 @@ importers:
       '@eslint/eslintrc':
         specifier: ^3
         version: 3.3.1
-      '@figma/rest-api-spec':
-        specifier: ^0.21.0
-        version: 0.21.0
       '@playwright/test':
         specifier: ^1.52.0
         version: 1.52.0
@@ -1156,8 +1153,8 @@ importers:
         version: 0.5.0
     devDependencies:
       '@figma/rest-api-spec':
-        specifier: ^0.21.0
-        version: 0.21.0
+        specifier: 0.35.0
+        version: 0.35.0
       '@grida/cg':
         specifier: workspace:*
         version: link:../grida-canvas-cg
@@ -3108,8 +3105,8 @@ packages:
     resolution: {integrity: sha512-XQ3cU+Q8Uqmrbf2e0cIC/QN43sTBSC8KF12u29Mb47tWrt2hAgBXSgpZMj4Ao8Uk0iJcU99QsOCaIL8934obCg==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0, npm: '>=6.14.13'}
 
-  '@figma/rest-api-spec@0.21.0':
-    resolution: {integrity: sha512-dOXROcTB/veCsyPJI9GyL1pFl5RTPkutD1A5PFuZtXPoVpOKengOIn+CY3goVrrxpjSAH7PczmqcEij8OHuiRw==}
+  '@figma/rest-api-spec@0.35.0':
+    resolution: {integrity: sha512-0v/KJmCWzKBp/wmsqjOas7tLauD1s0nrJJ70vzOCqEEgNrZvugi6/Myssfy+BsfpU5bcC66KrgApqoRRnsbJ4Q==}
 
   '@fingerprintjs/fingerprintjs@4.6.2':
     resolution: {integrity: sha512-g8mXuqcFKbgH2CZKwPfVtsUJDHyvcgIABQI7Y0tzWEFXpGxJaXuAuzlifT2oTakjDBLTK4Gaa9/5PERDhqUjtw==}
@@ -10873,6 +10870,7 @@ packages:
   next@15.3.8:
     resolution: {integrity: sha512-L+4c5Hlr84fuaNADZbB9+ceRX9/CzwxJ+obXIGHupboB/Q1OLbSUapFs4bO8hnS/E6zV/JDX7sG1QpKVR2bguA==}
     engines: {node: ^18.18.0 || ^19.8.0 || >= 20.0.0}
+    deprecated: This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/security-update-2025-12-11 for more details.
     hasBin: true
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
@@ -17184,7 +17182,7 @@ snapshots:
 
   '@faker-js/faker@8.4.1': {}
 
-  '@figma/rest-api-spec@0.21.0': {}
+  '@figma/rest-api-spec@0.35.0': {}
 
   '@fingerprintjs/fingerprintjs@4.6.2':
     dependencies:

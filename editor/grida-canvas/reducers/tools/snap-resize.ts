@@ -291,8 +291,6 @@ export function getResizeSnapPoints(
  * - If both or neither snapped: Return snap delta as-is
  *
  * @param snapDelta - The snap delta from snap calculation [dx, dy]
- * @param direction - Resize handle direction (needed for directional logic)
- * @param origin - Transform origin point
  * @param rectBeforeSnap - The initial rectangle (for aspect ratio calculation)
  * @param options - Configuration options
  * @param options.preserveAspectRatio - Whether to maintain aspect ratio (Shift key)
@@ -305,8 +303,6 @@ export function getResizeSnapPoints(
  * // Square rect, X snapped by +3, aspect ratio enabled
  * adjustMovementForSnap(
  *   [3, 0],
- *   "se",
- *   [0, 0],
  *   { x: 0, y: 0, width: 100, height: 100 },
  *   { preserveAspectRatio: true, originalMovement: [47, 47] }
  * );
@@ -315,15 +311,18 @@ export function getResizeSnapPoints(
  */
 export function adjustMovementForSnap(
   snapDelta: cmath.Vector2,
-  direction: cmath.CardinalDirection,
-  origin: cmath.Vector2,
   rectBeforeSnap: cmath.Rectangle,
   options: {
     preserveAspectRatio?: boolean;
     originalMovement?: cmath.Vector2;
+    targetAspectRatio?: [number, number];
   } = {}
 ): cmath.Vector2 {
-  const { preserveAspectRatio = false, originalMovement } = options;
+  const {
+    preserveAspectRatio = false,
+    originalMovement,
+    targetAspectRatio,
+  } = options;
 
   // If no snap, return zero adjustment
   if (snapDelta[0] === 0 && snapDelta[1] === 0) {
@@ -336,7 +335,10 @@ export function adjustMovementForSnap(
   }
 
   // With aspect ratio preservation, we need to adjust both axes proportionally
-  const aspect_ratio = rectBeforeSnap.width / rectBeforeSnap.height;
+  // Use target aspect ratio if provided, otherwise use the current rect's ratio
+  const aspect_ratio = targetAspectRatio
+    ? targetAspectRatio[0] / targetAspectRatio[1]
+    : rectBeforeSnap.width / rectBeforeSnap.height;
 
   // Determine which axis snapped (has non-zero delta)
   const x_snapped = Math.abs(snapDelta[0]) > 0;
@@ -370,6 +372,7 @@ interface CalculateResizeSnapParams {
   options?: {
     preserveAspectRatio?: boolean;
     centerOrigin?: boolean;
+    targetAspectRatio?: [number, number];
   };
 }
 
@@ -450,7 +453,11 @@ export function calculateResizeSnap(
     options = {},
   } = params;
 
-  const { preserveAspectRatio = false, centerOrigin = false } = options;
+  const {
+    preserveAspectRatio = false,
+    centerOrigin = false,
+    targetAspectRatio,
+  } = options;
 
   // If no anchors, return original movement
   if (anchors.length === 0) {
@@ -534,13 +541,11 @@ export function calculateResizeSnap(
   ];
 
   // Calculate movement adjustment
-  const movement_adjustment = adjustMovementForSnap(
-    snap_delta,
-    direction,
-    origin,
-    initial,
-    { preserveAspectRatio, originalMovement: movement }
-  );
+  const movement_adjustment = adjustMovementForSnap(snap_delta, initial, {
+    preserveAspectRatio,
+    originalMovement: movement,
+    targetAspectRatio,
+  });
 
   // Adjusted movement
   const adjusted_movement: cmath.Vector2 = [
@@ -625,6 +630,7 @@ export function calculateResizeSnap(
  * @param options.enabled - Whether snapping is enabled (Control key toggles)
  * @param options.preserveAspectRatio - Maintain aspect ratio (Shift key)
  * @param options.centerOrigin - Resize from center (Alt/Option key)
+ * @param options.targetAspectRatio - Optional target aspect ratio [width, height] to enforce
  *
  * @returns Result containing:
  *   - `adjusted_movement`: Movement after snap applied (for transform calculation)
@@ -662,6 +668,7 @@ export function snapObjectsResize(
     enabled?: boolean;
     preserveAspectRatio?: boolean;
     centerOrigin?: boolean;
+    targetAspectRatio?: [number, number];
   } = {}
 ): {
   adjusted_movement: cmath.Vector2;
@@ -671,6 +678,7 @@ export function snapObjectsResize(
     enabled = true,
     preserveAspectRatio = false,
     centerOrigin = false,
+    targetAspectRatio,
   } = options;
 
   // If snapping is disabled, return original movement
@@ -753,6 +761,7 @@ export function snapObjectsResize(
     options: {
       preserveAspectRatio,
       centerOrigin,
+      targetAspectRatio,
     },
   });
 

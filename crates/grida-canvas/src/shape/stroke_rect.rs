@@ -1,6 +1,7 @@
 use crate::cg::prelude::*;
 use skia_safe::{
-    path_effect::PathEffect, stroke_rec::InitStyle, Path, PathBuilder, PathOp, RRect, Rect, StrokeRec, Vector,
+    path_effect::PathEffect, stroke_rec::InitStyle, Path, PathBuilder, PathOp, RRect, Rect,
+    StrokeRec, Vector,
 };
 
 /// Builds an RRect from a Skia Rect and RectangularCornerRadius.

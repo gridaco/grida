@@ -134,8 +134,8 @@ async fn demo_basic() -> Scene {
 
     // Create a root container node containing the shapes group, text, and line
     let mut root_container_node = nf.create_container_node();
-    root_container_node.layout_dimensions.width = Some(1080.0);
-    root_container_node.layout_dimensions.height = Some(1080.0);
+    root_container_node.layout_dimensions.layout_target_width = Some(1080.0);
+    root_container_node.layout_dimensions.layout_target_height = Some(1080.0);
 
     // Build the scene graph
     let mut graph = SceneGraph::new();

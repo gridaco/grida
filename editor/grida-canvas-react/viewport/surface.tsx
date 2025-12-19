@@ -90,6 +90,7 @@ import {
   GapOverlay,
 } from "./ui/surface-distribution-overlay";
 import { PaddingOverlay } from "./ui/surface-padding-overlay";
+import { AspectRatioGuide } from "./ui/aspect-ratio-guide";
 import cmath from "@grida/cmath";
 import { cn } from "@/components/lib/utils";
 
@@ -1190,6 +1191,15 @@ function NodeOverlay({
   const { scaleX, scaleY } = useTransformState();
   const backend = useBackendState();
   const tool = useToolState();
+  const data = useSingleSelection(node_id);
+  const { gesture } = useGestureState();
+  const { transform_with_preserve_aspect_ratio } = useEditorState(
+    editor,
+    (state) => ({
+      transform_with_preserve_aspect_ratio:
+        state.gesture_modifiers.transform_with_preserve_aspect_ratio,
+    })
+  );
 
   // enable overlay dragging only when the cursor tool is active and editable
   const enabled =
@@ -1223,11 +1233,9 @@ function NodeOverlay({
     { enabled }
   );
 
-  const data = useSingleSelection(node_id);
-
   if (!data) return <></>;
 
-  const { node, style, size } = data;
+  const { node, style, size, boundingSurfaceRect } = data;
 
   const { is_component_consumer, is_flex_parent } = node.meta;
   // readonly = readonly || is_component_consumer;
@@ -1238,6 +1246,17 @@ function NodeOverlay({
   const show_corner_radius_handle =
     rect_ui_width >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE &&
     rect_ui_height >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE;
+
+  const show_aspect_ratio_guide =
+    gesture.type === "scale" &&
+    gesture.selection.includes(node_id) &&
+    // Show guide when:
+    // A) the node has aspect ratio set, OR
+    // B) the user is uniformly scaling the node (parametric scale tool), OR
+    // C) the user is pressing Shift key (preserve aspect ratio modifier)
+    (node.layout_target_aspect_ratio !== undefined ||
+      gesture.uniform_scale !== undefined ||
+      transform_with_preserve_aspect_ratio === "on");
 
   // TODO: resize for bitmap is not supported */
   const is_resizable_node = node.type !== "bitmap";
@@ -1438,6 +1457,19 @@ function NodeOverlay({
             <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
             <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
           </>
+        )}
+        {/* Aspect ratio guide - shows diagonal line during resize when aspect ratio is locked */}
+        {show_aspect_ratio_guide && (
+          <AspectRatioGuide
+            rect={{
+              x: 0,
+              y: 0,
+              width: rect_ui_width,
+              height: rect_ui_height,
+            }}
+            direction={gesture.direction}
+            zIndex={diagonalZIndex + 1}
+          />
         )}
         {focused && !readonly && (
           <SizeMeterLabel

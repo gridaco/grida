@@ -242,6 +242,28 @@ function self_update_gesture_resize_scale(
       })
       .filter((r): r is cmath.Rectangle => r !== null && r !== undefined);
 
+    // Collect target aspect ratio from nodes that have layout_target_aspect_ratio set
+    // For snap logic, use the first node's target ratio if available
+    let snap_target_aspect_ratio: [number, number] | undefined = undefined;
+    if (selection.length > 0) {
+      const first_node = draft.document.nodes[
+        selection[0]
+      ] as grida.program.nodes.Node;
+      const target_ratio = (first_node as any).layout_target_aspect_ratio as
+        | [number, number]
+        | undefined;
+      if (target_ratio) {
+        snap_target_aspect_ratio = target_ratio;
+      }
+    }
+
+    // Aspect ratio should be preserved for snap if:
+    // - Shift key is pressed, OR
+    // - Any node in selection has layout_target_aspect_ratio set
+    const should_preserve_aspect_ratio_for_snap =
+      transform_with_preserve_aspect_ratio === "on" ||
+      snap_target_aspect_ratio !== undefined;
+
     const { adjusted_movement, snapping } = snapObjectsResize(
       initial_rects,
       {
@@ -257,8 +279,9 @@ function self_update_gesture_resize_scale(
       ),
       {
         enabled: should_snap,
-        preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
+        preserveAspectRatio: should_preserve_aspect_ratio_for_snap,
         centerOrigin: transform_with_center_origin === "on",
+        targetAspectRatio: snap_target_aspect_ratio,
       }
     );
 
@@ -291,13 +314,26 @@ function self_update_gesture_resize_scale(
     const is_scalable = initial_node.type !== "bitmap";
     if (!is_scalable) continue;
 
+    // Check if node has layout_target_aspect_ratio set
+    const targetAspectRatio = (node as any).layout_target_aspect_ratio as
+      | [number, number]
+      | undefined;
+
+    // Aspect ratio should be preserved if:
+    // - Shift key is pressed (transform_with_preserve_aspect_ratio === "on"), OR
+    // - Node has layout_target_aspect_ratio set
+    const should_preserve_aspect_ratio =
+      transform_with_preserve_aspect_ratio === "on" ||
+      targetAspectRatio !== undefined;
+
     if (!parent_id || is_scene_parent) {
       updateNodeTransform(node as any, {
         type: "scale",
         rect: initial_rect,
         origin: origin,
         movement,
-        preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
+        preserveAspectRatio: should_preserve_aspect_ratio,
+        targetAspectRatio: targetAspectRatio,
       });
     } else {
       const parent_rect =
@@ -329,7 +365,8 @@ function self_update_gesture_resize_scale(
         rect: relative_rect,
         origin: relative_origin,
         movement,
-        preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
+        preserveAspectRatio: should_preserve_aspect_ratio,
+        targetAspectRatio: targetAspectRatio,
       });
     }
 

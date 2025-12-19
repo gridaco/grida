@@ -3082,6 +3082,24 @@ export namespace editor.api {
     toggleNodeActive(node_id: NodeID): void;
     toggleNodeLocked(node_id: NodeID): void;
 
+    /**
+     * Locks aspect ratio for the target node **as-is** (non-recursive) by setting
+     * `layout_target_aspect_ratio`.
+     *
+     * - This applies **only** to the target node passed in.
+     * - This does **not** update children/descendants.
+     */
+    lockAspectRatio(node_id: NodeID): void;
+
+    /**
+     * Unlocks aspect ratio for the target node **as-is** (non-recursive) by clearing
+     * `layout_target_aspect_ratio`.
+     *
+     * - This applies **only** to the target node passed in.
+     * - This does **not** update children/descendants.
+     */
+    unlockAspectRatio(node_id: NodeID): void;
+
     changeNodeUserData(node_id: NodeID, userdata: unknown): void;
     changeNodeSize(
       node_id: NodeID,

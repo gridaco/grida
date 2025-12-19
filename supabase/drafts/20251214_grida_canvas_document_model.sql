@@ -274,16 +274,14 @@ create table grida_canvas.canvas_node (
 
     -- layout: positioning basis (cartesian vs inset)
     layout_position_basis grida_canvas.position_basis not null default 'cartesian',
-    layout_x real null,
-    layout_y real null,
     layout_inset_left real null,
     layout_inset_right real null,
     layout_inset_top real null,
     layout_inset_bottom real null,
  
     -- layout: dimensions and constraints
-    layout_width real null,
-    layout_height real null,
+    layout_target_width real null,
+    layout_target_height real null,
     layout_min_width real null,
     layout_max_width real null,
     layout_min_height real null,

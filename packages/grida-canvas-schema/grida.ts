@@ -1718,6 +1718,27 @@ export namespace grida.program.nodes {
       style: S;
     }
 
+    export interface ILayoutTargetAspectRatio {
+      /**
+       * Preferred layout aspect ratio.
+       *
+       * Represents a proportional relationship between width and height
+       * expressed as a normalized integer ratio pair (e.g. `[16, 9]`, `[4, 3]`, `[1, 1]`).
+       *
+       * This property does not define geometry by itself. Instead, it provides
+       * a sizing preference that layout engines may consult when resolving
+       * under-specified dimensions (e.g. when either width or height is `auto`)
+       * or when proportional sizing is explicitly required by the layout model.
+       *
+       * When both width and height are definitively specified, this value
+       * has no effect and must not override explicit dimensions.
+       *
+       * This property may be ignored by layout engines that do not support
+       * aspect-ratio-aware sizing.
+       */
+      layout_target_aspect_ratio?: [number, number];
+    }
+
     /**
      * @deprecated
      */
@@ -1729,6 +1750,7 @@ export namespace grida.program.nodes {
         IZIndex,
         IPositioning,
         ICSSDimension,
+        ILayoutTargetAspectRatio,
         IFill<props.PropsPaintValue>,
         ICSSBorder {
       /**
@@ -2221,6 +2243,7 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.IPositioning,
       i.IFixedDimension,
+      i.ILayoutTargetAspectRatio,
       i.IBlend,
       i.IZIndex,
       i.IRotation,
@@ -2242,6 +2265,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
+      i.ILayoutTargetAspectRatio,
       i.IBlend,
       i.ILayerMaskType,
       i.IZIndex,
@@ -2275,6 +2299,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
+      i.ILayoutTargetAspectRatio,
       i.IBlend,
       i.ILayerMaskType,
       i.IZIndex,
@@ -2292,6 +2317,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
+      i.ILayoutTargetAspectRatio,
       i.IBlend,
       i.IZIndex,
       i.IRotation,
@@ -2309,6 +2335,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.IPositioning,
       i.IFixedDimension,
+      i.ILayoutTargetAspectRatio,
       i.IBlend,
       i.IZIndex,
       i.IRotation,
@@ -2352,6 +2379,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       i.IStroke,
       i.IFixedDimension,
+      i.ILayoutTargetAspectRatio,
       i.IBlend,
       i.ILayerMaskType,
       i.IZIndex,
@@ -2384,6 +2412,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
+      i.ILayoutTargetAspectRatio,
       i.IBlend,
       i.IZIndex,
       i.IRotation,
@@ -2422,6 +2451,7 @@ export namespace grida.program.nodes {
       i.IPositioning,
       // i.ICSSDimension,
       i.IFixedDimension,
+      i.ILayoutTargetAspectRatio,
       i.IEllipseArcData,
       i.IBlend,
       i.ILayerMaskType,

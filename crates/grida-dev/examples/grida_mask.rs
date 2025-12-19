@@ -158,8 +158,8 @@ async fn demo_mask_panels() -> Scene {
     let mut root = nf.create_container_node();
     let width = 1400.0;
     let height = 400.0;
-    root.layout_dimensions.width = Some(width);
-    root.layout_dimensions.height = Some(height);
+    root.layout_dimensions.layout_target_width = Some(width);
+    root.layout_dimensions.layout_target_height = Some(height);
     root.clip = false;
     root.set_fill(CGColor::WHITE.into());
 
@@ -184,8 +184,8 @@ async fn demo_mask_panels() -> Scene {
         let mut panel = nf.create_container_node();
         panel.position = CGPoint::new(left, top).into();
         panel.rotation = 0.0;
-        panel.layout_dimensions.width = Some(panel_w);
-        panel.layout_dimensions.height = Some(panel_h);
+        panel.layout_dimensions.layout_target_width = Some(panel_w);
+        panel.layout_dimensions.layout_target_height = Some(panel_h);
         panel.corner_radius = RectangularCornerRadius::circular(6.0);
         panel.set_fill(CGColor::from_rgba(245, 245, 245, 255).into());
 

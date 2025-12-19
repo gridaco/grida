@@ -753,6 +753,22 @@ pub struct JSONUnknownNodeProperties {
     )]
     pub height: CSSDimension,
 
+    #[serde(rename = "layout_min_width", alias = "minWidth", default)]
+    pub layout_min_width: Option<f32>,
+    #[serde(rename = "layout_max_width", alias = "maxWidth", default)]
+    pub layout_max_width: Option<f32>,
+    #[serde(rename = "layout_min_height", alias = "minHeight", default)]
+    pub layout_min_height: Option<f32>,
+    #[serde(rename = "layout_max_height", alias = "maxHeight", default)]
+    pub layout_max_height: Option<f32>,
+
+    /// Layout target aspect ratio constraint (w, h).
+    ///
+    /// This is stored in Grida documents as a JSON tuple/array like `[16, 9]`.
+    /// When present, it is mapped into `LayoutDimensionStyle.layout_target_aspect_ratio`.
+    #[serde(rename = "layout_target_aspect_ratio", alias = "aspectRatio")]
+    pub layout_target_aspect_ratio: Option<(f32, f32)>,
+
     #[serde(rename = "corner_radius", alias = "cornerRadius", default)]
     pub corner_radius: Option<JSONCornerRadius>,
     #[serde(
@@ -1349,12 +1365,13 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 },
             },
             layout_dimensions: LayoutDimensionStyle {
-                width,
-                height,
-                min_width: None,
-                max_width: None,
-                min_height: None,
-                max_height: None,
+                layout_target_width: width,
+                layout_target_height: height,
+                layout_min_width: node.base.layout_min_width,
+                layout_max_width: node.base.layout_max_width,
+                layout_min_height: node.base.layout_min_height,
+                layout_max_height: node.base.layout_max_height,
+                layout_target_aspect_ratio: node.base.layout_target_aspect_ratio,
             },
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node

@@ -37,6 +37,7 @@ export function AlignControl({
 }) {
   return (
     <div
+      data-testid="ext-align"
       className={cn("w-full flex items-center justify-center gap-1", className)}
     >
       <HorizontalItems disabled={disabled} onAlign={onAlign} />
@@ -49,7 +50,7 @@ export function AlignControl({
             onDistributeEvenly?.("x");
           }}
         >
-          <SpaceEvenlyHorizontallyIcon />
+          <SpaceEvenlyHorizontallyIcon className="size-2.5" />
         </Item>
         <Item
           disabled={disabled}
@@ -58,7 +59,7 @@ export function AlignControl({
             onDistributeEvenly?.("y");
           }}
         >
-          <SpaceEvenlyVerticallyIcon />
+          <SpaceEvenlyVerticallyIcon className="size-2.5" />
         </Item>
       </ActionGroup>
     </div>
@@ -83,7 +84,7 @@ function HorizontalItems({
           onAlign?.({ horizontal: "min" });
         }}
       >
-        <AlignLeftIcon />
+        <AlignLeftIcon className="size-2.5" />
       </Item>
       <Item
         disabled={disabled}
@@ -92,7 +93,7 @@ function HorizontalItems({
           onAlign?.({ horizontal: "center" });
         }}
       >
-        <AlignCenterHorizontallyIcon />
+        <AlignCenterHorizontallyIcon className="size-2.5" />
       </Item>
       <Item
         disabled={disabled}
@@ -101,7 +102,7 @@ function HorizontalItems({
           onAlign?.({ horizontal: "max" });
         }}
       >
-        <AlignRightIcon />
+        <AlignRightIcon className="size-2.5" />
       </Item>
     </ActionGroup>
   );
@@ -125,7 +126,7 @@ function VerticalItems({
           onAlign?.({ vertical: "min" });
         }}
       >
-        <AlignTopIcon />
+        <AlignTopIcon className="size-2.5" />
       </Item>
       <Item
         disabled={disabled}
@@ -134,7 +135,7 @@ function VerticalItems({
           onAlign?.({ vertical: "center" });
         }}
       >
-        <AlignCenterVerticallyIcon />
+        <AlignCenterVerticallyIcon className="size-2.5" />
       </Item>
       <Item
         disabled={disabled}
@@ -143,7 +144,7 @@ function VerticalItems({
           onAlign?.({ vertical: "max" });
         }}
       >
-        <AlignBottomIcon />
+        <AlignBottomIcon className="size-2.5" />
       </Item>
     </ActionGroup>
   );
@@ -170,7 +171,7 @@ function Item({
           {children}
         </ActionGroupItem>
       </TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
+      <TooltipContent collisionPadding={4}>{tooltip}</TooltipContent>
     </Tooltip>
   );
 }

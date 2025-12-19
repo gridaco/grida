@@ -57,8 +57,8 @@ fn container_world_bounds_include_children() {
     let mut graph = SceneGraph::new();
 
     let mut container = nf.create_container_node();
-    container.layout_dimensions.width = Some(100.0);
-    container.layout_dimensions.height = Some(100.0);
+    container.layout_dimensions.layout_target_width = Some(100.0);
+    container.layout_dimensions.layout_target_height = Some(100.0);
     let mut rect = nf.create_rectangle_node();
     rect.transform = AffineTransform::new(50.0, 50.0, 0.0);
     rect.size = Size {
