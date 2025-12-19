@@ -42,6 +42,7 @@ import { LineHeightControl } from "./controls/line-height";
 import { NameControl } from "./controls/name";
 import { UserDataControl } from "./controls/x-userdata";
 import { LengthPercentageControl } from "./controls/length-percentage";
+import { WidthHeightControl } from "./controls/width-height";
 import { LayoutControl } from "./controls/layout";
 import { MaxlengthControl } from "./controls/maxlength";
 import { BlendModeDropdown } from "./controls/blend-mode";
@@ -1658,27 +1659,36 @@ function SectionText({ node_id }: { node_id: string }) {
 }
 
 function SectionDimension({ node_id }: { node_id: string }) {
-  const { width, height } = useNodeState(node_id, (node) => ({
-    width: node.width,
-    height: node.height,
-  }));
+  const instance = useCurrentEditor();
+  const { width, height, layout_target_aspect_ratio } = useNodeState(
+    node_id,
+    (node) => ({
+      width: node.width,
+      height: node.height,
+      layout_target_aspect_ratio: (node as any).layout_target_aspect_ratio as
+        | [number, number]
+        | undefined,
+    })
+  );
 
   const actions = useNodeActions(node_id)!;
+  const locked = Boolean(layout_target_aspect_ratio);
 
   return (
-    <>
-      <PropertyLine>
-        <PropertyLineLabel>Width</PropertyLineLabel>
-        <LengthPercentageControl value={width} onValueCommit={actions.width} />
-      </PropertyLine>
-      <PropertyLine>
-        <PropertyLineLabel>Height</PropertyLineLabel>
-        <LengthPercentageControl
-          value={height}
-          onValueCommit={actions.height}
-        />
-      </PropertyLine>
-    </>
+    <WidthHeightControl
+      width={width}
+      height={height}
+      locked={locked}
+      onWidthChange={actions.width}
+      onHeightChange={actions.height}
+      onLockChange={(pressed) => {
+        if (pressed) {
+          instance.commands.lockAspectRatio(node_id);
+        } else {
+          instance.commands.unlockAspectRatio(node_id);
+        }
+      }}
+    />
   );
 }
 
