@@ -54,7 +54,7 @@ value 1,value 2
 
 ### 전화번호 형식(phone)
 
-전화번호를 E.164 형식으로 변환하려면 [Grida E.164 변환 도구](https://app.grida.co/tools/e164)를 이용하면 됩니다.
+전화번호를 E.164 형식으로 변환하려면 [Grida E.164 변환 도구](https://grida.co/tools/e164)를 이용하면 됩니다.
 
 ## 삽입(Inserting)
 

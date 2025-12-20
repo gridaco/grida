@@ -98,7 +98,7 @@ function WaitlistCard() {
 
           <div className="flex flex-col sm:flex-row gap-4">
             <a
-              href="https://app.grida.co/d/e/0f9dbc73-a7c6-494d-b233-6e992e9bf916"
+              href="https://grida.co/d/e/0f9dbc73-a7c6-494d-b233-6e992e9bf916"
               target="_blank"
               rel="noopener noreferrer"
             >

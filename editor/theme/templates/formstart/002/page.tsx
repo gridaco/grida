@@ -107,7 +107,7 @@ export default function _002() {
                           </>
                         )}
                       />
-                      <Link href="https://app.grida.co/d/e/8516e066-f620-416d-955c-1ec9b3e4dc75">
+                      <Link href="https://grida.co/d/e/8516e066-f620-416d-955c-1ec9b3e4dc75">
                         <Button
                           variant="outline"
                           className="border-foreground bg-transparent rounded-none"
