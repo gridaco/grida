@@ -119,6 +119,8 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 | Toggle italic       | `⌘ + I`     | `Ctrl + I`     | Toggle italic style       |
 | Toggle underline    | `⌘ + U`     | `Ctrl + U`     | Toggle underline style    |
 | Toggle line-through | `⌘ + ⇧ + X` | `Ctrl + ⇧ + X` | Toggle line-through style |
+| Increase font size  | `⌘ + ⇧ + >` | `Ctrl + ⇧ + >` | Increase font size by 1px |
+| Decrease font size  | `⌘ + ⇧ + <` | `Ctrl + ⇧ + <` | Decrease font size by 1px |
 
 ## Object Properties
 
@@ -177,4 +179,3 @@ The following shortcuts are defined but not yet implemented:
 - `⇧ + V` - Flip vertical
 - `⌥ + ⌘ + K` / `Alt + Ctrl + K` - Create component
 - `⌥ + ⌘ + B` / `Alt + Ctrl + B` - Eject component
-- `⌘ + ⇧ + <` / `Ctrl + ⇧ + <` (decrease), `⌘ + ⇧ + >` / `Ctrl + ⇧ + >` (increase) - Adjust font size

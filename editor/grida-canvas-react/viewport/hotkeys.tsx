@@ -83,6 +83,16 @@ export const keybindings_sheet = [
     keys: ["meta+shift+x"],
   },
   {
+    name: "increase font size",
+    description: "Increase font size for text",
+    keys: ["meta+shift+>", "ctrl+shift+>"],
+  },
+  {
+    name: "decrease font size",
+    description: "Decrease font size for text",
+    keys: ["meta+shift+<", "ctrl+shift+<"],
+  },
+  {
     name: "toggle active",
     description: "Toggle active state for the selection",
     keys: ["meta+shift+h"],
@@ -751,6 +761,39 @@ export function useEditorHotKeys() {
   useHotkeys("meta+shift+x, ctrl+shift+x", () => {
     editor.surface.a11yToggleLineThrough("selection");
   });
+
+  // Increase font size: ⌘+⇧+. (macOS) / Ctrl+⇧+. (Windows/Linux)
+  // Note: Period (.) with Shift produces > symbol. Using splitKey: "|" to combine
+  // macOS and Windows bindings in a single call (comma is the default separator).
+  useHotkeys(
+    "meta+shift+. | ctrl+shift+.",
+    () => {
+      editor.surface.a11yChangeFontSize("selection", 1);
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+      splitKey: "|",
+    }
+  );
+
+  // Decrease font size: ⌘+⇧+, (macOS) / Ctrl+⇧+, (Windows/Linux)
+  // Note: Comma (,) with Shift produces < symbol. Using splitKey: "|" because:
+  // 1. Comma is the default separator in react-hotkeys-hook, so we need pipe to separate key combinations
+  // 2. This allows comma to be used as part of the key name (meta+shift+,)
+  useHotkeys(
+    "meta+shift+, | ctrl+shift+,",
+    () => {
+      editor.surface.a11yChangeFontSize("selection", -1);
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+      splitKey: "|",
+    }
+  );
 
   useHotkeys("shift+r", () => {
     const v = editor.surface.surfaceToggleRuler();
