@@ -33,6 +33,23 @@ export const MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE = 100;
 export const MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE = 100;
 
 /**
+ * Minimum node size in UI space (pixels) required to display resize handles.
+ * When nodes are smaller than this threshold (zoomed out), resize handles are hidden
+ * to prioritize translate-drag region, making it easier to drag thin nodes like text.
+ *
+ * @remarks
+ * The value should theoretically be calculated as: `(knob_width * n) + (n - 1) * gap`
+ * where:
+ * - `knob_width` is the physical size of each resize knob
+ * - `n` is the number of knobs on a single axis (usually 2 for left/right or top/bottom, or 3 for left/center/right or top/center/bottom)
+ * - `gap` is the spacing between knobs
+ *
+ * This ensures handles don't collapse or conflict with each other before they disappear.
+ * Only consider a single axis (width or height) when calculating this value.
+ */
+export const MIN_NODE_OVERLAY_RESIZE_HANDLES_VISIBLE_UI_SIZE = 12;
+
+/**
  * Border width in pixels for the dropzone highlight indication.
  * This controls the visual thickness of the border shown when dragging nodes
  * to indicate the target dropzone where they will be placed.
