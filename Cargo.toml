@@ -8,3 +8,7 @@ members = [
   "crates/csscascade",
   "crates/math2", 
 ]
+
+# Reduce debug information for tests to lower memory usage during linking in CI
+[profile.test]
+debug = 1
