@@ -180,8 +180,6 @@ The tests require:
 - `fast-png` - For PNG encoding/decoding
 - `fast-xml-parser` - For XML parsing
 - `image-size` - For image dimension detection and type inference
-- `jest` - Test framework
-- `@types/jest` - Jest type definitions
 
 All dependencies are already included in the package.
 
