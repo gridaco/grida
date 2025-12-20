@@ -479,7 +479,9 @@ export function useEventTargetCSSCursor() {
       case "flood-fill":
         return "cell";
       case "lasso":
-        return "crosshair";
+        return cursors.lasso_png.css;
+      case "bend":
+        return cursors.bend_vertex_png.css;
     }
   }, [tool, istyping]);
 }

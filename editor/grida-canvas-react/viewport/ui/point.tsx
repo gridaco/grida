@@ -42,7 +42,6 @@ export const Point = React.forwardRef(
             top: point[1],
             width: hitSize,
             height: hitSize,
-            cursor: "pointer",
             outline: "none",
             touchAction: "none",
             transform: `translate(-50%, -50%)${styleTransform ? ` ${styleTransform}` : ""}`,
@@ -57,7 +56,7 @@ export const Point = React.forwardRef(
             "border border-workbench-accent-sky bg-background",
             shape === "circle" ? "rounded-full" : undefined,
             "data-[selected='true']:shadow-sm data-[selected='true']:bg-workbench-accent-sky data-[selected='true']:border-spacing-1.5 data-[selected='true']:border-background",
-            "data-[hovered='true']:border-workbench-accent-sky/50",
+            "data-[hovered='true']:border-workbench-accent-sky/25",
             className
           )}
           style={{

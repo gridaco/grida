@@ -476,7 +476,7 @@ function CurveControlExtension({
       <Point
         {...bind()}
         point={b}
-        style={{ cursor: "pointer", zIndex: 99 }}
+        style={{ zIndex: 99 }}
         selected={selected}
         shape="diamond"
         size={6}
@@ -644,6 +644,9 @@ function VertexPoint({
       selected={selected}
       hovered={hovered}
       point={point}
+      style={{
+        cursor: tool.type === "bend" ? "inherit" : undefined,
+      }}
     />
   );
 }
