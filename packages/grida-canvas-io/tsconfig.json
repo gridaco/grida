@@ -2,6 +2,7 @@
   "compilerOptions": {
     "noImplicitAny": true,
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "skipLibCheck": true
   }
 }

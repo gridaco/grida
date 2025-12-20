@@ -10,31 +10,6 @@ export const canvas_examples = [
     url: `/examples/canvas/helloworld.grida`,
   },
   {
-    id: "slides-01",
-    name: "Slide 01",
-    url: `/examples/canvas/slides-01.grida`,
-  },
-  {
-    id: "instagram-post-01",
-    name: "Instagram Post 01",
-    url: `/examples/canvas/instagram-post-01.grida`,
-  },
-  {
-    id: "poster-01",
-    name: "Poster 01",
-    url: `/examples/canvas/poster-01.grida`,
-  },
-  {
-    id: "resume-01",
-    name: "Resume 01",
-    url: `/examples/canvas/resume-01.grida`,
-  },
-  {
-    id: "event-page-01",
-    name: "Event Page 01",
-    url: `/examples/canvas/event-page-01.grida`,
-  },
-  {
     id: "component-01",
     name: "Component 01",
     url: `/examples/canvas/component-01.grida`,

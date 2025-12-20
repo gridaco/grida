@@ -272,7 +272,6 @@ const safe_properties: Partial<
   }),
   fill: defineNodeProperty<"fill">({
     assert: (node) =>
-      node.type === "svgpath" ||
       node.type === "vector" ||
       node.type === "image" ||
       node.type === "rectangle" ||
@@ -314,26 +313,30 @@ const safe_properties: Partial<
       (draft as UN).corner_radius = value;
     },
   }),
-  rectangular_corner_radius_top_left: defineNodeProperty<"rectangular_corner_radius_top_left">({
-    apply: (draft, value, prev) => {
-      (draft as UN).rectangular_corner_radius_top_left = value;
-    },
-  }),
-  rectangular_corner_radius_top_right: defineNodeProperty<"rectangular_corner_radius_top_right">({
-    apply: (draft, value, prev) => {
-      (draft as UN).rectangular_corner_radius_top_right = value;
-    },
-  }),
-  rectangular_corner_radius_bottom_right: defineNodeProperty<"rectangular_corner_radius_bottom_right">({
-    apply: (draft, value, prev) => {
-      (draft as UN).rectangular_corner_radius_bottom_right = value;
-    },
-  }),
-  rectangular_corner_radius_bottom_left: defineNodeProperty<"rectangular_corner_radius_bottom_left">({
-    apply: (draft, value, prev) => {
-      (draft as UN).rectangular_corner_radius_bottom_left = value;
-    },
-  }),
+  rectangular_corner_radius_top_left:
+    defineNodeProperty<"rectangular_corner_radius_top_left">({
+      apply: (draft, value, prev) => {
+        (draft as UN).rectangular_corner_radius_top_left = value;
+      },
+    }),
+  rectangular_corner_radius_top_right:
+    defineNodeProperty<"rectangular_corner_radius_top_right">({
+      apply: (draft, value, prev) => {
+        (draft as UN).rectangular_corner_radius_top_right = value;
+      },
+    }),
+  rectangular_corner_radius_bottom_right:
+    defineNodeProperty<"rectangular_corner_radius_bottom_right">({
+      apply: (draft, value, prev) => {
+        (draft as UN).rectangular_corner_radius_bottom_right = value;
+      },
+    }),
+  rectangular_corner_radius_bottom_left:
+    defineNodeProperty<"rectangular_corner_radius_bottom_left">({
+      apply: (draft, value, prev) => {
+        (draft as UN).rectangular_corner_radius_bottom_left = value;
+      },
+    }),
   corner_smoothing: defineNodeProperty<"corner_smoothing">({
     apply: (draft, value, prev) => {
       (draft as UN).corner_smoothing = cmath.clamp(value, 0, 1);
@@ -423,46 +426,50 @@ const safe_properties: Partial<
       );
     },
   }),
-  rectangular_stroke_width_top: defineNodeProperty<"rectangular_stroke_width_top">({
-    assert: (node) => node.type === "rectangle",
-    apply: (draft, value, prev) => {
-      (draft as UN).rectangular_stroke_width_top = ranged(
-        0,
-        value,
-        editor.config.DEFAULT_MAX_STROKE_WIDTH
-      );
-    },
-  }),
-  rectangular_stroke_width_right: defineNodeProperty<"rectangular_stroke_width_right">({
-    assert: (node) => node.type === "rectangle",
-    apply: (draft, value, prev) => {
-      (draft as UN).rectangular_stroke_width_right = ranged(
-        0,
-        value,
-        editor.config.DEFAULT_MAX_STROKE_WIDTH
-      );
-    },
-  }),
-  rectangular_stroke_width_bottom: defineNodeProperty<"rectangular_stroke_width_bottom">({
-    assert: (node) => node.type === "rectangle",
-    apply: (draft, value, prev) => {
-      (draft as UN).rectangular_stroke_width_bottom = ranged(
-        0,
-        value,
-        editor.config.DEFAULT_MAX_STROKE_WIDTH
-      );
-    },
-  }),
-  rectangular_stroke_width_left: defineNodeProperty<"rectangular_stroke_width_left">({
-    assert: (node) => node.type === "rectangle",
-    apply: (draft, value, prev) => {
-      (draft as UN).rectangular_stroke_width_left = ranged(
-        0,
-        value,
-        editor.config.DEFAULT_MAX_STROKE_WIDTH
-      );
-    },
-  }),
+  rectangular_stroke_width_top:
+    defineNodeProperty<"rectangular_stroke_width_top">({
+      assert: (node) => node.type === "rectangle",
+      apply: (draft, value, prev) => {
+        (draft as UN).rectangular_stroke_width_top = ranged(
+          0,
+          value,
+          editor.config.DEFAULT_MAX_STROKE_WIDTH
+        );
+      },
+    }),
+  rectangular_stroke_width_right:
+    defineNodeProperty<"rectangular_stroke_width_right">({
+      assert: (node) => node.type === "rectangle",
+      apply: (draft, value, prev) => {
+        (draft as UN).rectangular_stroke_width_right = ranged(
+          0,
+          value,
+          editor.config.DEFAULT_MAX_STROKE_WIDTH
+        );
+      },
+    }),
+  rectangular_stroke_width_bottom:
+    defineNodeProperty<"rectangular_stroke_width_bottom">({
+      assert: (node) => node.type === "rectangle",
+      apply: (draft, value, prev) => {
+        (draft as UN).rectangular_stroke_width_bottom = ranged(
+          0,
+          value,
+          editor.config.DEFAULT_MAX_STROKE_WIDTH
+        );
+      },
+    }),
+  rectangular_stroke_width_left:
+    defineNodeProperty<"rectangular_stroke_width_left">({
+      assert: (node) => node.type === "rectangle",
+      apply: (draft, value, prev) => {
+        (draft as UN).rectangular_stroke_width_left = ranged(
+          0,
+          value,
+          editor.config.DEFAULT_MAX_STROKE_WIDTH
+        );
+      },
+    }),
   stroke_align: defineNodeProperty<"stroke_align">({
     assert: (node) =>
       node.type === "vector" ||
@@ -497,7 +504,6 @@ const safe_properties: Partial<
       node.type === "ellipse" ||
       node.type === "polygon" ||
       node.type === "star" ||
-      node.type === "svgpath" ||
       node.type === "image" ||
       node.type === "container" ||
       node.type === "boolean",
@@ -649,10 +655,28 @@ const safe_properties: Partial<
       (draft as UN).fit = value;
     },
   }),
-  padding: defineNodeProperty<"padding">({
+  padding_top: defineNodeProperty<"padding_top">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding = value;
+      (draft as UN).padding_top = value;
+    },
+  }),
+  padding_right: defineNodeProperty<"padding_right">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      (draft as UN).padding_right = value;
+    },
+  }),
+  padding_bottom: defineNodeProperty<"padding_bottom">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      (draft as UN).padding_bottom = value;
+    },
+  }),
+  padding_left: defineNodeProperty<"padding_left">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      (draft as UN).padding_left = value;
     },
   }),
   layout: defineNodeProperty<"layout">({

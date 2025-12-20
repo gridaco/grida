@@ -3228,7 +3228,7 @@ export namespace editor.api {
 
     changeContainerNodePadding(
       node_id: NodeID,
-      padding: grida.program.nodes.i.IPadding["padding"]
+      padding: grida.program.nodes.i.IPadding
     ): void;
     changeContainerNodeLayout(
       node_id: NodeID,

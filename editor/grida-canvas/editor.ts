@@ -2231,12 +2231,12 @@ class EditorDocumentStore
   //
   changeContainerNodePadding(
     node_id: string,
-    padding: grida.program.nodes.i.IPadding["padding"]
+    padding: grida.program.nodes.i.IPadding
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      padding,
+      ...padding,
     });
   }
 
@@ -2651,7 +2651,7 @@ export class Editor
 
   public archive(): Blob {
     const documentData = {
-      version: "0.0.4-beta+20251209",
+      version: "0.89.0-beta+20251219",
       document: this.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -2813,7 +2813,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.0.4-beta+20251209",
+          version: "0.89.0-beta+20251219",
           document: payloadDocument,
         });
         surface.loadScene(p);

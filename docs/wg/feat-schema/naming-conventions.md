@@ -4,9 +4,9 @@ title: Grida document schema naming conventions
 
 # `.grida` Naming Conventions
 
-| feature id                    | status | description                                                | PRs                                                                                                  |
-| ----------------------------- | ------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `.grida (naming conventions)` | draft  | Naming conventions internals for the `.grida` file format. | [#456](https://github.com/gridaco/grida/pull/456), [#462](https://github.com/gridaco/grida/pull/462) |
+| feature id                    | status | description                                                | PRs                                                                                                                                                     |
+| ----------------------------- | ------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.grida (naming conventions)` | draft  | Naming conventions internals for the `.grida` file format. | [#456](https://github.com/gridaco/grida/pull/456), [#462](https://github.com/gridaco/grida/pull/462), [#474](https://github.com/gridaco/grida/pull/474) |
 
 ## Purpose
 
@@ -93,6 +93,9 @@ line_height
 
 ```
 padding_top
+padding_right
+padding_bottom
+padding_left
 main_axis_alignment
 cross_axis_gap
 ```

@@ -1443,7 +1443,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               cross_axis_gap: cmath.quantize(layout.spacing, 1),
               main_axis_alignment: layout.mainAxisAlignment,
               cross_axis_alignment: layout.crossAxisAlignment,
-              padding: children.length === 1 ? 16 : 0,
+              padding_top: children.length === 1 ? 16 : 0,
+              padding_right: children.length === 1 ? 16 : 0,
+              padding_bottom: children.length === 1 ? 16 : 0,
+              padding_left: children.length === 1 ? 16 : 0,
               // children (empty when init)
               children: [],
               // position

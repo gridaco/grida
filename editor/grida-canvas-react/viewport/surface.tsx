@@ -892,9 +892,15 @@ function SingleSelectionOverlay({
   const { node, distribution, rotation, boundingSurfaceRect, size, object } =
     data;
 
-  // Get padding if this is a container
   const padding =
-    node.type === "container" && "padding" in node ? node.padding : undefined;
+    node.type === "container" || node.type === "component"
+      ? {
+          padding_top: node.padding_top ?? 0,
+          padding_right: node.padding_right ?? 0,
+          padding_bottom: node.padding_bottom ?? 0,
+          padding_left: node.padding_left ?? 0,
+        }
+      : undefined;
 
   // Calculate measurement rect for visibility checks
   const rect_ui_width = size[0] * scaleX;
@@ -934,21 +940,12 @@ function SingleSelectionOverlay({
                     <PaddingOverlay
                       offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
                       containerRect={object.boundingRect}
-                      padding={
-                        typeof padding === "number"
-                          ? {
-                              top: padding,
-                              right: padding,
-                              bottom: padding,
-                              left: padding,
-                            }
-                          : {
-                              top: padding.padding_top,
-                              right: padding.padding_right,
-                              bottom: padding.padding_bottom,
-                              left: padding.padding_left,
-                            }
-                      }
+                      padding={{
+                        top: padding.padding_top ?? 0,
+                        right: padding.padding_right ?? 0,
+                        bottom: padding.padding_bottom ?? 0,
+                        left: padding.padding_left ?? 0,
+                      }}
                       onPaddingGestureStart={(side) => {
                         editor.surface.surfaceStartPaddingGesture(
                           node_id,

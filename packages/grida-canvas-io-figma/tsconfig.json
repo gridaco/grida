@@ -6,6 +6,7 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "noImplicitAny": true,
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "skipLibCheck": true
   }
 }

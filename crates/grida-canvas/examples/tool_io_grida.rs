@@ -9,12 +9,6 @@
 //! cargo run --example tool_io_grida <path-to-grida-file>
 //! ```
 //!
-//! ## Example
-//!
-//! ```bash
-//! cargo run --example tool_io_grida ../../editor/public/examples/canvas/instagram-post-01.grida
-//! ```
-//!
 //! ## Output
 //!
 //! On success, the tool prints:
@@ -61,7 +55,6 @@ fn main() {
                     let type_name = match node {
                         cg::io::io_grida::JSONNode::Group(_) => "group",
                         cg::io::io_grida::JSONNode::Container(_) => "container",
-                        cg::io::io_grida::JSONNode::Path(_) => "svgpath",
                         cg::io::io_grida::JSONNode::Vector(_) => "vector",
                         cg::io::io_grida::JSONNode::Ellipse(_) => "ellipse",
                         cg::io::io_grida::JSONNode::Rectangle(_) => "rectangle",

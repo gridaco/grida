@@ -530,7 +530,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.0.4-beta+20251209";
+  export const SCHEMA_VERSION = "0.89.0-beta+20251219";
 
   /**
    * Simple Node Selector
@@ -1112,7 +1112,6 @@ export namespace grida.program.nodes {
     | HTMLIFrameNode
     | HTMLRichTextNode
     | BitmapNode
-    | SVGPathNode
     | VectorNode
     | LineNode
     | RectangleNode
@@ -1131,7 +1130,6 @@ export namespace grida.program.nodes {
     | ComputedContainerNode
     | ComputedHTMLIFrameNode
     | ComputedHTMLRichTextNode
-    | ComputedSVGPathNode
     | ComputedVectorNode
     | ComputedLineNode
     | ComputedRectangleNode
@@ -1151,7 +1149,6 @@ export namespace grida.program.nodes {
       Partial<ComputedContainerNode> &
       Partial<ComputedHTMLIFrameNode> &
       Partial<ComputedHTMLRichTextNode> &
-      Partial<ComputedSVGPathNode> &
       Partial<ComputedVectorNode> &
       Partial<ComputedLineNode> &
       Partial<ComputedRectangleNode> &
@@ -1178,7 +1175,6 @@ export namespace grida.program.nodes {
       Partial<ContainerNode> &
       Partial<HTMLIFrameNode> &
       Partial<HTMLRichTextNode> &
-      Partial<SVGPathNode> &
       Partial<VectorNode> &
       Partial<LineNode> &
       Partial<RectangleNode> &
@@ -1261,7 +1257,6 @@ export namespace grida.program.nodes {
         Omit<Partial<HTMLRichTextNode>, __base_scene_node_properties>
       >
     | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<SVGPathNode>, __base_scene_node_properties>>
     | PathNodePrototype
     | LineNodePrototype
     | RectangleNodePrototype
@@ -1484,17 +1479,31 @@ export namespace grida.program.nodes {
     }
 
     /**
-     * padding
+     * padding - flat properties (no shorthand)
+     *
+     * All properties default to 0 when not specified.
      */
     export interface IPadding {
-      padding:
-        | number
-        | {
-            padding_top: number;
-            padding_right: number;
-            padding_bottom: number;
-            padding_left: number;
-          };
+      /**
+       * Padding on the top edge.
+       * @default 0
+       */
+      padding_top: number;
+      /**
+       * Padding on the right edge.
+       * @default 0
+       */
+      padding_right: number;
+      /**
+       * Padding on the bottom edge.
+       * @default 0
+       */
+      padding_bottom: number;
+      /**
+       * Padding on the left edge.
+       * @default 0
+       */
+      padding_left: number;
     }
 
     /**
@@ -2195,7 +2204,7 @@ export namespace grida.program.nodes {
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IRectangularStrokeWidth,
-      i.IPadding,
+      Partial<i.IPadding>,
       i.IFlexContainer {
     readonly type: "container";
     //
@@ -2253,44 +2262,6 @@ export namespace grida.program.nodes {
   }
 
   export type ComputedBitmapNode = BitmapNode;
-
-  /**
-   * @deprecated - not ready - do not use in production
-   */
-  export interface SVGPathNode
-    extends i.IBaseNode,
-      i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IPositioning,
-      // i.ICSSDimension,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.ILayerMaskType,
-      i.IZIndex,
-      i.IRotation,
-      i.IFill<cg.Paint> {
-    type: "svgpath";
-
-    /**
-     * @deprecated - use vectorNetwork instead
-     */
-    paths: (cg.Path & {
-      /**
-       * specifies which property to use to fill the path
-       * this is to support compatibility with figma rest api, where it returns a vector stroke as a path individually
-       *
-       * @default "fill"
-       */
-      fill: "fill" | "stroke";
-    })[];
-  }
-
-  /**
-   * @deprecated - not ready - do not use in production
-   */
-  export type ComputedSVGPathNode = SVGPathNode;
 
   export interface RegularPolygonNode
     extends i.IBaseNode,
@@ -2481,7 +2452,7 @@ export namespace grida.program.nodes {
       i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
-      i.IPadding,
+      Partial<i.IPadding>,
       i.IFlexContainer,
       i.IProperties {
     readonly type: "component";
@@ -2642,7 +2613,6 @@ export namespace grida.program.nodes {
         case "richtext":
         case "text":
         case "vector":
-        case "svgpath":
         case "polygon":
         case "star":
         case "video": {
@@ -2822,7 +2792,10 @@ export namespace grida.program.nodes {
         main_axis_gap: 0,
         cross_axis_alignment: "start",
         cross_axis_gap: 0,
-        padding: 0,
+        padding_top: 0,
+        padding_right: 0,
+        padding_bottom: 0,
+        padding_left: 0,
         width: 100,
         height: 100,
         corner_radius: 0,
