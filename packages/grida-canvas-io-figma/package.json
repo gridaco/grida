@@ -3,8 +3,8 @@
   "description": "Figma I/O for Grida Canvas",
   "private": true,
   "scripts": {
-    "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@grida/cmath": "workspace:*",
