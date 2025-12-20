@@ -21,6 +21,7 @@ import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useValueSeekedSelector } from "@/hooks/use-value-seeked-selector";
 import { useAutoFocusSelect } from "@/hooks/use-auto-focus-select";
+import { useGridaFontsSearch } from "@/hooks/use-grida-fonts-search";
 import { cn } from "@/components/lib/utils";
 import { TMixed } from "./utils/types";
 import grida from "@grida/schema";
@@ -87,6 +88,7 @@ function FontFamilyCommand({
   height,
   fonts,
   usedFonts,
+  popularFonts,
   placeholder,
   selectedFontFamily,
   onSelectFontFamily,
@@ -95,6 +97,7 @@ function FontFamilyCommand({
   height: string | number;
   fonts: GoogleWebFontListItem[];
   usedFonts: string[];
+  popularFonts?: string[];
   placeholder: string;
   selectedFontFamily: string;
   onSelectFontFamily?: (fontFamily: string) => void;
@@ -116,37 +119,47 @@ function FontFamilyCommand({
   });
 
   const [category, setCategory] = React.useState<
-    "all-fonts" | "with-axes" | "non-variable" | "used-in-document"
+    "all-fonts" | "popular" | "with-axes" | "non-variable" | "used-in-document"
   >("all-fonts");
 
-  const categoryFilteredFontFamilies = React.useMemo(() => {
-    switch (category) {
-      case "with-axes":
-        return fonts
-          .filter((f) => f.axes && f.axes.length > 0)
-          .map((f) => f.family);
-      case "non-variable":
-        return fonts
-          .filter((f) => !f.axes || f.axes.length === 0)
-          .map((f) => f.family);
-      case "used-in-document":
-        return fonts
-          .filter((f) => usedFonts.includes(f.family))
-          .map((f) => f.family);
-      case "all-fonts":
-      default:
-        return fonts.map((f) => f.family);
-    }
-  }, [fonts, usedFonts, category]);
+  const availableFontSet = React.useMemo(
+    () => new Set(fonts.map((f) => f.family)),
+    [fonts]
+  );
 
   const filteredFontFamilies = React.useMemo(() => {
-    const searchQuery = query?.toLowerCase() || "";
-    return searchQuery
-      ? categoryFilteredFontFamilies.filter((fontFamily) =>
-          fontFamily.toLowerCase().includes(searchQuery)
-        )
-      : categoryFilteredFontFamilies;
-  }, [categoryFilteredFontFamilies, query]);
+    let result: string[];
+
+    switch (category) {
+      case "popular":
+        result = (popularFonts || []).filter((name) =>
+          availableFontSet.has(name)
+        );
+        break;
+      case "with-axes":
+        result = fonts
+          .filter((f) => f.axes && f.axes.length > 0)
+          .map((f) => f.family);
+        break;
+      case "non-variable":
+        result = fonts
+          .filter((f) => !f.axes || f.axes.length === 0)
+          .map((f) => f.family);
+        break;
+      case "used-in-document":
+        result = fonts
+          .filter((f) => usedFonts.includes(f.family))
+          .map((f) => f.family);
+        break;
+      case "all-fonts":
+      default:
+        result = fonts.map((f) => f.family);
+    }
+
+    if (!query) return result;
+    const q = query.toLowerCase();
+    return result.filter((f) => f.toLowerCase().includes(q));
+  }, [fonts, usedFonts, category, popularFonts, availableFontSet, query]);
 
   const parentRef = React.useRef<HTMLDivElement>(null);
   const { sync } = useValueSeekedSelector(parentRef, onValueSeeked, "selected");
@@ -194,6 +207,7 @@ function FontFamilyCommand({
             <NativeSelectOption value="all-fonts">
               All fonts ({fonts.length})
             </NativeSelectOption>
+            <NativeSelectOption value="popular">Popular</NativeSelectOption>
             <NativeSelectOption value="with-axes">
               Variable fonts (
               {fonts.filter((f) => f.axes && f.axes.length > 0).length})
@@ -244,6 +258,7 @@ function FontFamilyCommand({
                     height: `${virtualItem.size}px`,
                     transform: `translateY(${virtualItem.start}px)`,
                   }}
+                  title={fontFamily}
                   key={fontFamily}
                   value={fontFamily}
                   onSelect={onSelectFontFamily}
@@ -276,6 +291,14 @@ export function FontFamilyControl({
   const usedFonts = useCanvasEditorState(editor, (state) =>
     state.fontfaces.map((f) => f.family)
   );
+  const { fonts: popularFontsData } = useGridaFontsSearch({
+    sort: "popular",
+    limit: 100,
+  });
+  const popularFonts = React.useMemo(
+    () => popularFontsData.map((f) => f.family),
+    [popularFontsData]
+  );
   const mixed = value === grida.mixed;
   const [open, setOpen] = React.useState<boolean>(false);
 
@@ -297,11 +320,17 @@ export function FontFamilyControl({
           <CaretSortIcon className="ml-2 size-4 shrink-0 text-muted-foreground opacity-50" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="p-0" side="right" align="start">
+      <PopoverContent
+        className="p-0"
+        side="right"
+        align="start"
+        collisionPadding={8}
+      >
         <FontFamilyCommand
           height="400px"
           fonts={list}
           usedFonts={usedFonts}
+          popularFonts={popularFonts}
           placeholder="Font"
           selectedFontFamily={mixed ? "" : value || ""}
           onValueSeeked={onValueSeeked}

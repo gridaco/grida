@@ -15,17 +15,19 @@ Original Author: Grida
 
 ## Cursors
 
-| name                | size | hotspot (image) | fill     | png                                                                                  | svg                                                                                  |
-| ------------------- | ---: | --------------: | -------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `default`           | `64` |       `x28 y28` | `000000` | [`default-64-x28y28-000000.png`](./default-64-x28y28-000000.png)                     | [`default-64-x28y28-000000.svg`](./default-64-x28y28-000000.svg)                     |
-| `ew-resize`         | `64` |       `x32 y32` | `000000` | [`ew-resize-64-x32y32-000000.png`](./ew-resize-64-x32y32-000000.png)                 | [`ew-resize-64-x32y32-000000.svg`](./ew-resize-64-x32y32-000000.svg)                 |
-| `ew-resize-scale`   | `64` |       `x32 y32` | `000000` | [`ew-resize-scale-64-x32y32-000000.png`](./ew-resize-scale-64-x32y32-000000.png)     | [`ew-resize-scale-64-x32y32-000000.svg`](./ew-resize-scale-64-x32y32-000000.svg)     |
-| `ns-resize`         | `64` |       `x32 y32` | `000000` | [`ns-resize-64-x32y32-000000.png`](./ns-resize-64-x32y32-000000.png)                 | [`ns-resize-64-x32y32-000000.svg`](./ns-resize-64-x32y32-000000.svg)                 |
-| `ns-resize-scale`   | `64` |       `x32 y32` | `000000` | [`ns-resize-scale-64-x32y32-000000.png`](./ns-resize-scale-64-x32y32-000000.png)     | [`ns-resize-scale-64-x32y32-000000.svg`](./ns-resize-scale-64-x32y32-000000.svg)     |
-| `nesw-resize`       | `64` |       `x32 y32` | `000000` | [`nesw-resize-64-x32y32-000000.png`](./nesw-resize-64-x32y32-000000.png)             | [`nesw-resize-64-x32y32-000000.svg`](./nesw-resize-64-x32y32-000000.svg)             |
-| `nesw-resize-scale` | `64` |       `x32 y32` | `000000` | [`nesw-resize-scale-64-x32y32-000000.png`](./nesw-resize-scale-64-x32y32-000000.png) | [`nesw-resize-scale-64-x32y32-000000.svg`](./nesw-resize-scale-64-x32y32-000000.svg) |
-| `nwse-resize`       | `64` |       `x32 y32` | `000000` | [`nwse-resize-64-x32y32-000000.png`](./nwse-resize-64-x32y32-000000.png)             | [`nwse-resize-64-x32y32-000000.svg`](./nwse-resize-64-x32y32-000000.svg)             |
-| `nwse-resize-scale` | `64` |       `x32 y32` | `000000` | [`nwse-resize-scale-64-x32y32-000000.png`](./nwse-resize-scale-64-x32y32-000000.png) | [`nwse-resize-scale-64-x32y32-000000.svg`](./nwse-resize-scale-64-x32y32-000000.svg) |
+| name                     | size | hotspot (image) | fill     | png                                                                      | svg                                                                                            |
+| ------------------------ | ---: | --------------: | -------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `default`                | `64` |       `x28 y28` | `000000` | ![default](./default-64-x28y28-000000.png)                               | [`default-64-x28y28-000000.svg`](./default-64-x28y28-000000.svg)                               |
+| `lasso`                  | `64` |       `x12 y12` | `000000` | ![lasso](./lasso-64-x12y12-000000.png)                                   | [`lasso-64-x12y12-000000.svg`](./lasso-64-x12y12-000000.svg)                                   |
+| `bend-vertex-mirror-all` | `64` |       `x12 y12` | `000000` | ![bend-vertex-mirror-all](./bend-vertex-mirror-all-64-x12y12-000000.png) | [`bend-vertex-mirror-all-64-x12y12-000000.svg`](./bend-vertex-mirror-all-64-x12y12-000000.svg) |
+| `ew-resize`              | `64` |       `x32 y32` | `000000` | ![ew-resize](./ew-resize-64-x32y32-000000.png)                           | [`ew-resize-64-x32y32-000000.svg`](./ew-resize-64-x32y32-000000.svg)                           |
+| `ew-resize-scale`        | `64` |       `x32 y32` | `000000` | ![ew-resize-scale](./ew-resize-scale-64-x32y32-000000.png)               | [`ew-resize-scale-64-x32y32-000000.svg`](./ew-resize-scale-64-x32y32-000000.svg)               |
+| `ns-resize`              | `64` |       `x32 y32` | `000000` | ![ns-resize](./ns-resize-64-x32y32-000000.png)                           | [`ns-resize-64-x32y32-000000.svg`](./ns-resize-64-x32y32-000000.svg)                           |
+| `ns-resize-scale`        | `64` |       `x32 y32` | `000000` | ![ns-resize-scale](./ns-resize-scale-64-x32y32-000000.png)               | [`ns-resize-scale-64-x32y32-000000.svg`](./ns-resize-scale-64-x32y32-000000.svg)               |
+| `nesw-resize`            | `64` |       `x32 y32` | `000000` | ![nesw-resize](./nesw-resize-64-x32y32-000000.png)                       | [`nesw-resize-64-x32y32-000000.svg`](./nesw-resize-64-x32y32-000000.svg)                       |
+| `nesw-resize-scale`      | `64` |       `x32 y32` | `000000` | ![nesw-resize-scale](./nesw-resize-scale-64-x32y32-000000.png)           | [`nesw-resize-scale-64-x32y32-000000.svg`](./nesw-resize-scale-64-x32y32-000000.svg)           |
+| `nwse-resize`            | `64` |       `x32 y32` | `000000` | ![nwse-resize](./nwse-resize-64-x32y32-000000.png)                       | [`nwse-resize-64-x32y32-000000.svg`](./nwse-resize-64-x32y32-000000.svg)                       |
+| `nwse-resize-scale`      | `64` |       `x32 y32` | `000000` | ![nwse-resize-scale](./nwse-resize-scale-64-x32y32-000000.png)           | [`nwse-resize-scale-64-x32y32-000000.svg`](./nwse-resize-scale-64-x32y32-000000.svg)           |
 
 ## Usage
 

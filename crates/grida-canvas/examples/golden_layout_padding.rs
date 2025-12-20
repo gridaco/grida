@@ -115,7 +115,7 @@ fn compute_layout_with_production_pipeline(
         background_color: None,
     };
     let mut layout_engine = LayoutEngine::new();
-    let layout_result = layout_engine.compute(&scene, viewport_size);
+    let layout_result = layout_engine.compute(&scene, viewport_size, None);
 
     // Extract layouts
     let children_ids = scene.graph.get_children(&icb_id).unwrap();

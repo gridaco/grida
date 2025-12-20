@@ -1,6 +1,6 @@
 use cg::cg::prelude::*;
 use cg::shape::*;
-use skia_safe::{Path, PathBuilder};
+use skia_safe::PathBuilder;
 
 #[test]
 fn dashed_stroke_has_more_segments() {

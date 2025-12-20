@@ -705,7 +705,12 @@ impl UnknownTargetApplication {
     }
 
     fn get_hit_tester(&mut self) -> crate::hittest::HitTester<'_> {
-        crate::hittest::HitTester::new(self.renderer.get_cache())
+        // Pass the scene graph if available to enable culling checks
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+        } else {
+            crate::hittest::HitTester::new(self.renderer.get_cache())
+        }
     }
 
     fn verbose(&self, msg: &str) {

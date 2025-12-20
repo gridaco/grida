@@ -413,6 +413,7 @@ export function IconsBrowser({ onInsert, onDragStart }: IconsBrowserProps) {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
+        <hr />
         <div className="w-full space-y-1 pb-2">
           {vendors.length > 0 && (
             <PillsList>

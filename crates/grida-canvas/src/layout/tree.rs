@@ -1,6 +1,34 @@
+use crate::cache::paragraph::ParagraphCache;
+use crate::cg::types::{TextAlign, TextStyleRec};
 use crate::node::schema::NodeId;
+use crate::runtime::font_repository::FontRepository;
 use std::collections::HashMap;
 use taffy::prelude::*;
+
+/// Context stored for nodes that require custom measurement.
+#[derive(Clone)]
+pub(crate) enum LayoutNodeContext {
+    Text(TextMeasureContext),
+}
+
+/// Measurement inputs for text nodes.
+#[derive(Clone)]
+pub(crate) struct TextMeasureContext {
+    pub scene_node_id: NodeId,
+    pub text: String,
+    pub text_style: TextStyleRec,
+    pub text_align: TextAlign,
+    pub max_lines: Option<usize>,
+    pub ellipsis: Option<String>,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+}
+
+/// Shared provider to measure text using the same paragraph cache + fonts as geometry.
+pub struct TextMeasureProvider<'a> {
+    pub paragraph_cache: &'a mut ParagraphCache,
+    pub fonts: &'a FontRepository,
+}
 
 /// Integration layer between SceneGraph and TaffyTree
 ///
@@ -8,7 +36,7 @@ use taffy::prelude::*;
 /// flex layout computation while preserving scene graph structure.
 pub(crate) struct LayoutTree {
     /// Taffy tree for layout computation
-    taffy: TaffyTree,
+    taffy: TaffyTree<LayoutNodeContext>,
     /// Map from our SceneGraph NodeId to Taffy's NodeId
     scene_to_taffy: HashMap<NodeId, taffy::NodeId>,
     /// Reverse map from Taffy NodeId to SceneGraph NodeId
@@ -47,6 +75,28 @@ impl LayoutTree {
         Ok(taffy_id)
     }
 
+    /// Create a text leaf node with measurement context.
+    pub(crate) fn new_text_leaf(
+        &mut self,
+        scene_node_id: NodeId,
+        style: Style,
+        context: TextMeasureContext,
+    ) -> Result<taffy::NodeId, taffy::TaffyError> {
+        let taffy_id = self
+            .taffy
+            .new_leaf_with_context(style, LayoutNodeContext::Text(context))?;
+
+        if let Some(old_taffy_id) = self.scene_to_taffy.insert(scene_node_id, taffy_id) {
+            self.taffy_to_scene.remove(&old_taffy_id);
+        }
+
+        if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
+            self.scene_to_taffy.remove(&old_scene_id);
+        }
+
+        Ok(taffy_id)
+    }
+
     /// Create a container node with children
     ///
     /// Maps the scene node ID to a taffy node ID and returns it
@@ -76,8 +126,51 @@ impl LayoutTree {
         &mut self,
         root: taffy::NodeId,
         available_space: Size<AvailableSpace>,
+        measure_provider: Option<&mut TextMeasureProvider<'_>>,
     ) -> Result<(), taffy::TaffyError> {
-        self.taffy.compute_layout(root, available_space)
+        if let Some(provider) = measure_provider {
+            let provider = provider;
+            self.taffy.compute_layout_with_measure(
+                root,
+                available_space,
+                move |known_dimensions, available_space, _node_id, node_context, _style| {
+                    if let Some(LayoutNodeContext::Text(ctx)) = node_context {
+                        // For text:
+                        // - If Taffy already resolved a definite width for this node, honor it.
+                        // - Else if the node schema has an explicit width, use it.
+                        // - Otherwise keep width unconstrained (measure to intrinsic).
+                        let width_constraint = known_dimensions.width.or(ctx.width);
+
+                        let measurements = provider.paragraph_cache.measure(
+                            &ctx.text,
+                            &ctx.text_style,
+                            &ctx.text_align,
+                            &ctx.max_lines,
+                            &ctx.ellipsis,
+                            width_constraint,
+                            provider.fonts,
+                            Some(&ctx.scene_node_id),
+                        );
+
+                        let width = width_constraint.unwrap_or(measurements.max_width);
+                        let measured_height = ctx.height.unwrap_or(measurements.height);
+                        let height = known_dimensions.height.unwrap_or(measured_height);
+
+                        Size {
+                            width: width.max(1.0),
+                            height: height.max(1.0),
+                        }
+                    } else {
+                        Size {
+                            width: known_dimensions.width.unwrap_or(0.0),
+                            height: known_dimensions.height.unwrap_or(0.0),
+                        }
+                    }
+                },
+            )
+        } else {
+            self.taffy.compute_layout(root, available_space)
+        }
     }
 
     /// Get computed layout for a scene node
@@ -123,13 +216,13 @@ impl LayoutTree {
     ///
     /// Use this when you need to perform operations not wrapped by LayoutTree
     #[allow(dead_code)]
-    pub(crate) fn taffy(&self) -> &TaffyTree {
+    pub(crate) fn taffy(&self) -> &TaffyTree<LayoutNodeContext> {
         &self.taffy
     }
 
     /// Mutable access to the underlying taffy tree
     #[allow(dead_code)]
-    pub(crate) fn taffy_mut(&mut self) -> &mut TaffyTree {
+    pub(crate) fn taffy_mut(&mut self) -> &mut TaffyTree<LayoutNodeContext> {
         &mut self.taffy
     }
 }
@@ -199,6 +292,7 @@ mod tests {
                 width: AvailableSpace::Definite(200.0),
                 height: AvailableSpace::Definite(100.0),
             },
+            None,
         )
         .unwrap();
 
@@ -239,6 +333,7 @@ mod tests {
                 width: AvailableSpace::Definite(1000.0),
                 height: AvailableSpace::Definite(1000.0),
             },
+            None,
         )
         .unwrap();
 

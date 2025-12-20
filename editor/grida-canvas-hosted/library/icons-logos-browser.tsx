@@ -252,6 +252,7 @@ export function LogosBrowser({
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
+        <hr />
         <div className="w-full pb-2">
           <div className="px-2 flex items-center gap-4">
             <div className="flex items-center gap-2">

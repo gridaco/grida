@@ -1,6 +1,6 @@
 use cg::cg::types::{StrokeAlign, StrokeCap, StrokeJoin, StrokeMiterLimit};
 use cg::shape::stroke::stroke_geometry;
-use skia_safe::{Path, PathBuilder};
+use skia_safe::PathBuilder;
 
 #[test]
 fn open_path_uses_center_alignment_for_inside_outside() {

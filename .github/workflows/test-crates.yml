@@ -54,4 +54,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run cargo tests
+        env:
+          CARGO_BUILD_JOBS: 2
         run: cargo test --workspace

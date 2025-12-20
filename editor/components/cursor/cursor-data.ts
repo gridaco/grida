@@ -42,6 +42,19 @@ export namespace cursors {
     css: pngsetcss(_default_png_url, 28, 28),
   };
 
+  const _lasso_png_url = "/assets/css-cursors-grida/lasso-64-x12y12-000000.png";
+  export const lasso_png = {
+    url: _lasso_png_url,
+    css: pngsetcss(_lasso_png_url, 12, 12),
+  };
+
+  const _bend_vertex_mirror_all_png_url =
+    "/assets/css-cursors-grida/bend-vertex-mirror-all-64-x12y12-000000.png";
+  export const bend_vertex_png = {
+    url: _bend_vertex_mirror_all_png_url,
+    css: pngsetcss(_bend_vertex_mirror_all_png_url, 12, 12),
+  };
+
   const _ew_resize_png_url =
     "/assets/css-cursors-grida/ew-resize-64-x32y32-000000.png";
   const _ns_resize_png_url =
