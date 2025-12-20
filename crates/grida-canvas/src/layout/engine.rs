@@ -44,7 +44,7 @@
 //! - Missing layout results indicate a bug in the layout engine
 
 use crate::layout::cache::LayoutResult;
-use crate::layout::tree::LayoutTree;
+use crate::layout::tree::{LayoutTree, TextMeasureContext, TextMeasureProvider};
 use crate::layout::ComputedLayout;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::{Node, NodeId, NodeRectMixin, Size};
@@ -77,6 +77,7 @@ impl LayoutEngine {
         &mut self,
         scene: &crate::node::schema::Scene,
         viewport_size: Size,
+        mut text_measure: Option<TextMeasureProvider<'_>>,
     ) -> &LayoutResult {
         // Clear previous state
         self.tree.clear();
@@ -95,6 +96,7 @@ impl LayoutEngine {
                         width: AvailableSpace::Definite(viewport_size.width),
                         height: AvailableSpace::Definite(viewport_size.height),
                     },
+                    text_measure.as_mut(),
                 );
 
                 // Extract all computed layouts
@@ -270,7 +272,22 @@ impl LayoutEngine {
         }
 
         // Leaf node
-        self.tree.new_leaf(*node_id, style).ok()
+        match node {
+            Node::TextSpan(n) => {
+                let ctx = TextMeasureContext {
+                    scene_node_id: *node_id,
+                    text: n.text.clone(),
+                    text_style: n.text_style.clone(),
+                    text_align: n.text_align.clone(),
+                    max_lines: n.max_lines.clone(),
+                    ellipsis: n.ellipsis.clone(),
+                    width: n.width,
+                    height: n.height,
+                };
+                self.tree.new_text_leaf(*node_id, style, ctx).ok()
+            }
+            _ => self.tree.new_leaf(*node_id, style).ok(),
+        }
     }
 
     /// Recursively extract all computed layouts from the Taffy tree
@@ -385,6 +402,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify all nodes get layout results
@@ -441,6 +459,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify layout works without ICB
@@ -486,6 +505,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify rectangle gets layout result with its dimensions
@@ -547,6 +567,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify nested layout computation
@@ -599,6 +620,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify ICB fills viewport and lays out children
@@ -654,6 +676,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify text participates in layout
@@ -695,6 +718,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify each root is laid out independently
@@ -735,6 +759,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify it still gets layout result
@@ -809,6 +834,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // With flex_shrink: 0.0, children should NOT shrink
@@ -876,6 +902,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Get layouts
@@ -939,6 +966,7 @@ mod tests {
                 width: 1200.0,
                 height: 1200.0,
             },
+            None,
         );
 
         // Get layout
@@ -1019,6 +1047,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify all children get layout results (Taffy computes absolute positioned ones too)
@@ -1072,6 +1101,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         let layout = result
@@ -1119,6 +1149,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Root node MUST get layout result, even if marked absolute
@@ -1211,6 +1242,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify all children get layout results (Taffy handles both relative and absolute)
@@ -1290,6 +1322,7 @@ mod tests {
                 width: 800.0,
                 height: 600.0,
             },
+            None,
         );
 
         // Verify: Layout results have corrected positions
@@ -1358,6 +1391,7 @@ mod tests {
                 width: 1000.0,
                 height: 1000.0,
             },
+            None,
         );
 
         // Verify position is correct
@@ -1425,6 +1459,7 @@ mod tests {
                 width: 1000.0,
                 height: 1000.0,
             },
+            None,
         );
 
         // Verify position is correct

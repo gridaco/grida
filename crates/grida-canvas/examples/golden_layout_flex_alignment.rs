@@ -133,6 +133,7 @@ fn main() {
                 width: 600.0,
                 height: 120.0,
             },
+            None,
         );
 
         let children_ids = scene.graph.get_children(&icb_id).unwrap();
@@ -199,6 +200,7 @@ fn main() {
                 width: 600.0,
                 height: 150.0,
             },
+            None,
         );
 
         let children_ids = scene.graph.get_children(&icb_id).unwrap();

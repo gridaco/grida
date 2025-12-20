@@ -139,6 +139,7 @@ fn main() {
                 width: 800.0,
                 height: 200.0,
             },
+            None,
         );
 
         // Extract layouts in order
@@ -198,6 +199,7 @@ fn main() {
                 width: 400.0,
                 height: 300.0,
             },
+            None,
         );
 
         let children_ids = scene.graph.get_children(&icb_id).unwrap();
@@ -256,6 +258,7 @@ fn main() {
                 width: 250.0,
                 height: 700.0,
             },
+            None,
         );
 
         let children_ids = scene.graph.get_children(&icb_id).unwrap();
@@ -323,6 +326,7 @@ fn main() {
                 width: 500.0,
                 height: 300.0,
             },
+            None,
         );
 
         let children_ids = scene.graph.get_children(&icb_id).unwrap();

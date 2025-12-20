@@ -386,7 +386,17 @@ impl Renderer {
             let viewport_size = self.window_context.viewport_size;
 
             // 1. Compute layout phase
-            self.layout_engine.compute(scene, viewport_size);
+            {
+                let mut paragraph_cache = self.scene_cache.paragraph.borrow_mut();
+                self.layout_engine.compute(
+                    scene,
+                    viewport_size,
+                    Some(crate::layout::tree::TextMeasureProvider {
+                        paragraph_cache: &mut paragraph_cache,
+                        fonts: &self.fonts,
+                    }),
+                );
+            }
 
             // 2. Build geometry with layout results
             let layout_result = self.layout_engine.result();
@@ -445,7 +455,17 @@ impl Renderer {
             let viewport_size = self.window_context.viewport_size;
 
             // 1. Recompute layout
-            self.layout_engine.compute(scene, viewport_size);
+            {
+                let mut paragraph_cache = self.scene_cache.paragraph.borrow_mut();
+                self.layout_engine.compute(
+                    scene,
+                    viewport_size,
+                    Some(crate::layout::tree::TextMeasureProvider {
+                        paragraph_cache: &mut paragraph_cache,
+                        fonts: &self.fonts,
+                    }),
+                );
+            }
 
             // 2. Rebuild geometry with layout results
             let layout_result = self.layout_engine.result();

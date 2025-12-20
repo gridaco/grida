@@ -375,41 +375,52 @@ impl GeometryCache {
                 union_world_bounds
             }
             Node::TextSpan(n) => {
-                // Get final measured metrics from cache
+                // Resolve layout position/size (if available) and measure text consistently with layout width
+                let layout = layout_result.and_then(|r| r.get(id));
+                let width_for_measure = layout.map(|l| l.width).or(n.width);
+
                 let measurements = paragraph_cache.measure(
                     &n.text,
                     &n.text_style,
                     &n.text_align,
                     &n.max_lines,
                     &n.ellipsis,
-                    n.width,
+                    width_for_measure,
                     fonts,
                     Some(id),
                 );
 
-                // Create intrinsic bounds (starting at origin, like other nodes)
-                /// TODO: Remove this hack to support 0 value visibility
                 const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
-                let intrinsic_bounds = Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: measurements.max_width.max(MIN_SIZE_DIRTY_HACK),
-                    height: n
-                        .height
-                        .unwrap_or(measurements.height)
-                        .max(MIN_SIZE_DIRTY_HACK),
+                let width = layout
+                    .map(|l| l.width)
+                    .unwrap_or_else(|| measurements.max_width)
+                    .max(MIN_SIZE_DIRTY_HACK);
+                let height = layout
+                    .map(|l| l.height)
+                    .unwrap_or_else(|| n.height.unwrap_or(measurements.height))
+                    .max(MIN_SIZE_DIRTY_HACK);
+
+                let (x, y) = if let Some(l) = layout {
+                    (l.x, l.y)
+                } else {
+                    (n.transform.x(), n.transform.y())
                 };
 
-                // Use the node's transform directly (which already includes positioning)
-                let local_transform = n.transform;
+                let local_transform = AffineTransform::new(x, y, n.transform.rotation());
+                let local_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width,
+                    height,
+                };
                 let world_transform = parent_world.compose(&local_transform);
-                let world_bounds = transform_rect(&intrinsic_bounds, &world_transform);
+                let world_bounds = transform_rect(&local_bounds, &world_transform);
                 let render_bounds = compute_render_bounds(node, world_bounds);
 
                 let entry = GeometryEntry {
                     transform: local_transform,
                     absolute_transform: world_transform,
-                    bounding_box: intrinsic_bounds,
+                    bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
                     absolute_render_bounds: render_bounds,
                     parent: parent_id.clone(),
@@ -418,7 +429,7 @@ impl GeometryCache {
                 };
                 cache.entries.insert(id.clone(), entry.clone());
 
-                intrinsic_bounds
+                local_bounds
             }
             _ => {
                 // Leaf nodes - check layout result first, fallback to schema transform
