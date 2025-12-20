@@ -63,9 +63,11 @@ const config: Config = {
     image: "img/social-card.png",
     navbar: {
       logo: {
-        alt: "Grida",
-        src: "img/logo.svg",
-        srcDark: "img/logo-on-dark.svg",
+        alt: "Grida Logo",
+        src: "img/navbar-logo.svg",
+        srcDark: "img/navbar-logo-dark.svg",
+        href: "https://grida.co/",
+        target: "_self",
       },
       items: [
         {
