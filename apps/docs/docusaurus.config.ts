@@ -144,6 +144,12 @@ const config: Config = {
           trackingID: "G-T0S919XJ07",
           anonymizeIP: true,
         },
+        sitemap: {
+          changefreq: "weekly",
+          priority: 0.5,
+          lastmod: "date",
+          ignorePatterns: ["/tags/**"],
+        },
       },
     ],
   ],
