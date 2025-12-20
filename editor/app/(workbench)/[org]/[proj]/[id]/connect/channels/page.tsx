@@ -151,7 +151,7 @@ export default function ConnectChannels() {
                     at: "Just now",
                     from: {
                       name: "Grida Forms",
-                      email: "notifications@app.grida.co",
+                      email: "notifications@grida.co",
                       avatar: "GR",
                     },
                     title: "Your Ticket is Ready",
@@ -210,7 +210,7 @@ export default function ConnectChannels() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="default">
-                        notifications@app.grida.co
+                        notifications@grida.co
                       </SelectItem>
                     </SelectContent>
                   </Select>

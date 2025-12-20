@@ -10,9 +10,9 @@
     <strong>Grida is a open source Canvas platform where you can manage your database, design websites, and create forms in one place. <u>Designed for Supabase</u>.</strong>
   </p>
   <p>
-    <a href="https://app.grida.co/downloads">Downloads</a> •
+    <a href="https://grida.co/downloads">Downloads</a> •
     <a href="./CONTRIBUTING.md">Contributing</a> •
-    <a href="https://app.grida.co">Website</a> •
+    <a href="https://grida.co">Website</a> •
     <a href="https://grida.co/join-slack">Slack Community</a>
   </p>
 </div>
@@ -90,7 +90,7 @@
 
 > (Technical Preview)
 
-[Technical Demo](https://app.grida.co/canvas) • [Canary](https://canary.grida.co/canvas)
+[Technical Demo](https://grida.co/canvas)
 
 - [x] Infinite Canvas
 - [x] Standard Library

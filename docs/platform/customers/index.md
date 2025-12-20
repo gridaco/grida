@@ -34,7 +34,7 @@ For example,
 ### `phone`
 
 `phone` is a phone number of the customer in E.164 format. If you don't know how to format the phone number properly, you can use the
-[Grida E.164 tool](https://app.grida.co/tools/e164) to format the phone number.
+[Grida E.164 tool](https://grida.co/tools/e164) to format the phone number.
 
 ### `tags`
 

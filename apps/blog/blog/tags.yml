@@ -17,3 +17,23 @@ ux:
   label: UX
   permalink: /ux
   description: Designing professional grade editor User Experience
+
+font:
+  label: Font
+  permalink: /font
+  description: Font rendering and typography in Grida
+
+italic:
+  label: Italic
+  permalink: /italic
+  description: Italic font handling and selection
+
+typography:
+  label: Typography
+  permalink: /typography
+  description: Typography and text rendering
+
+opentype:
+  label: OpenType
+  permalink: /opentype
+  description: OpenType font format and metadata

@@ -11,9 +11,11 @@ hide_table_of_contents: false
 In this article, we will demonstrate how snapping works on Grida Canvas. Snapping the elements on the Grida canvas
 gives you consistency in spacing between elements.
 
+<!-- truncate -->
+
 # Snapping horizontally
 
-To see the horizontal snapping in action, visit https://app.grida.co/canvas and follow the steps below
+To see the horizontal snapping in action, visit https://grida.co/canvas and follow the steps below
 
 1. Create a rectangle
 
@@ -35,7 +37,7 @@ I said "almost" here because internally we use a metric called threshold, that d
 
 # Snapping vertically
 
-To see the vetical snapping in action, visit https://app.grida.co/canvas and follow the steps below
+To see the vetical snapping in action, visit https://grida.co/canvas and follow the steps below
 
 1. Create a rectangle as shown below, this rectangle should be horizontal as we stack more rectangle in the next steps
    to demonstrate the vertical snapping.
