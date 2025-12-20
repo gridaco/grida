@@ -4440,6 +4440,22 @@ export class EditorSurface
     }
   }
 
+  public a11yChangeFontSize(
+    target: "selection" | editor.NodeID = "selection",
+    delta: number
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeFontSize(node_id, {
+          type: "delta",
+          value: delta,
+        });
+      }
+    }
+  }
+
   // ==============================================================
   // #endregion a11y actions
   // ==============================================================

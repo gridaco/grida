@@ -23,6 +23,8 @@ This document lists all implemented features including the ones that are not yet
 | toggle bold             | toggle bold style                       | `meta+b`                   | `ctrl+b`                | canvas |
 | toggle italic           | toggle italic style                     | `meta+i`                   | `ctrl+i`                | canvas |
 | toggle underline        | toggle underline style                  | `meta+u`                   | `ctrl+u`                | canvas |
+| increase font size      | increase font size for text             | `meta+shift+>`             | `ctrl+shift+>`          | canvas |
+| decrease font size      | decrease font size for text             | `meta+shift+<`             | `ctrl+shift+<`          | canvas |
 | toggle active           | toggle active state for the selection   | `meta+shift+h`             | `ctrl+shift+h`          | canvas |
 | toggle locked           | toggle locked state for the selection   | `meta+shift+l`             | `ctrl+shift+l`          | canvas |
 | select parent           | select the parent of the current node   | `shift+enter`              | `shift+enter`           | canvas |

@@ -3406,6 +3406,28 @@ export namespace editor.api {
     a11yToggleLineThrough(target: "selection" | NodeID): void;
     // //
     a11ySetOpacity(target: "selection" | NodeID, opacity: number): void;
+    /**
+     * Change font size for text nodes.
+     *
+     * Applies a delta change to the font size of text nodes in the selection.
+     * Only affects nodes with type "text". Positive delta increases font size,
+     * negative delta decreases it.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param delta - The amount to change the font size by (in pixels). Positive values increase, negative values decrease.
+     *
+     * @example
+     * ```ts
+     * // Increase font size by 1px for selected text nodes
+     * editor.surface.a11yChangeFontSize("selection", 1);
+     *
+     * // Decrease font size by 2px for a specific node
+     * editor.surface.a11yChangeFontSize("node-id-123", -2);
+     * ```
+     *
+     * Bind this to `⌘ + ⇧ + >` (increase) and `⌘ + ⇧ + <` (decrease) keys.
+     */
+    a11yChangeFontSize(target: "selection" | NodeID, delta: number): void;
   }
 
   /**
