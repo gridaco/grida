@@ -181,7 +181,7 @@ export function ScaleToolSection({
         <SidebarSectionHeaderActions>
           <Button
             variant="ghost"
-            size="xs"
+            size="icon"
             onClick={() => editor.surface.surfaceSetTool({ type: "cursor" })}
           >
             <Cross2Icon className="size-3" />

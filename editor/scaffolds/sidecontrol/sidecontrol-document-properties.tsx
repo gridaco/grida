@@ -168,7 +168,7 @@ function PropertyDefinitionBlock({
           <SidebarSectionHeaderActions className="gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs" className="size-4 p-0">
+                <Button variant="ghost" size="icon" className="size-4 p-0">
                   <GearIcon />
                 </Button>
               </DropdownMenuTrigger>
@@ -188,7 +188,7 @@ function PropertyDefinitionBlock({
             </DropdownMenu>
             <Button
               variant="ghost"
-              size="xs"
+              size="icon"
               className="size-4 p-0"
               onClick={(e) => {
                 e.stopPropagation();

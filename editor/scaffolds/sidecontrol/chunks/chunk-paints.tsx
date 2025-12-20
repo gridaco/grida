@@ -389,7 +389,7 @@ export function ChunkPaints({
         <SidebarSectionHeaderLabel>{title}</SidebarSectionHeaderLabel>
         {isCanvasBackend && (
           <SidebarSectionHeaderActions>
-            <Button variant="ghost" size="xs">
+            <Button variant="ghost" size="icon">
               <PlusIcon className="size-3" />
             </Button>
           </SidebarSectionHeaderActions>
