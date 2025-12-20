@@ -6,7 +6,7 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 
 - **Prefix**: `d[n]` is a simple counter (`d1`, `d2`, `d3`, ...).
 - **Schema version specifier**: we encode the schema version **build metadata date** as `yyyymmdd`.
-  - Example: schema version `0.89.0-beta+20251219` → version specifier `20251209`
+  - Example: schema version `0.89.0-beta+20251219` → version specifier `20251219`
   - **Note**: this `yyyymmdd` is **not** the authoring date of the file.
 
 ### Support expectations (important)
