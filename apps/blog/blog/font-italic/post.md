@@ -14,6 +14,8 @@ hide_table_of_contents: false
 
 _That little **Italic** toggle in your design tool is doing far more than leaning letters to the right. In a professional renderer, italic is a **font discovery and selection problem**—and it’s messy in ways most people never see._
 
+<!-- truncate -->
+
 Clicking **Italic** is a request for a specific typographic design: a distinct face (often with different letterforms, spacing, and metrics), ideally authored by the type designer. To honor that request, a design tool has to navigate:
 
 - families shipped as one file vs many files
