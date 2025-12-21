@@ -5,6 +5,13 @@ on:
     branches:
       - main
   pull_request:
+    paths:
+      - ".github/workflows/*"
+      - "crates/*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -52,6 +59,8 @@ jobs:
 
       - name: Cache cargo build outputs
         uses: Swatinem/rust-cache@v2
+        with:
+          key: test
 
       - name: Run cargo tests
         env:
