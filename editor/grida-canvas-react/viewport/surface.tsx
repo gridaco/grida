@@ -75,6 +75,7 @@ import {
   MIN_NODE_OVERLAY_GAP_VISIBLE_UI_SIZE,
   MIN_NODE_OVERLAY_PADDING_VISIBLE_UI_SIZE,
   MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE,
+  MIN_NODE_OVERLAY_RESIZE_HANDLES_VISIBLE_UI_SIZE,
   DROPZONE_BORDER_WIDTH,
 } from "../ui-config";
 import {
@@ -1046,6 +1047,13 @@ function SelectionGroupOverlay({
   const nsweZIndex = show_side_handles_as_important ? 22 : 11;
   const diagonalZIndex = 21;
 
+  // Calculate viewport size for resize handle visibility
+  const rect_ui_width = size[0] * scaleX;
+  const rect_ui_height = size[1] * scaleY;
+  const show_resize_handles =
+    rect_ui_width >= MIN_NODE_OVERLAY_RESIZE_HANDLES_VISIBLE_UI_SIZE &&
+    rect_ui_height >= MIN_NODE_OVERLAY_RESIZE_HANDLES_VISIBLE_UI_SIZE;
+
   return (
     <>
       <LayerOverlay
@@ -1054,94 +1062,66 @@ function SelectionGroupOverlay({
         transform={style}
         zIndex={10}
       >
-        <LayerOverlayResizeSide
-          anchor="n"
-          zIndex={nsweZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "n");
-          }}
-        />
-        <LayerOverlayResizeSide
-          anchor="s"
-          zIndex={nsweZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "s");
-          }}
-        />
-        <LayerOverlayResizeSide
-          anchor="e"
-          zIndex={nsweZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "e");
-          }}
-        />
-        <LayerOverlayResizeSide
-          anchor="w"
-          zIndex={nsweZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "w");
-          }}
-        />
-        <LayerOverlayResizeHandle
-          anchor="n"
-          zIndex={nsweZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "n");
-          }}
-          disabled={true}
-        />
-        <LayerOverlayResizeHandle
-          anchor="s"
-          zIndex={nsweZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "s");
-          }}
-          disabled={true}
-        />
-        <LayerOverlayResizeHandle
-          anchor="e"
-          zIndex={nsweZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "e");
-          }}
-          disabled={true}
-        />
-        <LayerOverlayResizeHandle
-          anchor="w"
-          zIndex={nsweZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "w");
-          }}
-          disabled={true}
-        />
-        <LayerOverlayResizeHandle
-          anchor="nw"
-          zIndex={diagonalZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "nw");
-          }}
-        />
-        <LayerOverlayResizeHandle
-          anchor="ne"
-          zIndex={diagonalZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "ne");
-          }}
-        />
-        <LayerOverlayResizeHandle
-          anchor="sw"
-          zIndex={diagonalZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "sw");
-          }}
-        />
-        <LayerOverlayResizeHandle
-          anchor="se"
-          zIndex={diagonalZIndex}
-          onDragStart={() => {
-            editor.surface.surfaceStartScaleGesture(ids, "se");
-          }}
-        />
+        {show_resize_handles && (
+          <>
+            <LayerOverlayResizeSide
+              anchor="n"
+              zIndex={nsweZIndex}
+              onDragStart={() => {
+                editor.surface.surfaceStartScaleGesture(ids, "n");
+              }}
+            />
+            <LayerOverlayResizeSide
+              anchor="s"
+              zIndex={nsweZIndex}
+              onDragStart={() => {
+                editor.surface.surfaceStartScaleGesture(ids, "s");
+              }}
+            />
+            <LayerOverlayResizeSide
+              anchor="e"
+              zIndex={nsweZIndex}
+              onDragStart={() => {
+                editor.surface.surfaceStartScaleGesture(ids, "e");
+              }}
+            />
+            <LayerOverlayResizeSide
+              anchor="w"
+              zIndex={nsweZIndex}
+              onDragStart={() => {
+                editor.surface.surfaceStartScaleGesture(ids, "w");
+              }}
+            />
+            <LayerOverlayResizeHandle
+              anchor="nw"
+              zIndex={diagonalZIndex}
+              onDragStart={() => {
+                editor.surface.surfaceStartScaleGesture(ids, "nw");
+              }}
+            />
+            <LayerOverlayResizeHandle
+              anchor="ne"
+              zIndex={diagonalZIndex}
+              onDragStart={() => {
+                editor.surface.surfaceStartScaleGesture(ids, "ne");
+              }}
+            />
+            <LayerOverlayResizeHandle
+              anchor="sw"
+              zIndex={diagonalZIndex}
+              onDragStart={() => {
+                editor.surface.surfaceStartScaleGesture(ids, "sw");
+              }}
+            />
+            <LayerOverlayResizeHandle
+              anchor="se"
+              zIndex={diagonalZIndex}
+              onDragStart={() => {
+                editor.surface.surfaceStartScaleGesture(ids, "se");
+              }}
+            />
+          </>
+        )}
         {/*  */}
         <DistributeButton
           axis={preferredDistributeEvenlyActionAxis}
@@ -1244,6 +1224,10 @@ function NodeOverlay({
     rect_ui_width >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE &&
     rect_ui_height >= MIN_NODE_OVERLAY_CORNER_RADIUS_VISIBLE_UI_SIZE;
 
+  const show_resize_handles =
+    rect_ui_width >= MIN_NODE_OVERLAY_RESIZE_HANDLES_VISIBLE_UI_SIZE &&
+    rect_ui_height >= MIN_NODE_OVERLAY_RESIZE_HANDLES_VISIBLE_UI_SIZE;
+
   const show_aspect_ratio_guide =
     gesture.type === "scale" &&
     gesture.selection.includes(node_id) &&
@@ -1303,7 +1287,7 @@ function NodeOverlay({
       >
         {focused && !readonly && (
           <>
-            {is_resizable_node && (
+            {is_resizable_node && show_resize_handles && (
               <>
                 {node.type === "line" ? (
                   <>
@@ -1322,22 +1306,6 @@ function NodeOverlay({
                         editor.surface.surfaceStartScaleGesture(node_id, "w");
                       }}
                       onDoubleClick={handleSideDoubleClickHorizontal}
-                    />
-                    <LayerOverlayResizeHandle
-                      anchor="e"
-                      zIndex={nsweZIndex}
-                      onDragStart={() => {
-                        editor.surface.surfaceStartScaleGesture(node_id, "e");
-                      }}
-                      disabled={true}
-                    />
-                    <LayerOverlayResizeHandle
-                      anchor="w"
-                      zIndex={nsweZIndex}
-                      onDragStart={() => {
-                        editor.surface.surfaceStartScaleGesture(node_id, "w");
-                      }}
-                      disabled={true}
                     />
                   </>
                 ) : (
@@ -1373,38 +1341,6 @@ function NodeOverlay({
                         editor.surface.surfaceStartScaleGesture(node_id, "w");
                       }}
                       onDoubleClick={handleSideDoubleClickHorizontal}
-                    />
-                    <LayerOverlayResizeHandle
-                      anchor="n"
-                      zIndex={nsweZIndex}
-                      onDragStart={() => {
-                        editor.surface.surfaceStartScaleGesture(node_id, "n");
-                      }}
-                      disabled={true}
-                    />
-                    <LayerOverlayResizeHandle
-                      anchor="s"
-                      zIndex={nsweZIndex}
-                      onDragStart={() => {
-                        editor.surface.surfaceStartScaleGesture(node_id, "s");
-                      }}
-                      disabled={true}
-                    />
-                    <LayerOverlayResizeHandle
-                      anchor="e"
-                      zIndex={nsweZIndex}
-                      onDragStart={() => {
-                        editor.surface.surfaceStartScaleGesture(node_id, "e");
-                      }}
-                      disabled={true}
-                    />
-                    <LayerOverlayResizeHandle
-                      anchor="w"
-                      zIndex={nsweZIndex}
-                      onDragStart={() => {
-                        editor.surface.surfaceStartScaleGesture(node_id, "w");
-                      }}
-                      disabled={true}
                     />
                     <LayerOverlayResizeHandle
                       anchor="nw"

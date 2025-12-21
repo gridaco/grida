@@ -5,6 +5,7 @@
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
+    "dev": "docusaurus start",
     "build": "docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "@docusaurus/core": "3.7.0",
+    "@docusaurus/plugin-sitemap": "3.7.0",
     "@docusaurus/preset-classic": "3.7.0",
     "@docusaurus/theme-mermaid": "3.7.0",
     "@mdx-js/react": "^3.1.0",

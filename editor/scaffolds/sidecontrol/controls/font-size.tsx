@@ -20,7 +20,7 @@ export function FontSizeControl({
   onValueCommit?: (change: editor.api.NumberChange) => void;
 }) {
   return (
-    <div className="relative">
+    <div className="relative flex-1">
       <InputPropertyNumber
         mode="auto"
         type="integer"

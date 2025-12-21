@@ -1529,7 +1529,7 @@ function SectionText({ node_id }: { node_id: string }) {
           <SidebarSectionHeaderActions>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs">
+                <Button variant="ghost" size="icon">
                   <MixerVerticalIcon />
                 </Button>
               </DropdownMenuTrigger>
@@ -1841,7 +1841,7 @@ function SectionEffects({ node_id }: { node_id: string }) {
       <SidebarSectionHeaderItem onClick={onAddEffect}>
         <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
         <SidebarSectionHeaderActions>
-          <Button variant="ghost" size="xs">
+          <Button variant="ghost" size="icon">
             <PlusIcon className="size-3" />
           </Button>
         </SidebarSectionHeaderActions>

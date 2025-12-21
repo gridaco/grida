@@ -8,10 +8,61 @@ import {
   CornerBottomRightIcon,
   CornerBottomLeftIcon,
   CornersIcon,
+  ChevronDownIcon,
 } from "@radix-ui/react-icons";
 import grida from "@grida/schema";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/components/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui-editor/select";
+import * as SelectPrimitive from "@radix-ui/react-select";
+
+/**
+ * Tailwind CSS border-radius preset values (uniform shorthands only).
+ *
+ * @see https://tailwindcss.com/docs/border-radius
+ */
+const twradius = {
+  "rounded-none": {
+    "border-radius": 0,
+    name: "none",
+  },
+  "rounded-xs": {
+    "border-radius": 2,
+    name: "xs",
+  },
+  "rounded-sm": {
+    "border-radius": 4,
+    name: "sm",
+  },
+  "rounded-md": {
+    "border-radius": 6,
+    name: "md",
+  },
+  "rounded-lg": {
+    "border-radius": 8,
+    name: "lg",
+  },
+  "rounded-xl": {
+    "border-radius": 12,
+    name: "xl",
+  },
+  "rounded-2xl": {
+    "border-radius": 16,
+    name: "2xl",
+  },
+  "rounded-3xl": {
+    "border-radius": 24,
+    name: "3xl",
+  },
+  "rounded-4xl": {
+    "border-radius": 32,
+    name: "4xl",
+  },
+} as const;
 
 function isUniform(value: grida.program.nodes.i.IRectangularCornerRadius) {
   const _tl = value.rectangular_corner_radius_top_left;
@@ -109,22 +160,65 @@ export function CornerRadius4Control({
     onValueCommit?.(newCorners as cg.CornerRadius4);
   };
 
+  const hasPreset = useMemo(() => {
+    if (mode !== "all" || uniformValue === undefined) return false;
+    return Object.values(twradius).some(
+      (preset) => preset["border-radius"] === uniformValue
+    );
+  }, [mode, uniformValue]);
+
   return (
     <div className="flex flex-col gap-2">
       {/* First Row: Uniform Input + Toggle Button */}
       <div className="flex items-center gap-2">
-        <InputPropertyNumber
-          mode="fixed"
-          disabled={disabled}
-          type="number"
-          value={mode === "all" ? uniformValue : undefined}
-          placeholder={placeholder}
-          min={0}
-          step={1}
-          className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "flex-1")}
-          onValueCommit={handleUniformChange}
-          aria-label="Corner radius all corners"
-        />
+        <div className="relative flex-1">
+          <InputPropertyNumber
+            mode="fixed"
+            disabled={disabled}
+            type="number"
+            value={mode === "all" ? uniformValue : undefined}
+            placeholder={placeholder}
+            min={0}
+            step={1}
+            className={cn(
+              WorkbenchUI.inputVariants({ size: "xs" }),
+              "overflow-hidden",
+              "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            )}
+            onValueCommit={handleUniformChange}
+            aria-label="Corner radius all corners"
+          />
+          {mode === "all" && (
+            <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
+              <Select
+                value={hasPreset ? String(uniformValue) : undefined}
+                onValueChange={(_v) => {
+                  const value = parseInt(_v);
+                  handleUniformChange(value);
+                }}
+              >
+                <SelectPrimitive.SelectTrigger asChild>
+                  <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-1 opacity-50">
+                    <ChevronDownIcon />
+                  </button>
+                </SelectPrimitive.SelectTrigger>
+                <SelectContent align="end">
+                  {Object.entries(twradius).map(([key, value]) => (
+                    <SelectItem
+                      key={key}
+                      value={String(value["border-radius"])}
+                    >
+                      {value["border-radius"]}{" "}
+                      <span className="text-muted-foreground text-xs">
+                        {value.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
         <div className="flex gap-1">
           <Toggle
             size="sm"

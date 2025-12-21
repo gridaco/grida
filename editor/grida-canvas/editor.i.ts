@@ -2688,7 +2688,8 @@ export namespace editor.api {
      * Reset the entire document state
      *
      * Completely replaces the editor state, bypassing the reducer.
-     * - Preserves ONLY the camera transform (everything else is replaced)
+     * - Preserves editor-level runtime properties: camera transform and webfontlist
+     *   (Google Fonts registry). Document-level properties are replaced.
      * - Clears undo/redo history
      * - Emits a "document/reset" action for subscribers
      * - Auto-generates a timestamp key if not provided

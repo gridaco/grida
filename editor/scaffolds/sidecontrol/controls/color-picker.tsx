@@ -65,7 +65,7 @@ export function ColorPicker32F({
             title={isSupported ? "eye dropper" : "eye dropper not supported"}
             disabled={!isSupported}
             variant="ghost"
-            size="xs"
+            size="icon"
             className="text-muted-foreground"
             onClick={handleEyeDropperPick}
           >
