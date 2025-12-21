@@ -558,7 +558,8 @@ class EditorDocumentStore
    *
    * **Characteristics:**
    * - Completely replaces the state (no Immer produce)
-   * - Preserves ONLY the current camera transform (everything else is replaced)
+   * - Preserves editor-level runtime properties: camera transform and webfontlist
+   *   (Google Fonts registry). Document-level properties (document, fontfaces, etc.) are replaced.
    * - Clears undo/redo history
    * - Resets transaction ID to 0
    * - Emits a "document/reset" action so subscribers can detect the reset
@@ -597,13 +598,15 @@ class EditorDocumentStore
 
     const document_key = key ?? Date.now().toString();
     const prev_transform = this.mstate.transform;
+    const prev_webfontlist = this.mstate.webfontlist;
 
     // Explicit full reset: Use the provided state (typically from editor.state.init())
-    // and only preserve the current camera transform
+    // Preserve editor-level runtime properties (transform, webfontlist) while replacing document-level properties
     this.mstate = {
       ...state,
       document_key, // Set reset identifier
       transform: prev_transform, // Preserve camera transform
+      webfontlist: prev_webfontlist, // Preserve Google Fonts registry (editor-level, not document-level)
     };
 
     this.historyManager.clear();
