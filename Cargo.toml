@@ -10,5 +10,7 @@ members = [
 ]
 
 # Reduce debug information for tests to lower memory usage during linking in CI
+# opt-level = 1 speeds up compilation while maintaining debuggability
 [profile.test]
+opt-level = 1
 debug = 1

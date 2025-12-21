@@ -55,5 +55,5 @@ jobs:
 
       - name: Run cargo tests
         env:
-          CARGO_BUILD_JOBS: 2
+          FORCE_SKIA_BINARIES_DOWNLOAD: "1"
         run: cargo test --workspace --exclude grida-canvas-wasm
