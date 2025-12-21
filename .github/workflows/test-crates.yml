@@ -60,7 +60,8 @@ jobs:
       - name: Cache cargo build outputs
         uses: Swatinem/rust-cache@v2
         with:
-          key: test
+          shared-key: test-native
+          cache-all-crates: true
 
       - name: Run cargo tests
         env:
