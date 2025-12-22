@@ -4571,6 +4571,86 @@ export class EditorSurface
   // ==============================================================
   // #endregion a11y actions
   // ==============================================================
+
+  /**
+   * Explicitly overrides browser's native undo/redo behavior for Cmd+Z/Cmd+Shift+Z when fired from
+   * input or contentEditable elements, and automatically executes the editor's undo/redo instead.
+   *
+   * **Why this exists:**
+   *
+   * When contentEditable elements or input fields are focused and the user presses Cmd+Z or Cmd+Shift+Z,
+   * the browser's native undo/redo system intercepts the keyboard shortcut before our custom hotkey handlers
+   * can respond. This creates a conflict between:
+   * 1. The browser's native undo/redo (which operates on the input's own history)
+   * 2. Our custom editor history system (which tracks document-level changes)
+   *
+   * This conflict causes the browser's native undo/redo to execute instead of our editor's undo/redo,
+   * breaking the user's expectation that Cmd+Z should undo document-level changes, not just text input changes.
+   *
+   * **How it works:**
+   *
+   * This method should be called in the `onKeyDown` handler of input or contentEditable elements
+   * that are part of the editor's content editing flow (e.g., text editing mode). When it detects
+   * Cmd+Z or Cmd+Shift+Z, it:
+   * 1. Prevents the browser's default undo/redo behavior
+   * 2. Stops event propagation
+   * 3. Automatically executes the appropriate editor command (undo or redo)
+   *
+   * **When to use:**
+   *
+   * Call this method in `onKeyDown` handlers for:
+   * - ContentEditable elements used for text editing in content edit mode
+   * - Any input elements where the editor's history should take precedence over browser's native undo/redo
+   *
+   * Do NOT use this for regular form inputs or inputs in UI widgets where browser's native undo/redo
+   * is expected and desired behavior.
+   *
+   * @param event - The keyboard event from the `onKeyDown` handler (works with both native KeyboardEvent and React.KeyboardEvent)
+   * @returns `true` if the event was handled (Cmd+Z/Cmd+Shift+Z), `false` otherwise
+   *
+   * @example
+   * ```typescript
+   * <ContentEditable
+   *   onKeyDown={(e) => {
+   *     if (editor.surface.explicitlyOverrideInputUndoRedo(e)) {
+   *       return; // Event was handled (undo/redo executed)
+   *     }
+   *     // Handle other keys normally...
+   *   }}
+   * />
+   * ```
+   */
+  public explicitlyOverrideInputUndoRedo(event: {
+    key: string;
+    metaKey: boolean;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+    preventDefault: () => void;
+    stopPropagation: () => void;
+  }): boolean {
+    // Check if this is Cmd+Z (undo) or Cmd+Shift+Z (redo)
+    const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+    const isZKey = event.key === "z" || event.key === "Z";
+
+    if (!isCmdOrCtrl || !isZKey) {
+      return false;
+    }
+
+    // Prevent browser's native undo/redo behavior
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Execute the appropriate editor command
+    if (event.shiftKey) {
+      // Redo: Cmd+Shift+Z
+      this._editor.doc.redo();
+    } else {
+      // Undo: Cmd+Z
+      this._editor.doc.undo();
+    }
+
+    return true;
+  }
 }
 
 export class ImageProxy implements editor.api.ImageInstance {
