@@ -264,8 +264,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "select": {
       return updateState(state, (draft) => {
-        const { selection } = <EditorSelectAction>action;
-        self_selectNode(draft, "reset", ...selection);
+        const { selection, mode = "reset" } = <EditorSelectAction>action;
+        self_selectNode(draft, mode, ...selection);
       });
     }
     case "blur": {

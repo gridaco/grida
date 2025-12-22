@@ -233,6 +233,12 @@ export interface ChangeSceneBackgroundAction {
 
 export interface EditorSelectAction {
   type: "select";
+  /**
+   * Selection mode: "reset" (replace), "add" (additive), or "toggle".
+   * Defaults to "reset" for backward compatibility.
+   * @default "reset"
+   */
+  mode?: "reset" | "add" | "toggle";
   selection: NodeID[];
 }
 
