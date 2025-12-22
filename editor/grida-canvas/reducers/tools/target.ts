@@ -4,22 +4,50 @@ import grida from "@grida/schema";
 import tree from "@grida/tree";
 
 /**
- * Determines if a node type should be treated as selectable even when it's a root node with children.
- * Container nodes are treated as containers (non-selectable when root with children).
- * Group and boolean nodes are treated as selectable nodes (selectable even when root with children).
+ * Gets the top/root node ID for a given node within a scene context.
+ * Returns the node_id itself if no top/root can be determined.
  */
-function is_selectable_root_with_children(
-  node_type: grida.program.nodes.NodeType
-): boolean {
-  switch (node_type) {
-    case "container":
-      return false; // Container nodes are not selectable when root with children
-    case "group":
-    case "boolean":
-      return true; // Group and boolean nodes are selectable even when root with children
-    default:
-      return false; // Other node types are not selectable when root with children
+function getTopNodeId(
+  context: editor.state.IEditorState,
+  node_id: string
+): string {
+  if (context.scene_id) {
+    const top_id = dq.getTopIdWithinScene(
+      context.document_ctx,
+      node_id,
+      context.scene_id
+    );
+    return top_id ?? node_id;
+  } else {
+    const root_id = dq.getRootId(context.document_ctx, node_id);
+    return root_id ?? node_id;
   }
+}
+
+/**
+ * Checks if a root node with children should be filtered out based on scene constraints.
+ * In single mode: root nodes with children are filtered out.
+ * In normal mode: root containers are treated normally (no filtering).
+ */
+function shouldFilterRootNodeWithChildren(
+  context: editor.state.IEditorState,
+  node_id: string,
+  top_id: string,
+  children: string[] | undefined
+): boolean {
+  if (!context.scene_id || !children || children.length === 0) {
+    return false;
+  }
+
+  if (node_id !== top_id) {
+    return false;
+  }
+
+  const scene = context.document.nodes[
+    context.scene_id
+  ] as grida.program.nodes.SceneNode;
+  // Only filter in single mode
+  return scene.constraints.children === "single";
 }
 
 /**
@@ -82,24 +110,20 @@ export function getRayTarget(
         return false; // Ignore nodes that don't exist
       }
 
-      const top_id = context.scene_id
-        ? dq.getTopIdWithinScene(
-            context.document_ctx,
-            node_id,
-            context.scene_id
-          )
-        : dq.getRootId(context.document_ctx, node_id);
+      const top_id = getTopNodeId(context, node_id);
       const maybeichildren = context.document.links[node_id];
 
-      // Check if this is a root node with children that should be ignored
+      // In single mode: skip hit testing for root nodes with children
+      // In normal mode: treat root containers normally (no special filtering)
       if (
-        maybeichildren &&
-        maybeichildren.length > 0 &&
-        config.ignores_root_with_children &&
-        node_id === top_id &&
-        !is_selectable_root_with_children(node.type)
+        shouldFilterRootNodeWithChildren(
+          context,
+          node_id,
+          top_id,
+          maybeichildren
+        )
       ) {
-        return false; // Ignore the root node if configured and not selectable
+        return false; // Ignore the root node in single mode
       }
 
       if (config.ignores_locked && node.locked) {
@@ -215,21 +239,7 @@ export function getRayTarget(
       // so reverse to get deepest first
       const deepest = nonSceneNodes.reverse()[0];
 
-      // Special case: If meta key is pressed and we're hovering a root container
-      // (container node directly under scene), ensure it's selectable
-      if (deepest) {
-        const parent_id = dq.getParentId(context.document_ctx, deepest);
-        const node = nodes[deepest];
-        const isRootContainer =
-          (parent_id === null || parent_id === context.scene_id) &&
-          node?.type === "container";
-
-        // Root containers are already included in nonSceneNodes, so just return deepest
-        // This ensures root containers can be selected when meta key is pressed
-        return deepest;
-      }
-
-      return null;
+      return deepest ?? null;
     }
   }
 
@@ -248,21 +258,17 @@ export function getMarqueeSelection(
   // 2. shall not be a locked node
   // 3. the parent of this node shall also be hit by the marquee (unless it's the root node)
   const target_node_ids = hits.filter((hit_id) => {
-    const root_id = state.scene_id
-      ? dq.getTopIdWithinScene(document_ctx, hit_id, state.scene_id)
-      : dq.getRootId(document_ctx, hit_id);
+    const root_id = getTopNodeId(state, hit_id);
     const hit = dq.__getNodeById(state, hit_id);
 
-    // (1) shall not be a root node (if configured)
+    // (1) In single mode: shall not be a root node with children
+    // In normal mode: treat root containers normally (no special filtering)
     const maybeichildren = state.document.links[hit_id];
     if (
-      maybeichildren &&
-      maybeichildren.length > 0 &&
-      state.pointer_hit_testing_config.ignores_root_with_children &&
-      hit_id === root_id &&
-      !is_selectable_root_with_children(hit.type)
-    )
+      shouldFilterRootNodeWithChildren(state, hit_id, root_id, maybeichildren)
+    ) {
       return false;
+    }
 
     // (2) shall not be a locked node
 

@@ -114,9 +114,7 @@ function _reducer<S extends editor.state.IEditorState>(
         if (config.ignores_locked)
           draft.pointer_hit_testing_config.ignores_locked =
             config.ignores_locked;
-        if (config.ignores_root_with_children)
-          draft.pointer_hit_testing_config.ignores_root_with_children =
-            config.ignores_root_with_children;
+        // ignores_root_with_children removed - now using scene-based logic (single mode vs normal mode)
         self_updateSurfaceHoverState(draft);
       });
     }

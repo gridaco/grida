@@ -384,19 +384,26 @@ export namespace editor.config {
 
   export const DEFAULT_HIT_TESTING_CONFIG: state.HitTestingConfig = {
     target: "auto",
-    ignores_root_with_children: true,
     ignores_locked: true,
+    // ignores_root_with_children: true, // REMOVED - now using scene-based logic
   };
 
   /**
    * Specialized hit testing configuration for measurement targeting.
    *
-   * Measurement needs to include root containers in the result so we
-   * override the default behaviour that ignores roots with children.
+   * Measurement mode respects the target mode (auto/deepest) set by the user
+   * (e.g., via Cmd key). It sets ignores_locked to false so that locked nodes
+   * can be measured (useful for measuring distances to reference elements).
+   *
+   * Note: ignores_root_with_children was removed - measurement mode now follows
+   * the same scene-based logic (single mode vs normal mode).
    */
   export const MEASUREMENT_HIT_TESTING_CONFIG: Partial<state.HitTestingConfig> =
     {
-      ignores_root_with_children: false,
+      ignores_locked: false, // Allow measuring to locked nodes (reference elements)
+      // Don't override - respect user's target choice (auto/deepest via Cmd)
+      // target: "auto",
+      // ignores_root_with_children: false, // REMOVED
     };
 
   export const DEFAULT_GESTURE_MODIFIERS: state.GestureModifiers = {
@@ -742,11 +749,19 @@ export namespace editor.state {
      */
     target: "auto" | "deepest";
 
-    /**
-     * ignores the root node from the targeting (if not empty)
-     * @default true
-     */
-    ignores_root_with_children: boolean;
+    // /**
+    //  * @deprecated REMOVED - ignores_root_with_children feature has been removed.
+    //  *
+    //  * Reason for removal: The feature was buggy and caused poor UX. We now use
+    //  * simpler scene-based logic:
+    //  * - Single mode (scene.constraints.children === "single"): Skip hit testing for root nodes with children
+    //  * - Normal mode: Treat root containers normally (no special filtering)
+    //  *
+    //  * Original intent: In real-world design practices, a root container/frame acts as an artboard,
+    //  * not a design element, so it makes sense to make its children take higher priority over the root.
+    //  * This can be revisited in the future if needed.
+    //  */
+    // ignores_root_with_children: boolean;
 
     /**
      * ignores the locked node from the targeting
