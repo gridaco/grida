@@ -18,30 +18,40 @@ export function self_updateSurfaceHoverState<
     return draft;
   }
 
-  const isMeasurementMode = draft.surface_measurement_targeting === "on";
-  const target = getRayTarget(
+  // Always compute normal hover (for selection) - independent of measurement mode
+  const normalHoverTarget = getRayTarget(
     draft.hits,
     {
-      config: isMeasurementMode
-        ? {
-            ...draft.pointer_hit_testing_config,
-            ...editor.config.MEASUREMENT_HIT_TESTING_CONFIG,
-          }
-        : draft.pointer_hit_testing_config,
+      config: draft.pointer_hit_testing_config, // Normal config
       context: draft,
     },
     false, // nested_first
-    isMeasurementMode // isMeasurementMode
+    false // isMeasurementMode = false
   );
+  draft.hovered_node_id = normalHoverTarget;
 
-  draft.hovered_node_id = target;
-
+  // Separately compute measurement target (only when measurement mode is on)
   if (
-    target &&
     draft.surface_measurement_targeting === "on" &&
     !draft.surface_measurement_targeting_locked
   ) {
-    draft.surface_measurement_target = [target];
+    const measurementTarget = getRayTarget(
+      draft.hits,
+      {
+        config: {
+          ...draft.pointer_hit_testing_config,
+          ...editor.config.MEASUREMENT_HIT_TESTING_CONFIG,
+        },
+        context: draft,
+      },
+      false, // nested_first
+      true // isMeasurementMode = true
+    );
+    draft.surface_measurement_target = measurementTarget
+      ? [measurementTarget]
+      : undefined;
+  } else if (draft.surface_measurement_targeting === "off") {
+    draft.surface_measurement_target = undefined;
   }
 
   return draft;
