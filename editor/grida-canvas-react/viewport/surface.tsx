@@ -202,6 +202,21 @@ export function EditorSurface() {
       });
   }, [eventTargetRef.current]);
 
+  // Register window blur handler
+  // This is the single source of blur handling for the editor surface.
+  // When window loses focus, modifier keys (Meta/Ctrl/Alt/Shift) don't fire keyup events,
+  // so we reset all modifier-dependent state to prevent stuck configurations.
+  useEffect(() => {
+    // Wrap in arrow function to preserve `this` context when called by browser event system
+    const handleBlur = (event: FocusEvent) => {
+      editor.surface.onblur(event);
+    };
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [editor]);
+
   const __hand_tool_triggered_by_aux_button = useRef(false);
 
   const bind = useSurfaceGesture(

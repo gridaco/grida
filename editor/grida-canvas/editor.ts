@@ -3714,18 +3714,77 @@ export class EditorSurface
 
   public surfaceHoverNode(node_id: string, event: "enter" | "leave") {
     this.dispatch({
-      type: "hover",
+      type: "hover/ui",
       target: node_id,
       event,
     });
   }
 
   public surfaceHoverEnterNode(node_id: string) {
-    this.surfaceHoverNode(node_id, "enter");
+    this.dispatch({
+      type: "hover/title-bar",
+      target: node_id,
+      event: "enter",
+    });
   }
 
   public surfaceHoverLeaveNode(node_id: string) {
-    this.surfaceHoverNode(node_id, "leave");
+    this.dispatch({
+      type: "hover/title-bar",
+      target: node_id,
+      event: "leave",
+    });
+  }
+
+  /**
+   * Blur event handler for window focus loss.
+   *
+   * **Why we need this:**
+   * When the window/tab loses focus (e.g., user switches tabs, clicks outside the window),
+   * modifier keys (Meta/Cmd, Ctrl, Alt, Shift) do NOT fire keyup events. This means:
+   * - If user was holding Alt+click, then switches tabs, Alt state remains "pressed"
+   * - Surface configurations (measurement mode, snap modifiers, etc.) remain active
+   * - Tool state may be stuck in a modifier-dependent mode
+   *
+   * **Solution:**
+   * On window blur, we reset all modifier-dependent state to safe defaults:
+   * - Clear stuck title bar hover (pointerLeave never fires on tab switch)
+   * - Reset all surface configurations (raycast targeting, measurement, modifiers)
+   * - Reset tool to cursor (safe default state)
+   *
+   * This ensures the editor is in a consistent, predictable state when the user returns.
+   */
+  public onblur(event: FocusEvent): void {
+    if (event.defaultPrevented) return;
+
+    // Clear stuck title bar hover state
+    // This handles edge case where pointerLeave never fires (e.g., tab switch, window blur)
+    const state = this.state;
+    if (
+      state.hovered_node_source === "title-bar" &&
+      state.hovered_node_id !== null
+    ) {
+      this.surfaceHoverLeaveNode(state.hovered_node_id);
+    }
+
+    // Reset all surface configurations
+    // Meta keys (Alt, Ctrl, Meta, Shift) don't fire keyup events on tab switch,
+    // so we must reset all modifier-dependent configurations to prevent stuck state
+    this.surfaceConfigureSurfaceRaycastTargeting({
+      target: "auto",
+    });
+    this.surfaceConfigureMeasurement("off");
+    this.surfaceConfigureTranslateWithCloneModifier("off");
+    this.surfaceConfigureTransformWithCenterOriginModifier("off");
+    this.surfaceConfigureTranslateWithAxisLockModifier("off");
+    this.surfaceConfigureTransformWithPreserveAspectRatioModifier("off");
+    this.surfaceConfigureTranslateWithForceDisableSnap("off");
+    this.surfaceConfigureScaleWithForceDisableSnap("off");
+    this.surfaceConfigureRotateWithQuantizeModifier("off");
+    this.surfaceConfigurePaddingWithMirroringModifier("off");
+
+    // Reset tool to cursor (safe default state)
+    this.surfaceSetTool({ type: "cursor" }, "window blur");
   }
 
   public surfaceLockNudgeGesture(state: "on" | "off") {

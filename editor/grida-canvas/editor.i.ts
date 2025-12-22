@@ -1012,6 +1012,19 @@ export namespace editor.state {
     hovered_node_id: string | null;
 
     /**
+     * Source of the current hover state.
+     * Used to determine if hover should be preserved during hit-testing.
+     *
+     * - "hit-test": Hover from canvas geometry hit-testing (normal hover)
+     * - "title-bar": Hover from container/frame title bar (no geometry, needs preservation)
+     * - "hierarchy-tree": Hover from hierarchy tree UI (doesn't need preservation)
+     * - null: No UI-triggered hover active
+     *
+     * @default null
+     */
+    hovered_node_source: "hit-test" | "title-bar" | "hierarchy-tree" | null;
+
+    /**
      * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
      *
      * @default undefined
@@ -1414,6 +1427,7 @@ export namespace editor.state {
     dropzone: undefined,
     gesture: { type: "idle" },
     hovered_node_id: null,
+    hovered_node_source: null,
     marquee: undefined,
     selection: [],
     hits: [],
@@ -3632,6 +3646,32 @@ export namespace editor.api {
     surfaceConfigurePaddingWithMirroringModifier(
       padding_with_axis_mirroring: "on" | "off"
     ): void;
+
+    /**
+     * Blur event handler callback.
+     * Can be used with `window.addEventListener("blur", editor.surface.onblur)`.
+     *
+     * **Why this exists:**
+     * When the window/tab loses focus, modifier keys (Meta/Cmd, Ctrl, Alt, Shift) do NOT
+     * fire keyup events. This means modifier-dependent state can get stuck (e.g., measurement
+     * mode stays on, snap modifiers remain active). We reset everything on blur to ensure
+     * a consistent state when the user returns.
+     *
+     * **What it does:**
+     * - Clears stuck title bar hover state (pointerLeave never fires on tab switch)
+     * - Resets all surface configurations (raycast targeting, measurement, modifiers)
+     * - Resets tool to cursor (safe default)
+     *
+     * The callback signature matches `window.addEventListener("blur", callback)`.
+     *
+     * @example
+     * ```typescript
+     * window.addEventListener("blur", editor.surface.onblur);
+     * // Later:
+     * window.removeEventListener("blur", editor.surface.onblur);
+     * ```
+     */
+    onblur(event: FocusEvent): void;
     //
   }
 

@@ -381,32 +381,6 @@ export function useEditorHotKeys() {
   const [altKey, setAltKey] = useState(false);
 
   useEffect(() => {
-    const cb = (e: FocusEvent) => {
-      if (e.defaultPrevented) return;
-      editor.surface.surfaceConfigureSurfaceRaycastTargeting({
-        target: "auto",
-      });
-      editor.surface.surfaceConfigureMeasurement("off");
-      editor.surface.surfaceConfigureTranslateWithCloneModifier("off");
-      editor.surface.surfaceConfigureTransformWithCenterOriginModifier("off");
-      editor.surface.surfaceConfigureTranslateWithAxisLockModifier("off");
-      editor.surface.surfaceConfigureTransformWithPreserveAspectRatioModifier(
-        "off"
-      );
-      editor.surface.surfaceConfigureTranslateWithForceDisableSnap("off");
-      editor.surface.surfaceConfigureScaleWithForceDisableSnap("off");
-      editor.surface.surfaceConfigureRotateWithQuantizeModifier("off");
-      editor.surface.surfaceConfigurePaddingWithMirroringModifier("off");
-      setAltKey(false);
-      editor.surface.surfaceSetTool({ type: "cursor" }, "window blur");
-    };
-    window.addEventListener("blur", cb);
-    return () => {
-      window.removeEventListener("blur", cb);
-    };
-  }, [editor]);
-
-  useEffect(() => {
     let mode: "auto" | "all" | "none" = "auto";
     if (tool.type === "bend") {
       mode = "all";

@@ -41,7 +41,8 @@ export type DocumentAction =
   | LoadSceneAction
   | SceneAction
   | EditorSelectAction
-  | EditorHoverAction
+  | EditorTitleBarHoverAction
+  | EditorUITriggeredHoverAction
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
@@ -242,11 +243,37 @@ export interface EditorSelectAction {
   selection: NodeID[];
 }
 
-export interface EditorHoverAction {
-  type: "hover";
+/**
+ * Title bar hover action from DOM events.
+ * This sets hovered_node_id and hovered_node_source to "title-bar" to prevent
+ * hit-testing from clearing the hover state when moving the pointer within the title bar.
+ * This is distinct from hit-testing-based hover which updates hovered_node_id
+ * directly in self_updateSurfaceHoverState.
+ */
+export interface EditorTitleBarHoverAction {
+  type: "hover/title-bar";
   event: "enter" | "leave";
   target: NodeID;
 }
+
+/**
+ * UI-triggered hover action from DOM events (e.g., hierarchy tree).
+ * This sets hovered_node_id and hovered_node_source to "hierarchy-tree".
+ * This is distinct from hit-testing-based hover which updates hovered_node_id
+ * directly in self_updateSurfaceHoverState.
+ */
+export interface EditorUITriggeredHoverAction {
+  type: "hover/ui";
+  event: "enter" | "leave";
+  target: NodeID;
+}
+
+/**
+ * @deprecated Use EditorTitleBarHoverAction or EditorUITriggeredHoverAction instead
+ */
+export type EditorHoverAction =
+  | EditorTitleBarHoverAction
+  | EditorUITriggeredHoverAction;
 
 export interface EditorBlurAction {
   type: "blur";
