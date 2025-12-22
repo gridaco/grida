@@ -632,7 +632,7 @@ function RootFramesBarOverlay() {
         {/* Single-mode: full styling with padding, rounded corners, and background */}
         {/* Use padding-bottom on wrapper instead of margin to ensure events work in the gap */}
         <div className="pb-1.5">
-          <div className="w-full flex items-center gap-2 cursor-pointer rounded-lg py-2 px-2.5 bg-background/80 group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent group-data-[layer-is-component-consumer='true']:!bg-workbench-accent-violet/50">
+          <div className="w-full flex items-center gap-2 rounded-lg py-2 px-2.5 bg-background/80 group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent group-data-[layer-is-component-consumer='true']:!bg-workbench-accent-violet/50">
             <NodeTitleBarTitle node={rootframe}>
               {" (single mode)"}
             </NodeTitleBarTitle>
@@ -660,7 +660,7 @@ function RootFramesBarOverlay() {
           {/* Multi-mode: plain text, no styling */}
           {/* Use padding-bottom on wrapper instead of margin to ensure events work in the gap */}
           <div className="pb-1.5 py-px">
-            <div className="w-full flex items-center gap-2 cursor-pointer">
+            <div className="w-full flex items-center gap-2">
               <NodeTitleBarTitle node={node} />
             </div>
           </div>
