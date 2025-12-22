@@ -702,6 +702,15 @@ function NodeTitleBar({
   );
 }
 
+/**
+ * Title bar title component that displays the node name and allows renaming via double-click.
+ *
+ * **Rename Behavior:**
+ * - Double-click triggers rename mode
+ * - Rename is only triggered when NO modifier keys are pressed (Shift, Ctrl/Cmd, Alt)
+ * - This prevents accidental rename when modifier keys are used for other actions
+ *   (e.g., Shift+double-click for selection, Cmd/Ctrl+double-click for shortcuts)
+ */
 function NodeTitleBarTitle({
   node,
   children,
@@ -758,7 +767,12 @@ function NodeTitleBarTitle({
     <FloatingBarTitle
       onDoubleClick={(e) => {
         e.stopPropagation();
-        setEditing(true);
+        // Only trigger rename when no modifier keys are pressed
+        // This prevents accidental rename when using modifier keys for other actions
+        // (e.g., Shift+double-click for selection, Cmd/Ctrl+double-click for other shortcuts)
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          setEditing(true);
+        }
       }}
     >
       {node.name}
