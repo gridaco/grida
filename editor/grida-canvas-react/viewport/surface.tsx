@@ -676,9 +676,11 @@ function NodeTitleBar({
       onPointerDown: ({ event }) => {
         event.preventDefault();
         if (event.shiftKey) {
-          editor.commands.select("selection", [node.id]);
+          // Toggle selection when shift is pressed
+          editor.commands.select([node.id], "toggle");
         } else {
-          editor.commands.select([node.id]);
+          // Reset selection when shift is not pressed
+          editor.commands.select([node.id], "reset");
         }
       },
     },

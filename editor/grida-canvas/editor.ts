@@ -781,7 +781,28 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
-  public select(...selectors: grida.program.document.Selector[]) {
+  /**
+   * Query nodes using selectors and return their IDs.
+   * This is a pure query function that does not dispatch any actions.
+   *
+   * @param selectors - Array of selectors to query nodes
+   * @returns Array of node IDs within the current scene, or empty array if none found
+   *
+   * @example
+   * ```typescript
+   * // Get all nodes in current scene
+   * const allNodes = editor.commands.querySelectAll("~");
+   *
+   * // Get children of selected nodes
+   * const children = editor.commands.querySelectAll(">");
+   *
+   * // Then use select() to actually select them
+   * editor.commands.select(children, "reset");
+   * ```
+   */
+  public querySelectAll(
+    ...selectors: grida.program.document.Selector[]
+  ): editor.NodeID[] {
     const { document_ctx, selection, scene_id } = this.mstate;
     const ids = Array.from(
       new Set(
@@ -805,18 +826,47 @@ class EditorDocumentStore
         })
       : ids;
 
-    if (scene_scoped_ids.length === 0) {
-      // if no ids found, keep the current selection
-      // e.g. this can happen whe `>` (select children) is used but no children found
-      return false;
-    } else {
-      this.dispatch({
-        type: "select",
-        selection: scene_scoped_ids,
-      });
+    return scene_scoped_ids;
+  }
+
+  /**
+   * Select nodes by their IDs with an optional selection mode.
+   * This is the low-level selection action dispatcher.
+   *
+   * @param selection - Array of node IDs to select
+   * @param mode - Selection mode: "reset" (replace), "add" (additive), or "toggle"
+   * @default "reset"
+   *
+   * @example
+   * ```typescript
+   * // Reset selection to specific nodes
+   * editor.commands.select([node1, node2], "reset");
+   *
+   * // Add nodes to current selection
+   * editor.commands.select([node3], "add");
+   *
+   * // Toggle nodes in selection
+   * editor.commands.select([node4], "toggle");
+   *
+   * // Query then select (common pattern)
+   * const targets = editor.commands.querySelectAll("~");
+   * editor.commands.select(targets);
+   * ```
+   */
+  public select(
+    selection: editor.NodeID[],
+    mode: "reset" | "add" | "toggle" = "reset"
+  ): void {
+    if (selection.length === 0) {
+      // If no ids provided, keep the current selection unchanged
+      return;
     }
 
-    return scene_scoped_ids;
+    this.dispatch({
+      type: "select",
+      selection,
+      mode,
+    });
   }
 
   public blur(debug_label?: string) {

@@ -2715,35 +2715,61 @@ export namespace editor.api {
     ): void;
 
     /**
-     * Selects nodes by the given selectors.
+     * Query nodes using selectors and return their IDs.
+     * This is a pure query function that does not dispatch any actions.
      *
-     * **Scene Scoping**: All selection results are automatically scoped to the current scene.
-     * Nodes from other scenes are filtered out, ensuring that selection operations (e.g., CMD+A)
-     * only affect nodes within the active scene, even when the selector would otherwise match
-     * nodes across multiple scenes.
+     * **Scene Scoping**: All query results are automatically scoped to the current scene.
+     * Nodes from other scenes are filtered out, ensuring that queries (e.g., CMD+A)
+     * only return nodes within the active scene.
      *
      * @param selectors - Array of {@link grida.program.document.Selector} values to query nodes
-     * @returns The selected node IDs within the current scene, or `false` if no nodes were found
+     * @returns Array of node IDs within the current scene, or empty array if none found
      *
      * @example
      * ```typescript
-     * // Select all nodes in the current scene (CMD+A)
-     * const selected = editor.commands.select("~");
+     * // Get all nodes in the current scene
+     * const allNodes = editor.commands.querySelectAll("~");
      *
-     * // Select children of currently selected nodes
-     * editor.commands.select(">");
+     * // Get children of currently selected nodes
+     * const children = editor.commands.querySelectAll(">");
      *
-     * // Select siblings of currently selected nodes
-     * editor.commands.select("~");
+     * // Then use select() to actually select them
+     * editor.commands.select(allNodes);
      * ```
      *
      * @remarks
      * - When selection is empty and selector is `"~"`, it defaults to `"*"` (all nodes)
-     * - Scene scoping ensures that even when selecting all nodes, only nodes within the
+     * - Scene scoping ensures that even when querying all nodes, only nodes within the
      *   current scene are included in the result
      * - Scene nodes themselves are never selectable and are automatically filtered out
      */
-    select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
+    querySelectAll(...selectors: grida.program.document.Selector[]): NodeID[];
+
+    /**
+     * Select nodes by their IDs with an optional selection mode.
+     * This is the low-level selection action dispatcher.
+     *
+     * @param selection - Array of node IDs to select
+     * @param mode - Selection mode: "reset" (replace), "add" (additive), or "toggle"
+     * @default "reset"
+     *
+     * @example
+     * ```typescript
+     * // Reset selection to specific nodes
+     * editor.commands.select([node1, node2], "reset");
+     *
+     * // Add nodes to current selection
+     * editor.commands.select([node3], "add");
+     *
+     * // Toggle nodes in selection
+     * editor.commands.select([node4], "toggle");
+     *
+     * // Query then select (common pattern)
+     * const targets = editor.commands.querySelectAll("~");
+     * editor.commands.select(targets);
+     * ```
+     */
+    select(selection: NodeID[], mode?: "reset" | "add" | "toggle"): void;
 
     blur(): void;
     cut(target: "selection" | NodeID): void;
