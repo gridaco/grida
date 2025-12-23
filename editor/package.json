@@ -205,6 +205,7 @@
     "react-use": "^17.5.1",
     "react-window": "^1.8.6",
     "recharts": "^2.15.3",
+    "replicate": "^1.4.0",
     "resend": "^4.5.1",
     "semver": "^7.7.1",
     "shiki": "^3.14.0",
