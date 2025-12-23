@@ -381,32 +381,6 @@ export function useEditorHotKeys() {
   const [altKey, setAltKey] = useState(false);
 
   useEffect(() => {
-    const cb = (e: FocusEvent) => {
-      if (e.defaultPrevented) return;
-      editor.surface.surfaceConfigureSurfaceRaycastTargeting({
-        target: "auto",
-      });
-      editor.surface.surfaceConfigureMeasurement("off");
-      editor.surface.surfaceConfigureTranslateWithCloneModifier("off");
-      editor.surface.surfaceConfigureTransformWithCenterOriginModifier("off");
-      editor.surface.surfaceConfigureTranslateWithAxisLockModifier("off");
-      editor.surface.surfaceConfigureTransformWithPreserveAspectRatioModifier(
-        "off"
-      );
-      editor.surface.surfaceConfigureTranslateWithForceDisableSnap("off");
-      editor.surface.surfaceConfigureScaleWithForceDisableSnap("off");
-      editor.surface.surfaceConfigureRotateWithQuantizeModifier("off");
-      editor.surface.surfaceConfigurePaddingWithMirroringModifier("off");
-      setAltKey(false);
-      editor.surface.surfaceSetTool({ type: "cursor" }, "window blur");
-    };
-    window.addEventListener("blur", cb);
-    return () => {
-      window.removeEventListener("blur", cb);
-    };
-  }, [editor]);
-
-  useEffect(() => {
     let mode: "auto" | "all" | "none" = "auto";
     if (tool.type === "bend") {
       mode = "all";
@@ -590,7 +564,8 @@ export function useEditorHotKeys() {
   useHotkeys(
     "meta+a, ctrl+a",
     () => {
-      editor.commands.select("selection", "~");
+      const targets = editor.commands.querySelectAll("selection", "~");
+      editor.commands.select(targets);
     },
     {
       preventDefault: true,
@@ -654,10 +629,12 @@ export function useEditorHotKeys() {
   useHotkeys(
     "enter",
     () => {
-      const maybe_selected = editor.commands.select(">");
-      if (!maybe_selected) {
-        // check if select(">") is possible first, then toggle when not possible
+      const targets = editor.commands.querySelectAll(">");
+      if (targets.length === 0) {
+        // check if querySelectAll(">") is possible first, then toggle when not possible
         editor.surface.surfaceTryToggleContentEditMode();
+      } else {
+        editor.commands.select(targets);
       }
     },
     {
@@ -670,7 +647,8 @@ export function useEditorHotKeys() {
   useHotkeys(
     "shift+enter, \\",
     () => {
-      editor.commands.select("..");
+      const targets = editor.commands.querySelectAll("..");
+      editor.commands.select(targets);
     },
     {
       preventDefault: true,
@@ -682,7 +660,8 @@ export function useEditorHotKeys() {
   useHotkeys(
     "tab",
     () => {
-      editor.commands.select("~+");
+      const targets = editor.commands.querySelectAll("~+");
+      editor.commands.select(targets);
     },
     {
       preventDefault: true,
@@ -694,7 +673,8 @@ export function useEditorHotKeys() {
   useHotkeys(
     "shift+tab",
     () => {
-      editor.commands.select("~-");
+      const targets = editor.commands.querySelectAll("~-");
+      editor.commands.select(targets);
     },
     {
       preventDefault: true,

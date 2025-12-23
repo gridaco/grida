@@ -781,7 +781,28 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
-  public select(...selectors: grida.program.document.Selector[]) {
+  /**
+   * Query nodes using selectors and return their IDs.
+   * This is a pure query function that does not dispatch any actions.
+   *
+   * @param selectors - Array of selectors to query nodes
+   * @returns Array of node IDs within the current scene, or empty array if none found
+   *
+   * @example
+   * ```typescript
+   * // Get all nodes in current scene
+   * const allNodes = editor.commands.querySelectAll("~");
+   *
+   * // Get children of selected nodes
+   * const children = editor.commands.querySelectAll(">");
+   *
+   * // Then use select() to actually select them
+   * editor.commands.select(children, "reset");
+   * ```
+   */
+  public querySelectAll(
+    ...selectors: grida.program.document.Selector[]
+  ): editor.NodeID[] {
     const { document_ctx, selection, scene_id } = this.mstate;
     const ids = Array.from(
       new Set(
@@ -805,18 +826,47 @@ class EditorDocumentStore
         })
       : ids;
 
-    if (scene_scoped_ids.length === 0) {
-      // if no ids found, keep the current selection
-      // e.g. this can happen whe `>` (select children) is used but no children found
-      return false;
-    } else {
-      this.dispatch({
-        type: "select",
-        selection: scene_scoped_ids,
-      });
+    return scene_scoped_ids;
+  }
+
+  /**
+   * Select nodes by their IDs with an optional selection mode.
+   * This is the low-level selection action dispatcher.
+   *
+   * @param selection - Array of node IDs to select
+   * @param mode - Selection mode: "reset" (replace), "add" (additive), or "toggle"
+   * @default "reset"
+   *
+   * @example
+   * ```typescript
+   * // Reset selection to specific nodes
+   * editor.commands.select([node1, node2], "reset");
+   *
+   * // Add nodes to current selection
+   * editor.commands.select([node3], "add");
+   *
+   * // Toggle nodes in selection
+   * editor.commands.select([node4], "toggle");
+   *
+   * // Query then select (common pattern)
+   * const targets = editor.commands.querySelectAll("~");
+   * editor.commands.select(targets);
+   * ```
+   */
+  public select(
+    selection: editor.NodeID[],
+    mode: "reset" | "add" | "toggle" = "reset"
+  ): void {
+    if (selection.length === 0) {
+      // If no ids provided, keep the current selection unchanged
+      return;
     }
 
-    return scene_scoped_ids;
+    this.dispatch({
+      type: "select",
+      selection,
+      mode,
+    });
   }
 
   public blur(debug_label?: string) {
@@ -3664,18 +3714,77 @@ export class EditorSurface
 
   public surfaceHoverNode(node_id: string, event: "enter" | "leave") {
     this.dispatch({
-      type: "hover",
+      type: "hover/ui",
       target: node_id,
       event,
     });
   }
 
   public surfaceHoverEnterNode(node_id: string) {
-    this.surfaceHoverNode(node_id, "enter");
+    this.dispatch({
+      type: "hover/title-bar",
+      target: node_id,
+      event: "enter",
+    });
   }
 
   public surfaceHoverLeaveNode(node_id: string) {
-    this.surfaceHoverNode(node_id, "leave");
+    this.dispatch({
+      type: "hover/title-bar",
+      target: node_id,
+      event: "leave",
+    });
+  }
+
+  /**
+   * Blur event handler for window focus loss.
+   *
+   * **Why we need this:**
+   * When the window/tab loses focus (e.g., user switches tabs, clicks outside the window),
+   * modifier keys (Meta/Cmd, Ctrl, Alt, Shift) do NOT fire keyup events. This means:
+   * - If user was holding Alt+click, then switches tabs, Alt state remains "pressed"
+   * - Surface configurations (measurement mode, snap modifiers, etc.) remain active
+   * - Tool state may be stuck in a modifier-dependent mode
+   *
+   * **Solution:**
+   * On window blur, we reset all modifier-dependent state to safe defaults:
+   * - Clear stuck title bar hover (pointerLeave never fires on tab switch)
+   * - Reset all surface configurations (raycast targeting, measurement, modifiers)
+   * - Reset tool to cursor (safe default state)
+   *
+   * This ensures the editor is in a consistent, predictable state when the user returns.
+   */
+  public onblur(event: FocusEvent): void {
+    if (event.defaultPrevented) return;
+
+    // Clear stuck title bar hover state
+    // This handles edge case where pointerLeave never fires (e.g., tab switch, window blur)
+    const state = this.state;
+    if (
+      state.hovered_node_source === "title-bar" &&
+      state.hovered_node_id !== null
+    ) {
+      this.surfaceHoverLeaveNode(state.hovered_node_id);
+    }
+
+    // Reset all surface configurations
+    // Meta keys (Alt, Ctrl, Meta, Shift) don't fire keyup events on tab switch,
+    // so we must reset all modifier-dependent configurations to prevent stuck state
+    this.surfaceConfigureSurfaceRaycastTargeting({
+      target: "auto",
+    });
+    this.surfaceConfigureMeasurement("off");
+    this.surfaceConfigureTranslateWithCloneModifier("off");
+    this.surfaceConfigureTransformWithCenterOriginModifier("off");
+    this.surfaceConfigureTranslateWithAxisLockModifier("off");
+    this.surfaceConfigureTransformWithPreserveAspectRatioModifier("off");
+    this.surfaceConfigureTranslateWithForceDisableSnap("off");
+    this.surfaceConfigureScaleWithForceDisableSnap("off");
+    this.surfaceConfigureRotateWithQuantizeModifier("off");
+    this.surfaceConfigurePaddingWithMirroringModifier("off");
+
+    // Reset tool to cursor (safe default state)
+    this.surfaceSetTool({ type: "cursor" }, "window blur");
   }
 
   public surfaceLockNudgeGesture(state: "on" | "off") {
@@ -4462,6 +4571,86 @@ export class EditorSurface
   // ==============================================================
   // #endregion a11y actions
   // ==============================================================
+
+  /**
+   * Explicitly overrides browser's native undo/redo behavior for Cmd+Z/Cmd+Shift+Z when fired from
+   * input or contentEditable elements, and automatically executes the editor's undo/redo instead.
+   *
+   * **Why this exists:**
+   *
+   * When contentEditable elements or input fields are focused and the user presses Cmd+Z or Cmd+Shift+Z,
+   * the browser's native undo/redo system intercepts the keyboard shortcut before our custom hotkey handlers
+   * can respond. This creates a conflict between:
+   * 1. The browser's native undo/redo (which operates on the input's own history)
+   * 2. Our custom editor history system (which tracks document-level changes)
+   *
+   * This conflict causes the browser's native undo/redo to execute instead of our editor's undo/redo,
+   * breaking the user's expectation that Cmd+Z should undo document-level changes, not just text input changes.
+   *
+   * **How it works:**
+   *
+   * This method should be called in the `onKeyDown` handler of input or contentEditable elements
+   * that are part of the editor's content editing flow (e.g., text editing mode). When it detects
+   * Cmd+Z or Cmd+Shift+Z, it:
+   * 1. Prevents the browser's default undo/redo behavior
+   * 2. Stops event propagation
+   * 3. Automatically executes the appropriate editor command (undo or redo)
+   *
+   * **When to use:**
+   *
+   * Call this method in `onKeyDown` handlers for:
+   * - ContentEditable elements used for text editing in content edit mode
+   * - Any input elements where the editor's history should take precedence over browser's native undo/redo
+   *
+   * Do NOT use this for regular form inputs or inputs in UI widgets where browser's native undo/redo
+   * is expected and desired behavior.
+   *
+   * @param event - The keyboard event from the `onKeyDown` handler (works with both native KeyboardEvent and React.KeyboardEvent)
+   * @returns `true` if the event was handled (Cmd+Z/Cmd+Shift+Z), `false` otherwise
+   *
+   * @example
+   * ```typescript
+   * <ContentEditable
+   *   onKeyDown={(e) => {
+   *     if (editor.surface.explicitlyOverrideInputUndoRedo(e)) {
+   *       return; // Event was handled (undo/redo executed)
+   *     }
+   *     // Handle other keys normally...
+   *   }}
+   * />
+   * ```
+   */
+  public explicitlyOverrideInputUndoRedo(event: {
+    key: string;
+    metaKey: boolean;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+    preventDefault: () => void;
+    stopPropagation: () => void;
+  }): boolean {
+    // Check if this is Cmd+Z (undo) or Cmd+Shift+Z (redo)
+    const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+    const isZKey = event.key === "z" || event.key === "Z";
+
+    if (!isCmdOrCtrl || !isZKey) {
+      return false;
+    }
+
+    // Prevent browser's native undo/redo behavior
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Execute the appropriate editor command
+    if (event.shiftKey) {
+      // Redo: Cmd+Shift+Z
+      this._editor.doc.redo();
+    } else {
+      // Undo: Cmd+Z
+      this._editor.doc.undo();
+    }
+
+    return true;
+  }
 }
 
 export class ImageProxy implements editor.api.ImageInstance {

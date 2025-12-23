@@ -108,25 +108,122 @@ impl<'a> Painter<'a> {
         }
     }
 
-    /// If blend mode is not Normal, wrap drawing in a save_layer with blend mode; else draw directly.
-    pub fn with_blendmode<F: FnOnce()>(&self, layer_blend_mode: LayerBlendMode, f: F) {
-        let canvas = self.canvas;
+    /// Calculate safe bounds for blend mode isolation layer in world coordinates.
+    ///
+    /// Must include drop shadows which extend beyond shape.rect.
+    /// Layer blur and backdrop effects handle their own save_layer bounds.
+    ///
+    /// Parameters:
+    /// - shape: Shape with bounds in LOCAL coordinates (0,0 based)
+    /// - effects: Layer effects for drop shadow expansion
+    /// - transform: Transform matrix to convert local bounds to world coordinates
+    ///
+    /// # TODO: Move to Geometry Stage
+    ///
+    /// Pre-compute blend mode bounds in the geometry stage (similar to `compute_render_bounds`
+    /// in `cache::geometry`). This would unify all geometry computations (world/absolute/local transforms,
+    /// render bounds, blend mode isolation bounds) in a single place, ensuring consistency and avoiding
+    /// redundant calculations during rendering. The geometry cache already computes `absolute_render_bounds`
+    /// which includes effect expansion - blend mode isolation bounds could be added as a separate field
+    /// or computed alongside render bounds.
+    fn compute_blend_mode_bounds(
+        shape: &PainterShape,
+        effects: &LayerEffects,
+        transform: &[[f32; 3]; 2],
+    ) -> Rect {
+        // Start with local bounds (0,0 based)
+        let mut local_bounds = shape.rect;
 
-        // let mut paint = SkPaint::default();
-        // paint.set_blend_mode(blend_mode.into());
-        // canvas.save_layer(&SaveLayerRec::default().paint(&paint));
-        // f();
-        // canvas.restore();
+        // Expand for drop shadows in local space (drawn inside blend mode isolation)
+        for shadow in &effects.shadows {
+            if let FilterShadowEffect::DropShadow(ds) = shadow {
+                // Calculate shadow bounds at offset position
+                let mut shadow_bounds = local_bounds;
+                // Offset the bounds by shadow dx, dy
+                shadow_bounds = Rect::from_xywh(
+                    shadow_bounds.x() + ds.dx,
+                    shadow_bounds.y() + ds.dy,
+                    shadow_bounds.width(),
+                    shadow_bounds.height(),
+                );
 
-        if layer_blend_mode != LayerBlendMode::PassThrough {
-            let mut paint = SkPaint::default();
-            let blend_mode: BlendMode = layer_blend_mode.into();
-            paint.set_blend_mode(blend_mode.into());
-            canvas.save_layer(&SaveLayerRec::default().paint(&paint));
-            f();
-            canvas.restore();
-        } else {
-            f();
+                // Apply spread (expand or contract)
+                if ds.spread != 0.0 {
+                    let expansion = ds.spread.abs();
+                    shadow_bounds = shadow_bounds.with_outset((expansion, expansion));
+                }
+
+                // Apply blur expansion (3x sigma for Gaussian coverage)
+                if ds.blur > 0.0 {
+                    shadow_bounds = shadow_bounds.with_outset((ds.blur * 3.0, ds.blur * 3.0));
+                }
+
+                // Union with original bounds to include entire shadow area
+                local_bounds = Rect::from_ltrb(
+                    local_bounds.left().min(shadow_bounds.left()),
+                    local_bounds.top().min(shadow_bounds.top()),
+                    local_bounds.right().max(shadow_bounds.right()),
+                    local_bounds.bottom().max(shadow_bounds.bottom()),
+                );
+            }
+        }
+
+        // Transform local bounds to world coordinates using the layer transform
+        // Convert Skia Rect to math2 Rectangle for transformation
+        let math_rect = math2::rect::Rectangle {
+            x: local_bounds.left(),
+            y: local_bounds.top(),
+            width: local_bounds.width(),
+            height: local_bounds.height(),
+        };
+
+        let affine_transform = math2::transform::AffineTransform { matrix: *transform };
+        let world_rect = math2::rect::transform(math_rect, &affine_transform);
+
+        // Convert back to Skia Rect
+        Rect::from_xywh(
+            world_rect.x,
+            world_rect.y,
+            world_rect.width,
+            world_rect.height,
+        )
+    }
+
+    /// If blend mode is not PassThrough, wrap drawing in a bounds-optimized save_layer.
+    ///
+    /// Performance: Uses bounds-based save_layer to limit offscreen buffer size (~100x smaller).
+    /// Spec compliance: Preserves isolation semantics - all blend modes (including Normal) are isolated.
+    ///
+    /// Bounds safety: Includes drop shadows which extend beyond base shape bounds.
+    ///
+    /// Note: transform parameter is needed to convert shape.rect (local coordinates) to world coordinates.
+    pub fn with_blendmode<F: FnOnce()>(
+        &self,
+        layer_blend_mode: LayerBlendMode,
+        shape: &PainterShape,
+        effects: &LayerEffects,
+        transform: &[[f32; 3]; 2],
+        f: F,
+    ) {
+        match layer_blend_mode {
+            LayerBlendMode::PassThrough => {
+                // No isolation - draw directly (fast path)
+                f();
+            }
+            LayerBlendMode::Blend(blend_mode) => {
+                // Compute safe bounds in world coordinates (shape.rect is in local space)
+                let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
+
+                let mut paint = SkPaint::default();
+                paint.set_blend_mode(blend_mode.into());
+
+                // Use bounds-based save_layer (much smaller than full canvas)
+                let layer_rec = SaveLayerRec::default().bounds(&bounds).paint(&paint);
+
+                self.canvas.save_layer(&layer_rec);
+                f();
+                self.canvas.restore();
+            }
         }
     }
 
@@ -243,11 +340,44 @@ impl<'a> Painter<'a> {
         shadow: &FeShadow,
         y_offset: f32,
     ) {
+        // Compute paragraph bounds (in text coordinate space, before y_offset translation)
+        let (text_width, text_height) = {
+            let para_ref = paragraph.borrow();
+            (para_ref.max_width(), para_ref.height())
+        };
+        let text_bounds = Rect::from_xywh(0.0, y_offset, text_width, text_height);
+
+        // Expand bounds for drop shadow: offset + spread + blur expansion
+        let mut shadow_bounds = text_bounds;
+        // Offset by shadow dx, dy
+        shadow_bounds = Rect::from_xywh(
+            shadow_bounds.x() + shadow.dx,
+            shadow_bounds.y() + shadow.dy,
+            shadow_bounds.width(),
+            shadow_bounds.height(),
+        );
+        // Apply spread (expand or contract)
+        if shadow.spread != 0.0 {
+            let expansion = shadow.spread.abs();
+            shadow_bounds = shadow_bounds.with_outset((expansion, expansion));
+        }
+        // Apply blur expansion (3x sigma for Gaussian coverage)
+        if shadow.blur > 0.0 {
+            shadow_bounds = shadow_bounds.with_outset((shadow.blur * 3.0, shadow.blur * 3.0));
+        }
+        // Union with original bounds to include entire shadow area
+        let bounds = Rect::from_ltrb(
+            text_bounds.left().min(shadow_bounds.left()),
+            text_bounds.top().min(shadow_bounds.top()),
+            text_bounds.right().max(shadow_bounds.right()),
+            text_bounds.bottom().max(shadow_bounds.bottom()),
+        );
+
         let mut paint = SkPaint::default();
         paint.set_image_filter(shadow::drop_shadow_image_filter(shadow));
         paint.set_anti_alias(true);
         self.canvas
-            .save_layer(&SaveLayerRec::default().paint(&paint));
+            .save_layer(&SaveLayerRec::default().bounds(&bounds).paint(&paint));
         self.canvas.translate((0.0, y_offset));
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
         self.canvas.restore();
@@ -260,11 +390,25 @@ impl<'a> Painter<'a> {
         shadow: &FeShadow,
         y_offset: f32,
     ) {
+        // Compute paragraph bounds (in text coordinate space, before y_offset translation)
+        // Inner shadows are clipped to the text bounds, but still need expansion for blur
+        let (text_width, text_height) = {
+            let para_ref = paragraph.borrow();
+            (para_ref.max_width(), para_ref.height())
+        };
+        let mut bounds = Rect::from_xywh(0.0, y_offset, text_width, text_height);
+
+        // Expand bounds for inner shadow blur (inner shadows are clipped to shape, but blur needs expansion)
+        // Note: inner shadows don't use offset/spread expansion like drop shadows since they're clipped
+        if shadow.blur > 0.0 {
+            bounds = bounds.with_outset((shadow.blur * 3.0, shadow.blur * 3.0));
+        }
+
         let mut paint = SkPaint::default();
         paint.set_image_filter(shadow::inner_shadow_image_filter(shadow));
         paint.set_anti_alias(true);
         self.canvas
-            .save_layer(&SaveLayerRec::default().paint(&paint));
+            .save_layer(&SaveLayerRec::default().bounds(&bounds).paint(&paint));
         self.canvas.translate((0.0, y_offset));
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
         self.canvas.restore();
@@ -438,7 +582,11 @@ impl<'a> Painter<'a> {
         }
 
         // SaveLayer with backdrop captures background and applies filter
-        let layer_rec = SaveLayerRec::default().backdrop(&glass_filter);
+        // Use bounds relative to translated origin (0,0 based after translation)
+        let layer_bounds = Rect::from_xywh(0.0, 0.0, width, height);
+        let layer_rec = SaveLayerRec::default()
+            .bounds(&layer_bounds)
+            .backdrop(&glass_filter);
         canvas.save_layer(&layer_rec);
 
         canvas.restore();
@@ -709,187 +857,221 @@ impl<'a> Painter<'a> {
     pub fn draw_layer(&self, layer: &PainterPictureLayer) {
         match layer {
             PainterPictureLayer::Shape(shape_layer) => {
-                self.with_blendmode(shape_layer.base.blend_mode, || {
-                    self.with_transform(&shape_layer.base.transform.matrix, || {
-                        let shape = &shape_layer.shape;
-                        let effect_ref = &shape_layer.effects;
-                        let clip_path = &shape_layer.base.clip_path;
-                        let draw_content = || {
-                            self.with_opacity(shape_layer.base.opacity, || {
-                                // 1. Fills
-                                self.draw_fills(shape, &shape_layer.fills);
+                self.with_blendmode(
+                    shape_layer.base.blend_mode,
+                    &shape_layer.shape,
+                    &shape_layer.effects,
+                    &shape_layer.base.transform.matrix,
+                    || {
+                        self.with_transform(&shape_layer.base.transform.matrix, || {
+                            let shape = &shape_layer.shape;
+                            let effect_ref = &shape_layer.effects;
+                            let clip_path = &shape_layer.base.clip_path;
+                            let draw_content = || {
+                                self.with_opacity(shape_layer.base.opacity, || {
+                                    // 1. Fills
+                                    self.draw_fills(shape, &shape_layer.fills);
 
-                                // 2. Noise (only if fills are visible)
-                                if !shape_layer.fills.is_empty() && !effect_ref.noises.is_empty() {
-                                    self.draw_noise_effects(shape, &effect_ref.noises);
-                                }
+                                    // 2. Noise (only if fills are visible)
+                                    if !shape_layer.fills.is_empty()
+                                        && !effect_ref.noises.is_empty()
+                                    {
+                                        self.draw_noise_effects(shape, &effect_ref.noises);
+                                    }
 
-                                // 3. Strokes
-                                if let Some(path) = &shape_layer.stroke_path {
-                                    self.draw_stroke_path(shape, path, &shape_layer.strokes);
-                                }
-                            });
-                        };
-                        if let Some(clip) = clip_path {
-                            self.canvas.save();
-                            self.canvas.clip_path(clip, None, true);
-                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            self.canvas.restore();
-                        } else {
-                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                        }
-                    });
-                });
+                                    // 3. Strokes
+                                    if let Some(path) = &shape_layer.stroke_path {
+                                        self.draw_stroke_path(shape, path, &shape_layer.strokes);
+                                    }
+                                });
+                            };
+                            if let Some(clip) = clip_path {
+                                self.canvas.save();
+                                self.canvas.clip_path(clip, None, true);
+                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
+                                self.canvas.restore();
+                            } else {
+                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
+                            }
+                        });
+                    },
+                );
             }
             PainterPictureLayer::Text(text_layer) => {
-                self.with_blendmode(text_layer.base.blend_mode, || {
-                    self.with_transform(&text_layer.base.transform.matrix, || {
-                        let effects = &text_layer.effects;
-                        let clip_path = &text_layer.base.clip_path;
+                self.with_blendmode(
+                    text_layer.base.blend_mode,
+                    &text_layer.shape,
+                    &text_layer.effects,
+                    &text_layer.base.transform.matrix,
+                    || {
+                        self.with_transform(&text_layer.base.transform.matrix, || {
+                            let effects = &text_layer.effects;
+                            let clip_path = &text_layer.base.clip_path;
 
-                        let paragraph = self.cached_paragraph(
-                            &text_layer.base.id,
-                            &text_layer.text,
-                            &text_layer.width,
-                            &text_layer.max_lines,
-                            &text_layer.ellipsis,
-                            &text_layer.fills,
-                            &text_layer.text_align,
-                            &text_layer.text_align_vertical,
-                            &text_layer.text_style,
-                        );
-                        let layout_size = {
-                            let para = paragraph.borrow();
-                            (para.max_width(), para.height())
-                        };
+                            let paragraph = self.cached_paragraph(
+                                &text_layer.base.id,
+                                &text_layer.text,
+                                &text_layer.width,
+                                &text_layer.max_lines,
+                                &text_layer.ellipsis,
+                                &text_layer.fills,
+                                &text_layer.text_align,
+                                &text_layer.text_align_vertical,
+                                &text_layer.text_style,
+                            );
+                            let layout_size = {
+                                let para = paragraph.borrow();
+                                (para.max_width(), para.height())
+                            };
 
-                        let layout_height = layout_size.1;
-                        let container_height = text_layer.height.unwrap_or(layout_height);
-                        let y_offset = match text_layer.height {
-                            Some(h) => match text_layer.text_align_vertical {
-                                TextAlignVertical::Top => 0.0,
-                                TextAlignVertical::Center => (h - layout_height) / 2.0,
-                                TextAlignVertical::Bottom => h - layout_height,
-                            },
-                            None => 0.0,
-                        };
+                            let layout_height = layout_size.1;
+                            let container_height = text_layer.height.unwrap_or(layout_height);
+                            let y_offset = match text_layer.height {
+                                Some(h) => match text_layer.text_align_vertical {
+                                    TextAlignVertical::Top => 0.0,
+                                    TextAlignVertical::Center => (h - layout_height) / 2.0,
+                                    TextAlignVertical::Bottom => h - layout_height,
+                                },
+                                None => 0.0,
+                            };
 
-                        let draw_content = || {
-                            self.with_opacity(text_layer.base.opacity, || {
-                                if text_layer.fills.is_empty() {
-                                    return;
+                            let draw_content = || {
+                                self.with_opacity(text_layer.base.opacity, || {
+                                    if text_layer.fills.is_empty() {
+                                        return;
+                                    }
+                                    self.draw_text_paragraph(
+                                        &paragraph,
+                                        &text_layer.strokes,
+                                        text_layer.stroke_width,
+                                        &text_layer.stroke_align,
+                                        (layout_size.0, container_height),
+                                        y_offset,
+                                    );
+                                });
+                            };
+
+                            let apply_effects = || {
+                                if let Some(blur) = &effects.backdrop_blur {
+                                    self.draw_text_backdrop_blur(&paragraph, &blur.blur, y_offset);
                                 }
-                                self.draw_text_paragraph(
-                                    &paragraph,
-                                    &text_layer.strokes,
-                                    text_layer.stroke_width,
-                                    &text_layer.stroke_align,
-                                    (layout_size.0, container_height),
-                                    y_offset,
-                                );
-                            });
-                        };
 
-                        let apply_effects = || {
-                            if let Some(blur) = &effects.backdrop_blur {
-                                self.draw_text_backdrop_blur(&paragraph, &blur.blur, y_offset);
-                            }
-
-                            for shadow in &effects.shadows {
-                                if let FilterShadowEffect::DropShadow(ds) = shadow {
-                                    self.draw_text_shadow(&paragraph, ds, y_offset);
+                                for shadow in &effects.shadows {
+                                    if let FilterShadowEffect::DropShadow(ds) = shadow {
+                                        self.draw_text_shadow(&paragraph, ds, y_offset);
+                                    }
                                 }
-                            }
 
-                            draw_content();
+                                draw_content();
 
-                            for shadow in &effects.shadows {
-                                if let FilterShadowEffect::InnerShadow(is) = shadow {
-                                    self.draw_text_inner_shadow(&paragraph, is, y_offset);
+                                for shadow in &effects.shadows {
+                                    if let FilterShadowEffect::InnerShadow(is) = shadow {
+                                        self.draw_text_inner_shadow(&paragraph, is, y_offset);
+                                    }
                                 }
-                            }
-                        };
+                            };
 
-                        let draw_with_effects = || {
-                            if let Some(layer_blur) = &effects.blur {
-                                let text_bounds =
-                                    Rect::from_xywh(0.0, y_offset, layout_size.0, container_height);
-                                self.with_layer_blur(&layer_blur.blur, text_bounds, apply_effects);
+                            let draw_with_effects = || {
+                                if let Some(layer_blur) = &effects.blur {
+                                    let text_bounds = Rect::from_xywh(
+                                        0.0,
+                                        y_offset,
+                                        layout_size.0,
+                                        container_height,
+                                    );
+                                    self.with_layer_blur(
+                                        &layer_blur.blur,
+                                        text_bounds,
+                                        apply_effects,
+                                    );
+                                } else {
+                                    apply_effects();
+                                }
+                            };
+
+                            if let Some(clip) = clip_path {
+                                self.canvas.save();
+                                self.canvas.clip_path(clip, None, true);
+                                draw_with_effects();
+                                self.canvas.restore();
                             } else {
-                                apply_effects();
+                                draw_with_effects();
                             }
-                        };
-
-                        if let Some(clip) = clip_path {
-                            self.canvas.save();
-                            self.canvas.clip_path(clip, None, true);
-                            draw_with_effects();
-                            self.canvas.restore();
-                        } else {
-                            draw_with_effects();
-                        }
-                    });
-                });
+                        });
+                    },
+                );
             }
             PainterPictureLayer::Vector(vector_layer) => {
-                self.with_blendmode(vector_layer.base.blend_mode, || {
-                    self.with_transform(&vector_layer.base.transform.matrix, || {
-                        let shape = &vector_layer.shape;
-                        let effect_ref = &vector_layer.effects;
-                        let clip_path = &vector_layer.base.clip_path;
-                        let draw_content = || {
-                            self.with_opacity(vector_layer.base.opacity, || {
-                                // Use VNPainter for vector network rendering
-                                let vn_painter =
+                self.with_blendmode(
+                    vector_layer.base.blend_mode,
+                    &vector_layer.shape,
+                    &vector_layer.effects,
+                    &vector_layer.base.transform.matrix,
+                    || {
+                        self.with_transform(&vector_layer.base.transform.matrix, || {
+                            let shape = &vector_layer.shape;
+                            let effect_ref = &vector_layer.effects;
+                            let clip_path = &vector_layer.base.clip_path;
+                            let draw_content = || {
+                                self.with_opacity(vector_layer.base.opacity, || {
+                                    // Use VNPainter for vector network rendering
+                                    let vn_painter =
                                     crate::vectornetwork::vn_painter::VNPainter::new_with_images(
                                         self.canvas,
                                         self.images,
                                     );
 
-                                // 1. Render fills only (pass None for strokes)
-                                vn_painter.draw(
-                                    &vector_layer.vector,
-                                    &vector_layer.fills,
-                                    None,
-                                    vector_layer.corner_radius,
-                                );
-
-                                // 2. Apply noise effects (only if fills are visible)
-                                if !vector_layer.fills.is_empty() && !effect_ref.noises.is_empty() {
-                                    self.draw_noise_effects(shape, &effect_ref.noises);
-                                }
-
-                                // 3. Render strokes separately
-                                if !vector_layer.strokes.is_empty() {
-                                    let stroke_options = StrokeOptions {
-                                        stroke_width: vector_layer.stroke_width,
-                                        stroke_align: vector_layer.stroke_align,
-                                        stroke_cap: vector_layer.stroke_cap,
-                                        stroke_join: vector_layer.stroke_join,
-                                        stroke_miter_limit: vector_layer.stroke_miter_limit,
-                                        paints: vector_layer.strokes.clone(),
-                                        width_profile: vector_layer.stroke_width_profile.clone(),
-                                        stroke_dash_array: vector_layer.stroke_dash_array.clone(),
-                                    };
-                                    self.draw_vector_strokes(
-                                        &vn_painter,
+                                    // 1. Render fills only (pass None for strokes)
+                                    vn_painter.draw(
                                         &vector_layer.vector,
-                                        &stroke_options,
+                                        &vector_layer.fills,
+                                        None,
                                         vector_layer.corner_radius,
                                     );
-                                }
-                            });
-                        };
-                        if let Some(clip) = clip_path {
-                            self.canvas.save();
-                            self.canvas.clip_path(clip, None, true);
-                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            self.canvas.restore();
-                        } else {
-                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                        }
-                    });
-                });
+
+                                    // 2. Apply noise effects (only if fills are visible)
+                                    if !vector_layer.fills.is_empty()
+                                        && !effect_ref.noises.is_empty()
+                                    {
+                                        self.draw_noise_effects(shape, &effect_ref.noises);
+                                    }
+
+                                    // 3. Render strokes separately
+                                    if !vector_layer.strokes.is_empty() {
+                                        let stroke_options = StrokeOptions {
+                                            stroke_width: vector_layer.stroke_width,
+                                            stroke_align: vector_layer.stroke_align,
+                                            stroke_cap: vector_layer.stroke_cap,
+                                            stroke_join: vector_layer.stroke_join,
+                                            stroke_miter_limit: vector_layer.stroke_miter_limit,
+                                            paints: vector_layer.strokes.clone(),
+                                            width_profile: vector_layer
+                                                .stroke_width_profile
+                                                .clone(),
+                                            stroke_dash_array: vector_layer
+                                                .stroke_dash_array
+                                                .clone(),
+                                        };
+                                        self.draw_vector_strokes(
+                                            &vn_painter,
+                                            &vector_layer.vector,
+                                            &stroke_options,
+                                            vector_layer.corner_radius,
+                                        );
+                                    }
+                                });
+                            };
+                            if let Some(clip) = clip_path {
+                                self.canvas.save();
+                                self.canvas.clip_path(clip, None, true);
+                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
+                                self.canvas.restore();
+                            } else {
+                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
+                            }
+                        });
+                    },
+                );
             }
         }
     }

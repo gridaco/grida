@@ -76,6 +76,25 @@ function MaskIndicatorContainer({
   }
 }
 
+function NodeActionButton({
+  alwaysVisible,
+  className,
+  ...props
+}: {
+  alwaysVisible: boolean;
+} & React.ComponentProps<"button">) {
+  return (
+    <button
+      {...props}
+      className={cn(
+        "opacity-0 group-hover/item:opacity-100 transition-opacity",
+        alwaysVisible && "opacity-100",
+        className
+      )}
+    />
+  );
+}
+
 export const NodeHierarchyTreeItem = React.memo(function NodeHierarchyTreeItem({
   item,
   node,
@@ -129,11 +148,18 @@ export const NodeHierarchyTreeItem = React.memo(function NodeHierarchyTreeItem({
         </div>
         <div
           aria-label="actions"
-          className="group-hover/item:flex group-data-[renaming=true]/item:hidden hidden shrink-0 items-center gap-2 px-2"
+          className={cn(
+            "shrink-0 items-center gap-2 px-2",
+            "group-data-[renaming=true]/item:hidden",
+            "group-hover/item:flex",
+            (node.locked || !node.active) && "flex",
+            !(node.locked || !node.active) && "hidden"
+          )}
         >
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
+          <NodeActionButton
+            alwaysVisible={node.locked}
+            onClick={(e) => {
+              e.stopPropagation();
               onToggleLocked();
             }}
           >
@@ -142,10 +168,11 @@ export const NodeHierarchyTreeItem = React.memo(function NodeHierarchyTreeItem({
             ) : (
               <LockOpen1Icon className="size-3" />
             )}
-          </button>
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
+          </NodeActionButton>
+          <NodeActionButton
+            alwaysVisible={!node.active}
+            onClick={(e) => {
+              e.stopPropagation();
               onToggleActive();
             }}
           >
@@ -154,7 +181,7 @@ export const NodeHierarchyTreeItem = React.memo(function NodeHierarchyTreeItem({
             ) : (
               <EyeClosedIcon className="size-3" />
             )}
-          </button>
+          </NodeActionButton>
         </div>
       </TreeItemLabel>
     </TreeItem>

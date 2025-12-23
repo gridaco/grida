@@ -61,7 +61,7 @@ import type { BitmapEditorBrush } from "@grida/bitmap";
 import { toast } from "sonner";
 import {
   FloatingBar,
-  FloatingBarContent,
+  FloatingBarContentWrapper,
   FloatingBarTitle,
 } from "./ui/floating-bar";
 import grida from "@grida/schema";
@@ -201,6 +201,21 @@ export function EditorSurface() {
         capture: true,
       });
   }, [eventTargetRef.current]);
+
+  // Register window blur handler
+  // This is the single source of blur handling for the editor surface.
+  // When window loses focus, modifier keys (Meta/Ctrl/Alt/Shift) don't fire keyup events,
+  // so we reset all modifier-dependent state to prevent stuck configurations.
+  useEffect(() => {
+    // Wrap in arrow function to preserve `this` context when called by browser event system
+    const handleBlur = (event: FocusEvent) => {
+      editor.surface.onblur(event);
+    };
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [editor]);
 
   const __hand_tool_triggered_by_aux_button = useRef(false);
 
@@ -614,11 +629,15 @@ function RootFramesBarOverlay() {
     if (!rootframe) return null;
     return (
       <NodeTitleBar node={rootframe} node_id={rootframe.id} state={"active"}>
-        <FloatingBarContent>
-          <NodeTitleBarTitle node={rootframe}>
-            {" (single mode)"}
-          </NodeTitleBarTitle>
-        </FloatingBarContent>
+        {/* Single-mode: full styling with padding, rounded corners, and background */}
+        {/* Use padding-bottom on wrapper instead of margin to ensure events work in the gap */}
+        <div className="pb-1.5">
+          <div className="w-full flex items-center gap-2 rounded-lg py-2 px-2.5 bg-background/80 group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent group-data-[layer-is-component-consumer='true']:!bg-workbench-accent-violet/50">
+            <NodeTitleBarTitle node={rootframe}>
+              {" (single mode)"}
+            </NodeTitleBarTitle>
+          </div>
+        </div>
       </NodeTitleBar>
     );
   }
@@ -638,7 +657,13 @@ function RootFramesBarOverlay() {
                 : "idle"
           }
         >
-          <NodeTitleBarTitle node={node} />
+          {/* Multi-mode: plain text, no styling */}
+          {/* Use padding-bottom on wrapper instead of margin to ensure events work in the gap */}
+          <div className="pb-1.5 py-px">
+            <div className="w-full flex items-center gap-2">
+              <NodeTitleBarTitle node={node} />
+            </div>
+          </div>
         </NodeTitleBar>
       ))}
     </>
@@ -676,9 +701,11 @@ function NodeTitleBar({
       onPointerDown: ({ event }) => {
         event.preventDefault();
         if (event.shiftKey) {
-          editor.commands.select("selection", [node.id]);
+          // Toggle selection when shift is pressed
+          editor.commands.select([node.id], "toggle");
         } else {
-          editor.commands.select([node.id]);
+          // Reset selection when shift is not pressed
+          editor.commands.select([node.id], "reset");
         }
       },
     },
@@ -695,13 +722,22 @@ function NodeTitleBar({
       state={state}
       isComponentConsumer={is_direct_component_consumer(node.type)}
     >
-      <div {...bind()} style={{ touchAction: "none" }} className="pb-1">
+      <FloatingBarContentWrapper {...bind()} style={{ touchAction: "none" }}>
         {children}
-      </div>
+      </FloatingBarContentWrapper>
     </FloatingBar>
   );
 }
 
+/**
+ * Title bar title component that displays the node name and allows renaming via double-click.
+ *
+ * **Rename Behavior:**
+ * - Double-click triggers rename mode
+ * - Rename is only triggered when NO modifier keys are pressed (Shift, Ctrl/Cmd, Alt)
+ * - This prevents accidental rename when modifier keys are used for other actions
+ *   (e.g., Shift+double-click for selection, Cmd/Ctrl+double-click for shortcuts)
+ */
 function NodeTitleBarTitle({
   node,
   children,
@@ -758,7 +794,12 @@ function NodeTitleBarTitle({
     <FloatingBarTitle
       onDoubleClick={(e) => {
         e.stopPropagation();
-        setEditing(true);
+        // Only trigger rename when no modifier keys are pressed
+        // This prevents accidental rename when using modifier keys for other actions
+        // (e.g., Shift+double-click for selection, Cmd/Ctrl+double-click for other shortcuts)
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          setEditing(true);
+        }
       }}
     >
       {node.name}

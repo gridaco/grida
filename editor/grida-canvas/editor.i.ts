@@ -384,19 +384,26 @@ export namespace editor.config {
 
   export const DEFAULT_HIT_TESTING_CONFIG: state.HitTestingConfig = {
     target: "auto",
-    ignores_root_with_children: true,
     ignores_locked: true,
+    // ignores_root_with_children: true, // REMOVED - now using scene-based logic
   };
 
   /**
    * Specialized hit testing configuration for measurement targeting.
    *
-   * Measurement needs to include root containers in the result so we
-   * override the default behaviour that ignores roots with children.
+   * Measurement mode respects the target mode (auto/deepest) set by the user
+   * (e.g., via Cmd key). It sets ignores_locked to false so that locked nodes
+   * can be measured (useful for measuring distances to reference elements).
+   *
+   * Note: ignores_root_with_children was removed - measurement mode now follows
+   * the same scene-based logic (single mode vs normal mode).
    */
   export const MEASUREMENT_HIT_TESTING_CONFIG: Partial<state.HitTestingConfig> =
     {
-      ignores_root_with_children: false,
+      ignores_locked: false, // Allow measuring to locked nodes (reference elements)
+      // Don't override - respect user's target choice (auto/deepest via Cmd)
+      // target: "auto",
+      // ignores_root_with_children: false, // REMOVED
     };
 
   export const DEFAULT_GESTURE_MODIFIERS: state.GestureModifiers = {
@@ -742,11 +749,19 @@ export namespace editor.state {
      */
     target: "auto" | "deepest";
 
-    /**
-     * ignores the root node from the targeting (if not empty)
-     * @default true
-     */
-    ignores_root_with_children: boolean;
+    // /**
+    //  * @deprecated REMOVED - ignores_root_with_children feature has been removed.
+    //  *
+    //  * Reason for removal: The feature was buggy and caused poor UX. We now use
+    //  * simpler scene-based logic:
+    //  * - Single mode (scene.constraints.children === "single"): Skip hit testing for root nodes with children
+    //  * - Normal mode: Treat root containers normally (no special filtering)
+    //  *
+    //  * Original intent: In real-world design practices, a root container/frame acts as an artboard,
+    //  * not a design element, so it makes sense to make its children take higher priority over the root.
+    //  * This can be revisited in the future if needed.
+    //  */
+    // ignores_root_with_children: boolean;
 
     /**
      * ignores the locked node from the targeting
@@ -1010,6 +1025,19 @@ export namespace editor.state {
      * @default null
      */
     hovered_node_id: string | null;
+
+    /**
+     * Source of the current hover state.
+     * Used to determine if hover should be preserved during hit-testing.
+     *
+     * - "hit-test": Hover from canvas geometry hit-testing (normal hover)
+     * - "title-bar": Hover from container/frame title bar (no geometry, needs preservation)
+     * - "hierarchy-tree": Hover from hierarchy tree UI (doesn't need preservation)
+     * - null: No UI-triggered hover active
+     *
+     * @default null
+     */
+    hovered_node_source: "hit-test" | "title-bar" | "hierarchy-tree" | null;
 
     /**
      * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
@@ -1414,6 +1442,7 @@ export namespace editor.state {
     dropzone: undefined,
     gesture: { type: "idle" },
     hovered_node_id: null,
+    hovered_node_source: null,
     marquee: undefined,
     selection: [],
     hits: [],
@@ -2715,35 +2744,61 @@ export namespace editor.api {
     ): void;
 
     /**
-     * Selects nodes by the given selectors.
+     * Query nodes using selectors and return their IDs.
+     * This is a pure query function that does not dispatch any actions.
      *
-     * **Scene Scoping**: All selection results are automatically scoped to the current scene.
-     * Nodes from other scenes are filtered out, ensuring that selection operations (e.g., CMD+A)
-     * only affect nodes within the active scene, even when the selector would otherwise match
-     * nodes across multiple scenes.
+     * **Scene Scoping**: All query results are automatically scoped to the current scene.
+     * Nodes from other scenes are filtered out, ensuring that queries (e.g., CMD+A)
+     * only return nodes within the active scene.
      *
      * @param selectors - Array of {@link grida.program.document.Selector} values to query nodes
-     * @returns The selected node IDs within the current scene, or `false` if no nodes were found
+     * @returns Array of node IDs within the current scene, or empty array if none found
      *
      * @example
      * ```typescript
-     * // Select all nodes in the current scene (CMD+A)
-     * const selected = editor.commands.select("~");
+     * // Get all nodes in the current scene
+     * const allNodes = editor.commands.querySelectAll("~");
      *
-     * // Select children of currently selected nodes
-     * editor.commands.select(">");
+     * // Get children of currently selected nodes
+     * const children = editor.commands.querySelectAll(">");
      *
-     * // Select siblings of currently selected nodes
-     * editor.commands.select("~");
+     * // Then use select() to actually select them
+     * editor.commands.select(allNodes);
      * ```
      *
      * @remarks
      * - When selection is empty and selector is `"~"`, it defaults to `"*"` (all nodes)
-     * - Scene scoping ensures that even when selecting all nodes, only nodes within the
+     * - Scene scoping ensures that even when querying all nodes, only nodes within the
      *   current scene are included in the result
      * - Scene nodes themselves are never selectable and are automatically filtered out
      */
-    select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
+    querySelectAll(...selectors: grida.program.document.Selector[]): NodeID[];
+
+    /**
+     * Select nodes by their IDs with an optional selection mode.
+     * This is the low-level selection action dispatcher.
+     *
+     * @param selection - Array of node IDs to select
+     * @param mode - Selection mode: "reset" (replace), "add" (additive), or "toggle"
+     * @default "reset"
+     *
+     * @example
+     * ```typescript
+     * // Reset selection to specific nodes
+     * editor.commands.select([node1, node2], "reset");
+     *
+     * // Add nodes to current selection
+     * editor.commands.select([node3], "add");
+     *
+     * // Toggle nodes in selection
+     * editor.commands.select([node4], "toggle");
+     *
+     * // Query then select (common pattern)
+     * const targets = editor.commands.querySelectAll("~");
+     * editor.commands.select(targets);
+     * ```
+     */
+    select(selection: NodeID[], mode?: "reset" | "add" | "toggle"): void;
 
     blur(): void;
     cut(target: "selection" | NodeID): void;
@@ -3606,6 +3661,32 @@ export namespace editor.api {
     surfaceConfigurePaddingWithMirroringModifier(
       padding_with_axis_mirroring: "on" | "off"
     ): void;
+
+    /**
+     * Blur event handler callback.
+     * Can be used with `window.addEventListener("blur", editor.surface.onblur)`.
+     *
+     * **Why this exists:**
+     * When the window/tab loses focus, modifier keys (Meta/Cmd, Ctrl, Alt, Shift) do NOT
+     * fire keyup events. This means modifier-dependent state can get stuck (e.g., measurement
+     * mode stays on, snap modifiers remain active). We reset everything on blur to ensure
+     * a consistent state when the user returns.
+     *
+     * **What it does:**
+     * - Clears stuck title bar hover state (pointerLeave never fires on tab switch)
+     * - Resets all surface configurations (raycast targeting, measurement, modifiers)
+     * - Resets tool to cursor (safe default)
+     *
+     * The callback signature matches `window.addEventListener("blur", callback)`.
+     *
+     * @example
+     * ```typescript
+     * window.addEventListener("blur", editor.surface.onblur);
+     * // Later:
+     * window.removeEventListener("blur", editor.surface.onblur);
+     * ```
+     */
+    onblur(event: FocusEvent): void;
     //
   }
 

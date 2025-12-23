@@ -327,6 +327,7 @@ function ModeMixedNodeProperties({
     cross_axis_alignment,
     //
     cursor,
+    blend_mode,
 
     // component_id,
     // style,
@@ -361,6 +362,7 @@ function ModeMixedNodeProperties({
   const has_container = types.has("container");
   const has_flex_container =
     has_container && nodes.some((n) => "layout" in n && n.layout === "flex");
+  const has_stylable = nodes.some((n) => n.type !== "template_instance");
 
   return (
     <div key={sid} className="mt-4 mb-10">
@@ -491,9 +493,16 @@ function ModeMixedNodeProperties({
             </PropertyLine> */}
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection hidden={!has_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderActions>
+            <BlendModeDropdown
+              type="layer"
+              value={blend_mode?.value}
+              onValueChange={change.blend_mode}
+            />
+          </SidebarSectionHeaderActions>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>

@@ -26,6 +26,7 @@ import {
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import updateNodeTransform from "./node-transform.reducer";
+import { __validateHoverState } from "./methods/hover";
 import {
   self_clearSelection,
   self_try_remove_node,
@@ -264,8 +265,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "select": {
       return updateState(state, (draft) => {
-        const { selection } = <EditorSelectAction>action;
-        self_selectNode(draft, "reset", ...selection);
+        const { selection, mode = "reset" } = <EditorSelectAction>action;
+        self_selectNode(draft, mode, ...selection);
       });
     }
     case "blur": {
@@ -273,23 +274,67 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         self_clearSelection(draft);
       });
     }
-    case "hover": {
+    case "hover/title-bar": {
       const { event, target } = action;
       switch (event) {
         case "enter": {
           return updateState(state, (draft) => {
+            // Set both hovered_node_id and hovered_node_source
+            // This marks it as a title bar hover, preventing hit-testing from clearing it
             draft.hovered_node_id = target;
+            draft.hovered_node_source = "title-bar";
+            // Validate state consistency
+            __validateHoverState(draft);
           });
         }
         case "leave": {
           return updateState(state, (draft) => {
-            if (draft.hovered_node_id === target) {
+            // Only clear if this is the currently hovered node and it's from title bar
+            // This ensures we don't clear hover from other sources
+            if (
+              draft.hovered_node_id === target &&
+              draft.hovered_node_source === "title-bar"
+            ) {
               draft.hovered_node_id = null;
+              draft.hovered_node_source = null;
             }
+            // Validate state consistency
+            __validateHoverState(draft);
           });
         }
       }
-      //
+      break;
+    }
+    case "hover/ui": {
+      const { event, target } = action;
+      switch (event) {
+        case "enter": {
+          return updateState(state, (draft) => {
+            // Set hovered_node_id and source for hierarchy tree hover
+            // This does not affect title bar hover state
+            draft.hovered_node_id = target;
+            draft.hovered_node_source = "hierarchy-tree";
+            // Validate state consistency
+            __validateHoverState(draft);
+          });
+        }
+        case "leave": {
+          return updateState(state, (draft) => {
+            // Only clear if this is the currently hovered node and it's from hierarchy tree
+            // This ensures we don't clear hover from other sources
+            if (
+              draft.hovered_node_id === target &&
+              draft.hovered_node_source === "hierarchy-tree"
+            ) {
+              draft.hovered_node_id = null;
+              draft.hovered_node_source = null;
+            }
+            // Validate state consistency
+            __validateHoverState(draft);
+          });
+        }
+      }
+      break;
     }
     case "copy":
     case "cut": {

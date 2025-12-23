@@ -2,7 +2,11 @@
 
 import React, { useMemo, useState } from "react";
 import { useGesture as __useGesture } from "@use-gesture/react";
-import { useGestureState, useTransformState } from "../../provider";
+import {
+  useGestureState,
+  useTransformState,
+  useToolState,
+} from "../../provider";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import { ObjectsDistributionAnalysis } from "./distribution";
 import cmath from "@grida/cmath";
@@ -117,6 +121,20 @@ function GapWithHandle({
   onGapGestureStart?: (axis: cmath.Axis) => void;
 }) {
   const { gesture } = useGestureState();
+  const tool = useToolState();
+
+  // Note: This handler is required because the gap overlay uses `pointer-events-auto`
+  // to enable hover detection (showing the gap overlay on hover). Since it consumes
+  // pointer events, we need to prevent default to avoid triggering selection changes
+  // when clicking on the gap overlay region.
+  const handlePointerDown = (event: React.PointerEvent) => {
+    // Don't prevent default for insert/draw tools - they need pointer events
+    if (tool.type === "insert" || tool.type === "draw") {
+      return;
+    }
+    // For all other tools, prevent default to block selection changes
+    event.preventDefault();
+  };
 
   const r = useMemo(() => {
     const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
@@ -166,6 +184,7 @@ function GapWithHandle({
         data-is-gesture={is_gesture}
         data-highlighted={highlighted}
         className={cn("group/gap pointer-events-auto", className)}
+        onPointerDown={handlePointerDown}
         {...props}
       >
         <svg className="absolute inset-0 overflow-visible pointer-events-none">

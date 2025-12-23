@@ -134,43 +134,181 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 13. **Minimize Canvas State Changes**
 
-    - Reuse transforms and paints.
-    - Precompute common values like DPI × Zoom × ViewMatrix.
+- Reuse transforms and paints.
+- Precompute common values like DPI × Zoom × ViewMatrix.
 
-14. **Text & Path Caching**
+14. **Tight Bounds for `save_layer` Operations**
 
-    - Cache laid-out paragraphs and SVG paths keyed by node ID.
-    - Each entry stores a hash of the text/style or path string and the current
-      font repository generation.
-    - Caches are invalidated when fonts or the original data change.
-    - Hit testing reuses these paths for `path.contains` checks.
+- Always provide explicit bounds to `save_layer` calls instead of using unbounded layers.
+- Unbounded `save_layer` creates full-canvas offscreen buffers, which can be 100× or more larger than necessary.
+- Compute tight bounds that include all visual content:
+  - Base shape bounds (in local coordinates)
+  - Effect expansions (drop shadows: offset + spread + 3× blur radius)
+  - Transform to world coordinates before passing to `save_layer`
+- **Critical for blend mode isolation**: Blend modes require `save_layer` for isolation semantics. Using tight bounds reduces offscreen buffer size dramatically.
+- **Coordinate space consistency**: Ensure bounds are in the correct coordinate space (world space) when `save_layer` is called, accounting for transforms applied before the layer.
+- **Future optimization**: Consider pre-computing blend mode isolation bounds in the geometry stage alongside render bounds for unified geometry computation.
 
-15. **Render Pass Flattening**
+15. **Text & Path Caching**
 
-    - Group nodes with same blend/composite states.
-    - Sort draw calls for fewer GPU flushes.
+- Cache laid-out paragraphs and SVG paths keyed by node ID.
+- Each entry stores a hash of the text/style or path string and the current
+  font repository generation.
+- Caches are invalidated when fonts or the original data change.
+- Hit testing reuses these paths for `path.contains` checks.
+
+16. **Render Pass Flattening**
+
+- Group nodes with same blend/composite states.
+- Sort draw calls for fewer GPU flushes.
+
+---
+
+## Zoom & Interaction Optimization
+
+Scaling-specific optimization tricks for real-world authoring UX (zoom/pinch).
+
+17. **Adaptive Interactive Resolution (LOD While Zooming)**
+
+- Maintain `interactive_scale` s ∈ (0, 1]
+- Effective render resolution: `effective_dpr = device_dpr * s`
+- Drive `s` by zoom velocity, not zoom level:
+  - High `|d(zoom)/dt|` → lower `s` (faster)
+  - Near-zero velocity → ramp `s` → 1 (sharpen)
+
+**Practical heuristics:**
+
+- **Hysteresis**: Enter low-res when `v > V_hi`, exit when `v < V_lo`
+- **Settle timer**: After last zoom input, wait 80–150ms, then refine
+- **Smoothing**: EMA on velocity to avoid flicker:
+  - `v_smooth = lerp(v_smooth, v_raw, α)` (α≈0.2–0.4)
+
+**Suggested scale mapping (simple, stable):**
+
+- `s = clamp(1 / (1 + k * v_smooth), s_min, 1)`
+- Typical: `s_min=0.25–0.5`, `k` tuned to device
+
+18. **Two-Phase Rendering: "Fast Preview" Then "Refine"**
+
+    **During active zoom:**
+
+- Render coarse:
+  - Reuse cached tiles even if they're "wrong density" and just scale them
+  - Prefer nearest/linear sampling for speed
+  - Skip expensive effects (see below)
+
+**After settle:**
+
+- Render final:
+  - Regenerate tiles at full `effective_dpr` for the current zoom
+  - Do it progressively (center first)
+
+19. **Progressive Refinement Ordering (Perceptual Priority)**
+
+When restoring full quality, update tiles in this order:
+
+1.  Tiles near focal point (pinch center / cursor)
+2.  Tiles in the visible viewport
+3.  Tiles in a margin ring (prefetch)
+
+**Implementation detail:**
+
+- Compute `priority = distance(tile_center, focal_point)`
+- Process in a min-heap / bucketed rings
+
+20. **Crossfade to Hide "Pop"**
+
+To avoid harsh swaps from blurry→sharp:
+
+- Keep old tile texture around for ~80–120ms
+- Blend old → new with a short fade (or swap on vsync boundaries)
+
+This is especially important for text and thin strokes.
+
+21. **Effect LOD: Degrade Expensive Passes Only While Scaling**
+
+While zooming, selectively replace/skip heavy operations:
+
+- Drop `saveLayer` + `ImageFilter` chains (blur, shadows, backdrop) → cheap placeholder
+- Reduce blur sigma / shadow blur radius proportionally to `s`
+- Replace complex paths with simplified geometry (optional)
+- Clamp very thin strokes to a minimum pixel width to prevent shimmer
+
+After settle: restore exact effects.
+
+**Key point**: This is UX-acceptable because users perceive motion first, fidelity second.
+
+22. **Stable Tile Identity: Cache in World-Space, Not Zoom-Space**
+
+Avoid "cache per zoom level" keys. Prefer:
+
+- Tile key based on world coordinates at a reference density
+- During zoom:
+  - Sample existing tiles (scaled)
+  - Only re-render when zoom exceeds your density budget
+
+If GPU supports it, use mipmaps for zoom-out so tiles remain usable.
+
+23. **Snap Bounds to Reduce Thrash**
+
+If zoom changes continuously, tiny float differences can cause re-raster storms.
+
+- Snap tile bounds / layer bounds to integer pixels in device space
+- Quantize `effective_dpr` to a small set (e.g. `{0.5, 0.67, 0.75, 1.0}`)
+
+This greatly increases cache hit rate during pinch.
+
+24. **Temporal Throttling: Don't Re-Render on Every Wheel Tick**
+
+During active zoom:
+
+- Rate-limit expensive re-raster to e.g. 30–60 Hz
+- Still update transform (scale) every frame for responsiveness
+- "Refine" pass runs only after settle
+
+This keeps input feel crisp even on heavy documents.
+
+25. **Text-First Refinement (Optional but Huge for Authoring Tools)**
+
+People notice text blur more than shape blur.
+
+After settle (or even during slow zoom), prioritize:
+
+- Glyph atlas/text tiles
+- Selection/caret overlays at full resolution
+
+Even if the scene is still refining, the editor feels "sharp".
+
+26. **Interaction Overlays Rendered at Full-Res**
+
+Always render UI overlays separately at native resolution:
+
+- Selection bounds, handles, guides, cursor, rulers
+- Snapping hints, hover highlights
+
+Even if content is temporarily low-res, the tool still feels precise.
 
 ---
 
 ## Image Optimization
 
-16. **LoD / Mipmapped Image Swapping**
+27. **LoD / Mipmapped Image Swapping**
 
-    - Use lower-res versions of images at low zoom.
-    - Prevents high GPU bandwidth use at low visibility.
+- Use lower-res versions of images at low zoom.
+- Prevents high GPU bandwidth use at low visibility.
 
-17. **ImageRepository with Transform-Aware Access**
+28. **ImageRepository with Transform-Aware Access**
 
-    - Pick image resolution based on projected screen size.
-    - _TODO_: currently we select mipmap levels solely by the size of the
-      drawing rectangle. This is a temporary strategy until a proper cache
-      invalidation mechanism based on zoom is introduced.
+- Pick image resolution based on projected screen size.
+- _TODO_: currently we select mipmap levels solely by the size of the
+  drawing rectangle. This is a temporary strategy until a proper cache
+  invalidation mechanism based on zoom is introduced.
 
 ---
 
 ## Text & Glyph Optimization
 
-18. **Glyph Cache (Atlas or Paragraph Caching)**
+29. **Glyph Cache (Atlas or Paragraph Caching)**
 
     - Cache rasterized or vector glyphs used across the document.
     - Prevents redundant layout or rendering of text.
@@ -180,41 +318,41 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 ## Engine-Level
 
-19. **Precomputed World Transforms**
+30. **Precomputed World Transforms**
 
-    - Avoid recalculating transforms per draw call.
-    - Essential for random-access rendering.
+- Avoid recalculating transforms per draw call.
+- Essential for random-access rendering.
 
-20. **Flat Table Architecture**
+31. **Flat Table Architecture**
 
-    - All node data (transforms, bounds, styles) stored in flat maps.
-    - Enables fast diffing, syncing, and concurrent access.
+- All node data (transforms, bounds, styles) stored in flat maps.
+- Enables fast diffing, syncing, and concurrent access.
 
-21. **Callback-Based Traversal with Fn/FnMut**
+32. **Callback-Based Traversal with Fn/FnMut**
 
-    - Owner controls child behavior via inlined, zero-cost closures.
+- Owner controls child behavior via inlined, zero-cost closures.
 
-22. **Scene Planner & Scheduler**
+33. **Scene Planner & Scheduler**
 
-    - A dynamic system that builds the flat render list per frame.
-    - Reacts to scene changes, memory pressure, or frame budget changes.
-    - Drives the decision to re-record, cache, evict, or downgrade fidelity.
+- A dynamic system that builds the flat render list per frame.
+- Reacts to scene changes, memory pressure, or frame budget changes.
+- Drives the decision to re-record, cache, evict, or downgrade fidelity.
 
 ---
 
 ## Optional Advanced
 
-23. **Multithreaded Scene Update**
+34. **Multithreaded Scene Update**
 
-    - Parallelize transform/bounds resolution.
+- Parallelize transform/bounds resolution.
 
-24. **CRDT-Ready Data Stores**
+35. **CRDT-Ready Data Stores**
 
-    - Flat table model enables future collaboration support.
+- Flat table model enables future collaboration support.
 
-25. **BVH or Quadtree Spatial Index**
+36. **BVH or Quadtree Spatial Index**
 
-    - Build dynamic index from `world_bounds` for fast spatial queries.
+- Build dynamic index from `world_bounds` for fast spatial queries.
 
 ---
 

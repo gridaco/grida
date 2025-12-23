@@ -88,6 +88,11 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
             onPointerDown={stopPropagation}
             onDoubleClick={stopPropagation}
             onKeyDown={(e) => {
+              // Handle Cmd+Z/Cmd+Shift+Z to use editor's history system instead of browser's native undo/redo
+              if (editor.surface.explicitlyOverrideInputUndoRedo(e)) {
+                return;
+              }
+
               if (e.key === "Escape") {
                 e.currentTarget.blur();
               }
