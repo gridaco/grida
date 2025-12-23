@@ -2,19 +2,16 @@
 
 import {
   streamObject,
-  experimental_generateImage,
   type UserModelMessage,
   type UserContent,
   type TextPart,
   type FilePart,
   type ImagePart,
-  type Tool,
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "@ai-sdk/rsc";
 import { request_schema } from "./schema";
 import assert from "assert";
-import { z } from "zod/v3";
 
 const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-4o-mini";
 
