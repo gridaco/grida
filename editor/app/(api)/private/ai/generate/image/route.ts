@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  experimental_generateImage,
+  generateImage,
   type GeneratedFile,
-  type Experimental_GenerateImageResult,
+  type GenerateImageResult,
   type ImageModel,
 } from "ai";
 import { createLibraryClient, service_role } from "@/lib/supabase/server";
@@ -91,9 +91,9 @@ export async function POST(req: NextRequest) {
   }
 
   // generate image
-  let generation: Experimental_GenerateImageResult;
+  let generation: GenerateImageResult;
   try {
-    generation = await generateImage({
+    generation = await generateImageWithSize({
       prompt: body.prompt,
       width: body.width,
       height: body.height,
@@ -197,7 +197,7 @@ async function upload_generated_to_library({
   };
 }
 
-async function generateImage({
+async function generateImageWithSize({
   model,
   prompt,
   width,
@@ -209,11 +209,11 @@ async function generateImage({
   width?: number;
   height?: number;
   aspect_ratio?: ai.image.AspectRatioString;
-}): Promise<Experimental_GenerateImageResult> {
+}): Promise<GenerateImageResult> {
   const size: ai.image.SizeString | undefined =
     width && height ? `${width}x${height}` : undefined;
 
-  return await experimental_generateImage({
+  return await generateImage({
     model: model,
     prompt: prompt,
     size: size,
