@@ -16,7 +16,8 @@ import cg from "@grida/cg";
 import type grida from "@grida/schema";
 import type { editor } from "@/grida-canvas";
 import { editor as editorUtils } from "@/grida-canvas/editor.i";
-import { ImageUpscale, Scissors } from "lucide-react";
+import { ImageUpscale } from "lucide-react";
+import { RemoveBackgroundIcon } from "../starterkit-icons/remove-background";
 import {
   upscaleImage,
   removeBackgroundImage,
@@ -410,7 +411,7 @@ export function ImageToolbar() {
           disabled={removingBackground}
         />
         <ToolbarButtonWithLoading
-          icon={<Scissors className="w-3.5 h-3.5" />}
+          icon={<RemoveBackgroundIcon className="w-3.5 h-3.5" />}
           label="Remove background"
           tooltip="Remove Background"
           onClick={handleRemoveBackground}
