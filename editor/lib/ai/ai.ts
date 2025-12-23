@@ -199,17 +199,18 @@ export namespace ai {
 
         switch (model_id) {
           case MODEL_ID_BRIA_REMOVE_BACKGROUND: {
-            const briaOptions =
-              options as BackgroundRemoverModelOptions[typeof MODEL_ID_BRIA_REMOVE_BACKGROUND];
+            const __options =
+              (options as BackgroundRemoverModelOptions[typeof MODEL_ID_BRIA_REMOVE_BACKGROUND]) ??
+              {};
             const outputUrl = await ai.server.providers.replicate.run(
               MODEL_ID_BRIA_REMOVE_BACKGROUND,
               {
                 image: imageUrl,
-                ...(briaOptions?.preserve_partial_alpha !== undefined && {
-                  preserve_partial_alpha: briaOptions.preserve_partial_alpha,
+                ...(__options.preserve_partial_alpha !== undefined && {
+                  preserve_partial_alpha: __options.preserve_partial_alpha,
                 }),
-                ...(briaOptions?.content_moderation !== undefined && {
-                  content_moderation: briaOptions.content_moderation,
+                ...(__options.content_moderation !== undefined && {
+                  content_moderation: __options.content_moderation,
                 }),
               }
             );
@@ -220,14 +221,15 @@ export namespace ai {
           }
 
           case MODEL_ID_851_LABS_BACKGROUND_REMOVER: {
-            const labsOptions =
-              options as BackgroundRemoverModelOptions[typeof MODEL_ID_851_LABS_BACKGROUND_REMOVER];
+            const __options =
+              (options as BackgroundRemoverModelOptions[typeof MODEL_ID_851_LABS_BACKGROUND_REMOVER]) ??
+              {};
             const outputUrl = await ai.server.providers.replicate.run(
               MODEL_ID_851_LABS_BACKGROUND_REMOVER_IDENTIFIER,
               {
                 image: imageUrl,
-                format: labsOptions.format ?? "png",
-                background_type: labsOptions.background_type ?? "rgba",
+                format: __options.format ?? "png",
+                background_type: __options.background_type ?? "rgba",
               }
             );
 

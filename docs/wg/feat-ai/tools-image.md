@@ -63,7 +63,7 @@ It enables the AI agent to extract foreground elements from existing images, cre
 
 The tool abstracts over multiple background removal models, each optimized for different use cases:
 
-- General purpose removal for diverse image types
+- General-purpose removal for diverse image types
 - High-precision removal for complex subjects (hair, transparency, partial occlusion)
 - Fast removal for batch processing
 

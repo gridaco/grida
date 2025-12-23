@@ -22,6 +22,7 @@ import {
   upscaleImage,
   removeBackgroundImage,
 } from "@/app/(api)/private/ai/image/actions";
+import type { Editor } from "@/grida-canvas/editor";
 
 type ImageSelectionInfo = {
   node_id: string;
@@ -115,7 +116,7 @@ function isImageNodeSelection(
  * Extracts base64 image data from the image reference
  */
 async function extractImageBase64(
-  editor: ReturnType<typeof useCurrentEditor> | any,
+  editor: Editor,
   imageRef: string
 ): Promise<string> {
   const image = editor.getImage(imageRef);
