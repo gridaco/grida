@@ -28,6 +28,7 @@ export namespace ai {
       | "dall-e-2"
       | "dall-e-3"
       | "gpt-image-1"
+      | "gpt-image-1.5"
       | (string & {});
 
     export type ReplicateImageModelId =
@@ -142,7 +143,7 @@ export namespace ai {
       "gpt-image-1": {
         id: "gpt-image-1",
         label: "GPT Image",
-        deprecated: false,
+        deprecated: true,
         short_description: "State-of-the-art image generation model",
         vendor: "openai",
         provider: "openai",
@@ -160,6 +161,34 @@ export namespace ai {
         max_height: 1536,
         avg_ppi: 0.0975,
         avg_credit: 62,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      "gpt-image-1.5": {
+        id: "gpt-image-1.5",
+        label: "GPT Image 1.5",
+        deprecated: false,
+        short_description:
+          "Successor to GPT Image 1 - State-of-the-art image generation model",
+        vendor: "openai",
+        provider: "openai",
+        speed_label: "medium",
+        speed_max: "1m",
+        styles: null,
+        sizes: [
+          [1024, 1024, "1:1"],
+          [1024, 1536, "2:3"],
+          [1536, 1024, "3:2"],
+        ],
+        min_width: 1024,
+        max_width: 1536,
+        min_height: 1024,
+        max_height: 1536,
+        avg_ppi: 0.0257,
+        avg_credit: 50,
         default: {
           width: 1024,
           height: 1024,
