@@ -33,7 +33,6 @@ export namespace canvas_use {
       "canvas_use_data_artboard_sizes" satisfies NS_NAME_CANVAS_USE;
 
     export const platform_sys_tool_ai_fetch_preflight = tool({
-      name: name_platform_sys_tool_ai_fetch_preflight,
       description:
         "A general fetch() utility, with HEAD. used for validating web resources.",
       inputSchema: z.object({
@@ -48,7 +47,6 @@ export namespace canvas_use {
     });
 
     export const platform_sys_tool_ai_image_model_cards = tool({
-      name: name_platform_sys_tool_ai_image_model_cards,
       description:
         "Get the model cards list of Grida Platform supported AI image models",
       inputSchema: z.object({
@@ -87,7 +85,6 @@ export namespace canvas_use {
      * From: https://ai-sdk.dev/cookbook/next/generate-image-with-chat-prompt
      */
     export const platform_sys_tool_ai_generate_image = tool({
-      name: name_platform_sys_tool_ai_generate_image,
       description:
         "Generate an image from a text prompt. Use this when the user wants to create, generate, or visualize an image.",
       inputSchema: z.object({
@@ -185,7 +182,6 @@ export namespace canvas_use {
     });
 
     export const man = tool({
-      name: name_man,
       description: "Display the manual page for the given tool.",
       inputSchema: z.object({
         tool: z
@@ -199,7 +195,6 @@ export namespace canvas_use {
     });
 
     export const tree = tool({
-      name: name_tree,
       description: "Display the tree structure of the canvas.",
       inputSchema: z.object({
         entry_id: z
@@ -215,7 +210,6 @@ export namespace canvas_use {
     });
 
     export const make_from_svg = tool({
-      name: name_make_from_svg,
       title: "Create Node from SVG",
       description:
         "Create a node from an SVG string under new container node. Return the ID of the created node.",
@@ -228,7 +222,6 @@ export namespace canvas_use {
     });
 
     export const make_from_image = tool({
-      name: name_make_from_image,
       title: "Create Image Node",
       description:
         "Create a image node from with optional image source. If no image source is provided, it still creates a image node with placeholder checker image.",
@@ -249,7 +242,6 @@ export namespace canvas_use {
     });
 
     export const make_from_markdown = tool({
-      name: name_make_from_markdown,
       title: "Create Node from Markdown",
       description:
         "Create a node from a markdown string with new text node. Return the ID of the created node.",
@@ -264,10 +256,9 @@ export namespace canvas_use {
     });
 
     export const data_artboard_sizes = tool({
-      name: name_data_artboard_sizes,
       description: "Get the list of commonly defined artboard sizes",
       inputSchema: z.object({}),
-      execute: async ({}) => {
+      execute: async () => {
         return artboard_data;
       },
     });

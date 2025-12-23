@@ -136,6 +136,26 @@ export namespace editor {
   export type NodeID = grida.program.nodes.NodeID;
 
   /**
+   * Gets the index of the topmost fill in the fills array.
+   *
+   * Note: In the fill_paints array, the last element (fills[-1]) is the topmost fill.
+   * This function returns the index of the last element, which represents the topmost fill.
+   *
+   * @param fills - Array of paint fills
+   * @returns The index of the topmost fill (last element in array), or -1 if array is empty
+   *
+   * @example
+   * ```ts
+   * const fills = [fill1, fill2, fill3];
+   * const topmostIndex = editor.getTopmostFillIndex(fills); // returns 2 (index of fill3)
+   * const topmostFill = fills[topmostIndex]; // fill3 is the topmost
+   * ```
+   */
+  export function getTopmostFillIndex(fills: cg.Paint[]): number {
+    return fills.length > 0 ? fills.length - 1 : -1;
+  }
+
+  /**
    * a global class based editor instances
    *
    * @deprecated move under class
