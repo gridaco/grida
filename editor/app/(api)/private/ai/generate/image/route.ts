@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
   const { object, publicUrl } = await upload_generated_to_library({
     client: service_role.library,
     request: {
-      model: model.model.modelId,
+      model: model.card.id,
       prompt: body.prompt,
       width: width,
       height: height,
