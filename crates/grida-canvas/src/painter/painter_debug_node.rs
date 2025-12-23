@@ -32,45 +32,18 @@ impl<'a> NodePainter<'a> {
         self.painter.with_transform(&node.transform.matrix, || {
             let node_enum = Node::Rectangle(node.clone());
             let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
+            // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
+            let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter.draw_fills(&shape, &node.fills);
-                            let stroke_width = node.render_bounds_stroke_width();
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                stroke_width,
-                                node.stroke_style.stroke_align,
-                                node.stroke_style.stroke_cap,
-                                node.stroke_style.stroke_join,
-                                node.stroke_style.stroke_miter_limit,
-                                node.stroke_style.stroke_dash_array.as_ref(),
-                            );
-                        });
-                    });
-                });
-        });
-    }
-
-    /// Draw an ImageNode, respecting transform, effect, rounded corners, blend mode, opacity
-    pub fn draw_image_node(&self, node: &ImageNodeRec) -> bool {
-        self.painter.with_transform(&node.transform.matrix, || {
-            let node_enum = Node::Image(node.clone());
-            let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
-
-            self.painter
-                .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            // Use the single image fill directly - aligns with web development patterns
-                            // where <img> elements have one image source
-                            // Create the Paint wrapper once and reuse the reference
-                            let image_paint = Paint::Image(node.fill.clone());
-                            self.painter
-                                .draw_fills(&shape, std::slice::from_ref(&image_paint));
-                            if !node.strokes.is_empty() {
+                        self.painter.with_blendmode(
+                            node.blend_mode,
+                            &shape,
+                            &node.effects,
+                            &identity_transform,
+                            || {
+                                self.painter.draw_fills(&shape, &node.fills);
                                 let stroke_width = node.render_bounds_stroke_width();
                                 self.painter.draw_strokes(
                                     &shape,
@@ -82,8 +55,51 @@ impl<'a> NodePainter<'a> {
                                     node.stroke_style.stroke_miter_limit,
                                     node.stroke_style.stroke_dash_array.as_ref(),
                                 );
-                            }
-                        });
+                            },
+                        );
+                    });
+                });
+        });
+    }
+
+    /// Draw an ImageNode, respecting transform, effect, rounded corners, blend mode, opacity
+    pub fn draw_image_node(&self, node: &ImageNodeRec) -> bool {
+        self.painter.with_transform(&node.transform.matrix, || {
+            let node_enum = Node::Image(node.clone());
+            let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
+            // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
+            let identity_transform = math2::transform::AffineTransform::identity().matrix;
+
+            self.painter
+                .draw_shape_with_effects(&node.effects, &shape, || {
+                    self.painter.with_opacity(node.opacity, || {
+                        self.painter.with_blendmode(
+                            node.blend_mode,
+                            &shape,
+                            &node.effects,
+                            &identity_transform,
+                            || {
+                                // Use the single image fill directly - aligns with web development patterns
+                                // where <img> elements have one image source
+                                // Create the Paint wrapper once and reuse the reference
+                                let image_paint = Paint::Image(node.fill.clone());
+                                self.painter
+                                    .draw_fills(&shape, std::slice::from_ref(&image_paint));
+                                if !node.strokes.is_empty() {
+                                    let stroke_width = node.render_bounds_stroke_width();
+                                    self.painter.draw_strokes(
+                                        &shape,
+                                        &node.strokes,
+                                        stroke_width,
+                                        node.stroke_style.stroke_align,
+                                        node.stroke_style.stroke_cap,
+                                        node.stroke_style.stroke_join,
+                                        node.stroke_style.stroke_miter_limit,
+                                        node.stroke_style.stroke_dash_array.as_ref(),
+                                    );
+                                }
+                            },
+                        );
                     });
                 });
         });
@@ -95,22 +111,30 @@ impl<'a> NodePainter<'a> {
         self.painter.with_transform(&node.transform.matrix, || {
             let node_enum = Node::Ellipse(node.clone());
             let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
+            // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
+            let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter.draw_fills(&shape, &node.fills);
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width.value_or_zero(),
-                                node.stroke_style.stroke_align,
-                                node.stroke_style.stroke_cap,
-                                node.stroke_style.stroke_join,
-                                node.stroke_style.stroke_miter_limit,
-                                node.stroke_style.stroke_dash_array.as_ref(),
-                            );
-                        });
+                        self.painter.with_blendmode(
+                            node.blend_mode,
+                            &shape,
+                            &node.effects,
+                            &identity_transform,
+                            || {
+                                self.painter.draw_fills(&shape, &node.fills);
+                                self.painter.draw_strokes(
+                                    &shape,
+                                    &node.strokes,
+                                    node.stroke_width.value_or_zero(),
+                                    node.stroke_style.stroke_align,
+                                    node.stroke_style.stroke_cap,
+                                    node.stroke_style.stroke_join,
+                                    node.stroke_style.stroke_miter_limit,
+                                    node.stroke_style.stroke_dash_array.as_ref(),
+                                );
+                            },
+                        );
                     });
                 });
         });
@@ -123,18 +147,24 @@ impl<'a> NodePainter<'a> {
             let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
 
             self.painter.with_opacity(node.opacity, || {
-                self.painter.with_blendmode(node.blend_mode, || {
-                    self.painter.draw_strokes(
-                        &shape,
-                        &node.strokes,
-                        node.stroke_width,
-                        node.get_stroke_align(),
-                        node.stroke_cap,
-                        StrokeJoin::default(), // Join not applicable for single line
-                        node.stroke_miter_limit,
-                        node.stroke_dash_array.as_ref(),
-                    );
-                });
+                self.painter.with_blendmode(
+                    node.blend_mode,
+                    &shape,
+                    &node.effects,
+                    &node.transform.matrix,
+                    || {
+                        self.painter.draw_strokes(
+                            &shape,
+                            &node.strokes,
+                            node.stroke_width,
+                            node.get_stroke_align(),
+                            node.stroke_cap,
+                            StrokeJoin::default(), // Join not applicable for single line
+                            node.stroke_miter_limit,
+                            node.stroke_dash_array.as_ref(),
+                        );
+                    },
+                );
             });
         });
     }
@@ -144,24 +174,32 @@ impl<'a> NodePainter<'a> {
             let path = node.to_path();
             let stroke_align = node.get_stroke_align();
             let shape = PainterShape::from_path(path);
+            // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
+            let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            if !node.fills.is_empty() {
-                                self.painter.draw_fills(&shape, &node.fills);
-                            }
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width,
-                                stroke_align,
-                                node.stroke_cap,
-                                node.stroke_join,
-                                node.stroke_miter_limit,
-                                node.stroke_dash_array.as_ref(),
-                            );
-                        });
+                        self.painter.with_blendmode(
+                            node.blend_mode,
+                            &shape,
+                            &node.effects,
+                            &identity_transform,
+                            || {
+                                if !node.fills.is_empty() {
+                                    self.painter.draw_fills(&shape, &node.fills);
+                                }
+                                self.painter.draw_strokes(
+                                    &shape,
+                                    &node.strokes,
+                                    node.stroke_width,
+                                    stroke_align,
+                                    node.stroke_cap,
+                                    node.stroke_join,
+                                    node.stroke_miter_limit,
+                                    node.stroke_dash_array.as_ref(),
+                                );
+                            },
+                        );
                     });
                 });
         });
@@ -174,26 +212,34 @@ impl<'a> NodePainter<'a> {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = self.painter.cached_path(&dummy_id, &node.data);
             let shape = PainterShape::from_path((*path).clone());
+            // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
+            let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            if !node.fills.is_empty() {
-                                self.painter.draw_fills(&shape, &node.fills);
-                            }
-                            if !node.strokes.is_empty() {
-                                self.painter.draw_strokes(
-                                    &shape,
-                                    &node.strokes,
-                                    node.stroke_width.value_or_zero(),
-                                    node.stroke_style.stroke_align,
-                                    node.stroke_style.stroke_cap,
-                                    node.stroke_style.stroke_join,
-                                    node.stroke_style.stroke_miter_limit,
-                                    node.stroke_style.stroke_dash_array.as_ref(),
-                                );
-                            }
-                        });
+                        self.painter.with_blendmode(
+                            node.blend_mode,
+                            &shape,
+                            &node.effects,
+                            &identity_transform,
+                            || {
+                                if !node.fills.is_empty() {
+                                    self.painter.draw_fills(&shape, &node.fills);
+                                }
+                                if !node.strokes.is_empty() {
+                                    self.painter.draw_strokes(
+                                        &shape,
+                                        &node.strokes,
+                                        node.stroke_width.value_or_zero(),
+                                        node.stroke_style.stroke_align,
+                                        node.stroke_style.stroke_cap,
+                                        node.stroke_style.stroke_join,
+                                        node.stroke_style.stroke_miter_limit,
+                                        node.stroke_style.stroke_dash_array.as_ref(),
+                                    );
+                                }
+                            },
+                        );
                     });
                 });
         });
@@ -204,22 +250,30 @@ impl<'a> NodePainter<'a> {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
             let shape = PainterShape::from_path(path.clone());
+            // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
+            let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
                     self.painter.with_opacity(node.opacity, || {
-                        self.painter.with_blendmode(node.blend_mode, || {
-                            self.painter.draw_fills(&shape, &node.fills);
-                            self.painter.draw_strokes(
-                                &shape,
-                                &node.strokes,
-                                node.stroke_width.value_or_zero(),
-                                node.stroke_style.stroke_align,
-                                node.stroke_style.stroke_cap,
-                                node.stroke_style.stroke_join,
-                                node.stroke_style.stroke_miter_limit,
-                                node.stroke_style.stroke_dash_array.as_ref(),
-                            );
-                        });
+                        self.painter.with_blendmode(
+                            node.blend_mode,
+                            &shape,
+                            &node.effects,
+                            &identity_transform,
+                            || {
+                                self.painter.draw_fills(&shape, &node.fills);
+                                self.painter.draw_strokes(
+                                    &shape,
+                                    &node.strokes,
+                                    node.stroke_width.value_or_zero(),
+                                    node.stroke_style.stroke_align,
+                                    node.stroke_style.stroke_cap,
+                                    node.stroke_style.stroke_join,
+                                    node.stroke_style.stroke_miter_limit,
+                                    node.stroke_style.stroke_dash_array.as_ref(),
+                                );
+                            },
+                        );
                     });
                 });
         });
@@ -279,24 +333,35 @@ impl<'a> NodePainter<'a> {
         // TODO: Pass id as parameter - using dummy 0 for now in debug mode
         let dummy_id = 0;
         self.painter.with_transform(&node.transform.matrix, || {
+            // Build shape for text bounds (text nodes don't use effects in blend mode bounds)
+            let node_enum = Node::TextSpan(node.clone());
+            let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
+            // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
+            let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter.with_opacity(node.opacity, || {
-                self.painter.with_blendmode(node.blend_mode, || {
-                    self.painter.draw_text_span(
-                        &dummy_id,
-                        &node.text,
-                        &node.width,
-                        &node.height,
-                        &node.max_lines,
-                        &node.ellipsis,
-                        &node.fills,
-                        &node.strokes,
-                        node.stroke_width,
-                        &node.stroke_align,
-                        &node.text_align,
-                        &node.text_align_vertical,
-                        &node.text_style,
-                    );
-                });
+                self.painter.with_blendmode(
+                    node.blend_mode,
+                    &shape,
+                    &node.effects,
+                    &identity_transform,
+                    || {
+                        self.painter.draw_text_span(
+                            &dummy_id,
+                            &node.text,
+                            &node.width,
+                            &node.height,
+                            &node.max_lines,
+                            &node.ellipsis,
+                            &node.fills,
+                            &node.strokes,
+                            node.stroke_width,
+                            &node.stroke_align,
+                            &node.text_align,
+                            &node.text_align_vertical,
+                            &node.text_style,
+                        );
+                    },
+                );
             });
         });
     }
@@ -365,26 +430,34 @@ impl<'a> NodePainter<'a> {
     ) {
         self.painter.with_transform_option(&node.transform, || {
             if let Some(shape) = boolean_operation_shape(id, node, graph, cache) {
+                // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
+                let identity_transform = math2::transform::AffineTransform::identity().matrix;
                 self.painter
                     .draw_shape_with_effects(&node.effects, &shape, || {
                         self.painter.with_opacity(node.opacity, || {
-                            self.painter.with_blendmode(node.blend_mode, || {
-                                if !node.fills.is_empty() {
-                                    self.painter.draw_fills(&shape, &node.fills);
-                                }
-                                if !node.strokes.is_empty() {
-                                    self.painter.draw_strokes(
-                                        &shape,
-                                        &node.strokes,
-                                        node.stroke_width.value_or_zero(),
-                                        node.stroke_style.stroke_align,
-                                        node.stroke_style.stroke_cap,
-                                        node.stroke_style.stroke_join,
-                                        node.stroke_style.stroke_miter_limit,
-                                        node.stroke_style.stroke_dash_array.as_ref(),
-                                    );
-                                }
-                            });
+                            self.painter.with_blendmode(
+                                node.blend_mode,
+                                &shape,
+                                &node.effects,
+                                &identity_transform,
+                                || {
+                                    if !node.fills.is_empty() {
+                                        self.painter.draw_fills(&shape, &node.fills);
+                                    }
+                                    if !node.strokes.is_empty() {
+                                        self.painter.draw_strokes(
+                                            &shape,
+                                            &node.strokes,
+                                            node.stroke_width.value_or_zero(),
+                                            node.stroke_style.stroke_align,
+                                            node.stroke_style.stroke_cap,
+                                            node.stroke_style.stroke_join,
+                                            node.stroke_style.stroke_miter_limit,
+                                            node.stroke_style.stroke_dash_array.as_ref(),
+                                        );
+                                    }
+                                },
+                            );
                         });
                     });
             } else {
@@ -447,19 +520,37 @@ impl<'a> NodePainter<'a> {
                             .get_world_bounds(id)
                             .expect("Geometry must exist - pipeline bug");
                         let shape = build_shape(node, &bounds);
+                        // In debug rendering, transform (local_transform) is already applied, so bounds should be in local space (identity transform)
+                        let identity_transform =
+                            math2::transform::AffineTransform::identity().matrix;
 
                         // Draw effects, fills, children (with optional clipping), then strokes last
                         self.painter
                             .draw_shape_with_effects(&n.effects, &shape, || {
-                                self.painter.with_blendmode(n.blend_mode, || {
-                                    // Paint fills first
-                                    self.painter.draw_fills(&shape, &n.fills);
+                                self.painter.with_blendmode(
+                                    n.blend_mode,
+                                    &shape,
+                                    &n.effects,
+                                    &identity_transform,
+                                    || {
+                                        // Paint fills first
+                                        self.painter.draw_fills(&shape, &n.fills);
 
-                                    // Children are drawn next; if `clip` is enabled we push
-                                    // a clip region for the container's shape
-                                    if let Some(children) = graph.get_children(id) {
-                                        if n.clip {
-                                            self.painter.with_clip(&shape, || {
+                                        // Children are drawn next; if `clip` is enabled we push
+                                        // a clip region for the container's shape
+                                        if let Some(children) = graph.get_children(id) {
+                                            if n.clip {
+                                                self.painter.with_clip(&shape, || {
+                                                    for child_id in children {
+                                                        if let Ok(child) = graph.get_node(child_id)
+                                                        {
+                                                            self.draw_node_recursively(
+                                                                child_id, child, graph, cache,
+                                                            );
+                                                        }
+                                                    }
+                                                });
+                                            } else {
                                                 for child_id in children {
                                                     if let Ok(child) = graph.get_node(child_id) {
                                                         self.draw_node_recursively(
@@ -467,31 +558,23 @@ impl<'a> NodePainter<'a> {
                                                         );
                                                     }
                                                 }
-                                            });
-                                        } else {
-                                            for child_id in children {
-                                                if let Ok(child) = graph.get_node(child_id) {
-                                                    self.draw_node_recursively(
-                                                        child_id, child, graph, cache,
-                                                    );
-                                                }
                                             }
                                         }
-                                    }
 
-                                    // Finally paint the stroke
-                                    let stroke_width = n.render_bounds_stroke_width();
-                                    self.painter.draw_strokes(
-                                        &shape,
-                                        &n.strokes,
-                                        stroke_width,
-                                        n.stroke_style.stroke_align,
-                                        n.stroke_style.stroke_cap,
-                                        n.stroke_style.stroke_join,
-                                        n.stroke_style.stroke_miter_limit,
-                                        n.stroke_style.stroke_dash_array.as_ref(),
-                                    );
-                                });
+                                        // Finally paint the stroke
+                                        let stroke_width = n.render_bounds_stroke_width();
+                                        self.painter.draw_strokes(
+                                            &shape,
+                                            &n.strokes,
+                                            stroke_width,
+                                            n.stroke_style.stroke_align,
+                                            n.stroke_style.stroke_cap,
+                                            n.stroke_style.stroke_join,
+                                            n.stroke_style.stroke_miter_limit,
+                                            n.stroke_style.stroke_dash_array.as_ref(),
+                                        );
+                                    },
+                                );
                             });
                     });
                 });
