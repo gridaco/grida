@@ -340,11 +340,44 @@ impl<'a> Painter<'a> {
         shadow: &FeShadow,
         y_offset: f32,
     ) {
+        // Compute paragraph bounds (in text coordinate space, before y_offset translation)
+        let (text_width, text_height) = {
+            let para_ref = paragraph.borrow();
+            (para_ref.max_width(), para_ref.height())
+        };
+        let text_bounds = Rect::from_xywh(0.0, y_offset, text_width, text_height);
+
+        // Expand bounds for drop shadow: offset + spread + blur expansion
+        let mut shadow_bounds = text_bounds;
+        // Offset by shadow dx, dy
+        shadow_bounds = Rect::from_xywh(
+            shadow_bounds.x() + shadow.dx,
+            shadow_bounds.y() + shadow.dy,
+            shadow_bounds.width(),
+            shadow_bounds.height(),
+        );
+        // Apply spread (expand or contract)
+        if shadow.spread != 0.0 {
+            let expansion = shadow.spread.abs();
+            shadow_bounds = shadow_bounds.with_outset((expansion, expansion));
+        }
+        // Apply blur expansion (3x sigma for Gaussian coverage)
+        if shadow.blur > 0.0 {
+            shadow_bounds = shadow_bounds.with_outset((shadow.blur * 3.0, shadow.blur * 3.0));
+        }
+        // Union with original bounds to include entire shadow area
+        let bounds = Rect::from_ltrb(
+            text_bounds.left().min(shadow_bounds.left()),
+            text_bounds.top().min(shadow_bounds.top()),
+            text_bounds.right().max(shadow_bounds.right()),
+            text_bounds.bottom().max(shadow_bounds.bottom()),
+        );
+
         let mut paint = SkPaint::default();
         paint.set_image_filter(shadow::drop_shadow_image_filter(shadow));
         paint.set_anti_alias(true);
         self.canvas
-            .save_layer(&SaveLayerRec::default().paint(&paint));
+            .save_layer(&SaveLayerRec::default().bounds(&bounds).paint(&paint));
         self.canvas.translate((0.0, y_offset));
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
         self.canvas.restore();
@@ -357,11 +390,25 @@ impl<'a> Painter<'a> {
         shadow: &FeShadow,
         y_offset: f32,
     ) {
+        // Compute paragraph bounds (in text coordinate space, before y_offset translation)
+        // Inner shadows are clipped to the text bounds, but still need expansion for blur
+        let (text_width, text_height) = {
+            let para_ref = paragraph.borrow();
+            (para_ref.max_width(), para_ref.height())
+        };
+        let mut bounds = Rect::from_xywh(0.0, y_offset, text_width, text_height);
+
+        // Expand bounds for inner shadow blur (inner shadows are clipped to shape, but blur needs expansion)
+        // Note: inner shadows don't use offset/spread expansion like drop shadows since they're clipped
+        if shadow.blur > 0.0 {
+            bounds = bounds.with_outset((shadow.blur * 3.0, shadow.blur * 3.0));
+        }
+
         let mut paint = SkPaint::default();
         paint.set_image_filter(shadow::inner_shadow_image_filter(shadow));
         paint.set_anti_alias(true);
         self.canvas
-            .save_layer(&SaveLayerRec::default().paint(&paint));
+            .save_layer(&SaveLayerRec::default().bounds(&bounds).paint(&paint));
         self.canvas.translate((0.0, y_offset));
         paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
         self.canvas.restore();
@@ -535,7 +582,11 @@ impl<'a> Painter<'a> {
         }
 
         // SaveLayer with backdrop captures background and applies filter
-        let layer_rec = SaveLayerRec::default().backdrop(&glass_filter);
+        // Use bounds relative to translated origin (0,0 based after translation)
+        let layer_bounds = Rect::from_xywh(0.0, 0.0, width, height);
+        let layer_rec = SaveLayerRec::default()
+            .bounds(&layer_bounds)
+            .backdrop(&glass_filter);
         canvas.save_layer(&layer_rec);
 
         canvas.restore();
