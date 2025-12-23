@@ -1720,6 +1720,9 @@ export namespace iofigma {
           fills: nc.fillPaints ? paints(nc.fillPaints) : [],
           strokes: nc.strokePaints ? paints(nc.strokePaints) : [],
           strokeWeight: nc.strokeWeight ?? 0,
+          strokeAlign: nc.strokeAlign
+            ? map.strokeAlign(nc.strokeAlign)
+            : "INSIDE",
           style: {
             fontFamily: nc.fontName?.family ?? "Inter",
             fontPostScriptName: nc.fontName?.postscript,
