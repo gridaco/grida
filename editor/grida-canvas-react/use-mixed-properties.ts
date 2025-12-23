@@ -335,6 +335,15 @@ export function useMixedProperties(ids: string[]) {
     [mixedProperties.cursor?.ids, instance.commands]
   );
 
+  const blendMode = useCallback(
+    (value: cg.LayerBlendMode) => {
+      mixedProperties.blend_mode?.ids.forEach((id) => {
+        instance.doc.getNodeById(id).blend_mode = value;
+      });
+    },
+    [mixedProperties.blend_mode?.ids, instance]
+  );
+
   const actions = useMemo(
     () => ({
       copy,
@@ -370,6 +379,7 @@ export function useMixedProperties(ids: string[]) {
       cross_axis_alignment: crossAxisAlignment,
       corner_radius,
       cursor,
+      blend_mode: blendMode,
     }),
     [
       copy,
@@ -405,6 +415,7 @@ export function useMixedProperties(ids: string[]) {
       crossAxisAlignment,
       corner_radius,
       cursor,
+      blendMode,
     ]
   );
 
