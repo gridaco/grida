@@ -34,6 +34,8 @@ import {
   useToolState,
 } from "@/grida-canvas-react/provider";
 import { RGBChip } from "@/scaffolds/sidecontrol/controls/utils/paint-chip";
+import { ImageToolbar } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/image-toolbar";
+
 export function PlaygroundToolbar() {
   const editor = useCurrentEditor();
   const tool = useToolState();
@@ -44,6 +46,7 @@ export function PlaygroundToolbar() {
 
   return (
     <div className="relative" aria-label="Toolbar">
+      <ImageToolbar />
       {content_edit_mode?.type === "bitmap" && (
         <div className="relative bottom-2 w-full flex justify-center">
           <BitmapEditModeAuxiliaryToolbar />
