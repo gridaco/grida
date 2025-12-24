@@ -63,3 +63,14 @@ export const DROPZONE_BORDER_WIDTH = 2;
  * When handles are larger than this threshold, diagonal handles maintain priority (current default behavior).
  */
 export const MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE = 36;
+
+/**
+ * Z-index for the node title bar (floating bar).
+ *
+ * Must be higher than selection overlays so the title bar remains interactive,
+ * but should remain below resize/rotation handles.
+ *
+ * @remarks
+ * We keep this centralized so z-ordering can be tracked/tuned in one place.
+ */
+export const FLOATING_BAR_Z_INDEX = 999;
