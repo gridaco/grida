@@ -40,13 +40,27 @@ Base64-encoded Kiwi binary data containing:
 
 ## Contents
 
-| File                                          | Description                                       | Usage          |
-| --------------------------------------------- | ------------------------------------------------- | -------------- |
-| `ellipse-circle-100x100-black.clipboard.html` | Circle/ellipse, 100×100, black fill               | basic          |
-| `frame-with-r-g-b-rect.clipboard.html`        | Frame node containing red, green, blue rectangles | basic          |
-| `group-with-r-g-b-rect.clipboard.html`        | Group node containing red, green, blue rectangles | group-is-frame |
-| `rect-square-100x100-black.clipboard.html`    | Rectangle/square, 100×100, black fill             | basic          |
-| `star-5-40-100x100-black.clipboard.html`      | 5-pointed star, 40pt, 100×100, black fill         | basic          |
+| File                                                                            | Description                                                            | Source                                   | Usage          |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------- | -------------- |
+| `ellipse-circle-100x100-black.clipboard.html`                                   | Circle/ellipse, 100×100, black fill                                    |                                          | basic          |
+| `frame-with-r-g-b-rect.clipboard.html`                                          | Frame node containing red, green, blue rectangles                      |                                          | basic          |
+| `group-with-r-g-b-rect.clipboard.html`                                          | Group node containing red, green, blue rectangles                      |                                          | group-is-frame |
+| `rect-square-100x100-black.clipboard.html`                                      | Rectangle/square, 100×100, black fill                                  |                                          | basic          |
+| `star-5-40-100x100-black.clipboard.html`                                        | 5-pointed star, 40pt, 100×100, black fill                              |                                          | basic          |
+| `component-component-blue.clipboard.html`                                       | Blue component definition (SYMBOL)                                     | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-red.clipboard.html`                                        | Red component definition (SYMBOL)                                      | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-instance-blue.clipboard.html`                              | Blue component instance (INSTANCE)                                     | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-instance-blue-with-overrides.clipboard.html`               | Blue component instance with overrides (INSTANCE)                      | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-instance-red.clipboard.html`                               | Red component instance (INSTANCE)                                      | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-instance-red-with-overrides.clipboard.html`                | Red component instance with overrides (INSTANCE)                       | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-set.clipboard.html`                                        | Component set definition (COMPONENT_SET)                               | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-set-component-blue.clipboard.html`                         | Blue component definition within a component set (SYMBOL)              | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-set-component-red.clipboard.html`                          | Red component definition within a component set (SYMBOL)               | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-set-component-instance-blue.clipboard.html`                | Blue component instance from a component set (INSTANCE)                | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-set-component-instance-blue-with-overrides.clipboard.html` | Blue component instance from a component set with overrides (INSTANCE) | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-set-component-instance-red.clipboard.html`                 | Red component instance from a component set (INSTANCE)                 | [`components.fig`](../L0/components.fig) | component      |
+| `component-component-set-component-instance-red-with-overrides.clipboard.html`  | Red component instance from a component set with overrides (INSTANCE)  | [`components.fig`](../L0/components.fig) | component      |
+
 
 ## Capturing Clipboard Data
 
