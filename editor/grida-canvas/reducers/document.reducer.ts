@@ -1402,12 +1402,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "ungroup": {
       const { target } = action;
-      const target_node_ids = target === "selection" ? state.selection : target;
 
       return updateState(state, (draft) => {
-        self_ungroup(draft, target_node_ids, context.geometry);
+        self_ungroup(draft, target, context.geometry);
       });
-      break;
     }
     case "group-op": {
       const { target, op } = action;

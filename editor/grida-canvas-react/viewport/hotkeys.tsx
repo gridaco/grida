@@ -1130,7 +1130,7 @@ export function useEditorHotKeys() {
     "ctrl+shift+g, meta+shift+g",
     () => {
       try {
-        editor.commands.ungroup("selection");
+        editor.surface.ungroup(editor.state.selection);
       } catch {}
     },
     {

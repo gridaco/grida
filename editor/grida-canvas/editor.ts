@@ -1512,11 +1512,23 @@ class EditorDocumentStore
     });
   }
 
-  public ungroup(target: "selection" | editor.NodeID[]) {
+  public ungroup(target: editor.NodeID): editor.NodeID[][] {
+    // Validate and track children before ungrouping (helper also validates)
+    const node = this.mstate.document.nodes[target];
+    if (!node || (node.type !== "group" && node.type !== "boolean")) {
+      // Not a group, reject/ignore - return empty array
+      return [];
+    }
+
+    const childrenBefore = this.mstate.document.links[target] || [];
+
     this.dispatch({
       type: "ungroup",
       target,
     });
+
+    // Return children as a single chunk (chunked by original group)
+    return [childrenBefore];
   }
 
   // #region ISchemaActions implementation
@@ -4690,6 +4702,33 @@ export class EditorSurface
     }
 
     return allInsertedNodeIds;
+  }
+
+  public ungroup(target: editor.NodeID[]): editor.NodeID[][] {
+    // Filter to only group and boolean nodes
+    const groupNodes = target.filter((nodeId) => {
+      const node = this.state.document.nodes[nodeId];
+      return node && (node.type === "group" || node.type === "boolean");
+    });
+
+    if (groupNodes.length === 0) {
+      return [];
+    }
+
+    // Ungroup each group node and collect chunks (preserving which children came from which group)
+    const allChunks: editor.NodeID[][] = [];
+    for (const groupId of groupNodes) {
+      const chunks = this._editor.doc.ungroup(groupId);
+      allChunks.push(...chunks);
+    }
+
+    // Update selection to all ungrouped children (flatten chunks for selection)
+    const allUngroupedChildren = allChunks.flat();
+    if (allUngroupedChildren.length > 0) {
+      this._editor.doc.select(allUngroupedChildren, "reset");
+    }
+
+    return allChunks;
   }
 
   public order(

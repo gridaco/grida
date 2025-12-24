@@ -3274,10 +3274,23 @@ export namespace editor.api {
     group(target: "selection" | NodeID[]): void;
 
     /**
-     * ungroup the nodes (from group or boolean)
-     * @param target - the nodes to ungroup
+     * Ungroups a single group or boolean operation node, moving its children to the parent.
+     *
+     * This is a pure document tree operation that:
+     * - Does NOT read from selection state (caller must provide explicit node ID)
+     * - Only modifies the document tree structure
+     * - Does NOT modify or read selection state
+     * - Rejects/ignores if the target is not a group or boolean node
+     *
+     * @param target - Single group or boolean node ID to ungroup
+     * @returns Array of chunks, where each chunk contains the child node IDs from one original group (empty array if target is not a group)
+     *
+     * @remarks
+     * - This aligns with future `groupNode.ungroup()` API
+     * - For UX-facing code with multiple targets, use `surface.ungroup()` which handles validation and filtering
+     * - The core operation expects exactly one node and validates it is a group
      */
-    ungroup(target: "selection" | NodeID[]): void;
+    ungroup(target: NodeID): NodeID[][];
 
     /**
      * delete the guide at the given index
@@ -3896,6 +3909,24 @@ export namespace editor.api {
      * ```
      */
     insert(payload: InsertPayload | InsertPayload[]): NodeID[];
+
+    /**
+     * User-facing ungroup operation that handles UX concerns.
+     *
+     * This method:
+     * - Validates and filters target nodes to only group/boolean nodes
+     * - Calls core ungroup() for each valid group node
+     * - Updates selection to all ungrouped children
+     *
+     * @param target - Array of node IDs to ungroup (will be filtered to only groups)
+     * @returns Array of chunks, where each chunk contains child node IDs from one original group
+     *
+     * @remarks
+     * - Filters target to only group/boolean nodes before calling core
+     * - Selection is updated after ungroup to select all ungrouped children
+     * - For programmatic ungroup operations on a single known group, use `editor.commands.ungroup(nodeId)` directly
+     */
+    ungroup(target: NodeID[]): NodeID[][];
 
     /**
      * User-facing order operation that handles UX concerns.

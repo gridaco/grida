@@ -615,7 +615,7 @@ export interface EditorBooleanOperationAction {
 
 export interface EditorUngroupAction {
   type: "ungroup";
-  target: NodeID[] | "selection";
+  target: NodeID;
 }
 
 export interface EditorApplyParametricScaleAction {

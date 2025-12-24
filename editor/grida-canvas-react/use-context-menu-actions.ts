@@ -138,7 +138,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Ungroup",
         shortcut: "⌘⇧G",
         disabled: !canUngroup,
-        onSelect: () => editor.commands.ungroup(ids),
+        onSelect: () => editor.surface.ungroup(ids),
       },
       autoLayout: {
         label: "Auto-Layout",
