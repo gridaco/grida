@@ -7,7 +7,7 @@ import cmath from "@grida/cmath";
 import tree from "@grida/tree";
 import { self_moveNode } from "./move";
 import { self_insertSubDocument } from "./insert";
-import { self_selectNode } from "./selection";
+import { self_selectNode } from "./select";
 import * as modeProperties from "@/grida-canvas/utils/properties";
 import cg from "@grida/cg";
 import "core-js/features/object/group-by";

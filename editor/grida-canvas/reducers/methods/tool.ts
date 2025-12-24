@@ -1,6 +1,6 @@
 import type { Draft } from "immer";
 import { editor } from "@/grida-canvas";
-import { getVectorSelectionStartPoint } from "./selection";
+import { getVectorSelectionStartPoint } from "./select";
 import type { ReducerContext } from "..";
 import { __self_try_enter_content_edit_mode_vector } from "../surface.reducer";
 import { dq } from "@/grida-canvas/query";
