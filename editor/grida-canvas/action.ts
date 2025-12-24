@@ -306,7 +306,11 @@ export interface EditorCutAction {
 
 export interface EditorPasteAction {
   type: "paste";
+  /**
+   * @deprecated Vector network paste. Should be removed in favor of clipboard mechanism.
+   */
   vector_network?: vn.VectorNetwork;
+  target: NodeID | NodeID[];
 }
 
 export interface EditorDuplicateAction {

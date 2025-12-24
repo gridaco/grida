@@ -365,13 +365,13 @@ export function useDataTransferEventTarget() {
             current_clipboard_ref?.payload_id ===
             grida_payload.clipboard.payload_id
           ) {
-            instance.commands.paste();
+            instance.surface.a11yPaste();
             return true;
           } else if (grida_payload.clipboard.type === "prototypes") {
             instance.commands.pastePayload(grida_payload.clipboard);
             return true;
           } else {
-            instance.commands.paste();
+            instance.surface.a11yPaste();
             return true;
           }
         }
@@ -446,7 +446,7 @@ export function useDataTransferEventTarget() {
       if (event.target instanceof HTMLTextAreaElement) return;
 
       if (!event.clipboardData) {
-        instance.commands.paste();
+        instance.surface.a11yPaste();
         event.preventDefault();
         return;
       }
@@ -477,7 +477,7 @@ export function useDataTransferEventTarget() {
         event.preventDefault();
       } else {
         // Fallback to local clipboard if no valid payload found
-        instance.commands.paste();
+        instance.surface.a11yPaste();
         event.preventDefault();
       }
     },
@@ -507,15 +507,15 @@ export function useDataTransferEventTarget() {
 
         if (!handled) {
           // Fallback to local clipboard if no valid payload found
-          instance.commands.paste();
+          instance.surface.a11yPaste();
         }
       } else {
         // No clipboard items, fallback to local clipboard
-        instance.commands.paste();
+        instance.surface.a11yPaste();
       }
     } catch (e) {
       // Clipboard API may fail (permissions, etc.), fallback to local clipboard
-      instance.commands.paste();
+      instance.surface.a11yPaste();
     }
   }, [instance, handlePasteFromItems, current_clipboard]);
 

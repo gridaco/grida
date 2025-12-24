@@ -2839,7 +2839,45 @@ export namespace editor.api {
     blur(): void;
     cut(target: "selection" | NodeID): void;
     copy(target: "selection" | NodeID): void;
-    paste(): void;
+    /**
+     * Pastes the current clipboard payload into the specified parent node(s).
+     *
+     * This is a pure document tree operation that:
+     * - Only inserts nodes from the current clipboard (`state.user_clipboard`)
+     * - Does NOT read or modify selection state
+     * - Does NOT perform hit testing or target resolution (caller must provide explicit parent IDs)
+     * - Does NOT update selection after paste
+     * - Only modifies the document tree structure (adds new nodes)
+     *
+     * @param target - Explicit parent node ID(s) where nodes should be pasted.
+     *   - Single NodeID: Paste all clipboard items into this parent
+     *   - Array of NodeIDs: Paste each clipboard item into corresponding parent (if multiple items in clipboard, cycles through parents)
+     *   - For scene-level paste, explicitly pass the scene_id
+     *
+     * @returns Array of newly inserted top-level node IDs. Empty array if:
+     *   - No clipboard exists
+     *   - Clipboard type is not "prototypes"
+     *   - Paste operation failed
+     *
+     * @remarks
+     * - This method is a pure document tree updater - it does not handle UX concerns like selection
+     * - For user-facing paste operations, use `surface.a11yPaste()` instead
+     * - The returned node IDs can be used by the caller to update selection or perform other operations
+     *
+     * @example
+     * ```typescript
+     * // Paste to scene level
+     * const pastedIds = editor.commands.paste(editor.state.scene_id);
+     * editor.commands.select(pastedIds, "reset");
+     *
+     * // Paste into a specific container
+     * const pastedIds = editor.commands.paste(containerId);
+     *
+     * // Paste into multiple parents (if clipboard has multiple items)
+     * const pastedIds = editor.commands.paste([parent1, parent2]);
+     * ```
+     */
+    paste(target: NodeID | NodeID[]): NodeID[];
     pasteVector(network: vn.VectorNetwork): void;
     pastePayload(payload: io.clipboard.ClipboardPayload): boolean;
     duplicate(target: "selection" | NodeID): void;

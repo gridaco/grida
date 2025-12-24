@@ -644,66 +644,26 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       if (!state.user_clipboard) break;
       if (state.user_clipboard.type !== "prototypes") break;
-      const { user_clipboard, selection } = state;
+      if (!action.target) break;
+      const { user_clipboard } = state;
       const { ids, prototypes } = user_clipboard;
 
+      const target_parents: string[] = Array.isArray(action.target)
+        ? action.target
+        : [action.target];
+
+      const { width, height } = context.viewport;
+      const _inset_rect = cmath.rect.inset(
+        { x: 0, y: 0, width, height },
+        PLACEMENT_VIEWPORT_INSET
+      );
+      const viewport_rect = cmath.rect.transform(
+        _inset_rect,
+        cmath.transform.invert(state.transform)
+      );
+
       return updateState(state, (draft) => {
-        const new_top_ids: string[] = [];
-
-        // Find target parents for each selected node:
-        // - If selected node is a container -> paste as child (target parent = node itself)
-        // - If selected node is not a container -> paste as sibling (target parent = node's parent)
-        // - Target parent must be a container or null (scene)
-        // - Target parent must not be one of the copied nodes
-        //
-        // KNOWN LIMITATION:
-        // When no selection exists, hit test is used to find parent (see below).
-        // However, after first paste, newly pasted nodes become selected, so subsequent
-        // pastes use this selection-based logic instead of hit test. This means position
-        // adjustment for hit-tested parents only applies to the first paste in a sequence.
-        const target_parents = Array.from(
-          new Set(
-            selection
-              .map((node_id) => {
-                const node = dq.__getNodeById(draft, node_id);
-
-                // If node is a container, use it as target parent (paste as child)
-                if (node.type === "container") {
-                  return node_id;
-                }
-
-                // Otherwise, use its parent as target parent (paste as sibling)
-                const parent_id = dq.getParentId(draft.document_ctx, node_id);
-
-                // Parent can be null (scene) or a container
-                if (!parent_id) return null;
-
-                const parent = dq.__getNodeById(draft, parent_id);
-                // Only return valid container parents
-                return parent?.type === "container" ? parent_id : null;
-              })
-              .filter((target_id) => {
-                // Ensure target parent is not one of the originals
-                if (target_id && ids.includes(target_id)) return false;
-                return true;
-              })
-          )
-        );
-
-        const targets: Array<string | null> =
-          target_parents.length > 0 ? target_parents : [null];
-
-        const { width, height } = context.viewport;
-        const _inset_rect = cmath.rect.inset(
-          { x: 0, y: 0, width, height },
-          PLACEMENT_VIEWPORT_INSET
-        );
-        const viewport_rect = cmath.rect.transform(
-          _inset_rect,
-          cmath.transform.invert(state.transform)
-        );
-
-        for (const target of targets) {
+        for (const target_parent of target_parents) {
           for (const prototype of prototypes) {
             const sub =
               grida.program.nodes.factory.create_packed_scene_document_from_prototype(
@@ -725,44 +685,25 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               box.y += delta[1];
             }
 
-            let parent = target;
-            let parent_was_hit_tested = false;
-            if (!parent) {
-              parent = hitTestNestedInsertionTarget(
-                box,
-                context.geometry,
-                (id) => {
-                  // Exclude originals from hit test
-                  if (ids.includes(id)) return false;
-                  return dq.__getNodeById(draft, id).type === "container";
-                },
-                INSERTION_HIT_TEST_MAX_DEPTH
-              );
-              parent_was_hit_tested = parent !== null;
-            }
+            const parent = target_parent;
 
-            // If parent was found via hit test, adjust positions to be relative to parent
-            // NOTE: This only applies when target parent is null (no selection).
-            // After first paste, selection changes, so subsequent pastes won't hit this path.
-            if (parent_was_hit_tested && parent) {
+            if (parent) {
               const parent_rect =
-                context.geometry.getNodeAbsoluteBoundingRect(parent)!;
-              sub.scene.children_refs.forEach((node_id) => {
-                const node = sub.nodes[node_id];
-                if ("position" in node && node.position === "absolute") {
-                  node.left = (node.left ?? 0) - parent_rect.x;
-                  node.top = (node.top ?? 0) - parent_rect.y;
-                }
-              });
+                context.geometry.getNodeAbsoluteBoundingRect(parent);
+              if (parent_rect) {
+                sub.scene.children_refs.forEach((node_id) => {
+                  const node = sub.nodes[node_id];
+                  if ("position" in node && node.position === "absolute") {
+                    node.left = (node.left ?? 0) - parent_rect.x;
+                    node.top = (node.top ?? 0) - parent_rect.y;
+                  }
+                });
+              }
             }
 
-            const top_ids = self_insertSubDocument(draft, parent, sub);
-            new_top_ids.push(...top_ids);
+            self_insertSubDocument(draft, parent, sub);
           }
         }
-
-        self_select_tool(draft, { type: "cursor" }, context);
-        self_selectNode(draft, "reset", ...new_top_ids);
       });
     }
     case "duplicate": {

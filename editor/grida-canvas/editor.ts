@@ -22,6 +22,7 @@ import {
 } from "./backends";
 import { domapi } from "./backends/dom";
 import { dq } from "@/grida-canvas/query";
+import { resolvePasteTargetParents } from "@/grida-canvas/utils/paste-helpers";
 import { io } from "@grida/io";
 import * as googlefonts from "@grida/fonts/google";
 import grida from "@grida/schema";
@@ -891,14 +892,24 @@ class EditorDocumentStore
     });
   }
 
-  public paste() {
+  public paste(target: editor.NodeID | editor.NodeID[]): editor.NodeID[] {
+    const nodesBefore = new Set(Object.keys(this.mstate.document.nodes));
+
     this.dispatch({
       type: "paste",
+      target,
     });
+
+    const nodesAfter = Object.keys(this.mstate.document.nodes);
+    return nodesAfter.filter((id) => !nodesBefore.has(id));
   }
 
   public pasteVector(vector_network: vn.VectorNetwork): void {
-    this.dispatch({ type: "paste", vector_network });
+    const scene_id = this.mstate.scene_id;
+    if (!scene_id) {
+      return;
+    }
+    this.dispatch({ type: "paste", vector_network, target: scene_id });
   }
 
   public pastePayload(payload: io.clipboard.ClipboardPayload): boolean {
@@ -4520,8 +4531,96 @@ export class EditorSurface
     this._editor.doc.cut("selection");
   }
 
+  /**
+   * User-facing paste operation that handles UX concerns.
+   *
+   * This method:
+   * - Captures current selection at invocation time (bounded context)
+   * - Resolves target parents from selection using UX logic:
+   *   - If container selected → paste as child
+   *   - If non-container selected → paste as sibling
+   *   - If no selection → paste to scene level
+   * - Calls core paste() with explicit target
+   * - Updates selection to newly pasted nodes
+   *
+   * This is the primary method for user-initiated paste operations (keyboard shortcuts, menu items, etc.).
+   *
+   * @remarks
+   * - Selection is captured at invocation time, so multiple pastes don't cause nesting
+   * - Selection is updated after paste to select the newly inserted nodes
+   * - All UX logic (selection resolution, selection update) is handled here, not in the reducer
+   * - For programmatic paste operations, use `editor.commands.paste(target)` directly
+   *
+   * @example
+   * ```typescript
+   * // Called from keyboard shortcut (Cmd+V)
+   * editor.surface.a11yPaste();
+   * ```
+   */
   public a11yPaste() {
-    this._editor.doc.paste();
+    // Capture current selection at invocation time (bounded context)
+    const currentSelection = [...this.state.selection];
+    const clipboard = this.state.user_clipboard;
+
+    if (!clipboard || clipboard.type !== "prototypes") {
+      // No clipboard or wrong type - delegate to core paste which will handle other cases
+      // For scene-level paste with no selection
+      const scene_id = this.state.scene_id;
+      if (scene_id) {
+        this._editor.doc.paste(scene_id);
+      }
+      return;
+    }
+
+    const copiedIds = clipboard.ids;
+
+    // Resolve target parents from current selection using helper function
+    let targetParents: Array<string | null>;
+
+    if (currentSelection.length === 0) {
+      // No selection - paste to scene level
+      const scene_id = this.state.scene_id;
+      targetParents = scene_id ? [scene_id] : [null];
+    } else {
+      // Use helper to resolve target parents from selection
+      targetParents = resolvePasteTargetParents(
+        this.state,
+        currentSelection,
+        copiedIds
+      );
+
+      // If no valid targets resolved, fallback to scene level
+      if (targetParents.length === 0) {
+        const scene_id = this.state.scene_id;
+        targetParents = scene_id ? [scene_id] : [null];
+      }
+    }
+
+    // Validate that we can resolve valid targets (reject invalid input)
+    // If targetParents contains null, we must have a valid scene_id to convert it
+    const scene_id = this.state.scene_id;
+    const hasNullTargets = targetParents.some((id) => id === null);
+    if (hasNullTargets && !scene_id) {
+      // Cannot paste: no valid target parent and no scene_id available
+      return;
+    }
+
+    // Normalize to single target or array (core paste accepts both)
+    // Convert null to scene_id (we've validated scene_id exists above)
+    const target: string | string[] =
+      targetParents.length === 1
+        ? (targetParents[0] ?? scene_id!)
+        : targetParents.map((id) => id ?? scene_id!);
+
+    // Call core paste with explicit target - it returns newly inserted node IDs
+    const pastedNodeIds = this._editor.doc.paste(target);
+
+    // Update selection to newly pasted nodes
+    // Note: pastedNodeIds includes all newly created nodes, but we want to select only top-level ones
+    // For now, select all - this can be refined later if needed
+    if (pastedNodeIds.length > 0) {
+      this._editor.doc.select(pastedNodeIds, "reset");
+    }
   }
 
   public a11yDelete() {
