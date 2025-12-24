@@ -479,105 +479,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
         });
       }
-      if (action.vector_network) {
-        if (state.content_edit_mode?.type === "vector") {
-          const net = action.vector_network;
-          return updateState(state, (draft) => {
-            const mode =
-              draft.content_edit_mode as editor.state.VectorContentEditMode;
-            const node = dq.__getNodeById(
-              draft,
-              mode.node_id
-            ) as grida.program.nodes.VectorNode;
-            const vertex_offset = node.vector_network.vertices.length;
-            const segment_offset = node.vector_network.segments.length;
-
-            let net_to_union = net;
-            if (mode.clipboard && mode.clipboard_node_position) {
-              const delta: [number, number] = [
-                mode.clipboard_node_position[0] - (node.left ?? 0),
-                mode.clipboard_node_position[1] - (node.top ?? 0),
-              ];
-              if (JSON.stringify(mode.clipboard) === JSON.stringify(net)) {
-                net_to_union = vn.VectorNetworkEditor.translate(net, delta);
-              }
-            }
-
-            node.vector_network = vn.VectorNetworkEditor.union(
-              node.vector_network,
-              net_to_union,
-              null
-            );
-            normalizeVectorNodeBBox(node);
-            const new_vertices = Array.from(
-              { length: net.vertices.length },
-              (_, i) => i + vertex_offset
-            );
-            const new_segments = Array.from(
-              { length: net.segments.length },
-              (_, i) => i + segment_offset
-            );
-            mode.selection = {
-              selected_vertices: new_vertices,
-              selected_segments: new_segments,
-              selected_tangents: [],
-            };
-            mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
-              node.vector_network,
-              {
-                selected_vertices: new_vertices,
-                selected_segments: new_segments,
-                selected_tangents: [],
-              }
-            );
-            mode.a_point = getVectorSelectionStartPoint({
-              selected_vertices: new_vertices,
-              selected_tangents: [],
-            });
-            mode.clipboard = net;
-          });
-        }
-
-        return updateState(state, (draft) => {
-          const net = action.vector_network!;
-          const id = context.idgen.next();
-          const black = kolor.colorformats.RGBA32F.BLACK;
-          const node: grida.program.nodes.VectorNode = {
-            type: "vector",
-            name: "vector",
-            id,
-            active: true,
-            locked: false,
-            position: "absolute",
-            left: 0,
-            top: 0,
-            opacity: 1,
-            width: 0,
-            height: 0,
-            rotation: 0,
-            z_index: 0,
-            stroke: { type: "solid", color: black, active: true },
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            stroke_width: 1,
-            vector_network: net,
-          };
-
-          normalizeVectorNodeBBox(node);
-
-          const valid_target_selection = state.selection.filter((node_id) => {
-            const n = dq.__getNodeById(draft, node_id);
-            return n.type === "container";
-          });
-
-          const target = valid_target_selection[0] ?? null;
-
-          self_try_insert_node(draft, target, node);
-
-          self_select_tool(draft, { type: "cursor" }, context);
-          self_selectNode(draft, "reset", node.id);
-        });
-      }
 
       if (state.content_edit_mode?.type === "vector") {
         const net = state.content_edit_mode.clipboard;
@@ -698,6 +599,102 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             self_insertSubDocument(draft, parent, sub);
           }
         }
+      });
+    }
+    case "paste-vector-network": {
+      const { vector_network, target } = action;
+
+      if (state.content_edit_mode?.type === "vector") {
+        const net = vector_network;
+        return updateState(state, (draft) => {
+          const mode =
+            draft.content_edit_mode as editor.state.VectorContentEditMode;
+          const node = dq.__getNodeById(
+            draft,
+            mode.node_id
+          ) as grida.program.nodes.VectorNode;
+          const vertex_offset = node.vector_network.vertices.length;
+          const segment_offset = node.vector_network.segments.length;
+
+          let net_to_union = net;
+          if (mode.clipboard && mode.clipboard_node_position) {
+            const delta: [number, number] = [
+              mode.clipboard_node_position[0] - (node.left ?? 0),
+              mode.clipboard_node_position[1] - (node.top ?? 0),
+            ];
+            if (JSON.stringify(mode.clipboard) === JSON.stringify(net)) {
+              net_to_union = vn.VectorNetworkEditor.translate(net, delta);
+            }
+          }
+
+          node.vector_network = vn.VectorNetworkEditor.union(
+            node.vector_network,
+            net_to_union,
+            null
+          );
+          normalizeVectorNodeBBox(node);
+          const new_vertices = Array.from(
+            { length: net.vertices.length },
+            (_, i) => i + vertex_offset
+          );
+          const new_segments = Array.from(
+            { length: net.segments.length },
+            (_, i) => i + segment_offset
+          );
+          mode.selection = {
+            selected_vertices: new_vertices,
+            selected_segments: new_segments,
+            selected_tangents: [],
+          };
+          mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
+            node.vector_network,
+            {
+              selected_vertices: new_vertices,
+              selected_segments: new_segments,
+              selected_tangents: [],
+            }
+          );
+          mode.a_point = getVectorSelectionStartPoint({
+            selected_vertices: new_vertices,
+            selected_tangents: [],
+          });
+          mode.clipboard = net;
+        });
+      }
+
+      return updateState(state, (draft) => {
+        const net = vector_network;
+        const id = context.idgen.next();
+        const black = kolor.colorformats.RGBA32F.BLACK;
+        const node: grida.program.nodes.VectorNode = {
+          type: "vector",
+          name: "vector",
+          id,
+          active: true,
+          locked: false,
+          position: "absolute",
+          left: 0,
+          top: 0,
+          opacity: 1,
+          width: 0,
+          height: 0,
+          rotation: 0,
+          z_index: 0,
+          stroke: { type: "solid", color: black, active: true },
+          stroke_cap: "butt",
+          stroke_join: "miter",
+          stroke_width: 1,
+          vector_network: net,
+        };
+
+        normalizeVectorNodeBBox(node);
+
+        const target_parent = target;
+
+        self_try_insert_node(draft, target_parent, node);
+
+        self_select_tool(draft, { type: "cursor" }, context);
+        self_selectNode(draft, "reset", node.id);
       });
     }
     case "duplicate": {

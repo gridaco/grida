@@ -927,12 +927,24 @@ class EditorDocumentStore
     return nodesAfter.filter((id) => !nodesBefore.has(id));
   }
 
+  /**
+   * TODO: Refactor this method to either:
+   * 1. Rename to `insertVector` - since this method directly inserts a vector network
+   *    without relying on memory clipboard data (unlike `paste()` which uses `state.user_clipboard`).
+   *    This would be more accurate naming and consistent with `insert()`.
+   * 2. OR make it use memory clipboard payload - store the vector network in `state.user_clipboard`
+   *    and use the standard `paste()` flow, making it consistent with other paste operations.
+   */
   public pasteVector(vector_network: vn.VectorNetwork): void {
     const scene_id = this.mstate.scene_id;
     if (!scene_id) {
       return;
     }
-    this.dispatch({ type: "paste", vector_network, target: scene_id });
+    this.dispatch({
+      type: "paste-vector-network",
+      vector_network,
+      target: scene_id,
+    });
   }
 
   public pastePayload(payload: io.clipboard.ClipboardPayload): boolean {

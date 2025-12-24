@@ -2916,6 +2916,14 @@ export namespace editor.api {
      * ```
      */
     paste(target: NodeID | NodeID[]): NodeID[];
+    /**
+     * TODO: Refactor this method to either:
+     * 1. Rename to `insertVector` - since this method directly inserts a vector network
+     *    without relying on memory clipboard data (unlike `paste()` which uses `state.user_clipboard`).
+     *    This would be more accurate naming and consistent with `insert()`.
+     * 2. OR make it use memory clipboard payload - store the vector network in `state.user_clipboard`
+     *    and use the standard `paste()` flow, making it consistent with other paste operations.
+     */
     pasteVector(network: vn.VectorNetwork): void;
     pastePayload(payload: io.clipboard.ClipboardPayload): boolean;
     duplicate(target: "selection" | NodeID): void;

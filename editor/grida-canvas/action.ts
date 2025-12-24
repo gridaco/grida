@@ -292,6 +292,7 @@ export type EditorCopyCutPasteAction =
   | EditorCopyAction
   | EditorCutAction
   | EditorPasteAction
+  | EditorPasteVectorNetworkAction
   | EditorDuplicateAction;
 
 export interface EditorCopyAction {
@@ -306,11 +307,13 @@ export interface EditorCutAction {
 
 export interface EditorPasteAction {
   type: "paste";
-  /**
-   * @deprecated Vector network paste. Should be removed in favor of clipboard mechanism.
-   */
-  vector_network?: vn.VectorNetwork;
   target: NodeID | NodeID[];
+}
+
+export interface EditorPasteVectorNetworkAction {
+  type: "paste-vector-network";
+  vector_network: vn.VectorNetwork;
+  target: NodeID | null;
 }
 
 export interface EditorDuplicateAction {
