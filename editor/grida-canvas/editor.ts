@@ -22,7 +22,10 @@ import {
 } from "./backends";
 import { domapi } from "./backends/dom";
 import { dq } from "@/grida-canvas/query";
-import { resolvePasteTargetParents } from "@/grida-canvas/utils/paste-helpers";
+import {
+  resolveInsertTargetParent,
+  resolvePasteTargetParents,
+} from "@/grida-canvas/utils/insertion-targeting";
 import { io } from "@grida/io";
 import * as googlefonts from "@grida/fonts/google";
 import grida from "@grida/schema";
@@ -628,12 +631,19 @@ class EditorDocumentStore
         }
       | {
           document: grida.program.document.IPackedSceneDocument;
-        }
-  ) {
+        },
+    target: editor.NodeID | null
+  ): editor.NodeID[] {
+    const nodesBefore = new Set(Object.keys(this.mstate.document.nodes));
+
     this.dispatch({
       type: "insert",
       ...payload,
+      target,
     });
+
+    const nodesAfter = Object.keys(this.mstate.document.nodes);
+    return nodesAfter.filter((id) => !nodesBefore.has(id));
   }
 
   public loadScene(scene_id: string) {
@@ -709,10 +719,14 @@ class EditorDocumentStore
       result = result as grida.program.nodes.i.IPositioning &
         grida.program.nodes.i.IFixedDimension;
 
-      this.insert({
-        id: id,
-        prototype: result,
-      });
+      // Use explicit scene-level target for programmatic SVG node creation
+      this.insert(
+        {
+          id: id,
+          prototype: result,
+        },
+        this.mstate.scene_id ?? null
+      );
 
       return this.getNodeById<grida.program.nodes.ContainerNode>(id);
     } else {
@@ -724,60 +738,69 @@ class EditorDocumentStore
     image: grida.program.document.ImageRef
   ): NodeProxy<grida.program.nodes.ImageNode> {
     const id = this.idgen.next();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "image",
-        _$id: id,
-        src: image.url,
-        width: image.width,
-        height: image.height,
+    // Use explicit scene-level target for programmatic image node creation
+    this.insert(
+      {
+        id: id,
+        prototype: {
+          type: "image",
+          _$id: id,
+          src: image.url,
+          width: image.width,
+          height: image.height,
+        },
       },
-    });
+      this.mstate.scene_id ?? null
+    );
 
     return this.getNodeById(id);
   }
 
   public createTextNode(text = ""): NodeProxy<grida.program.nodes.TextNode> {
     const id = this.idgen.next();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "text",
-        _$id: id,
-        text: text,
-        width: "auto",
-        height: "auto",
-        fill: {
-          type: "solid",
-          color: kolor.colorformats.RGBA32F.BLACK,
-          active: true,
+    // Use explicit scene-level target for programmatic text node creation
+    this.insert(
+      {
+        id: id,
+        prototype: {
+          type: "text",
+          _$id: id,
+          text: text,
+          width: "auto",
+          height: "auto",
+          fill: {
+            type: "solid",
+            color: kolor.colorformats.RGBA32F.BLACK,
+            active: true,
+          },
         },
       },
-    });
+      this.mstate.scene_id ?? null
+    );
 
     return this.getNodeById(id);
   }
 
   public createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode> {
     const id = this.idgen.next();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "rectangle",
-        _$id: id,
-        width: 100,
-        height: 100,
-        fill: {
-          type: "solid",
-          color: kolor.colorformats.RGBA32F.BLACK,
-          active: true,
+    // Use explicit scene-level target for programmatic rectangle node creation
+    this.insert(
+      {
+        id: id,
+        prototype: {
+          type: "rectangle",
+          _$id: id,
+          width: 100,
+          height: 100,
+          fill: {
+            type: "solid",
+            color: kolor.colorformats.RGBA32F.BLACK,
+            active: true,
+          },
         },
       },
-    });
+      this.mstate.scene_id ?? null
+    );
 
     return this.getNodeById(id);
   }
@@ -915,13 +938,18 @@ class EditorDocumentStore
   public pastePayload(payload: io.clipboard.ClipboardPayload): boolean {
     switch (payload.type) {
       case "prototypes": {
+        // Capture selection at start to prevent nesting when looping
+        const currentSelection = [...this.mstate.selection];
+        const target = resolveInsertTargetParent(this.mstate, currentSelection);
+
         payload.prototypes.forEach((p) => {
           const sub =
             grida.program.nodes.factory.create_packed_scene_document_from_prototype(
               p,
               () => this.idgen.next()
             );
-          this.insert({ document: sub });
+          // Use explicit target to prevent nesting - all prototypes go to same parent
+          this.insert({ document: sub }, target);
         });
         return true;
       }
@@ -1215,11 +1243,14 @@ class EditorDocumentStore
 
   public insertNode(prototype: grida.program.nodes.NodePrototype) {
     const id = this.idgen.next();
-    this.dispatch({
-      type: "insert",
-      id,
-      prototype,
-    });
+    // Use explicit scene-level target for programmatic node insertion
+    this.insert(
+      {
+        id,
+        prototype,
+      },
+      this.mstate.scene_id ?? null
+    );
     return id;
   }
 
@@ -3069,12 +3100,14 @@ export class Editor
         }
       | {
           document: grida.program.document.IPackedSceneDocument;
-        }
-  ): void {
-    this.doc.insert(payload);
+        },
+    target: editor.NodeID | null
+  ): editor.NodeID[] {
+    const insertedNodeIds = this.doc.insert(payload, target);
     for (const font of this.doc.state.fontfaces) {
       this.loadFontSync(font);
     }
+    return insertedNodeIds;
   }
 
   async createImageAsync(
@@ -4621,6 +4654,30 @@ export class EditorSurface
     if (pastedNodeIds.length > 0) {
       this._editor.doc.select(pastedNodeIds, "reset");
     }
+  }
+
+  public insert(
+    payload: editor.api.InsertPayload | editor.api.InsertPayload[]
+  ): editor.NodeID[] {
+    const currentSelection = [...this.state.selection];
+    const target = resolveInsertTargetParent(this.state, currentSelection);
+
+    const payloads = Array.isArray(payload) ? payload : [payload];
+    const allInsertedNodeIds: editor.NodeID[] = [];
+
+    // Insert all payloads using the same target (prevents nesting)
+    // Use editor.insert() instead of doc.insert() to handle font sync
+    for (const p of payloads) {
+      const insertedNodeIds = this._editor.insert(p, target);
+      allInsertedNodeIds.push(...insertedNodeIds);
+    }
+
+    // Select all newly inserted nodes as a group
+    if (allInsertedNodeIds.length > 0) {
+      this._editor.doc.select(allInsertedNodeIds, "reset");
+    }
+
+    return allInsertedNodeIds;
   }
 
   public a11yDelete() {

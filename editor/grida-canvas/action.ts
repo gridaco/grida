@@ -930,6 +930,12 @@ export type EditorSurface_StartGesture = {
 
 export type DocumentEditorInsertNodeAction = {
   type: "insert";
+  /**
+   * Explicit parent node ID for insertion.
+   * - `null`: Insert at scene level
+   * - `NodeID`: Insert into this parent container
+   */
+  target: NodeID | null;
 } & (
   | {
       id?: string;

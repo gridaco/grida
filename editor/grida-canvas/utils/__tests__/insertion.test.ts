@@ -1,8 +1,8 @@
 import {
   getViewportAwareDelta,
-  hitTestNestedInsertionTarget,
   getPackedSubtreeBoundingRect,
 } from "@/grida-canvas/utils/insertion";
+import { hitTestNestedInsertionTarget } from "@/grida-canvas/utils/insertion-targeting";
 import cmath from "@grida/cmath";
 
 import type grida from "@grida/schema";

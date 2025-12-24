@@ -127,7 +127,7 @@ export function PlaygroundMenuContent({
       <ImportFromFigmaDialog
         {...importFromFigmaDialog.props}
         onImport={(res) => {
-          instance.insert({
+          instance.surface.insert({
             document: iofigma.restful.factory.document(
               res.document as any,
               res.images,
@@ -160,7 +160,7 @@ export function PlaygroundMenuContent({
               const packedDoc = FigImporter.convertPageToScene(page, {
                 gradient_id_generator: () => v4(),
               });
-              instance.insert({ document: packedDoc });
+              instance.surface.insert({ document: packedDoc });
             }
           }
         }}

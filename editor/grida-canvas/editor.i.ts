@@ -2728,9 +2728,25 @@ export namespace editor.api {
 
   export interface IEditorDocumentStoreConsumerWithConstraintsActions {
     /**
-     * inserts the payload with assertions and constraints
+     * Inserts a node or subdocument into the document tree.
+     *
+     * This method wraps the core document insertion with additional operations:
+     * - Calls `doc.insert()` to perform the document tree insertion
+     * - Handles post-insertion operations (e.g., font synchronization)
+     * - Ensures fonts referenced by inserted nodes are loaded
+     *
+     * @param payload - Node prototype or subdocument to insert
+     * @param target - Explicit parent node ID (null = scene-level)
+     *
+     * @returns Array of newly inserted top-level node IDs
+     *
+     * @remarks
+     * - This is the recommended method for programmatic insertion (as opposed to `doc.insert()`)
+     * - It handles necessary post-insertion operations like font sync that `doc.insert()` does not
+     * - For user-facing insert operations, use `surface.insert()` instead
+     * - The returned node IDs can be used by caller to update selection or perform other operations
      */
-    insert(payload: InsertPayload): void;
+    insert(payload: InsertPayload, target: NodeID | null): NodeID[];
     autoSizeTextNode(node_id: string, axis: "width" | "height"): void;
   }
 
@@ -2768,7 +2784,29 @@ export namespace editor.api {
       key?: string,
       force?: boolean
     ): void;
-    insert(payload: InsertPayload): void;
+    /**
+     * Inserts a node or subdocument into the document tree.
+     *
+     * This is a pure document tree operation that:
+     * - Does NOT read or modify selection state
+     * - Does NOT perform selection-based target resolution (caller must provide explicit target)
+     * - Does NOT update selection after insertion
+     * - Only modifies the document tree structure (adds new nodes)
+     * - Does NOT handle post-insertion operations (e.g., font sync)
+     *
+     * @param payload - Node prototype or subdocument to insert
+     * @param target - Explicit parent node ID (null = scene-level)
+     *
+     * @returns Array of newly inserted top-level node IDs
+     *
+     * @remarks
+     * - **In most cases, do NOT call this method directly.** Instead, use `Editor.insert()` which
+     *   handles post-document operations (e.g., font synchronization) that are necessary after insertion.
+     * - For user-facing insert operations, use `surface.insert()` instead
+     * - The returned node IDs can be used by caller to update selection
+     * - This method is intended for internal use or when you explicitly need to skip post-insertion operations
+     */
+    insert(payload: InsertPayload, target: NodeID | null): NodeID[];
     loadScene(scene_id: string): void;
     createScene(scene?: grida.program.document.SceneInit): void;
     deleteScene(scene_id: string): void;
@@ -3735,6 +3773,41 @@ export namespace editor.api {
     surfaceConfigurePaddingWithMirroringModifier(
       padding_with_axis_mirroring: "on" | "off"
     ): void;
+
+    /**
+     * User-facing insert operation that handles UX concerns.
+     *
+     * This method:
+     * - Captures current selection at invocation time (bounded context)
+     * - Resolves target parent from selection using UX logic
+     * - Calls core insert() with explicit target
+     * - Updates selection to newly inserted nodes
+     *
+     * @param payload - Node prototype or subdocument to insert, or array of payloads
+     * @returns Array of newly inserted top-level node IDs
+     *
+     * @remarks
+     * - When passing an array, all payloads are inserted as a group using the same target
+     *   (from the initial selection), then all newly inserted nodes are selected together.
+     *   This prevents nesting when inserting multiple items (e.g., from Figma clipboard).
+     * - When passing a single payload, selection is captured at invocation time to prevent
+     *   nesting in loops, and selection is updated after insert to select the newly inserted node.
+     * - All UX logic is handled here, not in the reducer.
+     *
+     * @example
+     * ```typescript
+     * // Single insertion
+     * editor.surface.insert({ prototype: myPrototype });
+     *
+     * // Multiple insertions (prevents nesting)
+     * editor.surface.insert([
+     *   { document: doc1 },
+     *   { document: doc2 },
+     *   { document: doc3 },
+     * ]);
+     * ```
+     */
+    insert(payload: InsertPayload | InsertPayload[]): NodeID[];
 
     /**
      * Blur event handler callback.

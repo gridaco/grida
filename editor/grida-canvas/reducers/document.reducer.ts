@@ -49,7 +49,6 @@ import { self_apply_scale_by_factor } from "./methods/scale";
 import {
   getPackedSubtreeBoundingRect,
   getViewportAwareDelta,
-  hitTestNestedInsertionTarget,
 } from "@/grida-canvas/utils/insertion";
 import {
   self_wrapNodes,
@@ -83,11 +82,6 @@ const PLACEMENT_ANCHORS_PADDING = 40;
  * the inset is inteded to be applied **before** being converted to canvas space (for better visual consistency)
  */
 const PLACEMENT_VIEWPORT_INSET = 40;
-
-/**
- * Maximum depth of hit-tested results considered for nested insertion.
- */
-const INSERTION_HIT_TEST_MAX_DEPTH = 8;
 
 /**
  * Helper to get a SceneNode from the document.
@@ -895,36 +889,24 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       });
 
-      const placedRect = {
-        x: box.x + placement.x,
-        y: box.y + placement.y,
-        width: box.width,
-        height: box.height,
-      };
+      const parent: string | null = action.target;
 
-      let parent: string | null = null;
-      if (state.selection.length > 0) {
-        const first = state.selection[0];
-        const selected = dq.__getNodeById(state, first);
-        parent =
-          selected.type === "container"
-            ? first
-            : dq.getParentId(state.document_ctx, first);
-      }
-      if (!parent) {
-        parent = hitTestNestedInsertionTarget(
-          placedRect,
-          context.geometry,
-          (id) => dq.__getNodeById(state, id).type === "container",
-          INSERTION_HIT_TEST_MAX_DEPTH
-        );
+      if (parent) {
+        const parent_rect =
+          context.geometry.getNodeAbsoluteBoundingRect(parent);
+        if (parent_rect) {
+          sub.scene.children_refs.forEach((node_id) => {
+            const node = sub.nodes[node_id];
+            if ("position" in node && node.position === "absolute") {
+              node.left = (node.left ?? 0) - parent_rect.x;
+              node.top = (node.top ?? 0) - parent_rect.y;
+            }
+          });
+        }
       }
 
       return updateState(state, (draft) => {
-        const new_top_ids = self_insertSubDocument(draft, parent, sub);
-
-        self_select_tool(draft, { type: "cursor" }, context);
-        self_selectNode(draft, "reset", ...new_top_ids);
+        self_insertSubDocument(draft, parent, sub);
       });
     }
     case "order": {

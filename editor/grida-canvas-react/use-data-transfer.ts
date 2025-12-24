@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { iofigma } from "@grida/io-figma";
 import { nanoid } from "nanoid";
 import { datatransfer } from "@/grida-canvas/data-transfer";
+import type { editor } from "@/grida-canvas";
 
 /**
  * Hook that provides file insertion utilities for the Grida canvas editor.
@@ -199,16 +200,17 @@ async function tryInsertFromFigmaClipboardPayload(
     };
 
     // Convert each root node to Grida document (will recursively process children)
-    rootNodes.forEach((figmaNode) => {
+    const payloads: editor.api.InsertPayload[] = rootNodes.map((figmaNode) => {
       const gridaDoc = iofigma.restful.factory.document(
         figmaNode,
         {}, // images map (empty for clipboard paste)
         context
       );
-
-      // 5. Insert into canvas
-      editor.insert({ document: gridaDoc });
+      return { document: gridaDoc };
     });
+
+    // Insert all payloads as a group (prevents nesting)
+    editor.surface.insert(payloads);
 
     return { success: true, insertedNodeCount: rootNodes.length };
   } catch (error) {
