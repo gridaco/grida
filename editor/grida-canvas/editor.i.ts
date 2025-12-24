@@ -1086,6 +1086,22 @@ export namespace editor.state {
      * Lasso state
      */
     lasso?: editor.state.Lasso;
+
+    /**
+     * @private - internal use only
+     *
+     * Deferred selection operation state.
+     * Stores the operation that was deferred on pointerdown.
+     * Used to track which node was already selected when pointerdown occurred,
+     * so that deferred operations are only applied to nodes that were already selected,
+     * not nodes that were added to selection on pointerdown.
+     *
+     * @default undefined
+     */
+    __deferred_selection?: {
+      node_id: string | "__clear_selection__";
+      operation: "reset" | "toggle";
+    };
   }
 
   /**

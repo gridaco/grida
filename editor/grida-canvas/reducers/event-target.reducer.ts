@@ -18,6 +18,11 @@ import type {
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
+import {
+  decidePointerDownSelection,
+  decideClickSelection,
+  decideDragStartAction,
+} from "./methods/selection";
 import nodeReducer from "./node.reducer";
 import initialNode from "./tools/initial-node";
 import assert from "assert";
@@ -93,8 +98,30 @@ function __self_evt_on_click(
   action: EditorEventTarget_Click,
   context: ReducerContext
 ) {
-  const { node_ids_from_point } = <EditorEventTarget_Click>action;
+  const { node_ids_from_point, shiftKey } = <EditorEventTarget_Click>action;
   draft.hits = node_ids_from_point;
+
+  // Handle deferred selection operations using the testable decision function
+  const decision = decideClickSelection({
+    clicked_node_id: node_ids_from_point[0] ?? null,
+    deferred_selection: draft.__deferred_selection,
+  });
+
+  if (decision.type === "immediate") {
+    if (decision.mode === "clear") {
+      self_clearSelection(draft);
+    } else {
+      self_selectNode(draft, decision.mode, decision.node_id);
+    }
+    draft.__deferred_selection = undefined;
+    // Early return to prevent other click handlers from running
+    // (this matches the behavior of immediate selection changes)
+    return;
+  }
+
+  // Clear deferred marker if no operation was applied
+  draft.__deferred_selection = undefined;
+
   switch (draft.tool.type) {
     case "cursor":
     case "scale":
@@ -210,7 +237,8 @@ function __self_evt_on_double_click(draft: editor.state.IEditorState) {
 
 function __self_pointer_down_selection_like_cursor(
   draft: editor.state.IEditorState,
-  shiftKey: boolean
+  shiftKey: boolean,
+  context: ReducerContext
 ) {
   const { hovered_node_id } = self_updateSurfaceHoverState(draft);
 
@@ -222,18 +250,37 @@ function __self_pointer_down_selection_like_cursor(
     return;
   }
 
-  if (shiftKey) {
-    if (hovered_node_id) {
-      self_selectNode(draft, "toggle", hovered_node_id);
-    } else {
-      // do nothing (when shift key is pressed)
-    }
-  } else {
-    if (hovered_node_id) {
-      self_selectNode(draft, "reset", hovered_node_id);
-    } else {
-      self_clearSelection(draft);
-    }
+  // Use the testable decision function
+  // TODO: Determine is_empty_space_within_overlay from geometry
+  // For now, pass undefined (will be treated as outside overlay, immediate clear)
+  // In the future, this should be computed using selection geometry rects and pointer position
+  const decision = decidePointerDownSelection({
+    hovered_node_id,
+    shiftKey,
+    current_selection: draft.selection,
+    document_ctx: draft.document_ctx,
+    is_empty_space_within_overlay: undefined, // TODO: compute from geometry
+  });
+
+  // Apply the decision
+  switch (decision.type) {
+    case "immediate":
+      if (decision.mode === "clear") {
+        self_clearSelection(draft);
+      } else {
+        self_selectNode(draft, decision.mode, decision.node_id);
+      }
+      draft.__deferred_selection = undefined;
+      break;
+    case "deferred":
+      draft.__deferred_selection = {
+        node_id: decision.node_id,
+        operation: decision.operation,
+      };
+      break;
+    case "none":
+      draft.__deferred_selection = undefined;
+      break;
   }
 }
 
@@ -249,12 +296,12 @@ function __self_evt_on_pointer_down(
 
   switch (draft.tool.type) {
     case "cursor": {
-      __self_pointer_down_selection_like_cursor(draft, shiftKey);
+      __self_pointer_down_selection_like_cursor(draft, shiftKey, context);
       break;
     }
     case "scale": {
       // Scale tool behaves like cursor for selection interactions.
-      __self_pointer_down_selection_like_cursor(draft, shiftKey);
+      __self_pointer_down_selection_like_cursor(draft, shiftKey, context);
       break;
     }
     case "insert": {
@@ -306,29 +353,52 @@ function __self_drag_start_selection_like_cursor(
     return;
   }
 
-  // TODO: improve logic
-  if (shiftKey) {
-    if (draft.hovered_node_id) {
-      __self_start_gesture_translate(draft, context);
-    } else {
-      // marquee selection
-      draft.marquee = {
-        a: draft.pointer.position,
-        b: draft.pointer.position,
-        additive: shiftKey,
-      };
+  // TODO: move overlay hit-testing into `decideDragStartAction` (selection module).
+  // Today, this reducer computes `is_empty_space_within_overlay` via geometry to keep
+  // `event-target/event/on-drag-start` clean (no selection-specific payload).
+  //
+  // In the future, as described in docs/wg/feat-editor/ux-surface/selection.md, the
+  // selection module should own this logic by taking selection geometry + pointer
+  // position and determining `is_empty_space_within_overlay` internally.
+  //
+  // Selection overlay hit test (pure math, reducer-local):
+  // If pointer is on empty space and there is a selection, determine whether the pointer is
+  // inside the selection overlay bounds (union of selected nodes' absolute rects).
+  //
+  // This is required to distinguish:
+  // - Shift + empty space within overlay → drag selection (axis lock)
+  // - Shift + empty space outside overlay → marquee selection
+  let is_empty_space_within_overlay: boolean | undefined = undefined;
+  if (draft.selection.length > 0 && !draft.hovered_node_id) {
+    const rects = draft.selection
+      .map((id) => context.geometry.getNodeAbsoluteBoundingRect(id))
+      .filter((r) => r) as cmath.Rectangle[];
+    if (rects.length > 0) {
+      const overlay = cmath.rect.union(rects);
+      is_empty_space_within_overlay = cmath.rect.containsPoint(
+        overlay,
+        draft.pointer.position
+      );
     }
+  }
+
+  // Use the testable decision function
+  const action = decideDragStartAction({
+    hovered_node_id: draft.hovered_node_id,
+    shiftKey,
+    current_selection: draft.selection,
+    is_empty_space_within_overlay,
+  });
+
+  if (action === "drag") {
+    __self_start_gesture_translate(draft, context);
   } else {
-    if (draft.selection.length === 0) {
-      // marquee selection
-      draft.marquee = {
-        a: draft.pointer.position,
-        b: draft.pointer.position,
-        additive: shiftKey,
-      };
-    } else {
-      __self_start_gesture_translate(draft, context);
-    }
+    // marquee selection
+    draft.marquee = {
+      a: draft.pointer.position,
+      b: draft.pointer.position,
+      additive: shiftKey,
+    };
   }
 }
 
@@ -349,6 +419,9 @@ function __self_evt_on_drag_start(
   draft.lasso = undefined;
   draft.dropzone = undefined;
   draft.surface_snapping = undefined;
+
+  // Cancel deferred selection operations (per docs: "On dragstart → deferred operations cancelled")
+  draft.__deferred_selection = undefined;
 
   switch (draft.tool.type) {
     case "cursor": {
