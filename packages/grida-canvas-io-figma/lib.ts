@@ -1948,7 +1948,7 @@ export namespace iofigma {
       ): figrest.SubcanvasNode | undefined {
         if (!nc.guid || !nc.name || !nc.size) return undefined;
 
-        return {
+        const node = {
           ...kiwi_is_layer_trait(nc, "INSTANCE"),
           ...kiwi_blend_opacity_trait(nc),
           ...kiwi_layout_trait(nc),
@@ -1962,6 +1962,66 @@ export namespace iofigma {
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
         } satisfies figrest.InstanceNode;
+
+        // Minimal override support (fixtures-based):
+        // In observed clipboard payloads, overrides are provided as a NodeChange-like patch object
+        // under `symbolData.symbolOverrides`, often without guid/type, carrying fillPaints/strokePaints.
+        // Treat such entries as root-level overrides for the instance node.
+        //
+        // TODO(kiwi-overrides): implement full override resolution.
+        // - Targeted overrides should be applied to the referenced nested nodes (by guid/path),
+        //   not only the instance root.
+        // - Handle instance swaps (`overriddenSymbolID` / symbol swap), nested overrides,
+        //   and non-paint fields (text styles, effects, layout, etc.).
+        const symbolOverrides = nc.symbolData?.symbolOverrides;
+        if (Array.isArray(symbolOverrides) && symbolOverrides.length > 0) {
+          const o0 = symbolOverrides[0] as figkiwi.NodeChange;
+
+          // Only treat as root patch when the override entry is not targeted.
+          // (Targeted overrides should carry guid/type/parentIndex and are applied during flattening.)
+          const looksLikeRootPatch =
+            o0.guid === undefined &&
+            o0.type === undefined &&
+            o0.parentIndex?.guid === undefined;
+
+          if (looksLikeRootPatch) {
+            // FIXME(kiwi-overrides): this assumes a single root-level patch entry.
+            // Real payloads may contain multiple override entries and/or targeted overrides
+            // even when the first entry looks like a patch.
+            if (o0.fillPaints !== undefined) {
+              node.fills = paints(o0.fillPaints);
+            }
+            if (o0.strokePaints !== undefined) {
+              node.strokes = paints(o0.strokePaints);
+            }
+            if (o0.strokeWeight !== undefined) {
+              node.strokeWeight = o0.strokeWeight ?? 0;
+            }
+            if (o0.strokeAlign !== undefined) {
+              node.strokeAlign = map.strokeAlign(o0.strokeAlign);
+            }
+            if (o0.strokeCap !== undefined) {
+              node.strokeCap = map.strokeCap(o0.strokeCap);
+            }
+            if (o0.strokeJoin !== undefined) {
+              node.strokeJoin = map.strokeJoin(o0.strokeJoin);
+            }
+            if (o0.miterLimit !== undefined) {
+              node.strokeMiterAngle = o0.miterLimit;
+            }
+            if (o0.opacity !== undefined) {
+              node.opacity = o0.opacity;
+            }
+            if (o0.blendMode !== undefined) {
+              node.blendMode = map.blendMode(o0.blendMode);
+            }
+            if (o0.visible !== undefined) {
+              node.visible = o0.visible;
+            }
+          }
+        }
+
+        return node;
       }
 
       /**
@@ -2166,6 +2226,347 @@ export namespace iofigma {
       }
     }
 
+    export type BuildTreeOptions = {
+      /**
+       * Fallback behavior for environments that do not support a real component/instance system.
+       *
+       * When enabled, `INSTANCE` nodes are turned into normal container trees by inlining/cloning
+       * the referenced `SYMBOL` subtree (resolved via `INSTANCE.symbolData.symbolID -> SYMBOL.guid`).
+       *
+       * This is primarily needed for clipboard payloads where the `SYMBOL` definition lives under
+       * an internal-only canvas (`CANVAS.internalOnly === true`).
+       */
+      flattenInstances?: boolean;
+    };
+
+    type AnyFigmaNode = NonNullable<
+      ReturnType<typeof iofigma.kiwi.factory.node>
+    >;
+
+    function buildGuidToKiwiMap(
+      nodeChanges: figkiwi.NodeChange[]
+    ): Map<string, figkiwi.NodeChange> {
+      const guidToKiwi = new Map<string, figkiwi.NodeChange>();
+      nodeChanges.forEach((nc) => {
+        if (nc.guid) guidToKiwi.set(iofigma.kiwi.guid(nc.guid), nc);
+      });
+      return guidToKiwi;
+    }
+
+    function buildFlatFigmaNodes(
+      nodeChanges: figkiwi.NodeChange[],
+      message: figkiwi.Message
+    ): { flat: AnyFigmaNode[]; guidToNode: Map<string, AnyFigmaNode> } {
+      const flat = nodeChanges
+        .map((nc) => iofigma.kiwi.factory.node(nc, message))
+        .filter((node) => node !== undefined) as AnyFigmaNode[];
+
+      const guidToNode = new Map<string, AnyFigmaNode>();
+      flat.forEach((node) => guidToNode.set((node as any).id, node));
+      return { flat, guidToNode };
+    }
+
+    function buildChildrenRelationsInPlace(
+      flatNodes: AnyFigmaNode[],
+      guidToNode: Map<string, AnyFigmaNode>,
+      guidToKiwi: Map<string, figkiwi.NodeChange>
+    ) {
+      // Attach children arrays by consulting parentIndex in Kiwi
+      flatNodes.forEach((node) => {
+        const kiwiNode = guidToKiwi.get((node as any).id);
+        if (!kiwiNode?.parentIndex?.guid) return;
+
+        const parentGuid = iofigma.kiwi.guid(kiwiNode.parentIndex.guid);
+        const parentNode = guidToNode.get(parentGuid);
+
+        if (parentNode && "children" in (parentNode as any)) {
+          if (!(parentNode as any).children) (parentNode as any).children = [];
+          ((parentNode as any).children as any[]).push(node);
+        }
+      });
+
+      // Sort children by parentIndex.position (fractional index string), if present
+      guidToNode.forEach((parentNode) => {
+        if (
+          !("children" in (parentNode as any)) ||
+          !(parentNode as any).children
+        )
+          return;
+
+        ((parentNode as any).children as any[]).sort((a, b) => {
+          const aKiwi = guidToKiwi.get((a as any).id);
+          const bKiwi = guidToKiwi.get((b as any).id);
+          const aPos = aKiwi?.parentIndex?.position ?? "";
+          const bPos = bKiwi?.parentIndex?.position ?? "";
+          return aPos.localeCompare(bPos);
+        });
+      });
+    }
+
+    function inheritContainerPropsFromComponentIfMissing(
+      instanceNode: any,
+      componentNode: any
+    ) {
+      // This is a conservative copy: only fill missing/empty fields on the instance.
+      if (!instanceNode || !componentNode) return;
+
+      if (
+        (instanceNode.fills === undefined || instanceNode.fills.length === 0) &&
+        componentNode.fills?.length
+      ) {
+        instanceNode.fills = componentNode.fills;
+      }
+      if (
+        (instanceNode.strokes === undefined ||
+          instanceNode.strokes.length === 0) &&
+        componentNode.strokes?.length
+      ) {
+        instanceNode.strokes = componentNode.strokes;
+      }
+      if (
+        (instanceNode.effects === undefined ||
+          instanceNode.effects.length === 0) &&
+        componentNode.effects?.length
+      ) {
+        instanceNode.effects = componentNode.effects;
+      }
+      if (
+        instanceNode.clipsContent === undefined &&
+        componentNode.clipsContent !== undefined
+      ) {
+        instanceNode.clipsContent = componentNode.clipsContent;
+      }
+      if (
+        instanceNode.cornerRadius === undefined &&
+        componentNode.cornerRadius !== undefined
+      ) {
+        instanceNode.cornerRadius = componentNode.cornerRadius;
+      }
+    }
+
+    function cloneTreeWithNewIdsAndFlattenInstances(params: {
+      node: any;
+      idPrefix: string;
+      guidToNode: Map<string, AnyFigmaNode>;
+      options: BuildTreeOptions;
+      componentStack: string[];
+      idCounter: { n: number };
+      symbolOverrideByGuid?: Map<string, figkiwi.NodeChange>;
+    }): any {
+      const { node, idPrefix, guidToNode, options, componentStack, idCounter } =
+        params;
+      const symbolOverrideByGuid = params.symbolOverrideByGuid;
+
+      const originalId = (node as any).id;
+      const newId = `${idPrefix}::${idCounter.n++}::${originalId}`;
+
+      // Shallow clone
+      const cloned: any = { ...(node as any), id: newId };
+
+      // Apply targeted overrides (by guid) to cloned nodes.
+      // Note: Rest node ids are guid strings (sessionID:localID).
+      const override = symbolOverrideByGuid?.get(originalId);
+      if (override) {
+        // Minimal: text overrides (characters)
+        if (
+          cloned.type === "TEXT" &&
+          typeof override.textData?.characters === "string"
+        ) {
+          cloned.characters = override.textData.characters;
+        }
+        // Optional common fields that are safe to apply in practice:
+        if (override.visible !== undefined) cloned.visible = override.visible;
+        if (override.opacity !== undefined) cloned.opacity = override.opacity;
+        // TODO(kiwi-overrides): apply more targeted overrides when needed.
+        // - Paint overrides: requires converting Kiwi Paints (override.fillPaints/strokePaints)
+        //   onto REST nodes here (we currently only do root-level paints in instance()).
+        // - Text style overrides: font, size, fills, etc.
+        // - Layout/geometry overrides, effect overrides, etc.
+        // - Instance swaps (`overriddenSymbolID`) and nested instance overrides.
+      }
+
+      // Children clone (default: clone existing children)
+      if ("children" in cloned && Array.isArray(cloned.children)) {
+        cloned.children = cloned.children.map((child: any) =>
+          cloneTreeWithNewIdsAndFlattenInstances({
+            node: child,
+            idPrefix,
+            guidToNode,
+            options,
+            componentStack,
+            idCounter,
+            symbolOverrideByGuid,
+          })
+        );
+      }
+
+      // Fallback: inline/clone component children for INSTANCE
+      if (options.flattenInstances && cloned.type === "INSTANCE") {
+        const componentId: string | undefined = cloned.componentId;
+        if (componentId) {
+          // Cycle guard: INSTANCE -> component -> INSTANCE -> same component...
+          if (componentStack.includes(componentId)) {
+            return cloned;
+          }
+
+          const componentNode: any = guidToNode.get(componentId);
+          if (componentNode) {
+            inheritContainerPropsFromComponentIfMissing(cloned, componentNode);
+
+            const componentChildren = componentNode.children ?? [];
+            const nextStack = [...componentStack, componentId];
+            cloned.children = (componentChildren as any[]).map((child) =>
+              cloneTreeWithNewIdsAndFlattenInstances({
+                node: child,
+                idPrefix,
+                guidToNode,
+                options,
+                componentStack: nextStack,
+                idCounter,
+                symbolOverrideByGuid,
+              })
+            );
+          }
+        }
+      }
+
+      return cloned;
+    }
+
+    function flattenInstancesInPlace(params: {
+      rootNodes: AnyFigmaNode[];
+      guidToNode: Map<string, AnyFigmaNode>;
+      guidToKiwi: Map<string, figkiwi.NodeChange>;
+      options: BuildTreeOptions;
+    }) {
+      const { rootNodes, guidToNode, guidToKiwi, options } = params;
+      if (!options.flattenInstances) return;
+
+      const visit = (node: any) => {
+        if (!node) return;
+
+        if (node.type === "INSTANCE" && node.componentId) {
+          const componentNode: any = guidToNode.get(node.componentId);
+          if (componentNode?.children?.length) {
+            inheritContainerPropsFromComponentIfMissing(node, componentNode);
+            const symbolOverrideByGuid = new Map<string, figkiwi.NodeChange>();
+            const kiwiInstance = guidToKiwi.get(node.id);
+            const instOverrides = kiwiInstance?.symbolData?.symbolOverrides;
+            (instOverrides ?? []).forEach((o) => {
+              if (o.guid)
+                symbolOverrideByGuid.set(iofigma.kiwi.guid(o.guid), o);
+            });
+
+            const idCounter = { n: 0 };
+            node.children = (componentNode.children as any[]).map((child) =>
+              cloneTreeWithNewIdsAndFlattenInstances({
+                node: child,
+                idPrefix: node.id,
+                guidToNode,
+                options,
+                componentStack: [node.componentId],
+                idCounter,
+                symbolOverrideByGuid,
+              })
+            );
+          }
+        }
+
+        if (Array.isArray(node.children)) {
+          node.children.forEach(visit);
+        }
+      };
+
+      rootNodes.forEach(visit);
+    }
+
+    /**
+     * Build a clipboard-friendly root node list (Kiwi NodeChanges → REST nodes with hierarchy).
+     *
+     * - Builds hierarchy using `parentIndex.guid` and sorts by `parentIndex.position`.
+     * - When `options.flattenInstances === true`, `INSTANCE` nodes inline/clone referenced `SYMBOL` subtrees.
+     */
+    export function buildClipboardRootNodes(params: {
+      nodeChanges: figkiwi.NodeChange[];
+      message: figkiwi.Message;
+      options?: BuildTreeOptions;
+    }): AnyFigmaNode[] {
+      const {
+        nodeChanges,
+        message,
+        options = { flattenInstances: true },
+      } = params;
+
+      const guidToKiwi = buildGuidToKiwiMap(nodeChanges);
+      const { flat, guidToNode } = buildFlatFigmaNodes(nodeChanges, message);
+
+      buildChildrenRelationsInPlace(flat, guidToNode, guidToKiwi);
+
+      // In clipboard payloads, component definitions may live under internal-only canvases.
+      // We treat those canvases as a repository and exclude their direct children from roots.
+      const internalCanvasGuids = new Set<string>();
+      nodeChanges.forEach((nc) => {
+        if (nc.type === "CANVAS" && nc.internalOnly === true && nc.guid) {
+          internalCanvasGuids.add(iofigma.kiwi.guid(nc.guid));
+        }
+      });
+
+      const rootNodes = flat.filter((node) => {
+        const kiwi = guidToKiwi.get((node as any).id);
+        if (!kiwi?.parentIndex?.guid) return true;
+
+        const parentGuid = iofigma.kiwi.guid(kiwi.parentIndex.guid);
+        const parentKiwi = guidToKiwi.get(parentGuid);
+
+        // Exclude items that are direct children of internal-only canvases
+        if (
+          parentKiwi?.type === "CANVAS" &&
+          internalCanvasGuids.has(parentGuid)
+        ) {
+          return false;
+        }
+
+        return (
+          !parentKiwi ||
+          parentKiwi.type === "CANVAS" ||
+          parentKiwi.type === "DOCUMENT"
+        );
+      });
+
+      flattenInstancesInPlace({ rootNodes, guidToNode, guidToKiwi, options });
+      return rootNodes;
+    }
+
+    /**
+     * Build a tree for a specific CANVAS node (used for .fig file import).
+     *
+     * Note: This can also be used for clipboard payloads when you want a specific page.
+     */
+    function buildCanvasRootNodes(params: {
+      canvasGuid: figkiwi.GUID;
+      nodeChanges: figkiwi.NodeChange[];
+      message: figkiwi.Message;
+      options?: BuildTreeOptions;
+    }): AnyFigmaNode[] {
+      const { canvasGuid, nodeChanges, message, options = {} } = params;
+
+      const canvasGuidStr = iofigma.kiwi.guid(canvasGuid);
+      const guidToKiwi = buildGuidToKiwiMap(nodeChanges);
+      const { flat, guidToNode } = buildFlatFigmaNodes(nodeChanges, message);
+
+      buildChildrenRelationsInPlace(flat, guidToNode, guidToKiwi);
+
+      const rootNodes = flat.filter((node) => {
+        const kiwiNode = guidToKiwi.get((node as any).id);
+        if (!kiwiNode?.parentIndex?.guid) return false;
+        const parentGuid = iofigma.kiwi.guid(kiwiNode.parentIndex.guid);
+        return parentGuid === canvasGuidStr;
+      });
+
+      flattenInstancesInPlace({ rootNodes, guidToNode, guidToKiwi, options });
+      return rootNodes;
+    }
+
     /**
      * Namespace for .fig file import functionality
      */
@@ -2194,9 +2595,12 @@ export namespace iofigma {
      * @param fileData - The .fig file as Uint8Array
      * @returns Document with pages ready for import
      */
-    export function parseFile(fileData: Uint8Array): FigFileDocument {
+    export function parseFile(
+      fileData: Uint8Array,
+      options: BuildTreeOptions = {}
+    ): FigFileDocument {
       const figData = readFigFile(fileData);
-      const pages = extractPages(figData);
+      const pages = extractPages(figData, options);
 
       return {
         pages,
@@ -2215,7 +2619,10 @@ export namespace iofigma {
      *
      * To sort pages: pages.sort((a, b) => a.sortkey.localeCompare(b.sortkey))
      */
-    function extractPages(figData: ParsedFigmaArchive): FigPage[] {
+    function extractPages(
+      figData: ParsedFigmaArchive,
+      options: BuildTreeOptions
+    ): FigPage[] {
       const nodeChanges = figData.message.nodeChanges || [];
 
       // Find all CANVAS nodes, excluding internal-only ones
@@ -2225,7 +2632,7 @@ export namespace iofigma {
 
       // Extract pages with sortkey information (no sorting - consumers can sort by sortkey property)
       return canvasNodes.map((canvas) => {
-        const rootNodes = buildPageTree(canvas, nodeChanges, figData);
+        const rootNodes = buildPageTree(canvas, nodeChanges, figData, options);
         const sortkey = canvas.parentIndex?.position ?? "";
 
         return {
@@ -2243,50 +2650,16 @@ export namespace iofigma {
     function buildPageTree(
       canvas: figkiwi.NodeChange,
       allNodeChanges: figkiwi.NodeChange[],
-      figData: ParsedFigmaArchive
+      figData: ParsedFigmaArchive,
+      options: BuildTreeOptions
     ): any[] {
       const canvasGuid = canvas.guid;
       if (!canvasGuid) return [];
-
-      const canvasGuidStr = guid(canvasGuid);
-
-      // Convert all Kiwi nodes to REST API nodes
-      const flatFigmaNodes = allNodeChanges
-        .map((nc) => factory.node(nc, figData.message))
-        .filter((node) => node !== undefined);
-
-      // Build GUID maps
-      const guidToNode = new Map<string, any>();
-      const guidToKiwi = new Map<string, figkiwi.NodeChange>();
-
-      allNodeChanges.forEach((nc) => {
-        if (nc.guid) guidToKiwi.set(guid(nc.guid), nc);
-      });
-
-      flatFigmaNodes.forEach((node) => {
-        guidToNode.set(node.id, node);
-      });
-
-      // Build parent-child relationships
-      flatFigmaNodes.forEach((node) => {
-        const kiwiNode = guidToKiwi.get(node.id);
-        if (kiwiNode?.parentIndex?.guid) {
-          const parentGuid = guid(kiwiNode.parentIndex.guid);
-          const parentNode = guidToNode.get(parentGuid);
-
-          if (parentNode && "children" in parentNode) {
-            if (!parentNode.children) parentNode.children = [];
-            (parentNode.children as any[]).push(node);
-          }
-        }
-      });
-
-      // Return root nodes (direct children of CANVAS)
-      return flatFigmaNodes.filter((node) => {
-        const kiwiNode = guidToKiwi.get(node.id);
-        if (!kiwiNode?.parentIndex?.guid) return false;
-        const parentGuid = guid(kiwiNode.parentIndex.guid);
-        return parentGuid === canvasGuidStr;
+      return buildCanvasRootNodes({
+        canvasGuid,
+        nodeChanges: allNodeChanges,
+        message: figData.message,
+        options,
       });
     }
 
@@ -2297,8 +2670,24 @@ export namespace iofigma {
       page: FigPage,
       context: restful.factory.FactoryContext
     ): grida.program.document.IPackedSceneDocument {
+      // IMPORTANT:
+      // When converting multiple root nodes, each `restful.factory.document()` call maintains its
+      // own local ID mapping. If the caller doesn't provide a `node_id_generator`, the fallback
+      // generator inside `document()` can easily collide across calls (same timestamp + reset counter),
+      // causing Object.assign merges to overwrite previously converted roots.
+      //
+      // To avoid dropping roots, ensure we always use a shared node_id_generator across all roots.
+      let counter = 0;
+      const sharedNodeIdGenerator =
+        context.node_id_generator ??
+        (() => `figma-import-${Date.now()}-${++counter}`);
+      const sharedContext: restful.factory.FactoryContext = {
+        ...context,
+        node_id_generator: sharedNodeIdGenerator,
+      };
+
       const individualDocs = page.rootNodes.map((rootNode) =>
-        restful.factory.document(rootNode, {}, context)
+        restful.factory.document(rootNode, {}, sharedContext)
       );
 
       if (individualDocs.length === 1) return individualDocs[0];
@@ -2340,8 +2729,11 @@ export namespace iofigma {
      * Legacy class-based API for backward compatibility
      */
     export class FigImporter {
-      static parseFile(fileData: Uint8Array): FigFileDocument {
-        return parseFile(fileData);
+      static parseFile(
+        fileData: Uint8Array,
+        options: BuildTreeOptions = {}
+      ): FigFileDocument {
+        return parseFile(fileData, options);
       }
 
       static convertPageToScene(

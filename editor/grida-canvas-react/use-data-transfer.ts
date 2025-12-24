@@ -174,73 +174,18 @@ async function tryInsertFromFigmaClipboardPayload(
     const parsed = readHTMLMessage(payload);
     const nodeChanges = parsed.message.nodeChanges || [];
 
-    // 1. Convert Kiwi NodeChanges to Figma REST API or IR nodes (flat array)
-    const flatFigmaNodes = nodeChanges
-      .map((nc) => iofigma.kiwi.factory.node(nc, parsed.message))
-      .filter((node) => node !== undefined);
-
-    if (flatFigmaNodes.length === 0) {
-      return {
-        success: false,
-        error: `No supported Figma nodes found. Found ${nodeChanges.length} node(s), but none could be converted.`,
-      };
-    }
-
-    // 2. Build parent-child tree from flat nodes using parentIndex from Kiwi
-    // Map GUID to nodes for quick lookup
-    const guidToNode = new Map<
-      string,
-      NonNullable<ReturnType<typeof iofigma.kiwi.factory.node>>
-    >();
-    const guidToKiwi = new Map<string, (typeof nodeChanges)[number]>();
-
-    nodeChanges.forEach((nc) => {
-      if (nc.guid) {
-        guidToKiwi.set(iofigma.kiwi.guid(nc.guid), nc);
-      }
-    });
-
-    flatFigmaNodes.forEach((node) => {
-      guidToNode.set(node.id, node);
-    });
-
-    // Build children arrays by reading parentIndex from original Kiwi data
-    flatFigmaNodes.forEach((node) => {
-      const kiwi = guidToKiwi.get(node.id);
-      if (kiwi?.parentIndex?.guid) {
-        const parentGuid = iofigma.kiwi.guid(kiwi.parentIndex.guid);
-        const parentNode = guidToNode.get(parentGuid);
-
-        if (parentNode && "children" in parentNode) {
-          if (!parentNode.children) {
-            parentNode.children = [];
-          }
-          // Type assertion: IR nodes (X_VECTOR, etc.) will be handled by restful.factory.document
-          (parentNode.children as any[]).push(node);
-        }
-      }
-    });
-
-    // 3. Find root nodes (nodes without parent or whose parent is CANVAS/DOCUMENT)
-    const rootNodes = flatFigmaNodes.filter((node) => {
-      const kiwi = guidToKiwi.get(node.id);
-      if (!kiwi?.parentIndex?.guid) return true;
-
-      const parentGuid = iofigma.kiwi.guid(kiwi.parentIndex.guid);
-      const parentKiwi = guidToKiwi.get(parentGuid);
-
-      // Root if parent is CANVAS or DOCUMENT
-      return (
-        !parentKiwi ||
-        parentKiwi.type === "CANVAS" ||
-        parentKiwi.type === "DOCUMENT"
-      );
+    // Convert Kiwi NodeChanges to a hierarchy of REST/IR nodes, excluding internal-only canvas roots.
+    // This also applies the fallback instance flattening behavior (INSTANCE -> inline SYMBOL subtree).
+    const rootNodes = iofigma.kiwi.buildClipboardRootNodes({
+      nodeChanges,
+      message: parsed.message,
+      options: { flattenInstances: true },
     });
 
     if (rootNodes.length === 0) {
       return {
         success: false,
-        error: `No root nodes found. All ${flatFigmaNodes.length} node(s) appear to be nested within containers.`,
+        error: `No supported Figma nodes found. Found ${nodeChanges.length} node(s), but none could be converted into insertable roots.`,
       };
     }
 
