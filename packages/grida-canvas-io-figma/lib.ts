@@ -1012,6 +1012,7 @@ export namespace iofigma {
               ...base_node_trait(node),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
+              ...stroke_trait(node),
               ...style_trait({
                 overflow: node.clipsContent ? "clip" : undefined,
               }),
