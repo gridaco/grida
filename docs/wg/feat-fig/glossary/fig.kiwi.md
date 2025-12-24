@@ -263,6 +263,77 @@ This structure has been verified in:
 
 Both formats show the same pattern: component sets are FRAME nodes containing SYMBOL children, with distinguishing properties on both the FRAME and SYMBOL nodes.
 
+#### Component sets in clipboard payloads (observed)
+
+Clipboard payloads add some practical patterns around where the component-set `FRAME` and variant `SYMBOL` nodes appear:
+
+- **Copying the component set container** (see `fixtures/test-fig/clipboard/component-component-set.clipboard.html`):
+
+  - The user-facing canvas contains the component-set `FRAME` (`isStateGroup === true`) with variant `SYMBOL` children.
+  - An `"Internal Only Canvas"` (`CANVAS.internalOnly === true`) may still be present.
+
+- **Copying a variant component itself** (see `fixtures/test-fig/clipboard/component-component-set-component-*.clipboard.html`):
+
+  - The user-facing canvas contains the copied variant as a `SYMBOL`.
+  - The internal-only canvas contains the component-set `FRAME` and its variant `SYMBOL` children.
+
+- **Copying a variant instance** (see `fixtures/test-fig/clipboard/component-component-set-component-instance-*.clipboard.html`):
+  - The user-facing canvas contains an `INSTANCE`.
+  - The internal-only canvas contains the component-set `FRAME` and its variant `SYMBOL` children.
+  - The reference uses `INSTANCE.symbolData.symbolID` → `SYMBOL.guid` (where the referenced `SYMBOL` is a variant under the component-set `FRAME`, not necessarily a direct child of a `CANVAS`).
+
+**Verified in fixtures:**
+
+- `fixtures/test-fig/clipboard/component-component-set.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-set-component-blue.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-set-component-red.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-set-component-instance-blue.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-set-component-instance-red.clipboard.html`
+
+### Components & Instances (clipboard payloads)
+
+The Kiwi clipboard payloads in `fixtures/test-fig/clipboard` demonstrate how **components** and **instances** are represented in practice.
+
+#### Node types
+
+- **Component definition**: `SYMBOL`
+- **Component instance**: `INSTANCE`
+
+#### Internal-only canvas
+
+Clipboard payloads may include a canvas commonly named `"Internal Only Canvas"` where:
+
+- The `CANVAS.internalOnly` field is `true`
+- Component definitions (`SYMBOL`) may be stored there, even when the user copies an `INSTANCE`
+
+#### Observed patterns (from fixtures)
+
+**When copying the component definition** (`component-component-*.clipboard.html`):
+
+- The `SYMBOL` appears under the user-facing canvas (e.g. `"Page 1"`).
+- An `"Internal Only Canvas"` may still be present, but is empty of `SYMBOL` children in these fixtures.
+
+**When copying a component instance** (`component-component-instance-*.clipboard.html`):
+
+- The user-facing canvas contains an `INSTANCE`.
+- The `"Internal Only Canvas"` contains the referenced `SYMBOL` definition.
+- The linkage is `INSTANCE.symbolData.symbolID` → `SYMBOL.guid`.
+
+**When copying a component-set variant instance** (`component-component-set-component-instance-*.clipboard.html`):
+
+- The user-facing canvas contains an `INSTANCE`.
+- The internal-only canvas contains the component set `FRAME` (`isStateGroup === true`) and its variant `SYMBOL` children.
+- The linkage is still `INSTANCE.symbolData.symbolID` → `SYMBOL.guid` (the referenced `SYMBOL` is a variant under the component-set `FRAME`).
+
+**Verified in fixtures:**
+
+- `fixtures/test-fig/clipboard/component-component-blue.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-red.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-instance-blue.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-instance-red.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-set-component-instance-blue.clipboard.html`
+- `fixtures/test-fig/clipboard/component-component-set-component-instance-red.clipboard.html`
+
 ### Vector
 
 **Node Type:** `VECTOR`
