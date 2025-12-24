@@ -2071,9 +2071,15 @@ export namespace iofigma {
           );
 
           if (blobBytes) {
-            const vectorNetwork = parseVectorNetworkBlob(blobBytes);
+            const parsed = parseVectorNetworkBlob(blobBytes);
 
-            if (vectorNetwork) {
+            if (parsed) {
+              const vectorNetwork = scaleVectorNetworkFromNormalizedSize({
+                network: parsed,
+                normalizedSize: nc.vectorData?.normalizedSize,
+                size: nc.size,
+              });
+
               // Return X_VECTOR with parsed network data
               return {
                 ...kiwi_is_layer_trait(nc, "X_VECTOR"),
@@ -2128,6 +2134,68 @@ export namespace iofigma {
           pointCount: nc.count ?? 5,
           innerRadius: nc.starInnerScale ?? 0.5,
         } as __ir.StarNodeWithPointsDataPresent;
+      }
+
+      /**
+       * Scale a parsed vector network from `vectorData.normalizedSize` space into `NodeChange.size` space.
+       *
+       * IMPORTANT (vector network coordinate space):
+       * In observed real-world `.fig`/clipboard payloads, `vectorNetworkBlob` coordinates are often expressed
+       * in the `vectorData.normalizedSize` coordinate space, while the node's rendered size is `NodeChange.size`.
+       *
+       * Mapping:
+       * - sx = size.x / normalizedSize.x
+       * - sy = size.y / normalizedSize.y
+       *
+       * Applies to both:
+       * - vertex positions (x, y)
+       * - segment tangents (dx, dy)
+       */
+      function scaleVectorNetworkFromNormalizedSize(params: {
+        network: __ir.VectorNetwork;
+        normalizedSize: figkiwi.Vector | undefined;
+        size: figkiwi.Vector | undefined;
+      }): __ir.VectorNetwork {
+        const { network, normalizedSize, size } = params;
+
+        const sx =
+          normalizedSize &&
+          size &&
+          normalizedSize.x !== 0 &&
+          normalizedSize.x !== undefined
+            ? (size.x ?? 0) / normalizedSize.x
+            : 1;
+        const sy =
+          normalizedSize &&
+          size &&
+          normalizedSize.y !== 0 &&
+          normalizedSize.y !== undefined
+            ? (size.y ?? 0) / normalizedSize.y
+            : 1;
+
+        if (sx === 1 && sy === 1) return network;
+
+        return {
+          vertices: network.vertices.map((v) => ({
+            ...v,
+            x: v.x * sx,
+            y: v.y * sy,
+          })),
+          segments: network.segments.map((s) => ({
+            ...s,
+            start: {
+              ...s.start,
+              dx: s.start.dx * sx,
+              dy: s.start.dy * sy,
+            },
+            end: {
+              ...s.end,
+              dx: s.end.dx * sx,
+              dy: s.end.dy * sy,
+            },
+          })),
+          regions: network.regions,
+        };
       }
 
       /**
