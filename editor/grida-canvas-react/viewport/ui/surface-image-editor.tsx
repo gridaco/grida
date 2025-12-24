@@ -10,7 +10,6 @@ import {
   useTransformState,
 } from "@/grida-canvas-react/provider";
 import { editor } from "@/grida-canvas";
-import { resolvePaints } from "@/grida-canvas/utils/paint-resolution";
 import {
   getImageRectCorners,
   reduceImageTransform,
@@ -76,7 +75,11 @@ export function SurfaceImageEditor({ node_id }: { node_id: string }) {
 
   const target = contentMode.paint_target ?? "fill";
   const paintIndex = contentMode.paint_index ?? 0;
-  const { paints, resolvedIndex } = resolvePaints(node, target, paintIndex);
+  const { paints, resolvedIndex } = editor.resolvePaints(
+    node,
+    target,
+    paintIndex
+  );
   const paint = paints[resolvedIndex];
 
   if (!isImagePaint(paint)) {
@@ -218,7 +221,7 @@ function _ImagePaintEditor({
         ...paint,
         transform: next,
       };
-      const { paints } = resolvePaints(node!, paintTarget, paintIndex);
+      const { paints } = editor.resolvePaints(node!, paintTarget, paintIndex);
       const updatedPaints = [...paints];
       updatedPaints[paintIndex] = updatedPaint;
       if (paintTarget === "stroke") {

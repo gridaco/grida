@@ -136,6 +136,53 @@ export namespace editor {
   export type NodeID = grida.program.nodes.NodeID;
 
   /**
+   * Resolves paint arrays and indices for a given node and target
+   *
+   * @param node - The node containing paint properties (supports all node types and Immer drafts)
+   * @param target - Whether to target "fill" or "stroke" paints
+   * @param paintIndex - The desired paint index (defaults to 0)
+   * @returns Object containing resolved paints array and valid index
+   */
+  export function resolvePaints(
+    node: grida.program.nodes.UnknwonNode,
+    target: "fill" | "stroke",
+    paintIndex: number = 0
+  ): { paints: cg.Paint[]; resolvedIndex: number } {
+    // Validate inputs
+    if (!node) {
+      throw new Error("resolvePaints: node is required");
+    }
+    if (!["fill", "stroke"].includes(target)) {
+      throw new Error(
+        `Invalid paint_target: ${target}. Must be "fill" or "stroke".`
+      );
+    }
+    if (typeof paintIndex !== "number" || paintIndex < 0) {
+      throw new Error(
+        `Invalid paint_index: ${paintIndex}. Must be a non-negative number.`
+      );
+    }
+
+    const pluralKey = target === "stroke" ? "stroke_paints" : "fill_paints";
+    const singularKey = target === "stroke" ? "stroke" : "fill";
+
+    // Get paints array, handling both legacy and new paint models
+    const paints = Array.isArray(node[pluralKey])
+      ? (node[pluralKey] as cg.Paint[])
+      : node[singularKey]
+        ? [node[singularKey] as cg.Paint]
+        : [];
+
+    // Resolve index with bounds checking
+    const resolvedIndex =
+      paints.length > 0
+        ? Math.min(Math.max(0, paintIndex), paints.length - 1)
+        : 0;
+
+    return { paints, resolvedIndex };
+  }
+
+  /**
    * Gets the index of the topmost fill in the fills array.
    *
    * Note: In the fill_paints array, the last element (fills[-1]) is the topmost fill.

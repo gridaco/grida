@@ -13,11 +13,7 @@ import {
   useNodeState,
 } from "@/grida-canvas-react/provider";
 import { editor } from "@/grida-canvas";
-import {
-  resolvePaints,
-  getTargetPaint,
-  updateTargetPaint,
-} from "@/grida-canvas/utils/paint-resolution";
+import { editor as _editor } from "@/grida-canvas";
 
 const gradientTypeMap: Record<string, "linear" | "radial" | "sweep"> = {
   ["linear_gradient" satisfies cg.Paint["type"]]: "linear",
@@ -36,7 +32,7 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
   if (!data || !node) return null;
 
   const target = paint_target ?? "fill";
-  const { paints, resolvedIndex: activePaintIndex } = resolvePaints(
+  const { paints, resolvedIndex: activePaintIndex } = editor.resolvePaints(
     node,
     target,
     paint_index ?? 0
@@ -135,13 +131,17 @@ function EditorUser({
   const onValueChange = useCallback(
     (g: cg.GradientPaint) => {
       if (editor && node) {
-        const { paints } = resolvePaints(node, paint_target, paint_index);
+        const { paints } = _editor.resolvePaints(
+          node,
+          paint_target,
+          paint_index
+        );
         const updatedPaints = [...paints];
 
         if (updatedPaints.length === 0) {
           updatedPaints.push(g);
         } else {
-          const { resolvedIndex } = resolvePaints(
+          const { resolvedIndex } = _editor.resolvePaints(
             node,
             paint_target,
             paint_index

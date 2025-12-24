@@ -4693,7 +4693,78 @@ export class EditorSurface
   }
 
   public a11yDelete() {
-    this.dispatch({ type: "a11y/delete" });
+    const state = this.state;
+    const target_node_ids = state.selection;
+
+    // Handle content edit modes first
+    if (state.content_edit_mode?.type === "paint/gradient") {
+      const mode =
+        state.content_edit_mode as editor.state.PaintGradientContentEditMode;
+      const { node_id, selected_stop, paint_target, paint_index } = mode;
+
+      // Only delete if there are more than 2 stops (minimum required for gradient)
+      const node = dq.__getNodeById(state, node_id);
+      if (node) {
+        const paintTarget = paint_target ?? "fill";
+        const { paints, resolvedIndex } = editor.resolvePaints(
+          node as grida.program.nodes.UnknwonNode,
+          paintTarget,
+          paint_index ?? 0
+        );
+        const targetPaint = paints[resolvedIndex];
+
+        if (targetPaint && cg.isGradientPaint(targetPaint)) {
+          const gradient = targetPaint as cg.GradientPaint;
+          if (gradient.stops.length > 2) {
+            this.dispatch({
+              type: "paint/gradient/delete-stop",
+              target: {
+                node_id,
+                stop: selected_stop,
+                paint_index: paint_index ?? 0,
+                paint_target: paintTarget,
+              },
+            });
+            return;
+          }
+        }
+      }
+    }
+
+    if (state.content_edit_mode?.type === "width") {
+      const mode =
+        state.content_edit_mode as editor.state.VariableWidthContentEditMode;
+      const { node_id, variable_width_selected_stop, variable_width_profile } =
+        mode;
+
+      // Only delete if there's a selected stop and more than 2 stops
+      if (
+        variable_width_selected_stop !== null &&
+        variable_width_profile.stops.length > 2
+      ) {
+        this._editor.doc.deleteVariableWidthStop(
+          node_id,
+          variable_width_selected_stop
+        );
+        return;
+      }
+    }
+
+    if (state.content_edit_mode?.type === "vector") {
+      const mode =
+        state.content_edit_mode as editor.state.VectorContentEditMode;
+      const { node_id } = mode;
+
+      this.dispatch({
+        type: "vector/delete-selection",
+        target: { node_id },
+      });
+      return;
+    }
+
+    // Default: delete selected nodes
+    // Scene deletion protection is handled by __self_delete_nodes with default 'on'
+    this._editor.doc.delete(target_node_ids);
   }
 
   public a11ySetClipboardColor(color: cg.RGBA32F) {

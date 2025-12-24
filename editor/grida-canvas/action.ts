@@ -47,7 +47,6 @@ export type DocumentAction =
   | EditorCopyCutPasteAction
   | EditorDeleteAction
   | EditorFlattenAction
-  | EditorA11yDeleteAction
   | EditorApplyParametricScaleAction
   | EditorHierarchyAction
   | EditorVectorEditorAction
@@ -333,10 +332,6 @@ export interface EditorFlattenAction {
   target: NodeID | "selection";
 }
 
-export interface EditorA11yDeleteAction {
-  type: "a11y/delete";
-}
-
 export type EditorHierarchyAction =
   | EditorHierarchyOrderAction
   | EditorHierarchyMoveAction;
@@ -368,6 +363,7 @@ export type EditorVectorEditorAction =
   | EditorVectorBendSegmentAction
   | EditorVectorPlanarizeAction
   | EditorVectorBendOrClearCornerAction
+  | EditorVectorDeleteSelectionAction
   | EditorVectorUpdateHoveredControlAction;
 
 export interface EditorVectorSelectVertexAction {
@@ -412,6 +408,13 @@ export interface EditorVectorSelectTangentAction {
 export interface EditorVectorDeleteTangentAction {
   type: "delete-tangent";
   target: TangentQuery;
+}
+
+export interface EditorVectorDeleteSelectionAction {
+  type: "vector/delete-selection";
+  target: {
+    node_id: NodeID;
+  };
 }
 
 export interface EditorVectorTranslateVertexAction {
@@ -494,10 +497,17 @@ export interface EditorVectorUpdateHoveredControlAction {
 // #endregion
 
 // #region [gradient]
-export type EditorGradientAction = EditorSelectGradientStopAction;
+export type EditorGradientAction =
+  | EditorSelectGradientStopAction
+  | EditorDeleteGradientStopAction;
 
 export interface EditorSelectGradientStopAction {
   type: "select-gradient-stop";
+  target: GradientStopQuery;
+}
+
+export interface EditorDeleteGradientStopAction {
+  type: "paint/gradient/delete-stop";
   target: GradientStopQuery;
 }
 

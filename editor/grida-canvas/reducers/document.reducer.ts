@@ -9,20 +9,17 @@ import type {
   NodeToggleUnderlineAction,
   NodeToggleLineThroughAction,
   EditorSelectGradientStopAction,
+  EditorDeleteGradientStopAction,
   EditorVectorBendOrClearCornerAction,
   EditorVariableWidthSelectStopAction,
   EditorVariableWidthDeleteStopAction,
   EditorVariableWidthAddStopAction,
+  EditorVectorDeleteSelectionAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import assert from "assert";
-import {
-  resolvePaints,
-  getTargetPaint,
-  updateTargetPaint,
-} from "../utils/paint-resolution";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import updateNodeTransform from "./node-transform.reducer";
@@ -336,7 +333,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const { node_id, paint_target, paint_index } = state.content_edit_mode;
         const node = dq.__getNodeById(state, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
-        const { paints, resolvedIndex } = resolvePaints(
+        const { paints, resolvedIndex } = editor.resolvePaints(
           node as grida.program.nodes.UnknwonNode,
           paint_target,
           paint_index
@@ -734,85 +731,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         __self_delete_nodes(draft, target_node_ids, "on");
       });
     }
-    case "a11y/delete": {
-      const target_node_ids = state.selection;
-
-      if (state.content_edit_mode?.type === "paint/gradient") {
-        const { node_id } = state.content_edit_mode;
-
-        return updateState(state, (draft) => {
-          const mode =
-            draft.content_edit_mode as editor.state.PaintGradientContentEditMode;
-          const node = dq.__getNodeById(draft, node_id)!;
-          const paintTarget = mode.paint_target ?? "fill";
-          const { paints, resolvedIndex } = resolvePaints(
-            node as grida.program.nodes.UnknwonNode,
-            paintTarget,
-            mode.paint_index ?? 0
-          );
-          const target = paints[resolvedIndex];
-
-          if (target && cg.isGradientPaint(target)) {
-            const gradient = target as cg.GradientPaint;
-            if (gradient.stops.length > 2) {
-              gradient.stops.splice(mode.selected_stop, 1);
-              mode.selected_stop = Math.min(
-                mode.selected_stop,
-                gradient.stops.length - 1
-              );
-            }
-
-            // Update the paint in the array
-            if (paints.length > 0) {
-              paints[resolvedIndex] = gradient;
-              // Update singular property for legacy compatibility
-              const singularKey = paintTarget === "stroke" ? "stroke" : "fill";
-              (node as any)[singularKey] = paints[0];
-            }
-          }
-        });
-      }
-
-      if (state.content_edit_mode?.type === "width") {
-        const { node_id } = state.content_edit_mode;
-        const mode =
-          state.content_edit_mode as editor.state.VariableWidthContentEditMode;
-
-        // Only delete if there's a selected stop and more than 2 stops
-        if (
-          mode.variable_width_selected_stop !== null &&
-          mode.variable_width_profile.stops.length > 2
-        ) {
-          // Dispatch the existing variable-width/delete-stop action
-          return documentReducer(
-            state,
-            {
-              type: "variable-width/delete-stop",
-              target: {
-                node_id,
-                stop: mode.variable_width_selected_stop,
-              },
-            },
-            context
-          );
-        }
-      }
-
-      if (state.content_edit_mode?.type === "vector") {
-        return updateState(state, (draft) => {
-          __self_delete_vector_network_selection(
-            draft,
-            draft.content_edit_mode as editor.state.VectorContentEditMode
-          );
-        });
-      }
-
-      // a11y/bug prevent scene from being deleted with a11y (DELETE)
-      // Scene deletion protection is handled by __self_delete_nodes with default 'on'
-      return updateState(state, (draft) => {
-        __self_delete_nodes(draft, target_node_ids, "on");
-      });
-    }
     case "insert": {
       let sub: grida.program.document.IPackedSceneDocument;
       if ("prototype" in action) {
@@ -985,7 +903,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             } = state.content_edit_mode;
             return updateState(state, (draft) => {
               const node = dq.__getNodeById(draft, node_id);
-              const { paints, resolvedIndex } = resolvePaints(
+              const { paints, resolvedIndex } = editor.resolvePaints(
                 node as grida.program.nodes.UnknwonNode,
                 paint_target,
                 paint_index
@@ -1784,6 +1702,22 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       });
     }
+    case "vector/delete-selection": {
+      return updateState(state, (draft) => {
+        const { target } = <EditorVectorDeleteSelectionAction>action;
+        const { node_id } = target;
+
+        if (
+          draft.content_edit_mode?.type === "vector" &&
+          draft.content_edit_mode.node_id === node_id
+        ) {
+          __self_delete_vector_network_selection(
+            draft,
+            draft.content_edit_mode as editor.state.VectorContentEditMode
+          );
+        }
+      });
+    }
     case "vector/update-hovered-control": {
       return updateState(state, (draft) => {
         if (draft.content_edit_mode?.type === "vector") {
@@ -1848,6 +1782,45 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
           draft.content_edit_mode.paint_target =
             paint_target ?? draft.content_edit_mode.paint_target ?? "fill";
+        }
+      });
+    }
+    case "paint/gradient/delete-stop": {
+      return updateState(state, (draft) => {
+        const { target } = <EditorDeleteGradientStopAction>action;
+        const { node_id, stop, paint_index, paint_target } = target;
+        const node = dq.__getNodeById(draft, node_id)!;
+        const paintTarget = paint_target ?? "fill";
+        const { paints, resolvedIndex } = editor.resolvePaints(
+          node as grida.program.nodes.UnknwonNode,
+          paintTarget,
+          paint_index ?? 0
+        );
+        const targetPaint = paints[resolvedIndex];
+
+        if (targetPaint && cg.isGradientPaint(targetPaint)) {
+          const gradient = targetPaint as cg.GradientPaint;
+          if (gradient.stops.length > 2) {
+            gradient.stops.splice(stop, 1);
+
+            // Update selected_stop if in content edit mode
+            if (draft.content_edit_mode?.type === "paint/gradient") {
+              const mode =
+                draft.content_edit_mode as editor.state.PaintGradientContentEditMode;
+              mode.selected_stop = Math.min(
+                mode.selected_stop,
+                gradient.stops.length - 1
+              );
+            }
+          }
+
+          // Update the paint in the array
+          if (paints.length > 0) {
+            paints[resolvedIndex] = gradient;
+            // Update singular property for legacy compatibility
+            const singularKey = paintTarget === "stroke" ? "stroke" : "fill";
+            (node as any)[singularKey] = paints[0];
+          }
         }
       });
     }
