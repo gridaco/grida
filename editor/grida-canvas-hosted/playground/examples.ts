@@ -30,6 +30,11 @@ export const canvas_examples = [
     url: `/examples/canvas/hero-main-demo.grida`,
   },
   {
+    id: "poster-happy-new-year-2026",
+    name: "Happy New Year 2026",
+    url: `/examples/canvas/poster-happy-new-year-2026.grida`,
+  },
+  {
     id: "with-templates/002",
     name: "Template 02",
   },

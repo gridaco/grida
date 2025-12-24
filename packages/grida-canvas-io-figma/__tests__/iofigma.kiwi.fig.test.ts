@@ -189,6 +189,91 @@ describe("FigImporter", () => {
         expect(packedDoc.nodes[rootId]).toBeDefined();
       });
     });
+
+    it("should not drop roots when merging (no node_id collisions)", () => {
+      // This is a regression test for a bug where multiple root conversions could
+      // generate colliding Grida IDs (when node_id_generator was not provided),
+      // causing later roots to overwrite earlier ones during merge.
+      const mockPage: any = {
+        name: "Mock",
+        sortkey: "!",
+        canvas: {
+          type: "CANVAS",
+          name: "Mock",
+          guid: { sessionID: 0, localID: 1 },
+        },
+        rootNodes: [
+          // Minimal REST-ish nodes; restful.factory.document will generate new Grida IDs anyway.
+          {
+            id: "0:100",
+            type: "FRAME",
+            name: "RootA",
+            visible: true,
+            locked: false,
+            rotation: 0,
+            opacity: 1,
+            blendMode: "PASS_THROUGH",
+            size: { x: 10, y: 10 },
+            relativeTransform: [
+              [1, 0, 0],
+              [0, 1, 0],
+            ],
+            absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+            absoluteRenderBounds: { x: 0, y: 0, width: 10, height: 10 },
+            fills: [],
+            strokes: [],
+            strokeWeight: 0,
+            strokeAlign: "INSIDE",
+            strokeCap: "NONE",
+            strokeJoin: "MITER",
+            strokeMiterAngle: 4,
+            cornerRadius: 0,
+            clipsContent: false,
+            children: [],
+            effects: [],
+          },
+          {
+            id: "0:101",
+            type: "FRAME",
+            name: "RootB",
+            visible: true,
+            locked: false,
+            rotation: 0,
+            opacity: 1,
+            blendMode: "PASS_THROUGH",
+            size: { x: 10, y: 10 },
+            relativeTransform: [
+              [1, 0, 20],
+              [0, 1, 0],
+            ],
+            absoluteBoundingBox: { x: 20, y: 0, width: 10, height: 10 },
+            absoluteRenderBounds: { x: 20, y: 0, width: 10, height: 10 },
+            fills: [],
+            strokes: [],
+            strokeWeight: 0,
+            strokeAlign: "INSIDE",
+            strokeCap: "NONE",
+            strokeJoin: "MITER",
+            strokeMiterAngle: 4,
+            cornerRadius: 0,
+            clipsContent: false,
+            children: [],
+            effects: [],
+          },
+        ],
+      };
+
+      const packedDoc = FigImporter.convertPageToScene(mockPage, {
+        gradient_id_generator: () => "test-id",
+        // Intentionally omit node_id_generator to exercise the internal shared generator.
+      });
+
+      const uniqueRoots = new Set(packedDoc.scene.children_refs);
+      expect(uniqueRoots.size).toBe(2);
+      packedDoc.scene.children_refs.forEach((rootId) => {
+        expect(packedDoc.nodes[rootId]).toBeDefined();
+      });
+    });
   });
 
   describe("page ordering", () => {
