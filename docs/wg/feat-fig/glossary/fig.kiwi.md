@@ -340,6 +340,23 @@ Clipboard payloads may include a canvas commonly named `"Internal Only Canvas"` 
 
 VECTOR nodes represent vector graphics (paths/shapes) in Figma. The vector geometry is stored in a binary format within the `.fig` file.
 
+#### Vector network coordinate space (observed)
+
+When `VECTOR.vectorData.vectorNetworkBlob` is present, the decoded vector network coordinates (vertices and segment tangents) are **not always expressed in the node’s `size` coordinate space**.
+
+- The vector network coordinates are typically expressed in the **`vectorData.normalizedSize` coordinate space** (in observed real-world `.fig` data, many blob vertex bboxes match `normalizedSize` closely).
+- The node’s rendered size is represented by `NodeChange.size`.
+- To map the vector network into the node’s local size space, you generally need to scale:
+  - $s_x = \frac{\text{size.x}}{\text{normalizedSize.x}}$
+  - $s_y = \frac{\text{size.y}}{\text{normalizedSize.y}}$
+- This scaling applies to both:
+  - **vertex positions** `(x, y)`
+  - **segment tangents** `(dx, dy)`
+
+**Practical consequence**: treating vector network coordinates “as-is” (without accounting for `normalizedSize` vs `size`) can produce vectors that render at the wrong size and appear mis-positioned relative to their container.
+
+**Caveat (also observed)**: some blobs have non-zero bbox origins (e.g. `minX/minY` not exactly `0`), so in some cases an additional translation may be necessary beyond pure scaling.
+
 **VectorData Structure:**
 
 VECTOR nodes contain a `vectorData` field of type `VectorData`:
