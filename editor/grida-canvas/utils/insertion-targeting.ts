@@ -1,4 +1,3 @@
-import cmath from "@grida/cmath";
 import type { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 
@@ -73,42 +72,3 @@ export function resolvePasteTargetParents(
     )
   );
 }
-
-/**
- * Performs hit-tested nested placement resolution.
- *
- * Starting from the top-most element at the center of `rect`, the function
- * searches down the hit-test stack for a container whose bounding rectangle
- * fully contains `rect`. The first such container found within `maxDepth`
- * levels is returned.
- *
- * @param rect - Rectangle of the element to place (in canvas space).
- * @param geometry - Geometry query interface for hit testing and bounds.
- * @param isContainer - Predicate that returns `true` if a node ID represents a
- *                      container capable of nesting children.
- * @param maxDepth - Optional maximum depth of hit-test results to consider.
- * @returns The ID of the containing node, or `null` if none is found.
- */
-export function hitTestNestedInsertionTarget(
-  rect: cmath.Rectangle,
-  geometry: {
-    getNodeIdsFromPoint(point: cmath.Vector2): string[];
-    getNodeAbsoluteBoundingRect(id: string): cmath.Rectangle | null;
-  },
-  isContainer: (id: string) => boolean,
-  maxDepth = Infinity
-): string | null {
-  const center = cmath.rect.getCenter(rect);
-  const hits = geometry.getNodeIdsFromPoint(center);
-  const depth = Math.min(maxDepth, hits.length);
-  for (let i = 0; i < depth; i++) {
-    const id = hits[i];
-    if (!isContainer(id)) continue;
-    const hitRect = geometry.getNodeAbsoluteBoundingRect(id);
-    if (hitRect && cmath.rect.contains(hitRect, rect)) {
-      return id;
-    }
-  }
-  return null;
-}
-

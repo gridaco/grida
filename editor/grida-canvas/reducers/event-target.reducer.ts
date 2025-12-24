@@ -1105,11 +1105,33 @@ function __self_maybe_end_gesture(
 }
 
 /**
- * get the parent of newly inserting node based on the current state
+ * Gets the parent container for newly inserting nodes based on pointer-based hit testing.
  *
- * this relies on `surface_raycast_detected_node_ids`, make sure it's updated before calling this function
+ * This function returns the first container node found in the hit stack at the current
+ * pointer position. It uses a simple pointer-based approach: iterates through nodes
+ * detected by raycast at the pointer location and returns the first one that is a
+ * container type. This is used by the insert tool when clicking or dragging to place
+ * new nodes.
  *
- * @returns the parent node id or `null` if no desired target
+ * **Behavior:**
+ * - If the scene has `constraints.children === "single"`, returns the single child container
+ * - Otherwise, iterates through `state.hits` (pointer-based raycast results) and returns
+ *   the first node that is a container type
+ * - Returns `null` if no container is found in the hit stack (insertion at scene level)
+ *
+ * The function uses the hit stack order (top-to-bottom in z-order) and doesn't perform
+ * geometry-based containment checks. It simply returns the first container encountered
+ * at the pointer position, which is appropriate for tool-based insertion where the user
+ * explicitly clicks or drags at a specific location.
+ *
+ * @param state - Current editor state
+ * @returns The parent container node ID, or `null` if no container is found (scene-level insertion)
+ *
+ * @remarks
+ * - This function relies on `state.hits` being populated from pointer raycast events
+ * - Make sure `state.hits` is updated (via `pointermove/raycast` or `click` events) before calling
+ * - This is used specifically for tool-based insertion (insert tool click/drag), not for
+ *   programmatic insertion via the `insert` action (which takes explicit `target` parameter)
  */
 function __get_insertion_target(
   state: editor.state.IEditorState
