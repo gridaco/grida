@@ -17,6 +17,35 @@ const IMAGE_TYPE_TO_MIME_TYPE: Record<
 };
 
 export namespace io {
+  /**
+   * Converts a Uint8Array to a base64-encoded string.
+   *
+   * Uses a chunked approach to avoid stack overflow when processing large arrays.
+   * Processes data in 32KB chunks (0x8000 bytes) which is safe for the spread operator.
+   *
+   * @param bytes - The Uint8Array to convert to base64
+   * @returns The base64-encoded string
+   *
+   * @example
+   * ```typescript
+   * const data = new TextEncoder().encode("Hello, World!");
+   * const base64 = io.uint8ArrayToBase64(data);
+   * console.log(base64); // "SGVsbG8sIFdvcmxkIQ=="
+   * ```
+   */
+  export function uint8ArrayToBase64(bytes: Uint8Array): string {
+    let binary = "";
+    const chunkSize = 0x8000; // 32 KB - safe for spread operator
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      // Convert Uint8Array chunk to array for spread operator
+      binary += String.fromCharCode(...Array.from(chunk));
+    }
+
+    return btoa(binary);
+  }
+
   export namespace clipboard {
     const __data_grida_io_prefix = "data-grida-io-";
     const __data_grida_clipboard = "data-grida-io-clipboard";
@@ -110,7 +139,8 @@ export namespace io {
     export function encodeClipboardHtml(payload: ClipboardPayload): string {
       const json = JSON.stringify(payload);
       const utf8Bytes = new TextEncoder().encode(json);
-      const base64 = btoa(String.fromCharCode(...Array.from(utf8Bytes)));
+      const base64 = io.uint8ArrayToBase64(utf8Bytes);
+
       return `<span ${__data_grida_clipboard}="b64:${base64}"></span>`;
     }
 

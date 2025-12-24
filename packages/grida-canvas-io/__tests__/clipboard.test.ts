@@ -1,4 +1,5 @@
 import { io } from "../index";
+import type grida from "@grida/schema";
 
 describe("clipboard", () => {
   // Using a simple test payload instead of the full ClipboardPayload type
@@ -93,6 +94,68 @@ describe("clipboard", () => {
 
     expect(io.clipboard.encode(payload)).toBeNull();
     expect(io.clipboard.encodeClipboardText(payload)).toBeNull();
+  });
+
+  it("should encode large clipboard payloads without stack overflow", () => {
+    // Create a large payload that would cause stack overflow with spread operator
+    // Simulate copying a root container with many nested children
+    const largePrototype: grida.program.nodes.NodePrototype = {
+      type: "container",
+      name: "Root",
+      active: true,
+      locked: false,
+      position: "absolute",
+      width: 1000,
+      height: 1000,
+      children: Array.from({ length: 100 }, (_, i) => ({
+        type: "container" as const,
+        name: `Child ${i}`,
+        active: true,
+        locked: false,
+        position: "absolute" as const,
+        width: 100,
+        height: 100,
+        children: Array.from({ length: 50 }, (_, j) => ({
+          type: "text" as const,
+          name: `Text ${i}-${j}`,
+          active: true,
+          locked: false,
+          position: "absolute" as const,
+          text: `This is text node ${i}-${j} with some content to make it larger`,
+          font_family: "Inter",
+          font_size: 14,
+          font_weight: 400,
+          width: "auto" as const,
+          height: "auto" as const,
+          fill: {
+            type: "solid" as const,
+            color: { r: 0, g: 0, b: 0, a: 1 },
+            active: true,
+          },
+          opacity: 1,
+          z_index: 0,
+        })),
+      })),
+    };
+
+    const largePayload: io.clipboard.ClipboardPayload = {
+      type: "prototypes",
+      ids: ["root"],
+      payload_id: "large-payload-test",
+      prototypes: [largePrototype],
+    };
+
+    // This should not throw a stack overflow error
+    expect(() => {
+      const encoded = io.clipboard.encodeClipboardHtml(largePayload);
+      expect(encoded).toContain("data-grida-io-clipboard");
+      expect(encoded).toContain("b64:");
+
+      // Verify it can be decoded back
+      const decoded = io.clipboard.decodeClipboardHtml(encoded);
+      expect(decoded).toBeTruthy();
+      expect(decoded?.payload_id).toBe("large-payload-test");
+    }).not.toThrow();
   });
 
   describe("isSvgText", () => {
