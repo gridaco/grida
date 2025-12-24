@@ -44,6 +44,7 @@ Base64-encoded Kiwi binary data containing:
 | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------- | -------------- |
 | `ellipse-circle-100x100-black.clipboard.html`                                   | Circle/ellipse, 100×100, black fill                                    |                                          | basic          |
 | `frame-with-r-g-b-rect.clipboard.html`                                          | Frame node containing red, green, blue rectangles                      |                                          | basic          |
+| `frame-with-stroke.clipboard.html`                                              | Frame node with stroke                                                 |                                          | basic          |
 | `group-with-r-g-b-rect.clipboard.html`                                          | Group node containing red, green, blue rectangles                      |                                          | group-is-frame |
 | `rect-square-100x100-black.clipboard.html`                                      | Rectangle/square, 100×100, black fill                                  |                                          | basic          |
 | `star-5-40-100x100-black.clipboard.html`                                        | 5-pointed star, 40pt, 100×100, black fill                              |                                          | basic          |
