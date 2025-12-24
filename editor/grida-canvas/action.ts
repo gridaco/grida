@@ -338,8 +338,8 @@ export type EditorHierarchyAction =
 
 export interface EditorHierarchyOrderAction {
   type: "order";
-  target: NodeID | "selection";
-  order: "front" | "back" | number;
+  target: NodeID[];
+  order: "front" | "back" | "forward" | "backward" | number;
 }
 
 export interface EditorHierarchyMoveAction {

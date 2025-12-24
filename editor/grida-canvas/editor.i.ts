@@ -3087,7 +3087,25 @@ export namespace editor.api {
     createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
     createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
 
-    order(target: "selection" | NodeID, order: "back" | "front" | number): void;
+    /**
+     * Changes the z-order of nodes in the document hierarchy.
+     *
+     * This is a pure document tree operation that:
+     * - Does NOT read from selection state (caller must provide explicit node IDs)
+     * - Only modifies the document tree hierarchy (z-order)
+     * - Does NOT modify or read selection state
+     *
+     * @param target - Explicit array of node IDs to reorder
+     * @param order - Order operation: "front", "back", "forward", "backward", or numeric index
+     *
+     * @remarks
+     * - For UX-facing code, read selection at call site and pass explicit node IDs
+     * - Use `surface.order()` for user-facing operations
+     */
+    order(
+      target: NodeID[],
+      order: "front" | "back" | "forward" | "backward" | number
+    ): void;
     mv(source: NodeID[], target: NodeID, index?: number): void;
 
     align(
@@ -3878,6 +3896,21 @@ export namespace editor.api {
      * ```
      */
     insert(payload: InsertPayload | InsertPayload[]): NodeID[];
+
+    /**
+     * User-facing order operation that handles UX concerns.
+     *
+     * This method:
+     * - Captures current selection at invocation time (bounded context)
+     * - Calls core order() with explicit target
+     *
+     * @param order - Order operation: "front", "back", "forward", "backward", or numeric index
+     *
+     * @remarks
+     * - Selection is captured at invocation time to prevent issues in loops
+     * - For programmatic order operations, use `editor.commands.order(nodeIds, order)` directly
+     */
+    order(order: "front" | "back" | "forward" | "backward" | number): void;
 
     /**
      * Blur event handler callback.

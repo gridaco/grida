@@ -114,13 +114,13 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Bring to front",
         shortcut: "]",
         disabled: !hasSelection,
-        onSelect: () => editor.commands.order(targetSingleOrSelection, "front"),
+        onSelect: () => editor.surface.order("front"),
       },
       sendToBack: {
         label: "Send to back",
         shortcut: "[",
         disabled: !hasSelection,
-        onSelect: () => editor.commands.order(targetSingleOrSelection, "back"),
+        onSelect: () => editor.surface.order("back"),
       },
       groupWithContainer: {
         label: "Group with Container",

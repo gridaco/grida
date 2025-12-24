@@ -1288,9 +1288,9 @@ class EditorDocumentStore
   }
 
   public order(
-    target: "selection" | editor.NodeID,
-    order: "back" | "front" | number
-  ) {
+    target: editor.NodeID[],
+    order: "back" | "front" | "forward" | "backward" | number
+  ): void {
     this.dispatch({
       type: "order",
       target,
@@ -4690,6 +4690,15 @@ export class EditorSurface
     }
 
     return allInsertedNodeIds;
+  }
+
+  public order(
+    order: "front" | "back" | "forward" | "backward" | number
+  ): void {
+    const currentSelection = [...this.state.selection];
+    if (currentSelection.length > 0) {
+      this._editor.doc.order(currentSelection, order);
+    }
   }
 
   public a11yDelete() {

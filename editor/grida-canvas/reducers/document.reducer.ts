@@ -823,16 +823,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "order": {
-      const { target, order } = action;
-      const target_node_ids =
-        target === "selection" ? state.selection : [target];
+      const { target: target_node_ids, order } = action;
 
       return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
           __self_order(draft, node_id, order);
         }
       });
-      break;
     }
     case "mv": {
       const { source, target, index } = action;
