@@ -3013,7 +3013,22 @@ export namespace editor.api {
 
     //
     insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
-    deleteNode(target: "selection" | NodeID): void;
+    /**
+     * Deletes nodes from the document tree.
+     *
+     * This is a pure document tree operation that:
+     * - Does NOT read from selection state (caller must provide explicit node IDs)
+     * - Only modifies the document tree structure (removes nodes)
+     * - Automatically filters deleted nodes from selection (safety measure handled in reducer)
+     *
+     * @param target - Explicit array of node IDs to delete
+     *
+     * @remarks
+     * - For UX-facing code, read selection at call site and pass explicit node IDs
+     * - Deleted nodes are automatically removed from selection (handled internally for document consistency)
+     * - Scene nodes are protected from deletion (filtered out automatically)
+     */
+    delete(target: NodeID[]): void;
     //
 
     createNodeFromSvg(

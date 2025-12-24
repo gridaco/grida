@@ -1266,7 +1266,7 @@ class EditorDocumentStore
     return id;
   }
 
-  public deleteNode(target: "selection" | editor.NodeID) {
+  public delete(target: editor.NodeID[]): void {
     this.dispatch({
       type: "delete",
       target,

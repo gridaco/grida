@@ -196,10 +196,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Delete",
         shortcut: "⌫",
         disabled: !hasSelection,
-        onSelect: () =>
-          editor.commands.deleteNode(
-            hasSelection && ids.length === 1 ? (ids[0] as string) : "selection"
-          ),
+        onSelect: () => editor.commands.delete(ids),
       },
     }),
     [

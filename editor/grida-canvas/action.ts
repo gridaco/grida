@@ -325,7 +325,7 @@ export interface EditorDuplicateAction {
 
 export interface EditorDeleteAction {
   type: "delete";
-  target: NodeID | "selection";
+  target: NodeID[];
 }
 
 export interface EditorFlattenAction {

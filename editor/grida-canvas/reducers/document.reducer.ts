@@ -728,9 +728,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "delete": {
-      const { target } = action;
-      const target_node_ids =
-        target === "selection" ? state.selection : [target];
+      const target_node_ids = action.target;
 
       return updateState(state, (draft) => {
         __self_delete_nodes(draft, target_node_ids, "on");
