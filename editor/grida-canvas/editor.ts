@@ -3712,6 +3712,87 @@ export class EditorSurface
     }
   }
 
+  /**
+   * Create a new scene with UX customizations.
+   *
+   * This method is almost identical to the core {@link EditorDocumentStore.createScene},
+   * but includes UX-specific customizations such as inheriting the background color
+   * from the current scene or fallback scenes.
+   *
+   * **Background Color Inheritance:**
+   * - If `scene.background_color` is provided, it will be used
+   * - Otherwise, inherits from the current scene's background color
+   * - If current scene has no background, falls back to any other scene's background
+   * - If no scene has a background, defaults to WHITESMOKE (#F5F5F5)
+   *
+   * @param scene - Optional scene initialization data
+   *
+   * @example
+   * ```typescript
+   * // Create a new scene with default UX customizations
+   * editor.surface.surfaceCreateScene();
+   *
+   * // Create a scene with custom name and background
+   * editor.surface.surfaceCreateScene({
+   *   name: "My Scene",
+   *   background_color: { r: 1, g: 0, b: 0, a: 1 }
+   * });
+   * ```
+   */
+  public surfaceCreateScene(scene?: grida.program.document.SceneInit) {
+    // If background_color was explicitly provided, use core API directly
+    if (scene?.background_color) {
+      this._editor.doc.createScene(scene);
+      return;
+    }
+
+    // Get the current scene's background before creating the new scene
+    const current_scene_id = this.state.scene_id;
+    const current_scene = current_scene_id
+      ? (this.state.document.nodes[current_scene_id] as
+          | grida.program.nodes.SceneNode
+          | undefined)
+      : undefined;
+    const current_background = current_scene?.background_color;
+
+    // First, create the scene using the core API
+    this._editor.doc.createScene(scene);
+
+    // Get the newly created scene ID (it becomes the current scene)
+    const new_scene_id = this.state.scene_id;
+    if (!new_scene_id) {
+      return;
+    }
+
+    // Get background color with fallback: current scene -> fallback scene -> default
+    let background_color: grida.program.document.ISceneBackground["background_color"];
+
+    // Use the previous current scene's background if available
+    if (current_background) {
+      background_color = current_background;
+    } else {
+      // Try any other scene (fallback)
+      for (const fallback_scene_id of this.state.document.scenes_ref) {
+        if (fallback_scene_id === new_scene_id) continue;
+        const fallback_scene = this.state.document.nodes[fallback_scene_id] as
+          | grida.program.nodes.SceneNode
+          | undefined;
+        if (fallback_scene?.background_color) {
+          background_color = fallback_scene.background_color;
+          break;
+        }
+      }
+    }
+
+    // Default to WHITESMOKE if no scene has a background color
+    if (!background_color) {
+      background_color = kolor.colorformats.RGBA32F.WHITESMOKE;
+    }
+
+    // Update the newly created scene's background
+    this._editor.doc.changeSceneBackground(new_scene_id, background_color);
+  }
+
   public surfaceHoverNode(node_id: string, event: "enter" | "leave") {
     this.dispatch({
       type: "hover/ui",

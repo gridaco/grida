@@ -151,7 +151,10 @@ export function PlaygroundMenuContent({
           // Process each page as a separate scene
           for (const page of figFile.pages) {
             const sceneId = `scene-${nanoid()}`;
-            instance.doc.createScene({ id: sceneId, name: page.name });
+            instance.surface.surfaceCreateScene({
+              id: sceneId,
+              name: page.name,
+            });
 
             if (page.rootNodes.length > 0) {
               const packedDoc = FigImporter.convertPageToScene(page, {
