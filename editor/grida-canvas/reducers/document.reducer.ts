@@ -1325,6 +1325,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               padding_right: children.length === 1 ? 16 : 0,
               padding_bottom: children.length === 1 ? 16 : 0,
               padding_left: children.length === 1 ? 16 : 0,
+              // corner radius
+              corner_radius: 0,
+              rectangular_corner_radius_top_left: 0,
+              rectangular_corner_radius_top_right: 0,
+              rectangular_corner_radius_bottom_right: 0,
+              rectangular_corner_radius_bottom_left: 0,
               // children (empty when init)
               children: [],
               // position
