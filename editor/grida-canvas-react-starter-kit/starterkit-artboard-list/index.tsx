@@ -43,6 +43,8 @@ const ArtboardList = () => {
       },
       children: [],
     });
+    // Reset to cursor tool after insertion (matches behavior of insert tool click)
+    editor.surface.surfaceSetTool({ type: "cursor" });
   };
 
   return (
