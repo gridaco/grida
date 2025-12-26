@@ -617,6 +617,7 @@ function RootFramesBarOverlay() {
     return children.filter(
       (n) =>
         n &&
+        n.active !== false &&
         (n.type === "container" ||
           n.type === "template_instance" ||
           n.type === "component" ||
