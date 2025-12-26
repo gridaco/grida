@@ -9,6 +9,8 @@ import {
   SelectItem,
 } from "@/components/ui-editor/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
+import type { TMixed } from "./utils/types";
+import grida from "@grida/schema";
 
 /**
  * Tailwind CSS gap preset values.
@@ -86,13 +88,15 @@ function GapControlSingle({
   disabled,
   onValueCommit,
 }: {
-  value: number;
+  value: TMixed<number>;
   disabled?: boolean;
   onValueCommit?: (value: number) => void;
 }) {
+  const isMixed = value === grida.mixed;
   const hasPreset = useMemo(() => {
-    return Object.values(twgap).some((preset) => preset.gap === value);
-  }, [value]);
+    if (isMixed) return false;
+    return typeof value === "number" && Object.values(twgap).some((preset) => preset.gap === value);
+  }, [value, isMixed]);
 
   const handleChange = (newValue: number | undefined) => {
     if (newValue === undefined) return;
@@ -105,8 +109,8 @@ function GapControlSingle({
         mode="fixed"
         disabled={disabled}
         type="number"
-        value={value}
-        placeholder="0"
+        value={isMixed ? undefined : value}
+        placeholder={isMixed ? "mixed" : "0"}
         step={1}
         min={0}
         className={cn(
@@ -119,7 +123,7 @@ function GapControlSingle({
       />
       <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
         <Select
-          value={hasPreset ? String(value) : undefined}
+          value={!isMixed && hasPreset && typeof value === "number" ? String(value) : undefined}
           onValueChange={(_v) => {
             const value = parseInt(_v);
             handleChange(value);
@@ -149,14 +153,17 @@ function GapControlMultiple({
   disabled,
   onValueCommit,
 }: {
-  value: { main_axis_gap: number; cross_axis_gap?: number };
+  value: { main_axis_gap: TMixed<number>; cross_axis_gap?: TMixed<number> };
   disabled?: boolean;
   onValueCommit?: (value: {
     main_axis_gap: number;
     cross_axis_gap: number;
   }) => void;
 }) {
-  const mainAxisGap = value.main_axis_gap ?? 0;
+  const isMainAxisMixed = value.main_axis_gap === grida.mixed;
+  const isCrossAxisMixed = value.cross_axis_gap === grida.mixed;
+  const mainAxisGap = isMainAxisMixed ? undefined : (value.main_axis_gap ?? 0);
+  const crossAxisGap = isCrossAxisMixed ? undefined : value.cross_axis_gap;
 
   return (
     <div className="flex gap-2 w-full">
@@ -165,13 +172,13 @@ function GapControlMultiple({
         type="number"
         disabled={disabled}
         value={mainAxisGap}
-        placeholder="0"
+        placeholder={isMainAxisMixed ? "mixed" : "0"}
         step={1}
         min={0}
         onValueCommit={(v) =>
           onValueCommit?.({
             main_axis_gap: v ?? 0,
-            cross_axis_gap: value.cross_axis_gap ?? v ?? 0,
+            cross_axis_gap: typeof crossAxisGap === "number" ? crossAxisGap : v ?? 0,
           })
         }
       />
@@ -179,13 +186,19 @@ function GapControlMultiple({
         mode="fixed"
         type="number"
         disabled={disabled}
-        value={value.cross_axis_gap}
-        placeholder={String(mainAxisGap)}
+        value={crossAxisGap}
+        placeholder={
+          isCrossAxisMixed
+            ? "mixed"
+            : typeof mainAxisGap === "number"
+            ? String(mainAxisGap)
+            : "0"
+        }
         step={1}
         min={0}
         onValueCommit={(v) =>
           onValueCommit?.({
-            main_axis_gap: mainAxisGap,
+            main_axis_gap: typeof mainAxisGap === "number" ? mainAxisGap : 0,
             cross_axis_gap: v ?? 0,
           })
         }
@@ -200,14 +213,14 @@ export function GapControl({
   disabled,
   onValueCommit,
 }: {
-  value: { main_axis_gap: number; cross_axis_gap?: number };
+  value: { main_axis_gap: TMixed<number>; cross_axis_gap?: TMixed<number> };
   mode?: "single" | "multiple";
   disabled?: boolean;
   onValueCommit?: (
     value: number | { main_axis_gap: number; cross_axis_gap: number }
   ) => void;
 }) {
-  const mainAxisGap = value.main_axis_gap ?? 0;
+  const mainAxisGap = value.main_axis_gap === grida.mixed ? grida.mixed : (value.main_axis_gap ?? 0);
 
   if (mode === "multiple") {
     return (

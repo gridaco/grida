@@ -317,6 +317,24 @@ export function useMixedProperties(ids: string[]) {
     [mixedProperties.cross_axis_alignment?.ids, instance.commands]
   );
 
+  const gap = useCallback(
+    (value: number | { main_axis_gap: number; cross_axis_gap: number }) => {
+      mixedProperties.main_axis_gap?.ids.forEach((id) => {
+        instance.commands.changeFlexContainerNodeGap(id, value);
+      });
+    },
+    [mixedProperties.main_axis_gap?.ids, instance.commands]
+  );
+
+  const padding = useCallback(
+    (value: grida.program.nodes.i.IPadding) => {
+      mixedProperties.padding_top?.ids.forEach((id) => {
+        instance.commands.changeContainerNodePadding(id, value);
+      });
+    },
+    [mixedProperties.padding_top?.ids, instance.commands]
+  );
+
   const corner_radius = useCallback(
     (value: cg.CornerRadius) => {
       mixedProperties.corner_radius?.ids.forEach((id) => {
@@ -377,6 +395,8 @@ export function useMixedProperties(ids: string[]) {
       direction,
       main_axis_alignment: mainAxisAlignment,
       cross_axis_alignment: crossAxisAlignment,
+      gap,
+      padding,
       corner_radius,
       cursor,
       blend_mode: blendMode,
@@ -413,6 +433,8 @@ export function useMixedProperties(ids: string[]) {
       direction,
       mainAxisAlignment,
       crossAxisAlignment,
+      gap,
+      padding,
       corner_radius,
       cursor,
       blendMode,
