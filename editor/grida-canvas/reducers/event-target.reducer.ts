@@ -739,10 +739,19 @@ function __self_evt_on_drag(
           return;
         }
 
-        const fixed_width =
-          typeof node.width === "number" ? node.width : undefined;
-        const fixed_height =
-          typeof node.height === "number" ? node.height : undefined;
+        // Get width/height from node if available (only check defined values)
+        let fixed_width: number | undefined;
+        let fixed_height: number | undefined;
+
+        if ("width" in node && "height" in node) {
+          const width = node.width;
+          const height = node.height;
+          if (typeof width === "number" && typeof height === "number") {
+            fixed_width = width;
+            fixed_height = height;
+          }
+        }
+
         const maxRadius = Math.min(
           fixed_width ? fixed_width / 2 : Infinity,
           fixed_height ? fixed_height / 2 : Infinity

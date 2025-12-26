@@ -2086,7 +2086,8 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke,
-      i.IPositioning {
+      i.IPositioning,
+      i.ICornerRadius {
     type: "boolean";
     op: cg.BooleanOperation;
   }
