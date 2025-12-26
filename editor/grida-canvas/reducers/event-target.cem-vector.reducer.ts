@@ -858,6 +858,14 @@ export function on_draw_drag_end(
 }
 
 // Helper function - needs to be imported or defined
+// TODO: Remove this duplicate function and use a shared implementation.
+//   This function is duplicated in:
+//   - event-target.reducer.ts
+//   - event-target.cem-bitmap.reducer.ts
+//   Future refactoring should extract this to a shared helper that:
+//   1. Filters out locked containers (currently missing)
+//   2. Applies root node filtering for consistency
+//   3. Preserves z-order (top-to-bottom, deepest first)
 function __get_insertion_target(
   state: editor.state.IEditorState
 ): string | null {

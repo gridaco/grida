@@ -1132,6 +1132,15 @@ function __self_maybe_end_gesture(
  * - Make sure `state.hits` is updated (via `pointermove/raycast` or `click` events) before calling
  * - This is used specifically for tool-based insertion (insert tool click/drag), not for
  *   programmatic insertion via the `insert` action (which takes explicit `target` parameter)
+ *
+ * @todo TODO: Remove this duplicate function and use a shared implementation.
+ *   This function is duplicated in:
+ *   - event-target.cem-vector.reducer.ts
+ *   - event-target.cem-bitmap.reducer.ts
+ *   Future refactoring should extract this to a shared helper that:
+ *   1. Filters out locked containers (currently missing)
+ *   2. Applies root node filtering for consistency
+ *   3. Preserves z-order (top-to-bottom, deepest first)
  */
 function __get_insertion_target(
   state: editor.state.IEditorState
