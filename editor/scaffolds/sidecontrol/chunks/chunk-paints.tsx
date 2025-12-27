@@ -34,6 +34,7 @@ import {
   useNodeState,
 } from "@/grida-canvas-react/provider";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
+import { editor } from "@/grida-canvas";
 import cg from "@grida/cg";
 import grida from "@grida/schema";
 
@@ -104,6 +105,128 @@ function usePaintSorting({
     handleDragEnd,
     modifiers,
   };
+}
+
+interface UsePaintEditModeActivationProps {
+  instance: ReturnType<typeof useCurrentEditor>;
+  node_id: string;
+  paintTarget: "fill" | "stroke";
+  paintList: cg.Paint[];
+  currentlyOpenIndex: number | null;
+  gradientMode?: editor.state.PaintGradientContentEditMode;
+  imageMode?: editor.state.PaintImageContentEditMode;
+}
+
+/**
+ * Hook to manage edit mode activation/deactivation based on paint type changes.
+ * Automatically activates gradient/image edit mode when paint type changes while panel is open.
+ */
+function usePaintEditModeActivation({
+  instance,
+  node_id,
+  paintTarget,
+  paintList,
+  currentlyOpenIndex,
+  gradientMode,
+  imageMode,
+}: UsePaintEditModeActivationProps) {
+  // Helper function to activate edit mode based on paint type
+  const tryActivateEditModeForPaint = React.useCallback(
+    (paintIndex: number) => {
+      const paint_at_index = paintList[paintIndex];
+      if (!paint_at_index) return; // Safety check
+
+      switch (paint_at_index.type) {
+        case "linear_gradient":
+        case "radial_gradient":
+        case "sweep_gradient":
+        case "diamond_gradient": {
+          instance.surface.surfaceTryEnterContentEditMode(
+            node_id,
+            "paint/gradient",
+            {
+              paintTarget,
+              paintIndex,
+            }
+          );
+          break;
+        }
+        case "image": {
+          instance.surface.surfaceTryEnterContentEditMode(
+            node_id,
+            "paint/image",
+            {
+              paintTarget,
+              paintIndex,
+            }
+          );
+          break;
+        }
+      }
+    },
+    [instance, node_id, paintTarget, paintList]
+  );
+
+  // Activate edit mode when paint type changes to gradient/image while panel is open
+  // Also exit edit mode when paint type changes away from gradient/image
+  React.useEffect(() => {
+    if (currentlyOpenIndex !== null) {
+      // Validate index is within bounds
+      if (currentlyOpenIndex < 0 || currentlyOpenIndex >= paintList.length) {
+        return;
+      }
+      const openPaint = paintList[currentlyOpenIndex];
+      if (!openPaint) return;
+
+      // Check if we need to activate gradient edit mode
+      if (cg.isGradientPaint(openPaint)) {
+        const isAlreadyInGradientMode =
+          gradientMode &&
+          gradientMode.paint_index === currentlyOpenIndex &&
+          gradientMode.paint_target === paintTarget;
+
+        if (!isAlreadyInGradientMode) {
+          tryActivateEditModeForPaint(currentlyOpenIndex);
+        }
+      }
+      // Check if we need to activate image edit mode
+      else if (openPaint.type === "image") {
+        const isAlreadyInImageMode =
+          imageMode &&
+          imageMode.paint_index === currentlyOpenIndex &&
+          imageMode.paint_target === paintTarget;
+
+        if (!isAlreadyInImageMode) {
+          tryActivateEditModeForPaint(currentlyOpenIndex);
+        }
+      }
+      // Exit edit mode if paint type changed to something that doesn't support edit mode
+      else {
+        const isInGradientMode =
+          gradientMode &&
+          gradientMode.paint_index === currentlyOpenIndex &&
+          gradientMode.paint_target === paintTarget;
+        const isInImageMode =
+          imageMode &&
+          imageMode.paint_index === currentlyOpenIndex &&
+          imageMode.paint_target === paintTarget;
+
+        if (isInGradientMode || isInImageMode) {
+          instance.surface.surfaceTryExitContentEditMode();
+        }
+      }
+    }
+  }, [
+    paintList,
+    currentlyOpenIndex,
+    paintTarget,
+    tryActivateEditModeForPaint,
+    gradientMode,
+    imageMode,
+    instance,
+  ]);
+
+  return { tryActivateEditModeForPaint };
 }
 
 export interface ChunkPaintsProps {
@@ -198,12 +321,22 @@ export function ChunkPaints({
     return null;
   }, [openPaintIndex, imageMode, imagePaintIndex]);
 
-  // Reset user-controlled state when content edit mode changes or node changes
+  // Reset user-controlled state when content edit mode changes to a different node
+  // (but not when it becomes null for the current node - e.g., when switching from gradient to solid)
   React.useEffect(() => {
-    if (!content_edit_mode || content_edit_mode.node_id !== node_id) {
+    if (content_edit_mode && content_edit_mode.node_id !== node_id) {
       setOpenPaintIndex(null);
     }
   }, [content_edit_mode, node_id]);
+
+  // Reset open state when node_id changes (different node selected)
+  const prevNodeIdRef = React.useRef(node_id);
+  React.useEffect(() => {
+    if (prevNodeIdRef.current !== node_id) {
+      prevNodeIdRef.current = node_id;
+      setOpenPaintIndex(null);
+    }
+  }, [node_id]);
 
   const actions = useNodeActions(node_id)!;
   const isCanvasBackend = backend === "canvas";
@@ -300,49 +433,30 @@ export function ChunkPaints({
     [instance, node_id, paintTarget]
   );
 
+  // Use hook to manage edit mode activation/deactivation
+  const { tryActivateEditModeForPaint } = usePaintEditModeActivation({
+    instance,
+    node_id,
+    paintTarget,
+    paintList,
+    currentlyOpenIndex,
+    gradientMode,
+    imageMode,
+  });
+
   const handleOpenChange = React.useCallback(
     (paintIndex: number, open: boolean) => {
       if (open) {
         // User opened a paint - this takes priority
         setOpenPaintIndex(paintIndex);
-
-        const paint_at_index = paintList[paintIndex];
-        if (!paint_at_index) return; // Safety check
-
-        switch (paint_at_index.type) {
-          case "linear_gradient":
-          case "radial_gradient":
-          case "sweep_gradient":
-          case "diamond_gradient": {
-            instance.surface.surfaceTryEnterContentEditMode(
-              node_id,
-              "paint/gradient",
-              {
-                paintTarget,
-                paintIndex,
-              }
-            );
-            break;
-          }
-          case "image": {
-            instance.surface.surfaceTryEnterContentEditMode(
-              node_id,
-              "paint/image",
-              {
-                paintTarget,
-                paintIndex,
-              }
-            );
-            break;
-          }
-        }
+        tryActivateEditModeForPaint(paintIndex);
       } else {
         // User closed the paint
         setOpenPaintIndex(null);
         instance.surface.surfaceTryExitContentEditMode();
       }
     },
-    [instance, node_id, paintTarget, paintList]
+    [tryActivateEditModeForPaint, instance]
   );
 
   // Use the custom hook for drag and drop sorting

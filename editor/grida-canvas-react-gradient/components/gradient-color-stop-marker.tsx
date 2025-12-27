@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/components/lib/utils";
+import { TransparencyGridIcon } from "@radix-ui/react-icons";
 
 export default function StopMarker({
   x,
@@ -77,13 +78,18 @@ export default function StopMarker({
 
       {/* fill */}
       <div
-        className={`
-          w-full h-full border-2 shadow-lg
-          group-data-[selected=true]/stop:border-yellow-400 group-data-[selected=false]/stop:border-gray-300
-          `}
-        style={{ backgroundColor: color }}
+        className={cn(
+          "relative w-full h-full border-2 shadow-lg overflow-hidden",
+          "group-data-[selected=true]/stop:border-yellow-400 group-data-[selected=false]/stop:border-gray-300"
+        )}
       >
-        <div className="w-full h-full bg-gradient-to-br from-white/30 to-transparent" />
+        <TransparencyGridIcon className="absolute w-full h-full -z-0" />
+        <div
+          className="absolute w-full h-full z-10"
+          style={{ backgroundColor: color }}
+        >
+          <div className="w-full h-full bg-gradient-to-br from-white/30 to-transparent" />
+        </div>
       </div>
     </div>
   );

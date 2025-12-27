@@ -195,7 +195,10 @@ export function ScenesList() {
               data-is-renaming={isRenaming}
             >
               <TreeItemLabel
-                className={cn("h-full bg-transparent px-1!")}
+                className={cn(
+                  "h-full bg-transparent px-1!",
+                  "!outline-none !ring-0"
+                )}
                 onDoubleClick={() => {
                   item.startRenaming();
                 }}

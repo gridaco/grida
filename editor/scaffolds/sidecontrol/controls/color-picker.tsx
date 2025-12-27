@@ -8,10 +8,59 @@ import { Button } from "@/components/ui-editor/button";
 import { useEyeDropper } from "./utils/eyedropper";
 import { Separator } from "@/components/ui/separator";
 import { ColorPickerPresets } from "./color-picker-presets";
+import { useNumberInput } from "@grida/number-input/react";
 import kolor from "@grida/color";
 import "./color-picker.css";
 
 type RGBA32F = kolor.colorformats.RGBA32F;
+
+function InlineOpacityControl({
+  value,
+  onValueCommit,
+}: {
+  value?: number;
+  onValueCommit?: (value: number) => void;
+}) {
+  const {
+    internalValue,
+    inputType,
+    handleFocus,
+    handleBlur,
+    handleKeyDown,
+    handleChange,
+    inputRef,
+  } = useNumberInput({
+    type: "number",
+    value,
+    step: 0.01,
+    autoSelect: true,
+    min: 0,
+    max: 1,
+    mode: "fixed",
+    onValueCommit,
+    commitOnBlur: true,
+    suffix: "%",
+    scale: 100,
+  });
+
+  return (
+    <input
+      ref={inputRef}
+      type={inputType}
+      placeholder="<opacity>"
+      value={internalValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      className="
+        w-12 appearance-none ps-1.5 text-xs
+        placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground
+        bg-transparent outline-none
+      "
+    />
+  );
+}
 
 export function ColorPicker32F({
   color,
@@ -73,7 +122,7 @@ export function ColorPicker32F({
           </Button>
           <div
             className={cn(
-              "border cursor-default",
+              "border cursor-default flex items-center",
               WorkbenchUI.inputVariants({
                 size: "xs",
                 variant: "paint-container",
@@ -81,13 +130,12 @@ export function ColorPicker32F({
             )}
           >
             <RGBHexInput
-              className="border-none outline-none w-full h-full ps-2 text-xs"
+              className="border-none outline-none flex-1 h-full ps-2 text-xs"
               unit="f32"
               value={{
                 r: color.r,
                 g: color.g,
                 b: color.b,
-                // omit the alpha (handled by slider/picker)
               }}
               onValueCommit={(newColor, opacity) => {
                 onColorChange?.(
@@ -96,6 +144,20 @@ export function ColorPicker32F({
                     newColor.g,
                     newColor.b,
                     opacity ?? color.a
+                  )
+                );
+              }}
+            />
+            <Separator orientation="vertical" />
+            <InlineOpacityControl
+              value={color.a}
+              onValueCommit={(opacity) => {
+                onColorChange?.(
+                  kolor.colorformats.newRGBA32F(
+                    color.r,
+                    color.g,
+                    color.b,
+                    opacity
                   )
                 );
               }}

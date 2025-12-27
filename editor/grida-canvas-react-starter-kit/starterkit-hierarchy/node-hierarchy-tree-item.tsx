@@ -122,6 +122,7 @@ export const NodeHierarchyTreeItem = React.memo(function NodeHierarchyTreeItem({
       <TreeItemLabel
         className={cn(
           "h-full bg-transparent px-1 py-1",
+          "!outline-none !ring-0",
           isHovered && "bg-accent"
         )}
         data-mask-role={maskRoleAttr}

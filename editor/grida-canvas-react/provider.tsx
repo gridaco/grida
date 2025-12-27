@@ -502,6 +502,19 @@ export function useToolState(): editor.state.IEditorState["tool"] {
 }
 
 /**
+ * Returns true when the insert or draw tool is active.
+ * Used to determine if interactions should be ignored/prevented to allow
+ * insert/draw operations to work correctly.
+ *
+ * When insert or draw tool is active, resize handles and other overlay
+ * interactions should be disabled to prevent interference.
+ */
+export function useShouldIgnoreInsertDrawInteractions(): boolean {
+  const tool = useToolState();
+  return tool.type === "insert" || tool.type === "draw";
+}
+
+/**
  * @deprecated {@link useContentEditModeState} can be expensive for certain modes.
  * @returns
  */

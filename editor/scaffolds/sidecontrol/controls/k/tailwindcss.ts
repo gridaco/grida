@@ -82,3 +82,79 @@ export const boxshadow: Record<
     },
   },
 } as const;
+
+type FeGaussianBlur = cg.FeGaussianBlur;
+
+export const blur: Record<
+  string,
+  {
+    label: string;
+    class: string;
+    value: FeGaussianBlur;
+  }
+> = {
+  "blur-none": {
+    label: "None",
+    class: "blur-none",
+    value: {
+      type: "blur",
+      radius: 0,
+    },
+  },
+  "blur-sm": {
+    label: "Small",
+    class: "blur-sm",
+    value: {
+      type: "blur",
+      radius: 4,
+    },
+  },
+  blur: {
+    label: "Default",
+    class: "blur",
+    value: {
+      type: "blur",
+      radius: 8,
+    },
+  },
+  "blur-md": {
+    label: "Medium",
+    class: "blur-md",
+    value: {
+      type: "blur",
+      radius: 12,
+    },
+  },
+  "blur-lg": {
+    label: "Large",
+    class: "blur-lg",
+    value: {
+      type: "blur",
+      radius: 16,
+    },
+  },
+  "blur-xl": {
+    label: "Extra Large",
+    class: "blur-xl",
+    value: {
+      type: "blur",
+      radius: 24,
+    },
+  },
+  "blur-2xl": {
+    label: "2 Extra Large",
+    class: "blur-2xl",
+    value: {
+      type: "blur",
+      radius: 40,
+    },
+  },
+  "blur-3xl": {
+    label: "3 Extra Large",
+    class: "blur-3xl",
+    value: {
+      type: "blur",
+      radius: 64,
+    },
+  },
+} as const;

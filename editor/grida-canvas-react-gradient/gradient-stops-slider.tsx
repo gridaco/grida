@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback, useEffect } from "react";
 import type cg from "@grida/cg";
 import kolor from "@grida/color";
 import { css } from "@/grida-canvas-utils/css";
+import { TransparencyGridIcon } from "@radix-ui/react-icons";
 
 interface GradientStopsSliderProps {
   stops: cg.GradientStop[];
@@ -264,15 +265,15 @@ export function GradientStopsSlider({
           }}
           onPointerDown={(e) => handlePointerDown(e, index)}
         >
-          <div
-            className="
-              block size-7 rounded border-4 border-gray-100 shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50
-              group-data-[selected=true]/stop-thumb:border-yellow-400
-            "
-            style={{
-              background: css.toRGBAString(stop.color),
-            }}
-          />
+          <div className="relative block size-7 rounded border-4 border-gray-100 shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 group-data-[selected=true]/stop-thumb:border-yellow-400 overflow-hidden">
+            <TransparencyGridIcon className="absolute w-full h-full -z-0" />
+            <div
+              className="absolute w-full h-full z-10"
+              style={{
+                background: css.toRGBAString(stop.color),
+              }}
+            />
+          </div>
         </div>
       ))}
     </div>

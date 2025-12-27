@@ -393,6 +393,28 @@ function FeGaussianBlurProperties({
   return (
     <div className="space-y-2">
       <PropertyLine>
+        <PropertyLineLabel>Preset</PropertyLineLabel>
+        <PropertyEnum
+          placeholder="Preset"
+          value={undefined}
+          onValueChange={(key) => {
+            const preset = tw.blur[key as keyof typeof tw.blur];
+
+            onValueChange?.({
+              ...value,
+              radius: preset.value.radius,
+            });
+          }}
+          enum={Object.keys(tw.blur).map((key) => {
+            const blurPreset = tw.blur[key as keyof typeof tw.blur];
+            return {
+              label: blurPreset.label,
+              value: blurPreset.class,
+            };
+          })}
+        />
+      </PropertyLine>
+      <PropertyLine>
         <PropertyLineLabel>Blur</PropertyLineLabel>
         <InputPropertyNumber
           mode="fixed"

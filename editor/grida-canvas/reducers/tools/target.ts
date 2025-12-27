@@ -133,10 +133,13 @@ export function getRayTarget(
       return true; // Include this node
     })
     .sort((a, b) => {
-      return (
+      // Sort by depth (shallowest first) for "auto" mode fallback
+      // Rust already orders correctly within same depth (topmost first),
+      // so we preserve that order by using original hits index as tie-breaker
+      const depthDiff =
         dq.getDepth(context.document_ctx, a) -
-        dq.getDepth(context.document_ctx, b)
-      );
+        dq.getDepth(context.document_ctx, b);
+      return depthDiff !== 0 ? depthDiff : hits.indexOf(a) - hits.indexOf(b);
     });
 
   switch (config.target) {
@@ -220,7 +223,7 @@ export function getRayTarget(
 
       // Fallback to depth-based selection when selection is empty or graph distance failed
       // This maintains backward compatibility
-      return filtered[0]; // shallowest node
+      return filtered[0] ?? null; // shallowest node
     }
     case "deepest": {
       // Filter out scene nodes - scenes should not be selectable as deepest
@@ -229,17 +232,22 @@ export function getRayTarget(
         return node?.type !== "scene";
       });
 
-      // If all nodes are scenes, return null
       if (nonSceneNodes.length === 0) {
         return null;
       }
 
-      // Find the deepest node among non-scene nodes
-      // The filtered array is already sorted by depth (shallowest first),
-      // so reverse to get deepest first
-      const deepest = nonSceneNodes.reverse()[0];
-
-      return deepest ?? null;
+      // Find max depth in one pass, then return first node at that depth (topmost)
+      // Since filtered preserves original hits order for same-depth nodes, first match is topmost
+      let maxDepth = -1;
+      let deepestNode: string | null = null;
+      for (const node_id of nonSceneNodes) {
+        const depth = dq.getDepth(context.document_ctx, node_id);
+        if (depth > maxDepth) {
+          maxDepth = depth;
+          deepestNode = node_id;
+        }
+      }
+      return deepestNode;
     }
   }
 

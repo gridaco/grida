@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useGesture } from "@use-gesture/react";
 import { useSurfaceGesture } from "./hooks/use-surface-gesture";
 import {
@@ -16,6 +23,7 @@ import {
   useMultiplayerCursorState,
   usePointerState,
   useSelectionState,
+  useShouldIgnoreInsertDrawInteractions,
   useToolState,
   useTransformState,
 } from "../provider";
@@ -57,6 +65,7 @@ import {
 } from "@/components/ui/context-menu";
 import { PixelGrid } from "@grida/pixel-grid/react";
 import { Rule } from "./ui/rule";
+import { WorkbenchColors } from "../ui-config";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import { toast } from "sonner";
 import {
@@ -1046,6 +1055,7 @@ function SelectionGroupOverlay({
   const editor = useCurrentEditor();
   const tool = useToolState();
   const { scaleX, scaleY } = useTransformState();
+  const shouldIgnoreInsertDraw = useShouldIgnoreInsertDrawInteractions();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
@@ -1056,7 +1066,7 @@ function SelectionGroupOverlay({
     {
       onPointerDown: ({ event }) => {
         // if insert mode, the event should be passed to the master to start the insertion
-        if (tool.type !== "insert" && tool.type !== "draw") {
+        if (!shouldIgnoreInsertDraw) {
           // otherwise, it should be stopped here
           // prevent default to prevent the master event target from changing the selection
           event.preventDefault();
@@ -1109,6 +1119,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeSide
               anchor="n"
               zIndex={nsweZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "n");
               }}
@@ -1116,6 +1127,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeSide
               anchor="s"
               zIndex={nsweZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "s");
               }}
@@ -1123,6 +1135,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeSide
               anchor="e"
               zIndex={nsweZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "e");
               }}
@@ -1130,6 +1143,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeSide
               anchor="w"
               zIndex={nsweZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "w");
               }}
@@ -1137,6 +1151,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeHandle
               anchor="nw"
               zIndex={diagonalZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "nw");
               }}
@@ -1144,6 +1159,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeHandle
               anchor="ne"
               zIndex={diagonalZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "ne");
               }}
@@ -1151,6 +1167,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeHandle
               anchor="sw"
               zIndex={diagonalZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "sw");
               }}
@@ -1158,6 +1175,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeHandle
               anchor="se"
               zIndex={diagonalZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "se");
               }}
@@ -1212,6 +1230,7 @@ function NodeOverlay({
   const tool = useToolState();
   const data = useSingleSelection(node_id);
   const { gesture } = useGestureState();
+  const shouldIgnoreInsertDraw = useShouldIgnoreInsertDrawInteractions();
   const { transform_with_preserve_aspect_ratio } = useEditorState(
     editor,
     (state) => ({
@@ -1232,12 +1251,7 @@ function NodeOverlay({
       // 1. the ui (input) to not blur from panel
       // 2. the inner content from being selected
       onPointerDown: ({ event }) => {
-        if (
-          tool.type !== "insert" &&
-          tool.type !== "draw" &&
-          !event.shiftKey &&
-          !event.metaKey
-        ) {
+        if (!shouldIgnoreInsertDraw && !event.shiftKey && !event.metaKey) {
           // prevent default to keep selection when clicking empty overlay
           // but allow shift+click to fall through for deselection
           event.preventDefault();
@@ -1336,6 +1350,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="e"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "e");
                       }}
@@ -1344,6 +1359,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="w"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "w");
                       }}
@@ -1355,6 +1371,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="n"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "n");
                       }}
@@ -1363,6 +1380,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="s"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "s");
                       }}
@@ -1371,6 +1389,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="e"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "e");
                       }}
@@ -1379,6 +1398,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="w"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "w");
                       }}
@@ -1387,6 +1407,7 @@ function NodeOverlay({
                     <LayerOverlayResizeHandle
                       anchor="nw"
                       zIndex={diagonalZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "nw");
                       }}
@@ -1394,6 +1415,7 @@ function NodeOverlay({
                     <LayerOverlayResizeHandle
                       anchor="ne"
                       zIndex={diagonalZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "ne");
                       }}
@@ -1402,6 +1424,7 @@ function NodeOverlay({
                     <LayerOverlayResizeHandle
                       anchor="sw"
                       zIndex={diagonalZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "sw");
                       }}
@@ -1410,6 +1433,7 @@ function NodeOverlay({
                     <LayerOverlayResizeHandle
                       anchor="se"
                       zIndex={diagonalZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "se");
                       }}
@@ -1779,6 +1803,23 @@ function RulerGuideOverlay() {
     editor.state.eager_canvas_input(state)
   );
 
+  const [focusedGuideIdx, setFocusedGuideIdx] = useState<number | null>(null);
+  const [hoveredGuideIdx, setHoveredGuideIdx] = useState<number | null>(null);
+
+  const handleGuideFocusChange = useCallback(
+    (idx: number, focused: boolean) => {
+      setFocusedGuideIdx(focused ? idx : null);
+    },
+    []
+  );
+
+  const handleGuideHoverChange = useCallback(
+    (idx: number, hovered: boolean) => {
+      setHoveredGuideIdx(hovered ? idx : null);
+    },
+    []
+  );
+
   const bindX = useSurfaceGesture(
     {
       onDragStart: ({ event }) => {
@@ -1818,20 +1859,49 @@ function RulerGuideOverlay() {
       );
   }, [d]);
 
-  const marks = guides.reduce(
-    (acc, g) => {
-      if (g.axis === "x") {
-        acc.y.push(g.offset);
-      } else {
-        acc.x.push(g.offset);
+  const marks = useMemo(() => {
+    return guides.reduce(
+      (acc, g, idx) => {
+        if (g.axis === "x") {
+          acc.y.push({ offset: g.offset, guideIdx: idx });
+        } else {
+          acc.x.push({ offset: g.offset, guideIdx: idx });
+        }
+        return acc;
+      },
+      {
+        x: [] as Array<{ offset: number; guideIdx: number }>,
+        y: [] as Array<{ offset: number; guideIdx: number }>,
       }
-      return acc;
-    },
-    { x: [] as number[], y: [] as number[] }
-  );
+    );
+  }, [guides]);
 
   const tx = transform[0][2];
   const ty = transform[1][2];
+
+  const createTick = useCallback(
+    (
+      m: { offset: number; guideIdx: number },
+      textAlign: "start" | "end"
+    ): Tick => {
+      const isHoveredOrFocused =
+        m.guideIdx === hoveredGuideIdx || m.guideIdx === focusedGuideIdx;
+      return {
+        pos: m.offset,
+        text: m.offset.toString(),
+        textAlign,
+        textAlignOffset: 8,
+        strokeColor:
+          m.guideIdx === focusedGuideIdx
+            ? WorkbenchColors.sky
+            : WorkbenchColors.red,
+        strokeWidth: isHoveredOrFocused ? 1 : 0.5,
+        strokeHeight: 24,
+        color: WorkbenchColors.red,
+      };
+    },
+    [hoveredGuideIdx, focusedGuideIdx]
+  );
 
   return (
     <div className="fixed w-full h-full pointer-events-none z-50">
@@ -1850,19 +1920,7 @@ function RulerGuideOverlay() {
             zoom={scaleX}
             offset={tx}
             ranges={ranges.x}
-            marks={marks.y.map(
-              (m) =>
-                ({
-                  pos: m,
-                  text: m.toString(),
-                  textAlign: "start",
-                  textAlignOffset: 8,
-                  strokeColor: "red",
-                  strokeWidth: 0.5,
-                  strokeHeight: 24,
-                  color: "red",
-                }) satisfies Tick
-            )}
+            marks={marks.y.map((m) => createTick(m, "start"))}
           />
         </div>
       </RulerContextMenu>
@@ -1881,26 +1939,23 @@ function RulerGuideOverlay() {
             zoom={scaleY}
             offset={ty}
             ranges={ranges.y}
-            marks={marks.x.map(
-              (m) =>
-                ({
-                  pos: m,
-                  text: m.toString(),
-                  textAlign: "end",
-                  textAlignOffset: 8,
-                  strokeColor: "red",
-                  strokeWidth: 0.5,
-                  strokeHeight: 24,
-                  color: "red",
-                }) satisfies Tick
-            )}
+            marks={marks.x.map((m) => createTick(m, "end"))}
           />
         </div>
       </RulerContextMenu>
       {/* Guides */}
       <div className="z-10">
         {guides.map((g, i) => {
-          return <Guide key={i} idx={i} axis={g.axis} offset={g.offset} />;
+          return (
+            <Guide
+              key={i}
+              idx={i}
+              axis={g.axis}
+              offset={g.offset}
+              onFocusChange={handleGuideFocusChange}
+              onHoverChange={handleGuideHoverChange}
+            />
+          );
         })}
       </div>
     </div>
@@ -1938,7 +1993,13 @@ function Guide({
   axis,
   offset,
   idx,
-}: grida.program.document.Guide2D & { idx: number }) {
+  onFocusChange,
+  onHoverChange,
+}: grida.program.document.Guide2D & {
+  idx: number;
+  onFocusChange?: (idx: number, focused: boolean) => void;
+  onHoverChange?: (idx: number, hovered: boolean) => void;
+}) {
   const editorInstance = useCurrentEditor();
   const { transform } = useTransformState();
   const eager_canvas_input = useEditorState(editorInstance, (state) =>
@@ -1953,14 +2014,22 @@ function Guide({
       onFocus: ({ event }) => {
         event.stopPropagation();
         setFocused(true);
+        onFocusChange?.(idx, true);
       },
       onBlur: ({ event }) => {
         event.stopPropagation();
         setFocused(false);
+        onFocusChange?.(idx, false);
       },
       onHover: (s) => {
-        if (s.first) setHover(true);
-        if (s.last) setHover(false);
+        if (s.first) {
+          setHover(true);
+          onHoverChange?.(idx, true);
+        }
+        if (s.last) {
+          setHover(false);
+          onHoverChange?.(idx, false);
+        }
       },
       onPointerDown: ({ event }) => {
         // ensure the div focuses

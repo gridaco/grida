@@ -498,12 +498,11 @@ export function useDataTransferEventTarget() {
         const decodedItems =
           await io.clipboard.decodeFromClipboardItems(clipboardItems);
 
+        // Use pointer position from editor state (where context menu was triggered)
+        const [clientX, clientY] = instance.state.pointer.client;
         // Use unified paste logic
         const handled = await handlePasteFromItems(decodedItems, {
-          position: {
-            clientX: window.innerWidth / 2,
-            clientY: window.innerHeight / 2,
-          },
+          position: { clientX, clientY },
           current_clipboard,
         });
 
