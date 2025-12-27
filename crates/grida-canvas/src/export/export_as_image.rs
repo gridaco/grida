@@ -49,7 +49,14 @@ pub fn export_node_as_image(
     r.load_scene(scene.clone());
     let image = r.snapshot();
 
-    let Some(data) = image.encode(None, skfmt, None) else {
+    // Extract quality for JPEG and WEBP formats
+    let quality = match &format {
+        ExportAsImage::JPEG(jpeg_config) => jpeg_config.quality,
+        ExportAsImage::WEBP(webp_config) => webp_config.quality,
+        _ => None,
+    };
+
+    let Some(data) = image.encode(None, skfmt, quality) else {
         r.free();
         return None;
     };

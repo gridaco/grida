@@ -29,11 +29,15 @@ impl Default for ExportAsPNG {
 #[derive(Clone, Deserialize)]
 pub struct ExportAsJPEG {
     pub(crate) constraints: ExportConstraints,
+    #[serde(default)]
+    pub(crate) quality: Option<u32>, // 0-100, None means use Skia default
 }
 
 #[derive(Clone, Deserialize)]
 pub struct ExportAsWEBP {
     pub(crate) constraints: ExportConstraints,
+    #[serde(default)]
+    pub(crate) quality: Option<u32>, // 0-100, None means use Skia default
 }
 
 #[derive(Clone, Deserialize)]
@@ -106,8 +110,11 @@ impl ExportAs {
         Self::PNG(ExportAsPNG::default())
     }
 
-    pub fn jpeg(constraints: ExportConstraints) -> Self {
-        Self::JPEG(ExportAsJPEG { constraints })
+    pub fn jpeg(constraints: ExportConstraints, quality: Option<u32>) -> Self {
+        Self::JPEG(ExportAsJPEG {
+            constraints,
+            quality,
+        })
     }
 
     pub fn pdf() -> Self {
