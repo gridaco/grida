@@ -5,6 +5,7 @@ import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import mixed from "@grida/mixed-properties";
 import type cg from "@grida/cg";
+import equal from "fast-deep-equal";
 
 // export function useMixedPropertiesSelector(
 //   ids: string[],
@@ -454,6 +455,11 @@ export function useMixedProperties(ids: string[]) {
 
 /**
  * @deprecated expensive
+ *
+ * @todo This function is expensive because it resolves all paint values at once.
+ * The UI only initially shows a partial set (n values). Optimize this by:
+ * - First limiting by n and early exiting
+ * - Adding a method to load all values on demand
  */
 export function useMixedPaints() {
   const instance = useCurrentEditor();
@@ -482,26 +488,41 @@ export function useMixedPaints() {
     });
   }, [ids, state.document.nodes]);
 
-  const mixedProperties = useMemo(
-    () =>
-      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
-        allnodes as grida.program.nodes.UnknwonNode[],
-        {
-          idKey: "id",
-          ignoredKey: (key) => {
-            return ![
-              "fill",
-              // TODO: support stroke
-              // "stroke"
-            ].includes(key);
-          },
-          mixed: grida.mixed,
-        }
-      ),
-    [allnodes]
-  );
+  // TODO: @grida/mixed-properties should support array properties (e.g., fill_paints[] per node)
+  // Once array handling is added to mixed(), replace this custom logic with normalized nodes + mixed()
+  const paintEntries = useMemo(() => {
+    const entries: Array<{ nodeId: string; paint: cg.Paint }> = [];
+    for (const node of allnodes as grida.program.nodes.UnknwonNode[]) {
+      const { paints } = editor.resolvePaints(node, "fill", 0);
+      const activePaints = paints.filter((p) => p?.active !== false);
+      for (const paint of activePaints) {
+        entries.push({ nodeId: node.id, paint });
+      }
+    }
+    return entries;
+  }, [allnodes]);
 
-  const paints = mixedProperties.fill?.values ?? [];
+  const paints = useMemo(() => {
+    // Group by paint value (using deep equality)
+    const paintGroups: Array<{ value: cg.Paint; ids: string[] }> = [];
+
+    for (const { nodeId, paint } of paintEntries) {
+      // Find existing group with same paint value
+      const existingGroup = paintGroups.find((group) =>
+        equal(group.value, paint)
+      );
+
+      if (existingGroup) {
+        if (!existingGroup.ids.includes(nodeId)) {
+          existingGroup.ids.push(nodeId);
+        }
+      } else {
+        paintGroups.push({ value: paint, ids: [nodeId] });
+      }
+    }
+
+    return paintGroups;
+  }, [paintEntries]);
 
   const setPaint = useCallback(
     (
