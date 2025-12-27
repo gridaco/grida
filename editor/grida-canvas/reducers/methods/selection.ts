@@ -1,205 +1,246 @@
-import type { Draft } from "immer";
-import { editor } from "@/grida-canvas";
-import assert from "assert";
+/**
+ * Deferred selection decision logic.
+ *
+ * This module contains pure functions that determine what selection operations
+ * should be performed (immediate vs deferred) based on the current state.
+ *
+ * This module is the single source of truth for all UX logic from:
+ * @see docs/wg/feat-editor/ux-surface/selection.md
+ *
+ * All decision logic from the documentation is implemented here and can be
+ * tested independently without DOM events or user interaction.
+ */
+
 import { dq } from "@/grida-canvas/query";
+import grida from "@grida/schema";
 
-/**
- * Selects nodes within the current scene (scene content).
- *
- * **IMPORTANT**: This function is STRICTLY for selecting scene content nodes only.
- * Scene nodes themselves are NEVER selectable and will be automatically filtered out.
- *
- * Scene nodes are organizational containers and should not be part of the selection
- * state, which is used for:
- * - Transform operations (move, resize, rotate)
- * - Copy/paste operations
- * - Delete operations
- * - Content editing (text, vector, bitmap editing)
- *
- * All of these operations are intended for nodes WITHIN a scene, not the scene container itself.
- *
- * @param draft - The editor state draft
- * @param mode - Selection mode: "reset" (replace), "add" (additive), or "toggle"
- * @param node_ids - Node IDs to select. Scene node IDs will be automatically filtered out.
- *
- * @remarks
- * - Scene nodes are identified by checking if they exist in `draft.document.scenes_ref`
- * - If all provided node_ids are scene nodes, the selection will remain unchanged (for "add"/"toggle") or be cleared (for "reset")
- * - This filtering ensures scenes cannot be accidentally selected via accessibility shortcuts (e.g., CMD+A)
- *
- * @todo
- * - validate the selection by config (which does not exists yet), to only select subset of children or a container, but not both. - when both container and children are selected, when transform, it will transform both, resulting in a weird behavior.
- */
-export function self_selectNode<S extends editor.state.IEditorState>(
-  draft: Draft<S>,
-  mode: "reset" | "add" | "toggle",
-  ...node_ids: string[]
-) {
-  // Filter out scene nodes - scenes should never be selectable
-  // Scenes are organizational containers, not selectable content
-  const scenes_ref_set = new Set(draft.document.scenes_ref);
-  const filtered_node_ids = node_ids.filter(
-    (node_id) => !scenes_ref_set.has(node_id)
-  );
-
-  for (const node_id of filtered_node_ids) {
-    assert(node_id, "Node ID must be provided");
-    assert(
-      dq.__getNodeById(draft, node_id),
-      `Node not found with id: "${node_id}"`
-    );
-  }
-
-  switch (mode) {
-    case "add": {
-      const set = new Set([...draft.selection, ...filtered_node_ids]);
-      const pruned = dq.pruneNestedNodes(draft.document_ctx, Array.from(set));
-      draft.selection = pruned;
-      break;
-    }
-    case "toggle": {
-      const set = new Set(draft.selection);
-      for (const node_id of filtered_node_ids) {
-        if (set.has(node_id)) {
-          set.delete(node_id);
-        } else {
-          set.add(node_id);
-        }
-      }
-      const pruned = dq.pruneNestedNodes(draft.document_ctx, Array.from(set));
-      draft.selection = pruned;
-      break;
-    }
-    case "reset": {
-      // only apply if actually changed
-      if (
-        JSON.stringify(filtered_node_ids) !== JSON.stringify(draft.selection)
-      ) {
-        const pruned = dq.pruneNestedNodes(
-          draft.document_ctx,
-          filtered_node_ids
-        );
-        draft.selection = pruned;
-
-        // reset the active duplication as selection changed. see ActiveDuplication's note
-        draft.active_duplication = null;
-      }
-      break;
-    }
-  }
-  return draft;
+export interface PointerDownContext {
+  hovered_node_id: string | null;
+  shiftKey: boolean;
+  current_selection: string[];
+  document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext;
+  /**
+   * Whether empty space is within selection overlay bounds.
+   *
+   * @todo In the future, this should be computed within the module itself using:
+   * - Selection geometry rects (from geometry provider)
+   * - Pointer event canvas space position
+   * This will make the module more self-contained and testable.
+   *
+   * For now, this is passed as a parameter from the reducer/caller.
+   */
+  is_empty_space_within_overlay?: boolean;
 }
 
-export function self_clearSelection<S extends editor.state.IEditorState>(
-  draft: Draft<S>
-) {
-  if (draft.content_edit_mode) {
-    switch (draft.content_edit_mode.type) {
-      case "vector": {
-        draft.content_edit_mode.selection = {
-          selected_vertices: [],
-          selected_segments: [],
-          selected_tangents: [],
+export interface ClickContext {
+  clicked_node_id: string | null;
+  deferred_selection?: {
+    node_id: string | "__clear_selection__";
+    operation: "reset" | "toggle";
+  };
+}
+
+export type SelectionOperation =
+  | { type: "immediate"; mode: "reset" | "toggle" | "add"; node_id: string }
+  | { type: "immediate"; mode: "clear" }
+  | {
+      type: "deferred";
+      operation: "reset" | "toggle";
+      node_id: string | "__clear_selection__";
+    }
+  | { type: "none" };
+
+export interface DragStartContext {
+  hovered_node_id: string | null;
+  shiftKey: boolean;
+  current_selection: string[];
+  /**
+   * Whether empty space is within selection overlay bounds.
+   *
+   * @todo In the future, this should be computed within the module itself using:
+   * - Selection geometry rects (from geometry provider)
+   * - Pointer event canvas space position
+   * This will make the module more self-contained and testable.
+   *
+   * For now, this is passed as a parameter from the reducer/caller.
+   */
+  is_empty_space_within_overlay?: boolean;
+}
+
+export type DragStartAction = "drag" | "marquee";
+
+/**
+ * Checks if a node is a child of any selected node.
+ *
+ * @param node_id - Node to check
+ * @param selection - Currently selected node IDs
+ * @param document_ctx - Document hierarchy context
+ * @returns true if node is a descendant of any selected node
+ */
+function isChildOfSelectedNodes(
+  node_id: string,
+  selection: string[],
+  document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
+): boolean {
+  const ancestors = dq.getAncestors(document_ctx, node_id);
+  return selection.some((selected_id) => ancestors.includes(selected_id));
+}
+
+/**
+ * Determines what selection operation should be performed on pointerdown.
+ *
+ * Implements ALL cases from docs/wg/feat-editor/ux-surface/selection.md:
+ *
+ * Immediate (on pointerdown):
+ * - Unselected node (no Shift) → select that node
+ * - Unselected node (with Shift) → add to selection
+ * - Empty space outside selection overlay (no Shift) → clear selection
+ *
+ * Deferred (on click):
+ * - Selected node (no Shift) → defer reset to that node
+ * - Selected node (with Shift) → defer toggle (deselect)
+ * - Child of selected node(s) → defer reset to that child
+ * - Empty space within selection overlay (no Shift) → defer clear selection
+ *
+ * @param context - Pointer down context
+ * @returns Decision: immediate operation, deferred operation, or none
+ */
+export function decidePointerDownSelection(
+  context: PointerDownContext
+): SelectionOperation {
+  const {
+    hovered_node_id,
+    shiftKey,
+    current_selection,
+    document_ctx,
+    is_empty_space_within_overlay,
+  } = context;
+
+  if (hovered_node_id) {
+    // There is a hovered node
+    const is_directly_selected = current_selection.includes(hovered_node_id);
+    const is_child_of_selected =
+      !is_directly_selected &&
+      isChildOfSelectedNodes(hovered_node_id, current_selection, document_ctx);
+
+    if (is_directly_selected) {
+      // Selected node → defer operation
+      const operation = shiftKey ? "toggle" : "reset";
+      return { type: "deferred", operation, node_id: hovered_node_id };
+    } else if (is_child_of_selected) {
+      // Child of selected node(s) → defer reset to that child
+      return { type: "deferred", operation: "reset", node_id: hovered_node_id };
+    } else {
+      // Unselected node → apply immediately
+      // Per docs: Shift + unselected node → add to selection (not toggle).
+      const mode = shiftKey ? "add" : "reset";
+      return { type: "immediate", mode, node_id: hovered_node_id };
+    }
+  } else {
+    // No hovered node (empty space)
+    if (shiftKey) {
+      // do nothing (when shift key is pressed on empty space)
+      return { type: "none" };
+    } else {
+      // Empty space
+      if (is_empty_space_within_overlay === true) {
+        // Empty space within selection overlay → defer clear selection
+        return {
+          type: "deferred",
+          operation: "reset",
+          node_id: "__clear_selection__",
         };
-        draft.content_edit_mode.selection_neighbouring_vertices = [];
-        draft.content_edit_mode.a_point = null;
-        draft.content_edit_mode.next_ta = null;
-        break;
+      } else {
+        // Empty space outside selection overlay → clear immediately
+        return { type: "immediate", mode: "clear" };
       }
     }
-  } else {
-    draft.selection = [];
   }
-
-  return draft;
 }
-
-export type VectorContentSelectionAction =
-  | { type: "vertex"; index: number; additive?: boolean }
-  | { type: "segment"; index: number; additive?: boolean }
-  | { type: "tangent"; index: [number, 0 | 1]; additive?: boolean };
 
 /**
- * Reduces vector content selection state based on selection actions.
+ * Determines what selection operation should be performed on click.
  *
- * Handles mixed selection of vertices and segments in VectorContentEditMode.
- * When not additive (normal select), clears existing selection and selects only the target.
- * When additive (shift key), toggles the selection state of the target.
+ * Applies deferred operations that were stored on pointerdown.
  *
- * @param state - Current selection state with selected_vertices and selected_segments
- * @param action - Selection action specifying type (vertex/segment), index, and additive flag
- * @returns Updated selection state with modified selected_vertices and selected_segments
+ * @param context - Click context
+ * @returns Decision: operation to apply, or none
  */
-export function reduceVectorContentSelection(
-  state: editor.state.VectorContentEditModeGeometryControlsSelection,
-  action: VectorContentSelectionAction
-): editor.state.VectorContentEditModeGeometryControlsSelection {
-  let { selected_vertices, selected_segments, selected_tangents } = state;
-  const additive = action.additive ?? false;
+export function decideClickSelection(
+  context: ClickContext
+): SelectionOperation {
+  const { clicked_node_id, deferred_selection } = context;
 
-  if (!additive) {
-    if (action.type === "vertex") {
-      selected_vertices = [action.index];
-      selected_segments = [];
-      selected_tangents = [];
-    } else {
-      if (action.type === "segment") {
-        selected_vertices = [];
-        selected_segments = [action.index];
-        selected_tangents = [];
-      } else {
-        selected_vertices = [];
-        selected_segments = [];
-        selected_tangents = [action.index];
-      }
-    }
-  } else {
-    if (action.type === "vertex") {
-      const set = new Set(selected_vertices);
-      if (set.has(action.index)) {
-        set.delete(action.index);
-      } else {
-        set.add(action.index);
-      }
-      selected_vertices = Array.from(set);
-    } else if (action.type === "segment") {
-      const set = new Set(selected_segments);
-      if (set.has(action.index)) {
-        set.delete(action.index);
-      } else {
-        set.add(action.index);
-      }
-      selected_segments = Array.from(set);
-    } else {
-      const key = (t: [number, 0 | 1]) => `${t[0]}:${t[1]}`;
-      const set = new Set(selected_tangents.map(key));
-      const k = key(action.index);
-      if (set.has(k)) {
-        set.delete(k);
-      } else {
-        set.add(k);
-      }
-      selected_tangents = Array.from(set).map((s) => {
-        const [v, t] = s.split(":");
-        return [parseInt(v), Number(t) as 0 | 1];
-      });
-    }
+  if (!deferred_selection) {
+    return { type: "none" };
   }
 
-  return { selected_vertices, selected_segments, selected_tangents };
+  // Handle deferred clear selection
+  if (deferred_selection.node_id === "__clear_selection__") {
+    return { type: "immediate", mode: "clear" };
+  }
+
+  // Only apply if clicked node matches deferred node
+  if (clicked_node_id === deferred_selection.node_id) {
+    const mode = deferred_selection.operation === "toggle" ? "toggle" : "reset";
+    return { type: "immediate", mode, node_id: clicked_node_id };
+  }
+
+  return { type: "none" };
 }
 
-export function getVectorSelectionStartPoint(
-  selection: Omit<
-    editor.state.VectorContentEditModeGeometryControlsSelection,
-    "selected_segments"
-  >
-): number | null {
-  if (selection.selected_vertices.length === 1) {
-    return selection.selected_vertices[0];
+/**
+ * Determines what drag action should be performed on dragstart.
+ *
+ * Implements drag vs marquee decision logic from docs/wg/feat-editor/ux-surface/selection.md:
+ *
+ * Drag (translate selection):
+ * - Has hovered node (selected or unselected) → drag
+ * - Has selection AND empty space within overlay → drag (even with Shift)
+ * - Has selection AND empty space outside overlay (no Shift) → drag
+ *
+ * Marquee (area selection):
+ * - No selection AND empty space → marquee
+ * - Has selection AND empty space outside overlay (with Shift) → marquee
+ * - Empty space within overlay (with Shift) when no selection → marquee
+ *
+ * @param context - Drag start context
+ * @returns Decision: "drag" to translate selection, or "marquee" to start area selection
+ */
+export function decideDragStartAction(
+  context: DragStartContext
+): DragStartAction {
+  const {
+    hovered_node_id,
+    shiftKey,
+    current_selection,
+    is_empty_space_within_overlay,
+  } = context;
+
+  // If there's a hovered node, always drag (can drag selected or unselected nodes)
+  if (hovered_node_id) {
+    return "drag";
   }
-  if (selection.selected_tangents.length === 1) {
-    return selection.selected_tangents[0][0];
+
+  // No hovered node (empty space)
+  if (current_selection.length === 0) {
+    // No selection → marquee
+    return "marquee";
   }
-  return null;
+
+  // Has selection and empty space
+  if (is_empty_space_within_overlay === true) {
+    // Empty space within overlay → drag (even with Shift, per docs)
+    // Shift key enables axis lock for dragging, not marquee
+    return "drag";
+  }
+
+  // Empty space outside overlay
+  if (shiftKey) {
+    // Shift + empty space outside overlay → marquee (additive selection)
+    return "marquee";
+  } else {
+    // No Shift + empty space outside overlay → drag (to move selection)
+    return "drag";
+  }
 }

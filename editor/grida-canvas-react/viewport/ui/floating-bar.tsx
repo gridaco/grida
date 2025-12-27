@@ -1,6 +1,7 @@
 import React from "react";
 import { useSingleSelection } from "../surface-hooks";
 import { cn } from "@/components/lib/utils";
+import { FLOATING_BAR_Z_INDEX } from "../../ui-config";
 
 interface BarProps {
   node_id: string;
@@ -22,7 +23,10 @@ export function FloatingBar({
       className="group relative pointer-events-none"
       data-state={state}
       data-layer-is-component-consumer={isComponentConsumer}
-      style={data?.style}
+      style={{
+        ...data?.style,
+        zIndex: FLOATING_BAR_Z_INDEX,
+      }}
     >
       {/* Title bar positioned above the parent using a percentage transform */}
       {/* No gap: -translate-y-full positions it flush with container top */}

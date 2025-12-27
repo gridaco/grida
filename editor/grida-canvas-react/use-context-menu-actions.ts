@@ -114,13 +114,13 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Bring to front",
         shortcut: "]",
         disabled: !hasSelection,
-        onSelect: () => editor.commands.order(targetSingleOrSelection, "front"),
+        onSelect: () => editor.surface.order("front"),
       },
       sendToBack: {
         label: "Send to back",
         shortcut: "[",
         disabled: !hasSelection,
-        onSelect: () => editor.commands.order(targetSingleOrSelection, "back"),
+        onSelect: () => editor.surface.order("back"),
       },
       groupWithContainer: {
         label: "Group with Container",
@@ -138,7 +138,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Ungroup",
         shortcut: "⌘⇧G",
         disabled: !canUngroup,
-        onSelect: () => editor.commands.ungroup(ids),
+        onSelect: () => editor.surface.ungroup(ids),
       },
       autoLayout: {
         label: "Auto-Layout",
@@ -196,10 +196,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
         label: "Delete",
         shortcut: "⌫",
         disabled: !hasSelection,
-        onSelect: () =>
-          editor.commands.deleteNode(
-            hasSelection && ids.length === 1 ? (ids[0] as string) : "selection"
-          ),
+        onSelect: () => editor.commands.delete(ids),
       },
     }),
     [

@@ -2086,7 +2086,8 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke,
-      i.IPositioning {
+      i.IPositioning,
+      i.ICornerRadius {
     type: "boolean";
     op: cg.BooleanOperation;
   }
@@ -2539,6 +2540,16 @@ export namespace grida.program.nodes {
       //
     }
 
+    export namespace factory_default_traits {
+      export const DEFAULT_RECTANGULAR_CORNER_RADIUS: grida.program.nodes.i.IRectangularCornerRadius =
+        {
+          rectangular_corner_radius_top_left: 0,
+          rectangular_corner_radius_top_right: 0,
+          rectangular_corner_radius_bottom_right: 0,
+          rectangular_corner_radius_bottom_left: 0,
+        };
+    }
+
     /**
      * Creates a Node data from prototype input, while ignoring the prototype's children.
      *
@@ -2571,10 +2582,7 @@ export namespace grida.program.nodes {
             top: 0,
             left: 0,
             corner_radius: 0,
-            rectangular_corner_radius_top_left: 0,
-            rectangular_corner_radius_top_right: 0,
-            rectangular_corner_radius_bottom_left: 0,
-            rectangular_corner_radius_bottom_right: 0,
+            ...factory_default_traits.DEFAULT_RECTANGULAR_CORNER_RADIUS,
             stroke_width: 0,
             stroke_cap: "butt",
             stroke_join: "miter",
@@ -2582,10 +2590,26 @@ export namespace grida.program.nodes {
             id: id,
           } satisfies RectangleNode;
         }
+        case "container": {
+          // Remove children from prototype before spreading to prevent leakage
+          const { children, ...prototypeWithoutChildren } = prototype as any;
+          return {
+            name: prototype.type,
+            type: prototype.type,
+            active: true,
+            locked: false,
+            opacity: 1,
+            z_index: 0,
+            rotation: 0,
+            corner_radius: 0,
+            ...factory_default_traits.DEFAULT_RECTANGULAR_CORNER_RADIUS,
+            ...prototypeWithoutChildren,
+            id: id,
+          } as ContainerNode;
+        }
         // TODO:
         case "boolean":
         case "group":
-        case "container":
         case "component":
         case "instance":
         case "template_instance": {

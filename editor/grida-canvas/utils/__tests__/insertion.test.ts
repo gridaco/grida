@@ -1,9 +1,7 @@
 import {
   getViewportAwareDelta,
-  hitTestNestedInsertionTarget,
   getPackedSubtreeBoundingRect,
 } from "@/grida-canvas/utils/insertion";
-import cmath from "@grida/cmath";
 
 import type grida from "@grida/schema";
 
@@ -19,30 +17,6 @@ describe("getViewportAwareDelta", () => {
     const rect = { x: 200, y: 200, width: 20, height: 20 };
     const delta = getViewportAwareDelta(viewport, rect);
     expect(delta).toEqual([-160, -160]);
-  });
-});
-
-describe("hitTestNestedInsertionTarget", () => {
-  const rects: Record<string, cmath.Rectangle> = {
-    containerA: { x: 0, y: 0, width: 300, height: 300 },
-    containerB: { x: 50, y: 50, width: 200, height: 200 },
-  };
-  const geometry = {
-    getNodeIdsFromPoint: () => ["leaf", "containerB", "containerA"],
-    getNodeAbsoluteBoundingRect: (id: string) => rects[id] || null,
-  };
-  const isContainer = (id: string) => id.startsWith("container");
-
-  it("returns deepest container containing rect", () => {
-    const rect = { x: 60, y: 60, width: 10, height: 10 };
-    const parent = hitTestNestedInsertionTarget(rect, geometry, isContainer);
-    expect(parent).toBe("containerB");
-  });
-
-  it("respects maxDepth", () => {
-    const rect = { x: 60, y: 60, width: 10, height: 10 };
-    const parent = hitTestNestedInsertionTarget(rect, geometry, isContainer, 1);
-    expect(parent).toBeNull();
   });
 });
 

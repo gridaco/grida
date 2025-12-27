@@ -1064,7 +1064,7 @@ export function useEditorHotKeys() {
     if (tool.type === "brush") {
       editor.commands.changeBrushSize({ type: "delta", value: 1 });
     } else {
-      editor.commands.order("selection", "front");
+      editor.surface.order("front");
     }
   });
 
@@ -1072,7 +1072,7 @@ export function useEditorHotKeys() {
     if (tool.type === "brush") {
       editor.commands.changeBrushSize({ type: "delta", value: -1 });
     } else {
-      editor.commands.order("selection", "back");
+      editor.surface.order("back");
     }
   });
 
@@ -1130,7 +1130,7 @@ export function useEditorHotKeys() {
     "ctrl+shift+g, meta+shift+g",
     () => {
       try {
-        editor.commands.ungroup("selection");
+        editor.surface.ungroup(editor.state.selection);
       } catch {}
     },
     {

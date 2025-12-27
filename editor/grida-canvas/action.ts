@@ -47,7 +47,6 @@ export type DocumentAction =
   | EditorCopyCutPasteAction
   | EditorDeleteAction
   | EditorFlattenAction
-  | EditorA11yDeleteAction
   | EditorApplyParametricScaleAction
   | EditorHierarchyAction
   | EditorVectorEditorAction
@@ -292,6 +291,7 @@ export type EditorCopyCutPasteAction =
   | EditorCopyAction
   | EditorCutAction
   | EditorPasteAction
+  | EditorPasteVectorNetworkAction
   | EditorDuplicateAction;
 
 export interface EditorCopyAction {
@@ -306,7 +306,13 @@ export interface EditorCutAction {
 
 export interface EditorPasteAction {
   type: "paste";
-  vector_network?: vn.VectorNetwork;
+  target: NodeID | NodeID[];
+}
+
+export interface EditorPasteVectorNetworkAction {
+  type: "paste-vector-network";
+  vector_network: vn.VectorNetwork;
+  target: NodeID | null;
 }
 
 export interface EditorDuplicateAction {
@@ -318,16 +324,12 @@ export interface EditorDuplicateAction {
 
 export interface EditorDeleteAction {
   type: "delete";
-  target: NodeID | "selection";
+  target: NodeID[];
 }
 
 export interface EditorFlattenAction {
   type: "flatten";
   target: NodeID | "selection";
-}
-
-export interface EditorA11yDeleteAction {
-  type: "a11y/delete";
 }
 
 export type EditorHierarchyAction =
@@ -336,8 +338,8 @@ export type EditorHierarchyAction =
 
 export interface EditorHierarchyOrderAction {
   type: "order";
-  target: NodeID | "selection";
-  order: "front" | "back" | number;
+  target: NodeID[];
+  order: "front" | "back" | "forward" | "backward" | number;
 }
 
 export interface EditorHierarchyMoveAction {
@@ -361,6 +363,7 @@ export type EditorVectorEditorAction =
   | EditorVectorBendSegmentAction
   | EditorVectorPlanarizeAction
   | EditorVectorBendOrClearCornerAction
+  | EditorVectorDeleteSelectionAction
   | EditorVectorUpdateHoveredControlAction;
 
 export interface EditorVectorSelectVertexAction {
@@ -405,6 +408,13 @@ export interface EditorVectorSelectTangentAction {
 export interface EditorVectorDeleteTangentAction {
   type: "delete-tangent";
   target: TangentQuery;
+}
+
+export interface EditorVectorDeleteSelectionAction {
+  type: "vector/delete-selection";
+  target: {
+    node_id: NodeID;
+  };
 }
 
 export interface EditorVectorTranslateVertexAction {
@@ -487,10 +497,17 @@ export interface EditorVectorUpdateHoveredControlAction {
 // #endregion
 
 // #region [gradient]
-export type EditorGradientAction = EditorSelectGradientStopAction;
+export type EditorGradientAction =
+  | EditorSelectGradientStopAction
+  | EditorDeleteGradientStopAction;
 
 export interface EditorSelectGradientStopAction {
   type: "select-gradient-stop";
+  target: GradientStopQuery;
+}
+
+export interface EditorDeleteGradientStopAction {
+  type: "paint/gradient/delete-stop";
   target: GradientStopQuery;
 }
 
@@ -598,7 +615,7 @@ export interface EditorBooleanOperationAction {
 
 export interface EditorUngroupAction {
   type: "ungroup";
-  target: NodeID[] | "selection";
+  target: NodeID;
 }
 
 export interface EditorApplyParametricScaleAction {
@@ -926,6 +943,12 @@ export type EditorSurface_StartGesture = {
 
 export type DocumentEditorInsertNodeAction = {
   type: "insert";
+  /**
+   * Explicit parent node ID for insertion.
+   * - `null`: Insert at scene level
+   * - `NodeID`: Insert into this parent container
+   */
+  target: NodeID | null;
 } & (
   | {
       id?: string;

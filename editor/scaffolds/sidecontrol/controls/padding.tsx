@@ -5,33 +5,69 @@ import { AllSidesIcon } from "@radix-ui/react-icons";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
+import type { TMixed } from "./utils/types";
 
 type Padding = grida.program.nodes.i.IPadding;
+
+type MixedPadding = {
+  padding_top?: TMixed<number>;
+  padding_right?: TMixed<number>;
+  padding_bottom?: TMixed<number>;
+  padding_left?: TMixed<number>;
+};
 
 export function PaddingControl({
   value,
   onValueCommit,
 }: {
-  value?: Padding;
+  value?: Padding | MixedPadding;
   onValueCommit?: (value: Padding) => void;
 }) {
   const [showIndividual, setShowIndividual] = useState(false);
 
+  const getPaddingValue = (
+    prop: "padding_top" | "padding_right" | "padding_bottom" | "padding_left",
+    defaultValue: number = 0
+  ): TMixed<number> => {
+    if (!value) return defaultValue;
+    const val = value[prop];
+    if (val === grida.mixed) return grida.mixed;
+    if (val === undefined) return defaultValue;
+    return val;
+  };
+
   const paddingValues = {
-    top: value?.padding_top ?? 0,
-    right: value?.padding_right ?? 0,
-    bottom: value?.padding_bottom ?? 0,
-    left: value?.padding_left ?? 0,
+    top: getPaddingValue("padding_top"),
+    right: getPaddingValue("padding_right"),
+    bottom: getPaddingValue("padding_bottom"),
+    left: getPaddingValue("padding_left"),
   };
 
   const { top, right, bottom, left } = paddingValues;
+  const isAnyMixed =
+    top === grida.mixed ||
+    right === grida.mixed ||
+    bottom === grida.mixed ||
+    left === grida.mixed;
+
   const uniformValue =
-    top === right && right === bottom && bottom === left ? top : undefined;
+    !isAnyMixed && top === right && right === bottom && bottom === left
+      ? typeof top === "number"
+        ? top
+        : undefined
+      : undefined;
 
   const placeholder =
     uniformValue !== undefined
       ? String(uniformValue)
-      : [left, top, right, bottom].join(", ");
+      : isAnyMixed
+        ? "mixed"
+        : [
+            typeof left === "number" ? left : 0,
+            typeof top === "number" ? top : 0,
+            typeof right === "number" ? right : 0,
+            typeof bottom === "number" ? bottom : 0,
+          ].join(", ");
 
   const handleUniformChange = (newValue: number | undefined) => {
     if (newValue === undefined) return;
@@ -48,11 +84,35 @@ export function PaddingControl({
     newValue: number | undefined
   ) => {
     if (newValue === undefined) return;
+    const currentTop =
+      side === "top"
+        ? newValue
+        : typeof paddingValues.top === "number"
+          ? paddingValues.top
+          : 0;
+    const currentRight =
+      side === "right"
+        ? newValue
+        : typeof paddingValues.right === "number"
+          ? paddingValues.right
+          : 0;
+    const currentBottom =
+      side === "bottom"
+        ? newValue
+        : typeof paddingValues.bottom === "number"
+          ? paddingValues.bottom
+          : 0;
+    const currentLeft =
+      side === "left"
+        ? newValue
+        : typeof paddingValues.left === "number"
+          ? paddingValues.left
+          : 0;
     onValueCommit?.({
-      padding_top: side === "top" ? newValue : paddingValues.top,
-      padding_right: side === "right" ? newValue : paddingValues.right,
-      padding_bottom: side === "bottom" ? newValue : paddingValues.bottom,
-      padding_left: side === "left" ? newValue : paddingValues.left,
+      padding_top: currentTop,
+      padding_right: currentRight,
+      padding_bottom: currentBottom,
+      padding_left: currentLeft,
     });
   };
 
@@ -63,7 +123,7 @@ export function PaddingControl({
         <InputPropertyNumber
           mode="fixed"
           type="number"
-          value={uniformValue}
+          value={isAnyMixed ? undefined : uniformValue}
           placeholder={placeholder}
           min={0}
           step={1}
@@ -96,8 +156,14 @@ export function PaddingControl({
             <InputPropertyNumber
               mode="fixed"
               type="number"
-              value={paddingValues.left}
-              placeholder="0"
+              value={
+                paddingValues.left === grida.mixed
+                  ? undefined
+                  : typeof paddingValues.left === "number"
+                    ? paddingValues.left
+                    : 0
+              }
+              placeholder={paddingValues.left === grida.mixed ? "mixed" : "0"}
               min={0}
               step={1}
               className="w-full h-7 rounded-none rounded-l-md border-r-0"
@@ -113,8 +179,14 @@ export function PaddingControl({
             <InputPropertyNumber
               mode="fixed"
               type="number"
-              value={paddingValues.top}
-              placeholder="0"
+              value={
+                paddingValues.top === grida.mixed
+                  ? undefined
+                  : typeof paddingValues.top === "number"
+                    ? paddingValues.top
+                    : 0
+              }
+              placeholder={paddingValues.top === grida.mixed ? "mixed" : "0"}
               min={0}
               step={1}
               className="w-full h-7 rounded-none border-x-0"
@@ -130,8 +202,14 @@ export function PaddingControl({
             <InputPropertyNumber
               mode="fixed"
               type="number"
-              value={paddingValues.right}
-              placeholder="0"
+              value={
+                paddingValues.right === grida.mixed
+                  ? undefined
+                  : typeof paddingValues.right === "number"
+                    ? paddingValues.right
+                    : 0
+              }
+              placeholder={paddingValues.right === grida.mixed ? "mixed" : "0"}
               min={0}
               step={1}
               className="w-full h-7 rounded-none border-x-0"
@@ -147,8 +225,14 @@ export function PaddingControl({
             <InputPropertyNumber
               mode="fixed"
               type="number"
-              value={paddingValues.bottom}
-              placeholder="0"
+              value={
+                paddingValues.bottom === grida.mixed
+                  ? undefined
+                  : typeof paddingValues.bottom === "number"
+                    ? paddingValues.bottom
+                    : 0
+              }
+              placeholder={paddingValues.bottom === grida.mixed ? "mixed" : "0"}
               min={0}
               step={1}
               className="w-full h-7 rounded-none rounded-r-md border-l-0"

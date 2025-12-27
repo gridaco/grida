@@ -22,6 +22,10 @@ import {
 } from "./backends";
 import { domapi } from "./backends/dom";
 import { dq } from "@/grida-canvas/query";
+import {
+  resolveInsertTargetParent,
+  resolvePasteTargetParents,
+} from "@/grida-canvas/utils/insertion-targeting";
 import { io } from "@grida/io";
 import * as googlefonts from "@grida/fonts/google";
 import grida from "@grida/schema";
@@ -627,12 +631,19 @@ class EditorDocumentStore
         }
       | {
           document: grida.program.document.IPackedSceneDocument;
-        }
-  ) {
+        },
+    target: editor.NodeID | null
+  ): editor.NodeID[] {
+    const nodesBefore = new Set(Object.keys(this.mstate.document.nodes));
+
     this.dispatch({
       type: "insert",
       ...payload,
+      target,
     });
+
+    const nodesAfter = Object.keys(this.mstate.document.nodes);
+    return nodesAfter.filter((id) => !nodesBefore.has(id));
   }
 
   public loadScene(scene_id: string) {
@@ -708,10 +719,14 @@ class EditorDocumentStore
       result = result as grida.program.nodes.i.IPositioning &
         grida.program.nodes.i.IFixedDimension;
 
-      this.insert({
-        id: id,
-        prototype: result,
-      });
+      // Use explicit scene-level target for programmatic SVG node creation
+      this.insert(
+        {
+          id: id,
+          prototype: result,
+        },
+        this.mstate.scene_id ?? null
+      );
 
       return this.getNodeById<grida.program.nodes.ContainerNode>(id);
     } else {
@@ -723,60 +738,69 @@ class EditorDocumentStore
     image: grida.program.document.ImageRef
   ): NodeProxy<grida.program.nodes.ImageNode> {
     const id = this.idgen.next();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "image",
-        _$id: id,
-        src: image.url,
-        width: image.width,
-        height: image.height,
+    // Use explicit scene-level target for programmatic image node creation
+    this.insert(
+      {
+        id: id,
+        prototype: {
+          type: "image",
+          _$id: id,
+          src: image.url,
+          width: image.width,
+          height: image.height,
+        },
       },
-    });
+      this.mstate.scene_id ?? null
+    );
 
     return this.getNodeById(id);
   }
 
   public createTextNode(text = ""): NodeProxy<grida.program.nodes.TextNode> {
     const id = this.idgen.next();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "text",
-        _$id: id,
-        text: text,
-        width: "auto",
-        height: "auto",
-        fill: {
-          type: "solid",
-          color: kolor.colorformats.RGBA32F.BLACK,
-          active: true,
+    // Use explicit scene-level target for programmatic text node creation
+    this.insert(
+      {
+        id: id,
+        prototype: {
+          type: "text",
+          _$id: id,
+          text: text,
+          width: "auto",
+          height: "auto",
+          fill: {
+            type: "solid",
+            color: kolor.colorformats.RGBA32F.BLACK,
+            active: true,
+          },
         },
       },
-    });
+      this.mstate.scene_id ?? null
+    );
 
     return this.getNodeById(id);
   }
 
   public createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode> {
     const id = this.idgen.next();
-    this.dispatch({
-      type: "insert",
-      id: id,
-      prototype: {
-        type: "rectangle",
-        _$id: id,
-        width: 100,
-        height: 100,
-        fill: {
-          type: "solid",
-          color: kolor.colorformats.RGBA32F.BLACK,
-          active: true,
+    // Use explicit scene-level target for programmatic rectangle node creation
+    this.insert(
+      {
+        id: id,
+        prototype: {
+          type: "rectangle",
+          _$id: id,
+          width: 100,
+          height: 100,
+          fill: {
+            type: "solid",
+            color: kolor.colorformats.RGBA32F.BLACK,
+            active: true,
+          },
         },
       },
-    });
+      this.mstate.scene_id ?? null
+    );
 
     return this.getNodeById(id);
   }
@@ -891,26 +915,53 @@ class EditorDocumentStore
     });
   }
 
-  public paste() {
+  public paste(target: editor.NodeID | editor.NodeID[]): editor.NodeID[] {
+    const nodesBefore = new Set(Object.keys(this.mstate.document.nodes));
+
     this.dispatch({
       type: "paste",
+      target,
     });
+
+    const nodesAfter = Object.keys(this.mstate.document.nodes);
+    return nodesAfter.filter((id) => !nodesBefore.has(id));
   }
 
+  /**
+   * TODO: Refactor this method to either:
+   * 1. Rename to `insertVector` - since this method directly inserts a vector network
+   *    without relying on memory clipboard data (unlike `paste()` which uses `state.user_clipboard`).
+   *    This would be more accurate naming and consistent with `insert()`.
+   * 2. OR make it use memory clipboard payload - store the vector network in `state.user_clipboard`
+   *    and use the standard `paste()` flow, making it consistent with other paste operations.
+   */
   public pasteVector(vector_network: vn.VectorNetwork): void {
-    this.dispatch({ type: "paste", vector_network });
+    const scene_id = this.mstate.scene_id;
+    if (!scene_id) {
+      return;
+    }
+    this.dispatch({
+      type: "paste-vector-network",
+      vector_network,
+      target: scene_id,
+    });
   }
 
   public pastePayload(payload: io.clipboard.ClipboardPayload): boolean {
     switch (payload.type) {
       case "prototypes": {
+        // Capture selection at start to prevent nesting when looping
+        const currentSelection = [...this.mstate.selection];
+        const target = resolveInsertTargetParent(this.mstate, currentSelection);
+
         payload.prototypes.forEach((p) => {
           const sub =
             grida.program.nodes.factory.create_packed_scene_document_from_prototype(
               p,
               () => this.idgen.next()
             );
-          this.insert({ document: sub });
+          // Use explicit target to prevent nesting - all prototypes go to same parent
+          this.insert({ document: sub }, target);
         });
         return true;
       }
@@ -1204,15 +1255,18 @@ class EditorDocumentStore
 
   public insertNode(prototype: grida.program.nodes.NodePrototype) {
     const id = this.idgen.next();
-    this.dispatch({
-      type: "insert",
-      id,
-      prototype,
-    });
+    // Use explicit scene-level target for programmatic node insertion
+    this.insert(
+      {
+        id,
+        prototype,
+      },
+      this.mstate.scene_id ?? null
+    );
     return id;
   }
 
-  public deleteNode(target: "selection" | editor.NodeID) {
+  public delete(target: editor.NodeID[]): void {
     this.dispatch({
       type: "delete",
       target,
@@ -1234,9 +1288,9 @@ class EditorDocumentStore
   }
 
   public order(
-    target: "selection" | editor.NodeID,
-    order: "back" | "front" | number
-  ) {
+    target: editor.NodeID[],
+    order: "back" | "front" | "forward" | "backward" | number
+  ): void {
     this.dispatch({
       type: "order",
       target,
@@ -1458,11 +1512,23 @@ class EditorDocumentStore
     });
   }
 
-  public ungroup(target: "selection" | editor.NodeID[]) {
+  public ungroup(target: editor.NodeID): editor.NodeID[][] {
+    // Validate and track children before ungrouping (helper also validates)
+    const node = this.mstate.document.nodes[target];
+    if (!node || (node.type !== "group" && node.type !== "boolean")) {
+      // Not a group, reject/ignore - return empty array
+      return [];
+    }
+
+    const childrenBefore = this.mstate.document.links[target] || [];
+
     this.dispatch({
       type: "ungroup",
       target,
     });
+
+    // Return children as a single chunk (chunked by original group)
+    return [childrenBefore];
   }
 
   // #region ISchemaActions implementation
@@ -3058,12 +3124,14 @@ export class Editor
         }
       | {
           document: grida.program.document.IPackedSceneDocument;
-        }
-  ): void {
-    this.doc.insert(payload);
+        },
+    target: editor.NodeID | null
+  ): editor.NodeID[] {
+    const insertedNodeIds = this.doc.insert(payload, target);
     for (const font of this.doc.state.fontfaces) {
       this.loadFontSync(font);
     }
+    return insertedNodeIds;
   }
 
   async createImageAsync(
@@ -3710,6 +3778,87 @@ export class EditorSurface
     } else {
       this.surfaceTryEnterContentEditMode();
     }
+  }
+
+  /**
+   * Create a new scene with UX customizations.
+   *
+   * This method is almost identical to the core {@link EditorDocumentStore.createScene},
+   * but includes UX-specific customizations such as inheriting the background color
+   * from the current scene or fallback scenes.
+   *
+   * **Background Color Inheritance:**
+   * - If `scene.background_color` is provided, it will be used
+   * - Otherwise, inherits from the current scene's background color
+   * - If current scene has no background, falls back to any other scene's background
+   * - If no scene has a background, defaults to WHITESMOKE (#F5F5F5)
+   *
+   * @param scene - Optional scene initialization data
+   *
+   * @example
+   * ```typescript
+   * // Create a new scene with default UX customizations
+   * editor.surface.surfaceCreateScene();
+   *
+   * // Create a scene with custom name and background
+   * editor.surface.surfaceCreateScene({
+   *   name: "My Scene",
+   *   background_color: { r: 1, g: 0, b: 0, a: 1 }
+   * });
+   * ```
+   */
+  public surfaceCreateScene(scene?: grida.program.document.SceneInit) {
+    // If background_color was explicitly provided, use core API directly
+    if (scene?.background_color) {
+      this._editor.doc.createScene(scene);
+      return;
+    }
+
+    // Get the current scene's background before creating the new scene
+    const current_scene_id = this.state.scene_id;
+    const current_scene = current_scene_id
+      ? (this.state.document.nodes[current_scene_id] as
+          | grida.program.nodes.SceneNode
+          | undefined)
+      : undefined;
+    const current_background = current_scene?.background_color;
+
+    // First, create the scene using the core API
+    this._editor.doc.createScene(scene);
+
+    // Get the newly created scene ID (it becomes the current scene)
+    const new_scene_id = this.state.scene_id;
+    if (!new_scene_id) {
+      return;
+    }
+
+    // Get background color with fallback: current scene -> fallback scene -> default
+    let background_color: grida.program.document.ISceneBackground["background_color"];
+
+    // Use the previous current scene's background if available
+    if (current_background) {
+      background_color = current_background;
+    } else {
+      // Try any other scene (fallback)
+      for (const fallback_scene_id of this.state.document.scenes_ref) {
+        if (fallback_scene_id === new_scene_id) continue;
+        const fallback_scene = this.state.document.nodes[fallback_scene_id] as
+          | grida.program.nodes.SceneNode
+          | undefined;
+        if (fallback_scene?.background_color) {
+          background_color = fallback_scene.background_color;
+          break;
+        }
+      }
+    }
+
+    // Default to WHITESMOKE if no scene has a background color
+    if (!background_color) {
+      background_color = kolor.colorformats.RGBA32F.WHITESMOKE;
+    }
+
+    // Update the newly created scene's background
+    this._editor.doc.changeSceneBackground(new_scene_id, background_color);
   }
 
   public surfaceHoverNode(node_id: string, event: "enter" | "leave") {
@@ -4439,12 +4588,231 @@ export class EditorSurface
     this._editor.doc.cut("selection");
   }
 
+  /**
+   * User-facing paste operation that handles UX concerns.
+   *
+   * This method:
+   * - Captures current selection at invocation time (bounded context)
+   * - Resolves target parents from selection using UX logic:
+   *   - If container selected → paste as child
+   *   - If non-container selected → paste as sibling
+   *   - If no selection → paste to scene level
+   * - Calls core paste() with explicit target
+   * - Updates selection to newly pasted nodes
+   *
+   * This is the primary method for user-initiated paste operations (keyboard shortcuts, menu items, etc.).
+   *
+   * @remarks
+   * - Selection is captured at invocation time, so multiple pastes don't cause nesting
+   * - Selection is updated after paste to select the newly inserted nodes
+   * - All UX logic (selection resolution, selection update) is handled here, not in the reducer
+   * - For programmatic paste operations, use `editor.commands.paste(target)` directly
+   *
+   * @example
+   * ```typescript
+   * // Called from keyboard shortcut (Cmd+V)
+   * editor.surface.a11yPaste();
+   * ```
+   */
   public a11yPaste() {
-    this._editor.doc.paste();
+    // Capture current selection at invocation time (bounded context)
+    const currentSelection = [...this.state.selection];
+    const clipboard = this.state.user_clipboard;
+
+    if (!clipboard || clipboard.type !== "prototypes") {
+      // No clipboard or wrong type - delegate to core paste which will handle other cases
+      // For scene-level paste with no selection
+      const scene_id = this.state.scene_id;
+      if (scene_id) {
+        this._editor.doc.paste(scene_id);
+      }
+      return;
+    }
+
+    const copiedIds = clipboard.ids;
+
+    // Resolve target parents from current selection using helper function
+    let targetParents: Array<string | null>;
+
+    if (currentSelection.length === 0) {
+      // No selection - paste to scene level
+      const scene_id = this.state.scene_id;
+      targetParents = scene_id ? [scene_id] : [null];
+    } else {
+      // Use helper to resolve target parents from selection
+      targetParents = resolvePasteTargetParents(
+        this.state,
+        currentSelection,
+        copiedIds
+      );
+
+      // If no valid targets resolved, fallback to scene level
+      if (targetParents.length === 0) {
+        const scene_id = this.state.scene_id;
+        targetParents = scene_id ? [scene_id] : [null];
+      }
+    }
+
+    // Validate that we can resolve valid targets (reject invalid input)
+    // If targetParents contains null, we must have a valid scene_id to convert it
+    const scene_id = this.state.scene_id;
+    const hasNullTargets = targetParents.some((id) => id === null);
+    if (hasNullTargets && !scene_id) {
+      // Cannot paste: no valid target parent and no scene_id available
+      return;
+    }
+
+    // Normalize to single target or array (core paste accepts both)
+    // Convert null to scene_id (we've validated scene_id exists above)
+    const target: string | string[] =
+      targetParents.length === 1
+        ? (targetParents[0] ?? scene_id!)
+        : targetParents.map((id) => id ?? scene_id!);
+
+    // Call core paste with explicit target - it returns newly inserted node IDs
+    const pastedNodeIds = this._editor.doc.paste(target);
+
+    // Update selection to newly pasted nodes
+    // Note: pastedNodeIds includes all newly created nodes, but we want to select only top-level ones
+    // For now, select all - this can be refined later if needed
+    if (pastedNodeIds.length > 0) {
+      this._editor.doc.select(pastedNodeIds, "reset");
+    }
+  }
+
+  public insert(
+    payload: editor.api.InsertPayload | editor.api.InsertPayload[]
+  ): editor.NodeID[] {
+    const currentSelection = [...this.state.selection];
+    const target = resolveInsertTargetParent(this.state, currentSelection);
+
+    const payloads = Array.isArray(payload) ? payload : [payload];
+    const allInsertedNodeIds: editor.NodeID[] = [];
+
+    // Insert all payloads using the same target (prevents nesting)
+    // Use editor.insert() instead of doc.insert() to handle font sync
+    for (const p of payloads) {
+      const insertedNodeIds = this._editor.insert(p, target);
+      allInsertedNodeIds.push(...insertedNodeIds);
+    }
+
+    // Select all newly inserted nodes as a group
+    if (allInsertedNodeIds.length > 0) {
+      this._editor.doc.select(allInsertedNodeIds, "reset");
+    }
+
+    return allInsertedNodeIds;
+  }
+
+  public ungroup(target: editor.NodeID[]): editor.NodeID[][] {
+    // Filter to only group and boolean nodes
+    const groupNodes = target.filter((nodeId) => {
+      const node = this.state.document.nodes[nodeId];
+      return node && (node.type === "group" || node.type === "boolean");
+    });
+
+    if (groupNodes.length === 0) {
+      return [];
+    }
+
+    // Ungroup each group node and collect chunks (preserving which children came from which group)
+    const allChunks: editor.NodeID[][] = [];
+    for (const groupId of groupNodes) {
+      const chunks = this._editor.doc.ungroup(groupId);
+      allChunks.push(...chunks);
+    }
+
+    // Update selection to all ungrouped children (flatten chunks for selection)
+    const allUngroupedChildren = allChunks.flat();
+    if (allUngroupedChildren.length > 0) {
+      this._editor.doc.select(allUngroupedChildren, "reset");
+    }
+
+    return allChunks;
+  }
+
+  public order(
+    order: "front" | "back" | "forward" | "backward" | number
+  ): void {
+    const currentSelection = [...this.state.selection];
+    if (currentSelection.length > 0) {
+      this._editor.doc.order(currentSelection, order);
+    }
   }
 
   public a11yDelete() {
-    this.dispatch({ type: "a11y/delete" });
+    const state = this.state;
+    const target_node_ids = state.selection;
+
+    // Handle content edit modes first
+    if (state.content_edit_mode?.type === "paint/gradient") {
+      const mode =
+        state.content_edit_mode as editor.state.PaintGradientContentEditMode;
+      const { node_id, selected_stop, paint_target, paint_index } = mode;
+
+      // Only delete if there are more than 2 stops (minimum required for gradient)
+      const node = dq.__getNodeById(state, node_id);
+      if (node) {
+        const paintTarget = paint_target ?? "fill";
+        const { paints, resolvedIndex } = editor.resolvePaints(
+          node as grida.program.nodes.UnknwonNode,
+          paintTarget,
+          paint_index ?? 0
+        );
+        const targetPaint = paints[resolvedIndex];
+
+        if (targetPaint && cg.isGradientPaint(targetPaint)) {
+          const gradient = targetPaint as cg.GradientPaint;
+          if (gradient.stops.length > 2) {
+            this.dispatch({
+              type: "paint/gradient/delete-stop",
+              target: {
+                node_id,
+                stop: selected_stop,
+                paint_index: paint_index ?? 0,
+                paint_target: paintTarget,
+              },
+            });
+            return;
+          }
+        }
+      }
+    }
+
+    if (state.content_edit_mode?.type === "width") {
+      const mode =
+        state.content_edit_mode as editor.state.VariableWidthContentEditMode;
+      const { node_id, variable_width_selected_stop, variable_width_profile } =
+        mode;
+
+      // Only delete if there's a selected stop and more than 2 stops
+      if (
+        variable_width_selected_stop !== null &&
+        variable_width_profile.stops.length > 2
+      ) {
+        this._editor.doc.deleteVariableWidthStop(
+          node_id,
+          variable_width_selected_stop
+        );
+        return;
+      }
+    }
+
+    if (state.content_edit_mode?.type === "vector") {
+      const mode =
+        state.content_edit_mode as editor.state.VectorContentEditMode;
+      const { node_id } = mode;
+
+      this.dispatch({
+        type: "vector/delete-selection",
+        target: { node_id },
+      });
+      return;
+    }
+
+    // Default: delete selected nodes
+    // Scene deletion protection is handled by __self_delete_nodes with default 'on'
+    this._editor.doc.delete(target_node_ids);
   }
 
   public a11ySetClipboardColor(color: cg.RGBA32F) {

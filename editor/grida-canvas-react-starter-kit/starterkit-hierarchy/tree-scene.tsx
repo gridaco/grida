@@ -18,7 +18,6 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/components/lib/utils";
-import { toReversedCopy } from "./utils";
 import { NameInput } from "./tree-item-name-input";
 import grida from "@grida/schema";
 
@@ -136,7 +135,7 @@ export function ScenesList() {
       },
       getChildren: (itemId) => {
         if (itemId === "<document>") {
-          return toReversedCopy(scenes.map((s) => s.id));
+          return scenes.map((s) => s.id);
         }
         return [];
       },

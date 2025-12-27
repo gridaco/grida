@@ -9,20 +9,17 @@ import type {
   NodeToggleUnderlineAction,
   NodeToggleLineThroughAction,
   EditorSelectGradientStopAction,
+  EditorDeleteGradientStopAction,
   EditorVectorBendOrClearCornerAction,
   EditorVariableWidthSelectStopAction,
   EditorVariableWidthDeleteStopAction,
   EditorVariableWidthAddStopAction,
+  EditorVectorDeleteSelectionAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import assert from "assert";
-import {
-  resolvePaints,
-  getTargetPaint,
-  updateTargetPaint,
-} from "../utils/paint-resolution";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import updateNodeTransform from "./node-transform.reducer";
@@ -49,7 +46,6 @@ import { self_apply_scale_by_factor } from "./methods/scale";
 import {
   getPackedSubtreeBoundingRect,
   getViewportAwareDelta,
-  hitTestNestedInsertionTarget,
 } from "@/grida-canvas/utils/insertion";
 import {
   self_wrapNodes,
@@ -83,11 +79,6 @@ const PLACEMENT_ANCHORS_PADDING = 40;
  * the inset is inteded to be applied **before** being converted to canvas space (for better visual consistency)
  */
 const PLACEMENT_VIEWPORT_INSET = 40;
-
-/**
- * Maximum depth of hit-tested results considered for nested insertion.
- */
-const INSERTION_HIT_TEST_MAX_DEPTH = 8;
 
 /**
  * Helper to get a SceneNode from the document.
@@ -342,7 +333,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const { node_id, paint_target, paint_index } = state.content_edit_mode;
         const node = dq.__getNodeById(state, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
-        const { paints, resolvedIndex } = resolvePaints(
+        const { paints, resolvedIndex } = editor.resolvePaints(
           node as grida.program.nodes.UnknwonNode,
           paint_target,
           paint_index
@@ -485,105 +476,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
         });
       }
-      if (action.vector_network) {
-        if (state.content_edit_mode?.type === "vector") {
-          const net = action.vector_network;
-          return updateState(state, (draft) => {
-            const mode =
-              draft.content_edit_mode as editor.state.VectorContentEditMode;
-            const node = dq.__getNodeById(
-              draft,
-              mode.node_id
-            ) as grida.program.nodes.VectorNode;
-            const vertex_offset = node.vector_network.vertices.length;
-            const segment_offset = node.vector_network.segments.length;
-
-            let net_to_union = net;
-            if (mode.clipboard && mode.clipboard_node_position) {
-              const delta: [number, number] = [
-                mode.clipboard_node_position[0] - (node.left ?? 0),
-                mode.clipboard_node_position[1] - (node.top ?? 0),
-              ];
-              if (JSON.stringify(mode.clipboard) === JSON.stringify(net)) {
-                net_to_union = vn.VectorNetworkEditor.translate(net, delta);
-              }
-            }
-
-            node.vector_network = vn.VectorNetworkEditor.union(
-              node.vector_network,
-              net_to_union,
-              null
-            );
-            normalizeVectorNodeBBox(node);
-            const new_vertices = Array.from(
-              { length: net.vertices.length },
-              (_, i) => i + vertex_offset
-            );
-            const new_segments = Array.from(
-              { length: net.segments.length },
-              (_, i) => i + segment_offset
-            );
-            mode.selection = {
-              selected_vertices: new_vertices,
-              selected_segments: new_segments,
-              selected_tangents: [],
-            };
-            mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
-              node.vector_network,
-              {
-                selected_vertices: new_vertices,
-                selected_segments: new_segments,
-                selected_tangents: [],
-              }
-            );
-            mode.a_point = getVectorSelectionStartPoint({
-              selected_vertices: new_vertices,
-              selected_tangents: [],
-            });
-            mode.clipboard = net;
-          });
-        }
-
-        return updateState(state, (draft) => {
-          const net = action.vector_network!;
-          const id = context.idgen.next();
-          const black = kolor.colorformats.RGBA32F.BLACK;
-          const node: grida.program.nodes.VectorNode = {
-            type: "vector",
-            name: "vector",
-            id,
-            active: true,
-            locked: false,
-            position: "absolute",
-            left: 0,
-            top: 0,
-            opacity: 1,
-            width: 0,
-            height: 0,
-            rotation: 0,
-            z_index: 0,
-            stroke: { type: "solid", color: black, active: true },
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            stroke_width: 1,
-            vector_network: net,
-          };
-
-          normalizeVectorNodeBBox(node);
-
-          const valid_target_selection = state.selection.filter((node_id) => {
-            const n = dq.__getNodeById(draft, node_id);
-            return n.type === "container";
-          });
-
-          const target = valid_target_selection[0] ?? null;
-
-          self_try_insert_node(draft, target, node);
-
-          self_select_tool(draft, { type: "cursor" }, context);
-          self_selectNode(draft, "reset", node.id);
-        });
-      }
 
       if (state.content_edit_mode?.type === "vector") {
         const net = state.content_edit_mode.clipboard;
@@ -644,66 +536,26 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       if (!state.user_clipboard) break;
       if (state.user_clipboard.type !== "prototypes") break;
-      const { user_clipboard, selection } = state;
+      if (!action.target) break;
+      const { user_clipboard } = state;
       const { ids, prototypes } = user_clipboard;
 
+      const target_parents: string[] = Array.isArray(action.target)
+        ? action.target
+        : [action.target];
+
+      const { width, height } = context.viewport;
+      const _inset_rect = cmath.rect.inset(
+        { x: 0, y: 0, width, height },
+        PLACEMENT_VIEWPORT_INSET
+      );
+      const viewport_rect = cmath.rect.transform(
+        _inset_rect,
+        cmath.transform.invert(state.transform)
+      );
+
       return updateState(state, (draft) => {
-        const new_top_ids: string[] = [];
-
-        // Find target parents for each selected node:
-        // - If selected node is a container -> paste as child (target parent = node itself)
-        // - If selected node is not a container -> paste as sibling (target parent = node's parent)
-        // - Target parent must be a container or null (scene)
-        // - Target parent must not be one of the copied nodes
-        //
-        // KNOWN LIMITATION:
-        // When no selection exists, hit test is used to find parent (see below).
-        // However, after first paste, newly pasted nodes become selected, so subsequent
-        // pastes use this selection-based logic instead of hit test. This means position
-        // adjustment for hit-tested parents only applies to the first paste in a sequence.
-        const target_parents = Array.from(
-          new Set(
-            selection
-              .map((node_id) => {
-                const node = dq.__getNodeById(draft, node_id);
-
-                // If node is a container, use it as target parent (paste as child)
-                if (node.type === "container") {
-                  return node_id;
-                }
-
-                // Otherwise, use its parent as target parent (paste as sibling)
-                const parent_id = dq.getParentId(draft.document_ctx, node_id);
-
-                // Parent can be null (scene) or a container
-                if (!parent_id) return null;
-
-                const parent = dq.__getNodeById(draft, parent_id);
-                // Only return valid container parents
-                return parent?.type === "container" ? parent_id : null;
-              })
-              .filter((target_id) => {
-                // Ensure target parent is not one of the originals
-                if (target_id && ids.includes(target_id)) return false;
-                return true;
-              })
-          )
-        );
-
-        const targets: Array<string | null> =
-          target_parents.length > 0 ? target_parents : [null];
-
-        const { width, height } = context.viewport;
-        const _inset_rect = cmath.rect.inset(
-          { x: 0, y: 0, width, height },
-          PLACEMENT_VIEWPORT_INSET
-        );
-        const viewport_rect = cmath.rect.transform(
-          _inset_rect,
-          cmath.transform.invert(state.transform)
-        );
-
-        for (const target of targets) {
+        for (const target_parent of target_parents) {
           for (const prototype of prototypes) {
             const sub =
               grida.program.nodes.factory.create_packed_scene_document_from_prototype(
@@ -725,44 +577,121 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               box.y += delta[1];
             }
 
-            let parent = target;
-            let parent_was_hit_tested = false;
-            if (!parent) {
-              parent = hitTestNestedInsertionTarget(
-                box,
-                context.geometry,
-                (id) => {
-                  // Exclude originals from hit test
-                  if (ids.includes(id)) return false;
-                  return dq.__getNodeById(draft, id).type === "container";
-                },
-                INSERTION_HIT_TEST_MAX_DEPTH
-              );
-              parent_was_hit_tested = parent !== null;
-            }
+            const parent = target_parent;
 
-            // If parent was found via hit test, adjust positions to be relative to parent
-            // NOTE: This only applies when target parent is null (no selection).
-            // After first paste, selection changes, so subsequent pastes won't hit this path.
-            if (parent_was_hit_tested && parent) {
+            if (parent) {
               const parent_rect =
-                context.geometry.getNodeAbsoluteBoundingRect(parent)!;
-              sub.scene.children_refs.forEach((node_id) => {
-                const node = sub.nodes[node_id];
-                if ("position" in node && node.position === "absolute") {
-                  node.left = (node.left ?? 0) - parent_rect.x;
-                  node.top = (node.top ?? 0) - parent_rect.y;
-                }
-              });
+                context.geometry.getNodeAbsoluteBoundingRect(parent);
+              if (parent_rect) {
+                sub.scene.children_refs.forEach((node_id) => {
+                  const node = sub.nodes[node_id];
+                  if ("position" in node && node.position === "absolute") {
+                    node.left = (node.left ?? 0) - parent_rect.x;
+                    node.top = (node.top ?? 0) - parent_rect.y;
+                  }
+                });
+              }
             }
 
-            const top_ids = self_insertSubDocument(draft, parent, sub);
-            new_top_ids.push(...top_ids);
+            self_insertSubDocument(draft, parent, sub);
           }
         }
+      });
+    }
+    case "paste-vector-network": {
+      const { vector_network, target } = action;
+
+      if (state.content_edit_mode?.type === "vector") {
+        const net = vector_network;
+        return updateState(state, (draft) => {
+          const mode =
+            draft.content_edit_mode as editor.state.VectorContentEditMode;
+          const node = dq.__getNodeById(
+            draft,
+            mode.node_id
+          ) as grida.program.nodes.VectorNode;
+          const vertex_offset = node.vector_network.vertices.length;
+          const segment_offset = node.vector_network.segments.length;
+
+          let net_to_union = net;
+          if (mode.clipboard && mode.clipboard_node_position) {
+            const delta: [number, number] = [
+              mode.clipboard_node_position[0] - (node.left ?? 0),
+              mode.clipboard_node_position[1] - (node.top ?? 0),
+            ];
+            if (JSON.stringify(mode.clipboard) === JSON.stringify(net)) {
+              net_to_union = vn.VectorNetworkEditor.translate(net, delta);
+            }
+          }
+
+          node.vector_network = vn.VectorNetworkEditor.union(
+            node.vector_network,
+            net_to_union,
+            null
+          );
+          normalizeVectorNodeBBox(node);
+          const new_vertices = Array.from(
+            { length: net.vertices.length },
+            (_, i) => i + vertex_offset
+          );
+          const new_segments = Array.from(
+            { length: net.segments.length },
+            (_, i) => i + segment_offset
+          );
+          mode.selection = {
+            selected_vertices: new_vertices,
+            selected_segments: new_segments,
+            selected_tangents: [],
+          };
+          mode.selection_neighbouring_vertices = getUXNeighbouringVertices(
+            node.vector_network,
+            {
+              selected_vertices: new_vertices,
+              selected_segments: new_segments,
+              selected_tangents: [],
+            }
+          );
+          mode.a_point = getVectorSelectionStartPoint({
+            selected_vertices: new_vertices,
+            selected_tangents: [],
+          });
+          mode.clipboard = net;
+        });
+      }
+
+      return updateState(state, (draft) => {
+        const net = vector_network;
+        const id = context.idgen.next();
+        const black = kolor.colorformats.RGBA32F.BLACK;
+        const node: grida.program.nodes.VectorNode = {
+          type: "vector",
+          name: "vector",
+          id,
+          active: true,
+          locked: false,
+          position: "absolute",
+          left: 0,
+          top: 0,
+          opacity: 1,
+          width: 0,
+          height: 0,
+          rotation: 0,
+          z_index: 0,
+          stroke: { type: "solid", color: black, active: true },
+          stroke_cap: "butt",
+          stroke_join: "miter",
+          stroke_width: 1,
+          vector_network: net,
+        };
+
+        normalizeVectorNodeBBox(node);
+
+        const target_parent = target;
+
+        self_try_insert_node(draft, target_parent, node);
 
         self_select_tool(draft, { type: "cursor" }, context);
-        self_selectNode(draft, "reset", ...new_top_ids);
+        self_selectNode(draft, "reset", node.id);
       });
     }
     case "duplicate": {
@@ -796,89 +725,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     case "delete": {
-      const { target } = action;
-      const target_node_ids =
-        target === "selection" ? state.selection : [target];
+      const target_node_ids = action.target;
 
-      return updateState(state, (draft) => {
-        __self_delete_nodes(draft, target_node_ids, "on");
-      });
-    }
-    case "a11y/delete": {
-      const target_node_ids = state.selection;
-
-      if (state.content_edit_mode?.type === "paint/gradient") {
-        const { node_id } = state.content_edit_mode;
-
-        return updateState(state, (draft) => {
-          const mode =
-            draft.content_edit_mode as editor.state.PaintGradientContentEditMode;
-          const node = dq.__getNodeById(draft, node_id)!;
-          const paintTarget = mode.paint_target ?? "fill";
-          const { paints, resolvedIndex } = resolvePaints(
-            node as grida.program.nodes.UnknwonNode,
-            paintTarget,
-            mode.paint_index ?? 0
-          );
-          const target = paints[resolvedIndex];
-
-          if (target && cg.isGradientPaint(target)) {
-            const gradient = target as cg.GradientPaint;
-            if (gradient.stops.length > 2) {
-              gradient.stops.splice(mode.selected_stop, 1);
-              mode.selected_stop = Math.min(
-                mode.selected_stop,
-                gradient.stops.length - 1
-              );
-            }
-
-            // Update the paint in the array
-            if (paints.length > 0) {
-              paints[resolvedIndex] = gradient;
-              // Update singular property for legacy compatibility
-              const singularKey = paintTarget === "stroke" ? "stroke" : "fill";
-              (node as any)[singularKey] = paints[0];
-            }
-          }
-        });
-      }
-
-      if (state.content_edit_mode?.type === "width") {
-        const { node_id } = state.content_edit_mode;
-        const mode =
-          state.content_edit_mode as editor.state.VariableWidthContentEditMode;
-
-        // Only delete if there's a selected stop and more than 2 stops
-        if (
-          mode.variable_width_selected_stop !== null &&
-          mode.variable_width_profile.stops.length > 2
-        ) {
-          // Dispatch the existing variable-width/delete-stop action
-          return documentReducer(
-            state,
-            {
-              type: "variable-width/delete-stop",
-              target: {
-                node_id,
-                stop: mode.variable_width_selected_stop,
-              },
-            },
-            context
-          );
-        }
-      }
-
-      if (state.content_edit_mode?.type === "vector") {
-        return updateState(state, (draft) => {
-          __self_delete_vector_network_selection(
-            draft,
-            draft.content_edit_mode as editor.state.VectorContentEditMode
-          );
-        });
-      }
-
-      // a11y/bug prevent scene from being deleted with a11y (DELETE)
-      // Scene deletion protection is handled by __self_delete_nodes with default 'on'
       return updateState(state, (draft) => {
         __self_delete_nodes(draft, target_node_ids, "on");
       });
@@ -954,49 +802,34 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       });
 
-      const placedRect = {
-        x: box.x + placement.x,
-        y: box.y + placement.y,
-        width: box.width,
-        height: box.height,
-      };
+      const parent: string | null = action.target;
 
-      let parent: string | null = null;
-      if (state.selection.length > 0) {
-        const first = state.selection[0];
-        const selected = dq.__getNodeById(state, first);
-        parent =
-          selected.type === "container"
-            ? first
-            : dq.getParentId(state.document_ctx, first);
-      }
-      if (!parent) {
-        parent = hitTestNestedInsertionTarget(
-          placedRect,
-          context.geometry,
-          (id) => dq.__getNodeById(state, id).type === "container",
-          INSERTION_HIT_TEST_MAX_DEPTH
-        );
+      if (parent) {
+        const parent_rect =
+          context.geometry.getNodeAbsoluteBoundingRect(parent);
+        if (parent_rect) {
+          sub.scene.children_refs.forEach((node_id) => {
+            const node = sub.nodes[node_id];
+            if ("position" in node && node.position === "absolute") {
+              node.left = (node.left ?? 0) - parent_rect.x;
+              node.top = (node.top ?? 0) - parent_rect.y;
+            }
+          });
+        }
       }
 
       return updateState(state, (draft) => {
-        const new_top_ids = self_insertSubDocument(draft, parent, sub);
-
-        self_select_tool(draft, { type: "cursor" }, context);
-        self_selectNode(draft, "reset", ...new_top_ids);
+        self_insertSubDocument(draft, parent, sub);
       });
     }
     case "order": {
-      const { target, order } = action;
-      const target_node_ids =
-        target === "selection" ? state.selection : [target];
+      const { target: target_node_ids, order } = action;
 
       return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
           __self_order(draft, node_id, order);
         }
       });
-      break;
     }
     case "mv": {
       const { source, target, index } = action;
@@ -1067,7 +900,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             } = state.content_edit_mode;
             return updateState(state, (draft) => {
               const node = dq.__getNodeById(draft, node_id);
-              const { paints, resolvedIndex } = resolvePaints(
+              const { paints, resolvedIndex } = editor.resolvePaints(
                 node as grida.program.nodes.UnknwonNode,
                 paint_target,
                 paint_index
@@ -1492,6 +1325,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               padding_right: children.length === 1 ? 16 : 0,
               padding_bottom: children.length === 1 ? 16 : 0,
               padding_left: children.length === 1 ? 16 : 0,
+              // corner radius
+              corner_radius: 0,
+              rectangular_corner_radius_top_left: 0,
+              rectangular_corner_radius_top_right: 0,
+              rectangular_corner_radius_bottom_right: 0,
+              rectangular_corner_radius_bottom_left: 0,
               // children (empty when init)
               children: [],
               // position
@@ -1569,12 +1408,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     }
     case "ungroup": {
       const { target } = action;
-      const target_node_ids = target === "selection" ? state.selection : target;
 
       return updateState(state, (draft) => {
-        self_ungroup(draft, target_node_ids, context.geometry);
+        self_ungroup(draft, target, context.geometry);
       });
-      break;
     }
     case "group-op": {
       const { target, op } = action;
@@ -1866,6 +1703,22 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       });
     }
+    case "vector/delete-selection": {
+      return updateState(state, (draft) => {
+        const { target } = <EditorVectorDeleteSelectionAction>action;
+        const { node_id } = target;
+
+        if (
+          draft.content_edit_mode?.type === "vector" &&
+          draft.content_edit_mode.node_id === node_id
+        ) {
+          __self_delete_vector_network_selection(
+            draft,
+            draft.content_edit_mode as editor.state.VectorContentEditMode
+          );
+        }
+      });
+    }
     case "vector/update-hovered-control": {
       return updateState(state, (draft) => {
         if (draft.content_edit_mode?.type === "vector") {
@@ -1930,6 +1783,45 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           }
           draft.content_edit_mode.paint_target =
             paint_target ?? draft.content_edit_mode.paint_target ?? "fill";
+        }
+      });
+    }
+    case "paint/gradient/delete-stop": {
+      return updateState(state, (draft) => {
+        const { target } = <EditorDeleteGradientStopAction>action;
+        const { node_id, stop, paint_index, paint_target } = target;
+        const node = dq.__getNodeById(draft, node_id)!;
+        const paintTarget = paint_target ?? "fill";
+        const { paints, resolvedIndex } = editor.resolvePaints(
+          node as grida.program.nodes.UnknwonNode,
+          paintTarget,
+          paint_index ?? 0
+        );
+        const targetPaint = paints[resolvedIndex];
+
+        if (targetPaint && cg.isGradientPaint(targetPaint)) {
+          const gradient = targetPaint as cg.GradientPaint;
+          if (gradient.stops.length > 2) {
+            gradient.stops.splice(stop, 1);
+
+            // Update selected_stop if in content edit mode
+            if (draft.content_edit_mode?.type === "paint/gradient") {
+              const mode =
+                draft.content_edit_mode as editor.state.PaintGradientContentEditMode;
+              mode.selected_stop = Math.min(
+                mode.selected_stop,
+                gradient.stops.length - 1
+              );
+            }
+          }
+
+          // Update the paint in the array
+          if (paints.length > 0) {
+            paints[resolvedIndex] = gradient;
+            // Update singular property for legacy compatibility
+            const singularKey = paintTarget === "stroke" ? "stroke" : "fill";
+            (node as any)[singularKey] = paints[0];
+          }
         }
       });
     }

@@ -321,7 +321,11 @@ pub fn boolean_operation_path(
                         Node::Image(n) => Node::Image(n.clone()),
                         Node::Container(n) => Node::Container(n.clone()),
                         Node::Error(n) => Node::Error(n.clone()),
-                        _ => return None, // Non-shape nodes
+                        // TODO: Support Group nodes as children of boolean operations.
+                        // Currently, boolean operations like `boolop(group(a, b), c)` are not supported.
+                        // When a Group is encountered, this function returns None, causing the boolean
+                        // operation to fail rendering.
+                        _ => return None, // Non-shape nodes (including Group)
                     };
                     build_shape(&intrinsic, &bounds).to_path()
                 }

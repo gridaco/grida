@@ -7,7 +7,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/components/lib/utils";
-import { ColorPicker32F } from "./color-picker";
+import { ColorPicker32FWithOptions } from "./color-picker";
 import RGBHexInput from "./utils/hex";
 import { useNumberInput } from "@grida/number-input/react";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
@@ -166,7 +166,10 @@ export function RGBA32FColorControl({
         sideOffset={16}
         className="p-0"
       >
-        <ColorPicker32F color={value} onColorChange={onValueChange} />
+        <ColorPicker32FWithOptions
+          color={value}
+          onColorChange={onValueChange}
+        />
       </PopoverContent>
     </Popover>
   );

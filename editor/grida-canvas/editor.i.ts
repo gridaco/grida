@@ -136,6 +136,53 @@ export namespace editor {
   export type NodeID = grida.program.nodes.NodeID;
 
   /**
+   * Resolves paint arrays and indices for a given node and target
+   *
+   * @param node - The node containing paint properties (supports all node types and Immer drafts)
+   * @param target - Whether to target "fill" or "stroke" paints
+   * @param paintIndex - The desired paint index (defaults to 0)
+   * @returns Object containing resolved paints array and valid index
+   */
+  export function resolvePaints(
+    node: grida.program.nodes.UnknwonNode,
+    target: "fill" | "stroke",
+    paintIndex: number = 0
+  ): { paints: cg.Paint[]; resolvedIndex: number } {
+    // Validate inputs
+    if (!node) {
+      throw new Error("resolvePaints: node is required");
+    }
+    if (!["fill", "stroke"].includes(target)) {
+      throw new Error(
+        `Invalid paint_target: ${target}. Must be "fill" or "stroke".`
+      );
+    }
+    if (typeof paintIndex !== "number" || paintIndex < 0) {
+      throw new Error(
+        `Invalid paint_index: ${paintIndex}. Must be a non-negative number.`
+      );
+    }
+
+    const pluralKey = target === "stroke" ? "stroke_paints" : "fill_paints";
+    const singularKey = target === "stroke" ? "stroke" : "fill";
+
+    // Get paints array, handling both legacy and new paint models
+    const paints = Array.isArray(node[pluralKey])
+      ? (node[pluralKey] as cg.Paint[])
+      : node[singularKey]
+        ? [node[singularKey] as cg.Paint]
+        : [];
+
+    // Resolve index with bounds checking
+    const resolvedIndex =
+      paints.length > 0
+        ? Math.min(Math.max(0, paintIndex), paints.length - 1)
+        : 0;
+
+    return { paints, resolvedIndex };
+  }
+
+  /**
    * Gets the index of the topmost fill in the fills array.
    *
    * Note: In the fill_paints array, the last element (fills[-1]) is the topmost fill.
@@ -1086,6 +1133,22 @@ export namespace editor.state {
      * Lasso state
      */
     lasso?: editor.state.Lasso;
+
+    /**
+     * @private - internal use only
+     *
+     * Deferred selection operation state.
+     * Stores the operation that was deferred on pointerdown.
+     * Used to track which node was already selected when pointerdown occurred,
+     * so that deferred operations are only applied to nodes that were already selected,
+     * not nodes that were added to selection on pointerdown.
+     *
+     * @default undefined
+     */
+    __deferred_selection?: {
+      node_id: string | "__clear_selection__";
+      operation: "reset" | "toggle";
+    };
   }
 
   /**
@@ -2712,9 +2775,25 @@ export namespace editor.api {
 
   export interface IEditorDocumentStoreConsumerWithConstraintsActions {
     /**
-     * inserts the payload with assertions and constraints
+     * Inserts a node or subdocument into the document tree.
+     *
+     * This method wraps the core document insertion with additional operations:
+     * - Calls `doc.insert()` to perform the document tree insertion
+     * - Handles post-insertion operations (e.g., font synchronization)
+     * - Ensures fonts referenced by inserted nodes are loaded
+     *
+     * @param payload - Node prototype or subdocument to insert
+     * @param target - Explicit parent node ID (null = scene-level)
+     *
+     * @returns Array of newly inserted top-level node IDs
+     *
+     * @remarks
+     * - This is the recommended method for programmatic insertion (as opposed to `doc.insert()`)
+     * - It handles necessary post-insertion operations like font sync that `doc.insert()` does not
+     * - For user-facing insert operations, use `surface.insert()` instead
+     * - The returned node IDs can be used by caller to update selection or perform other operations
      */
-    insert(payload: InsertPayload): void;
+    insert(payload: InsertPayload, target: NodeID | null): NodeID[];
     autoSizeTextNode(node_id: string, axis: "width" | "height"): void;
   }
 
@@ -2752,7 +2831,29 @@ export namespace editor.api {
       key?: string,
       force?: boolean
     ): void;
-    insert(payload: InsertPayload): void;
+    /**
+     * Inserts a node or subdocument into the document tree.
+     *
+     * This is a pure document tree operation that:
+     * - Does NOT read or modify selection state
+     * - Does NOT perform selection-based target resolution (caller must provide explicit target)
+     * - Does NOT update selection after insertion
+     * - Only modifies the document tree structure (adds new nodes)
+     * - Does NOT handle post-insertion operations (e.g., font sync)
+     *
+     * @param payload - Node prototype or subdocument to insert
+     * @param target - Explicit parent node ID (null = scene-level)
+     *
+     * @returns Array of newly inserted top-level node IDs
+     *
+     * @remarks
+     * - **In most cases, do NOT call this method directly.** Instead, use `Editor.insert()` which
+     *   handles post-document operations (e.g., font synchronization) that are necessary after insertion.
+     * - For user-facing insert operations, use `surface.insert()` instead
+     * - The returned node IDs can be used by caller to update selection
+     * - This method is intended for internal use or when you explicitly need to skip post-insertion operations
+     */
+    insert(payload: InsertPayload, target: NodeID | null): NodeID[];
     loadScene(scene_id: string): void;
     createScene(scene?: grida.program.document.SceneInit): void;
     deleteScene(scene_id: string): void;
@@ -2823,7 +2924,53 @@ export namespace editor.api {
     blur(): void;
     cut(target: "selection" | NodeID): void;
     copy(target: "selection" | NodeID): void;
-    paste(): void;
+    /**
+     * Pastes the current clipboard payload into the specified parent node(s).
+     *
+     * This is a pure document tree operation that:
+     * - Only inserts nodes from the current clipboard (`state.user_clipboard`)
+     * - Does NOT read or modify selection state
+     * - Does NOT perform hit testing or target resolution (caller must provide explicit parent IDs)
+     * - Does NOT update selection after paste
+     * - Only modifies the document tree structure (adds new nodes)
+     *
+     * @param target - Explicit parent node ID(s) where nodes should be pasted.
+     *   - Single NodeID: Paste all clipboard items into this parent
+     *   - Array of NodeIDs: Paste each clipboard item into corresponding parent (if multiple items in clipboard, cycles through parents)
+     *   - For scene-level paste, explicitly pass the scene_id
+     *
+     * @returns Array of newly inserted top-level node IDs. Empty array if:
+     *   - No clipboard exists
+     *   - Clipboard type is not "prototypes"
+     *   - Paste operation failed
+     *
+     * @remarks
+     * - This method is a pure document tree updater - it does not handle UX concerns like selection
+     * - For user-facing paste operations, use `surface.a11yPaste()` instead
+     * - The returned node IDs can be used by the caller to update selection or perform other operations
+     *
+     * @example
+     * ```typescript
+     * // Paste to scene level
+     * const pastedIds = editor.commands.paste(editor.state.scene_id);
+     * editor.commands.select(pastedIds, "reset");
+     *
+     * // Paste into a specific container
+     * const pastedIds = editor.commands.paste(containerId);
+     *
+     * // Paste into multiple parents (if clipboard has multiple items)
+     * const pastedIds = editor.commands.paste([parent1, parent2]);
+     * ```
+     */
+    paste(target: NodeID | NodeID[]): NodeID[];
+    /**
+     * TODO: Refactor this method to either:
+     * 1. Rename to `insertVector` - since this method directly inserts a vector network
+     *    without relying on memory clipboard data (unlike `paste()` which uses `state.user_clipboard`).
+     *    This would be more accurate naming and consistent with `insert()`.
+     * 2. OR make it use memory clipboard payload - store the vector network in `state.user_clipboard`
+     *    and use the standard `paste()` flow, making it consistent with other paste operations.
+     */
     pasteVector(network: vn.VectorNetwork): void;
     pastePayload(payload: io.clipboard.ClipboardPayload): boolean;
     duplicate(target: "selection" | NodeID): void;
@@ -2913,7 +3060,22 @@ export namespace editor.api {
 
     //
     insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
-    deleteNode(target: "selection" | NodeID): void;
+    /**
+     * Deletes nodes from the document tree.
+     *
+     * This is a pure document tree operation that:
+     * - Does NOT read from selection state (caller must provide explicit node IDs)
+     * - Only modifies the document tree structure (removes nodes)
+     * - Automatically filters deleted nodes from selection (safety measure handled in reducer)
+     *
+     * @param target - Explicit array of node IDs to delete
+     *
+     * @remarks
+     * - For UX-facing code, read selection at call site and pass explicit node IDs
+     * - Deleted nodes are automatically removed from selection (handled internally for document consistency)
+     * - Scene nodes are protected from deletion (filtered out automatically)
+     */
+    delete(target: NodeID[]): void;
     //
 
     createNodeFromSvg(
@@ -2925,7 +3087,25 @@ export namespace editor.api {
     createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
     createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
 
-    order(target: "selection" | NodeID, order: "back" | "front" | number): void;
+    /**
+     * Changes the z-order of nodes in the document hierarchy.
+     *
+     * This is a pure document tree operation that:
+     * - Does NOT read from selection state (caller must provide explicit node IDs)
+     * - Only modifies the document tree hierarchy (z-order)
+     * - Does NOT modify or read selection state
+     *
+     * @param target - Explicit array of node IDs to reorder
+     * @param order - Order operation: "front", "back", "forward", "backward", or numeric index
+     *
+     * @remarks
+     * - For UX-facing code, read selection at call site and pass explicit node IDs
+     * - Use `surface.order()` for user-facing operations
+     */
+    order(
+      target: NodeID[],
+      order: "front" | "back" | "forward" | "backward" | number
+    ): void;
     mv(source: NodeID[], target: NodeID, index?: number): void;
 
     align(
@@ -3094,10 +3274,23 @@ export namespace editor.api {
     group(target: "selection" | NodeID[]): void;
 
     /**
-     * ungroup the nodes (from group or boolean)
-     * @param target - the nodes to ungroup
+     * Ungroups a single group or boolean operation node, moving its children to the parent.
+     *
+     * This is a pure document tree operation that:
+     * - Does NOT read from selection state (caller must provide explicit node ID)
+     * - Only modifies the document tree structure
+     * - Does NOT modify or read selection state
+     * - Rejects/ignores if the target is not a group or boolean node
+     *
+     * @param target - Single group or boolean node ID to ungroup
+     * @returns Array of chunks, where each chunk contains the child node IDs from one original group (empty array if target is not a group)
+     *
+     * @remarks
+     * - This aligns with future `groupNode.ungroup()` API
+     * - For UX-facing code with multiple targets, use `surface.ungroup()` which handles validation and filtering
+     * - The core operation expects exactly one node and validates it is a group
      */
-    ungroup(target: "selection" | NodeID[]): void;
+    ungroup(target: NodeID): NodeID[][];
 
     /**
      * delete the guide at the given index
@@ -3681,6 +3874,74 @@ export namespace editor.api {
     surfaceConfigurePaddingWithMirroringModifier(
       padding_with_axis_mirroring: "on" | "off"
     ): void;
+
+    /**
+     * User-facing insert operation that handles UX concerns.
+     *
+     * This method:
+     * - Captures current selection at invocation time (bounded context)
+     * - Resolves target parent from selection using UX logic
+     * - Calls core insert() with explicit target
+     * - Updates selection to newly inserted nodes
+     *
+     * @param payload - Node prototype or subdocument to insert, or array of payloads
+     * @returns Array of newly inserted top-level node IDs
+     *
+     * @remarks
+     * - When passing an array, all payloads are inserted as a group using the same target
+     *   (from the initial selection), then all newly inserted nodes are selected together.
+     *   This prevents nesting when inserting multiple items (e.g., from Figma clipboard).
+     * - When passing a single payload, selection is captured at invocation time to prevent
+     *   nesting in loops, and selection is updated after insert to select the newly inserted node.
+     * - All UX logic is handled here, not in the reducer.
+     *
+     * @example
+     * ```typescript
+     * // Single insertion
+     * editor.surface.insert({ prototype: myPrototype });
+     *
+     * // Multiple insertions (prevents nesting)
+     * editor.surface.insert([
+     *   { document: doc1 },
+     *   { document: doc2 },
+     *   { document: doc3 },
+     * ]);
+     * ```
+     */
+    insert(payload: InsertPayload | InsertPayload[]): NodeID[];
+
+    /**
+     * User-facing ungroup operation that handles UX concerns.
+     *
+     * This method:
+     * - Validates and filters target nodes to only group/boolean nodes
+     * - Calls core ungroup() for each valid group node
+     * - Updates selection to all ungrouped children
+     *
+     * @param target - Array of node IDs to ungroup (will be filtered to only groups)
+     * @returns Array of chunks, where each chunk contains child node IDs from one original group
+     *
+     * @remarks
+     * - Filters target to only group/boolean nodes before calling core
+     * - Selection is updated after ungroup to select all ungrouped children
+     * - For programmatic ungroup operations on a single known group, use `editor.commands.ungroup(nodeId)` directly
+     */
+    ungroup(target: NodeID[]): NodeID[][];
+
+    /**
+     * User-facing order operation that handles UX concerns.
+     *
+     * This method:
+     * - Captures current selection at invocation time (bounded context)
+     * - Calls core order() with explicit target
+     *
+     * @param order - Order operation: "front", "back", "forward", "backward", or numeric index
+     *
+     * @remarks
+     * - Selection is captured at invocation time to prevent issues in loops
+     * - For programmatic order operations, use `editor.commands.order(nodeIds, order)` directly
+     */
+    order(order: "front" | "back" | "forward" | "backward" | number): void;
 
     /**
      * Blur event handler callback.

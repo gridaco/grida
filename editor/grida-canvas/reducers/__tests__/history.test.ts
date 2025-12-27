@@ -175,7 +175,7 @@ describe("History Management", () => {
       state = dispatchWithHistory(history, state, selectAction);
       expect(state.selection).toEqual(["rect2"]);
 
-      const deleteAction: Action = { type: "delete", target: "selection" };
+      const deleteAction: Action = { type: "delete", target: ["rect2"] };
       state = dispatchWithHistory(history, state, deleteAction);
       expect(state.document.nodes.rect2).toBeUndefined();
       expect(state.selection).toEqual([]);
@@ -352,7 +352,7 @@ describe("History Management", () => {
       });
       state = dispatchWithHistory(history, state, {
         type: "delete",
-        target: "selection",
+        target: ["rect1"],
       });
       state = dispatchWithHistory(history, state, {
         type: "select",

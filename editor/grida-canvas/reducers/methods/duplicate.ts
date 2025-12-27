@@ -1,7 +1,7 @@
 import type { Draft } from "immer";
 import { editor } from "@/grida-canvas";
 import { self_insertSubDocument } from "./insert";
-import { self_selectNode } from "./selection";
+import { self_selectNode } from "./select";
 import assert from "assert";
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";

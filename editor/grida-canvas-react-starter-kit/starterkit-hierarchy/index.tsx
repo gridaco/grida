@@ -27,7 +27,7 @@ export function ScenesGroup() {
     >
       <SidebarGroupLabel>
         Scenes
-        <SidebarGroupAction onClick={() => editor.commands.createScene()}>
+        <SidebarGroupAction onClick={() => editor.surface.surfaceCreateScene()}>
           <PlusIcon />
           <span className="sr-only">New Scene</span>
         </SidebarGroupAction>
@@ -62,7 +62,9 @@ export function DocumentHierarchy() {
         >
           <SidebarGroupLabel>
             Scenes
-            <SidebarGroupAction onClick={() => editor.commands.createScene()}>
+            <SidebarGroupAction
+              onClick={() => editor.surface.surfaceCreateScene()}
+            >
               <PlusIcon />
               <span className="sr-only">New Scene</span>
             </SidebarGroupAction>

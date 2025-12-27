@@ -18,6 +18,11 @@ import type {
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
+import {
+  decidePointerDownSelection,
+  decideClickSelection,
+  decideDragStartAction,
+} from "./methods/selection";
 import nodeReducer from "./node.reducer";
 import initialNode from "./tools/initial-node";
 import assert from "assert";
@@ -93,8 +98,30 @@ function __self_evt_on_click(
   action: EditorEventTarget_Click,
   context: ReducerContext
 ) {
-  const { node_ids_from_point } = <EditorEventTarget_Click>action;
+  const { node_ids_from_point, shiftKey } = <EditorEventTarget_Click>action;
   draft.hits = node_ids_from_point;
+
+  // Handle deferred selection operations using the testable decision function
+  const decision = decideClickSelection({
+    clicked_node_id: node_ids_from_point[0] ?? null,
+    deferred_selection: draft.__deferred_selection,
+  });
+
+  if (decision.type === "immediate") {
+    if (decision.mode === "clear") {
+      self_clearSelection(draft);
+    } else {
+      self_selectNode(draft, decision.mode, decision.node_id);
+    }
+    draft.__deferred_selection = undefined;
+    // Early return to prevent other click handlers from running
+    // (this matches the behavior of immediate selection changes)
+    return;
+  }
+
+  // Clear deferred marker if no operation was applied
+  draft.__deferred_selection = undefined;
+
   switch (draft.tool.type) {
     case "cursor":
     case "scale":
@@ -210,7 +237,8 @@ function __self_evt_on_double_click(draft: editor.state.IEditorState) {
 
 function __self_pointer_down_selection_like_cursor(
   draft: editor.state.IEditorState,
-  shiftKey: boolean
+  shiftKey: boolean,
+  context: ReducerContext
 ) {
   const { hovered_node_id } = self_updateSurfaceHoverState(draft);
 
@@ -222,18 +250,37 @@ function __self_pointer_down_selection_like_cursor(
     return;
   }
 
-  if (shiftKey) {
-    if (hovered_node_id) {
-      self_selectNode(draft, "toggle", hovered_node_id);
-    } else {
-      // do nothing (when shift key is pressed)
-    }
-  } else {
-    if (hovered_node_id) {
-      self_selectNode(draft, "reset", hovered_node_id);
-    } else {
-      self_clearSelection(draft);
-    }
+  // Use the testable decision function
+  // TODO: Determine is_empty_space_within_overlay from geometry
+  // For now, pass undefined (will be treated as outside overlay, immediate clear)
+  // In the future, this should be computed using selection geometry rects and pointer position
+  const decision = decidePointerDownSelection({
+    hovered_node_id,
+    shiftKey,
+    current_selection: draft.selection,
+    document_ctx: draft.document_ctx,
+    is_empty_space_within_overlay: undefined, // TODO: compute from geometry
+  });
+
+  // Apply the decision
+  switch (decision.type) {
+    case "immediate":
+      if (decision.mode === "clear") {
+        self_clearSelection(draft);
+      } else {
+        self_selectNode(draft, decision.mode, decision.node_id);
+      }
+      draft.__deferred_selection = undefined;
+      break;
+    case "deferred":
+      draft.__deferred_selection = {
+        node_id: decision.node_id,
+        operation: decision.operation,
+      };
+      break;
+    case "none":
+      draft.__deferred_selection = undefined;
+      break;
   }
 }
 
@@ -249,12 +296,12 @@ function __self_evt_on_pointer_down(
 
   switch (draft.tool.type) {
     case "cursor": {
-      __self_pointer_down_selection_like_cursor(draft, shiftKey);
+      __self_pointer_down_selection_like_cursor(draft, shiftKey, context);
       break;
     }
     case "scale": {
       // Scale tool behaves like cursor for selection interactions.
-      __self_pointer_down_selection_like_cursor(draft, shiftKey);
+      __self_pointer_down_selection_like_cursor(draft, shiftKey, context);
       break;
     }
     case "insert": {
@@ -306,29 +353,52 @@ function __self_drag_start_selection_like_cursor(
     return;
   }
 
-  // TODO: improve logic
-  if (shiftKey) {
-    if (draft.hovered_node_id) {
-      __self_start_gesture_translate(draft, context);
-    } else {
-      // marquee selection
-      draft.marquee = {
-        a: draft.pointer.position,
-        b: draft.pointer.position,
-        additive: shiftKey,
-      };
+  // TODO: move overlay hit-testing into `decideDragStartAction` (selection module).
+  // Today, this reducer computes `is_empty_space_within_overlay` via geometry to keep
+  // `event-target/event/on-drag-start` clean (no selection-specific payload).
+  //
+  // In the future, as described in docs/wg/feat-editor/ux-surface/selection.md, the
+  // selection module should own this logic by taking selection geometry + pointer
+  // position and determining `is_empty_space_within_overlay` internally.
+  //
+  // Selection overlay hit test (pure math, reducer-local):
+  // If pointer is on empty space and there is a selection, determine whether the pointer is
+  // inside the selection overlay bounds (union of selected nodes' absolute rects).
+  //
+  // This is required to distinguish:
+  // - Shift + empty space within overlay → drag selection (axis lock)
+  // - Shift + empty space outside overlay → marquee selection
+  let is_empty_space_within_overlay: boolean | undefined = undefined;
+  if (draft.selection.length > 0 && !draft.hovered_node_id) {
+    const rects = draft.selection
+      .map((id) => context.geometry.getNodeAbsoluteBoundingRect(id))
+      .filter((r) => r) as cmath.Rectangle[];
+    if (rects.length > 0) {
+      const overlay = cmath.rect.union(rects);
+      is_empty_space_within_overlay = cmath.rect.containsPoint(
+        overlay,
+        draft.pointer.position
+      );
     }
+  }
+
+  // Use the testable decision function
+  const action = decideDragStartAction({
+    hovered_node_id: draft.hovered_node_id,
+    shiftKey,
+    current_selection: draft.selection,
+    is_empty_space_within_overlay,
+  });
+
+  if (action === "drag") {
+    __self_start_gesture_translate(draft, context);
   } else {
-    if (draft.selection.length === 0) {
-      // marquee selection
-      draft.marquee = {
-        a: draft.pointer.position,
-        b: draft.pointer.position,
-        additive: shiftKey,
-      };
-    } else {
-      __self_start_gesture_translate(draft, context);
-    }
+    // marquee selection
+    draft.marquee = {
+      a: draft.pointer.position,
+      b: draft.pointer.position,
+      additive: shiftKey,
+    };
   }
 }
 
@@ -349,6 +419,9 @@ function __self_evt_on_drag_start(
   draft.lasso = undefined;
   draft.dropzone = undefined;
   draft.surface_snapping = undefined;
+
+  // Cancel deferred selection operations (per docs: "On dragstart → deferred operations cancelled")
+  draft.__deferred_selection = undefined;
 
   switch (draft.tool.type) {
     case "cursor": {
@@ -666,10 +739,19 @@ function __self_evt_on_drag(
           return;
         }
 
-        const fixed_width =
-          typeof node.width === "number" ? node.width : undefined;
-        const fixed_height =
-          typeof node.height === "number" ? node.height : undefined;
+        // Get width/height from node if available (only check defined values)
+        let fixed_width: number | undefined;
+        let fixed_height: number | undefined;
+
+        if ("width" in node && "height" in node) {
+          const width = node.width;
+          const height = node.height;
+          if (typeof width === "number" && typeof height === "number") {
+            fixed_width = width;
+            fixed_height = height;
+          }
+        }
+
         const maxRadius = Math.min(
           fixed_width ? fixed_width / 2 : Infinity,
           fixed_height ? fixed_height / 2 : Infinity
@@ -1032,11 +1114,42 @@ function __self_maybe_end_gesture(
 }
 
 /**
- * get the parent of newly inserting node based on the current state
+ * Gets the parent container for newly inserting nodes based on pointer-based hit testing.
  *
- * this relies on `surface_raycast_detected_node_ids`, make sure it's updated before calling this function
+ * This function returns the first container node found in the hit stack at the current
+ * pointer position. It uses a simple pointer-based approach: iterates through nodes
+ * detected by raycast at the pointer location and returns the first one that is a
+ * container type. This is used by the insert tool when clicking or dragging to place
+ * new nodes.
  *
- * @returns the parent node id or `null` if no desired target
+ * **Behavior:**
+ * - If the scene has `constraints.children === "single"`, returns the single child container
+ * - Otherwise, iterates through `state.hits` (pointer-based raycast results) and returns
+ *   the first node that is a container type
+ * - Returns `null` if no container is found in the hit stack (insertion at scene level)
+ *
+ * The function uses the hit stack order (top-to-bottom in z-order) and doesn't perform
+ * geometry-based containment checks. It simply returns the first container encountered
+ * at the pointer position, which is appropriate for tool-based insertion where the user
+ * explicitly clicks or drags at a specific location.
+ *
+ * @param state - Current editor state
+ * @returns The parent container node ID, or `null` if no container is found (scene-level insertion)
+ *
+ * @remarks
+ * - This function relies on `state.hits` being populated from pointer raycast events
+ * - Make sure `state.hits` is updated (via `pointermove/raycast` or `click` events) before calling
+ * - This is used specifically for tool-based insertion (insert tool click/drag), not for
+ *   programmatic insertion via the `insert` action (which takes explicit `target` parameter)
+ *
+ * @todo TODO: Remove this duplicate function and use a shared implementation.
+ *   This function is duplicated in:
+ *   - event-target.cem-vector.reducer.ts
+ *   - event-target.cem-bitmap.reducer.ts
+ *   Future refactoring should extract this to a shared helper that:
+ *   1. Filters out locked containers (currently missing)
+ *   2. Applies root node filtering for consistency
+ *   3. Preserves z-order (top-to-bottom, deepest first)
  */
 function __get_insertion_target(
   state: editor.state.IEditorState

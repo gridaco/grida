@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { iofigma } from "@grida/io-figma";
 import { nanoid } from "nanoid";
 import { datatransfer } from "@/grida-canvas/data-transfer";
+import type { editor } from "@/grida-canvas";
 
 /**
  * Hook that provides file insertion utilities for the Grida canvas editor.
@@ -199,16 +200,17 @@ async function tryInsertFromFigmaClipboardPayload(
     };
 
     // Convert each root node to Grida document (will recursively process children)
-    rootNodes.forEach((figmaNode) => {
+    const payloads: editor.api.InsertPayload[] = rootNodes.map((figmaNode) => {
       const gridaDoc = iofigma.restful.factory.document(
         figmaNode,
         {}, // images map (empty for clipboard paste)
         context
       );
-
-      // 5. Insert into canvas
-      editor.insert({ document: gridaDoc });
+      return { document: gridaDoc };
     });
+
+    // Insert all payloads as a group (prevents nesting)
+    editor.surface.insert(payloads);
 
     return { success: true, insertedNodeCount: rootNodes.length };
   } catch (error) {
@@ -365,13 +367,13 @@ export function useDataTransferEventTarget() {
             current_clipboard_ref?.payload_id ===
             grida_payload.clipboard.payload_id
           ) {
-            instance.commands.paste();
+            instance.surface.a11yPaste();
             return true;
           } else if (grida_payload.clipboard.type === "prototypes") {
             instance.commands.pastePayload(grida_payload.clipboard);
             return true;
           } else {
-            instance.commands.paste();
+            instance.surface.a11yPaste();
             return true;
           }
         }
@@ -446,7 +448,7 @@ export function useDataTransferEventTarget() {
       if (event.target instanceof HTMLTextAreaElement) return;
 
       if (!event.clipboardData) {
-        instance.commands.paste();
+        instance.surface.a11yPaste();
         event.preventDefault();
         return;
       }
@@ -477,7 +479,7 @@ export function useDataTransferEventTarget() {
         event.preventDefault();
       } else {
         // Fallback to local clipboard if no valid payload found
-        instance.commands.paste();
+        instance.surface.a11yPaste();
         event.preventDefault();
       }
     },
@@ -507,15 +509,15 @@ export function useDataTransferEventTarget() {
 
         if (!handled) {
           // Fallback to local clipboard if no valid payload found
-          instance.commands.paste();
+          instance.surface.a11yPaste();
         }
       } else {
         // No clipboard items, fallback to local clipboard
-        instance.commands.paste();
+        instance.surface.a11yPaste();
       }
     } catch (e) {
       // Clipboard API may fail (permissions, etc.), fallback to local clipboard
-      instance.commands.paste();
+      instance.surface.a11yPaste();
     }
   }, [instance, handlePasteFromItems, current_clipboard]);
 

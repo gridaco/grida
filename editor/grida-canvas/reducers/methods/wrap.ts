@@ -7,7 +7,6 @@ import cmath from "@grida/cmath";
 import tree from "@grida/tree";
 import { self_moveNode } from "./move";
 import { self_insertSubDocument } from "./insert";
-import { self_selectNode } from "./selection";
 import * as modeProperties from "@/grida-canvas/utils/properties";
 import cg from "@grida/cg";
 import "core-js/features/object/group-by";
@@ -115,7 +114,7 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
       left: cmath.quantize(union.x, 1),
       children: [],
       position: "absolute",
-    } as grida.program.nodes.NodePrototype;
+    } satisfies grida.program.nodes.NodePrototype;
 
     if (prototype.type === "container") {
       prototype.width = union.width;
@@ -124,7 +123,7 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
 
     const wrapperId = self_insertSubDocument(
       draft,
-      isScene ? null : (parentId as string),
+      isScene ? null : parentId,
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
         () => context.idgen.next()
@@ -165,85 +164,77 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
  */
 export function self_ungroup<S extends editor.state.IEditorState>(
   draft: Draft<S>,
-  groupNodeIds: string[],
+  groupNodeId: string,
   geometry: editor.api.IDocumentGeometryQuery
-): void {
-  // Filter to only group nodes and boolean nodes
-  const validGroupNodeIds = groupNodeIds.filter((node_id) => {
-    const node = dq.__getNodeById(draft, node_id);
-    return node.type === "group" || node.type === "boolean";
-  });
+): string[] {
+  const node = dq.__getNodeById(draft, groupNodeId);
 
-  if (validGroupNodeIds.length === 0) {
-    return;
+  // Reject if not a group or boolean node
+  if (!node || (node.type !== "group" && node.type !== "boolean")) {
+    return [];
   }
 
-  // Collect all ungrouped children to select them later
+  // Get node's children from links
+  const nodeChildren = draft.document.links[groupNodeId];
+  if (!Array.isArray(nodeChildren) || nodeChildren.length === 0) {
+    return [];
+  }
+
+  const parent_id = dq.getParentId(draft.document_ctx, groupNodeId);
+  const target_parent = parent_id ?? draft.scene_id!;
+
+  // Get the node's absolute position
+  const node_rect = geometry.getNodeAbsoluteBoundingRect(groupNodeId);
+  if (!node_rect) {
+    return [];
+  }
+
+  // Calculate the offset needed to preserve absolute positions
+  let offset_x = node_rect.x;
+  let offset_y = node_rect.y;
+
+  // If the target parent is not the scene, we need to account for its position
+  if (target_parent !== draft.scene_id) {
+    const parent_rect = geometry.getNodeAbsoluteBoundingRect(target_parent);
+    if (parent_rect) {
+      offset_x -= parent_rect.x;
+      offset_y -= parent_rect.y;
+    }
+  }
+
+  // Collect all ungrouped children to return them
   const ungroupedChildren: string[] = [];
 
-  // Process each group or boolean node
-  validGroupNodeIds.forEach((node_id) => {
-    const node = dq.__getNodeById(draft, node_id);
+  // Move all children to the parent of the node, preserving their order
+  const children_to_move: string[] = [...nodeChildren];
+  children_to_move.forEach((child_id) => {
+    // Move the child to the node's parent
+    self_moveNode(draft, child_id, target_parent);
 
-    // Get node's children from links
-    const nodeChildren = draft.document.links[node_id];
-    if (!Array.isArray(nodeChildren) || nodeChildren.length === 0) {
-      return;
+    // Adjust the child's position to preserve absolute position
+    const child = dq.__getNodeById(draft, child_id);
+    if ("left" in child && typeof child.left === "number") {
+      child.left += offset_x;
+    }
+    if ("top" in child && typeof child.top === "number") {
+      child.top += offset_y;
     }
 
-    const parent_id = dq.getParentId(draft.document_ctx, node_id);
-    const target_parent = parent_id ?? draft.scene_id!;
-
-    // Get the node's absolute position
-    const node_rect = geometry.getNodeAbsoluteBoundingRect(node_id);
-    if (!node_rect) {
-      return;
-    }
-
-    // Calculate the offset needed to preserve absolute positions
-    let offset_x = node_rect.x;
-    let offset_y = node_rect.y;
-
-    // If the target parent is not the scene, we need to account for its position
-    if (target_parent !== draft.scene_id) {
-      const parent_rect = geometry.getNodeAbsoluteBoundingRect(target_parent);
-      if (parent_rect) {
-        offset_x -= parent_rect.x;
-        offset_y -= parent_rect.y;
-      }
-    }
-
-    // Move all children to the parent of the node, preserving their order
-    const children_to_move: string[] = [...nodeChildren];
-    children_to_move.forEach((child_id) => {
-      // Move the child to the node's parent
-      self_moveNode(draft, child_id, target_parent);
-
-      // Adjust the child's position to preserve absolute position
-      const child = dq.__getNodeById(draft, child_id);
-      if ("left" in child && typeof child.left === "number") {
-        child.left += offset_x;
-      }
-      if ("top" in child && typeof child.top === "number") {
-        child.top += offset_y;
-      }
-
-      // Add to the list of ungrouped children
-      ungroupedChildren.push(child_id);
-    });
-
-    // Use Graph.unlink() - mutates draft.document directly (scene is now a node!)
-    const graphInstance = new tree.graph.Graph(draft.document);
-    graphInstance.unlink(node_id);
+    // Add to the list of ungrouped children
+    ungroupedChildren.push(child_id);
   });
+
+  // Use Graph.unlink() - mutates draft.document directly (scene is now a node!)
+  const graphInstance = new tree.graph.Graph(draft.document);
+  graphInstance.unlink(groupNodeId);
 
   // Update context from graph's cached LUT
   // Create final graph instance to get updated LUT after all operations
   const finalGraph = new tree.graph.Graph(draft.document);
   draft.document_ctx = finalGraph.lut;
 
-  // Select the ungrouped children
-  self_selectNode(draft, "reset", ...ungroupedChildren);
+  // Return the ungrouped children (selection update is handled by caller)
+  return ungroupedChildren;
 }
 
 /**
@@ -315,15 +306,15 @@ export function self_wrapNodesAsBooleanOperation<
       children: [],
       position: "absolute",
       op: op,
-      cornerRadius: modeProperties.cornerRadius(...nodes),
+      corner_radius: modeProperties.cornerRadius(...nodes),
       fill: modeProperties.fill(...nodes),
       stroke: modeProperties.stroke(...nodes),
       stroke_width: modeProperties.strokeWidth(...nodes),
-    } as grida.program.nodes.BooleanPathOperationNodePrototype;
+    } satisfies grida.program.nodes.BooleanPathOperationNodePrototype;
 
     const wrapperId = self_insertSubDocument(
       draft,
-      isScene ? null : (parentId as string),
+      isScene ? null : parentId,
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
         () => context.idgen.next()

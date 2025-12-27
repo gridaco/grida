@@ -64,6 +64,9 @@ import { supports } from "@/grida-canvas/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
+import { StrokeAlignControl } from "./controls/stroke-align";
+import { StrokeJoinControl } from "./controls/stroke-join";
+import { StrokeMiterLimitControl } from "./controls/stroke-miter-limit";
 import grida from "@grida/schema";
 import {
   useCurrentSceneState,
@@ -305,6 +308,9 @@ function ModeMixedNodeProperties({
     stroke,
     stroke_width,
     stroke_cap,
+    stroke_align,
+    stroke_join,
+    stroke_miter_limit,
     width,
     height,
     fit,
@@ -325,6 +331,13 @@ function ModeMixedNodeProperties({
     direction,
     main_axis_alignment,
     cross_axis_alignment,
+    main_axis_gap,
+    cross_axis_gap,
+    layout_wrap,
+    padding_top,
+    padding_right,
+    padding_bottom,
+    padding_left,
     //
     cursor,
     blend_mode,
@@ -341,9 +354,6 @@ function ModeMixedNodeProperties({
     // bottom,
     // maxLength,
     // border,
-    // padding,
-    // mainAxisGap,
-    // crossAxisGap,
     // userdata,
   } = properties;
 
@@ -474,23 +484,46 @@ function ModeMixedNodeProperties({
               }}
             />
           </PropertyLine>
-          {/* <PropertyLine hidden={!has_flex_container}>
-              <PropertyLineLabel>Gap</PropertyLineLabel>
-              <GapControl
-                value={{
-                  mainAxisGap: mainAxisGap!,
-                  crossAxisGap: crossAxisGap!,
-                }}
-                onValueChange={actions.gap}
-              />
-            </PropertyLine> */}
-          {/* <PropertyLine hidden={!has_flex_container}>
-              <PropertyLineLabel>Padding</PropertyLineLabel>
-              <PaddingControl
-                value={padding!}
-                onValueChange={actions.padding}
-              />
-            </PropertyLine> */}
+          <PropertyLine hidden={!has_flex_container}>
+            <PropertyLineLabel>Gap</PropertyLineLabel>
+            <GapControl
+              mode={layout_wrap?.value === "wrap" ? "multiple" : "single"}
+              value={{
+                main_axis_gap:
+                  main_axis_gap?.mixed || main_axis_gap?.value === undefined
+                    ? grida.mixed
+                    : (main_axis_gap.value ?? 0),
+                cross_axis_gap: cross_axis_gap?.mixed
+                  ? grida.mixed
+                  : cross_axis_gap?.value,
+              }}
+              onValueCommit={change.gap}
+            />
+          </PropertyLine>
+          <PropertyLine hidden={!has_container}>
+            <PropertyLineLabel>Padding</PropertyLineLabel>
+            <PaddingControl
+              value={{
+                padding_top:
+                  padding_top?.mixed || padding_top?.value === undefined
+                    ? grida.mixed
+                    : (padding_top.value ?? 0),
+                padding_right:
+                  padding_right?.mixed || padding_right?.value === undefined
+                    ? grida.mixed
+                    : (padding_right?.value ?? 0),
+                padding_bottom:
+                  padding_bottom?.mixed || padding_bottom?.value === undefined
+                    ? grida.mixed
+                    : (padding_bottom?.value ?? 0),
+                padding_left:
+                  padding_left?.mixed || padding_left?.value === undefined
+                    ? grida.mixed
+                    : (padding_left?.value ?? 0),
+              }}
+              onValueCommit={change.padding}
+            />
+          </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection hidden={!has_stylable} className="border-b pb-4">
@@ -825,11 +858,39 @@ function ModeMixedNodeProperties({
                 onValueCommit={change.stroke_width}
               />
             </PropertyLine>
-            <PropertyLine hidden={!supports_stroke_cap}>
+            <PropertyLine hidden={!stroke?.value || !supports_stroke_cap}>
               <PropertyLineLabel>Cap</PropertyLineLabel>
               <StrokeCapControl
                 value={stroke_cap?.value}
                 onValueChange={change.stroke_cap}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!stroke?.value}>
+              <PropertyLineLabel>Align</PropertyLineLabel>
+              <StrokeAlignControl
+                value={stroke_align?.value}
+                onValueChange={change.stroke_align}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!stroke?.value}>
+              <PropertyLineLabel>Join</PropertyLineLabel>
+              <StrokeJoinControl
+                value={stroke_join?.value}
+                onValueChange={change.stroke_join}
+              />
+            </PropertyLine>
+            <PropertyLine
+              hidden={
+                !stroke?.value ||
+                stroke_join?.value === grida.mixed ||
+                (stroke_join?.value !== undefined &&
+                  stroke_join?.value !== "miter")
+              }
+            >
+              <PropertyLineLabel>Miter</PropertyLineLabel>
+              <StrokeMiterLimitControl
+                value={stroke_miter_limit?.value}
+                onValueChange={change.stroke_miter_limit}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
