@@ -65,10 +65,10 @@ function ColorChip({
 }) {
   const cssColor = kolor.colorformats.RGBA32F.intoCSSRGBA(color);
   return (
-    <Tooltip>
+    <Tooltip disableHoverableContent>
       <TooltipTrigger asChild>
         <button
-          className={`size-4 rounded-xs border border-border/50 transition-transform cursor-pointer hover:scale-110 ${
+          className={`size-4 rounded-xs border border-border/50 cursor-pointer ${
             centered ? "block mx-auto" : ""
           }`}
           style={{ background: cssColor }}
@@ -76,7 +76,7 @@ function ColorChip({
           aria-label={label}
         />
       </TooltipTrigger>
-      <TooltipContent className="pointer-events-none">{label}</TooltipContent>
+      <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
 }
