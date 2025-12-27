@@ -22,6 +22,8 @@ export function resolveInsertTargetParent(
   const node_id = selection[0];
   const node = dq.__getNodeById(state, node_id);
 
+  if (!node) return null;
+
   if (node.type === "container") {
     return node_id;
   }

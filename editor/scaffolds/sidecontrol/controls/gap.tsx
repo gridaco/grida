@@ -17,70 +17,29 @@ import grida from "@grida/schema";
  *
  * @see https://tailwindcss.com/docs/gap
  */
+const GAP_UNIT = 4;
 const twgap = {
-  "gap-0": {
-    gap: 0,
-  },
-  "gap-1": {
-    gap: 1 * 4, // 4px
-  },
-  "gap-2": {
-    gap: 2 * 4, // 8px
-  },
-  "gap-3": {
-    gap: 3 * 4, // 12px
-  },
-  "gap-4": {
-    gap: 4 * 4, // 16px
-  },
-  "gap-5": {
-    gap: 5 * 4, // 20px
-  },
-  "gap-6": {
-    gap: 6 * 4, // 24px
-  },
-  "gap-8": {
-    gap: 8 * 4, // 32px
-  },
-  "gap-10": {
-    gap: 10 * 4, // 40px
-  },
-  "gap-12": {
-    gap: 12 * 4, // 48px
-  },
-  "gap-16": {
-    gap: 16 * 4, // 64px
-  },
-  "gap-20": {
-    gap: 20 * 4, // 80px
-  },
-  "gap-24": {
-    gap: 24 * 4, // 96px
-  },
-  "gap-32": {
-    gap: 32 * 4, // 128px
-  },
-  "gap-40": {
-    gap: 40 * 4, // 160px
-  },
-  "gap-48": {
-    gap: 48 * 4, // 192px
-  },
-  "gap-56": {
-    gap: 56 * 4, // 224px
-  },
-  "gap-64": {
-    gap: 64 * 4, // 256px
-  },
-  "gap-72": {
-    gap: 72 * 4, // 288px
-  },
-  "gap-80": {
-    gap: 80 * 4, // 320px
-  },
-  "gap-96": {
-    gap: 96 * 4, // 384px
-  },
+  "gap-0": { gap: 0 },
+  "gap-1": { gap: 1 * GAP_UNIT },
+  "gap-2": { gap: 2 * GAP_UNIT },
+  "gap-3": { gap: 3 * GAP_UNIT },
+  "gap-4": { gap: 4 * GAP_UNIT },
+  "gap-5": { gap: 5 * GAP_UNIT },
+  "gap-6": { gap: 6 * GAP_UNIT },
+  "gap-8": { gap: 8 * GAP_UNIT },
+  "gap-10": { gap: 10 * GAP_UNIT },
+  "gap-12": { gap: 12 * GAP_UNIT },
+  "gap-16": { gap: 16 * GAP_UNIT },
+  "gap-20": { gap: 20 * GAP_UNIT },
+  "gap-24": { gap: 24 * GAP_UNIT },
+  "gap-32": { gap: 32 * GAP_UNIT },
+  "gap-40": { gap: 40 * GAP_UNIT },
+  "gap-48": { gap: 48 * GAP_UNIT },
+  "gap-56": { gap: 56 * GAP_UNIT },
+  "gap-64": { gap: 64 * GAP_UNIT },
+  "gap-72": { gap: 72 * GAP_UNIT },
+  "gap-80": { gap: 80 * GAP_UNIT },
+  "gap-96": { gap: 96 * GAP_UNIT },
 } as const;
 
 function GapControlSingle({
@@ -93,15 +52,11 @@ function GapControlSingle({
   onValueCommit?: (value: number) => void;
 }) {
   const isMixed = value === grida.mixed;
+  const numericValue = isMixed ? undefined : value;
   const hasPreset = useMemo(() => {
-    if (isMixed) return false;
-    return typeof value === "number" && Object.values(twgap).some((preset) => preset.gap === value);
-  }, [value, isMixed]);
-
-  const handleChange = (newValue: number | undefined) => {
-    if (newValue === undefined) return;
-    onValueCommit?.(newValue);
-  };
+    if (!numericValue || typeof numericValue !== "number") return false;
+    return Object.values(twgap).some((preset) => preset.gap === numericValue);
+  }, [numericValue]);
 
   return (
     <div className="relative flex-1">
@@ -109,7 +64,7 @@ function GapControlSingle({
         mode="fixed"
         disabled={disabled}
         type="number"
-        value={isMixed ? undefined : value}
+        value={numericValue}
         placeholder={isMixed ? "mixed" : "0"}
         step={1}
         min={0}
@@ -118,19 +73,25 @@ function GapControlSingle({
           "overflow-hidden",
           "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         )}
-        onValueCommit={handleChange}
+        onValueCommit={(v) => v !== undefined && onValueCommit?.(v)}
         aria-label="Gap"
       />
       <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
         <Select
-          value={!isMixed && hasPreset && typeof value === "number" ? String(value) : undefined}
-          onValueChange={(_v) => {
-            const value = parseInt(_v);
-            handleChange(value);
-          }}
+          disabled={disabled}
+          value={hasPreset && numericValue ? String(numericValue) : undefined}
+          onValueChange={
+            disabled ? undefined : (v) => onValueCommit?.(parseInt(v, 10))
+          }
         >
           <SelectPrimitive.SelectTrigger asChild>
-            <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-1 opacity-50">
+            <button
+              disabled={disabled}
+              className={cn(
+                "w-full text-muted-foreground flex items-center justify-center size-6 p-1 opacity-50",
+                disabled && "cursor-not-allowed opacity-30"
+              )}
+            >
               <ChevronDownIcon />
             </button>
           </SelectPrimitive.SelectTrigger>
@@ -178,7 +139,8 @@ function GapControlMultiple({
         onValueCommit={(v) =>
           onValueCommit?.({
             main_axis_gap: v ?? 0,
-            cross_axis_gap: typeof crossAxisGap === "number" ? crossAxisGap : v ?? 0,
+            cross_axis_gap:
+              typeof crossAxisGap === "number" ? crossAxisGap : (v ?? 0),
           })
         }
       />
@@ -191,8 +153,8 @@ function GapControlMultiple({
           isCrossAxisMixed
             ? "mixed"
             : typeof mainAxisGap === "number"
-            ? String(mainAxisGap)
-            : "0"
+              ? String(mainAxisGap)
+              : "0"
         }
         step={1}
         min={0}
@@ -220,14 +182,17 @@ export function GapControl({
     value: number | { main_axis_gap: number; cross_axis_gap: number }
   ) => void;
 }) {
-  const mainAxisGap = value.main_axis_gap === grida.mixed ? grida.mixed : (value.main_axis_gap ?? 0);
+  const mainAxisGap =
+    value.main_axis_gap === grida.mixed
+      ? grida.mixed
+      : (value.main_axis_gap ?? 0);
 
   if (mode === "multiple") {
     return (
       <GapControlMultiple
         value={value}
         disabled={disabled}
-        onValueCommit={(v) => onValueCommit?.(v)}
+        onValueCommit={onValueCommit}
       />
     );
   }
