@@ -160,9 +160,12 @@ impl<'a> HitTester<'a> {
 
     /// Returns the top-most node containing the point, if any.
     ///
-    /// Layers are checked from deepest to shallowest, so the first match mimics
-    /// DOM hit testing semantics. This stops as soon as a match is found,
-    /// making it faster when only one result is needed.
+    /// This method matches browser's `elementFromPoint()` behavior:
+    /// - Returns the topmost (visually on top) node at the point
+    /// - For siblings: later siblings (added later in DOM order) are preferred
+    /// - For nested nodes: deeper nodes (children) are preferred over their parents
+    ///
+    /// This stops as soon as a match is found, making it faster when only one result is needed.
     pub fn hit_first(&self, point: Vector2) -> Option<NodeId> {
         let mut indices = self.cache.intersects_point(point);
         indices.sort();
@@ -192,8 +195,15 @@ impl<'a> HitTester<'a> {
 
     /// Returns all nodes containing the point ordered from top to bottom.
     ///
-    /// The returned vector is sorted from deepest to shallowest, mirroring how
-    /// events bubble in typical DOM systems.
+    /// The returned vector matches browser's `elementsFromPoint()` behavior:
+    /// - Ordered from topmost (visually on top) to bottommost (visually at bottom)
+    /// - For siblings at the same depth: later siblings (added later in DOM order) appear on top
+    /// - For nodes at different depths: deeper nodes (children) come before their parents
+    ///
+    /// This ordering reflects reverse paint order (topmost first), where nodes are:
+    /// 1. Grouped by stacking context
+    /// 2. Ordered by z-index (when z-index is set)
+    /// 3. Ordered by DOM order when z-index is equal (later siblings = higher z-index = on top)
     pub fn hits(&self, point: Vector2) -> Vec<NodeId> {
         let mut indices = self.cache.intersects_point(point);
         indices.sort();
@@ -243,8 +253,8 @@ impl<'a> HitTester<'a> {
 
     /// Returns all nodes whose bounding boxes intersect the given rectangle.
     ///
-    /// The returned vector is sorted from deepest to shallowest, mirroring how
-    /// events bubble in typical DOM systems.
+    /// The returned vector matches browser's ordering: from topmost to bottommost.
+    /// This matches the behavior of `hits()` - see that method's documentation for details.
     ///
     /// Note: This method checks if the rectangle center point is within parent clip bounds.
     /// For more precise culling, consider using point-based hit testing methods.
