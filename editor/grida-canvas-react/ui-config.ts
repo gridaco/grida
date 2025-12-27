@@ -74,3 +74,56 @@ export const MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE = 36;
  * We keep this centralized so z-ordering can be tracked/tuned in one place.
  */
 export const FLOATING_BAR_Z_INDEX = 999;
+
+/**
+ * Workbench accent colors in hex format.
+ *
+ * These colors are explicitly managed here because they are used in both:
+ * - React components (which can consume CSS variables via `var(--color-workbench-accent-*)`)
+ * - WASM/canvas rendering (which cannot consume CSS variable colors)
+ *
+ * @remarks
+ * - These hex values must match the corresponding CSS variables defined in `app/ui.css`
+ * - When updating colors in CSS, these values must be updated here as well
+ * - Colors are defined in oklch format in CSS: `--color-workbench-accent-*: oklch(...)`
+ * - Hex equivalents are provided here for use in canvas/WebGL contexts
+ *
+ * @see {@link https://github.com/gridaco/grida/blob/main/editor/app/ui.css} for CSS definitions
+ */
+export namespace WorkbenchColors {
+  /**
+   * Sky blue - primary selection/highlight color
+   * CSS: `--color-workbench-accent-sky: oklch(68.5% 0.169 237.323)`
+   */
+  export const sky = "#00a6f4";
+
+  /**
+   * Red - used for guidelines, measurements, and error states
+   * CSS: `--color-workbench-accent-red: oklch(63.7% 0.237 25.331)`
+   */
+  export const red = "#f44336";
+
+  /**
+   * Yellow - warning/attention states
+   * CSS: `--color-workbench-accent-yellow: oklch(0.795 0.184 86.047)`
+   */
+  export const yellow = "#fbbf24";
+
+  /**
+   * Violet - component consumer indicator
+   * CSS: `--color-workbench-accent-violet: oklch(60.6% 0.25 292.717)`
+   */
+  export const violet = "#8b5cf6";
+
+  /**
+   * Orange - secondary actions
+   * CSS: `--color-workbench-accent-orange: oklch(70.5% 0.213 47.604)`
+   */
+  export const orange = "#fb923c";
+
+  /**
+   * Pink - decorative elements
+   * CSS: `--color-workbench-accent-pink: oklch(65.6% 0.241 354.308)`
+   */
+  export const pink = "#f472b6";
+}
