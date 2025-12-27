@@ -143,7 +143,7 @@ export function RadialGradientPaintChip({
           background: css.toRadialGradientString(paint),
         }}
       />
-      <TransparencyGridIcon className="absolute w-full h-full -z-10" />
+      <TransparencyGridIcon className="absolute w-full h-full -z-0" />
     </ChipContainer>
   );
 }
