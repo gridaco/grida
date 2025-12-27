@@ -282,6 +282,33 @@ export function useMixedProperties(ids: string[]) {
     [mixedProperties.stroke_cap?.ids, instance.commands]
   );
 
+  const strokeAlign = useCallback(
+    (value: cg.StrokeAlign) => {
+      mixedProperties.stroke_align?.ids.forEach((id) => {
+        instance.commands.changeNodePropertyStrokeAlign(id, value);
+      });
+    },
+    [mixedProperties.stroke_align?.ids, instance.commands]
+  );
+
+  const strokeJoin = useCallback(
+    (value: cg.StrokeJoin) => {
+      mixedProperties.stroke_join?.ids.forEach((id) => {
+        instance.commands.changeNodePropertyStrokeJoin(id, value);
+      });
+    },
+    [mixedProperties.stroke_join?.ids, instance.commands]
+  );
+
+  const strokeMiterLimit = useCallback(
+    (value: number) => {
+      mixedProperties.stroke_miter_limit?.ids.forEach((id) => {
+        instance.commands.changeNodePropertyStrokeMiterLimit(id, value);
+      });
+    },
+    [mixedProperties.stroke_miter_limit?.ids, instance.commands]
+  );
+
   const layout = useCallback(
     (value: grida.program.nodes.i.IFlexContainer["layout"]) => {
       mixedProperties.layout?.ids.forEach((id) => {
@@ -392,6 +419,9 @@ export function useMixedProperties(ids: string[]) {
       stroke,
       stroke_width: strokeWidth,
       stroke_cap: strokeCap,
+      stroke_align: strokeAlign,
+      stroke_join: strokeJoin,
+      stroke_miter_limit: strokeMiterLimit,
       layout,
       direction,
       main_axis_alignment: mainAxisAlignment,
@@ -430,6 +460,9 @@ export function useMixedProperties(ids: string[]) {
       stroke,
       strokeWidth,
       strokeCap,
+      strokeAlign,
+      strokeJoin,
+      strokeMiterLimit,
       layout,
       direction,
       mainAxisAlignment,

@@ -64,6 +64,9 @@ import { supports } from "@/grida-canvas/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
+import { StrokeAlignControl } from "./controls/stroke-align";
+import { StrokeJoinControl } from "./controls/stroke-join";
+import { StrokeMiterLimitControl } from "./controls/stroke-miter-limit";
 import grida from "@grida/schema";
 import {
   useCurrentSceneState,
@@ -305,6 +308,9 @@ function ModeMixedNodeProperties({
     stroke,
     stroke_width,
     stroke_cap,
+    stroke_align,
+    stroke_join,
+    stroke_miter_limit,
     width,
     height,
     fit,
@@ -852,11 +858,39 @@ function ModeMixedNodeProperties({
                 onValueCommit={change.stroke_width}
               />
             </PropertyLine>
-            <PropertyLine hidden={!supports_stroke_cap}>
+            <PropertyLine hidden={!stroke?.value || !supports_stroke_cap}>
               <PropertyLineLabel>Cap</PropertyLineLabel>
               <StrokeCapControl
                 value={stroke_cap?.value}
                 onValueChange={change.stroke_cap}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!stroke?.value}>
+              <PropertyLineLabel>Align</PropertyLineLabel>
+              <StrokeAlignControl
+                value={stroke_align?.value}
+                onValueChange={change.stroke_align}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!stroke?.value}>
+              <PropertyLineLabel>Join</PropertyLineLabel>
+              <StrokeJoinControl
+                value={stroke_join?.value}
+                onValueChange={change.stroke_join}
+              />
+            </PropertyLine>
+            <PropertyLine
+              hidden={
+                !stroke?.value ||
+                stroke_join?.value === grida.mixed ||
+                (stroke_join?.value !== undefined &&
+                  stroke_join?.value !== "miter")
+              }
+            >
+              <PropertyLineLabel>Miter</PropertyLineLabel>
+              <StrokeMiterLimitControl
+                value={stroke_miter_limit?.value}
+                onValueChange={change.stroke_miter_limit}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
