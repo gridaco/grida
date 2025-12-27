@@ -4,8 +4,8 @@ import React, { useMemo, useState } from "react";
 import { useGesture as __useGesture } from "@use-gesture/react";
 import {
   useGestureState,
+  useShouldIgnoreInsertDrawInteractions,
   useTransformState,
-  useToolState,
 } from "../../provider";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import { ObjectsDistributionAnalysis } from "./distribution";
@@ -121,7 +121,7 @@ function GapWithHandle({
   onGapGestureStart?: (axis: cmath.Axis) => void;
 }) {
   const { gesture } = useGestureState();
-  const tool = useToolState();
+  const shouldIgnoreInsertDraw = useShouldIgnoreInsertDrawInteractions();
 
   // Note: This handler is required because the gap overlay uses `pointer-events-auto`
   // to enable hover detection (showing the gap overlay on hover). Since it consumes
@@ -129,7 +129,7 @@ function GapWithHandle({
   // when clicking on the gap overlay region.
   const handlePointerDown = (event: React.PointerEvent) => {
     // Don't prevent default for insert/draw tools - they need pointer events
-    if (tool.type === "insert" || tool.type === "draw") {
+    if (shouldIgnoreInsertDraw) {
       return;
     }
     // For all other tools, prevent default to block selection changes

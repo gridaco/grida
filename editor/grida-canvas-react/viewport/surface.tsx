@@ -23,6 +23,7 @@ import {
   useMultiplayerCursorState,
   usePointerState,
   useSelectionState,
+  useShouldIgnoreInsertDrawInteractions,
   useToolState,
   useTransformState,
 } from "../provider";
@@ -1054,6 +1055,7 @@ function SelectionGroupOverlay({
   const editor = useCurrentEditor();
   const tool = useToolState();
   const { scaleX, scaleY } = useTransformState();
+  const shouldIgnoreInsertDraw = useShouldIgnoreInsertDrawInteractions();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
@@ -1064,7 +1066,7 @@ function SelectionGroupOverlay({
     {
       onPointerDown: ({ event }) => {
         // if insert mode, the event should be passed to the master to start the insertion
-        if (tool.type !== "insert" && tool.type !== "draw") {
+        if (!shouldIgnoreInsertDraw) {
           // otherwise, it should be stopped here
           // prevent default to prevent the master event target from changing the selection
           event.preventDefault();
@@ -1117,6 +1119,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeSide
               anchor="n"
               zIndex={nsweZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "n");
               }}
@@ -1124,6 +1127,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeSide
               anchor="s"
               zIndex={nsweZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "s");
               }}
@@ -1131,6 +1135,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeSide
               anchor="e"
               zIndex={nsweZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "e");
               }}
@@ -1138,6 +1143,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeSide
               anchor="w"
               zIndex={nsweZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "w");
               }}
@@ -1145,6 +1151,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeHandle
               anchor="nw"
               zIndex={diagonalZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "nw");
               }}
@@ -1152,6 +1159,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeHandle
               anchor="ne"
               zIndex={diagonalZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "ne");
               }}
@@ -1159,6 +1167,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeHandle
               anchor="sw"
               zIndex={diagonalZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "sw");
               }}
@@ -1166,6 +1175,7 @@ function SelectionGroupOverlay({
             <LayerOverlayResizeHandle
               anchor="se"
               zIndex={diagonalZIndex}
+              disabled={shouldIgnoreInsertDraw}
               onDragStart={() => {
                 editor.surface.surfaceStartScaleGesture(ids, "se");
               }}
@@ -1220,6 +1230,7 @@ function NodeOverlay({
   const tool = useToolState();
   const data = useSingleSelection(node_id);
   const { gesture } = useGestureState();
+  const shouldIgnoreInsertDraw = useShouldIgnoreInsertDrawInteractions();
   const { transform_with_preserve_aspect_ratio } = useEditorState(
     editor,
     (state) => ({
@@ -1240,12 +1251,7 @@ function NodeOverlay({
       // 1. the ui (input) to not blur from panel
       // 2. the inner content from being selected
       onPointerDown: ({ event }) => {
-        if (
-          tool.type !== "insert" &&
-          tool.type !== "draw" &&
-          !event.shiftKey &&
-          !event.metaKey
-        ) {
+        if (!shouldIgnoreInsertDraw && !event.shiftKey && !event.metaKey) {
           // prevent default to keep selection when clicking empty overlay
           // but allow shift+click to fall through for deselection
           event.preventDefault();
@@ -1344,6 +1350,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="e"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "e");
                       }}
@@ -1352,6 +1359,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="w"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "w");
                       }}
@@ -1363,6 +1371,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="n"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "n");
                       }}
@@ -1371,6 +1380,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="s"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "s");
                       }}
@@ -1379,6 +1389,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="e"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "e");
                       }}
@@ -1387,6 +1398,7 @@ function NodeOverlay({
                     <LayerOverlayResizeSide
                       anchor="w"
                       zIndex={nsweZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "w");
                       }}
@@ -1395,6 +1407,7 @@ function NodeOverlay({
                     <LayerOverlayResizeHandle
                       anchor="nw"
                       zIndex={diagonalZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "nw");
                       }}
@@ -1402,6 +1415,7 @@ function NodeOverlay({
                     <LayerOverlayResizeHandle
                       anchor="ne"
                       zIndex={diagonalZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "ne");
                       }}
@@ -1410,6 +1424,7 @@ function NodeOverlay({
                     <LayerOverlayResizeHandle
                       anchor="sw"
                       zIndex={diagonalZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "sw");
                       }}
@@ -1418,6 +1433,7 @@ function NodeOverlay({
                     <LayerOverlayResizeHandle
                       anchor="se"
                       zIndex={diagonalZIndex}
+                      disabled={shouldIgnoreInsertDraw}
                       onDragStart={() => {
                         editor.surface.surfaceStartScaleGesture(node_id, "se");
                       }}
