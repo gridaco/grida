@@ -1063,8 +1063,14 @@ export type MetadataAction =
       data: grida.program.document.NodeExportSettings[];
     }
   | {
+      type: "node-metadata/set";
+      node_id: string;
+      namespace: "userdata";
+      data: Record<string, unknown> | null;
+    }
+  | {
       type: "node-metadata/remove";
       node_id: string;
-      namespace: "export_settings";
+      namespace: "export_settings" | "userdata";
     }
   | { type: "node-metadata/remove-all"; node_id: string };

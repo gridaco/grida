@@ -1673,14 +1673,6 @@ class EditorDocumentStore
     });
   }
 
-  changeNodeUserData(node_id: string, userdata: unknown) {
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      userdata: userdata as any,
-    });
-  }
-
   changeNodePropertyPositioning(
     node_id: string,
     positioning: Partial<grida.program.nodes.i.IPositioning>
@@ -3675,28 +3667,37 @@ export class Editor
   // ==============================================================
   // #region INodeMetadataActions implementation
   // ==============================================================
-  getNodeMetadata<NS extends "export_settings">(
+  getNodeMetadata<NS extends "export_settings" | "userdata">(
     node_id: string,
     namespace: NS
   ): NS extends "export_settings"
     ? grida.program.document.NodeExportSettings[] | undefined
-    : never {
-    if (namespace === "export_settings") {
-      const result =
-        this.doc.state.document.metadata?.[node_id]?.export_settings;
-      return result as NS extends "export_settings"
-        ? grida.program.document.NodeExportSettings[] | undefined
-        : never;
+    : NS extends "userdata"
+      ? Record<string, unknown> | null | undefined
+      : never {
+    const metadata = this.doc.state.document.metadata?.[node_id];
+    if (!metadata) {
+      return undefined as ReturnType<typeof this.getNodeMetadata<NS>>;
     }
-    return undefined as never;
+    if (namespace === "export_settings") {
+      return metadata.export_settings as ReturnType<
+        typeof this.getNodeMetadata<NS>
+      >;
+    }
+    if (namespace === "userdata") {
+      return metadata.userdata as ReturnType<typeof this.getNodeMetadata<NS>>;
+    }
+    return undefined as ReturnType<typeof this.getNodeMetadata<NS>>;
   }
 
-  setNodeMetadata<NS extends "export_settings">(
+  setNodeMetadata<NS extends "export_settings" | "userdata">(
     node_id: string,
     namespace: NS,
     data: NS extends "export_settings"
       ? grida.program.document.NodeExportSettings[]
-      : never
+      : NS extends "userdata"
+        ? Record<string, unknown> | null
+        : never
   ): void {
     if (namespace === "export_settings") {
       this.doc.dispatch({
@@ -3705,14 +3706,24 @@ export class Editor
         namespace: "export_settings",
         data: data as grida.program.document.NodeExportSettings[],
       });
+    } else if (namespace === "userdata") {
+      this.doc.dispatch({
+        type: "node-metadata/set",
+        node_id,
+        namespace: "userdata",
+        data: data as Record<string, unknown> | null,
+      });
     }
   }
 
-  removeNodeMetadata(node_id: string, namespace: "export_settings"): void {
+  removeNodeMetadata(
+    node_id: string,
+    namespace: "export_settings" | "userdata"
+  ): void {
     this.doc.dispatch({
       type: "node-metadata/remove",
       node_id,
-      namespace: "export_settings",
+      namespace,
     });
   }
 
@@ -3731,6 +3742,18 @@ export class Editor
 
   removeExportSettings(node_id: string): void {
     this.removeNodeMetadata(node_id, "export_settings");
+  }
+
+  getUserData(node_id: string): Record<string, unknown> | null | undefined {
+    return this.getNodeMetadata(node_id, "userdata");
+  }
+
+  setUserData(node_id: string, data: Record<string, unknown> | null): void {
+    this.setNodeMetadata(node_id, "userdata", data);
+  }
+
+  removeUserData(node_id: string): void {
+    this.removeNodeMetadata(node_id, "userdata");
   }
   // ==============================================================
   // #endregion INodeMetadataActions implementation

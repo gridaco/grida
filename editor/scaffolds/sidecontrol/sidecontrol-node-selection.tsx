@@ -929,16 +929,6 @@ function ModeMixedNodeProperties({
       <SelectionColors />
       {/* #endregion selection colors */}
       {config.export !== "off" && <ExportMultipleLayers node_ids={ids} />}
-      <SidebarSection hidden={config.developer === "off"} className="pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <UserDataControl disabled node_id={""} value={undefined} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
     </div>
   );
 }
@@ -996,9 +986,6 @@ function ModeNodeProperties({
     href: node.href,
     target: node.target,
     cursor: node.cursor,
-
-    // x
-    userdata: node.userdata,
   }));
 
   const {
@@ -1036,9 +1023,6 @@ function ModeNodeProperties({
     href,
     target,
     cursor,
-
-    // x
-    userdata,
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
@@ -1352,11 +1336,7 @@ function ModeNodeProperties({
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
-            <UserDataControl
-              node_id={id}
-              value={userdata}
-              onValueCommit={actions.userdata}
-            />
+            <UserDataControl node_id={id} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

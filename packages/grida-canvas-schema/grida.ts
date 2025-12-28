@@ -650,6 +650,11 @@ export namespace grida.program.document {
          * Array of export configurations (supports multiple configs per node)
          */
         export_settings?: NodeExportSettings[];
+        /**
+         * User-injected custom data
+         * JSON-serializable key-value object
+         */
+        userdata?: Record<string, unknown> | null;
       }
     >;
   }
@@ -1355,12 +1360,7 @@ export namespace grida.program.nodes {
       readonly _$id?: string;
     } & T;
 
-  type __base_scene_node_properties =
-    | "id"
-    | "name"
-    | "userdata"
-    | "active"
-    | "locked";
+  type __base_scene_node_properties = "id" | "name" | "active" | "locked";
 
   type __IPrototypeNodeChildren = {
     children: NodePrototype[];
@@ -1387,11 +1387,6 @@ export namespace grida.program.nodes {
     export interface IBaseNode {
       readonly id: NodeID;
       name: string;
-
-      /**
-       * user-injected custom data
-       */
-      userdata?: Record<string, unknown> | undefined | null;
     }
 
     export interface ISceneNode {
@@ -2595,7 +2590,6 @@ export namespace grida.program.nodes {
         position: "relative",
         properties,
         props: {},
-        userdata: {},
         overrides: cloneWithUndefinedValues(nodes),
         template_id: def.name,
         width: "auto",

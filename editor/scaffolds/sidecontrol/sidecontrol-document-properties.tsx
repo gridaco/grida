@@ -180,7 +180,7 @@ function PropertyDefinitionBlock({
                   <SidebarMenuSectionContent className="space-y-2">
                     <PropertyLine>
                       {/* TODO: */}
-                      <UserDataControl node_id="..." value={undefined} />
+                      <UserDataControl node_id="..." />
                     </PropertyLine>
                   </SidebarMenuSectionContent>
                 </SidebarSection>

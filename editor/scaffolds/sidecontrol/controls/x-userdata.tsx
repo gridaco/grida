@@ -13,6 +13,7 @@ import { DialogClose } from "@radix-ui/react-dialog";
 import assert from "assert";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useNodeMetadata, useCurrentEditor } from "@/grida-canvas-react";
 
 function validate(value: string | undefined): any | false {
   if (value === undefined) return undefined;
@@ -30,19 +31,22 @@ function validate(value: string | undefined): any | false {
 export function UserDataControl({
   disabled,
   node_id,
-  value,
-  onValueCommit,
 }: {
   disabled?: boolean;
   node_id: string;
-  value: unknown | undefined;
-  onValueCommit?: (value: unknown | undefined) => void;
 }) {
+  const editor = useCurrentEditor();
+  const value = useNodeMetadata(node_id, "userdata");
   const [txt, setTxt] = useState<string | undefined>(
     value ? JSON.stringify(value, null, 2) : ""
   );
 
   const [valid, setValid] = useState<boolean>(false);
+
+  // Sync txt state when value changes
+  useEffect(() => {
+    setTxt(value ? JSON.stringify(value, null, 2) : "");
+  }, [value]);
 
   useEffect(() => {
     setValid(validate(txt) !== false);
@@ -52,7 +56,7 @@ export function UserDataControl({
     if (!valid) return;
     const res = validate(txt);
     if (res) {
-      onValueCommit?.(res);
+      editor.setUserData(node_id, res as Record<string, unknown> | null);
     } else {
       toast.error("Invalid User Data Format");
     }
@@ -75,7 +79,7 @@ export function UserDataControl({
           <DialogTitle>Set Custom Node Data to `{node_id}`</DialogTitle>
           <DialogDescription>
             JSON Serializable data k:v is accepted. Accessible via{" "}
-            <code>`node.userdata`</code>
+            <code>`metadata.userdata`</code>
           </DialogDescription>
         </DialogHeader>
         <hr />

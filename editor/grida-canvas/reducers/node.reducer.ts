@@ -868,17 +868,6 @@ const safe_properties: Partial<
       (draft as UN).text = value ?? null;
     },
   }),
-  userdata: defineNodeProperty<"userdata">({
-    apply: (draft, value, prev) => {
-      assert(
-        value === undefined ||
-          value === null ||
-          (typeof value === "object" && !Array.isArray(value)),
-        "userdata must be an k:v object"
-      );
-      (draft as UN).userdata = value;
-    },
-  }),
 };
 
 function applyNodeProperty<K extends keyof grida.program.nodes.UnknwonNode>(

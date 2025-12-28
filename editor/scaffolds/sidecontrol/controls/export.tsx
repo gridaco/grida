@@ -14,7 +14,7 @@ import {
   SelectItem,
 } from "@/components/ui-editor/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
+import { useCurrentEditor, useNodeMetadata } from "@/grida-canvas-react";
 import { editor as editorTypes } from "@/grida-canvas";
 import {
   PlusIcon,
@@ -156,11 +156,8 @@ export function ExportSection({
 }) {
   const editor = useCurrentEditor();
 
-  // Subscribe to metadata changes for this specific node
-  const nodeMetadata = useEditorState(
-    editor,
-    (state) => state.document.metadata?.[node_id]?.export_settings
-  );
+  // Subscribe to export_settings from metadata
+  const nodeMetadata = useNodeMetadata(node_id, "export_settings");
 
   // Get export configs - this will update when metadata changes
   const exportConfigs = React.useMemo(() => {
@@ -214,11 +211,8 @@ export function ExportNodeControl({
   const editor = useCurrentEditor();
   const [isExporting, setIsExporting] = React.useState(false);
 
-  // Subscribe to metadata changes for this specific node
-  const nodeMetadata = useEditorState(
-    editor,
-    (state) => state.document.metadata?.[node_id]?.export_settings
-  );
+  // Subscribe to export_settings from metadata
+  const nodeMetadata = useNodeMetadata(node_id, "export_settings");
 
   // Get export configs - this will update when metadata changes
   const exportConfigs = React.useMemo(() => {

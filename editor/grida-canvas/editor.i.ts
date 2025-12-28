@@ -3396,7 +3396,6 @@ export namespace editor.api {
      */
     unlockAspectRatio(node_id: NodeID): void;
 
-    changeNodeUserData(node_id: NodeID, userdata: unknown): void;
     changeNodeSize(
       node_id: NodeID,
       axis: "width" | "height",
@@ -4023,31 +4022,35 @@ export namespace editor.api {
 
   /**
    * General-purpose metadata API for namespace-based metadata access.
-   * Supports multiple namespaces, currently only `export_settings` is implemented.
+   * Supports multiple namespaces: `export_settings` and `userdata`.
    *
-   * @template NS - The namespace type (currently only "export_settings")
+   * @template NS - The namespace type ("export_settings" | "userdata")
    * @template T - The value type for the namespace
    */
   export interface INodeMetadataActions {
     /**
      * Get metadata for a node by namespace
      */
-    getNodeMetadata<NS extends "export_settings">(
+    getNodeMetadata<NS extends "export_settings" | "userdata">(
       node_id: grida.program.nodes.NodeID,
       namespace: NS
     ): NS extends "export_settings"
       ? grida.program.document.NodeExportSettings[] | undefined
-      : never;
+      : NS extends "userdata"
+        ? Record<string, unknown> | null | undefined
+        : never;
 
     /**
      * Set metadata for a node by namespace
      */
-    setNodeMetadata<NS extends "export_settings">(
+    setNodeMetadata<NS extends "export_settings" | "userdata">(
       node_id: grida.program.nodes.NodeID,
       namespace: NS,
       data: NS extends "export_settings"
         ? grida.program.document.NodeExportSettings[]
-        : never
+        : NS extends "userdata"
+          ? Record<string, unknown> | null
+          : never
     ): void;
 
     /**
@@ -4055,7 +4058,7 @@ export namespace editor.api {
      */
     removeNodeMetadata(
       node_id: grida.program.nodes.NodeID,
-      namespace: "export_settings"
+      namespace: "export_settings" | "userdata"
     ): void;
 
     /**
@@ -4077,6 +4080,26 @@ export namespace editor.api {
      * Remove export settings for a node (convenience method)
      */
     removeExportSettings(node_id: grida.program.nodes.NodeID): void;
+
+    /**
+     * Get userdata for a node (convenience method)
+     */
+    getUserData(
+      node_id: grida.program.nodes.NodeID
+    ): Record<string, unknown> | null | undefined;
+
+    /**
+     * Set userdata for a node (convenience method)
+     */
+    setUserData(
+      node_id: grida.program.nodes.NodeID,
+      data: Record<string, unknown> | null
+    ): void;
+
+    /**
+     * Remove userdata for a node (convenience method)
+     */
+    removeUserData(node_id: grida.program.nodes.NodeID): void;
   }
 
   /**
