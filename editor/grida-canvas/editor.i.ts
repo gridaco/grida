@@ -4201,7 +4201,7 @@ export namespace editor.internal.export_settings {
   } as const;
 
   /**
-   * All supported export formats as an array
+   * All export formats (supported, will support) as an array
    */
   export const ALL_FORMATS = [
     "PNG",

@@ -185,7 +185,7 @@ export function ExportSection({
       <SidebarSectionHeaderItem onClick={onAddConfig}>
         <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
         <SidebarSectionHeaderActions>
-          <Button variant="ghost" size="icon" className="size-4 p-0">
+          <Button variant="ghost" size="icon">
             <PlusIcon className="size-3" />
           </Button>
         </SidebarSectionHeaderActions>
@@ -443,15 +443,22 @@ function ExportConfigRow({
 
   const scalePresets = [0.5, 0.75, 1, 1.5, 2, 3, 4];
   const hasPreset = scalePresets.includes(scaleValue);
+  const isDisabled = disabled || !scaleSupported;
 
   return (
     <Popover modal={false}>
       <PropertyLine>
         <div className="flex items-center w-full gap-2">
-          <div className="relative w-20">
+          <div
+            aria-disabled={isDisabled}
+            className={cn(
+              "relative w-20",
+              "aria-disabled:opacity-50 aria-disabled:pointer-events-none"
+            )}
+          >
             <InputPropertyNumber
               mode="fixed"
-              disabled={disabled || !scaleSupported}
+              disabled={isDisabled}
               type="number"
               value={scaleValue}
               placeholder="1"
@@ -478,7 +485,7 @@ function ExportConfigRow({
                   const scale = parseFloat(v.replace("x", "")) || 1;
                   handleScaleChange(scale.toString());
                 }}
-                disabled={disabled || !scaleSupported}
+                disabled={isDisabled}
               >
                 <SelectPrimitive.SelectTrigger asChild>
                   <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-1 opacity-50">
@@ -499,7 +506,10 @@ function ExportConfigRow({
             value={format}
             onValueChange={handleFormatChange}
             disabled={disabled}
-            enum={[...editorTypes.internal.export_settings.ALL_FORMATS]}
+            // BMP is not supported for export yet.
+            enum={editorTypes.internal.export_settings.ALL_FORMATS.filter(
+              (f) => f !== "BMP"
+            )}
             className="flex-1"
           />
           <PopoverTrigger asChild>
