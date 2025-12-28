@@ -62,7 +62,7 @@ export class CanvasWasmDefaultExportInterfaceProvider
   ) {}
 
   canExportNodeAs(
-    node_id: string,
+    _node_id: string,
     format: grida.program.document.NodeExportSettings["format"] | (string & {})
   ): boolean {
     return this.formats.includes(format as any);
@@ -74,21 +74,30 @@ export class CanvasWasmDefaultExportInterfaceProvider
     config?: editor.api.ExportConfigOf<"PNG" | "JPEG" | "WEBP" | "BMP">
   ): Promise<Uint8Array> {
     const constraints: types.ExportConstraints = config?.constraints || {
-      type: "SCALE",
+      type: "scale",
       value: 1,
     };
 
     // Build format-specific export config
     let exportFormat: types.ExportAs;
-    if (format === "PNG") {
-      exportFormat = { format: "PNG", constraints };
-    } else if (format === "JPEG") {
-      exportFormat = { format: "JPEG", constraints, quality: config?.quality };
-    } else if (format === "WEBP") {
-      exportFormat = { format: "WEBP", constraints, quality: config?.quality };
-    } else {
-      // BMP
-      exportFormat = { format: "BMP", constraints };
+    switch (format) {
+      // lossless formats
+      case "BMP":
+      case "PNG":
+        exportFormat = { format: "PNG", constraints };
+        break;
+      // with quality
+      case "JPEG":
+      case "WEBP":
+        exportFormat = {
+          format: "JPEG",
+          constraints,
+          quality: config?.quality,
+        };
+        break;
+
+      default:
+        throw new Error(`Unsupported image format: ${format}`);
     }
 
     const data = await this.surface.exportNodeAs(node_id, exportFormat);

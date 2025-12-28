@@ -4532,7 +4532,7 @@ export class EditorSurface
     const id = ids[0];
     const data = await this._editor.exportNodeAs(id, "PNG", {
       format: "PNG",
-      constraints: { type: "SCALE", value: 1 },
+      constraints: { type: "scale", value: 1 },
     });
     const blob = new Blob([data as BlobPart], { type: "image/png" });
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);

@@ -39,7 +39,18 @@ export namespace types {
   };
 
   export type ExportConstraints = {
-    type: "SCALE" | "WIDTH" | "HEIGHT";
+    /**
+     * - none: as-is, no resizing, scaling
+     * - scale: scale with factor
+     * - scale-to-fit-width: scale to fit width (with same aspect ratio)
+     * - scale-to-fit-height: scale to fit height (with same aspect ratio)
+     */
+    type: "none" | "scale" | "scale-to-fit-width" | "scale-to-fit-height";
+    /**
+     * - scale: scale factor
+     * - scale-to-fit-width: width in pixels
+     * - scale-to-fit-height: height in pixels
+     */
     value: number;
   };
 

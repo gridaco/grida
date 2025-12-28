@@ -86,14 +86,14 @@ function buildExportConfig(
     settings as grida.program.document.NodeExportSettings_Image;
   const constraints =
     imageSettings.constraints &&
-    (imageSettings.constraints.type === "SCALE" ||
-      imageSettings.constraints.type === "WIDTH" ||
-      imageSettings.constraints.type === "HEIGHT")
+    (imageSettings.constraints.type === "scale" ||
+      imageSettings.constraints.type === "scale-to-fit-width" ||
+      imageSettings.constraints.type === "scale-to-fit-height")
       ? {
           type: imageSettings.constraints.type,
           value: imageSettings.constraints.value,
         }
-      : { type: "SCALE" as const, value: 1 };
+      : { type: "scale" as const, value: 1 };
 
   if (format === "PNG" || format === "BMP") {
     return {
@@ -128,7 +128,7 @@ function getNextAvailableScale(
       config.format === "BMP"
     ) {
       if (
-        config.constraints?.type === "SCALE" &&
+        config.constraints?.type === "scale" &&
         config.constraints.value !== undefined
       ) {
         usedScales.add(config.constraints.value);
@@ -171,7 +171,7 @@ export function ExportSection({
     const autoSuffix = getAutoSuffix(nextScale);
     const newConfig: grida.program.document.NodeExportSettings_Image = {
       format: "PNG",
-      constraints: { type: "SCALE", value: nextScale },
+      constraints: { type: "scale", value: nextScale },
       ...(autoSuffix !== undefined && { suffix: autoSuffix }),
     };
     editor.addExportConfig(node_id, newConfig);
@@ -389,7 +389,7 @@ function ExportConfigRow({
       config.format === "WEBP" ||
       config.format === "BMP") &&
     (config as grida.program.document.NodeExportSettings_Image).constraints
-      ?.type === "SCALE"
+      ?.type === "scale"
       ? (config as grida.program.document.NodeExportSettings_Image).constraints!
           .value
       : 1;
@@ -423,10 +423,10 @@ function ExportConfigRow({
       config.format === "BMP"
     ) {
       const updates: {
-        constraints: { type: "SCALE"; value: number };
+        constraints: { type: "scale"; value: number };
         suffix?: string;
       } = {
-        constraints: { type: "SCALE", value: scale },
+        constraints: { type: "scale", value: scale },
       };
 
       if (shouldUpdateSuffix) {
@@ -572,8 +572,8 @@ function ExportConfigPopoverContent({
 
   const [suffix, setSuffix] = React.useState<string>(config.suffix || "");
   const [constraintType, setConstraintType] = React.useState<
-    "NONE" | "SCALE" | "WIDTH" | "HEIGHT"
-  >(imageConfig?.constraints?.type || "SCALE");
+    grida.program.document.NodeExportSettingsConstraints["type"]
+  >(imageConfig?.constraints?.type || "scale");
   const [constraintValue, setConstraintValue] = React.useState<string>(
     imageConfig?.constraints?.value?.toString() || "1"
   );
@@ -584,7 +584,7 @@ function ExportConfigPopoverContent({
   React.useEffect(() => {
     setSuffix(config.suffix || "");
     if (imageConfig) {
-      setConstraintType(imageConfig.constraints?.type || "SCALE");
+      setConstraintType(imageConfig.constraints?.type || "scale");
       setConstraintValue(imageConfig.constraints?.value?.toString() || "1");
       setQuality(imageConfig.quality);
     }
@@ -596,7 +596,7 @@ function ExportConfigPopoverContent({
   };
 
   const handleConstraintChange = (
-    type: "NONE" | "SCALE" | "WIDTH" | "HEIGHT",
+    type: grida.program.document.NodeExportSettingsConstraints["type"],
     value?: number
   ) => {
     setConstraintType(type);
@@ -663,18 +663,25 @@ function ExportConfigPopoverContent({
         )}
         <div className="grid gap-2">
           <Label>Constraint</Label>
-          <PropertyEnum
+          <PropertyEnum<
+            grida.program.document.NodeExportSettingsConstraints["type"]
+          >
             value={constraintType}
             onValueChange={(v) =>
               handleConstraintChange(
-                v as "NONE" | "SCALE" | "WIDTH" | "HEIGHT",
+                v as grida.program.document.NodeExportSettingsConstraints["type"],
                 parseFloat(constraintValue)
               )
             }
             disabled={disabled}
-            enum={["NONE", "SCALE", "WIDTH", "HEIGHT"]}
+            enum={[
+              "none",
+              "scale",
+              "scale-to-fit-width",
+              "scale-to-fit-height",
+            ]}
           />
-          {constraintType !== "NONE" && (
+          {constraintType !== "none" && (
             <InputPropertyNumber
               mode="fixed"
               type="number"
