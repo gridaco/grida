@@ -2,6 +2,7 @@ import { toPng, toSvg, toJpeg } from "html-to-image";
 import type { Options } from "html-to-image/lib/types";
 import type { editor } from "..";
 import type { Editor } from "../editor";
+import type grida from "@grida/schema";
 import assert from "assert";
 
 export async function exportAsImage(
@@ -99,7 +100,11 @@ export class DOMSVGExportInterfaceProvider
 export class DOMDefaultExportInterfaceProvider
   implements editor.api.IDocumentExporterInterfaceProvider
 {
-  readonly formats = ["PNG", "JPEG", "PDF", "SVG"];
+  readonly formats: grida.program.document.NodeExportSettings["format"][] = [
+    "PNG",
+    "JPEG",
+    "SVG",
+  ];
 
   readonly image_export: DOMImageExportInterfaceProvider;
   readonly svg_export: DOMSVGExportInterfaceProvider;
@@ -111,16 +116,19 @@ export class DOMDefaultExportInterfaceProvider
 
   canExportNodeAs(
     _node_id: string,
-    format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+    format: grida.program.document.NodeExportSettings["format"] | (string & {})
   ): boolean {
-    return this.formats.includes(format);
+    return this.formats.includes(format as any);
   }
 
-  async exportNodeAs(
+  async exportNodeAs<
+    F extends grida.program.document.NodeExportSettings["format"],
+  >(
     node_id: string,
-    format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
-  ): Promise<Uint8Array | string> {
-    assert(this.formats.includes(format), "non supported format");
+    format: F,
+    _config?: editor.api.ExportConfigOf<F>
+  ): Promise<F extends "SVG" ? string : Uint8Array> {
+    assert(this.formats.includes(format as any), "non supported format");
 
     switch (format) {
       case "PNG":
@@ -128,13 +136,24 @@ export class DOMDefaultExportInterfaceProvider
         return this.image_export.exportNodeAsImage(
           node_id,
           format as "PNG" | "JPEG"
-        );
+        ) as Promise<F extends "SVG" ? string : Uint8Array>;
       }
       case "SVG": {
-        return this.svg_export.exportNodeAsSVG(node_id);
+        return this.svg_export.exportNodeAsSVG(node_id) as Promise<
+          F extends "SVG" ? string : Uint8Array
+        >;
+      }
+      case "PDF": {
+        // PDF export not supported in DOM backend
+        throw new Error("PDF export not supported in DOM backend");
+      }
+      case "WEBP":
+      case "BMP": {
+        // WEBP and BMP export not supported in DOM backend
+        throw new Error(`${format} export not supported in DOM backend`);
       }
     }
 
-    throw new Error("Non supported format");
+    throw new Error(`Non supported format: ${format}`);
   }
 }

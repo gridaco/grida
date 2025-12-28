@@ -2551,18 +2551,45 @@ export namespace editor.api {
     exportNodeAsPDF(node_id: string): Promise<Uint8Array>;
   }
 
+  /**
+   * Export config type helper that maps format F to its corresponding config type.
+   * Uses the schema types and transforms them to the runtime export config format.
+   */
+  export type ExportConfigOf<
+    F extends grida.program.document.NodeExportSettings["format"],
+  > = F extends "PNG" | "JPEG" | "WEBP" | "BMP"
+    ? Omit<
+        grida.program.document.NodeExportSettings_Image,
+        "suffix" | "constraints"
+      > & {
+        format: F;
+        constraints: {
+          type: Exclude<
+            grida.program.document.NodeExportSettingsConstraints["type"],
+            "NONE"
+          >;
+          value: number;
+        };
+      }
+    : F extends "PDF"
+      ? Pick<grida.program.document.NodeExportSettings_PDF, "format">
+      : F extends "SVG"
+        ? Pick<grida.program.document.NodeExportSettings_SVG, "format">
+        : never;
+
   export interface IDocumentExporterInterfaceProvider {
-    readonly formats: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})[];
+    readonly formats: grida.program.document.NodeExportSettings["format"][];
 
     canExportNodeAs(
       node_id: string,
-      format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+      format: grida.program.document.NodeExportSettings["format"]
     ): boolean;
 
-    exportNodeAs(
+    exportNodeAs<F extends grida.program.document.NodeExportSettings["format"]>(
       node_id: string,
-      format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
-    ): Promise<Uint8Array | string>;
+      format: F,
+      config?: ExportConfigOf<F>
+    ): Promise<F extends "SVG" ? string : Uint8Array>;
   }
 
   /**
@@ -3987,12 +4014,113 @@ export namespace editor.api {
   }
 
   export interface IDocumentExportPluginActions {
-    exportNodeAs(
+    exportNodeAs<F extends grida.program.document.NodeExportSettings["format"]>(
       node_id: string,
-      format: "PNG" | "JPEG"
-    ): Promise<Uint8Array | false>;
-    exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array | false>;
-    exportNodeAs(node_id: string, format: "SVG"): Promise<string | false>;
+      format: F,
+      config: ExportConfigOf<F>
+    ): Promise<F extends "SVG" ? string : Uint8Array>;
+  }
+
+  /**
+   * General-purpose metadata API for namespace-based metadata access.
+   * Supports multiple namespaces, currently only `export_settings` is implemented.
+   *
+   * @template NS - The namespace type (currently only "export_settings")
+   * @template T - The value type for the namespace
+   */
+  export interface INodeMetadataActions {
+    /**
+     * Get metadata for a node by namespace
+     */
+    getNodeMetadata<NS extends "export_settings">(
+      node_id: grida.program.nodes.NodeID,
+      namespace: NS
+    ): NS extends "export_settings"
+      ? grida.program.document.NodeExportSettings[] | undefined
+      : never;
+
+    /**
+     * Set metadata for a node by namespace
+     */
+    setNodeMetadata<NS extends "export_settings">(
+      node_id: grida.program.nodes.NodeID,
+      namespace: NS,
+      data: NS extends "export_settings"
+        ? grida.program.document.NodeExportSettings[]
+        : never
+    ): void;
+
+    /**
+     * Remove metadata for a node by namespace
+     */
+    removeNodeMetadata(
+      node_id: grida.program.nodes.NodeID,
+      namespace: "export_settings"
+    ): void;
+
+    /**
+     * Get export settings for a node (convenience method)
+     */
+    getExportSettings(
+      node_id: grida.program.nodes.NodeID
+    ): grida.program.document.NodeExportSettings[] | undefined;
+
+    /**
+     * Set export settings for a node (convenience method)
+     */
+    setExportSettings(
+      node_id: grida.program.nodes.NodeID,
+      settings: grida.program.document.NodeExportSettings[]
+    ): void;
+
+    /**
+     * Remove export settings for a node (convenience method)
+     */
+    removeExportSettings(node_id: grida.program.nodes.NodeID): void;
+  }
+
+  /**
+   * High-level semantic API for export configuration.
+   * Wraps the metadata API with export-specific methods.
+   * Supports multiple export settings per node (like Figma).
+   */
+  export interface IExportConfigActions {
+    /**
+     * Get all export configurations for a node
+     */
+    getExportConfigs(
+      node_id: grida.program.nodes.NodeID
+    ): grida.program.document.NodeExportSettings[];
+
+    /**
+     * Add an export configuration to a node
+     */
+    addExportConfig(
+      node_id: grida.program.nodes.NodeID,
+      config: grida.program.document.NodeExportSettings
+    ): void;
+
+    /**
+     * Update an export configuration at a specific index
+     */
+    updateExportConfig(
+      node_id: grida.program.nodes.NodeID,
+      index: number,
+      config: grida.program.document.NodeExportSettings
+    ): void;
+
+    /**
+     * Remove an export configuration at a specific index
+     */
+    removeExportConfig(
+      node_id: grida.program.nodes.NodeID,
+      index: number
+    ): void;
+
+    /**
+     * Remove all export configurations for a node
+     */
+    clearExportConfigs(node_id: grida.program.nodes.NodeID): void;
   }
 
   export interface ISurfaceMultiplayerFollowPluginActions {
@@ -4004,6 +4132,133 @@ export namespace editor.api {
     openCursorChat(): void;
     closeCursorChat(): void;
     updateCursorChatMessage(message: string | null): void;
+  }
+}
+
+/**
+ * Internal export types and utilities.
+ * Centralizes all export-related types to avoid duplication and ensure consistency.
+ */
+export namespace editor.internal.export_settings {
+  /**
+   * All supported export formats
+   */
+  export type Format = grida.program.document.NodeExportSettings["format"];
+
+  /**
+   * Image export formats (raster formats that support quality)
+   */
+  export type ImageFormat = "PNG" | "JPEG" | "WEBP" | "BMP";
+
+  /**
+   * Vector export formats (do not support scale/quality)
+   */
+  export type VectorFormat = "SVG" | "PDF";
+
+  /**
+   * Formats that support quality settings
+   */
+  export type QualitySupportedFormat = "JPEG" | "WEBP";
+
+  /**
+   * Formats that support scale constraints
+   */
+  export type ScaleSupportedFormat = ImageFormat;
+
+  /**
+   * MIME types for each export format
+   */
+  export const MIME_TYPES: Record<NonNullable<Format>, string> = {
+    PNG: "image/png",
+    JPEG: "image/jpeg",
+    PDF: "application/pdf",
+    SVG: "image/svg+xml",
+    WEBP: "image/webp",
+    BMP: "image/bmp",
+  } as const;
+
+  /**
+   * All supported export formats as an array
+   */
+  export const ALL_FORMATS = [
+    "PNG",
+    "JPEG",
+    "SVG",
+    "PDF",
+    "WEBP",
+    "BMP",
+  ] as const satisfies readonly Format[];
+
+  /**
+   * Image export formats as an array
+   */
+  export const IMAGE_FORMATS: readonly ImageFormat[] = [
+    "PNG",
+    "JPEG",
+    "WEBP",
+    "BMP",
+  ] as const;
+
+  /**
+   * Formats that support quality settings
+   */
+  export const QUALITY_SUPPORTED_FORMATS: readonly QualitySupportedFormat[] = [
+    "JPEG",
+    "WEBP",
+  ] as const;
+
+  /**
+   * Formats that support scale constraints
+   */
+  export const SCALE_SUPPORTED_FORMATS: readonly ScaleSupportedFormat[] = [
+    "PNG",
+    "JPEG",
+    "WEBP",
+    "BMP",
+  ] as const;
+
+  /**
+   * Type guard to check if a format supports quality
+   */
+  export function supportsQuality(
+    format: Format | undefined
+  ): format is QualitySupportedFormat {
+    return (
+      format !== undefined &&
+      QUALITY_SUPPORTED_FORMATS.includes(format as QualitySupportedFormat)
+    );
+  }
+
+  /**
+   * Type guard to check if a format supports scale
+   */
+  export function supportsScale(
+    format: Format | undefined
+  ): format is ScaleSupportedFormat {
+    return (
+      format !== undefined &&
+      SCALE_SUPPORTED_FORMATS.includes(format as ScaleSupportedFormat)
+    );
+  }
+
+  /**
+   * Get file extension for a format
+   */
+  export function getFileExtension(format: Format): string {
+    if (!format) {
+      return "png"; // Default fallback
+    }
+    return format.toLowerCase();
+  }
+
+  /**
+   * Get MIME type for a format
+   */
+  export function getMimeType(format: Format): string {
+    if (!format) {
+      return "image/png"; // Default fallback
+    }
+    return MIME_TYPES[format];
   }
 }
 

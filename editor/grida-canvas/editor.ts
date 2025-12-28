@@ -2563,7 +2563,9 @@ export class Editor
     editor.api.IDocumentVectorInterfaceActions,
     editor.api.IDocumentSVGInterfaceProvider,
     editor.api.IDocumentMarkdownInterfaceProvider,
-    editor.api.IEditorIntrospectActions
+    editor.api.IEditorIntrospectActions,
+    editor.api.INodeMetadataActions,
+    editor.api.IExportConfigActions
 {
   // private readonly listeners: Set<(editor: this, action?: Action) => void> = new Set();
   private readonly logger: (...args: any[]) => void;
@@ -3648,26 +3650,140 @@ export class Editor
   // ==============================================================
   // #region IExportPluginActions implementation
   // ==============================================================
-  exportNodeAs(
+  exportNodeAs<F extends grida.program.document.NodeExportSettings["format"]>(
     node_id: string,
-    format: "PNG" | "JPEG"
-  ): Promise<Uint8Array | false>;
-  exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array | false>;
-  exportNodeAs(node_id: string, format: "SVG"): Promise<string | false>;
-  async exportNodeAs(
-    node_id: string,
-    format: "PNG" | "JPEG" | "PDF" | "SVG"
-  ): Promise<Uint8Array | string | false> {
-    const supported_by_exporter = this.exporter.formats.includes(format);
-    if (!supported_by_exporter) return false;
+    format: F,
+    config: editor.api.ExportConfigOf<F>
+  ): Promise<F extends "SVG" ? string : Uint8Array> {
+    // Validate format is supported by exporter
+    if (!this.exporter.formats.includes(format)) {
+      throw new Error(`Format "${format}" is not supported by the exporter`);
+    }
 
-    const can_export_request = this.exporter.canExportNodeAs(node_id, format);
-    if (!can_export_request) return false;
+    // Validate node can be exported
+    if (!this.exporter.canExportNodeAs(node_id, format)) {
+      throw new Error(`Node "${node_id}" cannot be exported as "${format}"`);
+    }
 
-    return this.exporter.exportNodeAs(node_id, format);
+    // Export with provided config - no metadata reading/writing
+    return this.exporter.exportNodeAs(node_id, format, config);
   }
   // ==============================================================
   // #endregion IExportPluginActions implementation
+  // ==============================================================
+
+  // ==============================================================
+  // #region INodeMetadataActions implementation
+  // ==============================================================
+  getNodeMetadata<NS extends "export_settings">(
+    node_id: string,
+    namespace: NS
+  ): NS extends "export_settings"
+    ? grida.program.document.NodeExportSettings[] | undefined
+    : never {
+    if (namespace === "export_settings") {
+      const result =
+        this.doc.state.document.metadata?.[node_id]?.export_settings;
+      return result as NS extends "export_settings"
+        ? grida.program.document.NodeExportSettings[] | undefined
+        : never;
+    }
+    return undefined as never;
+  }
+
+  setNodeMetadata<NS extends "export_settings">(
+    node_id: string,
+    namespace: NS,
+    data: NS extends "export_settings"
+      ? grida.program.document.NodeExportSettings[]
+      : never
+  ): void {
+    if (namespace === "export_settings") {
+      this.doc.dispatch({
+        type: "node-metadata/set",
+        node_id,
+        namespace: "export_settings",
+        data: data as grida.program.document.NodeExportSettings[],
+      });
+    }
+  }
+
+  removeNodeMetadata(node_id: string, namespace: "export_settings"): void {
+    this.doc.dispatch({
+      type: "node-metadata/remove",
+      node_id,
+      namespace: "export_settings",
+    });
+  }
+
+  getExportSettings(
+    node_id: string
+  ): grida.program.document.NodeExportSettings[] | undefined {
+    return this.getNodeMetadata(node_id, "export_settings");
+  }
+
+  setExportSettings(
+    node_id: string,
+    settings: grida.program.document.NodeExportSettings[]
+  ): void {
+    this.setNodeMetadata(node_id, "export_settings", settings);
+  }
+
+  removeExportSettings(node_id: string): void {
+    this.removeNodeMetadata(node_id, "export_settings");
+  }
+  // ==============================================================
+  // #endregion INodeMetadataActions implementation
+  // ==============================================================
+
+  // ==============================================================
+  // #region IExportConfigActions implementation
+  // ==============================================================
+  getExportConfigs(
+    node_id: string
+  ): grida.program.document.NodeExportSettings[] {
+    const configs = this.getExportSettings(node_id);
+    return configs || [];
+  }
+
+  addExportConfig(
+    node_id: string,
+    config: grida.program.document.NodeExportSettings
+  ): void {
+    const configs = this.getExportConfigs(node_id);
+    this.setExportSettings(node_id, [...configs, config]);
+  }
+
+  updateExportConfig(
+    node_id: string,
+    index: number,
+    config: grida.program.document.NodeExportSettings
+  ): void {
+    const configs = this.getExportConfigs(node_id);
+    if (index >= 0 && index < configs.length) {
+      const updated = [...configs];
+      updated[index] = config;
+      this.setExportSettings(node_id, updated);
+    }
+  }
+
+  removeExportConfig(node_id: string, index: number): void {
+    const configs = this.getExportConfigs(node_id);
+    if (index >= 0 && index < configs.length) {
+      const updated = configs.filter((_, i) => i !== index);
+      if (updated.length > 0) {
+        this.setExportSettings(node_id, updated);
+      } else {
+        this.removeExportSettings(node_id);
+      }
+    }
+  }
+
+  clearExportConfigs(node_id: string): void {
+    this.removeExportSettings(node_id);
+  }
+  // ==============================================================
+  // #endregion IExportConfigActions implementation
   // ==============================================================
 
   /**
@@ -4391,7 +4507,10 @@ export class EditorSurface
     const ids = target === "selection" ? this.state.selection : [target];
     if (ids.length === 0) return false;
     const id = ids[0];
-    const data = await this._editor.exportNodeAs(id, "PNG");
+    const data = await this._editor.exportNodeAs(id, "PNG", {
+      format: "PNG",
+      constraints: { type: "SCALE", value: 1 },
+    });
     const blob = new Blob([data as BlobPart], { type: "image/png" });
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
     return true;
@@ -4407,7 +4526,7 @@ export class EditorSurface
     const ids = target === "selection" ? this.state.selection : [target];
     if (ids.length === 0) return false;
     const id = ids[0];
-    const data = await this._editor.exportNodeAs(id, "SVG");
+    const data = await this._editor.exportNodeAs(id, "SVG", { format: "SVG" });
     if (typeof data !== "string") {
       return false;
     }

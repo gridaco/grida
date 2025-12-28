@@ -768,6 +768,7 @@ export namespace io {
           bitmaps: bitmaps,
           images: json.document.images ?? {},
           properties: json.document.properties ?? {},
+          metadata: json.document.metadata,
         },
       } satisfies JSONDocumentFileModel;
     }

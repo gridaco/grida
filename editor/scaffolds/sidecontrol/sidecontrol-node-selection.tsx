@@ -29,7 +29,7 @@ import { SrcControl } from "./controls/src";
 import { BoxFitControl } from "./controls/box-fit";
 import { PropsControl } from "./controls/props";
 import { TargetBlankControl } from "./controls/target";
-import { ExportNodeControl } from "./controls/export";
+import { ExportSection, ExportMultipleLayers } from "./controls/export";
 import { FontFamilyControl } from "./controls/font-family";
 import {
   PositioningConstraintsControl,
@@ -928,19 +928,7 @@ function ModeMixedNodeProperties({
       {/* #region selection colors */}
       <SelectionColors />
       {/* #endregion selection colors */}
-      <SidebarSection
-        hidden={config.export === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <ExportNodeControl disabled node_id={""} name={""} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {config.export !== "off" && <ExportMultipleLayers node_ids={ids} />}
       <SidebarSection hidden={config.developer === "off"} className="pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
@@ -1356,22 +1344,8 @@ function ModeNodeProperties({
           </SidebarMenuSectionContent>
         </SidebarSection>
       )}
-      {/* #region selection colors */}
       <SelectionColors />
-      {/* #endregion selection colors */}
-      <SidebarSection
-        hidden={config.export === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <ExportNodeControl node_id={id} name={name} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {config.export !== "off" && <ExportSection node_id={id} name={name} />}
       <SidebarSection hidden={config.developer === "off"} className="pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>

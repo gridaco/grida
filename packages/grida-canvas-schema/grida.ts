@@ -533,6 +533,18 @@ export namespace grida.program.document {
   export const SCHEMA_VERSION = "0.89.0-beta+20251219";
 
   /**
+   * JSON-serializable value type
+   * Represents all valid JSON values (no functions, undefined, etc.)
+   */
+  export type JSONValue =
+    | string
+    | number
+    | boolean
+    | null
+    | { [key: string]: JSONValue | undefined }
+    | JSONValue[];
+
+  /**
    * Simple Node Selector
    *
    * - "*" - all nodes
@@ -587,6 +599,59 @@ export namespace grida.program.document {
      * document level properties / variables
      */
     properties: schema.Properties;
+  }
+
+  /**
+   * Export configuration for a node
+   */
+  export type NodeExportSettings =
+    | NodeExportSettings_Image
+    | NodeExportSettings_PDF
+    | NodeExportSettings_SVG;
+
+  export type NodeExportSettingsConstraints = {
+    type: "NONE" | "SCALE" | "WIDTH" | "HEIGHT";
+    value: number;
+  };
+
+  export interface NodeExportSettings_Image {
+    readonly format: "PNG" | "JPEG" | "WEBP" | "BMP";
+    readonly suffix?: string;
+    readonly constraints?: NodeExportSettingsConstraints;
+    /**
+     * 0-100, for JPEG and WEBP formats
+     */
+    readonly quality?: number;
+  }
+
+  export interface NodeExportSettings_PDF {
+    readonly format: "PDF";
+    readonly suffix?: string;
+  }
+
+  export interface NodeExportSettings_SVG {
+    readonly format: "SVG";
+    readonly suffix?: string;
+  }
+
+  /**
+   * Per-node metadata storage
+   * Keyed by node_id, then namespace
+   *
+   * Currently only supports well-known namespaces.
+   * Add new namespaces here as features are added.
+   */
+  export interface INodeMetadata {
+    metadata?: Record<
+      nodes.NodeID,
+      {
+        /**
+         * Export settings for a node
+         * Array of export configurations (supports multiple configs per node)
+         */
+        export_settings?: NodeExportSettings[];
+      }
+    >;
   }
 
   /**
@@ -782,7 +847,7 @@ export namespace grida.program.document {
    * **Note on scenes**: Scenes are stored as SceneNode in `nodes`, and referenced by ID in `scenes_ref`.
    * The `nodes` collection is the single source of truth for all node-like data including scenes.
    */
-  export interface Document extends IDocumentDefinition {
+  export interface Document extends IDocumentDefinition, INodeMetadata {
     /**
      * Array of scene node IDs. Scene nodes themselves are stored in `nodes` as SceneNode.
      * Use `scenes_ref.map(id => nodes[id] as SceneNode)` to access scene data.

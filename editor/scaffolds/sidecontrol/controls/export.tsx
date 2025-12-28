@@ -1,54 +1,206 @@
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui-editor/button";
 import { toast } from "sonner";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
-import { useDialogState } from "@/components/hooks/use-dialog-state";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
 import React from "react";
+import { zipSync } from "fflate";
+import { Input } from "@/components/ui/input";
+import InputPropertyNumber from "../ui/number";
+import { WorkbenchUI } from "@/components/workbench";
+import { cn } from "@/components/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { CodeIcon, QuestionMarkCircledIcon } from "@radix-ui/react-icons";
+} from "@/components/ui-editor/select";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
+import { editor as editorTypes } from "@/grida-canvas";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Input } from "@/components/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { exportWithP666 } from "@/grida-canvas-plugin-p666";
-import { exportAsImage } from "@/grida-canvas/backends/dom-export";
-import { useCurrentEditor } from "@/grida-canvas-react";
+  PlusIcon,
+  MinusIcon,
+  DotsVerticalIcon,
+  ChevronDownIcon,
+} from "@radix-ui/react-icons";
+import type grida from "@grida/schema";
+import {
+  SidebarSection,
+  SidebarSectionHeaderItem,
+  SidebarSectionHeaderLabel,
+  SidebarSectionHeaderActions,
+  SidebarMenuSectionContent,
+} from "@/components/sidebar";
+import { PropertyLine, PropertyEnum } from "../ui";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 
-const mimes = {
-  PNG: "image/png",
-  JPEG: "image/jpeg",
-  PDF: "application/pdf",
-  SVG: "image/svg+xml",
-} as const;
+/**
+ * Available scale presets for auto-assignment when adding new export configs
+ */
+const AUTO_SCALE_PRESETS = [1, 2, 3] as const;
+
+/**
+ * Generates auto suffix for a given scale (e.g., "@2x" for scale 2).
+ * Returns undefined for scale 1 (no suffix needed).
+ */
+function getAutoSuffix(scale: number): string | undefined {
+  if (scale === 1) {
+    return undefined;
+  }
+  return `@${scale}x`;
+}
+
+/**
+ * Checks if a suffix matches the auto-generated pattern for a given scale.
+ * This is used to determine if the suffix should be updated when scale changes.
+ */
+function isAutoSuffix(suffix: string | undefined, scale: number): boolean {
+  if (!suffix) {
+    return scale === 1;
+  }
+  return suffix === getAutoSuffix(scale);
+}
+
+/**
+ * Helper to convert NodeExportSettings to ExportConfigOf
+ * Used by export handlers to transform stored metadata into runtime export config
+ */
+function buildExportConfig(
+  settings: grida.program.document.NodeExportSettings
+): editorTypes.api.ExportConfigOf<
+  grida.program.document.NodeExportSettings["format"]
+> {
+  const format = settings.format;
+
+  // Vector formats (PDF, SVG) - no constraints
+  if (format === "PDF" || format === "SVG") {
+    return { format } as editorTypes.api.ExportConfigOf<typeof format>;
+  }
+
+  // Image formats - require constraints
+  const imageSettings =
+    settings as grida.program.document.NodeExportSettings_Image;
+  const constraints =
+    imageSettings.constraints &&
+    (imageSettings.constraints.type === "SCALE" ||
+      imageSettings.constraints.type === "WIDTH" ||
+      imageSettings.constraints.type === "HEIGHT")
+      ? {
+          type: imageSettings.constraints.type,
+          value: imageSettings.constraints.value,
+        }
+      : { type: "SCALE" as const, value: 1 };
+
+  if (format === "PNG" || format === "BMP") {
+    return {
+      format,
+      constraints,
+    } as editorTypes.api.ExportConfigOf<typeof format>;
+  }
+
+  // JPEG and WEBP support quality
+  return {
+    format,
+    constraints,
+    quality: imageSettings.quality,
+  } as editorTypes.api.ExportConfigOf<typeof format>;
+}
+
+/**
+ * Finds the next available scale from presets [1, 2, 3] that isn't already in use.
+ * If all presets are used, cycles back to 1.
+ */
+function getNextAvailableScale(
+  existingConfigs: grida.program.document.NodeExportSettings[]
+): number {
+  // Extract scales from existing configs
+  const usedScales = new Set<number>();
+  for (const config of existingConfigs) {
+    // Only image configs have constraints
+    if (
+      config.format === "PNG" ||
+      config.format === "JPEG" ||
+      config.format === "WEBP" ||
+      config.format === "BMP"
+    ) {
+      if (
+        config.constraints?.type === "SCALE" &&
+        config.constraints.value !== undefined
+      ) {
+        usedScales.add(config.constraints.value);
+      }
+    }
+  }
+
+  // Find first unused scale from presets
+  for (const preset of AUTO_SCALE_PRESETS) {
+    if (!usedScales.has(preset)) {
+      return preset;
+    }
+  }
+
+  // All presets are used, cycle back to first
+  return AUTO_SCALE_PRESETS[0];
+}
+
+export function ExportSection({
+  node_id,
+  name,
+}: {
+  node_id: string;
+  name: string;
+}) {
+  const editor = useCurrentEditor();
+
+  // Subscribe to metadata changes for this specific node
+  const nodeMetadata = useEditorState(
+    editor,
+    (state) => state.document.metadata?.[node_id]?.export_settings
+  );
+
+  // Get export configs - this will update when metadata changes
+  const exportConfigs = React.useMemo(() => {
+    return editor.getExportConfigs(node_id);
+  }, [editor, node_id, nodeMetadata]);
+
+  const hasConfigs = exportConfigs.length > 0;
+
+  const onAddConfig = () => {
+    const nextScale = getNextAvailableScale(exportConfigs);
+    const autoSuffix = getAutoSuffix(nextScale);
+    const newConfig: grida.program.document.NodeExportSettings_Image = {
+      format: "PNG",
+      constraints: { type: "SCALE", value: nextScale },
+      ...(autoSuffix !== undefined && { suffix: autoSuffix }),
+    };
+    editor.addExportConfig(node_id, newConfig);
+  };
+
+  return (
+    <SidebarSection
+      data-empty={!hasConfigs}
+      className="border-b pb-4 [&[data-empty='true']]:pb-0"
+    >
+      <SidebarSectionHeaderItem onClick={onAddConfig}>
+        <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderActions>
+          <Button variant="ghost" size="icon" className="size-4 p-0">
+            <PlusIcon className="size-3" />
+          </Button>
+        </SidebarSectionHeaderActions>
+      </SidebarSectionHeaderItem>
+      {hasConfigs && (
+        <SidebarMenuSectionContent className="space-y-2">
+          <ExportNodeControl node_id={node_id} name={name} />
+        </SidebarMenuSectionContent>
+      )}
+    </SidebarSection>
+  );
+}
 
 export function ExportNodeControl({
   node_id,
@@ -60,359 +212,638 @@ export function ExportNodeControl({
   disabled?: boolean;
 }) {
   const editor = useCurrentEditor();
-  const advancedExportDialog = useDialogState("advenced-export", {
-    refreshkey: true,
-  });
+  const [isExporting, setIsExporting] = React.useState(false);
 
-  const exportHandler = (
-    dataPromise: Promise<Uint8Array | string | false>,
-    format: "SVG" | "PDF" | "PNG" | "JPEG"
-  ): Promise<Blob> => {
-    return new Promise<Blob>(async (resolve, reject) => {
-      try {
-        const data = await dataPromise;
+  // Subscribe to metadata changes for this specific node
+  const nodeMetadata = useEditorState(
+    editor,
+    (state) => state.document.metadata?.[node_id]?.export_settings
+  );
 
-        if (!data) {
-          reject(new Error("Failed to export"));
+  // Get export configs - this will update when metadata changes
+  const exportConfigs = React.useMemo(() => {
+    return editor.getExportConfigs(node_id);
+  }, [editor, node_id, nodeMetadata]);
+
+  const onExportAll = async () => {
+    // Show spinner immediately
+    setIsExporting(true);
+
+    // Small delay to show spinner before starting expensive export
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    try {
+      if (exportConfigs.length === 1) {
+        // Single file: download as-is
+        const config = exportConfigs[0];
+        if (!config?.format) return;
+
+        const format = config.format;
+        if (
+          !editorTypes.internal.export_settings.ALL_FORMATS.includes(format)
+        ) {
           return;
         }
 
-        const blob = new Blob([data as BlobPart], { type: mimes[format] });
-        resolve(blob);
-      } catch (e) {
-        reject(e);
+        // Build export config from stored settings
+        const exportConfig = buildExportConfig(config);
+        const editorApi: editorTypes.api.IDocumentExportPluginActions = editor;
+        const data = await editorApi.exportNodeAs(
+          node_id,
+          format,
+          exportConfig
+        );
+
+        const blob = new Blob(
+          [typeof data === "string" ? data : (data as BlobPart)],
+          { type: editorTypes.internal.export_settings.getMimeType(format) }
+        );
+        const suffix = config.suffix ? `-${config.suffix}` : "";
+        saveAs(
+          blob,
+          `${name}${suffix}.${editorTypes.internal.export_settings.getFileExtension(format)}`
+        );
+        return;
       }
-    });
+
+      // Multiple files: create zip
+      const files: Record<string, Uint8Array> = {};
+
+      const tasks = exportConfigs.map(async (config, index) => {
+        if (!config?.format) return null;
+
+        const format = config.format;
+        if (
+          !editorTypes.internal.export_settings.ALL_FORMATS.includes(format)
+        ) {
+          return null;
+        }
+
+        // Build export config from stored settings
+        const exportConfig = buildExportConfig(config);
+        const editorApi: editorTypes.api.IDocumentExportPluginActions = editor;
+        const data = await editorApi.exportNodeAs(
+          node_id,
+          format,
+          exportConfig
+        );
+
+        const suffix = config.suffix ? `-${config.suffix}` : "";
+        const filename = `${name}${suffix}.${editorTypes.internal.export_settings.getFileExtension(format)}`;
+
+        // Convert to Uint8Array for zip
+        let bytes: Uint8Array;
+        if (typeof data === "string") {
+          bytes = new TextEncoder().encode(data);
+        } else {
+          // data is Uint8Array | false, but we already checked !data above
+          bytes = data as Uint8Array;
+        }
+
+        files[filename] = bytes;
+        return { filename, data };
+      });
+
+      await toast.promise(
+        Promise.all(tasks).then(() => {
+          // Create zip file
+          const zipData = zipSync(files);
+          const zipBlob = new Blob([zipData as BlobPart], {
+            type: "application/zip",
+          });
+          saveAs(zipBlob, `${name}.zip`);
+        }),
+        {
+          loading: `Exporting ${exportConfigs.length} file(s)...`,
+          success: `Exported ${exportConfigs.length} file(s) as ZIP`,
+          error: "Failed to export some files",
+        }
+      );
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  const onExport = async (format: "SVG" | "PDF" | "PNG" | "JPEG") => {
-    let task: Promise<Blob>;
+  const onRemoveConfig = (index: number) => {
+    editor.removeExportConfig(node_id, index);
+  };
 
-    switch (format) {
-      case "JPEG":
-      case "PNG":
-        task = exportHandler(editor.exportNodeAs(node_id, format), format);
-        break;
-      case "PDF":
-        task = exportHandler(editor.exportNodeAs(node_id, format), format);
-        break;
-      case "SVG":
-        task = exportHandler(editor.exportNodeAs(node_id, format), format);
-        break;
-    }
+  const onUpdateConfig = (
+    index: number,
+    updates: Partial<grida.program.document.NodeExportSettings>
+  ) => {
+    const current = exportConfigs[index];
+    if (!current) return;
 
-    if (task) {
-      toast.promise(task, {
-        loading: "Exporting...",
-        success: "Exported",
-        error: "Failed to export",
-      });
-
-      task.then((blob) => {
-        saveAs(blob, `${name}.${format.toLowerCase()}`);
-      });
-    } else {
-      toast.error("Export is not supported yet");
-    }
+    editor.updateExportConfig(node_id, index, {
+      ...current,
+      ...updates,
+    });
   };
 
   return (
     <>
-      {editor.backend === "dom" && (
-        <AdvancedExportDialog
-          {...advancedExportDialog.props}
-          key={advancedExportDialog.refreshkey}
-          defaultName={name}
-          node_id={node_id}
+      {exportConfigs.map((config, index) => (
+        <ExportConfigRow
+          key={index}
+          config={config}
+          onRemove={() => onRemoveConfig(index)}
+          onUpdate={(updates) => onUpdateConfig(index, updates)}
+          disabled={disabled}
         />
-      )}
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
+      ))}
+      {exportConfigs.length >= 1 && (
+        <PropertyLine>
           <Button
-            disabled={disabled}
             variant="outline"
             size="xs"
-            className="w-full overflow-hidden"
+            className="w-full overflow-hidden font-normal"
+            onClick={onExportAll}
+            disabled={disabled || isExporting}
           >
-            <span className="text-ellipsis overflow-hidden">Export as ...</span>
+            {isExporting ? (
+              <>
+                <Spinner className="size-3 mr-2 flex-shrink-0" />
+                <span className="truncate">Exporting...</span>
+              </>
+            ) : (
+              <span className="truncate">
+                Export <span className="font-mono">{name}</span>
+              </span>
+            )}
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="left" align="start" collisionPadding={16}>
-          {editor.backend === "dom" && (
-            <>
-              <DropdownMenuLabel>
-                <Badge variant="outline" className="text-xs">
-                  BETA
-                </Badge>
-                <br />
-                <div className="w-40">
-                  <small className="leading-tight font-normal text-muted-foreground">
-                    &quot;Export as&quot; is currently in beta and may produce
-                    inconsistent outputs.
-                  </small>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-            </>
-          )}
-
-          <DropdownMenuItem
-            className="text-xs"
-            onSelect={() => onExport("PNG")}
-          >
-            PNG
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs"
-            onSelect={() => onExport("JPEG")}
-          >
-            JPEG
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs"
-            onSelect={() => onExport("SVG")}
-          >
-            SVG
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs"
-            onSelect={() => onExport("PDF")}
-          >
-            PDF
-          </DropdownMenuItem>
-          {editor.backend === "dom" && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-xs"
-                onSelect={advancedExportDialog.openDialog}
-              >
-                <CodeIcon className="size-3.5" />
-                Advanced
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </PropertyLine>
+      )}
     </>
   );
 }
 
-function AdvancedExportDialog({
-  node_id,
-  defaultName,
-  ...props
-}: React.ComponentProps<typeof Dialog> & {
-  node_id: string;
-  defaultName: string;
+function ExportConfigRow({
+  config,
+  onRemove,
+  onUpdate,
+  disabled,
+}: {
+  config: grida.program.document.NodeExportSettings;
+  onRemove: () => void;
+  onUpdate: (
+    updates: Partial<grida.program.document.NodeExportSettings>
+  ) => void;
+  disabled?: boolean;
 }) {
-  const [backend, setBackend] = React.useState<"canvas" | "p666">("canvas");
-  const [format, setFormat] = React.useState<"PNG" | "SVG" | "JPEG" | "PDF">(
-    "PNG"
-  );
-  const [name, setName] = React.useState<string>(defaultName);
-  const [xpath, setXPath] = React.useState<string>("");
+  const format: editorTypes.internal.export_settings.Format = (config.format ||
+    "PNG") as editorTypes.internal.export_settings.Format;
 
-  const options = {
-    canvas: ["PNG", "SVG", "JPEG"],
-    p666: ["PNG", "PDF"],
+  // Extract scale value - only image configs have constraints
+  const scaleValue =
+    (config.format === "PNG" ||
+      config.format === "JPEG" ||
+      config.format === "WEBP" ||
+      config.format === "BMP") &&
+    (config as grida.program.document.NodeExportSettings_Image).constraints
+      ?.type === "SCALE"
+      ? (config as grida.program.document.NodeExportSettings_Image).constraints!
+          .value
+      : 1;
+
+  // Scale is not supported for vector formats (SVG) and PDF
+  const scaleSupported =
+    editorTypes.internal.export_settings.supportsScale(format);
+
+  const handleFormatChange = (newFormat: string) => {
+    const validFormat = editorTypes.internal.export_settings.ALL_FORMATS.find(
+      (f) => f === newFormat
+    );
+    if (validFormat) {
+      onUpdate({ format: validFormat });
+    }
   };
 
-  const onExport = async () => {
-    switch (format) {
-      case "PNG":
-      case "JPEG":
-      case "SVG":
-        {
-          const result = await exportAsImage(node_id, format);
-          if (!result) {
-            toast.error("Failed to export");
-            return;
-          }
-          await fetch(result.url)
-            .then((res) => res.blob())
-            .then((blob) => {
-              saveAs(blob, `${name}.${format}`);
-            });
-        }
-        break;
-      case "PDF":
-        const task = exportWithP666(node_id, format).then((blob) => {
-          saveAs(blob, `${name}.${format}`);
-        });
+  const handleScaleChange = (newScale: string) => {
+    const oldScale = scaleValue;
+    const scale = parseFloat(newScale) || 1;
 
-        toast.promise(task, {
-          loading: "Exporting...",
-          success: "Exported",
-          error: "Failed to export",
+    // If suffix matches the auto pattern for old scale, update it for new scale
+    const currentSuffix = config.suffix;
+    const shouldUpdateSuffix = isAutoSuffix(currentSuffix, oldScale);
+
+    // Only image configs can have constraints
+    if (
+      config.format === "PNG" ||
+      config.format === "JPEG" ||
+      config.format === "WEBP" ||
+      config.format === "BMP"
+    ) {
+      const updates: {
+        constraints: { type: "SCALE"; value: number };
+        suffix?: string;
+      } = {
+        constraints: { type: "SCALE", value: scale },
+      };
+
+      if (shouldUpdateSuffix) {
+        const newSuffix = getAutoSuffix(scale);
+        if (newSuffix !== undefined) {
+          updates.suffix = newSuffix;
+        }
+        // If scale is 1, we omit suffix (don't set it to undefined)
+      }
+
+      onUpdate(updates as Partial<grida.program.document.NodeExportSettings>);
+    }
+  };
+
+  const scalePresets = [0.5, 0.75, 1, 1.5, 2, 3, 4];
+  const hasPreset = scalePresets.includes(scaleValue);
+
+  return (
+    <Popover modal={false}>
+      <PropertyLine>
+        <div className="flex items-center w-full gap-2">
+          <div className="relative w-20">
+            <InputPropertyNumber
+              mode="fixed"
+              disabled={disabled || !scaleSupported}
+              type="number"
+              value={scaleValue}
+              placeholder="1"
+              suffix="x"
+              min={0.1}
+              max={10}
+              step={0.05}
+              className={cn(
+                WorkbenchUI.inputVariants({ size: "xs" }),
+                "overflow-hidden",
+                "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              )}
+              onValueCommit={(v) => {
+                if (v !== undefined) {
+                  handleScaleChange(v.toString());
+                }
+              }}
+              aria-label="Export scale"
+            />
+            <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
+              <Select
+                value={hasPreset ? scaleValue.toString() + "x" : undefined}
+                onValueChange={(v) => {
+                  const scale = parseFloat(v.replace("x", "")) || 1;
+                  handleScaleChange(scale.toString());
+                }}
+                disabled={disabled || !scaleSupported}
+              >
+                <SelectPrimitive.SelectTrigger asChild>
+                  <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-1 opacity-50">
+                    <ChevronDownIcon />
+                  </button>
+                </SelectPrimitive.SelectTrigger>
+                <SelectContent align="end">
+                  {scalePresets.map((preset) => (
+                    <SelectItem key={preset} value={preset.toString() + "x"}>
+                      {preset}x
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <PropertyEnum
+            value={format}
+            onValueChange={handleFormatChange}
+            disabled={disabled}
+            enum={[...editorTypes.internal.export_settings.ALL_FORMATS]}
+            className="flex-1"
+          />
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-4 p-0"
+              disabled={disabled}
+            >
+              <DotsVerticalIcon className="size-3" />
+            </Button>
+          </PopoverTrigger>
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+            className="cursor-pointer size-4 p-0"
+            tabIndex={-1}
+            disabled={disabled}
+          >
+            <MinusIcon className="size-3.5" />
+          </Button>
+        </div>
+        <ExportConfigPopoverContent
+          config={config}
+          onUpdate={onUpdate}
+          disabled={disabled}
+        />
+      </PropertyLine>
+    </Popover>
+  );
+}
+
+function ExportConfigPopoverContent({
+  config,
+  onUpdate,
+  disabled,
+}: {
+  config: grida.program.document.NodeExportSettings;
+  onUpdate: (
+    updates: Partial<grida.program.document.NodeExportSettings>
+  ) => void;
+  disabled?: boolean;
+}) {
+  const format = config.format || "PNG";
+  const isImageFormat =
+    format === "PNG" ||
+    format === "JPEG" ||
+    format === "WEBP" ||
+    format === "BMP";
+  const imageConfig = isImageFormat
+    ? (config as grida.program.document.NodeExportSettings_Image)
+    : null;
+
+  const [suffix, setSuffix] = React.useState<string>(config.suffix || "");
+  const [constraintType, setConstraintType] = React.useState<
+    "NONE" | "SCALE" | "WIDTH" | "HEIGHT"
+  >(imageConfig?.constraints?.type || "SCALE");
+  const [constraintValue, setConstraintValue] = React.useState<string>(
+    imageConfig?.constraints?.value?.toString() || "1"
+  );
+  const [quality, setQuality] = React.useState<number | undefined>(
+    imageConfig?.quality
+  );
+
+  React.useEffect(() => {
+    setSuffix(config.suffix || "");
+    if (imageConfig) {
+      setConstraintType(imageConfig.constraints?.type || "SCALE");
+      setConstraintValue(imageConfig.constraints?.value?.toString() || "1");
+      setQuality(imageConfig.quality);
+    }
+  }, [config, imageConfig]);
+
+  const handleSuffixChange = (value: string) => {
+    setSuffix(value);
+    onUpdate({ suffix: value || undefined });
+  };
+
+  const handleConstraintChange = (
+    type: "NONE" | "SCALE" | "WIDTH" | "HEIGHT",
+    value?: number
+  ) => {
+    setConstraintType(type);
+    if (value !== undefined) {
+      setConstraintValue(value.toString());
+    }
+    // Only image configs can have constraints
+    if (isImageFormat) {
+      // Note: According to the type, NONE still requires a value
+      const constraintValueNum = value || parseFloat(constraintValue) || 1;
+      onUpdate({
+        constraints: { type, value: constraintValueNum },
+      } as Partial<grida.program.document.NodeExportSettings_Image>);
+    }
+  };
+
+  const handleQualityChange = (value: string) => {
+    const qualityMap: Record<string, number> = {
+      High: 90,
+      Medium: 75,
+      Low: 50,
+    };
+    const qualityValue = qualityMap[value];
+    if (qualityValue !== undefined && isImageFormat) {
+      setQuality(qualityValue);
+      onUpdate({
+        quality: qualityValue,
+      } as Partial<grida.program.document.NodeExportSettings_Image>);
+    }
+  };
+
+  const getQualityLabel = (q: number | undefined): string | undefined => {
+    if (q === undefined) return undefined;
+    if (q === 90) return "High";
+    if (q === 75) return "Medium";
+    if (q === 50) return "Low";
+    return undefined;
+  };
+
+  return (
+    <PopoverContent align="end" side="left" className="w-64">
+      <div className="grid gap-4">
+        <div className="grid gap-2">
+          <Label>Suffix</Label>
+          <Input
+            placeholder="e.g., @2x, -dark"
+            value={suffix}
+            onChange={(e) => handleSuffixChange(e.target.value)}
+            disabled={disabled}
+            className={WorkbenchUI.inputVariants({ size: "xs" })}
+          />
+        </div>
+        {editorTypes.internal.export_settings.supportsQuality(format) && (
+          <div className="grid gap-2">
+            <Label>Quality</Label>
+            <PropertyEnum
+              value={getQualityLabel(quality)}
+              onValueChange={handleQualityChange}
+              disabled={disabled}
+              placeholder="High"
+              enum={["High", "Medium", "Low"]}
+            />
+          </div>
+        )}
+        <div className="grid gap-2">
+          <Label>Constraint</Label>
+          <PropertyEnum
+            value={constraintType}
+            onValueChange={(v) =>
+              handleConstraintChange(
+                v as "NONE" | "SCALE" | "WIDTH" | "HEIGHT",
+                parseFloat(constraintValue)
+              )
+            }
+            disabled={disabled}
+            enum={["NONE", "SCALE", "WIDTH", "HEIGHT"]}
+          />
+          {constraintType !== "NONE" && (
+            <InputPropertyNumber
+              mode="fixed"
+              type="number"
+              step={0.1}
+              min={0.1}
+              max={10}
+              value={parseFloat(constraintValue) || 1}
+              onValueCommit={(v) => {
+                if (v !== undefined) {
+                  setConstraintValue(v.toString());
+                  handleConstraintChange(constraintType, v);
+                }
+              }}
+              placeholder="1.0"
+              disabled={disabled}
+              className={WorkbenchUI.inputVariants({ size: "xs" })}
+            />
+          )}
+        </div>
+      </div>
+    </PopoverContent>
+  );
+}
+
+/**
+ * Minimal export component for multiple node selection
+ * Shows a single button to export all selected layers
+ */
+export function ExportMultipleLayers({
+  node_ids,
+  disabled,
+}: {
+  node_ids: string[];
+  disabled?: boolean;
+}) {
+  const editor = useCurrentEditor();
+  const [isExporting, setIsExporting] = React.useState(false);
+  const count = node_ids.length;
+
+  const onExportAll = async () => {
+    if (node_ids.length === 0) return;
+
+    // Show spinner immediately
+    setIsExporting(true);
+
+    // Small delay to show spinner before starting expensive export
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    try {
+      // Filter nodes that have export_settings configured
+      const nodesWithConfigs = node_ids.filter((node_id) => {
+        const configs = editor.getExportConfigs(node_id);
+        return configs.length > 0;
+      });
+
+      if (nodesWithConfigs.length === 0) {
+        toast.error("No export configurations found for selected layers");
+        return;
+      }
+
+      // Get node names only when exporting
+      const nodeNames = nodesWithConfigs.reduce(
+        (acc, id, index) => {
+          const node = editor.doc.state.document.nodes[id];
+          acc[id] = node?.name || `layer-${index + 1}`;
+          return acc;
+        },
+        {} as Record<string, string>
+      );
+
+      const files: Record<string, Uint8Array> = {};
+
+      const tasks = nodesWithConfigs.flatMap((node_id) => {
+        const configs = editor.getExportConfigs(node_id);
+        return configs.map(async (config, configIndex) => {
+          if (!config?.format) return null;
+
+          const format = config.format;
+          if (
+            !editorTypes.internal.export_settings.ALL_FORMATS.includes(format)
+          ) {
+            return null;
+          }
+
+          const exportConfig = buildExportConfig(config);
+          const editorApi: editorTypes.api.IDocumentExportPluginActions =
+            editor;
+          const data = await editorApi.exportNodeAs(
+            node_id,
+            format,
+            exportConfig
+          );
+
+          const nodeName =
+            nodeNames[node_id] ||
+            `layer-${nodesWithConfigs.indexOf(node_id) + 1}`;
+          const suffix = config.suffix ? `-${config.suffix}` : "";
+          const filename = `${nodeName}${suffix}.${editorTypes.internal.export_settings.getFileExtension(format)}`;
+
+          // Convert to Uint8Array for zip
+          let bytes: Uint8Array;
+          if (typeof data === "string") {
+            bytes = new TextEncoder().encode(data);
+          } else {
+            bytes = data as Uint8Array;
+          }
+
+          files[filename] = bytes;
+          return { filename, data };
         });
-        break;
+      });
+
+      const results = await Promise.all(tasks);
+      const exportedCount = results.filter((r) => r !== null).length;
+
+      if (exportedCount === 0) {
+        toast.error("No files were exported");
+        return;
+      }
+
+      await toast.promise(
+        Promise.resolve().then(() => {
+          // Create zip file
+          const zipData = zipSync(files);
+          const zipBlob = new Blob([zipData as BlobPart], {
+            type: "application/zip",
+          });
+          saveAs(zipBlob, `export-${exportedCount}-files.zip`);
+        }),
+        {
+          loading: `Exporting ${exportedCount} file(s)...`,
+          success: `Exported ${exportedCount} file(s) as ZIP`,
+          error: "Failed to export some files",
+        }
+      );
+    } finally {
+      setIsExporting(false);
     }
   };
 
   return (
-    <Dialog modal={false} {...props}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Advanced Export</DialogTitle>
-          <DialogDescription>
-            Export node with advanced options
-          </DialogDescription>
-        </DialogHeader>
-        <hr />
-        <div className="grid gap-8 my-4">
-          <div className="grid gap-2">
-            <Label>Mode</Label>
-            <ToggleGroup
-              type="single"
-              value={backend}
-              onValueChange={(v) => v && setBackend(v as any)}
-              className="w-min"
-            >
-              <ToggleGroupItem value="canvas">Canvas</ToggleGroupItem>
-              <ToggleGroupItem value="p666">Daemon</ToggleGroupItem>
-            </ToggleGroup>
-            {backend === "p666" && (
-              <div className="text-xs">
-                To use daemon, run{" "}
-                <Link
-                  href="https://github.com/gridaco/puppeteer-666"
-                  target="_blank"
-                >
-                  p666
-                </Link>{" "}
-                on your machine
-                <br />
-                <code>{">"} npx p666</code>
-              </div>
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <Button
+            variant="outline"
+            size="xs"
+            className="w-full overflow-hidden font-normal"
+            onClick={onExportAll}
+            disabled={disabled || isExporting}
+          >
+            {isExporting ? (
+              <>
+                <Spinner className="size-3 mr-2 flex-shrink-0" />
+                <span className="truncate">Exporting...</span>
+              </>
+            ) : (
+              <span className="truncate">
+                Export {count} layer{count !== 1 ? "s" : ""}
+              </span>
             )}
-          </div>
-          <div className="grid gap-2">
-            <Label>Name</Label>
-            <Input
-              placeholder="filename"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Format</Label>
-            <Select value={format} onValueChange={(v) => setFormat(v as any)}>
-              <SelectTrigger>
-                <SelectValue placeholder="format" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  value="PNG"
-                  disabled={!options[backend].includes("PNG")}
-                >
-                  PNG
-                </SelectItem>
-                <SelectItem
-                  value="SVG"
-                  disabled={!options[backend].includes("SVG")}
-                >
-                  SVG
-                </SelectItem>
-                <SelectItem
-                  value="PDF"
-                  disabled={!options[backend].includes("PDF")}
-                >
-                  PDF
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="grid gap-4">
-          <div className="grid gap-2">
-            <Label>Filter</Label>
-            <Collapsible>
-              <CollapsibleTrigger>
-                <small>
-                  <QuestionMarkCircledIcon className="size-3 me-2 inline" />
-                  Learn More About Grida XPath
-                </small>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <GridaXPathHelpArticle />
-              </CollapsibleContent>
-            </Collapsible>
-            <Select
-              value={xpath || undefined}
-              onValueChange={(v) => setXPath(v)}
-              disabled={backend === "p666"}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose preset" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="//*[not(@data-grida-node-type='text')]">
-                  Exclude Text
-                </SelectItem>
-                {/* TODO: inspect me */}
-                <SelectItem value="//*[not(@data-grida-node-type='image')]">
-                  Exclude Image
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Textarea
-              placeholder="e.g. //*[not(@data-grida-node-type='text')]"
-              value={xpath}
-              disabled={backend === "p666"}
-              onChange={(e) => setXPath(e.target.value)}
-            />
-          </div>
-        </div>
-        <hr />
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Close</Button>
-          </DialogClose>
-          <DialogClose asChild>
-            <Button onClick={onExport}>Export</Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function GridaXPathHelpArticle() {
-  return (
-    <article className="prose prose-sm dark:prose-invert">
-      <p>
-        Use an XPath query to filter elements in the export process. You can
-        target specific elements based on their attributes, such as:
-      </p>
-      <ul>
-        <li>
-          <code>data-grida-node-id</code>: The unique identifier for each node.
-        </li>
-        <li>
-          <code>data-grida-node-locked</code>: Indicates whether the node is
-          locked.
-        </li>
-        <li>
-          <code>data-grida-node-type</code>: Specifies the type of node (e.g.,
-          text, image, container).
-        </li>
-      </ul>
-      <p>Examples:</p>
-      <ul>
-        <li>
-          Exclude nodes with a specific ID:
-          <code>//*[@data-grida-node-id='node123']</code>
-        </li>
-        <li>
-          Exclude all locked nodes:
-          <code>//*[@data-grida-node-locked='true']</code>
-        </li>
-        <li>
-          Exclude all nodes of a certain type (e.g., images):
-          <code>//*[@data-grida-node-type='image']</code>
-        </li>
-      </ul>
-    </article>
+          </Button>
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
   );
 }
