@@ -2,7 +2,7 @@ import { saveAs } from "file-saver";
 import { Button } from "@/components/ui-editor/button";
 import { toast } from "sonner";
 import React from "react";
-import { zipSync } from "fflate";
+import { io } from "@grida/io";
 import { Input } from "@/components/ui/input";
 import InputPropertyNumber from "../ui/number";
 import { WorkbenchUI } from "@/components/workbench";
@@ -286,13 +286,7 @@ export function ExportNodeControl({
         const filename = `${name}${suffix}.${editorTypes.internal.export_settings.getFileExtension(format)}`;
 
         // Convert to Uint8Array for zip
-        let bytes: Uint8Array;
-        if (typeof data === "string") {
-          bytes = new TextEncoder().encode(data);
-        } else {
-          // data is Uint8Array | false, but we already checked !data above
-          bytes = data as Uint8Array;
-        }
+        const bytes = io.zip.ensureUint8Array(data);
 
         files[filename] = bytes;
         return { filename, data };
@@ -301,7 +295,7 @@ export function ExportNodeControl({
       await toast.promise(
         Promise.all(tasks).then(() => {
           // Create zip file
-          const zipData = zipSync(files);
+          const zipData = io.zip.create(files);
           const zipBlob = new Blob([zipData as BlobPart], {
             type: "application/zip",
           });
@@ -771,12 +765,7 @@ export function ExportMultipleLayers({
           const filename = `${nodeName}${suffix}.${editorTypes.internal.export_settings.getFileExtension(format)}`;
 
           // Convert to Uint8Array for zip
-          let bytes: Uint8Array;
-          if (typeof data === "string") {
-            bytes = new TextEncoder().encode(data);
-          } else {
-            bytes = data as Uint8Array;
-          }
+          const bytes = io.zip.ensureUint8Array(data);
 
           files[filename] = bytes;
           return { filename, data };
@@ -794,7 +783,7 @@ export function ExportMultipleLayers({
       await toast.promise(
         Promise.resolve().then(() => {
           // Create zip file
-          const zipData = zipSync(files);
+          const zipData = io.zip.create(files);
           const zipBlob = new Blob([zipData as BlobPart], {
             type: "application/zip",
           });

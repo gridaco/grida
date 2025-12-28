@@ -861,6 +861,53 @@ export namespace io {
     }
   }
 
+  export namespace zip {
+    /**
+     * Ensures export data is a Uint8Array, encoding strings if needed.
+     * Used when preparing export data for zip file creation.
+     *
+     * @param data - The export data, either a string (e.g., SVG) or Uint8Array (e.g., PNG, JPEG)
+     * @returns Uint8Array representation of the data
+     *
+     * @example
+     * ```typescript
+     * const svgData = "<svg>...</svg>";
+     * const bytes = io.zip.ensureUint8Array(svgData);
+     *
+     * const pngData = new Uint8Array([...]);
+     * const bytes = io.zip.ensureUint8Array(pngData);
+     * ```
+     */
+    export function ensureUint8Array(data: string | Uint8Array): Uint8Array {
+      if (typeof data === "string") {
+        return new TextEncoder().encode(data);
+      }
+      return data;
+    }
+
+    /**
+     * Creates a ZIP file from a record of filenames to file data.
+     * Each file in the record will be included in the ZIP archive.
+     *
+     * @param files - Record mapping filenames to their Uint8Array data
+     * @returns Uint8Array containing the ZIP file data
+     *
+     * @example
+     * ```typescript
+     * const files = {
+     *   "image-1x.png": png1xData,
+     *   "image-2x.png": png2xData,
+     *   "vector.svg": svgData,
+     * };
+     * const zipData = io.zip.create(files);
+     * const blob = new Blob([zipData], { type: "application/zip" });
+     * ```
+     */
+    export function create(files: Record<string, Uint8Array>): Uint8Array {
+      return zipSync(files);
+    }
+  }
+
   function __norm_png_data(data: PngDataArray): Uint8ClampedArray {
     return data instanceof Uint8ClampedArray
       ? data
