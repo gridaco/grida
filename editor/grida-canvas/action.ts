@@ -73,7 +73,9 @@ export type DocumentAction =
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction
   //
-  | SchemaAction;
+  | SchemaAction
+  //
+  | MetadataAction;
 
 type NodeID = string & {};
 type Vector2 = [number, number];
@@ -1052,3 +1054,23 @@ export interface DocumentSchemaDeletePropertyAction {
   type: "document/properties/delete";
   key: string;
 }
+
+export type MetadataAction =
+  | {
+      type: "node-metadata/set";
+      node_id: string;
+      namespace: "export_settings";
+      data: grida.program.document.NodeExportSettings[];
+    }
+  | {
+      type: "node-metadata/set";
+      node_id: string;
+      namespace: "userdata";
+      data: Record<string, unknown> | null;
+    }
+  | {
+      type: "node-metadata/remove";
+      node_id: string;
+      namespace: "export_settings" | "userdata";
+    }
+  | { type: "node-metadata/remove-all"; node_id: string };

@@ -123,6 +123,7 @@ export class DocumentSyncManager {
             nodes: localDocument.nodes,
             scenes_ref: localDocument.scenes_ref,
             links: localDocument.links,
+            metadata: localDocument.metadata,
           },
         },
       ]);

@@ -401,8 +401,36 @@ create index canvas_node_by_doc on grida_canvas.canvas_node (doc_id);
 create index canvas_node_by_doc_type on grida_canvas.canvas_node (doc_id, node_type);
 create index canvas_node_link_by_child on grida_canvas.canvas_node_link (doc_id, child_node_id);
 
+-- Node metadata table (editor-only data, separate from renderable node data)
+-- This table stores per-node metadata keyed by namespace.
+-- Currently used for export settings (namespace = 'export_settings').
+-- 
+-- This table definition serves as documentation for future database persistence.
+create table grida_canvas.canvas_node_metadata (
+    doc_id uuid not null,
+    node_id grida_canvas.object_id not null,
+    namespace text not null default 'default',
+    data jsonb not null default '{}'::jsonb,
+    
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    
+    primary key (doc_id, node_id, namespace),
+    
+    foreign key (doc_id, node_id)
+      references grida_canvas.canvas_node (doc_id, node_id)
+      on delete cascade
+);
+
+create index canvas_node_metadata_by_doc 
+  on grida_canvas.canvas_node_metadata (doc_id);
+create index canvas_node_metadata_by_node 
+  on grida_canvas.canvas_node_metadata (doc_id, node_id);
+create index canvas_node_metadata_by_namespace 
+  on grida_canvas.canvas_node_metadata (doc_id, namespace);
+
 /*
-Shape parity checklist (draft; “obvious” alignment only):
+Shape parity checklist (draft; "obvious" alignment only):
 
 - Node::InitialContainer -> node_type='initial_container' + layout_* container fields as needed
 - Node::Container        -> node_type='container' + clip + layout_* + fill_paints/stroke_paints/effects

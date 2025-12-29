@@ -3,6 +3,8 @@ import type { editor } from "..";
 import type { Editor } from "../editor";
 import type { Scene, svgtypes } from "@grida/canvas-wasm";
 import type vn from "@grida/vn";
+import type grida from "@grida/schema";
+import type { types } from "@grida/canvas-wasm";
 import {
   UnifiedFontManager,
   type FontAdapter,
@@ -45,7 +47,14 @@ export class CanvasWasmGeometryQueryInterfaceProvider
 export class CanvasWasmDefaultExportInterfaceProvider
   implements editor.api.IDocumentExporterInterfaceProvider
 {
-  readonly formats = ["PNG", "JPEG", "PDF", "SVG"];
+  readonly formats: grida.program.document.NodeExportSettings["format"][] = [
+    "PNG",
+    "JPEG",
+    "PDF",
+    "SVG",
+    "WEBP",
+    "BMP",
+  ];
 
   constructor(
     readonly editor: Editor,
@@ -53,23 +62,45 @@ export class CanvasWasmDefaultExportInterfaceProvider
   ) {}
 
   canExportNodeAs(
-    node_id: string,
-    format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
+    _node_id: string,
+    format: grida.program.document.NodeExportSettings["format"] | (string & {})
   ): boolean {
-    return this.formats.includes(format);
+    return this.formats.includes(format as any);
   }
 
   async exportNodeAsImage(
     node_id: string,
-    format: "PNG" | "JPEG"
+    format: "PNG" | "JPEG" | "WEBP" | "BMP",
+    config?: editor.api.ExportConfigOf<"PNG" | "JPEG" | "WEBP" | "BMP">
   ): Promise<Uint8Array> {
-    const data = await this.surface.exportNodeAs(node_id, {
-      format: format,
-      constraints: {
-        type: "SCALE",
-        value: 1,
-      },
-    });
+    const constraints: types.ExportConstraints = config?.constraints || {
+      type: "scale",
+      value: 1,
+    };
+
+    // Build format-specific export config
+    let exportFormat: types.ExportAs;
+    switch (format) {
+      // lossless formats
+      case "BMP":
+      case "PNG":
+        exportFormat = { format: "PNG", constraints };
+        break;
+      // with quality
+      case "JPEG":
+      case "WEBP":
+        exportFormat = {
+          format: "JPEG",
+          constraints,
+          quality: config?.quality,
+        };
+        break;
+
+      default:
+        throw new Error(`Unsupported image format: ${format}`);
+    }
+
+    const data = await this.surface.exportNodeAs(node_id, exportFormat);
     return data.data;
   }
 
@@ -88,23 +119,34 @@ export class CanvasWasmDefaultExportInterfaceProvider
     return str;
   }
 
-  exportNodeAs(
+  exportNodeAs<F extends grida.program.document.NodeExportSettings["format"]>(
     node_id: string,
-    format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
-  ): Promise<Uint8Array | string> {
+    format: F,
+    config?: editor.api.ExportConfigOf<F>
+  ): Promise<F extends "SVG" ? string : Uint8Array> {
     switch (format) {
       case "PNG":
-      case "JPEG": {
-        return this.exportNodeAsImage(node_id, format as "PNG" | "JPEG");
+      case "JPEG":
+      case "WEBP":
+      case "BMP": {
+        return this.exportNodeAsImage(
+          node_id,
+          format as "PNG" | "JPEG" | "WEBP" | "BMP",
+          config as editor.api.ExportConfigOf<"PNG" | "JPEG" | "WEBP" | "BMP">
+        ) as Promise<F extends "SVG" ? string : Uint8Array>;
       }
       case "PDF": {
-        return this.exportNodeAsPDF(node_id);
+        return this.exportNodeAsPDF(node_id) as Promise<
+          F extends "SVG" ? string : Uint8Array
+        >;
       }
       case "SVG": {
-        return this.exportNodeAsSVG(node_id);
+        return this.exportNodeAsSVG(node_id) as Promise<
+          F extends "SVG" ? string : Uint8Array
+        >;
       }
       default: {
-        throw new Error("Non supported format");
+        throw new Error(`Non supported format: ${format}`);
       }
     }
   }

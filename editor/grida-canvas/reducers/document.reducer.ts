@@ -23,6 +23,8 @@ import assert from "assert";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import updateNodeTransform from "./node-transform.reducer";
+import metadataReducer from "./metadata.reducer";
+import schemaReducer from "./schema.reducer";
 import { __validateHoverState } from "./methods/hover";
 import {
   self_clearSelection,
@@ -56,7 +58,6 @@ import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import { layout } from "@grida/cmath/_layout";
 import { snapMovement } from "./tools/snap";
-import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import { v4 } from "uuid";
 import type { ReducerContext } from ".";
@@ -2031,6 +2032,20 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           action
         );
         //
+      });
+    }
+
+    case "node-metadata/set":
+    case "node-metadata/remove":
+    case "node-metadata/remove-all": {
+      return updateState(state, (draft) => {
+        if (!draft.document.metadata) {
+          draft.document.metadata = {};
+        }
+        draft.document.metadata = metadataReducer(
+          draft.document.metadata,
+          action
+        );
       });
     }
 

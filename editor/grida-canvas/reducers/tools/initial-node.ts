@@ -69,7 +69,6 @@ export default function initialNode(
     grida.program.nodes.i.ISceneNode = {
     id: id,
     name: type,
-    userdata: undefined,
     //
     locked: false,
     active: true,

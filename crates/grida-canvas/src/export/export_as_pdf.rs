@@ -4,6 +4,7 @@ use crate::{
     runtime::{
         camera::Camera2D,
         font_repository::FontRepository,
+        image_repository::ImageRepository,
         scene::{Backend, Renderer, RendererOptions},
     },
 };
@@ -14,6 +15,7 @@ use std::io::Cursor;
 pub fn export_node_as_pdf(
     scene: &Scene,
     fonts: &FontRepository,
+    images: &ImageRepository,
     rect: Rectangle,
     _options: ExportAsPDF,
 ) -> Option<Exported> {
@@ -45,6 +47,7 @@ pub fn export_node_as_pdf(
     );
 
     renderer.fonts = fonts.clone();
+    renderer.images = images.clone();
 
     // Load the scene
     renderer.load_scene(scene.clone());

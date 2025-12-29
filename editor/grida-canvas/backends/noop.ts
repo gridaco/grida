@@ -1,4 +1,5 @@
 import cmath from "@grida/cmath";
+import type grida from "@grida/schema";
 import type { editor } from "..";
 
 export class NoopGeometryQueryInterfaceProvider
@@ -33,10 +34,11 @@ export class NoopDefaultExportInterfaceProvider
     return false;
   }
 
-  exportNodeAs(
+  exportNodeAs<F extends grida.program.document.NodeExportSettings["format"]>(
     _node_id: string,
-    _format: "PNG" | "JPEG" | "PDF" | "SVG" | (string & {})
-  ): Promise<Uint8Array | string> {
+    _format: F,
+    _config?: editor.api.ExportConfigOf<F>
+  ): Promise<F extends "SVG" ? string : Uint8Array> {
     throw new Error("Not implemented");
   }
 }

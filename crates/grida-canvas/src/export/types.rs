@@ -3,13 +3,13 @@ use serde::Deserialize;
 #[derive(Clone, Deserialize)]
 #[serde(tag = "type", content = "value")]
 pub enum ExportConstraints {
-    #[serde(rename = "NONE")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename = "SCALE")]
+    #[serde(rename = "scale")]
     Scale(f32),
-    #[serde(rename = "WIDTH")]
+    #[serde(rename = "scale-to-fit-width")]
     ScaleToWidth(f32),
-    #[serde(rename = "HEIGHT")]
+    #[serde(rename = "scale-to-fit-height")]
     ScaleToHeight(f32),
 }
 
@@ -29,11 +29,19 @@ impl Default for ExportAsPNG {
 #[derive(Clone, Deserialize)]
 pub struct ExportAsJPEG {
     pub(crate) constraints: ExportConstraints,
+
+    /// 0-100, None means use Skia default (100)
+    #[serde(default)]
+    pub(crate) quality: Option<u32>,
 }
 
 #[derive(Clone, Deserialize)]
 pub struct ExportAsWEBP {
     pub(crate) constraints: ExportConstraints,
+
+    /// 0-100, None means use Skia default (75)
+    #[serde(default)]
+    pub(crate) quality: Option<u32>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -106,8 +114,11 @@ impl ExportAs {
         Self::PNG(ExportAsPNG::default())
     }
 
-    pub fn jpeg(constraints: ExportConstraints) -> Self {
-        Self::JPEG(ExportAsJPEG { constraints })
+    pub fn jpeg(constraints: ExportConstraints, quality: Option<u32>) -> Self {
+        Self::JPEG(ExportAsJPEG {
+            constraints,
+            quality,
+        })
     }
 
     pub fn pdf() -> Self {

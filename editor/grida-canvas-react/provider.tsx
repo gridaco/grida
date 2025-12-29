@@ -101,7 +101,7 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyProps(node_id, key, value),
       // attributes
       userdata: (value: any) =>
-        instance.commands.changeNodeUserData(node_id, value),
+        instance.setUserData(node_id, value as Record<string, unknown> | null),
       name: (name: string) => {
         node.name = name;
       },
@@ -856,4 +856,25 @@ export function useTemplateDefinition(template_id: string) {
   const templates = useEditorState(editor, (state) => state.templates);
 
   return templates![template_id];
+}
+
+/**
+ * Hook to access node metadata by namespace
+ * @param node_id - The node ID
+ * @param namespace - The metadata namespace ("export_settings" | "userdata")
+ * @returns The metadata value for the specified namespace, or undefined if not set
+ */
+export function useNodeMetadata<NS extends "export_settings" | "userdata">(
+  node_id: string,
+  namespace: NS
+): NS extends "export_settings"
+  ? grida.program.document.NodeExportSettings[] | undefined
+  : NS extends "userdata"
+    ? Record<string, unknown> | null | undefined
+    : never {
+  const editor = useCurrentEditor();
+  return useEditorState(
+    editor,
+    (state) => state.document.metadata?.[node_id]?.[namespace]
+  ) as any;
 }

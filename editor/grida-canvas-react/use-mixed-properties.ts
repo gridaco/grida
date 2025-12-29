@@ -35,7 +35,7 @@ export function useMixedProperties(ids: string[]) {
         nodes as grida.program.nodes.UnknwonNode[],
         {
           idKey: "id",
-          ignoredKey: ["id", "type", "userdata"],
+          ignoredKey: ["id", "type"],
           mixed: grida.mixed,
         }
       ),

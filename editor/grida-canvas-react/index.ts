@@ -5,6 +5,7 @@ export {
   useNode,
   useBrushState,
   useComputedNode,
+  useNodeMetadata,
   useNodeActions,
   useTransformState,
   useToolState,

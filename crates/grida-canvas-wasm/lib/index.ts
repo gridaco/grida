@@ -39,17 +39,56 @@ export namespace types {
   };
 
   export type ExportConstraints = {
-    type: "SCALE" | "WIDTH" | "HEIGHT";
+    /**
+     * - none: as-is, no resizing, scaling
+     * - scale: scale with factor
+     * - scale-to-fit-width: scale to fit width (with same aspect ratio)
+     * - scale-to-fit-height: scale to fit height (with same aspect ratio)
+     */
+    type: "none" | "scale" | "scale-to-fit-width" | "scale-to-fit-height";
+    /**
+     * - scale: scale factor
+     * - scale-to-fit-width: width in pixels
+     * - scale-to-fit-height: height in pixels
+     */
     value: number;
   };
 
   export type ExportAs = ExportAsImage | ExportAsPDF | ExportAsSVG;
   export type ExportAsPDF = { format: "PDF" };
   export type ExportAsSVG = { format: "SVG" };
-  export type ExportAsImage = {
-    format: "PNG" | "JPEG" | "WEBP" | "BMP";
+  export type ExportAsPNG = {
+    format: "PNG";
     constraints: ExportConstraints;
   };
+  export type ExportAsJPEG = {
+    format: "JPEG";
+    constraints: ExportConstraints;
+    /**
+     * Quality setting for JPEG compression (0-100). Higher values mean better quality but larger file size.
+     * @default 100
+     */
+    quality?: number;
+  };
+  export type ExportAsWEBP = {
+    format: "WEBP";
+    constraints: ExportConstraints;
+    /**
+     * Quality setting for WEBP compression (0-100). Higher values mean better quality but larger file size.
+     * Quality 100 is lossless. Lower values use lossy compression.
+     * @default 75
+     */
+    quality?: number;
+  };
+  export type ExportAsBMP = {
+    format: "BMP";
+    constraints: ExportConstraints;
+  };
+  export type ExportAsImage =
+    | ExportAsPNG
+    | ExportAsJPEG
+    | ExportAsWEBP
+    | ExportAsBMP;
 
   export type FontKey = {
     family: string;
