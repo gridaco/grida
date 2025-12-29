@@ -365,6 +365,15 @@ function EditMenuContent({
           Copy as SVG
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        {/* Color Picker */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.surfacePickColor()}
+          className="text-xs"
+        >
+          Pick color
+          <DropdownMenuShortcut>I</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {/* Actions Section */}
         <DropdownMenuItem
           onClick={() => instance.commands.duplicate("selection")}

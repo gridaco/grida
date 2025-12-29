@@ -37,6 +37,7 @@ import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
+import { toast } from "sonner";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -5353,6 +5354,92 @@ export class EditorSurface
       const hasAspectRatioLocked = aspectRatio !== undefined;
       if (hasAspectRatioLocked) {
         this._editor.doc.unlockAspectRatio(node_id);
+      }
+    }
+  }
+
+  /**
+   * Low-level color picker API wrapper. Opens the EyeDropper and returns the picked color.
+   *
+   * This method only handles the EyeDropper API interaction. It does not handle
+   * clipboard operations, toast notifications, or applying colors to selections.
+   *
+   * @returns A promise that resolves with the hex color string if a color was picked, or undefined if cancelled.
+   *          The hex string is in sRGB format (#aabbcc).
+   *          @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
+   *
+   * @example
+   * ```typescript
+   * const hex = await editor.surface.promptColorPicker();
+   * if (hex) {
+   *   // Handle the color as needed
+   *   // hex is a string representing the selected color in hexadecimal sRGB format (#aabbcc)
+   * }
+   * ```
+   */
+  public async promptColorPicker(): Promise<string | undefined> {
+    if (!window.EyeDropper) {
+      throw new Error(
+        "EyeDropper is not available on this browser (use Chrome)"
+      );
+    }
+
+    const eyeDropper = new window.EyeDropper();
+
+    try {
+      const result: {
+        /**
+         * A string representing the selected color, in hexadecimal sRGB format (#aabbcc).
+         * @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
+         */
+        sRGBHex: string;
+      } = await eyeDropper.open();
+      return result.sRGBHex;
+    } catch (error) {
+      // User cancelled or error occurred - return undefined
+      return undefined;
+    }
+  }
+
+  /**
+   * High-level color picker with full UX handling.
+   *
+   * Opens the color picker, applies the color to selection if available,
+   * or copies to clipboard with toast notification if no selection.
+   *
+   * @returns A promise that resolves when the operation completes
+   *
+   * @example
+   * ```typescript
+   * await editor.surface.surfacePickColor();
+   * ```
+   */
+  public async surfacePickColor(): Promise<void> {
+    try {
+      const hex = await this.promptColorPicker();
+      if (!hex) return; // User cancelled
+
+      const color = kolor.colorformats.RGBA32F.fromHEX(hex);
+      const solidPaint: cg.SolidPaint = {
+        type: "solid",
+        color: color,
+        active: true,
+      };
+
+      const selection = this.state.selection;
+
+      if (selection.length > 0) {
+        // Apply color to selection
+        this._editor.doc.changeNodePropertyFills(selection, [solidPaint]);
+      } else {
+        // No selection - set clipboard color, copy hex, and show toast
+        this.a11ySetClipboardColor(color);
+        await window.navigator.clipboard.writeText(hex);
+        toast.success(`Copied hex color to clipboard ${hex}`);
+      }
+    } catch (error: any) {
+      if (error.message) {
+        toast.error(error.message);
       }
     }
   }

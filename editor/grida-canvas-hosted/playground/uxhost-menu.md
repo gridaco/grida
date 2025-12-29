@@ -20,6 +20,7 @@
 | `Edit > Paste`       | Paste       | Pastes items from clipboard                                  | ⌘V       | ✅    |
 | `Edit > Copy as PNG` | Copy as PNG | Copies the selected items as PNG image (canvas backend only) | ⇧⌘C      | ✅    |
 | `Edit > Copy as SVG` | Copy as SVG | Copies the selected items as SVG (canvas backend only)       | —        | ✅    |
+| `Edit > Pick color`  | Pick color  | Opens color picker to pick color from screen                 | I        | ✅    |
 | `Edit > Duplicate`   | Duplicate   | Duplicates the selected items                                | ⌘D       | ✅    |
 | `Edit > Delete`      | Delete      | Deletes the selected items                                   | ⌫        | ✅    |
 

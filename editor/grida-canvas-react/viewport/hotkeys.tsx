@@ -6,9 +6,7 @@ import {
   useCurrentSelectionIds,
 } from "../provider";
 import { toast } from "sonner";
-import type cg from "@grida/cg";
 import { useEffect, useRef, useState } from "react";
-import kolor from "@grida/color";
 import { useCurrentEditor } from "../use-editor";
 
 export const keybindings_sheet = [
@@ -255,7 +253,7 @@ export const keybindings_sheet = [
   {
     name: "eye dropper",
     description: "Use eye dropper to pick color",
-    keys: ["i", "ctrl+c"],
+    keys: ["i"], // Note: ctrl+c is macOS only (Windows uses Ctrl+C for copy)
   },
   {
     name: "hand tool",
@@ -378,6 +376,11 @@ export const keybindings_sheet = [
     keys: ["0"],
   },
 ];
+
+function isApplePlatform(): boolean {
+  const platform = typeof navigator === "object" ? navigator.platform : "";
+  return /Mac|iPod|iPhone|iPad/.test(platform);
+}
 
 function useSingleDoublePressHotkey(
   key: string,
@@ -605,51 +608,10 @@ export function useEditorHotKeys() {
   );
 
   // #region selection
+  // Color picker: I on all platforms, Ctrl+C on macOS only (Windows uses Ctrl+C for copy)
   useHotkeys(
-    "i, ctrl+c",
-    () => {
-      if (window.EyeDropper) {
-        const eyeDropper = new window.EyeDropper();
-
-        eyeDropper
-          .open()
-          .then(
-            (result: {
-              /**
-               * A string representing the selected color, in hexadecimal sRGB format (#aabbcc).
-               * @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
-               */
-              sRGBHex: string;
-            }) => {
-              const color = kolor.colorformats.RGBA32F.fromHEX(result.sRGBHex);
-              const solidPaint: cg.SolidPaint = {
-                type: "solid",
-                color: color,
-                active: true,
-              };
-
-              if (selection.length > 0) {
-                editor.commands.changeNodePropertyFills(selection, [
-                  solidPaint,
-                ]);
-              } else {
-                editor.surface.a11ySetClipboardColor(color);
-                window.navigator.clipboard
-                  .writeText(result.sRGBHex)
-                  .then(() => {
-                    toast.success(
-                      `Copied hex color to clipboard ${result.sRGBHex}`
-                    );
-                  });
-              }
-            }
-          )
-          .catch((e: any) => {});
-        //
-      } else {
-        toast.error("EyeDropper is not available on this browser (use Chrome)");
-      }
-    },
+    isApplePlatform() ? "i, ctrl+c" : "i",
+    () => editor.surface.surfacePickColor(),
     {
       enableOnFormTags: false,
       enableOnContentEditable: false,

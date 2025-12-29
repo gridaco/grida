@@ -27,26 +27,26 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 
 ## Tools
 
-| Action          | macOS          | Windows/Linux     | Description                                |
-| --------------- | -------------- | ----------------- | ------------------------------------------ |
-| Cursor (Select) | `V`            | `V`               | Select tool                                |
-| Hand tool       | `H` or `Space` | `H` or `Space`    | Pan the canvas (Space is hold-to-activate) |
-| Zoom tool       | `Z`            | `Z`               | Zoom the canvas (hold-to-activate)         |
-| Scale tool      | `K`            | `K`               | Parametric scaling tool                    |
-| Lasso tool      | `Q`            | `Q`               | Lasso tool (vector mode only)              |
-| Rectangle tool  | `R`            | `R`               | Insert rectangle                           |
-| Ellipse tool    | `O`            | `O`               | Insert ellipse                             |
-| Polygon tool    | `Y`            | `Y`               | Insert polygon                             |
-| Text tool       | `T`            | `T`               | Insert text                                |
-| Line tool       | `L`            | `L`               | Draw line                                  |
-| Container tool  | `A` or `F`     | `A` or `F`        | Insert container                           |
-| Path tool       | `P`            | `P`               | Draw path (Pen tool)                       |
-| Pencil tool     | `⇧ + P`        | `⇧ + P`           | Draw with pencil                           |
-| Brush tool      | `B`            | `B`               | Brush tool                                 |
-| Eraser tool     | `E`            | `E`               | Eraser tool                                |
-| Paint bucket    | `G`            | `G`               | Flood fill tool (bitmap mode only)         |
-| Variable width  | `⇧ + W`        | `⇧ + W`           | Variable width tool (vector mode only)     |
-| Eye dropper     | `I` or `⌃ + C` | `I` or `Ctrl + C` | Pick color from screen                     |
+| Action          | macOS          | Windows/Linux  | Description                                |
+| --------------- | -------------- | -------------- | ------------------------------------------ |
+| Cursor (Select) | `V`            | `V`            | Select tool                                |
+| Hand tool       | `H` or `Space` | `H` or `Space` | Pan the canvas (Space is hold-to-activate) |
+| Zoom tool       | `Z`            | `Z`            | Zoom the canvas (hold-to-activate)         |
+| Scale tool      | `K`            | `K`            | Parametric scaling tool                    |
+| Lasso tool      | `Q`            | `Q`            | Lasso tool (vector mode only)              |
+| Rectangle tool  | `R`            | `R`            | Insert rectangle                           |
+| Ellipse tool    | `O`            | `O`            | Insert ellipse                             |
+| Polygon tool    | `Y`            | `Y`            | Insert polygon                             |
+| Text tool       | `T`            | `T`            | Insert text                                |
+| Line tool       | `L`            | `L`            | Draw line                                  |
+| Container tool  | `A` or `F`     | `A` or `F`     | Insert container                           |
+| Path tool       | `P`            | `P`            | Draw path (Pen tool)                       |
+| Pencil tool     | `⇧ + P`        | `⇧ + P`        | Draw with pencil                           |
+| Brush tool      | `B`            | `B`            | Brush tool                                 |
+| Eraser tool     | `E`            | `E`            | Eraser tool                                |
+| Paint bucket    | `G`            | `G`            | Flood fill tool (bitmap mode only)         |
+| Variable width  | `⇧ + W`        | `⇧ + W`        | Variable width tool (vector mode only)     |
+| Eye dropper     | `I` or `⌃ + C` | `I`            | Pick color from screen                     |
 
 ## Selection & Navigation
 
