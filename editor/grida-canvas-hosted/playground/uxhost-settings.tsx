@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { keysymbols } from "@/grida-canvas-react/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { keybindings_sheet } from "@/grida-canvas-react/viewport/hotkeys";
+import { keybindings_sheet } from "./uxhost-actions";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { Button } from "@/components/ui/button";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
