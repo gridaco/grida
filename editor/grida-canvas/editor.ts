@@ -1748,7 +1748,11 @@ class EditorDocumentStore
     );
   }
 
-  changeNodePropertyStrokes(node_id: string | string[], strokes: cg.Paint[]) {
+  changeNodePropertyStrokes(
+    node_id: string | string[],
+    strokes: cg.Paint[],
+    ensureStrokeWidth: boolean = false
+  ) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatch(
       node_ids.map((node_id) => ({
@@ -1757,9 +1761,26 @@ class EditorDocumentStore
         stroke_paints: strokes,
       }))
     );
+
+    // If ensureStrokeWidth is true, ensure stroke is visible by setting width to 1 if not set or 0
+    if (ensureStrokeWidth) {
+      for (const node_id of node_ids) {
+        const node = this.getNodeSnapshotById(node_id);
+        if (!node) continue;
+
+        const currentStrokeWidth =
+          "stroke_width" in node ? node.stroke_width : undefined;
+        if (currentStrokeWidth === undefined || currentStrokeWidth === 0) {
+          this.changeNodePropertyStrokeWidth(node_id, {
+            type: "set",
+            value: 1,
+          });
+        }
+      }
+    }
   }
 
-  swapFillAndStroke(node_id: string | string[]) {
+  swapFillAndStroke(node_id: string | string[], ensureStroke: boolean = false) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     for (const node_id of node_ids) {
       const node = this.getNodeSnapshotById(node_id);
@@ -1781,7 +1802,8 @@ class EditorDocumentStore
 
       // Swap them
       this.changeNodePropertyFills(node_id, currentStrokes);
-      this.changeNodePropertyStrokes(node_id, currentFills);
+      // changeNodePropertyStrokes handles ensureStrokeWidth internally
+      this.changeNodePropertyStrokes(node_id, currentFills, ensureStroke);
     }
   }
 
@@ -1815,30 +1837,28 @@ class EditorDocumentStore
   addNodeStroke(
     node_id: string | string[],
     stroke: cg.Paint,
-    at: "start" | "end" = "start"
+    at: "start" | "end" = "start",
+    ensureStrokeWidth: boolean = false
   ) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
-    this.dispatch(
-      node_ids.map((node_id) => {
-        const current = this.getNodeSnapshotById(node_id);
-        const currentStrokes = Array.isArray((current as any).stroke_paints)
-          ? ((current as any).stroke_paints as cg.Paint[])
-          : (current as any).stroke
-            ? [(current as any).stroke as cg.Paint]
-            : [];
+    for (const node_id of node_ids) {
+      const current = this.getNodeSnapshotById(node_id);
+      if (!current) continue;
 
-        const newStrokes =
-          at === "start"
-            ? [stroke, ...currentStrokes]
-            : [...currentStrokes, stroke];
+      const currentStrokes = Array.isArray((current as any).stroke_paints)
+        ? ((current as any).stroke_paints as cg.Paint[])
+        : (current as any).stroke
+          ? [(current as any).stroke as cg.Paint]
+          : [];
 
-        return {
-          type: "node/change/*",
-          node_id,
-          stroke_paints: newStrokes,
-        };
-      })
-    );
+      const newStrokes =
+        at === "start"
+          ? [stroke, ...currentStrokes]
+          : [...currentStrokes, stroke];
+
+      // Use changeNodePropertyStrokes to update strokes and handle ensureStrokeWidth
+      this.changeNodePropertyStrokes(node_id, newStrokes, ensureStrokeWidth);
+    }
   }
 
   changeNodePropertyStrokeWidth(
@@ -3589,8 +3609,11 @@ export class Editor
     return this.svgProvider.svgOptimize(svg);
   }
 
-  public swapFillAndStroke(node_id: string | string[]) {
-    this.doc.swapFillAndStroke(node_id);
+  public swapFillAndStroke(
+    node_id: string | string[],
+    ensureStroke: boolean = false
+  ) {
+    this.doc.swapFillAndStroke(node_id, ensureStroke);
   }
 
   public svgPack(
@@ -5293,10 +5316,11 @@ export class EditorSurface
   }
 
   public a11ySwapFillAndStroke(
-    target: "selection" | editor.NodeID = "selection"
+    target: "selection" | editor.NodeID = "selection",
+    ensureStroke: boolean = false
   ) {
     const target_ids = target === "selection" ? this.state.selection : [target];
-    this._editor.doc.swapFillAndStroke(target_ids);
+    this._editor.doc.swapFillAndStroke(target_ids, ensureStroke);
   }
 
   // ==============================================================

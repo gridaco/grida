@@ -143,8 +143,12 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyStrokes(node_id, strokes),
       addFill: (fill: cg.Paint, at?: "start" | "end") =>
         instance.commands.addNodeFill(node_id, fill, at),
-      addStroke: (stroke: cg.Paint, at?: "start" | "end") =>
-        instance.commands.addNodeStroke(node_id, stroke, at),
+      addStroke: (
+        stroke: cg.Paint,
+        at?: "start" | "end",
+        ensureStrokeWidth?: boolean
+      ) =>
+        instance.commands.addNodeStroke(node_id, stroke, at, ensureStrokeWidth),
       strokeWidth: (change: editor.api.NumberChange) =>
         instance.commands.changeNodePropertyStrokeWidth(node_id, change),
       strokeTopWidth: (value: number) =>

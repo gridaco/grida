@@ -3329,20 +3329,21 @@ export namespace editor.api {
      * Swap fill paints and stroke paints for the target nodes.
      *
      * Only swaps the paint arrays (fill_paints ↔ stroke_paints), preserving all other
-     * stroke properties like stroke_width, stroke_align, stroke_cap, etc.
+     * stroke properties like stroke_align, stroke_cap, etc.
      *
      * @param target - Single node ID or array of node IDs to swap fills and strokes for
+     * @param ensureStroke - If true, ensures stroke is visible by setting stroke_width to 1 if it's not set or 0
      *
      * @example
      * ```ts
      * // Swap fill and stroke for a single node
      * editor.commands.swapFillAndStroke("node-id-123");
      *
-     * // Swap fill and stroke for multiple nodes
-     * editor.commands.swapFillAndStroke(["node-1", "node-2", "node-3"]);
+     * // Swap fill and stroke for multiple nodes, ensuring stroke is visible
+     * editor.commands.swapFillAndStroke(["node-1", "node-2"], true);
      * ```
      */
-    swapFillAndStroke(target: NodeID | NodeID[]): void;
+    swapFillAndStroke(target: NodeID | NodeID[], ensureStroke?: boolean): void;
   }
 
   /**
@@ -3484,8 +3485,60 @@ export namespace editor.api {
     ): void;
     changeNodePropertyFills(node_id: NodeID, fills: cg.Paint[]): void;
     changeNodePropertyFills(node_id: NodeID[], fills: cg.Paint[]): void;
-    changeNodePropertyStrokes(node_id: NodeID, strokes: cg.Paint[]): void;
-    changeNodePropertyStrokes(node_id: NodeID[], strokes: cg.Paint[]): void;
+    /**
+     * Changes the stroke paints array for the target nodes.
+     *
+     * Replaces all stroke paints (stroke_paints) with the provided array. This is the core
+     * method for updating stroke paints and handles stroke width visibility when requested.
+     *
+     * **Key Behavior:**
+     * - Replaces the entire stroke_paints array (or stroke property for legacy nodes)
+     * - When `ensureStrokeWidth` is `true`, automatically sets `stroke_width` to `1` if it's
+     *   `undefined` or `0`, ensuring the stroke is visible after the paint update
+     * - Preserves all other stroke properties (align, cap, join, miter limit, dash array, etc.)
+     *
+     * This method is used internally by `addNodeStroke` and other stroke operations to ensure
+     * consistent behavior across all stroke paint updates.
+     *
+     * @param node_id - Single node ID or array of node IDs to update
+     * @param strokes - Array of stroke paints to set. Empty array `[]` clears all strokes
+     * @param ensureStrokeWidth - If `true`, ensures stroke is visible by setting `stroke_width`
+     *   to `1` if it's not set or `0`. Defaults to `false`
+     *
+     * @example
+     * ```typescript
+     * // Set strokes for a single node
+     * editor.commands.changeNodePropertyStrokes("node-id", [stroke1, stroke2]);
+     *
+     * // Set strokes for multiple nodes
+     * editor.commands.changeNodePropertyStrokes(["node-1", "node-2"], [stroke1]);
+     *
+     * // Clear all strokes
+     * editor.commands.changeNodePropertyStrokes("node-id", []);
+     *
+     * // Set strokes and ensure visibility
+     * editor.commands.changeNodePropertyStrokes("node-id", [stroke1], true);
+     * ```
+     *
+     * @remarks
+     * - This method is the single source of truth for stroke paint updates
+     * - All stroke paint operations (add, remove, swap) should go through this method
+     * - The `ensureStrokeWidth` parameter provides a convenient way to ensure strokes are visible
+     *   without requiring separate calls to `changeNodePropertyStrokeWidth`
+     */
+    changeNodePropertyStrokes(
+      node_id: NodeID,
+      strokes: cg.Paint[],
+      ensureStrokeWidth?: boolean
+    ): void;
+    /**
+     * @see {@link changeNodePropertyStrokes} - For single node ID overload
+     */
+    changeNodePropertyStrokes(
+      node_id: NodeID[],
+      strokes: cg.Paint[],
+      ensureStrokeWidth?: boolean
+    ): void;
 
     changeNodePropertyStrokeWidth(
       node_id: NodeID,
@@ -3529,15 +3582,60 @@ export namespace editor.api {
     addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
     addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
 
+    /**
+     * Adds a stroke paint to the target nodes.
+     *
+     * Appends or prepends a new stroke paint to the existing stroke paints array. This method
+     * delegates to `changeNodePropertyStrokes` internally to ensure consistent behavior.
+     *
+     * **Key Behavior:**
+     * - Adds the stroke paint to the beginning (`"start"`) or end (`"end"`) of the stroke_paints array
+     * - When added to `"end"`, the stroke appears on top (last in array is topmost in render order)
+     * - When `ensureStrokeWidth` is `true`, automatically sets `stroke_width` to `1` if it's
+     *   `undefined` or `0`, ensuring the newly added stroke is visible
+     * - Preserves all existing stroke paints and other stroke properties
+     *
+     * **Implementation:**
+     * This method uses `changeNodePropertyStrokes` internally, ensuring all stroke operations
+     * go through the same pipeline for consistent behavior and stroke width handling.
+     *
+     * @param node_id - Single node ID or array of node IDs to add stroke to
+     * @param stroke - The stroke paint to add
+     * @param at - Position to add the stroke: `"start"` (beginning) or `"end"` (topmost, default)
+     * @param ensureStrokeWidth - If `true`, ensures stroke is visible by setting `stroke_width`
+     *   to `1` if it's not set or `0`. Defaults to `false`
+     *
+     * @example
+     * ```typescript
+     * // Add stroke to a single node (topmost position)
+     * editor.commands.addNodeStroke("node-id", newStroke);
+     *
+     * // Add stroke to beginning of array
+     * editor.commands.addNodeStroke("node-id", newStroke, "start");
+     *
+     * // Add stroke and ensure visibility
+     * editor.commands.addNodeStroke("node-id", newStroke, "end", true);
+     *
+     * // Add stroke to multiple nodes
+     * editor.commands.addNodeStroke(["node-1", "node-2"], newStroke, "end", true);
+     * ```
+     *
+     * @see {@link changeNodePropertyStrokes} - The underlying method used for stroke updates
+     */
     addNodeStroke(
       node_id: NodeID,
       stroke: cg.Paint,
-      at?: "start" | "end"
+      at?: "start" | "end",
+      ensureStrokeWidth?: boolean
     ): void;
+    /**
+     * @see {@link addNodeStroke} - For single node ID overload
+     */
     addNodeStroke(
       node_id: NodeID[],
       stroke: cg.Paint,
-      at?: "start" | "end"
+      at?: "start" | "end",
+      ensureStrokeWidth?: boolean
     ): void;
 
     changeContainerNodePadding(
@@ -3888,20 +3986,24 @@ export namespace editor.api {
      * Swap fill paints and stroke paints for selected nodes.
      *
      * Only swaps the paint arrays (fill_paints ↔ stroke_paints), preserving all other
-     * stroke properties like stroke_width, stroke_align, stroke_cap, etc.
+     * stroke properties like stroke_align, stroke_cap, etc.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param ensureStroke - If true, ensures stroke is visible by setting stroke_width to 1 if it's not set or 0
      *
      * @example
      * ```ts
      * // Swap fill and stroke for selected nodes
      * editor.surface.a11ySwapFillAndStroke("selection");
      *
-     * // Swap fill and stroke for a specific node
-     * editor.surface.a11ySwapFillAndStroke("node-id-123");
+     * // Swap fill and stroke for a specific node, ensuring stroke is visible
+     * editor.surface.a11ySwapFillAndStroke("node-id-123", true);
      * ```
      */
-    a11ySwapFillAndStroke(target: "selection" | NodeID): void;
+    a11ySwapFillAndStroke(
+      target: "selection" | NodeID,
+      ensureStroke?: boolean
+    ): void;
   }
 
   /**
