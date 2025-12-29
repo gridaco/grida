@@ -657,7 +657,7 @@ function SidebarLeft({
         <SidebarHeader className="p-0">
           <DarwinSidebarHeaderDragArea />
           <header className="h-11 min-h-11 flex items-center px-4 border-b">
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger className="me-2">
                 <GridaLogo className="inline-block size-4" />
               </DropdownMenuTrigger>

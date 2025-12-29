@@ -3699,6 +3699,47 @@ export namespace editor.api {
     a11yToggleItalic(target: "selection" | NodeID): void;
     a11yToggleUnderline(target: "selection" | NodeID): void;
     a11yToggleLineThrough(target: "selection" | NodeID): void;
+    /**
+     * Change text alignment for text nodes.
+     *
+     * Applies the specified text alignment to text nodes in the selection.
+     * Only affects nodes with type "text".
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param textAlign - The text alignment to apply: "left", "right", "center", or "justify"
+     *
+     * @example
+     * ```ts
+     * // Align selected text nodes to the left
+     * editor.surface.a11yTextAlign("selection", "left");
+     *
+     * // Center align a specific text node
+     * editor.surface.a11yTextAlign("node-id-123", "center");
+     * ```
+     */
+    a11yTextAlign(target: "selection" | NodeID, textAlign: cg.TextAlign): void;
+    /**
+     * Change vertical text alignment for text nodes.
+     *
+     * Applies the specified vertical text alignment to text nodes in the selection.
+     * Only affects nodes with type "text".
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param textAlignVertical - The vertical text alignment to apply: "top", "center", or "bottom"
+     *
+     * @example
+     * ```ts
+     * // Align selected text nodes to the top
+     * editor.surface.a11yTextVerticalAlign("selection", "top");
+     *
+     * // Center align a specific text node vertically
+     * editor.surface.a11yTextVerticalAlign("node-id-123", "center");
+     * ```
+     */
+    a11yTextVerticalAlign(
+      target: "selection" | NodeID,
+      textAlignVertical: cg.TextAlignVertical
+    ): void;
     // //
     a11ySetOpacity(target: "selection" | NodeID, opacity: number): void;
     /**
@@ -3714,15 +3755,81 @@ export namespace editor.api {
      * @example
      * ```ts
      * // Increase font size by 1px for selected text nodes
-     * editor.surface.a11yChangeFontSize("selection", 1);
+     * editor.surface.a11yChangeTextFontSize("selection", 1);
      *
      * // Decrease font size by 2px for a specific node
-     * editor.surface.a11yChangeFontSize("node-id-123", -2);
+     * editor.surface.a11yChangeTextFontSize("node-id-123", -2);
      * ```
      *
      * Bind this to `⌘ + ⇧ + >` (increase) and `⌘ + ⇧ + <` (decrease) keys.
      */
-    a11yChangeFontSize(target: "selection" | NodeID, delta: number): void;
+    a11yChangeTextFontSize(target: "selection" | NodeID, delta: number): void;
+    /**
+     * Change line height for text nodes.
+     *
+     * Applies a delta change to the line height of text nodes in the selection.
+     * Only affects nodes with type "text". Positive delta increases line height,
+     * negative delta decreases it.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param delta - The amount to change the line height by. Positive values increase, negative values decrease.
+     *
+     * @example
+     * ```ts
+     * // Increase line height by 1 for selected text nodes
+     * editor.surface.a11yChangeTextLineHeight("selection", 1);
+     *
+     * // Decrease line height by 1 for a specific node
+     * editor.surface.a11yChangeTextLineHeight("node-id-123", -1);
+     * ```
+     */
+    a11yChangeTextLineHeight(target: "selection" | NodeID, delta: number): void;
+    /**
+     * Change letter spacing for text nodes.
+     *
+     * Applies a delta change to the letter spacing of text nodes in the selection.
+     * Only affects nodes with type "text". Positive delta increases letter spacing,
+     * negative delta decreases it.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param delta - The amount to change the letter spacing by. Positive values increase, negative values decrease.
+     *
+     * @example
+     * ```ts
+     * // Increase letter spacing by 0.1 for selected text nodes
+     * editor.surface.a11yChangeTextLetterSpacing("selection", 0.1);
+     *
+     * // Decrease letter spacing by 0.1 for a specific node
+     * editor.surface.a11yChangeTextLetterSpacing("node-id-123", -0.1);
+     * ```
+     */
+    a11yChangeTextLetterSpacing(
+      target: "selection" | NodeID,
+      delta: number
+    ): void;
+    /**
+     * Change font weight for text nodes.
+     *
+     * Changes the font weight to the next or previous available weight for the font family.
+     * Only affects nodes with type "text". Queries the font family to get available weights
+     * and selects the next/previous valid weight.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param direction - "increase" to move to next heavier weight, "decrease" to move to next lighter weight
+     *
+     * @example
+     * ```ts
+     * // Increase font weight for selected text nodes
+     * await editor.surface.a11yChangeTextFontWeight("selection", "increase");
+     *
+     * // Decrease font weight for a specific node
+     * await editor.surface.a11yChangeTextFontWeight("node-id-123", "decrease");
+     * ```
+     */
+    a11yChangeTextFontWeight(
+      target: "selection" | NodeID,
+      direction: "increase" | "decrease"
+    ): Promise<void>;
   }
 
   /**

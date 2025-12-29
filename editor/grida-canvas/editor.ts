@@ -3635,6 +3635,44 @@ export class Editor
     return this._fontManager.selectFontStyle(description);
   }
 
+  /**
+   * Gets all available font weights for a given font family and italic style.
+   *
+   * This is a general-purpose utility function that extracts available font weights
+   * from a font family that match the given italic state, returning them as a
+   * sorted array.
+   *
+   * @param fontFamily - The font family name (e.g., "Inter", "Roboto")
+   * @param fontStyleItalic - Whether to get weights for italic or non-italic styles
+   * @returns A sorted array of available font weights, or empty array if font not found or no weights available
+   *
+   * @example
+   * ```typescript
+   * const weights = await editor.getFontWeightsForFontFamily("Inter", false);
+   * // Returns [100, 200, 300, 400, 500, 600, 700, 800, 900] (sorted)
+   * ```
+   */
+  public async getFontWeightsForFontFamily(
+    fontFamily: string,
+    fontStyleItalic: boolean
+  ): Promise<number[]> {
+    const font = await this.getFontFamilyDetailsSync(fontFamily);
+    if (!font) {
+      return [];
+    }
+
+    // Extract unique available weights from styles (matching italic state)
+    const availableWeights = new Set<number>();
+    font.styles.forEach((style: editor.font_spec.FontStyleInstance) => {
+      if (style.fontStyleItalic === fontStyleItalic) {
+        availableWeights.add(style.fontWeight);
+      }
+    });
+
+    // Return sorted array
+    return Array.from(availableWeights).sort((a, b) => a - b);
+  }
+
   // ==============================================================
   // #endregion IFontLoaderActions implementation
   // ==============================================================
@@ -5051,18 +5089,36 @@ export class EditorSurface
     });
   }
 
-  public a11ySetOpacity(
+  public a11yTextAlign(
     target: "selection" | editor.NodeID = "selection",
-    opacity: number
+    textAlign: cg.TextAlign
   ) {
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
-      const _node = this._editor.doc.getNodeById(node_id);
-      if (_node) _node.opacity = opacity;
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeTextAlign(node_id, textAlign);
+      }
     }
   }
 
-  public a11yChangeFontSize(
+  public a11yTextVerticalAlign(
+    target: "selection" | editor.NodeID = "selection",
+    textAlignVertical: cg.TextAlignVertical
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeTextAlignVertical(
+          node_id,
+          textAlignVertical
+        );
+      }
+    }
+  }
+
+  public a11yChangeTextFontSize(
     target: "selection" | editor.NodeID = "selection",
     delta: number
   ) {
@@ -5075,6 +5131,116 @@ export class EditorSurface
           value: delta,
         });
       }
+    }
+  }
+
+  public a11yChangeTextLineHeight(
+    target: "selection" | editor.NodeID = "selection",
+    delta: number
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeLineHeight(node_id, {
+          type: "delta",
+          value: delta,
+        });
+      }
+    }
+  }
+
+  public a11yChangeTextLetterSpacing(
+    target: "selection" | editor.NodeID = "selection",
+    delta: number
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeLetterSpacing(node_id, {
+          type: "delta",
+          value: delta,
+        } as editor.api.NumberChange);
+      }
+    }
+  }
+
+  public async a11yChangeTextFontWeight(
+    target: "selection" | editor.NodeID = "selection",
+    direction: "increase" | "decrease"
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        const fontFamily = node.font_family;
+        if (!fontFamily) continue;
+
+        // Get available font weights for this font family and italic style
+        const availableWeights = await this._editor.getFontWeightsForFontFamily(
+          fontFamily,
+          node.font_style_italic ?? false
+        );
+
+        if (availableWeights.length === 0) continue;
+
+        const currentWeight = node.font_weight;
+
+        // Find next/previous weight
+        let nextWeight: number | null = null;
+        if (direction === "increase") {
+          nextWeight = availableWeights.find((w) => w > currentWeight) ?? null;
+          // If no heavier weight, use the heaviest available (wrap around)
+          if (nextWeight === null) {
+            nextWeight = availableWeights[availableWeights.length - 1];
+          }
+        } else {
+          // Find the next lighter weight
+          for (let i = availableWeights.length - 1; i >= 0; i--) {
+            if (availableWeights[i] < currentWeight) {
+              nextWeight = availableWeights[i];
+              break;
+            }
+          }
+          // If no lighter weight, use the lightest available (wrap around)
+          if (nextWeight === null) {
+            nextWeight = availableWeights[0];
+          }
+        }
+
+        if (nextWeight !== null) {
+          // Use selectFontStyle to ensure the weight is valid for this font
+          const match = this._editor.selectFontStyle({
+            fontFamily: fontFamily,
+            fontWeight: nextWeight as cg.NFontWeight,
+            fontStyleItalic: node.font_style_italic,
+          });
+
+          if (match) {
+            this._editor.changeTextNodeFontStyle(node_id, {
+              fontStyleKey: match.key,
+            });
+          } else {
+            // Fallback: directly set weight if style matching fails
+            this._editor.doc.changeTextNodeFontWeight(
+              node_id,
+              nextWeight as cg.NFontWeight
+            );
+          }
+        }
+      }
+    }
+  }
+
+  public a11ySetOpacity(
+    target: "selection" | editor.NodeID = "selection",
+    opacity: number
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const _node = this._editor.doc.getNodeById(node_id);
+      if (_node) _node.opacity = opacity;
     }
   }
 

@@ -83,6 +83,26 @@ export const keybindings_sheet = [
     keys: ["meta+shift+x"],
   },
   {
+    name: "text align left",
+    description: "Align text to the left",
+    keys: ["meta+alt+l", "ctrl+alt+l"],
+  },
+  {
+    name: "text align center",
+    description: "Center text horizontally",
+    keys: ["meta+alt+t", "ctrl+alt+t"],
+  },
+  {
+    name: "text align right",
+    description: "Align text to the right",
+    keys: ["meta+alt+r", "ctrl+alt+r"],
+  },
+  {
+    name: "text align justify",
+    description: "Justify text horizontally",
+    keys: ["meta+alt+j", "ctrl+alt+j"],
+  },
+  {
     name: "increase font size",
     description: "Increase font size for text",
     keys: ["meta+shift+>", "ctrl+shift+>"],
@@ -206,6 +226,16 @@ export const keybindings_sheet = [
     name: "move to back",
     description: "Move the selection to the back",
     keys: ["["],
+  },
+  {
+    name: "move forward",
+    description: "Move the selection forward one layer",
+    keys: ["meta+]", "ctrl+]"],
+  },
+  {
+    name: "move backward",
+    description: "Move the selection backward one layer",
+    keys: ["meta+[", "ctrl+["],
   },
   {
     name: "hide/show ruler",
@@ -742,37 +772,94 @@ export function useEditorHotKeys() {
     editor.surface.a11yToggleLineThrough("selection");
   });
 
-  // Increase font size: ⌘+⇧+. (macOS) / Ctrl+⇧+. (Windows/Linux)
-  // Note: Period (.) with Shift produces > symbol. Using splitKey: "|" to combine
-  // macOS and Windows bindings in a single call (comma is the default separator).
+  // Text alignment shortcuts
   useHotkeys(
-    "meta+shift+. | ctrl+shift+.",
+    "meta+alt+l, ctrl+alt+l",
     () => {
-      editor.surface.a11yChangeFontSize("selection", 1);
+      editor.surface.a11yTextAlign("selection", "left");
     },
-    {
-      preventDefault: true,
-      enableOnFormTags: false,
-      enableOnContentEditable: false,
-      splitKey: "|",
-    }
+    // prevent chrome: show download history
+    { preventDefault: true }
   );
 
-  // Decrease font size: ⌘+⇧+, (macOS) / Ctrl+⇧+, (Windows/Linux)
-  // Note: Comma (,) with Shift produces < symbol. Using splitKey: "|" because:
-  // 1. Comma is the default separator in react-hotkeys-hook, so we need pipe to separate key combinations
-  // 2. This allows comma to be used as part of the key name (meta+shift+,)
+  useHotkeys("meta+alt+t, ctrl+alt+t", () => {
+    editor.surface.a11yTextAlign("selection", "center");
+  });
+
+  useHotkeys("meta+alt+r, ctrl+alt+r", () => {
+    editor.surface.a11yTextAlign("selection", "right");
+  });
+
   useHotkeys(
-    "meta+shift+, | ctrl+shift+,",
+    "meta+alt+j, ctrl+alt+j",
     () => {
-      editor.surface.a11yChangeFontSize("selection", -1);
+      editor.surface.a11yTextAlign("selection", "justify");
     },
-    {
-      preventDefault: true,
-      enableOnFormTags: false,
-      enableOnContentEditable: false,
-      splitKey: "|",
-    }
+    // prevent chrome: open devtools
+    { preventDefault: true }
+  );
+
+  // Helper for text formatting shortcuts with period/comma keys
+  // Note: Period (.) with Shift produces >, Comma (,) with Shift produces <
+  // Using splitKey: "|" because comma is the default separator in react-hotkeys-hook
+  const textFormattingOptions = {
+    preventDefault: true,
+    enableOnFormTags: false,
+    enableOnContentEditable: false,
+    splitKey: "|" as const,
+  };
+
+  // Font size: ⌘+⇧+>/< (macOS) / Ctrl+⇧+>/< (Windows/Linux)
+  useHotkeys(
+    "meta+shift+period | ctrl+shift+period",
+    () => editor.surface.a11yChangeTextFontSize("selection", 1),
+    textFormattingOptions
+  );
+  useHotkeys(
+    "meta+shift+comma | ctrl+shift+comma",
+    () => editor.surface.a11yChangeTextFontSize("selection", -1),
+    textFormattingOptions
+  );
+
+  // Font weight: ⌘+⌥+>/< (macOS) / Ctrl+Alt+>/< (Windows/Linux)
+  // Note: ⌘+⌥+> means Command+Option+Period (without Shift)
+  // Using keycode names (period/comma) for safer cross-platform compatibility.
+  // Verified to work on macOS.
+  useHotkeys(
+    "meta+alt+period | ctrl+alt+period",
+    () => editor.surface.a11yChangeTextFontWeight("selection", "increase"),
+    textFormattingOptions
+  );
+  useHotkeys(
+    "meta+alt+comma | ctrl+alt+comma",
+    () => editor.surface.a11yChangeTextFontWeight("selection", "decrease"),
+    textFormattingOptions
+  );
+
+  // Line height: ⌥+⇧+>/< (macOS) / Alt+⇧+>/< (Windows/Linux)
+  useHotkeys(
+    "alt+shift+period | alt+shift+period",
+    () => editor.surface.a11yChangeTextLineHeight("selection", 1),
+    textFormattingOptions
+  );
+  useHotkeys(
+    "alt+shift+comma | alt+shift+comma",
+    () => editor.surface.a11yChangeTextLineHeight("selection", -1),
+    textFormattingOptions
+  );
+
+  // Letter spacing: ⌥+>/< (macOS) / Alt+>/< (Windows/Linux)
+  // Note: ⌥+> means Alt+Period (without Shift), producing period character
+  // This is different from line height (⌥+⇧+>) which is Alt+Shift+Period
+  useHotkeys(
+    "alt+period | alt+period",
+    () => editor.surface.a11yChangeTextLetterSpacing("selection", 0.1),
+    textFormattingOptions
+  );
+  useHotkeys(
+    "alt+comma | alt+comma",
+    () => editor.surface.a11yChangeTextLetterSpacing("selection", -0.1),
+    textFormattingOptions
   );
 
   useHotkeys("shift+r", () => {
@@ -1075,6 +1162,22 @@ export function useEditorHotKeys() {
       editor.surface.order("back");
     }
   });
+
+  useHotkeys(
+    "meta+], ctrl+]",
+    () => {
+      editor.surface.order("forward");
+    },
+    { preventDefault: true }
+  );
+
+  useHotkeys(
+    "meta+[, ctrl+[",
+    () => {
+      editor.surface.order("backward");
+    },
+    { preventDefault: true }
+  );
 
   useHotkeys("alt+a", () => {
     editor.surface.a11yAlign({ horizontal: "min" });

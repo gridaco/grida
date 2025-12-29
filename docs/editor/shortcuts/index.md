@@ -88,6 +88,8 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 | Nudge resize (down, 10px)  | `Ctrl + ⌥ + ⇧ + ↓` | `Ctrl + Alt + ⇧ + ↓` | Resize selection height by 10px                                       |
 | Move to front              | `]`                | `]`                  | Move selection to front (or increase brush size if brush tool active) |
 | Move to back               | `[`                | `[`                  | Move selection to back (or decrease brush size if brush tool active)  |
+| Move forward               | `⌘ + ]`            | `Ctrl + ]`           | Move selection forward one layer                                      |
+| Move backward              | `⌘ + [`            | `Ctrl + [`           | Move selection backward one layer                                     |
 
 ## Alignment & Distribution
 
@@ -113,14 +115,24 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 
 ## Text Formatting
 
-| Action              | macOS       | Windows/Linux  | Description               |
-| ------------------- | ----------- | -------------- | ------------------------- |
-| Toggle bold         | `⌘ + B`     | `Ctrl + B`     | Toggle bold style         |
-| Toggle italic       | `⌘ + I`     | `Ctrl + I`     | Toggle italic style       |
-| Toggle underline    | `⌘ + U`     | `Ctrl + U`     | Toggle underline style    |
-| Toggle line-through | `⌘ + ⇧ + X` | `Ctrl + ⇧ + X` | Toggle line-through style |
-| Increase font size  | `⌘ + ⇧ + >` | `Ctrl + ⇧ + >` | Increase font size by 1px |
-| Decrease font size  | `⌘ + ⇧ + <` | `Ctrl + ⇧ + <` | Decrease font size by 1px |
+| Action                  | macOS       | Windows/Linux    | Description               |
+| ----------------------- | ----------- | ---------------- | ------------------------- |
+| Toggle bold             | `⌘ + B`     | `Ctrl + B`       | Toggle bold style         |
+| Toggle italic           | `⌘ + I`     | `Ctrl + I`       | Toggle italic style       |
+| Toggle underline        | `⌘ + U`     | `Ctrl + U`       | Toggle underline style    |
+| Toggle line-through     | `⌘ + ⇧ + X` | `Ctrl + ⇧ + X`   | Toggle line-through style |
+| Text align left         | `⌘ + ⌥ + L` | `Ctrl + Alt + L` | Align text to the left    |
+| Text align center       | `⌘ + ⌥ + T` | `Ctrl + Alt + T` | Center text horizontally  |
+| Text align right        | `⌘ + ⌥ + R` | `Ctrl + Alt + R` | Align text to the right   |
+| Text align justify      | `⌘ + ⌥ + J` | `Ctrl + Alt + J` | Justify text horizontally |
+| Increase font size      | `⌘ + ⇧ + >` | `Ctrl + ⇧ + >`   | Increase font size by 1px |
+| Decrease font size      | `⌘ + ⇧ + <` | `Ctrl + ⇧ + <`   | Decrease font size by 1px |
+| Increase font weight    | `⌘ + ⌥ + >` | `Ctrl + Alt + >` | Increase font weight      |
+| Decrease font weight    | `⌘ + ⌥ + <` | `Ctrl + Alt + <` | Decrease font weight      |
+| Increase line height    | `⌥ + ⇧ + >` | `Alt + ⇧ + >`    | Increase line height      |
+| Decrease line height    | `⌥ + ⇧ + <` | `Alt + ⇧ + <`    | Decrease line height      |
+| Increase letter spacing | `⌥ + >`     | `Alt + >`        | Increase letter spacing   |
+| Decrease letter spacing | `⌥ + <`     | `Alt + <`        | Decrease letter spacing   |
 
 ## Object Properties
 
@@ -179,3 +191,5 @@ The following shortcuts are defined but not yet implemented:
 - `⇧ + V` - Flip vertical
 - `⌥ + ⌘ + K` / `Alt + Ctrl + K` - Create component
 - `⌥ + ⌘ + B` / `Alt + Ctrl + B` - Eject component
+- `Tab` - Text range: Increase indentation
+- `⇧ + Tab` - Text range: Decrease indentation
