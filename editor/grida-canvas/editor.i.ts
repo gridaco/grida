@@ -2566,7 +2566,7 @@ export namespace editor.api {
         constraints: {
           type: Exclude<
             grida.program.document.NodeExportSettingsConstraints["type"],
-            "NONE"
+            "none"
           >;
           value: number;
         };
