@@ -1066,12 +1066,22 @@ function ObjectMenuContent() {
               Remove all layout
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {/* TODO: Implement Lock aspect ratio */}
-            <DropdownMenuItem disabled className="text-xs">
+            {/* Lock aspect ratio */}
+            <DropdownMenuItem
+              onClick={() => instance.surface.a11yLockAspectRatio("selection")}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
               Lock aspect ratio
             </DropdownMenuItem>
-            {/* TODO: Implement Unlock aspect ratio */}
-            <DropdownMenuItem disabled className="text-xs">
+            {/* Unlock aspect ratio */}
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yUnlockAspectRatio("selection")
+              }
+              disabled={!hasSelection}
+              className="text-xs"
+            >
               Unlock aspect ratio
             </DropdownMenuItem>
             <DropdownMenuSeparator />

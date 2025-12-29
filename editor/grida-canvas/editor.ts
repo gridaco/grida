@@ -5323,6 +5323,40 @@ export class EditorSurface
     this._editor.doc.swapFillAndStroke(target_ids, ensureStroke);
   }
 
+  public a11yLockAspectRatio(
+    target: "selection" | editor.NodeID = "selection"
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      const aspectRatio =
+        "layout_target_aspect_ratio" in node
+          ? node["layout_target_aspect_ratio"]
+          : undefined;
+      const hasAspectRatioLocked = aspectRatio !== undefined;
+      if (!hasAspectRatioLocked) {
+        this._editor.doc.lockAspectRatio(node_id);
+      }
+    }
+  }
+
+  public a11yUnlockAspectRatio(
+    target: "selection" | editor.NodeID = "selection"
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      const aspectRatio =
+        "layout_target_aspect_ratio" in node
+          ? node["layout_target_aspect_ratio"]
+          : undefined;
+      const hasAspectRatioLocked = aspectRatio !== undefined;
+      if (hasAspectRatioLocked) {
+        this._editor.doc.unlockAspectRatio(node_id);
+      }
+    }
+  }
+
   // ==============================================================
   // #endregion a11y actions
   // ==============================================================

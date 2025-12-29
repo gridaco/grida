@@ -71,8 +71,8 @@
 | `Object > Create arc`                                         | Create arc                     | Creates an arc shape from current ellipse       | —        | ❌    |
 | `Object > More layout options > Suggest layout`               | Suggest layout                 | Suggests layout configuration                   | ⇧⌃A      | ❌    |
 | `Object > More layout options > Remove all layout`            | Remove all layout              | Removes layout from selection                   | —        | ❌    |
-| `Object > More layout options > Lock aspect ratio`            | Lock aspect ratio              | Locks aspect ratio for selection                | —        | ❌    |
-| `Object > More layout options > Unlock aspect ratio`          | Unlock aspect ratio            | Unlocks aspect ratio for selection              | —        | ❌    |
+| `Object > More layout options > Lock aspect ratio`            | Lock aspect ratio              | Locks aspect ratio for selection                | —        | ✅    |
+| `Object > More layout options > Unlock aspect ratio`          | Unlock aspect ratio            | Unlocks aspect ratio for selection              | —        | ✅    |
 | `Object > More layout options > Resize to fit`                | Resize to fit                  | Resizes containers to fit its contents          | ⌥⇧⌘R     | ❌    |
 | `Object > More layout options > Set width to hug contents`    | Set width to hug contents      | Sets width to hug contents                      | —        | ❌    |
 | `Object > More layout options > Set height to hug contents`   | Set height to hug contents     | Sets height to hug contents                     | —        | ❌    |

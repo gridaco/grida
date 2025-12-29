@@ -4004,6 +4004,44 @@ export namespace editor.api {
       target: "selection" | NodeID,
       ensureStroke?: boolean
     ): void;
+    /**
+     * Lock aspect ratio for selected nodes.
+     *
+     * Locks the aspect ratio of the target nodes to their current width:height ratio.
+     * Only locks nodes that don't already have aspect ratio locked. Calculates the
+     * aspect ratio from the current bounding box dimensions.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Lock aspect ratio for selected nodes
+     * editor.surface.a11yLockAspectRatio("selection");
+     *
+     * // Lock aspect ratio for a specific node
+     * editor.surface.a11yLockAspectRatio("node-id-123");
+     * ```
+     */
+    a11yLockAspectRatio(target: "selection" | NodeID): void;
+    /**
+     * Unlock aspect ratio for selected nodes.
+     *
+     * Unlocks the aspect ratio of the target nodes, allowing them to be resized
+     * independently in width and height. Only unlocks nodes that currently have
+     * aspect ratio locked.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Unlock aspect ratio for selected nodes
+     * editor.surface.a11yUnlockAspectRatio("selection");
+     *
+     * // Unlock aspect ratio for a specific node
+     * editor.surface.a11yUnlockAspectRatio("node-id-123");
+     * ```
+     */
+    a11yUnlockAspectRatio(target: "selection" | NodeID): void;
   }
 
   /**
