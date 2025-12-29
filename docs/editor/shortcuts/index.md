@@ -136,21 +136,23 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 
 ## Object Properties
 
-| Action              | macOS              | Windows/Linux      | Description                           |
-| ------------------- | ------------------ | ------------------ | ------------------------------------- |
-| Toggle active       | `⌘ + ⇧ + H`        | `Ctrl + ⇧ + H`     | Toggle active state for the selection |
-| Toggle locked       | `⌘ + ⇧ + L`        | `Ctrl + ⇧ + L`     | Toggle locked state for the selection |
-| Set opacity to 0%   | `0` (double press) | `0` (double press) | Set opacity to 0%                     |
-| Set opacity to 10%  | `1`                | `1`                | Set opacity to 10%                    |
-| Set opacity to 20%  | `2`                | `2`                | Set opacity to 20%                    |
-| Set opacity to 30%  | `3`                | `3`                | Set opacity to 30%                    |
-| Set opacity to 40%  | `4`                | `4`                | Set opacity to 40%                    |
-| Set opacity to 50%  | `5`                | `5`                | Set opacity to 50%                    |
-| Set opacity to 60%  | `6`                | `6`                | Set opacity to 60%                    |
-| Set opacity to 70%  | `7`                | `7`                | Set opacity to 70%                    |
-| Set opacity to 80%  | `8`                | `8`                | Set opacity to 80%                    |
-| Set opacity to 90%  | `9`                | `9`                | Set opacity to 90%                    |
-| Set opacity to 100% | `0` (single press) | `0` (single press) | Set opacity to 100%                   |
+| Action              | macOS              | Windows/Linux      | Description                                    |
+| ------------------- | ------------------ | ------------------ | ---------------------------------------------- |
+| Toggle active       | `⌘ + ⇧ + H`        | `Ctrl + ⇧ + H`     | Toggle active state for the selection          |
+| Toggle locked       | `⌘ + ⇧ + L`        | `Ctrl + ⇧ + L`     | Toggle locked state for the selection          |
+| Remove fill         | `⌥ + /`            | `Alt + /`          | Remove fill from selection                     |
+| Remove stroke       | `⇧ + /`            | `⇧ + /`            | Remove stroke from selection (sets width to 0) |
+| Set opacity to 0%   | `0` (double press) | `0` (double press) | Set opacity to 0%                              |
+| Set opacity to 10%  | `1`                | `1`                | Set opacity to 10%                             |
+| Set opacity to 20%  | `2`                | `2`                | Set opacity to 20%                             |
+| Set opacity to 30%  | `3`                | `3`                | Set opacity to 30%                             |
+| Set opacity to 40%  | `4`                | `4`                | Set opacity to 40%                             |
+| Set opacity to 50%  | `5`                | `5`                | Set opacity to 50%                             |
+| Set opacity to 60%  | `6`                | `6`                | Set opacity to 60%                             |
+| Set opacity to 70%  | `7`                | `7`                | Set opacity to 70%                             |
+| Set opacity to 80%  | `8`                | `8`                | Set opacity to 80%                             |
+| Set opacity to 90%  | `9`                | `9`                | Set opacity to 90%                             |
+| Set opacity to 100% | `0` (single press) | `0` (single press) | Set opacity to 100%                            |
 
 ## View & Zoom
 

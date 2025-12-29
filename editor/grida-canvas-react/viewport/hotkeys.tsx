@@ -872,6 +872,32 @@ export function useEditorHotKeys() {
     toast.success(`Pixel Grid ${v === "on" ? "on" : "off"}`);
   });
 
+  // Remove fill: ⌥/ (macOS) / Alt+/ (Windows/Linux)
+  useHotkeys(
+    "alt+slash",
+    () => {
+      editor.surface.a11yClearFill("selection");
+    },
+    {
+      preventDefault: true,
+      enableOnContentEditable: false,
+      enableOnFormTags: false,
+    }
+  );
+
+  // Remove stroke: ⇧/ (macOS) / Shift+/ (Windows/Linux)
+  useHotkeys(
+    "shift+slash",
+    () => {
+      editor.surface.a11yClearStroke("selection");
+    },
+    {
+      preventDefault: true,
+      enableOnContentEditable: false,
+      enableOnFormTags: false,
+    }
+  );
+
   useHotkeys(
     "meta+d, ctrl+d",
     () => {

@@ -57,56 +57,56 @@
 
 ## Object
 
-| Path                                                          | Name                           | Description                                   | Shortcut | Ready |
-| ------------------------------------------------------------- | ------------------------------ | --------------------------------------------- | -------- | ----- |
-| `Object > Container selection`                                | Container selection            | Wraps selection in a container                | ⌥⌘G      | ✅    |
-| `Object > Group selection`                                    | Group selection                | Groups selected items                         | ⌘G       | ✅    |
-| `Object > Ungroup selection`                                  | Ungroup selection              | Ungroups selected group                       | ⇧⌘G      | ✅    |
-| `Object > Wrap in new section`                                | Wrap in new section            | Wraps selection in a new section              | -        | ❌    |
-| `Object > Convert to section`                                 | Convert to section             | Converts selection to a section               | —        | ❌    |
-| `Object > Convert to container`                               | Convert to container           | Converts selection to a container             | —        | ❌    |
-| `Object > Use as mask`                                        | Use as mask                    | Uses selection as a clipping mask             | —        | ✅    |
-| `Object > Restore default thumbnail`                          | Restore default thumbnail      | Restores the default thumbnail for selection  | —        | ❌    |
-| `Object > Add layout`                                         | Add layout                     | Applies layout to selection                   | ⇧A       | ✅    |
-| `Object > Create arc`                                         | Create arc                     | Creates an arc shape from current ellipse     | —        | ❌    |
-| `Object > More layout options > Suggest layout`               | Suggest layout                 | Suggests layout configuration                 | ⇧⌃A      | ❌    |
-| `Object > More layout options > Remove all layout`            | Remove all layout              | Removes layout from selection                 | —        | ❌    |
-| `Object > More layout options > Lock aspect ratio`            | Lock aspect ratio              | Locks aspect ratio for selection              | —        | ❌    |
-| `Object > More layout options > Unlock aspect ratio`          | Unlock aspect ratio            | Unlocks aspect ratio for selection            | —        | ❌    |
-| `Object > More layout options > Resize to fit`                | Resize to fit                  | Resizes selection to fit contents             | ⌥⇧⌘R     | ❌    |
-| `Object > More layout options > Set width to hug contents`    | Set width to hug contents      | Sets width to hug contents                    | —        | ❌    |
-| `Object > More layout options > Set height to hug contents`   | Set height to hug contents     | Sets height to hug contents                   | —        | ❌    |
-| `Object > More layout options > Set width to fill container`  | Set width to fill container    | Sets width to fill container                  | —        | ❌    |
-| `Object > More layout options > Set height to fill container` | Set height to fill container   | Sets height to fill container                 | —        | ❌    |
-| `Object > Create component`                                   | Create component               | Creates a component from selection            | ⌥⌘K      | ❌    |
-| `Object > Reset instance`                                     | Reset instance                 | Resets component instance to main component   | —        | ❌    |
-| `Object > Detach instance`                                    | Detach instance                | Detaches component instance                   | ⌥⌘B      | ❌    |
-| `Object > Main component > Go to main component`              | Go to main component           | Navigates to the main component               | ⌃⌥⌘K     | ❌    |
-| `Object > Main component > Push changes to main component`    | Push changes to main component | Pushes overrides to main component            | —        | ❌    |
-| `Object > Main component > Restore main component`            | Restore main component         | Restores main component state                 | —        | ❌    |
-| `Object > Bring to front`                                     | Bring to front                 | Brings selection to the front                 | ]        | ✅    |
-| `Object > Bring forward`                                      | Bring forward                  | Brings selection forward one layer            | ⌘]       | ✅    |
-| `Object > Send backward`                                      | Send backward                  | Sends selection backward one layer            | ⌘[       | ✅    |
-| `Object > Send to back`                                       | Send to back                   | Sends selection to the back                   | [        | ✅    |
-| `Object > Flip horizontal`                                    | Flip horizontal                | Flips selection horizontally                  | ⇧H       | ❌    |
-| `Object > Flip vertical`                                      | Flip vertical                  | Flips selection vertically                    | ⇧V       | ❌    |
-| `Object > Rotate 180°`                                        | Rotate 180°                    | Rotates selection by 180 degrees              | —        | ❌    |
-| `Object > Rotate 90° left`                                    | Rotate 90° left                | Rotates selection 90 degrees counterclockwise | —        | ❌    |
-| `Object > Rotate 90° right`                                   | Rotate 90° right               | Rotates selection 90 degrees clockwise        | —        | ❌    |
-| `Object > Flatten`                                            | Flatten                        | Converts selection to vector paths            | ⌘E       | ✅    |
-| `Object > Outline stroke`                                     | Outline stroke                 | Converts stroke to filled shape               | ⌥⌘O      | ❌    |
-| `Object > Boolean groups > Union`                             | Union                          | Combines shapes using union operation         | —        | ✅    |
-| `Object > Boolean groups > Subtract`                          | Subtract                       | Subtracts shapes using subtract operation     | —        | ✅    |
-| `Object > Boolean groups > Intersect`                         | Intersect                      | Creates intersection of shapes                | —        | ✅    |
-| `Object > Boolean groups > Exclude`                           | Exclude                        | Creates exclusion of shapes                   | —        | ✅    |
-| `Object > Rasterize selection`                                | Rasterize selection            | Converts selection to raster image            | —        | ❌    |
-| `Object > Show/Hide selection`                                | Show/Hide selection            | Toggles visibility of selection               | ⇧⌘H      | ✅    |
-| `Object > Lock/Unlock selection`                              | Lock/Unlock selection          | Toggles lock state of selection               | ⇧⌘L      | ✅    |
-| `Object > Hide other layers`                                  | Hide other layers              | Hides all layers except selection             | —        | ❌    |
-| `Object > Collapse layers`                                    | Collapse layers                | Collapses layer hierarchy                     | ⌥L       | ❌    |
-| `Object > Remove fill`                                        | Remove fill                    | Removes fill from selection                   | ⌥/       | ❌    |
-| `Object > Remove stroke`                                      | Remove stroke                  | Removes stroke from selection                 | ⇧/       | ❌    |
-| `Object > Swap fill and stroke`                               | Swap fill and stroke           | Swaps fill and stroke colors                  | ⇧X       | ❌    |
+| Path                                                          | Name                           | Description                                     | Shortcut | Ready |
+| ------------------------------------------------------------- | ------------------------------ | ----------------------------------------------- | -------- | ----- |
+| `Object > Container selection`                                | Container selection            | Wraps selection in a container                  | ⌥⌘G      | ✅    |
+| `Object > Group selection`                                    | Group selection                | Groups selected items                           | ⌘G       | ✅    |
+| `Object > Ungroup selection`                                  | Ungroup selection              | Ungroups selected group                         | ⇧⌘G      | ✅    |
+| `Object > Wrap in new section`                                | Wrap in new section            | Wraps selection in a new section                | -        | ❌    |
+| `Object > Convert to section`                                 | Convert to section             | Converts selection to a section                 | —        | ❌    |
+| `Object > Convert to container`                               | Convert to container           | Converts selection to a container               | —        | ❌    |
+| `Object > Use as mask`                                        | Use as mask                    | Uses selection as a clipping mask               | —        | ✅    |
+| `Object > Restore default thumbnail`                          | Restore default thumbnail      | Restores the default thumbnail for selection    | —        | ❌    |
+| `Object > Add layout`                                         | Add layout                     | Applies layout to selection                     | ⇧A       | ✅    |
+| `Object > Create arc`                                         | Create arc                     | Creates an arc shape from current ellipse       | —        | ❌    |
+| `Object > More layout options > Suggest layout`               | Suggest layout                 | Suggests layout configuration                   | ⇧⌃A      | ❌    |
+| `Object > More layout options > Remove all layout`            | Remove all layout              | Removes layout from selection                   | —        | ❌    |
+| `Object > More layout options > Lock aspect ratio`            | Lock aspect ratio              | Locks aspect ratio for selection                | —        | ❌    |
+| `Object > More layout options > Unlock aspect ratio`          | Unlock aspect ratio            | Unlocks aspect ratio for selection              | —        | ❌    |
+| `Object > More layout options > Resize to fit`                | Resize to fit                  | Resizes selection to fit contents               | ⌥⇧⌘R     | ❌    |
+| `Object > More layout options > Set width to hug contents`    | Set width to hug contents      | Sets width to hug contents                      | —        | ❌    |
+| `Object > More layout options > Set height to hug contents`   | Set height to hug contents     | Sets height to hug contents                     | —        | ❌    |
+| `Object > More layout options > Set width to fill container`  | Set width to fill container    | Sets width to fill container                    | —        | ❌    |
+| `Object > More layout options > Set height to fill container` | Set height to fill container   | Sets height to fill container                   | —        | ❌    |
+| `Object > Create component`                                   | Create component               | Creates a component from selection              | ⌥⌘K      | ❌    |
+| `Object > Reset instance`                                     | Reset instance                 | Resets component instance to main component     | —        | ❌    |
+| `Object > Detach instance`                                    | Detach instance                | Detaches component instance                     | ⌥⌘B      | ❌    |
+| `Object > Main component > Go to main component`              | Go to main component           | Navigates to the main component                 | ⌃⌥⌘K     | ❌    |
+| `Object > Main component > Push changes to main component`    | Push changes to main component | Pushes overrides to main component              | —        | ❌    |
+| `Object > Main component > Restore main component`            | Restore main component         | Restores main component state                   | —        | ❌    |
+| `Object > Bring to front`                                     | Bring to front                 | Brings selection to the front                   | ]        | ✅    |
+| `Object > Bring forward`                                      | Bring forward                  | Brings selection forward one layer              | ⌘]       | ✅    |
+| `Object > Send backward`                                      | Send backward                  | Sends selection backward one layer              | ⌘[       | ✅    |
+| `Object > Send to back`                                       | Send to back                   | Sends selection to the back                     | [        | ✅    |
+| `Object > Flip horizontal`                                    | Flip horizontal                | Flips selection horizontally                    | ⇧H       | ❌    |
+| `Object > Flip vertical`                                      | Flip vertical                  | Flips selection vertically                      | ⇧V       | ❌    |
+| `Object > Rotate 180°`                                        | Rotate 180°                    | Rotates selection by 180 degrees                | —        | ❌    |
+| `Object > Rotate 90° left`                                    | Rotate 90° left                | Rotates selection 90 degrees counterclockwise   | —        | ❌    |
+| `Object > Rotate 90° right`                                   | Rotate 90° right               | Rotates selection 90 degrees clockwise          | —        | ❌    |
+| `Object > Flatten`                                            | Flatten                        | Converts selection to vector paths              | ⌘E       | ✅    |
+| `Object > Outline stroke`                                     | Outline stroke                 | Converts stroke to filled shape                 | ⌥⌘O      | ❌    |
+| `Object > Boolean groups > Union`                             | Union                          | Combines shapes using union operation           | —        | ✅    |
+| `Object > Boolean groups > Subtract`                          | Subtract                       | Subtracts shapes using subtract operation       | —        | ✅    |
+| `Object > Boolean groups > Intersect`                         | Intersect                      | Creates intersection of shapes                  | —        | ✅    |
+| `Object > Boolean groups > Exclude`                           | Exclude                        | Creates exclusion of shapes                     | —        | ✅    |
+| `Object > Rasterize selection`                                | Rasterize selection            | Converts selection to raster image              | —        | ❌    |
+| `Object > Show/Hide selection`                                | Show/Hide selection            | Toggles visibility of selection                 | ⇧⌘H      | ✅    |
+| `Object > Lock/Unlock selection`                              | Lock/Unlock selection          | Toggles lock state of selection                 | ⇧⌘L      | ✅    |
+| `Object > Hide other layers`                                  | Hide other layers              | Hides all layers except selection               | —        | ❌    |
+| `Object > Collapse layers`                                    | Collapse layers                | Collapses layer hierarchy                       | ⌥L       | ❌    |
+| `Object > Remove fill`                                        | Remove fill                    | Removes fill from selection                     | ⌥/       | ✅    |
+| `Object > Remove stroke`                                      | Remove stroke                  | Removes stroke from selection (sets width to 0) | ⇧/       | ✅    |
+| `Object > Swap fill and stroke`                               | Swap fill and stroke           | Swaps fill and stroke colors                    | ⇧X       | ❌    |
 
 ## Arrange
 

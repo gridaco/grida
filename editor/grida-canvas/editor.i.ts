@@ -3830,6 +3830,41 @@ export namespace editor.api {
       target: "selection" | NodeID,
       direction: "increase" | "decrease"
     ): Promise<void>;
+    /**
+     * Clear fill (fill_paints) for selected nodes.
+     *
+     * Removes all fill paints from the target nodes, effectively clearing the fill.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Clear fill for selected nodes
+     * editor.surface.a11yClearFill("selection");
+     *
+     * // Clear fill for a specific node
+     * editor.surface.a11yClearFill("node-id-123");
+     * ```
+     */
+    a11yClearFill(target: "selection" | NodeID): void;
+    /**
+     * Clear stroke (stroke_paints) and set stroke width to 0 for selected nodes.
+     *
+     * Removes all stroke paints and sets stroke width to 0, but preserves other stroke properties
+     * (such as stroke align, cap, join, etc.) in case the user wants to restore the stroke later.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Clear stroke for selected nodes
+     * editor.surface.a11yClearStroke("selection");
+     *
+     * // Clear stroke for a specific node
+     * editor.surface.a11yClearStroke("node-id-123");
+     * ```
+     */
+    a11yClearStroke(target: "selection" | NodeID): void;
   }
 
   /**

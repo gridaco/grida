@@ -5244,6 +5244,24 @@ export class EditorSurface
     }
   }
 
+  public a11yClearFill(target: "selection" | editor.NodeID = "selection") {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    this._editor.doc.changeNodePropertyFills(target_ids, []);
+  }
+
+  public a11yClearStroke(target: "selection" | editor.NodeID = "selection") {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    // Clear stroke paints
+    this._editor.doc.changeNodePropertyStrokes(target_ids, []);
+    // Set stroke width to 0, but keep other stroke properties
+    for (const node_id of target_ids) {
+      this._editor.doc.changeNodePropertyStrokeWidth(node_id, {
+        type: "set",
+        value: 0,
+      });
+    }
+  }
+
   // ==============================================================
   // #endregion a11y actions
   // ==============================================================

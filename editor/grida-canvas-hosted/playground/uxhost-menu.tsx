@@ -1188,14 +1188,20 @@ function ObjectMenuContent() {
           <DropdownMenuShortcut>⌥L</DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        {/* Fill & Stroke - disabled */}
-        {/* TODO: Implement Remove fill */}
-        <DropdownMenuItem disabled className="text-xs">
+        {/* Fill & Stroke */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yClearFill("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
           Remove fill
           <DropdownMenuShortcut>⌥/</DropdownMenuShortcut>
         </DropdownMenuItem>
-        {/* TODO: Implement Remove stroke */}
-        <DropdownMenuItem disabled className="text-xs">
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yClearStroke("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
           Remove stroke
           <DropdownMenuShortcut>⇧/</DropdownMenuShortcut>
         </DropdownMenuItem>
