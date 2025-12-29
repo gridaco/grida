@@ -255,7 +255,7 @@ export const keybindings_sheet = [
   {
     name: "eye dropper",
     description: "Use eye dropper to pick color",
-    keys: ["i"],
+    keys: ["i", "ctrl+c"],
   },
   {
     name: "hand tool",
@@ -606,7 +606,7 @@ export function useEditorHotKeys() {
 
   // #region selection
   useHotkeys(
-    "i",
+    "i, ctrl+c",
     () => {
       if (window.EyeDropper) {
         const eyeDropper = new window.EyeDropper();
