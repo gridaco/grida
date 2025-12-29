@@ -1205,8 +1205,11 @@ function ObjectMenuContent() {
           Remove stroke
           <DropdownMenuShortcut>⇧/</DropdownMenuShortcut>
         </DropdownMenuItem>
-        {/* TODO: Implement Swap fill and stroke */}
-        <DropdownMenuItem disabled className="text-xs">
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11ySwapFillAndStroke("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
           Swap fill and stroke
           <DropdownMenuShortcut>⇧X</DropdownMenuShortcut>
         </DropdownMenuItem>

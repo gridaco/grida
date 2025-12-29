@@ -898,6 +898,19 @@ export function useEditorHotKeys() {
     }
   );
 
+  // Swap fill and stroke: ⇧X (macOS) / Shift+X (Windows/Linux)
+  useHotkeys(
+    "shift+x",
+    () => {
+      editor.surface.a11ySwapFillAndStroke("selection");
+    },
+    {
+      preventDefault: true,
+      enableOnContentEditable: false,
+      enableOnFormTags: false,
+    }
+  );
+
   useHotkeys(
     "meta+d, ctrl+d",
     () => {

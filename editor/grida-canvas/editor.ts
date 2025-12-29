@@ -1759,6 +1759,32 @@ class EditorDocumentStore
     );
   }
 
+  swapFillAndStroke(node_id: string | string[]) {
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    for (const node_id of node_ids) {
+      const node = this.getNodeSnapshotById(node_id);
+      if (!node) continue;
+
+      // Get all fills and strokes using resolvePaints
+      // Note: resolvePaints returns the full paints array regardless of paintIndex
+      // The paintIndex parameter (0) is only used for resolvedIndex calculation, which we ignore
+      const { paints: currentFills } = editor.resolvePaints(
+        node as grida.program.nodes.UnknwonNode,
+        "fill",
+        0
+      );
+      const { paints: currentStrokes } = editor.resolvePaints(
+        node as grida.program.nodes.UnknwonNode,
+        "stroke",
+        0
+      );
+
+      // Swap them
+      this.changeNodePropertyFills(node_id, currentStrokes);
+      this.changeNodePropertyStrokes(node_id, currentFills);
+    }
+  }
+
   addNodeFill(
     node_id: string | string[],
     fill: cg.Paint,
@@ -3563,6 +3589,10 @@ export class Editor
     return this.svgProvider.svgOptimize(svg);
   }
 
+  public swapFillAndStroke(node_id: string | string[]) {
+    this.doc.swapFillAndStroke(node_id);
+  }
+
   public svgPack(
     svg: string
   ): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null {
@@ -5260,6 +5290,13 @@ export class EditorSurface
         value: 0,
       });
     }
+  }
+
+  public a11ySwapFillAndStroke(
+    target: "selection" | editor.NodeID = "selection"
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    this._editor.doc.swapFillAndStroke(target_ids);
   }
 
   // ==============================================================

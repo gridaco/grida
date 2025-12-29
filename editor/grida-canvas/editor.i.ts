@@ -3324,6 +3324,25 @@ export namespace editor.api {
      * @param idx
      */
     deleteGuide(idx: number): void;
+
+    /**
+     * Swap fill paints and stroke paints for the target nodes.
+     *
+     * Only swaps the paint arrays (fill_paints ↔ stroke_paints), preserving all other
+     * stroke properties like stroke_width, stroke_align, stroke_cap, etc.
+     *
+     * @param target - Single node ID or array of node IDs to swap fills and strokes for
+     *
+     * @example
+     * ```ts
+     * // Swap fill and stroke for a single node
+     * editor.commands.swapFillAndStroke("node-id-123");
+     *
+     * // Swap fill and stroke for multiple nodes
+     * editor.commands.swapFillAndStroke(["node-1", "node-2", "node-3"]);
+     * ```
+     */
+    swapFillAndStroke(target: NodeID | NodeID[]): void;
   }
 
   /**
@@ -3865,6 +3884,24 @@ export namespace editor.api {
      * ```
      */
     a11yClearStroke(target: "selection" | NodeID): void;
+    /**
+     * Swap fill paints and stroke paints for selected nodes.
+     *
+     * Only swaps the paint arrays (fill_paints ↔ stroke_paints), preserving all other
+     * stroke properties like stroke_width, stroke_align, stroke_cap, etc.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Swap fill and stroke for selected nodes
+     * editor.surface.a11ySwapFillAndStroke("selection");
+     *
+     * // Swap fill and stroke for a specific node
+     * editor.surface.a11ySwapFillAndStroke("node-id-123");
+     * ```
+     */
+    a11ySwapFillAndStroke(target: "selection" | NodeID): void;
   }
 
   /**

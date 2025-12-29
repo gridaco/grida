@@ -106,7 +106,7 @@
 | `Object > Collapse layers`                                    | Collapse layers                | Collapses layer hierarchy                       | ⌥L       | ❌    |
 | `Object > Remove fill`                                        | Remove fill                    | Removes fill from selection                     | ⌥/       | ✅    |
 | `Object > Remove stroke`                                      | Remove stroke                  | Removes stroke from selection (sets width to 0) | ⇧/       | ✅    |
-| `Object > Swap fill and stroke`                               | Swap fill and stroke           | Swaps fill and stroke colors                    | ⇧X       | ❌    |
+| `Object > Swap fill and stroke`                               | Swap fill and stroke           | Swaps fill and stroke paints                    | ⇧X       | ✅    |
 
 ## Arrange
 
