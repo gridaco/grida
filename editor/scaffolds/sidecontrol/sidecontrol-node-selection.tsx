@@ -819,6 +819,10 @@ function ModeMixedNodeProperties({
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
+      {/* TODO: Refactor this stroke section to use @editor/scaffolds/sidecontrol/chunks/section-strokes.tsx
+          for mixed/multiple selection as well. Currently, this section manually handles stroke width
+          visibility (setting to 1 if unset/0) in a "dirty way" - this should be moved to use the
+          centralized `ensureStrokeWidth` parameter in `addNodeStroke`/`changeNodePropertyStrokes`. */}
       {supports_stroke && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
