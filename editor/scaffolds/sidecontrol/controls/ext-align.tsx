@@ -2,7 +2,6 @@ import {
   ActionGroup,
   ActionGroupItem,
 } from "@/components/ui-editor/action-group";
-import { Button } from "@/components/ui-editor/button";
 import {
   Tooltip,
   TooltipContent,
