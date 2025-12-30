@@ -20,8 +20,8 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 <!-- | Command            | ⌘              | —                | ❌ No                               | ⌘ (macOS only)            | -->
 <!-- | Control            | ⌃              | Ctrl             | ❌ No                               | Ctrl (Windows), ⌃ (macOS) | -->
 <!-- | Option / Alt       | ⌥              | Alt              | ❌ No                               | Alt (Windows), ⌥ (macOS)  | -->
-<!-- | Shift              | ⇧              | ⇧                | ✅ Yes                              | ⇧ (both)                  | -->
-<!-- | Enter / Return     | ⏎ / ↵          | ↵                | ⚠️ Mostly                           | ↵ or Enter                | -->
+<!-- | Shift              | ⇧              | Shift            | ❌ No                               | Shift (Windows), ⇧ (macOS) | -->
+<!-- | Enter / Return     | ⏎ / ↵          | Enter            | ❌ No                               | Enter (Windows), ↵ (macOS) | -->
 <!-- | Escape             | ⎋              | Esc              | ⚠️ Mixed                            | Esc                       | -->
 <!-- | Backspace / Delete | ⌫ / ⌦          | Backspace / Del  | ❌ No                               | Text label                | -->
 
