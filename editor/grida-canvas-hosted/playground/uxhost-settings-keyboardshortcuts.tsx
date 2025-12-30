@@ -25,6 +25,10 @@ import { SearchIcon } from "lucide-react";
 
 interface KeyboardShortcutRowProps {
   action: {
+    /**
+     * Stable unique identifier for the action (derived from the `actions` registry key).
+     */
+    id?: string;
     name: string;
     description: string;
     command: string;
@@ -119,12 +123,17 @@ export function KeyboardShortcuts() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredActions = useMemo(() => {
+    const actionsWithId = Object.entries(actions).map(([id, action]) => ({
+      id,
+      ...action,
+    }));
+
     if (!searchQuery.trim()) {
-      return Object.values(actions);
+      return actionsWithId;
     }
 
     const query = searchQuery.toLowerCase().trim();
-    return Object.values(actions).filter(
+    return actionsWithId.filter(
       (action) =>
         action.name.toLowerCase().includes(query) ||
         action.description.toLowerCase().includes(query) ||
@@ -175,9 +184,13 @@ export function KeyboardShortcuts() {
               No shortcuts found matching "{searchQuery}"
             </div>
           ) : (
-            filteredActions.map((action) => (
+            filteredActions.map((action, index) => (
               <KeyboardShortcutRow
-                key={action.command}
+                key={
+                  action.id ??
+                  // Fallback: deterministic-ish unique string to avoid React key collisions
+                  `${action.command}:${action.name}:${action.description}:${index}`
+                }
                 action={action}
                 selectedPlatform={selectedPlatform}
               />

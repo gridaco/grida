@@ -200,6 +200,11 @@ function isApplePlatform(): boolean {
  * mostly to determine cmdctrl key (and for cases that keybindings are fundamentally different, e.g. ctrl+c being color picker on mac, but copy on windows/linux)
  */
 export function getKeyboardOS(): "mac" | "windows" | "linux" {
+  // SSR / non-browser safety: `navigator` is not defined in Node.js environments.
+  // Pick a reasonable default for headless contexts.
+  if (typeof navigator === "undefined" || !navigator.platform) {
+    return "linux";
+  }
   if (isApplePlatform()) return "mac";
   const platform = navigator.platform.toLowerCase();
   if (platform.includes("win")) return "windows";
@@ -385,18 +390,20 @@ export function uikbdk(
 ): string {
   const targetPlatform = platform || getKeyboardOS();
 
-  // Check if it's a modifier bitmask (M enum values are small bitmasks: 1, 2, 4, 8, 16)
-  // KeyCodes are enum values that start from a much higher number
-  // We check if it's a valid modifier by trying to resolve it
-  // If it resolves to modifier keys, it's a modifier; otherwise treat as KeyCode
-  const resolvedMods = resolveMods(key, targetPlatform);
+  // Only treat *single* modifier constants as modifiers.
+  // Do NOT try to infer modifiers from bit overlap, as some KeyCode values can overlap by chance.
   if (
-    resolvedMods.length > 0 &&
-    key & (M.Ctrl | M.Shift | M.Alt | M.Meta | M.CtrlCmd)
+    key === M.Ctrl ||
+    key === M.Shift ||
+    key === M.Alt ||
+    key === M.Meta ||
+    key === M.CtrlCmd
   ) {
-    // It's a modifier bitmask - return the first resolved key's label
-    // In practice, most single modifiers resolve to a single key
-    return keycodeToPlatformUILabel(resolvedMods[0], targetPlatform);
+    const resolvedMods = resolveMods(key, targetPlatform);
+    // In practice, single modifiers resolve to a single key (Ctrl/Cmd/Shift/Alt).
+    if (resolvedMods.length > 0) {
+      return keycodeToPlatformUILabel(resolvedMods[0], targetPlatform);
+    }
   }
 
   // It's a KeyCode
