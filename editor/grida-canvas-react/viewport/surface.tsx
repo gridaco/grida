@@ -87,6 +87,7 @@ import {
   MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE,
   MIN_NODE_OVERLAY_RESIZE_HANDLES_VISIBLE_UI_SIZE,
   DROPZONE_BORDER_WIDTH,
+  RULER_Z_INDEX,
 } from "../ui-config";
 import {
   NodeOverlayCornerRadiusHandle,
@@ -1905,12 +1906,18 @@ function RulerGuideOverlay() {
   );
 
   return (
-    <div className="fixed w-full h-full pointer-events-none z-50">
+    <div
+      className="fixed w-full h-full pointer-events-none"
+      style={{ zIndex: RULER_Z_INDEX }}
+    >
       <RulerContextMenu editor={editorInstance}>
         <div
           {...bindX()}
-          className="z-30 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
-          style={eager_canvas_input ? { pointerEvents: "none" } : undefined}
+          className="fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+          style={{
+            zIndex: RULER_Z_INDEX,
+            ...(eager_canvas_input ? { pointerEvents: "none" } : undefined),
+          }}
         >
           <AxisRuler
             axis="x"
@@ -1928,8 +1935,11 @@ function RulerGuideOverlay() {
       <RulerContextMenu editor={editorInstance}>
         <div
           {...bindY()}
-          className="z-20 fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
-          style={eager_canvas_input ? { pointerEvents: "none" } : undefined}
+          className="fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
+          style={{
+            zIndex: RULER_Z_INDEX,
+            ...(eager_canvas_input ? { pointerEvents: "none" } : undefined),
+          }}
         >
           <AxisRuler
             axis="y"
@@ -1945,7 +1955,7 @@ function RulerGuideOverlay() {
         </div>
       </RulerContextMenu>
       {/* Guides */}
-      <div className="z-10">
+      <div style={{ zIndex: RULER_Z_INDEX }}>
         {guides.map((g, i) => {
           return (
             <Guide
