@@ -48,9 +48,9 @@ function sequenceToString(
 
 /**
  * Get the first keybinding as a string for an action
- * Returns empty string if not found
  *
- * @throws {Error} If actionId is not a valid action ID
+ * Returns an empty string when the action has no resolved keybinding for the
+ * requested platform (including when the `actionId` is unknown).
  */
 export function keyboardShortcutText(
   actionId: UXHostActionId,
@@ -82,6 +82,9 @@ export function keyboardShortcutTextAll(
 /**
  * Get keyboard shortcut as a formatted string with separators between chunks
  * Useful for display in tooltips or settings
+ *
+ * Returns an empty string when the action has no resolved keybinding for the
+ * requested platform (including when the `actionId` is unknown).
  */
 export function keyboardShortcutTextFormatted(
   actionId: UXHostActionId,
