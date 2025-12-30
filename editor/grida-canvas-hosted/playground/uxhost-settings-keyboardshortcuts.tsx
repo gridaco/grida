@@ -10,7 +10,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { actions } from "./uxhost-actions";
 import {
   keybindingsToKeyCodes,
-  getPlatform,
+  getKeyboardOS,
   type Keybindings,
 } from "@/grida-canvas/keybinding";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -115,7 +115,7 @@ function KeyboardShortcutRow({
 export function KeyboardShortcuts() {
   const [selectedPlatform, setSelectedPlatform] = useState<
     "mac" | "windows" | "linux"
-  >(getPlatform());
+  >(getKeyboardOS());
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredActions = useMemo(() => {

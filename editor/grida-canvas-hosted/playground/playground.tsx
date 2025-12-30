@@ -80,6 +80,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import ErrorBoundary from "./error-boundary";
+import { uikbdk, M } from "@/grida-canvas/keybinding";
+import { KeyCode } from "@/grida-canvas/keycode";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
@@ -646,8 +648,8 @@ function SidebarLeft({
             <div className="flex items-center gap-2">
               <span>Open Library</span>
               <KbdGroup>
-                <Kbd>Shift</Kbd>
-                <Kbd>I</Kbd>
+                <Kbd>{uikbdk(M.CtrlCmd)}</Kbd>
+                <Kbd>{uikbdk(KeyCode.KeyI)}</Kbd>
               </KbdGroup>
             </div>
           </TooltipContent>

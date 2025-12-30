@@ -40,6 +40,7 @@ import {
   useToolState,
 } from "@/grida-canvas-react";
 import { cn } from "@/components/lib/utils";
+import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
 
 export function ToolGroupItem({
   className,
@@ -112,13 +113,13 @@ export default function Toolbar() {
       label: string;
       shortcut?: string;
     }> = [
-      { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
-      { value: "path", label: "Path tool", shortcut: "P" },
+      { value: "pencil", label: "Pencil tool", shortcut: keyboardShortcutText("workbench.surface.cursor.pencil") },
+      { value: "path", label: "Path tool", shortcut: keyboardShortcutText("workbench.surface.cursor.path") },
     ];
 
     if (flags.__unstable_brush_tool === "on") {
-      stable.push({ value: "brush", label: "Brush tool", shortcut: "B" });
-      stable.push({ value: "eraser", label: "Eraser tool", shortcut: "E" });
+      stable.push({ value: "brush", label: "Brush tool", shortcut: keyboardShortcutText("workbench.surface.cursor.brush") });
+      stable.push({ value: "eraser", label: "Eraser tool", shortcut: keyboardShortcutText("workbench.surface.cursor.eraser") });
     }
 
     return stable;
@@ -145,9 +146,9 @@ export default function Toolbar() {
           open={open === "cursor"}
           onOpenChange={(o) => setOpen(o ? "cursor" : null)}
           options={[
-            { value: "cursor", label: "Cursor", shortcut: "V" },
-            { value: "hand", label: "Hand tool", shortcut: "H" },
-            { value: "scale", label: "Scale tool", shortcut: "K" },
+            { value: "cursor", label: "Cursor", shortcut: keyboardShortcutText("workbench.surface.cursor.cursor") },
+            { value: "hand", label: "Hand tool", shortcut: keyboardShortcutText("workbench.surface.cursor.hand") },
+            { value: "scale", label: "Scale tool", shortcut: keyboardShortcutText("workbench.surface.cursor.scale") },
           ]}
           onValueChange={(v) => {
             editor.surface.surfaceSetTool(
@@ -160,7 +161,7 @@ export default function Toolbar() {
           value={"container" satisfies ToolbarToolType}
           className="aspect-square"
           label="Container tool"
-          shortcut="A, F"
+          shortcut={keyboardShortcutText("workbench.surface.cursor.container")}
         >
           <FrameIcon />
         </ToolGroupItem>
@@ -168,7 +169,7 @@ export default function Toolbar() {
           value={"text" satisfies ToolbarToolType}
           className="aspect-square"
           label="Text tool"
-          shortcut="T"
+          shortcut={keyboardShortcutText("workbench.surface.cursor.text")}
         >
           <ToolIcon type="text" />
         </ToolGroupItem>
@@ -177,10 +178,10 @@ export default function Toolbar() {
           open={open === "shape"}
           onOpenChange={(o) => setOpen(o ? "shape" : null)}
           options={[
-            { value: "rectangle", label: "Rectangle", shortcut: "R" },
-            { value: "ellipse", label: "Ellipse", shortcut: "O" },
-            { value: "line", label: "Line", shortcut: "L" },
-            { value: "polygon", label: "Polygon", shortcut: "Y" },
+            { value: "rectangle", label: "Rectangle", shortcut: keyboardShortcutText("workbench.surface.cursor.rectangle") },
+            { value: "ellipse", label: "Ellipse", shortcut: keyboardShortcutText("workbench.surface.cursor.ellipse") },
+            { value: "line", label: "Line", shortcut: keyboardShortcutText("workbench.surface.cursor.line") },
+            { value: "polygon", label: "Polygon", shortcut: keyboardShortcutText("workbench.surface.cursor.polygon") },
             { value: "star", label: "Star" },
             { value: "image", label: "Image" },
           ]}

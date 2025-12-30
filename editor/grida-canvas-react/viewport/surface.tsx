@@ -73,6 +73,7 @@ import {
   FloatingBarContentWrapper,
   FloatingBarTitle,
 } from "./ui/floating-bar";
+import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
 import grida from "@grida/schema";
 import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
@@ -1982,7 +1983,9 @@ function RulerContextMenu({
           }}
         >
           Hide ruler
-          <ContextMenuShortcut>⇧R</ContextMenuShortcut>
+          <ContextMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.hide-show-ruler")}
+          </ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

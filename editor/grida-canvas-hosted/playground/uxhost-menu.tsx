@@ -77,6 +77,7 @@ import { useFilePicker } from "use-file-picker";
 import { ImageIcon } from "lucide-react";
 import { SlackLogoIcon } from "@/components/logos";
 import { distro } from "../distro";
+import { keyboardShortcutText } from "./uxhost-shortcut-renderer";
 
 export function PlaygroundMenuContent({
   toggleVisibility,
@@ -310,14 +311,18 @@ function EditMenuContent({
           className="text-xs"
         >
           Undo
-          <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.undo")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.commands.redo()}
           className="text-xs"
         >
           Redo
-          <DropdownMenuShortcut>⌘⇧Z</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.redo")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* Clipboard Section */}
@@ -327,7 +332,9 @@ function EditMenuContent({
           className="text-xs"
         >
           Cut
-          <DropdownMenuShortcut>⌘X</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.cut")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yCopy()}
@@ -335,11 +342,15 @@ function EditMenuContent({
           className="text-xs"
         >
           Copy
-          <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.copy")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onPaste} className="text-xs">
           Paste
-          <DropdownMenuShortcut>⌘V</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.paste")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
@@ -353,7 +364,9 @@ function EditMenuContent({
           className="text-xs"
         >
           Copy as PNG
-          <DropdownMenuShortcut>⇧⌘C</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.copy-as-png")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
@@ -371,7 +384,9 @@ function EditMenuContent({
           className="text-xs"
         >
           Pick color
-          <DropdownMenuShortcut>I</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.eye-dropper")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* Actions Section */}
@@ -381,7 +396,9 @@ function EditMenuContent({
           className="text-xs"
         >
           Duplicate
-          <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.duplicate")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yDelete()}
@@ -389,7 +406,9 @@ function EditMenuContent({
           className="text-xs"
         >
           Delete
-          <DropdownMenuShortcut>⌫</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.delete-node")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
@@ -420,7 +439,9 @@ function ViewMenuContent({
           className="text-xs"
         >
           Zoom in
-          <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-in")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -428,7 +449,9 @@ function ViewMenuContent({
           className="text-xs"
         >
           Zoom out
-          <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-out")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -436,7 +459,9 @@ function ViewMenuContent({
           className="text-xs"
         >
           Zoom to 100%
-          <DropdownMenuShortcut>⇧0</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-100")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -444,7 +469,9 @@ function ViewMenuContent({
           className="text-xs"
         >
           Zoom to fit
-          <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-fit")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -452,7 +479,9 @@ function ViewMenuContent({
           className="text-xs"
         >
           Zoom to selection
-          <DropdownMenuShortcut>⇧2</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-selection")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         {/* Display Options */}
@@ -464,7 +493,11 @@ function ViewMenuContent({
           className="text-xs"
         >
           Pixel grid
-          <DropdownMenuShortcut>⇧'</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.view.hide-show-pixel-grid"
+            )}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={ruler === "on"}
@@ -474,7 +507,9 @@ function ViewMenuContent({
           className="text-xs"
         >
           Ruler
-          <DropdownMenuShortcut>⇧R</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.hide-show-ruler")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         {/* UI Visibility */}
         {toggleVisibility && toggleMinimal && (
@@ -482,11 +517,9 @@ function ViewMenuContent({
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={toggleVisibility} className="text-xs">
               Show/Hide UI
-              <DropdownMenuShortcut>⌘\</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={toggleMinimal} className="text-xs">
               Minimize UI
-              <DropdownMenuShortcut>⇧⌘\</DropdownMenuShortcut>
             </DropdownMenuItem>
           </>
         )}
@@ -612,7 +645,9 @@ function TextMenuContent() {
         >
           <FontBoldIcon className="size-3.5" />
           Bold
-          <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.toggle-bold")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yToggleItalic("selection")}
@@ -621,7 +656,9 @@ function TextMenuContent() {
         >
           <FontItalicIcon className="size-3.5" />
           Italic
-          <DropdownMenuShortcut>⌘I</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.toggle-italic")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yToggleUnderline("selection")}
@@ -630,7 +667,9 @@ function TextMenuContent() {
         >
           <UnderlineIcon className="size-3.5" />
           Underline
-          <DropdownMenuShortcut>⌘U</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.toggle-underline")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yToggleLineThrough("selection")}
@@ -639,24 +678,32 @@ function TextMenuContent() {
         >
           <StrikethroughIcon className="size-3.5" />
           Strikethrough
-          <DropdownMenuShortcut>⇧⌘X</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.toggle-line-through")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         {/* Create link - disabled */}
         {/* TODO: Implement Create link */}
         <DropdownMenuItem disabled className="text-xs">
           Create link
-          <DropdownMenuShortcut>⇧⌘U</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.create-link")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         {/* Lists - disabled */}
         {/* TODO: Implement Bulleted list */}
         <DropdownMenuItem disabled className="text-xs">
           Bulleted list
-          <DropdownMenuShortcut>⇧⌘8</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.ul")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         {/* TODO: Implement Numbered list */}
         <DropdownMenuItem disabled className="text-xs">
           Numbered list
-          <DropdownMenuShortcut>⇧⌘7</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.ol")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* Alignment */}
@@ -674,7 +721,9 @@ function TextMenuContent() {
             >
               <TextAlignLeftIcon className="size-3.5" />
               Text align left
-              <DropdownMenuShortcut>⌥⌘L</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText("workbench.surface.text.text-align-left")}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
@@ -685,7 +734,11 @@ function TextMenuContent() {
             >
               <TextAlignCenterIcon className="size-3.5" />
               Text align center
-              <DropdownMenuShortcut>⌥⌘T</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.text-align-center"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
@@ -696,7 +749,11 @@ function TextMenuContent() {
             >
               <TextAlignRightIcon className="size-3.5" />
               Text align right
-              <DropdownMenuShortcut>⌥⌘R</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.text-align-right"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
@@ -707,7 +764,11 @@ function TextMenuContent() {
             >
               <TextAlignJustifyIcon className="size-3.5" />
               Text align justified
-              <DropdownMenuShortcut>⌥⌘J</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.text-align-justify"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -752,12 +813,20 @@ function TextMenuContent() {
             {/* TODO: Implement Increase indentation */}
             <DropdownMenuItem disabled className="text-xs">
               Increase indentation
-              <DropdownMenuShortcut>Tab</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-indentation"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             {/* TODO: Implement Decrease indentation */}
             <DropdownMenuItem disabled className="text-xs">
               Decrease indentation
-              <DropdownMenuShortcut>⇧Tab</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-indentation"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {/* Font size */}
@@ -769,7 +838,11 @@ function TextMenuContent() {
               className="text-xs"
             >
               Increase font size
-              <DropdownMenuShortcut>⇧⌘&gt;</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-font-size"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
@@ -779,7 +852,11 @@ function TextMenuContent() {
               className="text-xs"
             >
               Decrease font size
-              <DropdownMenuShortcut>⇧⌘&lt;</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-font-size"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             {/* Font weight */}
             <DropdownMenuItem
@@ -793,7 +870,11 @@ function TextMenuContent() {
               className="text-xs"
             >
               Increase font weight
-              <DropdownMenuShortcut>⌥⌘&gt;</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-font-weight"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
@@ -806,7 +887,11 @@ function TextMenuContent() {
               className="text-xs"
             >
               Decrease font weight
-              <DropdownMenuShortcut>⌥⌘&lt;</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-font-weight"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {/* Line height */}
@@ -818,7 +903,11 @@ function TextMenuContent() {
               className="text-xs"
             >
               Increase line height
-              <DropdownMenuShortcut>⌥⇧&gt;</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-line-height"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
@@ -828,7 +917,11 @@ function TextMenuContent() {
               className="text-xs"
             >
               Decrease line height
-              <DropdownMenuShortcut>⌥⇧&lt;</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-line-height"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             {/* Letter spacing */}
             <DropdownMenuItem
@@ -839,7 +932,11 @@ function TextMenuContent() {
               className="text-xs"
             >
               Increase letter spacing
-              <DropdownMenuShortcut>⌥&gt;</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-letter-spacing"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
@@ -849,7 +946,11 @@ function TextMenuContent() {
               className="text-xs"
             >
               Decrease letter spacing
-              <DropdownMenuShortcut>⌥&lt;</DropdownMenuShortcut>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-letter-spacing"
+                )}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
@@ -927,7 +1028,9 @@ function ArrangeMenuContent() {
         >
           <AlignLeftIcon className="size-3.5" />
           Align left
-          <DropdownMenuShortcut>⌥A</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.arrange.align-left")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yAlign({ horizontal: "center" })}
@@ -936,7 +1039,11 @@ function ArrangeMenuContent() {
         >
           <AlignCenterHorizontallyIcon className="size-3.5" />
           Align horizontal centers
-          <DropdownMenuShortcut>⌥H</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.arrange.align-horizontal-center"
+            )}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yAlign({ horizontal: "max" })}
@@ -945,7 +1052,9 @@ function ArrangeMenuContent() {
         >
           <AlignRightIcon className="size-3.5" />
           Align right
-          <DropdownMenuShortcut>⌥D</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.arrange.align-right")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yAlign({ vertical: "min" })}
@@ -954,7 +1063,9 @@ function ArrangeMenuContent() {
         >
           <AlignTopIcon className="size-3.5" />
           Align top
-          <DropdownMenuShortcut>⌥W</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.arrange.align-top")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yAlign({ vertical: "center" })}
@@ -963,7 +1074,11 @@ function ArrangeMenuContent() {
         >
           <AlignCenterVerticallyIcon className="size-3.5" />
           Align vertical centers
-          <DropdownMenuShortcut>⌥V</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.arrange.align-vertical-center"
+            )}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yAlign({ vertical: "max" })}
@@ -972,7 +1087,9 @@ function ArrangeMenuContent() {
         >
           <AlignBottomIcon className="size-3.5" />
           Align bottom
-          <DropdownMenuShortcut>⌥S</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.arrange.align-bottom")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* Distribute */}
@@ -983,7 +1100,11 @@ function ArrangeMenuContent() {
         >
           <SpaceEvenlyHorizontallyIcon className="size-3.5" />
           Distribute horizontal spacing
-          <DropdownMenuShortcut>⌥⌃V</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.arrange.distribute-horizontally"
+            )}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.commands.distributeEvenly("selection", "y")}
@@ -992,7 +1113,11 @@ function ArrangeMenuContent() {
         >
           <SpaceEvenlyVerticallyIcon className="size-3.5" />
           Distribute vertical spacing
-          <DropdownMenuShortcut>⌥⌃H</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.arrange.distribute-vertically"
+            )}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
@@ -1017,7 +1142,11 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Container selection
-          <DropdownMenuShortcut>⌥⌘G</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.object.group-with-container"
+            )}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.commands.group("selection")}
@@ -1025,7 +1154,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Group selection
-          <DropdownMenuShortcut>⌘G</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.group")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.ungroup(selection)}
@@ -1033,7 +1164,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Ungroup selection
-          <DropdownMenuShortcut>⇧⌘G</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.ungroup")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* Mask */}
@@ -1052,7 +1185,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Add layout
-          <DropdownMenuShortcut>⇧A</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.auto-layout")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         {/* Create arc - disabled */}
         {/* TODO: Implement Create arc */}
@@ -1066,10 +1201,14 @@ function ObjectMenuContent() {
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-40">
             {/* TODO: Implement Suggest layout */}
-            <DropdownMenuItem disabled className="text-xs">
+            {/* <DropdownMenuItem disabled className="text-xs">
               Suggest layout
-              <DropdownMenuShortcut>⇧⌃A</DropdownMenuShortcut>
-            </DropdownMenuItem>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.object.auto-layout-all"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem> */}
             {/* TODO: Implement Remove all layout */}
             <DropdownMenuItem disabled className="text-xs">
               Remove all layout
@@ -1095,10 +1234,12 @@ function ObjectMenuContent() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {/* TODO: Implement Resize to fit */}
-            <DropdownMenuItem disabled className="text-xs">
+            {/* <DropdownMenuItem disabled className="text-xs">
               Resize to fit
-              <DropdownMenuShortcut>⌥⇧⌘R</DropdownMenuShortcut>
-            </DropdownMenuItem>
+              <DropdownMenuShortcut>
+                {keyboardShortcutText("workbench.surface.object.resize-to-fit")}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem> */}
             {/* TODO: Implement Set width to hug contents */}
             <DropdownMenuItem disabled className="text-xs">
               Set width to hug contents
@@ -1125,7 +1266,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Bring to front
-          <DropdownMenuShortcut>]</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.move-to-front")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.order("forward")}
@@ -1133,7 +1276,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Bring forward
-          <DropdownMenuShortcut>⌘]</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.move-forward")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.order("backward")}
@@ -1141,7 +1286,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Send backward
-          <DropdownMenuShortcut>⌘[</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.move-backward")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.order("back")}
@@ -1149,19 +1296,25 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Send to back
-          <DropdownMenuShortcut>[</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.move-to-back")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* Transform - Flip & Rotate disabled */}
         {/* TODO: Implement Flip horizontal */}
         <DropdownMenuItem disabled className="text-xs">
           Flip horizontal
-          <DropdownMenuShortcut>⇧H</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.flip-horizontal")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         {/* TODO: Implement Flip vertical */}
         <DropdownMenuItem disabled className="text-xs">
           Flip vertical
-          <DropdownMenuShortcut>⇧V</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.flip-vertical")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         {/* TODO: Implement Rotate 180° */}
         <DropdownMenuItem disabled className="text-xs">
@@ -1183,13 +1336,17 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Flatten
-          <DropdownMenuShortcut>⌘E</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.flatten")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         {/* Outline stroke - disabled */}
         {/* TODO: Implement Outline stroke */}
         <DropdownMenuItem disabled className="text-xs">
           Outline stroke
-          <DropdownMenuShortcut>⌥⌘O</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.outline-stroke")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* Boolean groups */}
@@ -1241,7 +1398,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Show/Hide selection
-          <DropdownMenuShortcut>⇧⌘H</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.toggle-active")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yToggleLocked("selection")}
@@ -1249,7 +1408,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Lock/Unlock selection
-          <DropdownMenuShortcut>⇧⌘L</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.toggle-locked")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         {/* Hide other layers - disabled */}
         {/* TODO: Implement Hide other layers */}
@@ -1258,10 +1419,12 @@ function ObjectMenuContent() {
         </DropdownMenuItem>
         {/* Collapse layers - disabled */}
         {/* TODO: Implement Collapse layers */}
-        <DropdownMenuItem disabled className="text-xs">
+        {/* <DropdownMenuItem disabled className="text-xs">
           Collapse layers
-          <DropdownMenuShortcut>⌥L</DropdownMenuShortcut>
-        </DropdownMenuItem>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.ui.collapse-layers")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem> */}
         <DropdownMenuSeparator />
         {/* Fill & Stroke */}
         <DropdownMenuItem
@@ -1270,7 +1433,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Remove fill
-          <DropdownMenuShortcut>⌥/</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.remove-fill")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11yClearStroke("selection")}
@@ -1278,7 +1443,9 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Remove stroke
-          <DropdownMenuShortcut>⇧/</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.remove-stroke")}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => instance.surface.a11ySwapFillAndStroke("selection")}
@@ -1286,7 +1453,11 @@ function ObjectMenuContent() {
           className="text-xs"
         >
           Swap fill and stroke
-          <DropdownMenuShortcut>⇧X</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.object.swap-fill-and-stroke"
+            )}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuSubContent>
     </DropdownMenuSub>

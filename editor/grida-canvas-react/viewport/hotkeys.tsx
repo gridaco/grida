@@ -8,11 +8,8 @@ import {
 import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import { useCurrentEditor } from "../use-editor";
-
-function isApplePlatform(): boolean {
-  const platform = typeof navigator === "object" ? navigator.platform : "";
-  return /Mac|iPod|iPhone|iPad/.test(platform);
-}
+import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
+import { getKeyboardOS } from "@/grida-canvas/keybinding";
 
 function useSingleDoublePressHotkey(
   key: string,
@@ -37,6 +34,7 @@ function useSingleDoublePressHotkey(
 }
 
 export function useEditorHotKeys() {
+  const keyboardOS = getKeyboardOS();
   const editor = useCurrentEditor();
   const tool = useToolState();
   const content_edit_mode = useContentEditModeMinimalState();
@@ -242,7 +240,7 @@ export function useEditorHotKeys() {
   // #region selection
   // Color picker: I on all platforms, Ctrl+C on macOS only (Windows uses Ctrl+C for copy)
   useHotkeys(
-    isApplePlatform() ? "i, ctrl+c" : "i",
+    keyboardOS === "mac" ? "i, ctrl+c" : "i",
     () => editor.surface.surfacePickColor(),
     {
       enableOnFormTags: false,
@@ -854,7 +852,9 @@ export function useEditorHotKeys() {
         editor.commands.group("selection");
       } catch (e) {
         console.error(e);
-        toast.error("use ⌥⌘G for grouping");
+        toast.error(
+          `use ${keyboardShortcutText("workbench.surface.object.group-with-container")} for grouping`
+        );
       }
     },
     {

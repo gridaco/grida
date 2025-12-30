@@ -1,3 +1,28 @@
+/**
+ * @fileoverview
+ * Keyboard Shortcut Actions - Single Source of Truth
+ *
+ * **Current State:**
+ * This file currently serves two purposes:
+ * 1. **Keyboard Shortcuts View (View Only)**: Displays all available keyboard shortcuts
+ *    in the settings/keyboard shortcuts UI for user reference.
+ * 2. **UI Component Labels**: Provides keybinding labels for UI components (menus, tooltips, etc.)
+ *    to display shortcuts dynamically without hardcoding them.
+ *
+ * **Future Vision:**
+ * This file will become the single source of truth for all user actions and keybindings.
+ * In the future, it will:
+ * - Define all executable commands/actions in the editor
+ * - Serve as the authoritative registry for keyboard shortcuts
+ * - Enable centralized keybinding management and customization
+ * - Support user-defined keybinding overrides
+ * - Provide type-safe action IDs throughout the codebase
+ *
+ * **Note:**
+ * Actions marked with `command: "todo!()"` are placeholders for features that are not yet implemented.
+ * They have keybindings defined but the actual command handlers are not yet available.
+ */
+
 import { KeyCode } from "@/grida-canvas/keycode";
 import {
   type Keybinding,
@@ -22,7 +47,21 @@ interface UXHostAction {
 /**
  * Playground-specific keyboard shortcut actions
  */
-export const actions: Record<string, UXHostAction> = {
+export const actions = {
+  // ["workbench.surface.ui.collapse-layers"]: {
+  //   name: "Collapse layers",
+  //   description: "Collapse layer hierarchy",
+  //   command: "todo!()",
+  //   keybindings: kb(KeyCode.KeyL, M.Alt),
+  // },
+
+  // ["workbench.surface.ui.open-library"]: {
+  //   name: "open library",
+  //   description: "Open the library",
+  //   command: "todo!()",
+  //   keybindings: kb(KeyCode.KeyI, M.Shift),
+  // },
+
   ["workbench.surface.edit.undo"]: {
     name: "undo",
     description: "Undo the last action",
@@ -152,261 +191,323 @@ export const actions: Record<string, UXHostAction> = {
   ["workbench.surface.cursor.select-all-siblings"]: {
     name: "select all siblings",
     description: "Select all siblings of the current selection",
-    command: "workbench.surface.cursor.select-all-siblings",
+    command: "editor.surface.action.selectAll",
     keybindings: kb(KeyCode.KeyA, M.CtrlCmd),
   },
 
   ["workbench.surface.cursor.select-children"]: {
     name: "select children",
     description: "Select all children of the current selection",
-    command: "workbench.surface.cursor.select-children",
+    command: "editor.surface.action.selectChildren",
     keybindings: kb(KeyCode.Enter),
   },
 
   ["workbench.surface.cursor.select-parent"]: {
     name: "select parent",
     description: "Select the parent of the current selection",
-    command: "workbench.surface.cursor.select-parent",
+    command: "editor.surface.action.selectParent",
     keybindings: [kb(KeyCode.Enter, M.Shift), kb(KeyCode.Backslash, 0)],
   },
 
   ["workbench.surface.cursor.select-next-sibling"]: {
     name: "select next sibling",
     description: "Select the next sibling of the current selection",
-    command: "workbench.surface.cursor.select-next-sibling",
+    command: "editor.surface.action.selectNextSibling",
     keybindings: kb(KeyCode.Tab, 0),
   },
 
   ["workbench.surface.cursor.select-previous-sibling"]: {
     name: "select previous sibling",
     description: "Select the previous sibling of the current selection",
-    command: "workbench.surface.cursor.select-previous-sibling",
+    command: "editor.surface.action.selectPreviousSibling",
     keybindings: kb(KeyCode.Tab, M.Shift),
   },
 
   ["workbench.surface.cursor.escape"]: {
     name: "Escape/Clear",
     description: "Clear selection and exit modes",
-    command: "workbench.surface.cursor.escape",
+    command: "editor.surface.action.escape",
     keybindings: [kb(KeyCode.Escape, 0), kb(KeyCode.Clear, 0)],
   },
 
-  ["workbench.surface.cursor.hand-tool"]: {
-    name: "hand tool",
-    description: "Pan the canvas (Space is hold-to-activate)",
-    command: "workbench.surface.cursor.hand-tool",
-    keybindings: [kb(KeyCode.KeyH, 0), kb(KeyCode.Space, 0)],
+  ["workbench.surface.cursor.hand"]: {
+    name: "hand",
+    description: "Hand tool (alternative to hand-tool)",
+    command: "editor.surface.action.setTool.hand",
+    keybindings: kb(KeyCode.KeyH, 0),
   },
 
   ["workbench.surface.cursor.zoom-tool"]: {
     name: "zoom tool",
     description: "Zoom the canvas (hold-to-activate)",
-    command: "workbench.surface.cursor.zoom-tool",
+    command: "editor.surface.action.setTool.zoom",
+    // while pressed
     keybindings: kb(KeyCode.KeyZ, 0),
   },
 
   ["workbench.surface.cursor.cursor"]: {
     name: "cursor",
     description: "Select tool",
-    command: "workbench.surface.cursor.cursor",
+    command: "editor.surface.action.setTool.cursor",
     keybindings: kb(KeyCode.KeyV, 0),
   },
 
   ["workbench.surface.cursor.scale"]: {
     name: "scale",
     description: "Scale tool (parametric scaling)",
-    command: "workbench.surface.cursor.scale",
+    command: "editor.surface.action.setTool.scale",
     keybindings: kb(KeyCode.KeyK, 0),
   },
 
   ["workbench.surface.cursor.lasso"]: {
     name: "lasso",
     description: "Lasso tool (vector mode)",
-    command: "workbench.surface.cursor.lasso",
+    command: "editor.surface.action.setTool.lasso",
     keybindings: kb(KeyCode.KeyQ, 0),
-  },
-
-  ["workbench.surface.cursor.hand"]: {
-    name: "hand",
-    description: "Hand tool (alternative to hand-tool)",
-    command: "workbench.surface.cursor.hand",
-    keybindings: kb(KeyCode.KeyH, 0),
   },
 
   ["workbench.surface.cursor.rectangle"]: {
     name: "rectangle",
     description: "Rectangle tool",
-    command: "workbench.surface.cursor.rectangle",
+    command: "editor.surface.action.setTool.rectangle",
     keybindings: kb(KeyCode.KeyR, 0),
   },
 
   ["workbench.surface.cursor.ellipse"]: {
     name: "ellipse",
     description: "Ellipse tool",
-    command: "workbench.surface.cursor.ellipse",
+    command: "editor.surface.action.setTool.ellipse",
     keybindings: kb(KeyCode.KeyO, 0),
   },
 
   ["workbench.surface.cursor.polygon"]: {
     name: "polygon",
     description: "Polygon tool",
-    command: "workbench.surface.cursor.polygon",
+    command: "editor.surface.action.setTool.polygon",
     keybindings: kb(KeyCode.KeyY, 0),
   },
 
   ["workbench.surface.cursor.text"]: {
     name: "text",
     description: "Text tool",
-    command: "workbench.surface.cursor.text",
+    command: "editor.surface.action.setTool.text",
     keybindings: kb(KeyCode.KeyT, 0),
   },
 
   ["workbench.surface.cursor.line"]: {
     name: "line",
     description: "Line tool",
-    command: "workbench.surface.cursor.line",
+    command: "editor.surface.action.setTool.line",
     keybindings: kb(KeyCode.KeyL, 0),
   },
 
   ["workbench.surface.cursor.container"]: {
     name: "container",
     description: "Container tool",
-    command: "workbench.surface.cursor.container",
+    command: "editor.surface.action.setTool.container",
     keybindings: [kb(KeyCode.KeyA, 0), kb(KeyCode.KeyF, 0)],
   },
 
   ["workbench.surface.cursor.pencil"]: {
     name: "pencil",
     description: "Pencil tool",
-    command: "workbench.surface.cursor.pencil",
+    command: "editor.surface.action.setTool.pencil",
     keybindings: kb(KeyCode.KeyP, M.Shift),
   },
 
   ["workbench.surface.cursor.path"]: {
     name: "path",
     description: "Path tool",
-    command: "workbench.surface.cursor.path",
+    command: "editor.surface.action.setTool.path",
     keybindings: kb(KeyCode.KeyP),
   },
 
   ["workbench.surface.cursor.brush"]: {
     name: "brush",
     description: "Brush tool",
-    command: "workbench.surface.cursor.brush",
+    command: "editor.surface.action.setTool.brush",
     keybindings: kb(KeyCode.KeyB),
   },
 
   ["workbench.surface.cursor.eraser"]: {
     name: "eraser",
     description: "Eraser tool",
-    command: "workbench.surface.cursor.eraser",
+    command: "editor.surface.action.setTool.eraser",
     keybindings: kb(KeyCode.KeyE),
   },
 
   ["workbench.surface.cursor.paint-bucket"]: {
     name: "paint bucket",
     description: "Paint bucket tool",
-    command: "workbench.surface.cursor.paint-bucket",
+    command: "editor.surface.action.setTool.paintBucket",
     keybindings: kb(KeyCode.KeyG),
   },
 
   ["workbench.surface.cursor.variable-width"]: {
     name: "variable width",
     description: "Variable width tool",
-    command: "workbench.surface.cursor.variable-width",
+    command: "editor.surface.action.setTool.variable-width",
     keybindings: kb(KeyCode.KeyW, M.Shift),
   },
 
   ["workbench.surface.cursor.increase-brush-size"]: {
     name: "increase brush size",
     description: "Increase brush size",
-    command: "workbench.surface.cursor.increase-brush-size",
+    command: "editor.surface.action.increaseBrushSize",
     keybindings: kb(KeyCode.BracketRight, 0),
   },
 
   ["workbench.surface.cursor.decrease-brush-size"]: {
     name: "decrease brush size",
     description: "Decrease brush size",
-    command: "workbench.surface.cursor.decrease-brush-size",
+    command: "editor.surface.action.decreaseBrushSize",
     keybindings: kb(KeyCode.BracketLeft, 0),
   },
 
-  ["workbench.surface.object.nudge"]: {
-    name: "nudge",
+  ["workbench.surface.object.nudge-left"]: {
+    name: "nudge left",
     description: "Move selection by 1px",
-    command: "workbench.surface.object.nudge",
-    keybindings: [
-      kb(KeyCode.RightArrow),
-      kb(KeyCode.LeftArrow),
-      kb(KeyCode.UpArrow),
-      kb(KeyCode.DownArrow),
-    ],
+    command: "editor.surface.action.nudgeLeft",
+    keybindings: [kb(KeyCode.LeftArrow)],
+  },
+
+  ["workbench.surface.object.nudge-left-10"]: {
+    name: "nudge left (10px)",
+    description: "Move selection by 10px",
+    command: "editor.surface.action.nudgeLeft10",
+    keybindings: [kb(KeyCode.LeftArrow, M.Shift)],
+  },
+
+  ["workbench.surface.object.nudge-right"]: {
+    name: "nudge right",
+    description: "Move selection by 1px",
+    command: "editor.surface.action.nudgeRight",
+    keybindings: [kb(KeyCode.RightArrow)],
+  },
+
+  ["workbench.surface.object.nudge-right-10"]: {
+    name: "nudge right (10px)",
+    description: "Move selection by 10px",
+    command: "editor.surface.action.nudgeRight10",
+    keybindings: [kb(KeyCode.RightArrow, M.Shift)],
+  },
+
+  ["workbench.surface.object.nudge-up"]: {
+    name: "nudge up",
+    description: "Move selection by 1px",
+    command: "editor.surface.action.nudgeUp",
+    keybindings: [kb(KeyCode.UpArrow)],
+  },
+
+  ["workbench.surface.object.nudge-up-10"]: {
+    name: "nudge up (10px)",
+    description: "Move selection by 10px",
+    command: "editor.surface.action.nudgeUp10",
+    keybindings: [kb(KeyCode.UpArrow, M.Shift)],
+  },
+
+  ["workbench.surface.object.nudge-down"]: {
+    name: "nudge down",
+    description: "Move selection by 1px",
+    command: "editor.surface.action.nudgeDown",
+    keybindings: [kb(KeyCode.DownArrow)],
+  },
+
+  ["workbench.surface.object.nudge-down-10"]: {
+    name: "nudge down (10px)",
+    description: "Move selection by 10px",
+    command: "editor.surface.action.nudgeDown10",
+    keybindings: [kb(KeyCode.DownArrow, M.Shift)],
   },
 
   ["workbench.surface.object.nudge-resize-right"]: {
     name: "nudge resize (right)",
     description: "Resize selection width by 1px",
-    command: "workbench.surface.object.nudge-resize-right",
+    command: "editor.surface.action.nudgeResizeRight",
     keybindings: kb(KeyCode.RightArrow, M.Ctrl | M.Alt),
   },
 
   ["workbench.surface.object.nudge-resize-right-10"]: {
     name: "nudge resize (right, 10px)",
     description: "Resize selection width by 10px",
-    command: "workbench.surface.object.nudge-resize-right-10",
+    command: "editor.surface.action.nudgeResizeRight10",
     keybindings: kb(KeyCode.RightArrow, M.Ctrl | M.Alt | M.Shift),
   },
 
   ["workbench.surface.object.nudge-resize-left"]: {
     name: "nudge resize (left)",
     description: "Resize selection width by -1px",
-    command: "workbench.surface.object.nudge-resize-left",
+    command: "editor.surface.action.nudgeResizeLeft",
     keybindings: kb(KeyCode.LeftArrow, M.Ctrl | M.Alt),
   },
 
   ["workbench.surface.object.nudge-resize-left-10"]: {
     name: "nudge resize (left, 10px)",
     description: "Resize selection width by -10px",
-    command: "workbench.surface.object.nudge-resize-left-10",
+    command: "editor.surface.action.nudgeResizeLeft10",
     keybindings: kb(KeyCode.LeftArrow, M.Ctrl | M.Alt | M.Shift),
   },
 
   ["workbench.surface.object.nudge-resize-up"]: {
     name: "nudge resize (up)",
     description: "Resize selection height by -1px",
-    command: "workbench.surface.object.nudge-resize-up",
+    command: "editor.surface.action.nudgeResizeUp",
     keybindings: kb(KeyCode.UpArrow, M.Ctrl | M.Alt),
   },
 
   ["workbench.surface.object.nudge-resize-up-10"]: {
     name: "nudge resize (up, 10px)",
     description: "Resize selection height by -10px",
-    command: "workbench.surface.object.nudge-resize-up-10",
+    command: "editor.surface.action.nudgeResizeUp10",
     keybindings: kb(KeyCode.UpArrow, M.Ctrl | M.Alt | M.Shift),
   },
 
   ["workbench.surface.object.nudge-resize-down"]: {
     name: "nudge resize (down)",
     description: "Resize selection height by 1px",
-    command: "workbench.surface.object.nudge-resize-down",
+    command: "editor.surface.action.nudgeResizeDown",
     keybindings: kb(KeyCode.DownArrow, M.Ctrl | M.Alt),
   },
 
   ["workbench.surface.object.nudge-resize-down-10"]: {
     name: "nudge resize (down, 10px)",
     description: "Resize selection height by 10px",
-    command: "workbench.surface.object.nudge-resize-down-10",
+    command: "editor.surface.action.nudgeResizeDown10",
     keybindings: kb(KeyCode.DownArrow, M.Ctrl | M.Alt | M.Shift),
   },
 
   ["workbench.surface.object.flatten"]: {
     name: "flatten",
     description: "Flatten the current selection",
-    command: "workbench.surface.object.flatten",
+    command: "editor.surface.action.flatten",
     keybindings: [
       kb(KeyCode.KeyE, M.CtrlCmd),
       kb(KeyCode.KeyF, M.Alt | M.Shift),
     ],
+  },
+
+  // TODO:
+  ["workbench.surface.object.outline-stroke"]: {
+    name: "outline stroke",
+    description: "Convert stroke to filled shape",
+    command: "todo!()",
+    keybindings: kb(KeyCode.KeyO, M.CtrlCmd | M.Alt),
+  },
+
+  // TODO:
+  ["workbench.surface.object.flip-horizontal"]: {
+    name: "flip horizontal",
+    description: "Flip selection horizontally",
+    command: "todo!()",
+    keybindings: kb(KeyCode.KeyH, M.Shift),
+  },
+
+  // TODO:
+  ["workbench.surface.object.flip-vertical"]: {
+    name: "flip vertical",
+    description: "Flip selection vertically",
+    command: "todo!()",
+    keybindings: kb(KeyCode.KeyV, M.Shift),
   },
 
   ["workbench.surface.text.toggle-bold"]: {
@@ -435,6 +536,30 @@ export const actions: Record<string, UXHostAction> = {
     description: "Toggle line-through style",
     command: "workbench.surface.text.toggle-line-through",
     keybindings: kb(KeyCode.KeyX, M.CtrlCmd | M.Shift),
+  },
+
+  // TODO:
+  ["workbench.surface.text.create-link"]: {
+    name: "create link",
+    description: "Create a hyperlink from selected text",
+    command: "todo!()",
+    keybindings: kb(KeyCode.KeyU, M.CtrlCmd | M.Shift),
+  },
+
+  // TODO:
+  ["workbench.surface.text.ul"]: {
+    name: "bulleted list",
+    description: "Convert text to a bulleted list",
+    command: "todo!()",
+    keybindings: kb(KeyCode.Digit8, M.CtrlCmd | M.Shift),
+  },
+
+  // TODO:
+  ["workbench.surface.text.ol"]: {
+    name: "numbered list",
+    description: "Convert text to a numbered list",
+    command: "todo!()",
+    keybindings: kb(KeyCode.Digit7, M.CtrlCmd | M.Shift),
   },
 
   ["workbench.surface.text.text-align-left"]: {
@@ -491,6 +616,22 @@ export const actions: Record<string, UXHostAction> = {
     description: "Decrease font weight",
     command: "workbench.surface.text.decrease-font-weight",
     keybindings: kb(KeyCode.Comma, M.CtrlCmd | M.Alt),
+  },
+
+  // TODO:
+  ["workbench.surface.text.increase-indentation"]: {
+    name: "increase indentation",
+    description: "Increase text indentation",
+    command: "todo!()",
+    keybindings: kb(KeyCode.Tab, 0),
+  },
+
+  // TODO:
+  ["workbench.surface.text.decrease-indentation"]: {
+    name: "decrease indentation",
+    description: "Decrease text indentation",
+    command: "todo!()",
+    keybindings: kb(KeyCode.Tab, M.Shift),
   },
 
   ["workbench.surface.text.increase-line-height"]: {
@@ -587,6 +728,20 @@ export const actions: Record<string, UXHostAction> = {
     command: "workbench.surface.object.auto-layout",
     keybindings: kb(KeyCode.KeyA, M.Shift),
   },
+
+  // ["workbench.surface.object.auto-layout-all"]: {
+  //   name: "suggest layout",
+  //   description: "Solves the current layout problem",
+  //   command: "todo!()",
+  //   keybindings: kb(KeyCode.KeyA, M.Ctrl | M.Shift),
+  // },
+
+  // ["workbench.surface.object.resize-to-fit"]: {
+  //   name: "resize to fit",
+  //   description: "Resize containers to fit its contents",
+  //   command: "todo!()",
+  //   keybindings: kb(KeyCode.KeyR, M.CtrlCmd | M.Shift | M.Alt),
+  // },
 
   ["workbench.surface.object.group"]: {
     name: "group",
@@ -741,4 +896,18 @@ export const actions: Record<string, UXHostAction> = {
     command: "workbench.surface.object.set-opacity-100",
     keybindings: kb(KeyCode.Digit0, 0),
   },
-};
+} as const satisfies Record<string, UXHostAction>;
+
+/**
+ * Type-safe action ID - union of all valid action keys
+ */
+export type UXHostActionId = keyof typeof actions;
+
+/**
+ * Get an action by its ID
+ * @param actionId - The action ID (type-safe)
+ * @returns The action, or undefined if not found
+ */
+export function getAction(actionId: UXHostActionId): UXHostAction {
+  return actions[actionId];
+}

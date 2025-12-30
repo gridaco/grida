@@ -9,6 +9,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
+import { uikbdk, M } from "@/grida-canvas/keybinding";
 
 export function PathToolbar() {
   const tool = useToolState();
@@ -41,7 +43,9 @@ export function PathToolbar() {
               </ToggleGroupItem>
             </span>
           </TooltipTrigger>
-          <TooltipContent>Cursor (V)</TooltipContent>
+          <TooltipContent>
+            Cursor ({keyboardShortcutText("workbench.surface.cursor.cursor")})
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -54,7 +58,10 @@ export function PathToolbar() {
               </ToggleGroupItem>
             </span>
           </TooltipTrigger>
-          <TooltipContent>Lasso tool (Q)</TooltipContent>
+          <TooltipContent>
+            Lasso tool ({keyboardShortcutText("workbench.surface.cursor.lasso")}
+            )
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -67,7 +74,7 @@ export function PathToolbar() {
               </ToggleGroupItem>
             </span>
           </TooltipTrigger>
-          <TooltipContent>Bend tool (⌘)</TooltipContent>
+          <TooltipContent>Bend tool ({uikbdk(M.CtrlCmd)})</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -80,7 +87,10 @@ export function PathToolbar() {
               </ToggleGroupItem>
             </span>
           </TooltipTrigger>
-          <TooltipContent>Variable Width (⇧ + W)</TooltipContent>
+          <TooltipContent>
+            Variable Width (
+            {keyboardShortcutText("workbench.surface.cursor.variable-width")})
+          </TooltipContent>
         </Tooltip>
       </ToggleGroup>
 
@@ -97,7 +107,10 @@ export function PathToolbar() {
             <Cross2Icon className="size-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Exit path mode (Esc)</TooltipContent>
+        <TooltipContent>
+          Exit path mode (
+          {keyboardShortcutText("workbench.surface.cursor.escape")})
+        </TooltipContent>
       </Tooltip>
     </div>
   );

@@ -188,22 +188,21 @@ export function resolveSequence(
   return sequence.map((chunk) => resolveChunk(chunk, platform));
 }
 
+function isApplePlatform(): boolean {
+  const platform = typeof navigator === "object" ? navigator.platform : "";
+  return /Mac|iPod|iPhone|iPad/.test(platform);
+}
+
 /**
- * Detect the current platform
+ * Detect the current keyboard OS
+ * this is not reliable for general platform/os detection, but good enough for keyboard OS detection
+ *
+ * mostly to determine cmdctrl key (and for cases that keybindings are fundamentally different, e.g. ctrl+c being color picker on mac, but copy on windows/linux)
  */
-export function getPlatform(): "mac" | "windows" | "linux" {
-  if (typeof navigator === "undefined") return "linux";
+export function getKeyboardOS(): "mac" | "windows" | "linux" {
+  if (isApplePlatform()) return "mac";
   const platform = navigator.platform.toLowerCase();
-  if (
-    platform.includes("mac") ||
-    platform.includes("iphone") ||
-    platform.includes("ipad")
-  ) {
-    return "mac";
-  }
-  if (platform.includes("win")) {
-    return "windows";
-  }
+  if (platform.includes("win")) return "windows";
   return "linux";
 }
 
@@ -218,7 +217,7 @@ export function keybindingsToKeyCodes(
   keybindings: Keybindings,
   platform?: "mac" | "windows" | "linux"
 ): ResolvedSequence[] {
-  const targetPlatform = platform || getPlatform();
+  const targetPlatform = platform || getKeyboardOS();
   const result: ResolvedSequence[] = [];
 
   // If it's a platform-specific object
@@ -367,4 +366,39 @@ export function keycodeToPlatformUILabel(
 ): string {
   const platformSymbols = keysymbols[platform];
   return platformSymbols[keyCode] || KeyCodeUtils.toString(keyCode);
+}
+
+/**
+ * Get platform-specific UI label for a modifier or key
+ * UI keybinding key - returns the platform-specific label string
+ * @param key - Either a modifier bitmask (M enum) or a KeyCode
+ * @param platform - Optional platform, defaults to current keyboard OS
+ * @returns Platform-specific label string (e.g., "⌘" on mac, "Ctrl" on windows/linux)
+ *
+ * @example
+ * uikbdk(M.CtrlCmd) // "⌘" on mac, "Ctrl" on windows/linux
+ * uikbdk(KeyCode.KeyI) // "I"
+ */
+export function uikbdk(
+  key: M | KeyCode,
+  platform?: "mac" | "windows" | "linux"
+): string {
+  const targetPlatform = platform || getKeyboardOS();
+
+  // Check if it's a modifier bitmask (M enum values are small bitmasks: 1, 2, 4, 8, 16)
+  // KeyCodes are enum values that start from a much higher number
+  // We check if it's a valid modifier by trying to resolve it
+  // If it resolves to modifier keys, it's a modifier; otherwise treat as KeyCode
+  const resolvedMods = resolveMods(key, targetPlatform);
+  if (
+    resolvedMods.length > 0 &&
+    key & (M.Ctrl | M.Shift | M.Alt | M.Meta | M.CtrlCmd)
+  ) {
+    // It's a modifier bitmask - return the first resolved key's label
+    // In practice, most single modifiers resolve to a single key
+    return keycodeToPlatformUILabel(resolvedMods[0], targetPlatform);
+  }
+
+  // It's a KeyCode
+  return keycodeToPlatformUILabel(key as KeyCode, targetPlatform);
 }
