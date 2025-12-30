@@ -327,7 +327,8 @@ impl<'a> NodePainter<'a> {
 
     /// Draw a TextSpanNode (simple text block)
     pub fn draw_text_span_node(&self, node: &TextSpanNodeRec) {
-        if node.fills.is_empty() {
+        // Allow stroke-only text in debug rendering too.
+        if node.fills.is_empty() && (node.strokes.is_empty() || node.stroke_width <= 0.0) {
             return;
         }
         // TODO: Pass id as parameter - using dummy 0 for now in debug mode

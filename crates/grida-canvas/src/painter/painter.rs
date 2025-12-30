@@ -752,7 +752,8 @@ impl<'a> Painter<'a> {
         text_align_vertical: &TextAlignVertical,
         text_style: &TextStyleRec,
     ) {
-        if fills.is_empty() {
+        // Allow stroke-only text: we still need a paragraph to visit glyph runs for stroking.
+        if fills.is_empty() && (strokes.is_empty() || stroke_width <= 0.0) {
             return;
         }
 
@@ -937,7 +938,11 @@ impl<'a> Painter<'a> {
 
                             let draw_content = || {
                                 self.with_opacity(text_layer.base.opacity, || {
-                                    if text_layer.fills.is_empty() {
+                                    // Allow stroke-only text: paragraph paint may be empty, but we can still draw strokes.
+                                    if text_layer.fills.is_empty()
+                                        && (text_layer.strokes.is_empty()
+                                            || text_layer.stroke_width <= 0.0)
+                                    {
                                         return;
                                     }
                                     self.draw_text_paragraph(
