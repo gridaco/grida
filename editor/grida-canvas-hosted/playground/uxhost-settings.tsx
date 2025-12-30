@@ -1,19 +1,62 @@
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { keysymbols } from "@/grida-canvas-react/devtools/keysymbols";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { keybindings_sheet } from "@/grida-canvas-react/viewport/hotkeys";
 import { useCurrentEditor } from "@/grida-canvas-react";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
-import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import {
+  OpenInNewWindowIcon,
+  GearIcon,
+  SunIcon,
+  MoonIcon,
+  DesktopIcon,
+} from "@radix-ui/react-icons";
 import Link from "next/link";
+import { KeyboardShortcuts } from "./uxhost-settings-keyboardshortcuts";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from "@/components/ui/sidebar";
+import { KeyboardIcon } from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const menuItems = [
+  {
+    name: "General",
+    value: "general",
+    icon: GearIcon,
+  },
+  {
+    name: "Keyboard Shortcuts",
+    value: "keybindings",
+    icon: KeyboardIcon,
+  },
+];
 
 export function SettingsDialog({
   initialPage = "keybindings",
@@ -22,107 +65,134 @@ export function SettingsDialog({
   initialPage?: "keybindings" | "general";
 }) {
   const editor = useCurrentEditor();
+  const { theme, setTheme } = useTheme();
+  const [activeTab, setActiveTab] = useState<"keybindings" | "general">(
+    initialPage
+  );
 
   return (
     <Dialog {...props}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Playground Settings</DialogTitle>
+      <DialogContent className="!max-w-4xl p-0 gap-0 flex flex-col h-[600px]">
+        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
+          <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
-        <hr />
-        <Tabs defaultValue={initialPage} className="min-h-96">
-          <TabsList>
-            <TabsTrigger value="keybindings">Keyboard Shortcuts</TabsTrigger>
-            <TabsTrigger value="general">General</TabsTrigger>
-          </TabsList>
-          <TabsContent value="general">
-            <div className="py-4 space-y-2">
-              <Label className="flex items-center justify-between">
-                Debug Mode
-                <Switch
-                  checked={editor.debug}
-                  onCheckedChange={(v) => {
-                    editor.debug = v;
-                  }}
-                />
-              </Label>
-              <hr />
-              <Label className="flex items-center justify-between">
-                Rendering Backend
-                <Link href="/canvas/experimental/dom" target="_blank">
-                  <Button size="sm" variant="outline">
-                    DOM
-                    <OpenInNewWindowIcon />
-                  </Button>
-                </Link>
-              </Label>
-              <Label className="flex items-center justify-between">
-                Rendering Backend
-                <Link href="/canvas" target="_blank">
-                  <Button size="sm" variant="outline">
-                    CANVAS WASM
-                    <OpenInNewWindowIcon />
-                  </Button>
-                </Link>
-              </Label>
-
-              {/* <label>
-                Snap to geometry
-                <Switch />
-              </label>
-              <label>
-                Snap to objects
-                <Switch />
-              </label>
-              <label>
-                Snap to pixel grid
-                <Switch />
-              </label> */}
-              {/* <label>Nudge Amount</label> */}
-            </div>
-          </TabsContent>
-          <TabsContent value="keybindings">
-            <ScrollArea className="h-96">
-              <ScrollBar />
-              <div>
-                {keybindings_sheet.map((action) => {
-                  return (
-                    <div
-                      key={action.name}
-                      className="flex items-center justify-between p-2 border-b last:border-b-0"
-                    >
-                      <div className="grid gap-1">
-                        <span className="font-medium text-sm text-gray-800">
-                          {action.name}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {action.description}
-                        </span>
-                      </div>
-                      <div className="flex space-x-2">
-                        {action.keys.map((key) => (
-                          <span
-                            key={key}
-                            className="px-2 py-1 text-xs font-mono font-bold text-gray-700 bg-gray-200 rounded-md shadow"
-                          >
-                            {key
-                              .split("+")
-                              .map(
-                                (part) =>
-                                  keysymbols[part.toLowerCase()] ||
-                                  part.toUpperCase()
+        <SidebarProvider className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-1 border-t overflow-hidden">
+            <Sidebar collapsible="none" className="w-48 border-r shrink-0">
+              <SidebarContent>
+                <SidebarGroup>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {menuItems.map((item) => (
+                        <SidebarMenuItem key={item.value}>
+                          <SidebarMenuButton
+                            isActive={activeTab === item.value}
+                            onClick={() =>
+                              setActiveTab(
+                                item.value as "keybindings" | "general"
                               )
-                              .join(" + ")}
-                          </span>
-                        ))}
+                            }
+                          >
+                            <item.icon className="size-4" />
+                            <span>{item.name}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </SidebarContent>
+            </Sidebar>
+            <main className="flex-1 overflow-y-auto min-w-0 h-full">
+              {activeTab === "general" && (
+                <div className="px-6 py-6">
+                  <FieldGroup>
+                    <Field orientation="horizontal">
+                      <FieldContent>
+                        <FieldLabel>Appearance</FieldLabel>
+                        <FieldDescription>
+                          Customize how Grida looks on your device.
+                        </FieldDescription>
+                      </FieldContent>
+                      <Select
+                        value={theme}
+                        onValueChange={(value) => setTheme(value)}
+                      >
+                        <SelectTrigger className="w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="light">
+                            <div className="flex items-center gap-2">
+                              <SunIcon className="size-4" />
+                              <span>Light</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="dark">
+                            <div className="flex items-center gap-2">
+                              <MoonIcon className="size-4" />
+                              <span>Dark</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="system">
+                            <div className="flex items-center gap-2">
+                              <DesktopIcon className="size-4" />
+                              <span>System</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <FieldSeparator />
+                    <Field orientation="horizontal">
+                      <FieldContent>
+                        <FieldLabel htmlFor="debug-mode">Debug Mode</FieldLabel>
+                        <FieldDescription>
+                          Enable debug mode for development and troubleshooting.
+                        </FieldDescription>
+                      </FieldContent>
+                      <Switch
+                        id="debug-mode"
+                        checked={editor.debug}
+                        onCheckedChange={(v) => {
+                          editor.debug = v;
+                        }}
+                      />
+                    </Field>
+                    <FieldSeparator />
+                    <Field orientation="horizontal">
+                      <FieldContent>
+                        <FieldLabel>Rendering Backend</FieldLabel>
+                        <FieldDescription>
+                          Choose the rendering backend for the canvas.
+                        </FieldDescription>
+                      </FieldContent>
+                      <div className="flex gap-2">
+                        <Link href="/canvas/experimental/dom" target="_blank">
+                          <Button size="sm" variant="outline">
+                            DOM
+                            <OpenInNewWindowIcon />
+                          </Button>
+                        </Link>
+                        <Link href="/canvas" target="_blank">
+                          <Button size="sm" variant="outline">
+                            CANVAS WASM
+                            <OpenInNewWindowIcon />
+                          </Button>
+                        </Link>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+                    </Field>
+                  </FieldGroup>
+                </div>
+              )}
+              {activeTab === "keybindings" && (
+                <div className="h-full flex flex-col">
+                  <KeyboardShortcuts />
+                </div>
+              )}
+            </main>
+          </div>
+        </SidebarProvider>
       </DialogContent>
     </Dialog>
   );

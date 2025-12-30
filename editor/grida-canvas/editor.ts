@@ -37,6 +37,7 @@ import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
+import { toast } from "sonner";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -1748,7 +1749,11 @@ class EditorDocumentStore
     );
   }
 
-  changeNodePropertyStrokes(node_id: string | string[], strokes: cg.Paint[]) {
+  changeNodePropertyStrokes(
+    node_id: string | string[],
+    strokes: cg.Paint[],
+    ensureStrokeWidth: boolean = false
+  ) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatch(
       node_ids.map((node_id) => ({
@@ -1757,6 +1762,50 @@ class EditorDocumentStore
         stroke_paints: strokes,
       }))
     );
+
+    // If ensureStrokeWidth is true, ensure stroke is visible by setting width to 1 if not set or 0
+    if (ensureStrokeWidth) {
+      for (const node_id of node_ids) {
+        const node = this.getNodeSnapshotById(node_id);
+        if (!node) continue;
+
+        const currentStrokeWidth =
+          "stroke_width" in node ? node.stroke_width : undefined;
+        if (currentStrokeWidth === undefined || currentStrokeWidth === 0) {
+          this.changeNodePropertyStrokeWidth(node_id, {
+            type: "set",
+            value: 1,
+          });
+        }
+      }
+    }
+  }
+
+  swapFillAndStroke(node_id: string | string[], ensureStroke: boolean = false) {
+    const node_ids = Array.isArray(node_id) ? node_id : [node_id];
+    for (const node_id of node_ids) {
+      const node = this.getNodeSnapshotById(node_id);
+      if (!node) continue;
+
+      // Get all fills and strokes using resolvePaints
+      // Note: resolvePaints returns the full paints array regardless of paintIndex
+      // The paintIndex parameter (0) is only used for resolvedIndex calculation, which we ignore
+      const { paints: currentFills } = editor.resolvePaints(
+        node as grida.program.nodes.UnknwonNode,
+        "fill",
+        0
+      );
+      const { paints: currentStrokes } = editor.resolvePaints(
+        node as grida.program.nodes.UnknwonNode,
+        "stroke",
+        0
+      );
+
+      // Swap them
+      this.changeNodePropertyFills(node_id, currentStrokes);
+      // changeNodePropertyStrokes handles ensureStrokeWidth internally
+      this.changeNodePropertyStrokes(node_id, currentFills, ensureStroke);
+    }
   }
 
   addNodeFill(
@@ -1789,30 +1838,28 @@ class EditorDocumentStore
   addNodeStroke(
     node_id: string | string[],
     stroke: cg.Paint,
-    at: "start" | "end" = "start"
+    at: "start" | "end" = "start",
+    ensureStrokeWidth: boolean = false
   ) {
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
-    this.dispatch(
-      node_ids.map((node_id) => {
-        const current = this.getNodeSnapshotById(node_id);
-        const currentStrokes = Array.isArray((current as any).stroke_paints)
-          ? ((current as any).stroke_paints as cg.Paint[])
-          : (current as any).stroke
-            ? [(current as any).stroke as cg.Paint]
-            : [];
+    for (const node_id of node_ids) {
+      const current = this.getNodeSnapshotById(node_id);
+      if (!current) continue;
 
-        const newStrokes =
-          at === "start"
-            ? [stroke, ...currentStrokes]
-            : [...currentStrokes, stroke];
+      const currentStrokes = Array.isArray((current as any).stroke_paints)
+        ? ((current as any).stroke_paints as cg.Paint[])
+        : (current as any).stroke
+          ? [(current as any).stroke as cg.Paint]
+          : [];
 
-        return {
-          type: "node/change/*",
-          node_id,
-          stroke_paints: newStrokes,
-        };
-      })
-    );
+      const newStrokes =
+        at === "start"
+          ? [stroke, ...currentStrokes]
+          : [...currentStrokes, stroke];
+
+      // Use changeNodePropertyStrokes to update strokes and handle ensureStrokeWidth
+      this.changeNodePropertyStrokes(node_id, newStrokes, ensureStrokeWidth);
+    }
   }
 
   changeNodePropertyStrokeWidth(
@@ -3563,6 +3610,13 @@ export class Editor
     return this.svgProvider.svgOptimize(svg);
   }
 
+  public swapFillAndStroke(
+    node_id: string | string[],
+    ensureStroke: boolean = false
+  ) {
+    this.doc.swapFillAndStroke(node_id, ensureStroke);
+  }
+
   public svgPack(
     svg: string
   ): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null {
@@ -3633,6 +3687,44 @@ export class Editor
     isVariable: boolean;
   } | null {
     return this._fontManager.selectFontStyle(description);
+  }
+
+  /**
+   * Gets all available font weights for a given font family and italic style.
+   *
+   * This is a general-purpose utility function that extracts available font weights
+   * from a font family that match the given italic state, returning them as a
+   * sorted array.
+   *
+   * @param fontFamily - The font family name (e.g., "Inter", "Roboto")
+   * @param fontStyleItalic - Whether to get weights for italic or non-italic styles
+   * @returns A sorted array of available font weights, or empty array if font not found or no weights available
+   *
+   * @example
+   * ```typescript
+   * const weights = await editor.getFontWeightsForFontFamily("Inter", false);
+   * // Returns [100, 200, 300, 400, 500, 600, 700, 800, 900] (sorted)
+   * ```
+   */
+  public async getFontWeightsForFontFamily(
+    fontFamily: string,
+    fontStyleItalic: boolean
+  ): Promise<number[]> {
+    const font = await this.getFontFamilyDetailsSync(fontFamily);
+    if (!font) {
+      return [];
+    }
+
+    // Extract unique available weights from styles (matching italic state)
+    const availableWeights = new Set<number>();
+    font.styles.forEach((style: editor.font_spec.FontStyleInstance) => {
+      if (style.fontStyleItalic === fontStyleItalic) {
+        availableWeights.add(style.fontWeight);
+      }
+    });
+
+    // Return sorted array
+    return Array.from(availableWeights).sort((a, b) => a - b);
   }
 
   // ==============================================================
@@ -5051,18 +5143,36 @@ export class EditorSurface
     });
   }
 
-  public a11ySetOpacity(
+  public a11yTextAlign(
     target: "selection" | editor.NodeID = "selection",
-    opacity: number
+    textAlign: cg.TextAlign
   ) {
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
-      const _node = this._editor.doc.getNodeById(node_id);
-      if (_node) _node.opacity = opacity;
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeTextAlign(node_id, textAlign);
+      }
     }
   }
 
-  public a11yChangeFontSize(
+  public a11yTextVerticalAlign(
+    target: "selection" | editor.NodeID = "selection",
+    textAlignVertical: cg.TextAlignVertical
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeTextAlignVertical(
+          node_id,
+          textAlignVertical
+        );
+      }
+    }
+  }
+
+  public a11yChangeTextFontSize(
     target: "selection" | editor.NodeID = "selection",
     delta: number
   ) {
@@ -5074,6 +5184,262 @@ export class EditorSurface
           type: "delta",
           value: delta,
         });
+      }
+    }
+  }
+
+  public a11yChangeTextLineHeight(
+    target: "selection" | editor.NodeID = "selection",
+    delta: number
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeLineHeight(node_id, {
+          type: "delta",
+          value: delta,
+        });
+      }
+    }
+  }
+
+  public a11yChangeTextLetterSpacing(
+    target: "selection" | editor.NodeID = "selection",
+    delta: number
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        this._editor.doc.changeTextNodeLetterSpacing(node_id, {
+          type: "delta",
+          value: delta,
+        } as editor.api.NumberChange);
+      }
+    }
+  }
+
+  public async a11yChangeTextFontWeight(
+    target: "selection" | editor.NodeID = "selection",
+    direction: "increase" | "decrease"
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      if (node && node.type === "text") {
+        const fontFamily = node.font_family;
+        if (!fontFamily) continue;
+
+        // Get available font weights for this font family and italic style
+        const availableWeights = await this._editor.getFontWeightsForFontFamily(
+          fontFamily,
+          node.font_style_italic ?? false
+        );
+
+        if (availableWeights.length === 0) continue;
+
+        const currentWeight = node.font_weight;
+
+        // Find next/previous weight
+        let nextWeight: number | null = null;
+        if (direction === "increase") {
+          nextWeight = availableWeights.find((w) => w > currentWeight) ?? null;
+          // If no heavier weight, use the heaviest available (wrap around)
+          if (nextWeight === null) {
+            nextWeight = availableWeights[availableWeights.length - 1];
+          }
+        } else {
+          // Find the next lighter weight
+          for (let i = availableWeights.length - 1; i >= 0; i--) {
+            if (availableWeights[i] < currentWeight) {
+              nextWeight = availableWeights[i];
+              break;
+            }
+          }
+          // If no lighter weight, use the lightest available (wrap around)
+          if (nextWeight === null) {
+            nextWeight = availableWeights[0];
+          }
+        }
+
+        if (nextWeight !== null) {
+          // Use selectFontStyle to ensure the weight is valid for this font
+          const match = this._editor.selectFontStyle({
+            fontFamily: fontFamily,
+            fontWeight: nextWeight as cg.NFontWeight,
+            fontStyleItalic: node.font_style_italic,
+          });
+
+          if (match) {
+            this._editor.changeTextNodeFontStyle(node_id, {
+              fontStyleKey: match.key,
+            });
+          } else {
+            // Fallback: directly set weight if style matching fails
+            this._editor.doc.changeTextNodeFontWeight(
+              node_id,
+              nextWeight as cg.NFontWeight
+            );
+          }
+        }
+      }
+    }
+  }
+
+  public a11ySetOpacity(
+    target: "selection" | editor.NodeID = "selection",
+    opacity: number
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const _node = this._editor.doc.getNodeById(node_id);
+      if (_node) _node.opacity = opacity;
+    }
+  }
+
+  public a11yClearFill(target: "selection" | editor.NodeID = "selection") {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    this._editor.doc.changeNodePropertyFills(target_ids, []);
+  }
+
+  public a11yClearStroke(target: "selection" | editor.NodeID = "selection") {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    // Clear stroke paints
+    this._editor.doc.changeNodePropertyStrokes(target_ids, []);
+    // Set stroke width to 0, but keep other stroke properties
+    for (const node_id of target_ids) {
+      this._editor.doc.changeNodePropertyStrokeWidth(node_id, {
+        type: "set",
+        value: 0,
+      });
+    }
+  }
+
+  public a11ySwapFillAndStroke(
+    target: "selection" | editor.NodeID = "selection",
+    ensureStroke: boolean = false
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    this._editor.doc.swapFillAndStroke(target_ids, ensureStroke);
+  }
+
+  public a11yLockAspectRatio(
+    target: "selection" | editor.NodeID = "selection"
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      const aspectRatio =
+        "layout_target_aspect_ratio" in node
+          ? node["layout_target_aspect_ratio"]
+          : undefined;
+      const hasAspectRatioLocked = aspectRatio !== undefined;
+      if (!hasAspectRatioLocked) {
+        this._editor.doc.lockAspectRatio(node_id);
+      }
+    }
+  }
+
+  public a11yUnlockAspectRatio(
+    target: "selection" | editor.NodeID = "selection"
+  ) {
+    const target_ids = target === "selection" ? this.state.selection : [target];
+    for (const node_id of target_ids) {
+      const node = this._editor.doc.getNodeSnapshotById(node_id);
+      const aspectRatio =
+        "layout_target_aspect_ratio" in node
+          ? node["layout_target_aspect_ratio"]
+          : undefined;
+      const hasAspectRatioLocked = aspectRatio !== undefined;
+      if (hasAspectRatioLocked) {
+        this._editor.doc.unlockAspectRatio(node_id);
+      }
+    }
+  }
+
+  /**
+   * Low-level color picker API wrapper. Opens the EyeDropper and returns the picked color.
+   *
+   * This method only handles the EyeDropper API interaction. It does not handle
+   * clipboard operations, toast notifications, or applying colors to selections.
+   *
+   * @returns A promise that resolves with the hex color string if a color was picked, or undefined if cancelled.
+   *          The hex string is in sRGB format (#aabbcc).
+   *          @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
+   *
+   * @example
+   * ```typescript
+   * const hex = await editor.surface.promptColorPicker();
+   * if (hex) {
+   *   // Handle the color as needed
+   *   // hex is a string representing the selected color in hexadecimal sRGB format (#aabbcc)
+   * }
+   * ```
+   */
+  public async promptColorPicker(): Promise<string | undefined> {
+    if (!window.EyeDropper) {
+      throw new Error(
+        "EyeDropper is not available on this browser (use Chrome)"
+      );
+    }
+
+    const eyeDropper = new window.EyeDropper();
+
+    try {
+      const result: {
+        /**
+         * A string representing the selected color, in hexadecimal sRGB format (#aabbcc).
+         * @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
+         */
+        sRGBHex: string;
+      } = await eyeDropper.open();
+      return result.sRGBHex;
+    } catch (error) {
+      // User cancelled or error occurred - return undefined
+      return undefined;
+    }
+  }
+
+  /**
+   * High-level color picker with full UX handling.
+   *
+   * Opens the color picker, applies the color to selection if available,
+   * or copies to clipboard with toast notification if no selection.
+   *
+   * @returns A promise that resolves when the operation completes
+   *
+   * @example
+   * ```typescript
+   * await editor.surface.surfacePickColor();
+   * ```
+   */
+  public async surfacePickColor(): Promise<void> {
+    try {
+      const hex = await this.promptColorPicker();
+      if (!hex) return; // User cancelled
+
+      const color = kolor.colorformats.RGBA32F.fromHEX(hex);
+      const solidPaint: cg.SolidPaint = {
+        type: "solid",
+        color: color,
+        active: true,
+      };
+
+      const selection = this.state.selection;
+
+      if (selection.length > 0) {
+        // Apply color to selection
+        this._editor.doc.changeNodePropertyFills(selection, [solidPaint]);
+      } else {
+        // No selection - set clipboard color, copy hex, and show toast
+        this.a11ySetClipboardColor(color);
+        await window.navigator.clipboard.writeText(hex);
+        toast.success(`Copied hex color to clipboard ${hex}`);
+      }
+    } catch (error: any) {
+      if (error.message) {
+        toast.error(error.message);
       }
     }
   }

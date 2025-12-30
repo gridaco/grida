@@ -17,6 +17,7 @@ import {
   useCurrentEditor,
   useEditorState,
 } from "@/grida-canvas-react/use-editor";
+import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
 
 export function ZoomControl({ className }: { className?: string }) {
   const editor = useCurrentEditor();
@@ -52,7 +53,9 @@ export function ZoomControl({ className }: { className?: string }) {
           className="text-xs"
         >
           Zoom in
-          <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-in")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -60,7 +63,9 @@ export function ZoomControl({ className }: { className?: string }) {
           className="text-xs"
         >
           Zoom out
-          <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-out")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -68,7 +73,9 @@ export function ZoomControl({ className }: { className?: string }) {
           className="text-xs"
         >
           Zoom to fit
-          <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-fit")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -76,7 +83,9 @@ export function ZoomControl({ className }: { className?: string }) {
           className="text-xs"
         >
           Zoom to selection
-          <DropdownMenuShortcut>⇧2</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-selection")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -91,7 +100,9 @@ export function ZoomControl({ className }: { className?: string }) {
           className="text-xs"
         >
           Zoom to 100%
-          <DropdownMenuShortcut className="text-xs">⇧0</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-100")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
@@ -109,7 +120,11 @@ export function ZoomControl({ className }: { className?: string }) {
           className="text-xs"
         >
           Pixel Grid
-          <DropdownMenuShortcut>⇧'</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.view.hide-show-pixel-grid"
+            )}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={ruler === "on"}
@@ -119,7 +134,9 @@ export function ZoomControl({ className }: { className?: string }) {
           className="text-xs"
         >
           Ruler
-          <DropdownMenuShortcut>⇧R</DropdownMenuShortcut>
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.hide-show-ruler")}
+          </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>

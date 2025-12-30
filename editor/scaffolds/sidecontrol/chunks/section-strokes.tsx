@@ -144,16 +144,13 @@ export function SectionStrokes({
       active: true,
     };
     // Append new paint to the end (top-most in render order)
-    actions.addStroke(paint, "end");
-
-    if (!stroke_width || stroke_width === 0) {
-      actions.strokeWidth({ type: "set", value: 1 });
-    }
+    // ensureStrokeWidth: true ensures stroke is visible by setting width to 1 if not set or 0
+    actions.addStroke(paint, "end", true);
 
     if (is_text_node && !stroke_align) {
       actions.strokeAlign("outside");
     }
-  }, [actions, stroke_width, is_text_node, stroke_align, paints.length]);
+  }, [actions, is_text_node, stroke_align, paints.length]);
 
   const handleUpdateStrokes = React.useCallback(
     (paints: any[]) => {

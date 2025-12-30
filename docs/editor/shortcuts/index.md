@@ -20,8 +20,8 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 <!-- | Command            | ⌘              | —                | ❌ No                               | ⌘ (macOS only)            | -->
 <!-- | Control            | ⌃              | Ctrl             | ❌ No                               | Ctrl (Windows), ⌃ (macOS) | -->
 <!-- | Option / Alt       | ⌥              | Alt              | ❌ No                               | Alt (Windows), ⌥ (macOS)  | -->
-<!-- | Shift              | ⇧              | ⇧                | ✅ Yes                              | ⇧ (both)                  | -->
-<!-- | Enter / Return     | ⏎ / ↵          | ↵                | ⚠️ Mostly                           | ↵ or Enter                | -->
+<!-- | Shift              | ⇧              | Shift            | ❌ No                               | Shift (Windows), ⇧ (macOS) | -->
+<!-- | Enter / Return     | ⏎ / ↵          | Enter            | ❌ No                               | Enter (Windows), ↵ (macOS) | -->
 <!-- | Escape             | ⎋              | Esc              | ⚠️ Mixed                            | Esc                       | -->
 <!-- | Backspace / Delete | ⌫ / ⌦          | Backspace / Del  | ❌ No                               | Text label                | -->
 
@@ -46,7 +46,7 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 | Eraser tool     | `E`            | `E`            | Eraser tool                                |
 | Paint bucket    | `G`            | `G`            | Flood fill tool (bitmap mode only)         |
 | Variable width  | `⇧ + W`        | `⇧ + W`        | Variable width tool (vector mode only)     |
-| Eye dropper     | `I`            | `I`            | Pick color from screen                     |
+| Eye dropper     | `I` or `⌃ + C` | `I`            | Pick color from screen                     |
 
 ## Selection & Navigation
 
@@ -88,6 +88,8 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 | Nudge resize (down, 10px)  | `Ctrl + ⌥ + ⇧ + ↓` | `Ctrl + Alt + ⇧ + ↓` | Resize selection height by 10px                                       |
 | Move to front              | `]`                | `]`                  | Move selection to front (or increase brush size if brush tool active) |
 | Move to back               | `[`                | `[`                  | Move selection to back (or decrease brush size if brush tool active)  |
+| Move forward               | `⌘ + ]`            | `Ctrl + ]`           | Move selection forward one layer                                      |
+| Move backward              | `⌘ + [`            | `Ctrl + [`           | Move selection backward one layer                                     |
 
 ## Alignment & Distribution
 
@@ -113,32 +115,45 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 
 ## Text Formatting
 
-| Action              | macOS       | Windows/Linux  | Description               |
-| ------------------- | ----------- | -------------- | ------------------------- |
-| Toggle bold         | `⌘ + B`     | `Ctrl + B`     | Toggle bold style         |
-| Toggle italic       | `⌘ + I`     | `Ctrl + I`     | Toggle italic style       |
-| Toggle underline    | `⌘ + U`     | `Ctrl + U`     | Toggle underline style    |
-| Toggle line-through | `⌘ + ⇧ + X` | `Ctrl + ⇧ + X` | Toggle line-through style |
-| Increase font size  | `⌘ + ⇧ + >` | `Ctrl + ⇧ + >` | Increase font size by 1px |
-| Decrease font size  | `⌘ + ⇧ + <` | `Ctrl + ⇧ + <` | Decrease font size by 1px |
+| Action                  | macOS       | Windows/Linux    | Description               |
+| ----------------------- | ----------- | ---------------- | ------------------------- |
+| Toggle bold             | `⌘ + B`     | `Ctrl + B`       | Toggle bold style         |
+| Toggle italic           | `⌘ + I`     | `Ctrl + I`       | Toggle italic style       |
+| Toggle underline        | `⌘ + U`     | `Ctrl + U`       | Toggle underline style    |
+| Toggle line-through     | `⌘ + ⇧ + X` | `Ctrl + ⇧ + X`   | Toggle line-through style |
+| Text align left         | `⌘ + ⌥ + L` | `Ctrl + Alt + L` | Align text to the left    |
+| Text align center       | `⌘ + ⌥ + T` | `Ctrl + Alt + T` | Center text horizontally  |
+| Text align right        | `⌘ + ⌥ + R` | `Ctrl + Alt + R` | Align text to the right   |
+| Text align justify      | `⌘ + ⌥ + J` | `Ctrl + Alt + J` | Justify text horizontally |
+| Increase font size      | `⌘ + ⇧ + >` | `Ctrl + ⇧ + >`   | Increase font size by 1px |
+| Decrease font size      | `⌘ + ⇧ + <` | `Ctrl + ⇧ + <`   | Decrease font size by 1px |
+| Increase font weight    | `⌘ + ⌥ + >` | `Ctrl + Alt + >` | Increase font weight      |
+| Decrease font weight    | `⌘ + ⌥ + <` | `Ctrl + Alt + <` | Decrease font weight      |
+| Increase line height    | `⌥ + ⇧ + >` | `Alt + ⇧ + >`    | Increase line height      |
+| Decrease line height    | `⌥ + ⇧ + <` | `Alt + ⇧ + <`    | Decrease line height      |
+| Increase letter spacing | `⌥ + >`     | `Alt + >`        | Increase letter spacing   |
+| Decrease letter spacing | `⌥ + <`     | `Alt + <`        | Decrease letter spacing   |
 
 ## Object Properties
 
-| Action              | macOS              | Windows/Linux      | Description                           |
-| ------------------- | ------------------ | ------------------ | ------------------------------------- |
-| Toggle active       | `⌘ + ⇧ + H`        | `Ctrl + ⇧ + H`     | Toggle active state for the selection |
-| Toggle locked       | `⌘ + ⇧ + L`        | `Ctrl + ⇧ + L`     | Toggle locked state for the selection |
-| Set opacity to 0%   | `0` (double press) | `0` (double press) | Set opacity to 0%                     |
-| Set opacity to 10%  | `1`                | `1`                | Set opacity to 10%                    |
-| Set opacity to 20%  | `2`                | `2`                | Set opacity to 20%                    |
-| Set opacity to 30%  | `3`                | `3`                | Set opacity to 30%                    |
-| Set opacity to 40%  | `4`                | `4`                | Set opacity to 40%                    |
-| Set opacity to 50%  | `5`                | `5`                | Set opacity to 50%                    |
-| Set opacity to 60%  | `6`                | `6`                | Set opacity to 60%                    |
-| Set opacity to 70%  | `7`                | `7`                | Set opacity to 70%                    |
-| Set opacity to 80%  | `8`                | `8`                | Set opacity to 80%                    |
-| Set opacity to 90%  | `9`                | `9`                | Set opacity to 90%                    |
-| Set opacity to 100% | `0` (single press) | `0` (single press) | Set opacity to 100%                   |
+| Action               | macOS              | Windows/Linux      | Description                                    |
+| -------------------- | ------------------ | ------------------ | ---------------------------------------------- |
+| Toggle active        | `⌘ + ⇧ + H`        | `Ctrl + ⇧ + H`     | Toggle active state for the selection          |
+| Toggle locked        | `⌘ + ⇧ + L`        | `Ctrl + ⇧ + L`     | Toggle locked state for the selection          |
+| Remove fill          | `⌥ + /`            | `Alt + /`          | Remove fill from selection                     |
+| Remove stroke        | `⇧ + /`            | `⇧ + /`            | Remove stroke from selection (sets width to 0) |
+| Swap fill and stroke | `⇧ + X`            | `⇧ + X`            | Swap fill paints and stroke paints             |
+| Set opacity to 0%    | `0` (double press) | `0` (double press) | Set opacity to 0%                              |
+| Set opacity to 10%   | `1`                | `1`                | Set opacity to 10%                             |
+| Set opacity to 20%   | `2`                | `2`                | Set opacity to 20%                             |
+| Set opacity to 30%   | `3`                | `3`                | Set opacity to 30%                             |
+| Set opacity to 40%   | `4`                | `4`                | Set opacity to 40%                             |
+| Set opacity to 50%   | `5`                | `5`                | Set opacity to 50%                             |
+| Set opacity to 60%   | `6`                | `6`                | Set opacity to 60%                             |
+| Set opacity to 70%   | `7`                | `7`                | Set opacity to 70%                             |
+| Set opacity to 80%   | `8`                | `8`                | Set opacity to 80%                             |
+| Set opacity to 90%   | `9`                | `9`                | Set opacity to 90%                             |
+| Set opacity to 100%  | `0` (single press) | `0` (single press) | Set opacity to 100%                            |
 
 ## View & Zoom
 
@@ -179,3 +194,5 @@ The following shortcuts are defined but not yet implemented:
 - `⇧ + V` - Flip vertical
 - `⌥ + ⌘ + K` / `Alt + Ctrl + K` - Create component
 - `⌥ + ⌘ + B` / `Alt + Ctrl + B` - Eject component
+- `Tab` - Text range: Increase indentation
+- `⇧ + Tab` - Text range: Decrease indentation

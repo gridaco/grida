@@ -5,6 +5,7 @@ import { useDataTransferEventTarget } from "./use-data-transfer";
 import { supportsFlatten } from "@/grida-canvas/reducers/methods/flatten";
 import grida from "@grida/schema";
 import assert from "assert";
+import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
 
 export interface ContextMenuAction {
   label: string;
@@ -106,49 +107,51 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       },
       copyAsPNG: {
         label: "Copy as PNG",
-        shortcut: "⇧⌘C",
+        shortcut: keyboardShortcutText("workbench.surface.edit.copy-as-png"),
         disabled: backend !== "canvas" || !hasSelection,
         onSelect: () => editor.surface.a11yCopyAsImage("png"),
       },
       bringToFront: {
         label: "Bring to front",
-        shortcut: "]",
+        shortcut: keyboardShortcutText("workbench.surface.view.move-to-front"),
         disabled: !hasSelection,
         onSelect: () => editor.surface.order("front"),
       },
       sendToBack: {
         label: "Send to back",
-        shortcut: "[",
+        shortcut: keyboardShortcutText("workbench.surface.view.move-to-back"),
         disabled: !hasSelection,
         onSelect: () => editor.surface.order("back"),
       },
       groupWithContainer: {
         label: "Group with Container",
-        shortcut: "⌥⌘G",
+        shortcut: keyboardShortcutText(
+          "workbench.surface.object.group-with-container"
+        ),
         disabled: !hasSelection,
         onSelect: () => editor.commands.contain(ids),
       },
       group: {
         label: "Group",
-        shortcut: "⌘G",
+        shortcut: keyboardShortcutText("workbench.surface.object.group"),
         disabled: !canGroup,
         onSelect: () => editor.commands.group(ids),
       },
       ungroup: {
         label: "Ungroup",
-        shortcut: "⌘⇧G",
+        shortcut: keyboardShortcutText("workbench.surface.object.ungroup"),
         disabled: !canUngroup,
         onSelect: () => editor.surface.ungroup(ids),
       },
       autoLayout: {
         label: "Auto-Layout",
-        shortcut: "⇧A",
+        shortcut: keyboardShortcutText("workbench.surface.object.auto-layout"),
         disabled: !hasSelection,
         onSelect: () => editor.commands.autoLayout(ids),
       },
       flatten: {
         label: "Flatten",
-        shortcut: "⌘E",
+        shortcut: keyboardShortcutText("workbench.surface.object.flatten"),
         disabled: !canFlatten,
         onSelect: () =>
           editor.commands.flatten(
@@ -172,7 +175,9 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       },
       toggleActive: {
         label: "Set Active/Inactive",
-        shortcut: "⌘⇧H",
+        shortcut: keyboardShortcutText(
+          "workbench.surface.object.toggle-active"
+        ),
         disabled: !hasSelection,
         onSelect: () => {
           ids.forEach((id) => editor.commands.toggleNodeActive(id));
@@ -180,13 +185,15 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       },
       zoomToFit: {
         label: "Zoom to fit",
-        shortcut: "⇧1",
+        shortcut: keyboardShortcutText("workbench.surface.view.zoom-to-fit"),
         disabled: !hasSelection,
         onSelect: () => editor.camera.fit(ids, { margin: 64, animate: true }),
       },
       toggleLocked: {
         label: "Lock/Unlock",
-        shortcut: "⌘⇧L",
+        shortcut: keyboardShortcutText(
+          "workbench.surface.object.toggle-locked"
+        ),
         disabled: !hasSelection,
         onSelect: () => {
           ids.forEach((id) => editor.commands.toggleNodeLocked(id));
@@ -194,7 +201,7 @@ export function useContextMenuActions(ids: string[]): ContextMenuActions {
       },
       delete: {
         label: "Delete",
-        shortcut: "⌫",
+        shortcut: keyboardShortcutText("workbench.surface.edit.delete-node"),
         disabled: !hasSelection,
         onSelect: () => editor.commands.delete(ids),
       },

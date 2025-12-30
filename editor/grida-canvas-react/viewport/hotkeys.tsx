@@ -6,348 +6,10 @@ import {
   useCurrentSelectionIds,
 } from "../provider";
 import { toast } from "sonner";
-import type cg from "@grida/cg";
 import { useEffect, useRef, useState } from "react";
-import kolor from "@grida/color";
 import { useCurrentEditor } from "../use-editor";
-
-export const keybindings_sheet = [
-  {
-    name: "select all siblings",
-    description: "Select all siblings of the current selection",
-    keys: ["meta+a"],
-  },
-  {
-    name: "select children",
-    description: "Select all children of the current selection",
-    keys: ["enter"],
-  },
-  {
-    name: "nudge",
-    description: "Move selection by 1px",
-    keys: ["arrowright", "arrowleft", "arrowup", "arrowdown"],
-  },
-  {
-    name: "duplicate",
-    description: "Duplicate the current selection",
-    keys: ["meta+d"],
-  },
-  {
-    name: "flatten",
-    description: "Flatten the current selection",
-    keys: ["meta+e", "alt+shift+f"],
-  },
-  {
-    name: "undo",
-    description: "Undo the last action",
-    keys: ["meta+z"],
-  },
-  {
-    name: "redo",
-    description: "Redo the last undone action",
-    keys: ["meta+shift+z"],
-  },
-  {
-    name: "cut",
-    description: "Cut the current selection",
-    keys: ["meta+x"],
-  },
-  {
-    name: "copy",
-    description: "Copy the current selection",
-    keys: ["meta+c"],
-  },
-  {
-    name: "copy as png",
-    description: "Copy selection as PNG",
-    keys: ["meta+shift+c"],
-  },
-  {
-    name: "paste",
-    description: "Paste from the clipboard",
-    keys: ["meta+v"],
-  },
-  {
-    name: "toggle bold",
-    description: "Toggle bold style",
-    keys: ["meta+b"],
-  },
-  {
-    name: "toggle italic",
-    description: "Toggle italic style",
-    keys: ["meta+i"],
-  },
-  {
-    name: "toggle line-through",
-    description: "Toggle line-through style",
-    keys: ["meta+shift+x"],
-  },
-  {
-    name: "increase font size",
-    description: "Increase font size for text",
-    keys: ["meta+shift+>", "ctrl+shift+>"],
-  },
-  {
-    name: "decrease font size",
-    description: "Decrease font size for text",
-    keys: ["meta+shift+<", "ctrl+shift+<"],
-  },
-  {
-    name: "toggle active",
-    description: "Toggle active state for the selection",
-    keys: ["meta+shift+h"],
-  },
-  {
-    name: "toggle locked",
-    description: "Toggle locked state for the selection",
-    keys: ["meta+shift+l"],
-  },
-  {
-    name: "select parent",
-    description: "Select the parent of the current selection",
-    keys: ["shift+enter", "\\"],
-  },
-  {
-    name: "select next sibling",
-    description: "Select the next sibling of the current selection",
-    keys: ["tab"],
-  },
-  {
-    name: "select previous sibling",
-    description: "Select the previous sibling of the current selection",
-    keys: ["shift+tab"],
-  },
-  {
-    name: "delete node",
-    description: "Delete the current selection",
-    keys: ["backspace", "delete"],
-  },
-  {
-    name: "Auto-layout",
-    description: "Auto-layout the current selection",
-    keys: ["shift+a"],
-  },
-  {
-    name: "Group with Container",
-    description: "Group the current selection with a container",
-    keys: ["ctrl+alt+g", "meta+alt+g"],
-  },
-  {
-    name: "align left",
-    description: "Align selection to the left",
-    keys: ["alt+a"],
-  },
-  {
-    name: "align right",
-    description: "Align selection to the right",
-    keys: ["alt+d"],
-  },
-  {
-    name: "align top",
-    description: "Align selection to the top",
-    keys: ["alt+w"],
-  },
-  {
-    name: "align bottom",
-    description: "Align selection to the bottom",
-    keys: ["alt+s"],
-  },
-  {
-    name: "align horizontal center",
-    description: "Align selection horizontally centered",
-    keys: ["alt+h"],
-  },
-  {
-    name: "align vertical center",
-    description: "Align selection vertically centered",
-    keys: ["alt+v"],
-  },
-  {
-    name: "distribute horizontally",
-    description: "Distribute selection evenly horizontally",
-    keys: ["alt+ctrl+v"],
-  },
-  {
-    name: "distribute vertically",
-    description: "Distribute selection evenly vertically",
-    keys: ["alt+ctrl+h"],
-  },
-  {
-    name: "zoom to fit",
-    description: "Zoom to fit the content",
-    keys: ["shift+1", "shift+9"],
-  },
-  {
-    name: "zoom to selection",
-    description: "Zoom to the current selection",
-    keys: ["shift+2"],
-  },
-  {
-    name: "zoom to 100%",
-    description: "Zoom to 100%",
-    keys: ["shift+0"],
-  },
-  {
-    name: "zoom in",
-    description: "Zoom in",
-    keys: ["meta+=, ctrl+=", "meta+plus, ctrl+plus"],
-  },
-  {
-    name: "zoom out",
-    description: "Zoom out",
-    keys: ["meta+minus, ctrl+minus"],
-  },
-  {
-    name: "move to front",
-    description: "Move the selection to the front",
-    keys: ["]"],
-  },
-  {
-    name: "move to back",
-    description: "Move the selection to the back",
-    keys: ["["],
-  },
-  {
-    name: "hide/show ruler",
-    description: "Toggle ruler visibility",
-    keys: ["shift+r"],
-  },
-  {
-    name: "hide/show pixel grid",
-    description: "Toggle pixel grid visibility",
-    keys: ["shift+'"],
-  },
-  {
-    name: "preview",
-    description: "preview current selection",
-    keys: ["shift+space"],
-  },
-  {
-    name: "eye dropper",
-    description: "Use eye dropper to pick color",
-    keys: ["i"],
-  },
-  {
-    name: "hand tool",
-    description: "Use hand tool to pan the canvas",
-    keys: ["space"],
-  },
-  {
-    name: "zoom tool",
-    description: "Use zoom tool to zoom the canvas",
-    keys: ["z"],
-  },
-  {
-    name: "cursor",
-    description: "Select tool",
-    keys: ["v"],
-  },
-  {
-    name: "scale",
-    description: "Scale tool (parametric scaling)",
-    keys: ["k"],
-  },
-  {
-    name: "lasso",
-    description: "Lasso tool (vector mode)",
-    keys: ["q"],
-  },
-  {
-    name: "hand",
-    description: "Hand tool",
-    keys: ["h"],
-  },
-  {
-    name: "rectangle",
-    description: "Rectangle tool",
-    keys: ["r"],
-  },
-  {
-    name: "ellipse",
-    description: "Ellipse tool",
-    keys: ["o"],
-  },
-  {
-    name: "polygon",
-    description: "Polygon tool",
-    keys: ["y"],
-  },
-  {
-    name: "text",
-    description: "Text tool",
-    keys: ["t"],
-  },
-  {
-    name: "line",
-    description: "Line tool",
-    keys: ["l"],
-  },
-  {
-    name: "container",
-    description: "Container tool",
-    keys: ["a", "f"],
-  },
-  {
-    name: "pencil",
-    description: "Pencil tool",
-    keys: ["shift+p"],
-  },
-  {
-    name: "path",
-    description: "Path tool",
-    keys: ["p"],
-  },
-  {
-    name: "brush",
-    description: "Brush tool",
-    keys: ["b"],
-  },
-  {
-    name: "eraser",
-    description: "Eraser tool",
-    keys: ["e"],
-  },
-  {
-    name: "paint bucket",
-    description: "Paint bucket tool",
-    keys: ["g"],
-  },
-  {
-    name: "variable width",
-    description: "Variable width tool",
-    keys: ["shif+w"],
-  },
-  {
-    name: "increase brush size",
-    description: "Increase brush size",
-    keys: ["]"],
-  },
-  {
-    name: "decrease brush size",
-    description: "Decrease brush size",
-    keys: ["["],
-  },
-  {
-    name: "set opacity to 0%",
-    description: "Set opacity to 0%",
-    keys: ["0+0"],
-  },
-  {
-    name: "set opacity to 10%",
-    description: "Set opacity to 10%",
-    keys: ["1"],
-  },
-  {
-    name: "set opacity to 50%",
-    description: "Set opacity to 50%",
-    keys: ["5"],
-  },
-  {
-    name: "set opacity to 100%",
-    description: "Set opacity to 100%",
-    keys: ["0"],
-  },
-];
+import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
+import { getKeyboardOS } from "@/grida-canvas/keybinding";
 
 function useSingleDoublePressHotkey(
   key: string,
@@ -372,6 +34,7 @@ function useSingleDoublePressHotkey(
 }
 
 export function useEditorHotKeys() {
+  const keyboardOS = getKeyboardOS();
   const editor = useCurrentEditor();
   const tool = useToolState();
   const content_edit_mode = useContentEditModeMinimalState();
@@ -575,51 +238,10 @@ export function useEditorHotKeys() {
   );
 
   // #region selection
+  // Color picker: I on all platforms, Ctrl+C on macOS only (Windows uses Ctrl+C for copy)
   useHotkeys(
-    "i",
-    () => {
-      if (window.EyeDropper) {
-        const eyeDropper = new window.EyeDropper();
-
-        eyeDropper
-          .open()
-          .then(
-            (result: {
-              /**
-               * A string representing the selected color, in hexadecimal sRGB format (#aabbcc).
-               * @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
-               */
-              sRGBHex: string;
-            }) => {
-              const color = kolor.colorformats.RGBA32F.fromHEX(result.sRGBHex);
-              const solidPaint: cg.SolidPaint = {
-                type: "solid",
-                color: color,
-                active: true,
-              };
-
-              if (selection.length > 0) {
-                editor.commands.changeNodePropertyFills(selection, [
-                  solidPaint,
-                ]);
-              } else {
-                editor.surface.a11ySetClipboardColor(color);
-                window.navigator.clipboard
-                  .writeText(result.sRGBHex)
-                  .then(() => {
-                    toast.success(
-                      `Copied hex color to clipboard ${result.sRGBHex}`
-                    );
-                  });
-              }
-            }
-          )
-          .catch((e: any) => {});
-        //
-      } else {
-        toast.error("EyeDropper is not available on this browser (use Chrome)");
-      }
-    },
+    keyboardOS === "mac" ? "i, ctrl+c" : "i",
+    () => editor.surface.surfacePickColor(),
     {
       enableOnFormTags: false,
       enableOnContentEditable: false,
@@ -742,37 +364,94 @@ export function useEditorHotKeys() {
     editor.surface.a11yToggleLineThrough("selection");
   });
 
-  // Increase font size: ⌘+⇧+. (macOS) / Ctrl+⇧+. (Windows/Linux)
-  // Note: Period (.) with Shift produces > symbol. Using splitKey: "|" to combine
-  // macOS and Windows bindings in a single call (comma is the default separator).
+  // Text alignment shortcuts
   useHotkeys(
-    "meta+shift+. | ctrl+shift+.",
+    "meta+alt+l, ctrl+alt+l",
     () => {
-      editor.surface.a11yChangeFontSize("selection", 1);
+      editor.surface.a11yTextAlign("selection", "left");
     },
-    {
-      preventDefault: true,
-      enableOnFormTags: false,
-      enableOnContentEditable: false,
-      splitKey: "|",
-    }
+    // prevent chrome: show download history
+    { preventDefault: true }
   );
 
-  // Decrease font size: ⌘+⇧+, (macOS) / Ctrl+⇧+, (Windows/Linux)
-  // Note: Comma (,) with Shift produces < symbol. Using splitKey: "|" because:
-  // 1. Comma is the default separator in react-hotkeys-hook, so we need pipe to separate key combinations
-  // 2. This allows comma to be used as part of the key name (meta+shift+,)
+  useHotkeys("meta+alt+t, ctrl+alt+t", () => {
+    editor.surface.a11yTextAlign("selection", "center");
+  });
+
+  useHotkeys("meta+alt+r, ctrl+alt+r", () => {
+    editor.surface.a11yTextAlign("selection", "right");
+  });
+
   useHotkeys(
-    "meta+shift+, | ctrl+shift+,",
+    "meta+alt+j, ctrl+alt+j",
     () => {
-      editor.surface.a11yChangeFontSize("selection", -1);
+      editor.surface.a11yTextAlign("selection", "justify");
     },
-    {
-      preventDefault: true,
-      enableOnFormTags: false,
-      enableOnContentEditable: false,
-      splitKey: "|",
-    }
+    // prevent chrome: open devtools
+    { preventDefault: true }
+  );
+
+  // Helper for text formatting shortcuts with period/comma keys
+  // Note: Period (.) with Shift produces >, Comma (,) with Shift produces <
+  // Using splitKey: "|" because comma is the default separator in react-hotkeys-hook
+  const textFormattingOptions = {
+    preventDefault: true,
+    enableOnFormTags: false,
+    enableOnContentEditable: false,
+    splitKey: "|" as const,
+  };
+
+  // Font size: ⌘+⇧+>/< (macOS) / Ctrl+⇧+>/< (Windows/Linux)
+  useHotkeys(
+    "meta+shift+period | ctrl+shift+period",
+    () => editor.surface.a11yChangeTextFontSize("selection", 1),
+    textFormattingOptions
+  );
+  useHotkeys(
+    "meta+shift+comma | ctrl+shift+comma",
+    () => editor.surface.a11yChangeTextFontSize("selection", -1),
+    textFormattingOptions
+  );
+
+  // Font weight: ⌘+⌥+>/< (macOS) / Ctrl+Alt+>/< (Windows/Linux)
+  // Note: ⌘+⌥+> means Command+Option+Period (without Shift)
+  // Using keycode names (period/comma) for safer cross-platform compatibility.
+  // Verified to work on macOS.
+  useHotkeys(
+    "meta+alt+period | ctrl+alt+period",
+    () => editor.surface.a11yChangeTextFontWeight("selection", "increase"),
+    textFormattingOptions
+  );
+  useHotkeys(
+    "meta+alt+comma | ctrl+alt+comma",
+    () => editor.surface.a11yChangeTextFontWeight("selection", "decrease"),
+    textFormattingOptions
+  );
+
+  // Line height: ⌥+⇧+>/< (macOS) / Alt+⇧+>/< (Windows/Linux)
+  useHotkeys(
+    "alt+shift+period | alt+shift+period",
+    () => editor.surface.a11yChangeTextLineHeight("selection", 1),
+    textFormattingOptions
+  );
+  useHotkeys(
+    "alt+shift+comma | alt+shift+comma",
+    () => editor.surface.a11yChangeTextLineHeight("selection", -1),
+    textFormattingOptions
+  );
+
+  // Letter spacing: ⌥+>/< (macOS) / Alt+>/< (Windows/Linux)
+  // Note: ⌥+> means Alt+Period (without Shift), producing period character
+  // This is different from line height (⌥+⇧+>) which is Alt+Shift+Period
+  useHotkeys(
+    "alt+period | alt+period",
+    () => editor.surface.a11yChangeTextLetterSpacing("selection", 0.1),
+    textFormattingOptions
+  );
+  useHotkeys(
+    "alt+comma | alt+comma",
+    () => editor.surface.a11yChangeTextLetterSpacing("selection", -0.1),
+    textFormattingOptions
   );
 
   useHotkeys("shift+r", () => {
@@ -784,6 +463,45 @@ export function useEditorHotKeys() {
     const v = editor.surface.surfaceTogglePixelGrid();
     toast.success(`Pixel Grid ${v === "on" ? "on" : "off"}`);
   });
+
+  // Remove fill: ⌥/ (macOS) / Alt+/ (Windows/Linux)
+  useHotkeys(
+    "alt+slash",
+    () => {
+      editor.surface.a11yClearFill("selection");
+    },
+    {
+      preventDefault: true,
+      enableOnContentEditable: false,
+      enableOnFormTags: false,
+    }
+  );
+
+  // Remove stroke: ⇧/ (macOS) / Shift+/ (Windows/Linux)
+  useHotkeys(
+    "shift+slash",
+    () => {
+      editor.surface.a11yClearStroke("selection");
+    },
+    {
+      preventDefault: true,
+      enableOnContentEditable: false,
+      enableOnFormTags: false,
+    }
+  );
+
+  // Swap fill and stroke: ⇧X (macOS) / Shift+X (Windows/Linux)
+  useHotkeys(
+    "shift+x",
+    () => {
+      editor.surface.a11ySwapFillAndStroke("selection");
+    },
+    {
+      preventDefault: true,
+      enableOnContentEditable: false,
+      enableOnFormTags: false,
+    }
+  );
 
   useHotkeys(
     "meta+d, ctrl+d",
@@ -1076,6 +794,22 @@ export function useEditorHotKeys() {
     }
   });
 
+  useHotkeys(
+    "meta+], ctrl+]",
+    () => {
+      editor.surface.order("forward");
+    },
+    { preventDefault: true }
+  );
+
+  useHotkeys(
+    "meta+[, ctrl+[",
+    () => {
+      editor.surface.order("backward");
+    },
+    { preventDefault: true }
+  );
+
   useHotkeys("alt+a", () => {
     editor.surface.a11yAlign({ horizontal: "min" });
   });
@@ -1118,7 +852,9 @@ export function useEditorHotKeys() {
         editor.commands.group("selection");
       } catch (e) {
         console.error(e);
-        toast.error("use ⌥⌘G for grouping");
+        toast.error(
+          `use ${keyboardShortcutText("workbench.surface.object.group-with-container")} for grouping`
+        );
       }
     },
     {

@@ -10,6 +10,38 @@ import {
   GitHubLogoIcon,
   MixIcon,
   OpenInNewWindowIcon,
+  FontBoldIcon,
+  FontItalicIcon,
+  UnderlineIcon,
+  StrikethroughIcon,
+  TextAlignLeftIcon,
+  TextAlignCenterIcon,
+  TextAlignRightIcon,
+  TextAlignJustifyIcon,
+  TextAlignTopIcon,
+  TextAlignMiddleIcon,
+  TextAlignBottomIcon,
+  LetterCaseToggleIcon,
+  LetterCaseUppercaseIcon,
+  LetterCaseLowercaseIcon,
+  LetterCaseCapitalizeIcon,
+  FrameIcon,
+  GroupIcon,
+  TransformIcon,
+  EyeOpenIcon,
+  EyeNoneIcon,
+  LockClosedIcon,
+  LockOpen1Icon,
+  LayersIcon,
+  Component1Icon,
+  AlignTopIcon,
+  AlignRightIcon,
+  AlignLeftIcon,
+  AlignBottomIcon,
+  AlignCenterHorizontallyIcon,
+  AlignCenterVerticallyIcon,
+  SpaceEvenlyHorizontallyIcon,
+  SpaceEvenlyVerticallyIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenuCheckboxItem,
@@ -45,6 +77,7 @@ import { useFilePicker } from "use-file-picker";
 import { ImageIcon } from "lucide-react";
 import { SlackLogoIcon } from "@/components/logos";
 import { distro } from "../distro";
+import { keyboardShortcutText } from "./uxhost-shortcut-renderer";
 
 export function PlaygroundMenuContent({
   toggleVisibility,
@@ -172,299 +205,37 @@ export function PlaygroundMenuContent({
       />
 
       <DropdownMenuContent align="start" className="min-w-52">
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            File
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-40">
-            <DropdownMenuItem
-              onClick={importFromJson.openDialog}
-              className="text-xs"
-            >
-              <FileIcon className="size-3.5" />
-              Open .grida
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onExport} className="text-xs">
-              <DownloadIcon className="size-3.5" />
-              Save as .grida
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={handleImportImageClick}
-              className="text-xs"
-            >
-              <ImageIcon className="size-3.5" />
-              Import Image
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={importFromFigmaDialog.openDialog}
-              className="text-xs"
-            >
-              <FigmaLogoIcon className="size-3.5" />
-              Import Figma
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            Edit
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-40">
-            {/* History Section */}
-            <DropdownMenuItem
-              onClick={() => instance.commands.undo()}
-              className="text-xs"
-            >
-              Undo
-              <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => instance.commands.redo()}
-              className="text-xs"
-            >
-              Redo
-              <DropdownMenuShortcut>⌘⇧Z</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {/* Clipboard Section */}
-            <DropdownMenuItem
-              onClick={() => instance.surface.a11yCut()}
-              disabled={!hasSelection}
-              className="text-xs"
-            >
-              Cut
-              <DropdownMenuShortcut>⌘X</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => instance.surface.a11yCopy()}
-              disabled={!hasSelection}
-              className="text-xs"
-            >
-              Copy
-              <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                void onpaste_external_event();
-              }}
-              className="text-xs"
-            >
-              Paste
-              <DropdownMenuShortcut>⌘V</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                const task = instance.surface.a11yCopyAsImage("png");
-                toast.promise(task, {
-                  success: "Copied as PNG",
-                  error: "Failed to copy as PNG",
-                });
-              }}
-              disabled={!hasSelection || backend !== "canvas"}
-              className="text-xs"
-            >
-              Copy as PNG
-              <DropdownMenuShortcut>⇧⌘C</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                void instance.surface.a11yCopyAsSVG();
-              }}
-              disabled={!hasSelection || backend !== "canvas"}
-              className="text-xs"
-            >
-              Copy as SVG
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {/* Actions Section */}
-            <DropdownMenuItem
-              onClick={() => instance.commands.duplicate("selection")}
-              disabled={!hasSelection}
-              className="text-xs"
-            >
-              Duplicate
-              <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => instance.surface.a11yDelete()}
-              disabled={!hasSelection}
-              className="text-xs"
-            >
-              Delete
-              <DropdownMenuShortcut>⌫</DropdownMenuShortcut>
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            View
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-40">
-            {/* Zoom Controls */}
-            <DropdownMenuCheckboxItem
-              checked={false}
-              onSelect={() => instance.camera.zoomIn()}
-              className="text-xs"
-            >
-              Zoom in
-              <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={false}
-              onSelect={() => instance.camera.zoomOut()}
-              className="text-xs"
-            >
-              Zoom out
-              <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={false}
-              onSelect={() => instance.camera.scale(1, "center")}
-              className="text-xs"
-            >
-              Zoom to 100%
-              <DropdownMenuShortcut>⌘0</DropdownMenuShortcut>
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={false}
-              onSelect={() => instance.camera.fit("*")}
-              className="text-xs"
-            >
-              Zoom to fit
-              <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={false}
-              onSelect={() => instance.camera.fit("selection")}
-              className="text-xs"
-            >
-              Zoom to selection
-              <DropdownMenuShortcut>⇧2</DropdownMenuShortcut>
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            {/* Display Options */}
-            <DropdownMenuCheckboxItem
-              checked={pixelgrid === "on"}
-              onSelect={() => {
-                instance.surface.surfaceTogglePixelGrid();
-              }}
-              className="text-xs"
-            >
-              Pixel grid
-              <DropdownMenuShortcut>⇧'</DropdownMenuShortcut>
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={ruler === "on"}
-              onSelect={() => {
-                instance.surface.surfaceToggleRuler();
-              }}
-              className="text-xs"
-            >
-              Ruler
-              <DropdownMenuShortcut>⇧R</DropdownMenuShortcut>
-            </DropdownMenuCheckboxItem>
-            {/* UI Visibility */}
-            {toggleVisibility && toggleMinimal && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={toggleVisibility}
-                  className="text-xs"
-                >
-                  Show/Hide UI
-                  <DropdownMenuShortcut>⌘\</DropdownMenuShortcut>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={toggleMinimal} className="text-xs">
-                  Minimize UI
-                  <DropdownMenuShortcut>⇧⌘\</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            Settings
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-40">
-            <DropdownMenuItem
-              onClick={() => {
-                setSettingsInitialPage("general");
-                settingsDialog.openDialog();
-              }}
-              className="text-xs"
-            >
-              General
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setSettingsInitialPage("keybindings");
-                settingsDialog.openDialog();
-              }}
-              className="text-xs"
-            >
-              Keyboard shortcuts
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            Developers
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-40">
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="text-xs">
-                <OpenInNewWindowIcon className="size-3.5" />
-                Tools
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="min-w-40">
-                <Link href="/canvas/tools/ai" target="_blank">
-                  <DropdownMenuItem className="text-xs">
-                    <OpenInNewWindowIcon className="size-3.5" />
-                    AI
-                  </DropdownMenuItem>
-                </Link>
-                <Link href="/canvas/tools/io-figma" target="_blank">
-                  <DropdownMenuItem className="text-xs">
-                    <OpenInNewWindowIcon className="size-3.5" />
-                    IO Figma
-                  </DropdownMenuItem>
-                </Link>
-                <Link href="/canvas/tools/io-svg" target="_blank">
-                  <DropdownMenuItem className="text-xs">
-                    <OpenInNewWindowIcon className="size-3.5" />
-                    IO SVG
-                  </DropdownMenuItem>
-                </Link>
-                <Link href="https://github.com/gridaco/p666" target="_blank">
-                  <DropdownMenuItem className="text-xs">
-                    <OpenInNewWindowIcon className="size-3.5" />
-                    P666 Daemon
-                  </DropdownMenuItem>
-                </Link>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="text-xs">
-                <MixIcon className="size-3.5" />
-                Examples
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="min-w-40">
-                {canvas_examples.map((example) => (
-                  <Link
-                    key={example.id}
-                    href={"/canvas/examples/" + example.id}
-                    target="_blank"
-                  >
-                    <DropdownMenuItem className="text-xs">
-                      <OpenInNewWindowIcon className="size-3.5" />
-                      {example.name}
-                    </DropdownMenuItem>
-                  </Link>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        <FileMenuContent
+          onExport={onExport}
+          onImportJson={importFromJson.openDialog}
+          onImportImage={handleImportImageClick}
+          onImportFigma={importFromFigmaDialog.openDialog}
+        />
+        <EditMenuContent
+          hasSelection={hasSelection}
+          backend={backend}
+          onPaste={onpaste_external_event}
+        />
+        <ViewMenuContent
+          pixelgrid={pixelgrid}
+          ruler={ruler}
+          toggleVisibility={toggleVisibility}
+          toggleMinimal={toggleMinimal}
+        />
+        <ObjectMenuContent />
+        <TextMenuContent />
+        <ArrangeMenuContent />
+        <SettingsMenuContent
+          onOpenGeneral={() => {
+            setSettingsInitialPage("general");
+            settingsDialog.openDialog();
+          }}
+          onOpenKeybindings={() => {
+            setSettingsInitialPage("keybindings");
+            settingsDialog.openDialog();
+          }}
+        />
+        <DevelopersMenuContent />
         <DropdownMenuSeparator />
         <Link href={sitemap.links.github} target="_blank">
           <DropdownMenuItem className="text-xs">
@@ -480,5 +251,1215 @@ export function PlaygroundMenuContent({
         </Link>
       </DropdownMenuContent>
     </>
+  );
+}
+
+function FileMenuContent({
+  onExport,
+  onImportJson,
+  onImportImage,
+  onImportFigma,
+}: {
+  onExport: () => void;
+  onImportJson: () => void;
+  onImportImage: () => void;
+  onImportFigma: () => void;
+}) {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">File</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        <DropdownMenuItem onClick={onImportJson} className="text-xs">
+          <FileIcon className="size-3.5" />
+          Open .grida
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onExport} className="text-xs">
+          <DownloadIcon className="size-3.5" />
+          Save as .grida
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onImportImage} className="text-xs">
+          <ImageIcon className="size-3.5" />
+          Import Image
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onImportFigma} className="text-xs">
+          <FigmaLogoIcon className="size-3.5" />
+          Import Figma
+        </DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function EditMenuContent({
+  hasSelection,
+  backend,
+  onPaste,
+}: {
+  hasSelection: boolean;
+  backend: string;
+  onPaste: () => void;
+}) {
+  const instance = useCurrentEditor();
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">Edit</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        {/* History Section */}
+        <DropdownMenuItem
+          onClick={() => instance.commands.undo()}
+          className="text-xs"
+        >
+          Undo
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.undo")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.commands.redo()}
+          className="text-xs"
+        >
+          Redo
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.redo")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Clipboard Section */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yCut()}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Cut
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.cut")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yCopy()}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Copy
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.copy")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onPaste} className="text-xs">
+          Paste
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.paste")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            const task = instance.surface.a11yCopyAsImage("png");
+            toast.promise(task, {
+              success: "Copied as PNG",
+              error: "Failed to copy as PNG",
+            });
+          }}
+          disabled={!hasSelection || backend !== "canvas"}
+          className="text-xs"
+        >
+          Copy as PNG
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.copy-as-png")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            void instance.surface.a11yCopyAsSVG();
+          }}
+          disabled={!hasSelection || backend !== "canvas"}
+          className="text-xs"
+        >
+          Copy as SVG
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Color Picker */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.surfacePickColor()}
+          className="text-xs"
+        >
+          Pick color
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.eye-dropper")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Actions Section */}
+        <DropdownMenuItem
+          onClick={() => instance.commands.duplicate("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Duplicate
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.duplicate")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yDelete()}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Delete
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.edit.delete-node")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function ViewMenuContent({
+  pixelgrid,
+  ruler,
+  toggleVisibility,
+  toggleMinimal,
+}: {
+  pixelgrid: string;
+  ruler: string;
+  toggleVisibility?: () => void;
+  toggleMinimal?: () => void;
+}) {
+  const instance = useCurrentEditor();
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">View</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        {/* Zoom Controls */}
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={() => instance.camera.zoomIn()}
+          className="text-xs"
+        >
+          Zoom in
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-in")}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={() => instance.camera.zoomOut()}
+          className="text-xs"
+        >
+          Zoom out
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-out")}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={() => instance.camera.scale(1, "center")}
+          className="text-xs"
+        >
+          Zoom to 100%
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-100")}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={() => instance.camera.fit("*")}
+          className="text-xs"
+        >
+          Zoom to fit
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-fit")}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={() => instance.camera.fit("selection")}
+          className="text-xs"
+        >
+          Zoom to selection
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.zoom-to-selection")}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        {/* Display Options */}
+        <DropdownMenuCheckboxItem
+          checked={pixelgrid === "on"}
+          onSelect={() => {
+            instance.surface.surfaceTogglePixelGrid();
+          }}
+          className="text-xs"
+        >
+          Pixel grid
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.view.hide-show-pixel-grid"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={ruler === "on"}
+          onSelect={() => {
+            instance.surface.surfaceToggleRuler();
+          }}
+          className="text-xs"
+        >
+          Ruler
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.hide-show-ruler")}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        {/* UI Visibility */}
+        {toggleVisibility && toggleMinimal && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={toggleVisibility} className="text-xs">
+              Show/Hide UI
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={toggleMinimal} className="text-xs">
+              Minimize UI
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function SettingsMenuContent({
+  onOpenGeneral,
+  onOpenKeybindings,
+}: {
+  onOpenGeneral: () => void;
+  onOpenKeybindings: () => void;
+}) {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">
+        Settings
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        <DropdownMenuItem onClick={onOpenGeneral} className="text-xs">
+          General
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onOpenKeybindings} className="text-xs">
+          Keyboard shortcuts
+        </DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function DevelopersMenuContent() {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">
+        Developers
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            <OpenInNewWindowIcon className="size-3.5" />
+            Tools
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <Link href="/canvas/tools/ai" target="_blank">
+              <DropdownMenuItem className="text-xs">
+                <OpenInNewWindowIcon className="size-3.5" />
+                AI
+              </DropdownMenuItem>
+            </Link>
+            <Link href="/canvas/tools/io-figma" target="_blank">
+              <DropdownMenuItem className="text-xs">
+                <OpenInNewWindowIcon className="size-3.5" />
+                IO Figma
+              </DropdownMenuItem>
+            </Link>
+            <Link href="/canvas/tools/io-svg" target="_blank">
+              <DropdownMenuItem className="text-xs">
+                <OpenInNewWindowIcon className="size-3.5" />
+                IO SVG
+              </DropdownMenuItem>
+            </Link>
+            <Link href="https://github.com/gridaco/p666" target="_blank">
+              <DropdownMenuItem className="text-xs">
+                <OpenInNewWindowIcon className="size-3.5" />
+                P666 Daemon
+              </DropdownMenuItem>
+            </Link>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            <MixIcon className="size-3.5" />
+            Examples
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            {canvas_examples.map((example) => (
+              <Link
+                key={example.id}
+                href={"/canvas/examples/" + example.id}
+                target="_blank"
+              >
+                <DropdownMenuItem className="text-xs">
+                  <OpenInNewWindowIcon className="size-3.5" />
+                  {example.name}
+                </DropdownMenuItem>
+              </Link>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function TextMenuContent() {
+  const instance = useCurrentEditor();
+  const selection = useEditorState(instance, (state) => state.selection);
+  const hasTextSelection = selection.some(
+    (node_id) => instance.doc.getNodeSnapshotById(node_id)?.type === "text"
+  );
+
+  // Helper to apply command to all selected text nodes
+  const applyToTextNodes = (fn: (node_id: string) => void) => {
+    selection.forEach((node_id) => {
+      const node = instance.doc.getNodeSnapshotById(node_id);
+      if (node?.type === "text") {
+        fn(node_id);
+      }
+    });
+  };
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">Text</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        {/* Basic Formatting */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yToggleBold("selection")}
+          disabled={!hasTextSelection}
+          className="text-xs"
+        >
+          <FontBoldIcon className="size-3.5" />
+          Bold
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.toggle-bold")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yToggleItalic("selection")}
+          disabled={!hasTextSelection}
+          className="text-xs"
+        >
+          <FontItalicIcon className="size-3.5" />
+          Italic
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.toggle-italic")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yToggleUnderline("selection")}
+          disabled={!hasTextSelection}
+          className="text-xs"
+        >
+          <UnderlineIcon className="size-3.5" />
+          Underline
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.toggle-underline")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yToggleLineThrough("selection")}
+          disabled={!hasTextSelection}
+          className="text-xs"
+        >
+          <StrikethroughIcon className="size-3.5" />
+          Strikethrough
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.toggle-line-through")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* Create link - disabled */}
+        {/* TODO: Implement Create link */}
+        <DropdownMenuItem disabled className="text-xs">
+          Create link
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.create-link")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* Lists - disabled */}
+        {/* TODO: Implement Bulleted list */}
+        <DropdownMenuItem disabled className="text-xs">
+          Bulleted list
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.ul")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* TODO: Implement Numbered list */}
+        <DropdownMenuItem disabled className="text-xs">
+          Numbered list
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.text.ol")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Alignment */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Alignment
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yTextAlign("selection", "left")
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <TextAlignLeftIcon className="size-3.5" />
+              Text align left
+              <DropdownMenuShortcut>
+                {keyboardShortcutText("workbench.surface.text.text-align-left")}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yTextAlign("selection", "center")
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <TextAlignCenterIcon className="size-3.5" />
+              Text align center
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.text-align-center"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yTextAlign("selection", "right")
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <TextAlignRightIcon className="size-3.5" />
+              Text align right
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.text-align-right"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yTextAlign("selection", "justify")
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <TextAlignJustifyIcon className="size-3.5" />
+              Text align justified
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.text-align-justify"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yTextVerticalAlign("selection", "top")
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <TextAlignTopIcon className="size-3.5" />
+              Text align top
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yTextVerticalAlign("selection", "center")
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <TextAlignMiddleIcon className="size-3.5" />
+              Text align middle
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yTextVerticalAlign("selection", "bottom")
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <TextAlignBottomIcon className="size-3.5" />
+              Text align bottom
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        {/* Adjust */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Adjust
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            {/* Indentation - disabled */}
+            {/* TODO: Implement Increase indentation */}
+            <DropdownMenuItem disabled className="text-xs">
+              Increase indentation
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-indentation"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            {/* TODO: Implement Decrease indentation */}
+            <DropdownMenuItem disabled className="text-xs">
+              Decrease indentation
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-indentation"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* Font size */}
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yChangeTextFontSize("selection", 1)
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              Increase font size
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-font-size"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yChangeTextFontSize("selection", -1)
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              Decrease font size
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-font-size"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            {/* Font weight */}
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yChangeTextFontWeight(
+                  "selection",
+                  "increase"
+                )
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              Increase font weight
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-font-weight"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yChangeTextFontWeight(
+                  "selection",
+                  "decrease"
+                )
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              Decrease font weight
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-font-weight"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* Line height */}
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yChangeTextLineHeight("selection", 1)
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              Increase line height
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-line-height"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yChangeTextLineHeight("selection", -1)
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              Decrease line height
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-line-height"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            {/* Letter spacing */}
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yChangeTextLetterSpacing("selection", 0.1)
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              Increase letter spacing
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.increase-letter-spacing"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yChangeTextLetterSpacing("selection", -0.1)
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              Decrease letter spacing
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.text.decrease-letter-spacing"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        {/* Case */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Case
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuItem
+              onClick={() =>
+                applyToTextNodes((node_id) =>
+                  instance.commands.changeTextNodeTextTransform(node_id, "none")
+                )
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <LetterCaseToggleIcon className="size-3.5" />
+              Original case
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                applyToTextNodes((node_id) =>
+                  instance.commands.changeTextNodeTextTransform(
+                    node_id,
+                    "uppercase"
+                  )
+                )
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <LetterCaseUppercaseIcon className="size-3.5" />
+              Uppercase
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                applyToTextNodes((node_id) =>
+                  instance.commands.changeTextNodeTextTransform(
+                    node_id,
+                    "lowercase"
+                  )
+                )
+              }
+              disabled={!hasTextSelection}
+              className="text-xs"
+            >
+              <LetterCaseLowercaseIcon className="size-3.5" />
+              Lowercase
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function ArrangeMenuContent() {
+  const instance = useCurrentEditor();
+  const selection = useEditorState(instance, (state) => state.selection);
+  const hasSelection = selection.length > 0;
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">
+        Arrange
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        {/* Align */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yAlign({ horizontal: "min" })}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          <AlignLeftIcon className="size-3.5" />
+          Align left
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.arrange.align-left")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yAlign({ horizontal: "center" })}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          <AlignCenterHorizontallyIcon className="size-3.5" />
+          Align horizontal centers
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.arrange.align-horizontal-center"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yAlign({ horizontal: "max" })}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          <AlignRightIcon className="size-3.5" />
+          Align right
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.arrange.align-right")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yAlign({ vertical: "min" })}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          <AlignTopIcon className="size-3.5" />
+          Align top
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.arrange.align-top")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yAlign({ vertical: "center" })}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          <AlignCenterVerticallyIcon className="size-3.5" />
+          Align vertical centers
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.arrange.align-vertical-center"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yAlign({ vertical: "max" })}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          <AlignBottomIcon className="size-3.5" />
+          Align bottom
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.arrange.align-bottom")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Distribute */}
+        <DropdownMenuItem
+          onClick={() => instance.commands.distributeEvenly("selection", "x")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          <SpaceEvenlyHorizontallyIcon className="size-3.5" />
+          Distribute horizontal spacing
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.arrange.distribute-horizontally"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.commands.distributeEvenly("selection", "y")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          <SpaceEvenlyVerticallyIcon className="size-3.5" />
+          Distribute vertical spacing
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.arrange.distribute-vertically"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function ObjectMenuContent() {
+  const instance = useCurrentEditor();
+  const selection = useEditorState(instance, (state) => state.selection);
+  const hasSelection = selection.length > 0;
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">
+        Object
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        {/* Container & Grouping */}
+        <DropdownMenuItem
+          onClick={() => instance.commands.contain("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Container selection
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.object.group-with-container"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.commands.group("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Group selection
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.group")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.ungroup(selection)}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Ungroup selection
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.ungroup")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Mask */}
+        <DropdownMenuItem
+          onClick={() => instance.commands.groupMask(selection)}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Use as mask
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Layout */}
+        <DropdownMenuItem
+          onClick={() => instance.commands.autoLayout("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Add layout
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.auto-layout")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* Create arc - disabled */}
+        {/* TODO: Implement Create arc */}
+        <DropdownMenuItem disabled className="text-xs">
+          Create arc
+        </DropdownMenuItem>
+        {/* More layout options */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            More layout options
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            {/* TODO: Implement Suggest layout */}
+            {/* <DropdownMenuItem disabled className="text-xs">
+              Suggest layout
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.object.auto-layout-all"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem> */}
+            {/* TODO: Implement Remove all layout */}
+            <DropdownMenuItem disabled className="text-xs">
+              Remove all layout
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* Lock aspect ratio */}
+            <DropdownMenuItem
+              onClick={() => instance.surface.a11yLockAspectRatio("selection")}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Lock aspect ratio
+            </DropdownMenuItem>
+            {/* Unlock aspect ratio */}
+            <DropdownMenuItem
+              onClick={() =>
+                instance.surface.a11yUnlockAspectRatio("selection")
+              }
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Unlock aspect ratio
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* TODO: Implement Resize to fit */}
+            {/* <DropdownMenuItem disabled className="text-xs">
+              Resize to fit
+              <DropdownMenuShortcut>
+                {keyboardShortcutText("workbench.surface.object.resize-to-fit")}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem> */}
+            {/* TODO: Implement Set width to hug contents */}
+            <DropdownMenuItem disabled className="text-xs">
+              Set width to hug contents
+            </DropdownMenuItem>
+            {/* TODO: Implement Set height to hug contents */}
+            <DropdownMenuItem disabled className="text-xs">
+              Set height to hug contents
+            </DropdownMenuItem>
+            {/* TODO: Implement Set width to fill container */}
+            <DropdownMenuItem disabled className="text-xs">
+              Set width to fill container
+            </DropdownMenuItem>
+            {/* TODO: Implement Set height to fill container */}
+            <DropdownMenuItem disabled className="text-xs">
+              Set height to fill container
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        {/* Ordering */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.order("front")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Bring to front
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.move-to-front")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.order("forward")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Bring forward
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.move-forward")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.order("backward")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Send backward
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.move-backward")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.order("back")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Send to back
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.move-to-back")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Transform - Flip & Rotate disabled */}
+        {/* TODO: Implement Flip horizontal */}
+        <DropdownMenuItem disabled className="text-xs">
+          Flip horizontal
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.flip-horizontal")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* TODO: Implement Flip vertical */}
+        <DropdownMenuItem disabled className="text-xs">
+          Flip vertical
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.flip-vertical")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* TODO: Implement Rotate 180° */}
+        <DropdownMenuItem disabled className="text-xs">
+          Rotate 180°
+        </DropdownMenuItem>
+        {/* TODO: Implement Rotate 90° left */}
+        <DropdownMenuItem disabled className="text-xs">
+          Rotate 90° left
+        </DropdownMenuItem>
+        {/* TODO: Implement Rotate 90° right */}
+        <DropdownMenuItem disabled className="text-xs">
+          Rotate 90° right
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Flatten */}
+        <DropdownMenuItem
+          onClick={() => instance.commands.flatten("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Flatten
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.flatten")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* Outline stroke - disabled */}
+        {/* TODO: Implement Outline stroke */}
+        <DropdownMenuItem disabled className="text-xs">
+          Outline stroke
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.outline-stroke")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* Boolean groups */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Boolean groups
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuItem
+              onClick={() => instance.commands.union(selection)}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Union
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => instance.commands.subtract(selection)}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Subtract
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => instance.commands.intersect(selection)}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Intersect
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => instance.commands.exclude(selection)}
+              disabled={!hasSelection}
+              className="text-xs"
+            >
+              Exclude
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        {/* Rasterize - disabled */}
+        {/* TODO: Implement Rasterize selection */}
+        <DropdownMenuItem disabled className="text-xs">
+          Rasterize selection
+        </DropdownMenuItem>
+        {/* Visibility & Lock */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yToggleActive("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Show/Hide selection
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.toggle-active")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yToggleLocked("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Lock/Unlock selection
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.toggle-locked")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* Hide other layers - disabled */}
+        {/* TODO: Implement Hide other layers */}
+        <DropdownMenuItem disabled className="text-xs">
+          Hide other layers
+        </DropdownMenuItem>
+        {/* Collapse layers - disabled */}
+        {/* TODO: Implement Collapse layers */}
+        {/* <DropdownMenuItem disabled className="text-xs">
+          Collapse layers
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.ui.collapse-layers")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem> */}
+        <DropdownMenuSeparator />
+        {/* Fill & Stroke */}
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yClearFill("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Remove fill
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.remove-fill")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11yClearStroke("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Remove stroke
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.object.remove-stroke")}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => instance.surface.a11ySwapFillAndStroke("selection")}
+          disabled={!hasSelection}
+          className="text-xs"
+        >
+          Swap fill and stroke
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.object.swap-fill-and-stroke"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }

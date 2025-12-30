@@ -35,6 +35,7 @@ import {
 } from "@/grida-canvas-react/provider";
 import { RGBChip } from "@/scaffolds/sidecontrol/controls/utils/paint-chip";
 import { ImageToolbar } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/image-toolbar";
+import { keyboardShortcutText } from "./uxhost-shortcut-renderer";
 
 export function PlaygroundToolbar() {
   const editor = useCurrentEditor();
@@ -70,9 +71,25 @@ export function PlaygroundToolbar() {
             open={open === "cursor"}
             onOpenChange={(o) => setOpen(o ? "cursor" : null)}
             options={[
-              { value: "cursor", label: "Cursor", shortcut: "V" },
-              { value: "hand", label: "Hand tool", shortcut: "H" },
-              { value: "scale", label: "Scale tool", shortcut: "K" },
+              {
+                value: "cursor",
+                label: "Cursor",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.cursor"
+                ),
+              },
+              {
+                value: "hand",
+                label: "Hand tool",
+                shortcut: keyboardShortcutText("workbench.surface.cursor.hand"),
+              },
+              {
+                value: "scale",
+                label: "Scale tool",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.scale"
+                ),
+              },
             ]}
             onValueChange={(v) => {
               editor.surface.surfaceSetTool(
@@ -84,14 +101,16 @@ export function PlaygroundToolbar() {
           <ToolGroupItem
             value={"container" satisfies ToolbarToolType}
             label="Container tool"
-            shortcut="A, F"
+            shortcut={keyboardShortcutText(
+              "workbench.surface.cursor.container"
+            )}
           >
             <FrameIcon />
           </ToolGroupItem>
           <ToolGroupItem
             value={"text" satisfies ToolbarToolType}
             label="Text tool"
-            shortcut="T"
+            shortcut={keyboardShortcutText("workbench.surface.cursor.text")}
           >
             <ToolIcon type="text" />
           </ToolGroupItem>
@@ -100,10 +119,32 @@ export function PlaygroundToolbar() {
             open={open === "shape"}
             onOpenChange={(o) => setOpen(o ? "shape" : null)}
             options={[
-              { value: "rectangle", label: "Rectangle", shortcut: "R" },
-              { value: "ellipse", label: "Ellipse", shortcut: "O" },
-              { value: "line", label: "Line", shortcut: "L" },
-              { value: "polygon", label: "Polygon", shortcut: "Y" },
+              {
+                value: "rectangle",
+                label: "Rectangle",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.rectangle"
+                ),
+              },
+              {
+                value: "ellipse",
+                label: "Ellipse",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.ellipse"
+                ),
+              },
+              {
+                value: "line",
+                label: "Line",
+                shortcut: keyboardShortcutText("workbench.surface.cursor.line"),
+              },
+              {
+                value: "polygon",
+                label: "Polygon",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.polygon"
+                ),
+              },
               { value: "star", label: "Star" },
               { value: "image", label: "Image" },
             ]}
@@ -118,10 +159,32 @@ export function PlaygroundToolbar() {
             open={open === "draw"}
             onOpenChange={(o) => setOpen(o ? "draw" : null)}
             options={[
-              { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
-              { value: "path", label: "Path tool", shortcut: "P" },
-              { value: "brush", label: "Brush tool", shortcut: "B" },
-              { value: "eraser", label: "Eraser tool", shortcut: "E" },
+              {
+                value: "pencil",
+                label: "Pencil tool",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.pencil"
+                ),
+              },
+              {
+                value: "path",
+                label: "Path tool",
+                shortcut: keyboardShortcutText("workbench.surface.cursor.path"),
+              },
+              {
+                value: "brush",
+                label: "Brush tool",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.brush"
+                ),
+              },
+              {
+                value: "eraser",
+                label: "Eraser tool",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.eraser"
+                ),
+              },
             ]}
             onValueChange={(v) => {
               editor.surface.surfaceSetTool(
@@ -178,7 +241,10 @@ function BitmapEditModeAuxiliaryToolbar() {
             </Toggle>
           </div>
         </TooltipTrigger>
-        <TooltipContent>Paint Bucket (G)</TooltipContent>
+        <TooltipContent>
+          Paint Bucket (
+          {keyboardShortcutText("workbench.surface.cursor.paint-bucket")})
+        </TooltipContent>
       </Tooltip>
       <VerticalDivider />
       <Tooltip>

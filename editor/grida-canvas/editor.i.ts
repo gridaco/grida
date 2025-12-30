@@ -3324,6 +3324,26 @@ export namespace editor.api {
      * @param idx
      */
     deleteGuide(idx: number): void;
+
+    /**
+     * Swap fill paints and stroke paints for the target nodes.
+     *
+     * Only swaps the paint arrays (fill_paints ↔ stroke_paints), preserving all other
+     * stroke properties like stroke_align, stroke_cap, etc.
+     *
+     * @param target - Single node ID or array of node IDs to swap fills and strokes for
+     * @param ensureStroke - If true, ensures stroke is visible by setting stroke_width to 1 if it's not set or 0
+     *
+     * @example
+     * ```ts
+     * // Swap fill and stroke for a single node
+     * editor.commands.swapFillAndStroke("node-id-123");
+     *
+     * // Swap fill and stroke for multiple nodes, ensuring stroke is visible
+     * editor.commands.swapFillAndStroke(["node-1", "node-2"], true);
+     * ```
+     */
+    swapFillAndStroke(target: NodeID | NodeID[], ensureStroke?: boolean): void;
   }
 
   /**
@@ -3465,8 +3485,60 @@ export namespace editor.api {
     ): void;
     changeNodePropertyFills(node_id: NodeID, fills: cg.Paint[]): void;
     changeNodePropertyFills(node_id: NodeID[], fills: cg.Paint[]): void;
-    changeNodePropertyStrokes(node_id: NodeID, strokes: cg.Paint[]): void;
-    changeNodePropertyStrokes(node_id: NodeID[], strokes: cg.Paint[]): void;
+    /**
+     * Changes the stroke paints array for the target nodes.
+     *
+     * Replaces all stroke paints (stroke_paints) with the provided array. This is the core
+     * method for updating stroke paints and handles stroke width visibility when requested.
+     *
+     * **Key Behavior:**
+     * - Replaces the entire stroke_paints array (or stroke property for legacy nodes)
+     * - When `ensureStrokeWidth` is `true`, automatically sets `stroke_width` to `1` if it's
+     *   `undefined` or `0`, ensuring the stroke is visible after the paint update
+     * - Preserves all other stroke properties (align, cap, join, miter limit, dash array, etc.)
+     *
+     * This method is used internally by `addNodeStroke` and other stroke operations to ensure
+     * consistent behavior across all stroke paint updates.
+     *
+     * @param node_id - Single node ID or array of node IDs to update
+     * @param strokes - Array of stroke paints to set. Empty array `[]` clears all strokes
+     * @param ensureStrokeWidth - If `true`, ensures stroke is visible by setting `stroke_width`
+     *   to `1` if it's not set or `0`. Defaults to `false`
+     *
+     * @example
+     * ```typescript
+     * // Set strokes for a single node
+     * editor.commands.changeNodePropertyStrokes("node-id", [stroke1, stroke2]);
+     *
+     * // Set strokes for multiple nodes
+     * editor.commands.changeNodePropertyStrokes(["node-1", "node-2"], [stroke1]);
+     *
+     * // Clear all strokes
+     * editor.commands.changeNodePropertyStrokes("node-id", []);
+     *
+     * // Set strokes and ensure visibility
+     * editor.commands.changeNodePropertyStrokes("node-id", [stroke1], true);
+     * ```
+     *
+     * @remarks
+     * - This method is the single source of truth for stroke paint updates
+     * - All stroke paint operations (add, remove, swap) should go through this method
+     * - The `ensureStrokeWidth` parameter provides a convenient way to ensure strokes are visible
+     *   without requiring separate calls to `changeNodePropertyStrokeWidth`
+     */
+    changeNodePropertyStrokes(
+      node_id: NodeID,
+      strokes: cg.Paint[],
+      ensureStrokeWidth?: boolean
+    ): void;
+    /**
+     * @see {@link changeNodePropertyStrokes} - For single node ID overload
+     */
+    changeNodePropertyStrokes(
+      node_id: NodeID[],
+      strokes: cg.Paint[],
+      ensureStrokeWidth?: boolean
+    ): void;
 
     changeNodePropertyStrokeWidth(
       node_id: NodeID,
@@ -3510,15 +3582,60 @@ export namespace editor.api {
     addNodeFill(node_id: NodeID, fill: cg.Paint, at?: "start" | "end"): void;
     addNodeFill(node_id: NodeID[], fill: cg.Paint, at?: "start" | "end"): void;
 
+    /**
+     * Adds a stroke paint to the target nodes.
+     *
+     * Appends or prepends a new stroke paint to the existing stroke paints array. This method
+     * delegates to `changeNodePropertyStrokes` internally to ensure consistent behavior.
+     *
+     * **Key Behavior:**
+     * - Adds the stroke paint to the beginning (`"start"`) or end (`"end"`) of the stroke_paints array
+     * - When added to `"end"`, the stroke appears on top (last in array is topmost in render order)
+     * - When `ensureStrokeWidth` is `true`, automatically sets `stroke_width` to `1` if it's
+     *   `undefined` or `0`, ensuring the newly added stroke is visible
+     * - Preserves all existing stroke paints and other stroke properties
+     *
+     * **Implementation:**
+     * This method uses `changeNodePropertyStrokes` internally, ensuring all stroke operations
+     * go through the same pipeline for consistent behavior and stroke width handling.
+     *
+     * @param node_id - Single node ID or array of node IDs to add stroke to
+     * @param stroke - The stroke paint to add
+     * @param at - Position to add the stroke: `"start"` (beginning) or `"end"` (topmost, default)
+     * @param ensureStrokeWidth - If `true`, ensures stroke is visible by setting `stroke_width`
+     *   to `1` if it's not set or `0`. Defaults to `false`
+     *
+     * @example
+     * ```typescript
+     * // Add stroke to a single node (topmost position)
+     * editor.commands.addNodeStroke("node-id", newStroke);
+     *
+     * // Add stroke to beginning of array
+     * editor.commands.addNodeStroke("node-id", newStroke, "start");
+     *
+     * // Add stroke and ensure visibility
+     * editor.commands.addNodeStroke("node-id", newStroke, "end", true);
+     *
+     * // Add stroke to multiple nodes
+     * editor.commands.addNodeStroke(["node-1", "node-2"], newStroke, "end", true);
+     * ```
+     *
+     * @see {@link changeNodePropertyStrokes} - The underlying method used for stroke updates
+     */
     addNodeStroke(
       node_id: NodeID,
       stroke: cg.Paint,
-      at?: "start" | "end"
+      at?: "start" | "end",
+      ensureStrokeWidth?: boolean
     ): void;
+    /**
+     * @see {@link addNodeStroke} - For single node ID overload
+     */
     addNodeStroke(
       node_id: NodeID[],
       stroke: cg.Paint,
-      at?: "start" | "end"
+      at?: "start" | "end",
+      ensureStrokeWidth?: boolean
     ): void;
 
     changeContainerNodePadding(
@@ -3699,6 +3816,47 @@ export namespace editor.api {
     a11yToggleItalic(target: "selection" | NodeID): void;
     a11yToggleUnderline(target: "selection" | NodeID): void;
     a11yToggleLineThrough(target: "selection" | NodeID): void;
+    /**
+     * Change text alignment for text nodes.
+     *
+     * Applies the specified text alignment to text nodes in the selection.
+     * Only affects nodes with type "text".
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param textAlign - The text alignment to apply: "left", "right", "center", or "justify"
+     *
+     * @example
+     * ```ts
+     * // Align selected text nodes to the left
+     * editor.surface.a11yTextAlign("selection", "left");
+     *
+     * // Center align a specific text node
+     * editor.surface.a11yTextAlign("node-id-123", "center");
+     * ```
+     */
+    a11yTextAlign(target: "selection" | NodeID, textAlign: cg.TextAlign): void;
+    /**
+     * Change vertical text alignment for text nodes.
+     *
+     * Applies the specified vertical text alignment to text nodes in the selection.
+     * Only affects nodes with type "text".
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param textAlignVertical - The vertical text alignment to apply: "top", "center", or "bottom"
+     *
+     * @example
+     * ```ts
+     * // Align selected text nodes to the top
+     * editor.surface.a11yTextVerticalAlign("selection", "top");
+     *
+     * // Center align a specific text node vertically
+     * editor.surface.a11yTextVerticalAlign("node-id-123", "center");
+     * ```
+     */
+    a11yTextVerticalAlign(
+      target: "selection" | NodeID,
+      textAlignVertical: cg.TextAlignVertical
+    ): void;
     // //
     a11ySetOpacity(target: "selection" | NodeID, opacity: number): void;
     /**
@@ -3714,15 +3872,176 @@ export namespace editor.api {
      * @example
      * ```ts
      * // Increase font size by 1px for selected text nodes
-     * editor.surface.a11yChangeFontSize("selection", 1);
+     * editor.surface.a11yChangeTextFontSize("selection", 1);
      *
      * // Decrease font size by 2px for a specific node
-     * editor.surface.a11yChangeFontSize("node-id-123", -2);
+     * editor.surface.a11yChangeTextFontSize("node-id-123", -2);
      * ```
      *
      * Bind this to `⌘ + ⇧ + >` (increase) and `⌘ + ⇧ + <` (decrease) keys.
      */
-    a11yChangeFontSize(target: "selection" | NodeID, delta: number): void;
+    a11yChangeTextFontSize(target: "selection" | NodeID, delta: number): void;
+    /**
+     * Change line height for text nodes.
+     *
+     * Applies a delta change to the line height of text nodes in the selection.
+     * Only affects nodes with type "text". Positive delta increases line height,
+     * negative delta decreases it.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param delta - The amount to change the line height by. Positive values increase, negative values decrease.
+     *
+     * @example
+     * ```ts
+     * // Increase line height by 1 for selected text nodes
+     * editor.surface.a11yChangeTextLineHeight("selection", 1);
+     *
+     * // Decrease line height by 1 for a specific node
+     * editor.surface.a11yChangeTextLineHeight("node-id-123", -1);
+     * ```
+     */
+    a11yChangeTextLineHeight(target: "selection" | NodeID, delta: number): void;
+    /**
+     * Change letter spacing for text nodes.
+     *
+     * Applies a delta change to the letter spacing of text nodes in the selection.
+     * Only affects nodes with type "text". Positive delta increases letter spacing,
+     * negative delta decreases it.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param delta - The amount to change the letter spacing by. Positive values increase, negative values decrease.
+     *
+     * @example
+     * ```ts
+     * // Increase letter spacing by 0.1 for selected text nodes
+     * editor.surface.a11yChangeTextLetterSpacing("selection", 0.1);
+     *
+     * // Decrease letter spacing by 0.1 for a specific node
+     * editor.surface.a11yChangeTextLetterSpacing("node-id-123", -0.1);
+     * ```
+     */
+    a11yChangeTextLetterSpacing(
+      target: "selection" | NodeID,
+      delta: number
+    ): void;
+    /**
+     * Change font weight for text nodes.
+     *
+     * Changes the font weight to the next or previous available weight for the font family.
+     * Only affects nodes with type "text". Queries the font family to get available weights
+     * and selects the next/previous valid weight.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param direction - "increase" to move to next heavier weight, "decrease" to move to next lighter weight
+     *
+     * @example
+     * ```ts
+     * // Increase font weight for selected text nodes
+     * await editor.surface.a11yChangeTextFontWeight("selection", "increase");
+     *
+     * // Decrease font weight for a specific node
+     * await editor.surface.a11yChangeTextFontWeight("node-id-123", "decrease");
+     * ```
+     */
+    a11yChangeTextFontWeight(
+      target: "selection" | NodeID,
+      direction: "increase" | "decrease"
+    ): Promise<void>;
+    /**
+     * Clear fill (fill_paints) for selected nodes.
+     *
+     * Removes all fill paints from the target nodes, effectively clearing the fill.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Clear fill for selected nodes
+     * editor.surface.a11yClearFill("selection");
+     *
+     * // Clear fill for a specific node
+     * editor.surface.a11yClearFill("node-id-123");
+     * ```
+     */
+    a11yClearFill(target: "selection" | NodeID): void;
+    /**
+     * Clear stroke (stroke_paints) and set stroke width to 0 for selected nodes.
+     *
+     * Removes all stroke paints and sets stroke width to 0, but preserves other stroke properties
+     * (such as stroke align, cap, join, etc.) in case the user wants to restore the stroke later.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Clear stroke for selected nodes
+     * editor.surface.a11yClearStroke("selection");
+     *
+     * // Clear stroke for a specific node
+     * editor.surface.a11yClearStroke("node-id-123");
+     * ```
+     */
+    a11yClearStroke(target: "selection" | NodeID): void;
+    /**
+     * Swap fill paints and stroke paints for selected nodes.
+     *
+     * Only swaps the paint arrays (fill_paints ↔ stroke_paints), preserving all other
+     * stroke properties like stroke_align, stroke_cap, etc.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     * @param ensureStroke - If true, ensures stroke is visible by setting stroke_width to 1 if it's not set or 0
+     *
+     * @example
+     * ```ts
+     * // Swap fill and stroke for selected nodes
+     * editor.surface.a11ySwapFillAndStroke("selection");
+     *
+     * // Swap fill and stroke for a specific node, ensuring stroke is visible
+     * editor.surface.a11ySwapFillAndStroke("node-id-123", true);
+     * ```
+     */
+    a11ySwapFillAndStroke(
+      target: "selection" | NodeID,
+      ensureStroke?: boolean
+    ): void;
+    /**
+     * Lock aspect ratio for selected nodes.
+     *
+     * Locks the aspect ratio of the target nodes to their current width:height ratio.
+     * Only locks nodes that don't already have aspect ratio locked. Calculates the
+     * aspect ratio from the current bounding box dimensions.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Lock aspect ratio for selected nodes
+     * editor.surface.a11yLockAspectRatio("selection");
+     *
+     * // Lock aspect ratio for a specific node
+     * editor.surface.a11yLockAspectRatio("node-id-123");
+     * ```
+     */
+    a11yLockAspectRatio(target: "selection" | NodeID): void;
+    /**
+     * Unlock aspect ratio for selected nodes.
+     *
+     * Unlocks the aspect ratio of the target nodes, allowing them to be resized
+     * independently in width and height. Only unlocks nodes that currently have
+     * aspect ratio locked.
+     *
+     * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
+     *
+     * @example
+     * ```ts
+     * // Unlock aspect ratio for selected nodes
+     * editor.surface.a11yUnlockAspectRatio("selection");
+     *
+     * // Unlock aspect ratio for a specific node
+     * editor.surface.a11yUnlockAspectRatio("node-id-123");
+     * ```
+     */
+    a11yUnlockAspectRatio(target: "selection" | NodeID): void;
   }
 
   /**
