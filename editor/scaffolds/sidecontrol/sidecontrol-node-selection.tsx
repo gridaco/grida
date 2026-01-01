@@ -68,7 +68,6 @@ import { StrokeCapControl } from "./controls/stroke-cap";
 import { StrokeAlignControl } from "./controls/stroke-align";
 import { StrokeJoinControl } from "./controls/stroke-join";
 import { StrokeMiterLimitControl } from "./controls/stroke-miter-limit";
-import grida from "@grida/schema";
 import {
   useCurrentSceneState,
   useEditorFlagsState,
@@ -98,9 +97,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
-import { dq } from "@/grida-canvas/query";
 import { TextDetails } from "./controls/widgets/text-details";
-import cg from "@grida/cg";
 import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
@@ -113,7 +110,6 @@ import { MaskControl } from "./controls/ext-mask";
 import {
   useMixedProperties,
   useMixedPaints,
-  MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
 import { editor } from "@/grida-canvas";
 import {
@@ -122,7 +118,10 @@ import {
 } from "./controls/context/font";
 import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gesture";
 import { MaskTypeControl } from "./controls/mask-type";
+import { dq } from "@/grida-canvas/query";
 import { Editor } from "@/grida-canvas/editor";
+import grida from "@grida/schema";
+import cg from "@grida/cg";
 
 function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   const editor = useCurrentEditor();
@@ -293,87 +292,39 @@ function ModeMixedNodeProperties({
   config?: ControlsConfig;
 }) {
   const backend = useBackendState();
-  const mp = useMixedProperties(ids);
-  const { nodes, properties, actions: change } = mp;
-  const {
-    name,
-    active,
-    locked,
-    opacity,
-    corner_radius,
-    rectangular_corner_radius_top_left,
-    rectangular_corner_radius_top_right,
-    rectangular_corner_radius_bottom_right,
-    rectangular_corner_radius_bottom_left,
-    fill,
-    stroke,
-    stroke_width,
-    stroke_cap,
-    stroke_align,
-    stroke_join,
-    stroke_miter_limit,
-    width,
-    height,
-    fit,
-    font_family,
-    font_weight,
-    font_style_italic,
-    font_postscript_name,
-    font_optical_sizing,
-    font_variations,
-    font_size,
-    line_height,
-    letter_spacing,
-    text_align,
-    text_align_vertical,
+  const instance = useCurrentEditor();
 
-    //
-    layout,
-    direction,
-    main_axis_alignment,
-    cross_axis_alignment,
-    main_axis_gap,
-    cross_axis_gap,
-    layout_wrap,
-    padding_top,
-    padding_right,
-    padding_bottom,
-    padding_left,
-    //
-    cursor,
-    blend_mode,
+  // Minimal "base" selector for mixed selection (not performance sensitive, but avoids deprecated hook).
+  const mp = useMixedProperties(ids, (node) => ({
+    type: node.type,
+    name: node.name,
+    active: node.active,
+    locked: node.locked,
+    fit: node.fit,
+    cursor: node.cursor,
+    blend_mode: node.blend_mode,
+  }));
 
-    // component_id,
-    // style,
-    // type,
-    // properties,
-    // position,
-    // rotation,
-    // left,
-    // top,
-    // right,
-    // bottom,
-    // maxLength,
-    // border,
-    // userdata,
-  } = properties;
+  const { name, active, locked, fit, cursor, blend_mode } = mp;
 
   const sid = ids.join(",");
   // const is_root = ids.length === 0 && scene.children.includes(ids[0]); // assuming when root is selected, only root is selected
-  const types = new Set(nodes.map((n) => n.type));
+  const types = new Set((mp.type?.values ?? []).map((v) => v.value));
   const _types = Array.from(types);
 
   const supports_corner_radius = _types.some((t) =>
     supports.cornerRadius(t, { backend })
   );
+  const supports_corner_radius4 = _types.some((t) =>
+    supports.cornerRadius4(t, { backend })
+  );
   const supports_stroke = _types.some((t) => supports.stroke(t, { backend }));
   const supports_stroke_cap = _types.some((t) =>
     supports.strokeCap(t, { backend })
   );
-  const has_container = types.has("container");
-  const has_flex_container =
-    has_container && nodes.some((n) => "layout" in n && n.layout === "flex");
-  const has_stylable = nodes.some((n) => n.type !== "template_instance");
+  const has_stylable = (mp.type?.values ?? []).some(
+    (v) => v.value !== "template_instance"
+  );
 
   return (
     <div key={sid} className="mt-4 mb-10">
@@ -383,23 +334,40 @@ function ModeMixedNodeProperties({
             <Checkbox
               checked={active.mixed ? false : active.value}
               disabled={active.mixed}
-              onCheckedChange={change.active}
+              onCheckedChange={(value) => {
+                const target = active?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.doc.getNodeById(id).active = Boolean(value);
+                });
+              }}
               className="me-1"
             />
             <NameControl
               value={name.mixed ? `${ids.length} selections` : name.value}
               disabled={name.mixed}
-              onValueChange={change.name}
+              onValueChange={(value) => {
+                const target = name?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.doc.getNodeById(id).name = value;
+                });
+              }}
             />
             <Toggle
               variant="outline"
               size="sm"
               disabled={locked.mixed}
               pressed={locked.mixed ? true : locked.value}
-              onPressedChange={change.locked}
+              onPressedChange={(value) => {
+                const target = locked?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.doc.getNodeById(id).locked = Boolean(value);
+                });
+              }}
               className="size-6 p-0.5 aspect-square"
             >
-              {locked ? (
+              {locked.mixed ? (
+                <LockClosedIcon className="size-3" />
+              ) : locked.value ? (
                 <LockClosedIcon className="size-3" />
               ) : (
                 <LockOpen1Icon className="size-3" />
@@ -409,121 +377,8 @@ function ModeMixedNodeProperties({
           </PropertyRow>
         </PropertySectionContent>
       </PropertySection>
-      {config.position !== "off" && <SectionMixedPosition mp={mp} />}
-      <PropertySection hidden={config.layout === "off"} className="border-b">
-        <PropertySectionHeaderItem>
-          <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
-        </PropertySectionHeaderItem>
-        <PropertySectionContent>
-          <PropertyRow hidden={config.size === "off"}>
-            <PropertyLineLabel>Width</PropertyLineLabel>
-            <LengthPercentageControl
-              value={width?.value}
-              onValueCommit={change.width}
-            />
-          </PropertyRow>
-          <PropertyRow hidden={config.size === "off"}>
-            <PropertyLineLabel>Height</PropertyLineLabel>
-            <LengthPercentageControl
-              value={height?.value}
-              onValueCommit={change.height}
-            />
-          </PropertyRow>
-          {types.has("container") && (
-            <PropertyRow>
-              <PropertyLineLabel>Flow</PropertyLineLabel>
-              <LayoutControl
-                value={
-                  layout?.value === grida.mixed ||
-                  direction?.value === grida.mixed ||
-                  layout?.value === undefined ||
-                  (layout?.value === "flex" && direction?.value === undefined)
-                    ? undefined
-                    : {
-                        layoutMode: layout?.value ?? "flow",
-                        direction:
-                          layout?.value === "flex"
-                            ? direction?.value
-                            : undefined,
-                      }
-                }
-                onValueChange={(value) => {
-                  change.layout(value.layoutMode);
-                  if (value.direction) {
-                    change.direction(value.direction);
-                  }
-                }}
-              />
-            </PropertyRow>
-          )}
-          <PropertyRow hidden={!has_flex_container}>
-            <PropertyLineLabel>Alignment</PropertyLineLabel>
-            <FlexAlignControl
-              className="w-full"
-              direction={
-                direction?.value === grida.mixed
-                  ? "horizontal"
-                  : (direction?.value ?? "horizontal")
-              }
-              value={
-                main_axis_alignment?.value === grida.mixed ||
-                cross_axis_alignment?.value === grida.mixed ||
-                main_axis_alignment?.value === undefined ||
-                cross_axis_alignment?.value === undefined
-                  ? undefined
-                  : {
-                      mainAxisAlignment: main_axis_alignment.value,
-                      crossAxisAlignment: cross_axis_alignment.value,
-                    }
-              }
-              onValueChange={(value) => {
-                change.main_axis_alignment(value.mainAxisAlignment);
-                change.cross_axis_alignment(value.crossAxisAlignment);
-              }}
-            />
-          </PropertyRow>
-          <PropertyRow hidden={!has_flex_container}>
-            <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl
-              mode={layout_wrap?.value === "wrap" ? "multiple" : "single"}
-              value={{
-                main_axis_gap:
-                  main_axis_gap?.mixed || main_axis_gap?.value === undefined
-                    ? grida.mixed
-                    : (main_axis_gap.value ?? 0),
-                cross_axis_gap: cross_axis_gap?.mixed
-                  ? grida.mixed
-                  : cross_axis_gap?.value,
-              }}
-              onValueCommit={change.gap}
-            />
-          </PropertyRow>
-          <PropertyRow hidden={!has_container}>
-            <PropertyLineLabel>Padding</PropertyLineLabel>
-            <PaddingControl
-              value={{
-                padding_top:
-                  padding_top?.mixed || padding_top?.value === undefined
-                    ? grida.mixed
-                    : (padding_top.value ?? 0),
-                padding_right:
-                  padding_right?.mixed || padding_right?.value === undefined
-                    ? grida.mixed
-                    : (padding_right?.value ?? 0),
-                padding_bottom:
-                  padding_bottom?.mixed || padding_bottom?.value === undefined
-                    ? grida.mixed
-                    : (padding_bottom?.value ?? 0),
-                padding_left:
-                  padding_left?.mixed || padding_left?.value === undefined
-                    ? grida.mixed
-                    : (padding_left?.value ?? 0),
-              }}
-              onValueCommit={change.padding}
-            />
-          </PropertyRow>
-        </PropertySectionContent>
-      </PropertySection>
+      {config.position !== "off" && <SectionMixedPosition ids={ids} />}
+      <SectionLayoutMixed ids={ids} config={config} />
       <PropertySection hidden={!has_stylable} className="border-b">
         <PropertySectionHeaderItem>
           <PropertySectionHeaderLabel>Appearance</PropertySectionHeaderLabel>
@@ -531,67 +386,24 @@ function ModeMixedNodeProperties({
             <BlendModeDropdown
               type="layer"
               value={blend_mode?.value}
-              onValueChange={change.blend_mode}
+              onValueChange={(value) => {
+                const target = blend_mode?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.doc.getNodeById(id).blend_mode = value;
+                });
+              }}
             />
           </PropertySectionHeaderActions>
         </PropertySectionHeaderItem>
         <PropertySectionContent>
           <PropertyRow>
-            <PropertyLineLabel>Opacity</PropertyLineLabel>
-            <OpacityControl
-              value={opacity?.value}
-              // onValueChange={change.opacity}
-              onValueCommit={change.opacity}
-            />
+            <PropertyOpacityRowMixed ids={ids} />
           </PropertyRow>
-          {supports_corner_radius && (
-            <PropertyRow>
-              <PropertyLineLabel>Radius</PropertyLineLabel>
-              {corner_radius?.mixed ? (
-                <CornerRadius4Control onValueCommit={change.corner_radius} />
-              ) : (
-                <CornerRadius4Control
-                  value={{
-                    rectangular_corner_radius_top_left:
-                      typeof rectangular_corner_radius_top_left?.value ===
-                      "number"
-                        ? rectangular_corner_radius_top_left?.value
-                        : undefined,
-                    rectangular_corner_radius_top_right:
-                      typeof rectangular_corner_radius_top_right?.value ===
-                      "number"
-                        ? rectangular_corner_radius_top_right?.value
-                        : undefined,
-                    rectangular_corner_radius_bottom_right:
-                      typeof rectangular_corner_radius_bottom_right?.value ===
-                      "number"
-                        ? rectangular_corner_radius_bottom_right?.value
-                        : undefined,
-                    rectangular_corner_radius_bottom_left:
-                      typeof rectangular_corner_radius_bottom_left?.value ===
-                      "number"
-                        ? rectangular_corner_radius_bottom_left?.value
-                        : undefined,
-                  }}
-                  onValueCommit={change.corner_radius}
-                />
-              )}
-            </PropertyRow>
-          )}
-          {/* {supports.border(node.type) && (
-              <PropertyRow>
-                <PropertyLineLabel>Border</PropertyLineLabel>
-                <BorderControl value={border} onValueChange={actions.border} />
-              </PropertyRow>
-            )} */}
-
-          {/* <PropertyRow>
-              <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <BoxShadowControl
-                value={{ boxShadow }}
-                onValueChange={actions.boxShadow}
-              />
-            </PropertyRow> */}
+          <PropertyCornerRadiusRowMixed
+            ids={ids}
+            supported={supports_corner_radius}
+            supports_corner_radius4={supports_corner_radius4}
+          />
         </PropertySectionContent>
       </PropertySection>
 
@@ -623,88 +435,7 @@ function ModeMixedNodeProperties({
           )}
         </PropertySection> */}
       {config.text !== "off" && types.has("text") && (
-        <CurrentFontProvider
-          description={{
-            fontFamily:
-              typeof font_family?.value === "string" ? font_family.value : "",
-            fontPostscriptName:
-              typeof font_postscript_name?.value === "string"
-                ? font_postscript_name.value
-                : undefined,
-            fontWeight:
-              typeof font_weight?.value === "number"
-                ? font_weight.value
-                : undefined,
-            fontStyleItalic:
-              typeof font_style_italic?.value === "boolean"
-                ? font_style_italic.value
-                : undefined,
-            fontVariations:
-              typeof font_variations?.value === "object"
-                ? (font_variations.value as Record<string, number>)
-                : undefined,
-          }}
-        >
-          <PropertySection className="border-b">
-            <PropertySectionHeaderItem>
-              <PropertySectionHeaderLabel>Text</PropertySectionHeaderLabel>
-            </PropertySectionHeaderItem>
-            <PropertySectionContent>
-              <PropertyRow>
-                <PropertyLineLabel>Font</PropertyLineLabel>
-                <div className="flex-1">
-                  <FontFamilyControl
-                    value={font_family?.value}
-                    onValueChange={change.font_family}
-                  />
-                </div>
-              </PropertyRow>
-              <PropertyRow>
-                <PropertyLineLabel>Style</PropertyLineLabel>
-                <FontStyleControlScaffold selection={ids} />
-              </PropertyRow>
-              <PropertyRow>
-                <PropertyLineLabel>Size</PropertyLineLabel>
-                <FontSizeControl
-                  value={font_size?.value}
-                  onValueCommit={change.font_size}
-                />
-              </PropertyRow>
-              <PropertyRow>
-                <PropertyLineLabel>Line</PropertyLineLabel>
-                <LineHeightControl
-                  value={line_height?.value}
-                  onValueCommit={change.line_height}
-                />
-              </PropertyRow>
-              <PropertyRow>
-                <PropertyLineLabel>Letter</PropertyLineLabel>
-                <LetterSpacingControl
-                  value={letter_spacing?.value}
-                  onValueCommit={change.letter_spacing}
-                />
-              </PropertyRow>
-              <PropertyRow>
-                <PropertyLineLabel>Align</PropertyLineLabel>
-                <TextAlignControl
-                  value={text_align?.value}
-                  onValueChange={change.text_align}
-                />
-              </PropertyRow>
-              <PropertyRow>
-                <PropertyLineLabel></PropertyLineLabel>
-                <TextAlignVerticalControl
-                  value={text_align_vertical?.value}
-                  onValueChange={change.text_align_vertical}
-                />
-              </PropertyRow>
-              <PropertyRow>
-                <PropertyLineLabel>Max Length</PropertyLineLabel>
-                <MaxlengthControl disabled placeholder={"multiple"} />
-              </PropertyRow>
-            </PropertySectionContent>
-          </PropertySection>
-        </CurrentFontProvider>
+        <SectionMixedText ids={ids} />
       )}
       <PropertySection
         hidden={config.image === "off" || !types.has("image")}
@@ -720,180 +451,26 @@ function ModeMixedNodeProperties({
             </PropertyRow> */}
           <PropertyRow>
             <PropertyLineLabel>Fit</PropertyLineLabel>
-            <BoxFitControl value={fit?.value} onValueChange={change.fit} />
-          </PropertyRow>
-        </PropertySectionContent>
-      </PropertySection>
-      <PropertySection hidden={config.layout === "off"} className="border-b">
-        <PropertySectionHeaderItem>
-          <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
-        </PropertySectionHeaderItem>
-        <PropertySectionContent>
-          <PropertyRow hidden={config.size === "off"}>
-            <PropertyLineLabel>Width</PropertyLineLabel>
-            <LengthPercentageControl
-              value={width?.value}
-              onValueCommit={change.width}
-            />
-          </PropertyRow>
-          <PropertyRow hidden={config.size === "off"}>
-            <PropertyLineLabel>Height</PropertyLineLabel>
-            <LengthPercentageControl
-              value={height?.value}
-              onValueCommit={change.height}
-            />
-          </PropertyRow>
-          {types.has("container") && (
-            <PropertyRow>
-              <PropertyLineLabel>Flow</PropertyLineLabel>
-              <LayoutControl
-                value={
-                  layout?.value === grida.mixed ||
-                  direction?.value === grida.mixed ||
-                  layout?.value === undefined ||
-                  (layout?.value === "flex" && direction?.value === undefined)
-                    ? undefined
-                    : {
-                        layoutMode: layout?.value ?? "flow",
-                        direction:
-                          layout?.value === "flex"
-                            ? direction?.value
-                            : undefined,
-                      }
-                }
-                onValueChange={(value) => {
-                  change.layout(value.layoutMode);
-                  if (value.direction) {
-                    change.direction(value.direction);
-                  }
-                }}
-              />
-            </PropertyRow>
-          )}
-          <PropertyRow hidden={!has_flex_container}>
-            <PropertyLineLabel>Alignment</PropertyLineLabel>
-            <FlexAlignControl
-              className="w-full"
-              direction={
-                direction?.value === grida.mixed
-                  ? "horizontal"
-                  : (direction?.value ?? "horizontal")
-              }
-              value={
-                main_axis_alignment?.value === grida.mixed ||
-                cross_axis_alignment?.value === grida.mixed ||
-                main_axis_alignment?.value === undefined ||
-                cross_axis_alignment?.value === undefined
-                  ? undefined
-                  : {
-                      mainAxisAlignment: main_axis_alignment.value,
-                      crossAxisAlignment: cross_axis_alignment.value,
-                    }
-              }
+            <BoxFitControl
+              value={fit?.value}
               onValueChange={(value) => {
-                change.main_axis_alignment(value.mainAxisAlignment);
-                change.cross_axis_alignment(value.crossAxisAlignment);
+                const target = fit?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeNodePropertyFit(id, value);
+                });
               }}
             />
           </PropertyRow>
         </PropertySectionContent>
       </PropertySection>
 
-      <PropertySection className="border-b">
-        <PropertySectionHeaderItem>
-          <PropertySectionHeaderLabel>Fills</PropertySectionHeaderLabel>
-        </PropertySectionHeaderItem>
-        <PropertySectionContent>
-          <PropertyRow>
-            <PropertyLineLabel>Fill</PropertyLineLabel>
-            {fill?.mixed || fill?.partial ? (
-              <PaintControl value={undefined} onValueChange={change.fill} />
-            ) : (
-              <PaintControl value={fill?.value} onValueChange={change.fill} />
-            )}
-          </PropertyRow>
-        </PropertySectionContent>
-      </PropertySection>
-      {/* TODO: Refactor this stroke section to use @editor/scaffolds/sidecontrol/chunks/section-strokes.tsx
-          for mixed/multiple selection as well. Currently, this section manually handles stroke width
-          visibility (setting to 1 if unset/0) in a "dirty way" - this should be moved to use the
-          centralized `ensureStrokeWidth` parameter in `addNodeStroke`/`changeNodePropertyStrokes`. */}
+      <SectionFillsMixed ids={ids} />
+
       {supports_stroke && (
-        <PropertySection className="border-b">
-          <PropertySectionHeaderItem>
-            <PropertySectionHeaderLabel>Strokes</PropertySectionHeaderLabel>
-          </PropertySectionHeaderItem>
-          <PropertySectionContent>
-            <PropertyRow>
-              <PropertyLineLabel>Color</PropertyLineLabel>
-              {stroke?.mixed || stroke?.partial ? (
-                <PaintControl
-                  value={undefined}
-                  onValueChange={change.stroke}
-                  onValueAdd={(value) => {
-                    change.stroke(value);
-                    if (!stroke_width?.value || stroke_width?.value === 0) {
-                      change.stroke_width({ type: "set", value: 1 });
-                    }
-                  }}
-                />
-              ) : (
-                <PaintControl
-                  value={stroke?.value}
-                  onValueChange={change.stroke}
-                  onValueAdd={(value) => {
-                    change.stroke(value);
-                    if (!stroke_width?.value || stroke_width?.value === 0) {
-                      change.stroke_width({ type: "set", value: 1 });
-                    }
-                  }}
-                />
-              )}
-            </PropertyRow>
-            <PropertyRow hidden={!stroke?.value}>
-              <PropertyLineLabel>Width</PropertyLineLabel>
-              <StrokeWidthControl
-                value={stroke_width?.value}
-                onValueCommit={change.stroke_width}
-              />
-            </PropertyRow>
-            <PropertyRow hidden={!stroke?.value || !supports_stroke_cap}>
-              <PropertyLineLabel>Cap</PropertyLineLabel>
-              <StrokeCapControl
-                value={stroke_cap?.value}
-                onValueChange={change.stroke_cap}
-              />
-            </PropertyRow>
-            <PropertyRow hidden={!stroke?.value}>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <StrokeAlignControl
-                value={stroke_align?.value}
-                onValueChange={change.stroke_align}
-              />
-            </PropertyRow>
-            <PropertyRow hidden={!stroke?.value}>
-              <PropertyLineLabel>Join</PropertyLineLabel>
-              <StrokeJoinControl
-                value={stroke_join?.value}
-                onValueChange={change.stroke_join}
-              />
-            </PropertyRow>
-            <PropertyRow
-              hidden={
-                !stroke?.value ||
-                stroke_join?.value === grida.mixed ||
-                (stroke_join?.value !== undefined &&
-                  stroke_join?.value !== "miter")
-              }
-            >
-              <PropertyLineLabel>Miter</PropertyLineLabel>
-              <StrokeMiterLimitControl
-                value={stroke_miter_limit?.value}
-                onValueChange={change.stroke_miter_limit}
-              />
-            </PropertyRow>
-          </PropertySectionContent>
-        </PropertySection>
+        <SectionStrokesMixed
+          ids={ids}
+          supports_stroke_cap={supports_stroke_cap}
+        />
       )}
       {backend === "dom" && (
         <PropertySection className="border-b">
@@ -918,7 +495,12 @@ function ModeMixedNodeProperties({
               <PropertyLineLabel>Cursor</PropertyLineLabel>
               <CursorControl
                 value={cursor?.value}
-                onValueChange={change.cursor}
+                onValueChange={(value) => {
+                  const target = cursor?.ids ?? ids;
+                  target.forEach((id) => {
+                    instance.commands.changeNodePropertyMouseCursor(id, value);
+                  });
+                }}
               />
             </PropertyRow>
           </PropertySectionContent>
@@ -955,14 +537,6 @@ function ModeNodeProperties({
     src: node.src,
     type: node.type,
     blend_mode: node.blend_mode,
-    corner_radius: node.corner_radius,
-    rectangular_corner_radius_top_left: node.rectangular_corner_radius_top_left,
-    rectangular_corner_radius_top_right:
-      node.rectangular_corner_radius_top_right,
-    rectangular_corner_radius_bottom_right:
-      node.rectangular_corner_radius_bottom_right,
-    rectangular_corner_radius_bottom_left:
-      node.rectangular_corner_radius_bottom_left,
     point_count: node.point_count,
     inner_radius: node.inner_radius,
     angle: node.angle,
@@ -972,14 +546,6 @@ function ModeNodeProperties({
 
     //
     border: node.border,
-    //
-    layout: node.layout,
-    direction: node.direction,
-    main_axis_alignment: node.main_axis_alignment,
-    cross_axis_alignment: node.cross_axis_alignment,
-    main_axis_gap: node.main_axis_gap,
-    cross_axis_gap: node.cross_axis_gap,
-    layout_wrap: node.layout_wrap,
 
     //
     href: node.href,
@@ -995,11 +561,6 @@ function ModeNodeProperties({
     component_id,
     type,
     blend_mode,
-    corner_radius,
-    rectangular_corner_radius_top_left,
-    rectangular_corner_radius_top_right,
-    rectangular_corner_radius_bottom_right,
-    rectangular_corner_radius_bottom_left,
     point_count,
     inner_radius,
     angle,
@@ -1009,14 +570,6 @@ function ModeNodeProperties({
 
     //
     border,
-    //
-    layout,
-    direction,
-    main_axis_alignment,
-    cross_axis_alignment,
-    main_axis_gap,
-    cross_axis_gap,
-    layout_wrap,
 
     //
     href,
@@ -1029,7 +582,6 @@ function ModeNodeProperties({
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
-  const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
   return (
@@ -1091,71 +643,7 @@ function ModeNodeProperties({
 
       <SectionMask node_id={node_id} editor={instance} />
 
-      <PropertySection hidden={config.layout === "off"} className="border-b">
-        <PropertySectionHeaderItem>
-          <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
-        </PropertySectionHeaderItem>
-        <PropertySectionContent>
-          {is_container && (
-            <PropertyRow>
-              <PropertyLineLabel>Flow</PropertyLineLabel>
-              <LayoutControl
-                value={{
-                  layoutMode: layout ?? "flow",
-                  direction: layout === "flex" ? direction : undefined,
-                }}
-                onValueChange={(value) => {
-                  instance.commands.reLayout(node_id, value.key);
-                  // actions.layout(value.layoutMode);
-                  // if (value.direction) {
-                  //   actions.direction(value.direction);
-                  // }
-                }}
-              />
-            </PropertyRow>
-          )}
-          {config.size !== "off" && <SectionDimension node_id={node_id} />}
-          <PropertyRow hidden={!is_flex_container}>
-            <PropertyLineLabel>Alignment</PropertyLineLabel>
-            <FlexAlignControl
-              className="w-full"
-              direction={direction ?? "horizontal"}
-              value={
-                main_axis_alignment !== undefined &&
-                cross_axis_alignment !== undefined
-                  ? {
-                      mainAxisAlignment: main_axis_alignment,
-                      crossAxisAlignment: cross_axis_alignment,
-                    }
-                  : undefined
-              }
-              onValueChange={(value) => {
-                actions.mainAxisAlignment(value.mainAxisAlignment);
-                actions.crossAxisAlignment(value.crossAxisAlignment);
-              }}
-            />
-          </PropertyRow>
-          <PropertyRow hidden={!is_flex_container}>
-            <PropertyLineLabel>Wrap</PropertyLineLabel>
-            <FlexWrapControl
-              value={layout_wrap}
-              onValueChange={actions.layoutWrap}
-            />
-          </PropertyRow>
-          <PropertyRow hidden={!is_flex_container}>
-            <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl
-              mode={layout_wrap === "wrap" ? "multiple" : "single"}
-              value={{
-                main_axis_gap: main_axis_gap!,
-                cross_axis_gap: cross_axis_gap,
-              }}
-              onValueCommit={actions.gap}
-            />
-          </PropertyRow>
-          <PropertyPaddingLine node_id={node_id} />
-        </PropertySectionContent>
-      </PropertySection>
+      <SectionLayout node_id={node_id} config={config} />
 
       <PropertySection hidden={!is_stylable} className="border-b">
         <PropertySectionHeaderItem>
@@ -1169,51 +657,14 @@ function ModeNodeProperties({
           </PropertySectionHeaderActions>
         </PropertySectionHeaderItem>
         <PropertySectionContent>
-          <PropertyLineOpacity node_id={node_id} />
+          <PropertyOpacityRow node_id={node_id} />
           {supports.border(node.type, { backend }) && (
             <PropertyRow>
               <PropertyLineLabel>Border</PropertyLineLabel>
               <BorderControl value={border} onValueChange={actions.border} />
             </PropertyRow>
           )}
-          {supports.cornerRadius(node.type, { backend }) && (
-            <>
-              {supports.cornerRadius4(node.type, { backend }) ? (
-                <PropertyRow>
-                  <PropertyLineLabelWithNumberGesture
-                    step={1}
-                    sensitivity={0.1}
-                    onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
-                  >
-                    Radius
-                  </PropertyLineLabelWithNumberGesture>
-                  <CornerRadius4Control
-                    value={{
-                      rectangular_corner_radius_top_left,
-                      rectangular_corner_radius_top_right,
-                      rectangular_corner_radius_bottom_right,
-                      rectangular_corner_radius_bottom_left,
-                    }}
-                    onValueCommit={actions.corner_radius}
-                  />
-                </PropertyRow>
-              ) : (
-                <PropertyRow>
-                  <PropertyLineLabelWithNumberGesture
-                    step={1}
-                    sensitivity={0.1}
-                    onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
-                  >
-                    Radius
-                  </PropertyLineLabelWithNumberGesture>
-                  <CornerRadiusControl
-                    value={corner_radius}
-                    onValueCommit={actions.corner_radius}
-                  />
-                </PropertyRow>
-              )}
-            </>
-          )}
+          <PropertyCornerRadiusRow node_id={node_id} />
           {(point_count != null || inner_radius != null) && (
             <>
               {point_count != null &&
@@ -1337,7 +788,7 @@ function ModeNodeProperties({
   );
 }
 
-function PropertyLineOpacity({ node_id }: { node_id: string }) {
+function PropertyOpacityRow({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const opacity = useNodeState(node_id, (node) => node.opacity);
 
@@ -1351,8 +802,30 @@ function PropertyLineOpacity({ node_id }: { node_id: string }) {
       >
         Opacity
       </PropertyLineLabelWithNumberGesture>
-      <OpacityControl value={opacity as any} onValueCommit={actions.opacity} />
+      <OpacityControl value={opacity} onValueCommit={actions.opacity} />
     </PropertyRow>
+  );
+}
+
+function PropertyOpacityRowMixed({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => ({
+    opacity: node.opacity,
+  }));
+
+  return (
+    <>
+      <PropertyLineLabel>Opacity</PropertyLineLabel>
+      <OpacityControl
+        value={mp.opacity?.value}
+        onValueCommit={(change) => {
+          const target = mp.opacity?.ids ?? ids;
+          target.forEach((id) => {
+            instance.doc.getNodeById(id)?.changeOpacity(change);
+          });
+        }}
+      />
+    </>
   );
 }
 
@@ -1431,7 +904,32 @@ function SectionPosition({ node_id }: { node_id: string }) {
   );
 }
 
-function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
+function SectionMixedPosition({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => {
+    return {
+      position: node.position,
+      top: node.top,
+      left: node.left,
+      right: node.right,
+      bottom: node.bottom,
+      rotation: node.rotation,
+    };
+  });
+
+  const position =
+    mp.position?.value === grida.mixed || mp.position?.value === undefined
+      ? "relative"
+      : mp.position.value;
+
+  const constraints_value: grida.program.nodes.i.IPositioning = {
+    position,
+    top: typeof mp.top?.value === "number" ? mp.top.value : undefined,
+    left: typeof mp.left?.value === "number" ? mp.left.value : undefined,
+    right: typeof mp.right?.value === "number" ? mp.right.value : undefined,
+    bottom: typeof mp.bottom?.value === "number" ? mp.bottom.value : undefined,
+  };
+
   return (
     <PropertySection className="border-b">
       <PropertySectionHeaderItem>
@@ -1443,31 +941,297 @@ function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
         </div>
         <div className="py-4 px-4">
           <PositioningConstraintsControl
-            // TODO:
-            value={{
-              position: "relative",
-              top: undefined,
-              left: undefined,
-              right: undefined,
-              bottom: undefined,
+            value={constraints_value}
+            onValueCommit={(value) => {
+              // Apply full constraint set to all selected nodes for consistency.
+              ids.forEach((id) => {
+                instance.commands.changeNodePropertyPositioning(id, value);
+              });
             }}
-            // onValueChange={actions.positioning}
           />
         </div>
         <PropertyRow>
           <PropertyLineLabel>Mode</PropertyLineLabel>
           <PositioningModeControl
-            value={mp.properties.position!.value}
-            onValueChange={mp.actions.positioningMode}
+            value={mp.position?.value}
+            onValueChange={(value) => {
+              ids.forEach((id) => {
+                instance.commands.changeNodePropertyPositioningMode(id, value);
+              });
+            }}
           />
         </PropertyRow>
         <PropertyRow>
           <PropertyLineLabel>Rotate</PropertyLineLabel>
           <RotateControl
-            value={mp.properties.rotation?.value}
-            onValueCommit={mp.actions.rotation}
+            value={mp.rotation?.value}
+            onValueCommit={(change) => {
+              const target = mp.rotation?.ids ?? ids;
+              target.forEach((id) => {
+                instance.doc.getNodeById(id)?.changeRotation(change);
+              });
+            }}
           />
         </PropertyRow>
+      </PropertySectionContent>
+    </PropertySection>
+  );
+}
+
+function SectionLayout({
+  node_id,
+  config,
+}: {
+  node_id: string;
+  config: ControlsConfig;
+}) {
+  const instance = useCurrentEditor();
+  const actions = useNodeActions(node_id)!;
+  const {
+    type,
+    layout,
+    direction,
+    main_axis_alignment,
+    cross_axis_alignment,
+    main_axis_gap,
+    cross_axis_gap,
+    layout_wrap,
+  } = useNodeState(node_id, (node) => ({
+    type: node.type,
+    layout: node.layout,
+    direction: node.direction,
+    main_axis_alignment: node.main_axis_alignment,
+    cross_axis_alignment: node.cross_axis_alignment,
+    main_axis_gap: node.main_axis_gap,
+    cross_axis_gap: node.cross_axis_gap,
+    layout_wrap: node.layout_wrap,
+  }));
+
+  const is_container = type === "container";
+  const is_flex_container = is_container && layout === "flex";
+
+  return (
+    <PropertySection hidden={config.layout === "off"} className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        {is_container && (
+          <PropertyRow>
+            <PropertyLineLabel>Flow</PropertyLineLabel>
+            <LayoutControl
+              value={{
+                layoutMode: layout ?? "flow",
+                direction: layout === "flex" ? direction : undefined,
+              }}
+              onValueChange={(value) => {
+                instance.commands.reLayout(node_id, value.key);
+              }}
+            />
+          </PropertyRow>
+        )}
+        {config.size !== "off" && <SectionDimension node_id={node_id} />}
+        <PropertyRow hidden={!is_flex_container}>
+          <PropertyLineLabel>Alignment</PropertyLineLabel>
+          <FlexAlignControl
+            className="w-full"
+            direction={direction ?? "horizontal"}
+            value={
+              main_axis_alignment !== undefined &&
+              cross_axis_alignment !== undefined
+                ? {
+                    mainAxisAlignment: main_axis_alignment,
+                    crossAxisAlignment: cross_axis_alignment,
+                  }
+                : undefined
+            }
+            onValueChange={(value) => {
+              actions.mainAxisAlignment(value.mainAxisAlignment);
+              actions.crossAxisAlignment(value.crossAxisAlignment);
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={!is_flex_container}>
+          <PropertyLineLabel>Wrap</PropertyLineLabel>
+          <FlexWrapControl
+            value={layout_wrap}
+            onValueChange={actions.layoutWrap}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={!is_flex_container}>
+          <PropertyLineLabel>Gap</PropertyLineLabel>
+          <GapControl
+            mode={layout_wrap === "wrap" ? "multiple" : "single"}
+            value={{
+              main_axis_gap: main_axis_gap!,
+              cross_axis_gap: cross_axis_gap,
+            }}
+            onValueCommit={actions.gap}
+          />
+        </PropertyRow>
+        <PropertyPaddingRow node_id={node_id} />
+      </PropertySectionContent>
+    </PropertySection>
+  );
+}
+
+function SectionLayoutMixed({
+  ids,
+  config,
+}: {
+  ids: string[];
+  config: ControlsConfig;
+}) {
+  const instance = useCurrentEditor();
+
+  const mp = useMixedProperties(ids, (node) => ({
+    type: node.type,
+    width: node.width,
+    height: node.height,
+    layout: node.layout,
+    direction: node.direction,
+    main_axis_alignment: node.main_axis_alignment,
+    cross_axis_alignment: node.cross_axis_alignment,
+    main_axis_gap: node.main_axis_gap,
+    cross_axis_gap: node.cross_axis_gap,
+    layout_wrap: node.layout_wrap,
+  }));
+
+  const containerIds =
+    mp.type?.values?.find((v) => v.value === "container")?.ids ?? [];
+  const has_container = containerIds.length > 0;
+
+  const flexIds = new Set(
+    mp.layout?.values?.find((v) => v.value === "flex")?.ids ?? []
+  );
+  const containerFlexIds = containerIds.filter((id) => flexIds.has(id));
+  const has_flex_container = containerFlexIds.length > 0;
+
+  return (
+    <PropertySection hidden={config.layout === "off"} className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        <PropertyRow hidden={config.size === "off"}>
+          <PropertyLineLabel>Width</PropertyLineLabel>
+          <LengthPercentageControl
+            value={mp.width?.value}
+            onValueCommit={(value) => {
+              const target = mp.width?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodeSize(id, "width", value);
+              });
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={config.size === "off"}>
+          <PropertyLineLabel>Height</PropertyLineLabel>
+          <LengthPercentageControl
+            value={mp.height?.value}
+            onValueCommit={(value) => {
+              const target = mp.height?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodeSize(id, "height", value);
+              });
+            }}
+          />
+        </PropertyRow>
+
+        {has_container && (
+          <PropertyRow>
+            <PropertyLineLabel>Flow</PropertyLineLabel>
+            <LayoutControl
+              value={
+                mp.layout?.value === grida.mixed ||
+                mp.direction?.value === grida.mixed ||
+                mp.layout?.value === undefined ||
+                (mp.layout?.value === "flex" &&
+                  mp.direction?.value === undefined)
+                  ? undefined
+                  : {
+                      layoutMode: mp.layout?.value ?? "flow",
+                      direction:
+                        mp.layout?.value === "flex"
+                          ? mp.direction?.value
+                          : undefined,
+                    }
+              }
+              onValueChange={(value) => {
+                containerIds.forEach((id) => {
+                  instance.commands.changeContainerNodeLayout(
+                    id,
+                    value.layoutMode
+                  );
+                  if (value.direction) {
+                    instance.commands.changeFlexContainerNodeDirection(
+                      id,
+                      value.direction
+                    );
+                  }
+                });
+              }}
+            />
+          </PropertyRow>
+        )}
+
+        <PropertyRow hidden={!has_flex_container}>
+          <PropertyLineLabel>Alignment</PropertyLineLabel>
+          <FlexAlignControl
+            className="w-full"
+            direction={
+              mp.direction?.value === grida.mixed
+                ? "horizontal"
+                : (mp.direction?.value ?? "horizontal")
+            }
+            value={
+              mp.main_axis_alignment?.value === grida.mixed ||
+              mp.cross_axis_alignment?.value === grida.mixed ||
+              mp.main_axis_alignment?.value === undefined ||
+              mp.cross_axis_alignment?.value === undefined
+                ? undefined
+                : {
+                    mainAxisAlignment: mp.main_axis_alignment.value,
+                    crossAxisAlignment: mp.cross_axis_alignment.value,
+                  }
+            }
+            onValueChange={(value) => {
+              containerFlexIds.forEach((id) => {
+                instance.commands.changeFlexContainerNodeMainAxisAlignment(
+                  id,
+                  value.mainAxisAlignment
+                );
+                instance.commands.changeFlexContainerNodeCrossAxisAlignment(
+                  id,
+                  value.crossAxisAlignment
+                );
+              });
+            }}
+          />
+        </PropertyRow>
+
+        <PropertyRow hidden={!has_flex_container}>
+          <PropertyLineLabel>Gap</PropertyLineLabel>
+          <GapControl
+            mode={mp.layout_wrap?.value === "wrap" ? "multiple" : "single"}
+            value={{
+              main_axis_gap:
+                mp.main_axis_gap?.mixed || mp.main_axis_gap?.value === undefined
+                  ? grida.mixed
+                  : (mp.main_axis_gap.value ?? 0),
+              cross_axis_gap: mp.cross_axis_gap?.mixed
+                ? grida.mixed
+                : mp.cross_axis_gap?.value,
+            }}
+            onValueCommit={(value) => {
+              containerFlexIds.forEach((id) => {
+                instance.commands.changeFlexContainerNodeGap(id, value);
+              });
+            }}
+          />
+        </PropertyRow>
+
+        <PropertyPaddingRowMixed ids={ids} />
       </PropertySectionContent>
     </PropertySection>
   );
@@ -1667,7 +1431,458 @@ function SectionText({ node_id }: { node_id: string }) {
   );
 }
 
-function PropertyPaddingLine({ node_id }: { node_id: string }) {
+function SectionMixedText({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => {
+    const t = node as grida.program.nodes.TextNode;
+    return {
+      font_family: t.font_family,
+      font_postscript_name: t.font_postscript_name,
+      font_weight: t.font_weight,
+      font_style_italic: t.font_style_italic,
+      font_variations: t.font_variations,
+      font_optical_sizing: t.font_optical_sizing,
+      font_size: t.font_size,
+      line_height: t.line_height,
+      letter_spacing: t.letter_spacing,
+      text_align: t.text_align,
+      text_align_vertical: t.text_align_vertical,
+      // max_length: t.max_length,
+    };
+  });
+
+  const {
+    font_family,
+    font_postscript_name,
+    font_weight,
+    font_style_italic,
+    font_variations,
+    font_optical_sizing,
+    font_size,
+    line_height,
+    letter_spacing,
+    text_align,
+    text_align_vertical,
+    // max_length,
+  } = mp;
+
+  return (
+    <CurrentFontProvider
+      description={{
+        fontFamily:
+          typeof font_family?.value === "string" ? font_family.value : "",
+        fontPostscriptName:
+          typeof font_postscript_name?.value === "string"
+            ? font_postscript_name.value
+            : undefined,
+        fontWeight:
+          typeof font_weight?.value === "number"
+            ? font_weight.value
+            : undefined,
+        fontStyleItalic:
+          typeof font_style_italic?.value === "boolean"
+            ? font_style_italic.value
+            : undefined,
+        fontVariations:
+          typeof font_variations?.value === "object"
+            ? (font_variations.value as Record<string, number>)
+            : undefined,
+      }}
+    >
+      <PropertySection className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Text</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
+            <PropertyLineLabel>Font</PropertyLineLabel>
+            <div className="flex-1">
+              <FontFamilyControl
+                value={font_family?.value}
+                onValueChange={(value: string) => {
+                  const target = font_family?.ids ?? ids;
+                  target.forEach((id) => {
+                    instance.changeTextNodeFontFamilySync(id, value);
+                  });
+                }}
+              />
+            </div>
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Style</PropertyLineLabel>
+            <FontStyleControlScaffold selection={ids} />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Size</PropertyLineLabel>
+            <FontSizeControl
+              value={font_size?.value}
+              onValueCommit={(change) => {
+                const target = font_size?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeFontSize(id, change);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Line</PropertyLineLabel>
+            <LineHeightControl
+              value={line_height?.value}
+              onValueCommit={(change) => {
+                const target = line_height?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeLineHeight(id, change);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Letter</PropertyLineLabel>
+            <LetterSpacingControl
+              value={letter_spacing?.value}
+              onValueCommit={(change) => {
+                const target = letter_spacing?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeLetterSpacing(id, change);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Align</PropertyLineLabel>
+            <TextAlignControl
+              value={text_align?.value}
+              onValueChange={(value) => {
+                const target = text_align?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeTextAlign(id, value);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel></PropertyLineLabel>
+            <TextAlignVerticalControl
+              value={text_align_vertical?.value}
+              onValueChange={(value) => {
+                const target = text_align_vertical?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeTextAlignVertical(id, value);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Max Length</PropertyLineLabel>
+            <MaxlengthControl disabled placeholder={"multiple"} />
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
+    </CurrentFontProvider>
+  );
+}
+
+function SectionStrokesMixed({
+  ids,
+  supports_stroke_cap,
+}: {
+  ids: string[];
+  supports_stroke_cap: boolean;
+}) {
+  const instance = useCurrentEditor();
+
+  const mp = useMixedProperties(ids, (node) => {
+    return {
+      stroke: node.stroke,
+      stroke_width: node.stroke_width,
+      stroke_cap: node.stroke_cap,
+      stroke_align: node.stroke_align,
+      stroke_join: node.stroke_join,
+      stroke_miter_limit: node.stroke_miter_limit,
+    };
+  });
+
+  const stroke = mp.stroke;
+  const stroke_width = mp.stroke_width;
+  const stroke_cap = mp.stroke_cap;
+  const stroke_align = mp.stroke_align;
+  const stroke_join = mp.stroke_join;
+  const stroke_miter_limit = mp.stroke_miter_limit;
+
+  const has_stroke = Boolean(stroke?.value) && stroke?.value !== grida.mixed;
+
+  return (
+    <PropertySection className="border-b">
+      {/* TODO: Refactor this stroke section to use @editor/scaffolds/sidecontrol/chunks/section-strokes.tsx
+          for mixed/multiple selection as well. Currently, this section manually handles stroke width
+          visibility (setting to 1 if unset/0) in a "dirty way" - this should be moved to use the
+          centralized `ensureStrokeWidth` parameter in `addNodeStroke`/`changeNodePropertyStrokes`. */}
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Strokes</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        <PropertyRow>
+          <PropertyLineLabel>Color</PropertyLineLabel>
+          <PaintControl
+            value={stroke?.mixed || stroke?.partial ? undefined : stroke?.value}
+            onValueChange={(value) => {
+              const paints = value === null ? [] : [value as cg.Paint];
+              instance.commands.changeNodePropertyStrokes(ids, paints);
+            }}
+            onValueAdd={(value) => {
+              const paints = value === null ? [] : [value as cg.Paint];
+              // Use centralized ensureStrokeWidth behavior.
+              instance.commands.changeNodePropertyStrokes(ids, paints, true);
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={!has_stroke}>
+          <PropertyLineLabel>Width</PropertyLineLabel>
+          <StrokeWidthControl
+            value={stroke_width?.value}
+            onValueCommit={(change) => {
+              const target = stroke_width?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodePropertyStrokeWidth(id, change);
+              });
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={!has_stroke || !supports_stroke_cap}>
+          <PropertyLineLabel>Cap</PropertyLineLabel>
+          <StrokeCapControl
+            value={stroke_cap?.value}
+            onValueChange={(value) => {
+              const target = stroke_cap?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodePropertyStrokeCap(id, value);
+              });
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={!has_stroke}>
+          <PropertyLineLabel>Align</PropertyLineLabel>
+          <StrokeAlignControl
+            value={stroke_align?.value}
+            onValueChange={(value) => {
+              const target = stroke_align?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodePropertyStrokeAlign(id, value);
+              });
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={!has_stroke}>
+          <PropertyLineLabel>Join</PropertyLineLabel>
+          <StrokeJoinControl
+            value={stroke_join?.value}
+            onValueChange={(value) => {
+              const target = stroke_join?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodePropertyStrokeJoin(id, value);
+              });
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow
+          hidden={
+            !has_stroke ||
+            stroke_join?.value === grida.mixed ||
+            (stroke_join?.value !== undefined && stroke_join?.value !== "miter")
+          }
+        >
+          <PropertyLineLabel>Miter</PropertyLineLabel>
+          <StrokeMiterLimitControl
+            value={stroke_miter_limit?.value}
+            onValueChange={(value) => {
+              const target = stroke_miter_limit?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodePropertyStrokeMiterLimit(id, value);
+              });
+            }}
+          />
+        </PropertyRow>
+      </PropertySectionContent>
+    </PropertySection>
+  );
+}
+
+function PropertyCornerRadiusRow({ node_id }: { node_id: string }) {
+  const backend = useBackendState();
+  const actions = useNodeActions(node_id)!;
+  const {
+    type,
+    corner_radius,
+    rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left,
+  } = useNodeState(node_id, (node) => ({
+    type: node.type,
+    corner_radius: node.corner_radius,
+    rectangular_corner_radius_top_left: node.rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right:
+      node.rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right:
+      node.rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left:
+      node.rectangular_corner_radius_bottom_left,
+  }));
+
+  if (!supports.cornerRadius(type, { backend })) return null;
+
+  return supports.cornerRadius4(type, { backend }) ? (
+    <PropertyRow>
+      <PropertyLineLabelWithNumberGesture
+        step={1}
+        sensitivity={0.1}
+        onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
+      >
+        Radius
+      </PropertyLineLabelWithNumberGesture>
+      <CornerRadius4Control
+        value={{
+          rectangular_corner_radius_top_left,
+          rectangular_corner_radius_top_right,
+          rectangular_corner_radius_bottom_right,
+          rectangular_corner_radius_bottom_left,
+        }}
+        onValueCommit={actions.corner_radius}
+      />
+    </PropertyRow>
+  ) : (
+    <PropertyRow>
+      <PropertyLineLabelWithNumberGesture
+        step={1}
+        sensitivity={0.1}
+        onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
+      >
+        Radius
+      </PropertyLineLabelWithNumberGesture>
+      <CornerRadiusControl
+        value={corner_radius}
+        onValueCommit={actions.corner_radius}
+      />
+    </PropertyRow>
+  );
+}
+
+function PropertyCornerRadiusRowMixed({
+  ids,
+  supported,
+  supports_corner_radius4,
+}: {
+  ids: string[];
+  supported: boolean;
+  supports_corner_radius4: boolean;
+}) {
+  const instance = useCurrentEditor();
+
+  const mp = useMixedProperties(ids, (node) => ({
+    corner_radius: node.corner_radius,
+    rectangular_corner_radius_top_left: node.rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right:
+      node.rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right:
+      node.rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left:
+      node.rectangular_corner_radius_bottom_left,
+  }));
+
+  if (!supported) return null;
+
+  if (supports_corner_radius4) {
+    const tl = mp.rectangular_corner_radius_top_left;
+    const tr = mp.rectangular_corner_radius_top_right;
+    const br = mp.rectangular_corner_radius_bottom_right;
+    const bl = mp.rectangular_corner_radius_bottom_left;
+
+    const corners_value =
+      typeof tl?.value === "number" &&
+      !tl.mixed &&
+      typeof tr?.value === "number" &&
+      !tr.mixed &&
+      typeof br?.value === "number" &&
+      !br.mixed &&
+      typeof bl?.value === "number" &&
+      !bl.mixed
+        ? {
+            rectangular_corner_radius_top_left: tl.value,
+            rectangular_corner_radius_top_right: tr.value,
+            rectangular_corner_radius_bottom_right: br.value,
+            rectangular_corner_radius_bottom_left: bl.value,
+          }
+        : undefined;
+
+    return (
+      <PropertyRow>
+        <PropertyLineLabel>Radius</PropertyLineLabel>
+        <CornerRadius4Control
+          value={corners_value}
+          onValueCommit={(value) => {
+            const target = mp.corner_radius?.ids ?? ids;
+            target.forEach((id) => {
+              instance.commands.changeNodePropertyCornerRadius(id, value);
+            });
+          }}
+        />
+      </PropertyRow>
+    );
+  }
+
+  return (
+    <PropertyRow>
+      <PropertyLineLabel>Radius</PropertyLineLabel>
+      <CornerRadiusControl
+        value={
+          typeof mp.corner_radius?.value === "number"
+            ? mp.corner_radius.value
+            : 0
+        }
+        disabled={mp.corner_radius?.mixed}
+        onValueCommit={(value) => {
+          const target = mp.corner_radius?.ids ?? ids;
+          target.forEach((id) => {
+            instance.commands.changeNodePropertyCornerRadius(id, value);
+          });
+        }}
+      />
+    </PropertyRow>
+  );
+}
+
+function SectionFillsMixed({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => {
+    return {
+      fill: node.fill,
+    };
+  });
+
+  const fill = mp.fill;
+
+  return (
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Fills</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        <PropertyRow>
+          <PropertyLineLabel>Fill</PropertyLineLabel>
+          <PaintControl
+            value={fill?.mixed || fill?.partial ? undefined : fill?.value}
+            onValueChange={(value) => {
+              const paints = value === null ? [] : [value as cg.Paint];
+              instance.commands.changeNodePropertyFills(ids, paints);
+            }}
+          />
+        </PropertyRow>
+      </PropertySectionContent>
+    </PropertySection>
+  );
+}
+
+function PropertyPaddingRow({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const {
     padding_top,
@@ -1703,6 +1918,54 @@ function PropertyPaddingLine({ node_id }: { node_id: string }) {
   );
 }
 
+function PropertyPaddingRowMixed({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => {
+    return {
+      type: node.type,
+      padding_top: node.padding_top,
+      padding_right: node.padding_right,
+      padding_bottom: node.padding_bottom,
+      padding_left: node.padding_left,
+    };
+  });
+
+  const containerIds =
+    mp.type?.values?.find((v) => v.value === "container")?.ids ?? [];
+  const has_container = containerIds.length > 0;
+
+  return (
+    <PropertyRow hidden={!has_container}>
+      <PropertyLineLabel>Padding</PropertyLineLabel>
+      <PaddingControl
+        value={{
+          padding_top:
+            mp.padding_top?.mixed || mp.padding_top?.value === undefined
+              ? grida.mixed
+              : (mp.padding_top.value ?? 0),
+          padding_right:
+            mp.padding_right?.mixed || mp.padding_right?.value === undefined
+              ? grida.mixed
+              : (mp.padding_right.value ?? 0),
+          padding_bottom:
+            mp.padding_bottom?.mixed || mp.padding_bottom?.value === undefined
+              ? grida.mixed
+              : (mp.padding_bottom.value ?? 0),
+          padding_left:
+            mp.padding_left?.mixed || mp.padding_left?.value === undefined
+              ? grida.mixed
+              : (mp.padding_left.value ?? 0),
+        }}
+        onValueCommit={(value) => {
+          containerIds.forEach((id) => {
+            instance.commands.changeContainerNodePadding(id, value);
+          });
+        }}
+      />
+    </PropertyRow>
+  );
+}
+
 function SectionDimension({ node_id }: { node_id: string }) {
   const instance = useCurrentEditor();
   const { width, height, layout_target_aspect_ratio } = useNodeState(
@@ -1710,9 +1973,7 @@ function SectionDimension({ node_id }: { node_id: string }) {
     (node) => ({
       width: node.width,
       height: node.height,
-      layout_target_aspect_ratio: (node as any).layout_target_aspect_ratio as
-        | [number, number]
-        | undefined,
+      layout_target_aspect_ratio: node.layout_target_aspect_ratio,
     })
   );
 
