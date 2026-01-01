@@ -1,5 +1,7 @@
 # Branding Assets for this repository
 
-## Are you looking for [brand.bridged.xyz](https://brand.bridged.xyz)?
+## Are you looking for [grida.co/brand](https://grida.co/brand)?
 
-Visit [brand.bridged.xyz](https://brand.bridged.xyz) for open branding resourced for / from bridged
+Visit [grida.co/brand](https://grida.co/brand) for official Grida branding assets and logo downloads
+
+> **Note:** bridged.xyz was renamed to grida.co in 2022.
