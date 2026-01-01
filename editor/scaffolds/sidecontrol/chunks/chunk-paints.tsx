@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import kolor from "@grida/color";
 import {
   DndContext,
   PointerSensor,
@@ -18,26 +17,18 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  PropertySection,
   PropertySectionContent,
+  PropertyRow,
+  PropertyRows,
   PropertySectionHeaderItem,
   PropertySectionHeaderLabel,
   PropertySectionHeaderActions,
-  PropertyRow,
-  PropertyRows,
 } from "../ui";
 import { Button } from "@/components/ui-editor/button";
 import { Checkbox } from "@/components/ui-editor/checkbox";
 import { PlusIcon, MinusIcon } from "@radix-ui/react-icons";
-import {
-  useBackendState,
-  useNodeActions,
-  useNodeState,
-} from "@/grida-canvas-react/provider";
 import { PaintControl } from "../controls/paint";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
-import type { Editor } from "@/grida-canvas/editor";
-import { editor } from "@/grida-canvas";
 import cg from "@grida/cg";
 
 interface PaintItem {
@@ -47,93 +38,45 @@ interface PaintItem {
 }
 
 /**
- * Hook for managing drag and drop sorting logic
+ * Hook to manage content edit mode activation/deactivation for paints.
+ * Handles gradient and image edit mode based on paint type changes.
+ *
+ * This hook is shared between fill and stroke paint controls.
  */
-function usePaintSorting({
-  displayPaintItems,
-  shouldEnableSorting,
-  onUpdatePaints,
-}: {
-  displayPaintItems: PaintItem[];
-  shouldEnableSorting: boolean;
-  onUpdatePaints: (paints: cg.Paint[]) => void;
-}) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 4,
-      },
-    })
-  );
-
-  const handleDragEnd = React.useCallback(
-    (event: DragEndEvent) => {
-      if (!shouldEnableSorting) {
-        return;
-      }
-
-      const { active, over } = event;
-
-      if (!over || active.id === over.id) {
-        return;
-      }
-
-      const oldIndex = displayPaintItems.findIndex(
-        (item) => item.id === active.id
-      );
-      const newIndex = displayPaintItems.findIndex(
-        (item) => item.id === over.id
-      );
-
-      if (oldIndex === -1 || newIndex === -1) {
-        return;
-      }
-
-      const newDisplayOrder = arrayMove(displayPaintItems, oldIndex, newIndex);
-      const newPaintOrder = newDisplayOrder
-        .slice()
-        .reverse()
-        .map((item) => item.paint);
-
-      onUpdatePaints(newPaintOrder);
-    },
-    [displayPaintItems, shouldEnableSorting, onUpdatePaints]
-  );
-
-  const modifiers = shouldEnableSorting ? [restrictToVerticalAxis] : undefined;
-
-  return {
-    sensors,
-    handleDragEnd,
-    modifiers,
-  };
-}
-
-/**
- * Hook to manage edit mode activation/deactivation based on paint type changes.
- * Automatically activates gradient/image edit mode when paint type changes while panel is open.
- */
-function usePaintEditModeActivation({
-  instance,
+export function usePaintContentEditMode({
   node_id,
   paintTarget,
-  paintList,
-  currentlyOpenIndex,
-  gradientMode,
-  imageMode,
+  paints,
+  openPaintIndex,
 }: {
-  instance: Editor;
   node_id: string;
   paintTarget: "fill" | "stroke";
-  paintList: cg.Paint[];
-  currentlyOpenIndex: number | null;
-  gradientMode?: editor.state.PaintGradientContentEditMode;
-  imageMode?: editor.state.PaintImageContentEditMode;
+  paints: cg.Paint[];
+  openPaintIndex: number | null;
 }) {
+  const instance = useCurrentEditor();
+  const { content_edit_mode } = useEditorState(instance, (state) => ({
+    content_edit_mode: state.content_edit_mode,
+  }));
+
+  const gradientMode =
+    content_edit_mode?.type === "paint/gradient" &&
+    content_edit_mode.node_id === node_id &&
+    (content_edit_mode.paint_target ?? "fill") === paintTarget
+      ? content_edit_mode
+      : undefined;
+
+  const imageMode =
+    content_edit_mode?.type === "paint/image" &&
+    content_edit_mode.node_id === node_id &&
+    (content_edit_mode.paint_target ?? "fill") === paintTarget
+      ? content_edit_mode
+      : undefined;
+
   // Helper function to activate edit mode based on paint type
   const tryActivateEditModeForPaint = React.useCallback(
     (paintIndex: number) => {
-      const paint_at_index = paintList[paintIndex];
+      const paint_at_index = paints[paintIndex];
       if (!paint_at_index) return; // Safety check
 
       switch (paint_at_index.type) {
@@ -164,51 +107,51 @@ function usePaintEditModeActivation({
         }
       }
     },
-    [instance, node_id, paintTarget, paintList]
+    [instance, node_id, paintTarget, paints]
   );
 
   // Activate edit mode when paint type changes to gradient/image while panel is open
   // Also exit edit mode when paint type changes away from gradient/image
   React.useEffect(() => {
-    if (currentlyOpenIndex !== null) {
+    if (openPaintIndex !== null) {
       // Validate index is within bounds
-      if (currentlyOpenIndex < 0 || currentlyOpenIndex >= paintList.length) {
+      if (openPaintIndex < 0 || openPaintIndex >= paints.length) {
         return;
       }
-      const openPaint = paintList[currentlyOpenIndex];
+      const openPaint = paints[openPaintIndex];
       if (!openPaint) return;
 
       // Check if we need to activate gradient edit mode
       if (cg.isGradientPaint(openPaint)) {
         const isAlreadyInGradientMode =
           gradientMode &&
-          gradientMode.paint_index === currentlyOpenIndex &&
+          gradientMode.paint_index === openPaintIndex &&
           gradientMode.paint_target === paintTarget;
 
         if (!isAlreadyInGradientMode) {
-          tryActivateEditModeForPaint(currentlyOpenIndex);
+          tryActivateEditModeForPaint(openPaintIndex);
         }
       }
       // Check if we need to activate image edit mode
       else if (openPaint.type === "image") {
         const isAlreadyInImageMode =
           imageMode &&
-          imageMode.paint_index === currentlyOpenIndex &&
+          imageMode.paint_index === openPaintIndex &&
           imageMode.paint_target === paintTarget;
 
         if (!isAlreadyInImageMode) {
-          tryActivateEditModeForPaint(currentlyOpenIndex);
+          tryActivateEditModeForPaint(openPaintIndex);
         }
       }
       // Exit edit mode if paint type changed to something that doesn't support edit mode
       else {
         const isInGradientMode =
           gradientMode &&
-          gradientMode.paint_index === currentlyOpenIndex &&
+          gradientMode.paint_index === openPaintIndex &&
           gradientMode.paint_target === paintTarget;
         const isInImageMode =
           imageMode &&
-          imageMode.paint_index === currentlyOpenIndex &&
+          imageMode.paint_index === openPaintIndex &&
           imageMode.paint_target === paintTarget;
 
         if (isInGradientMode || isInImageMode) {
@@ -217,8 +160,8 @@ function usePaintEditModeActivation({
       }
     }
   }, [
-    paintList,
-    currentlyOpenIndex,
+    paints,
+    openPaintIndex,
     paintTarget,
     tryActivateEditModeForPaint,
     gradientMode,
@@ -226,71 +169,14 @@ function usePaintEditModeActivation({
     instance,
   ]);
 
-  return { tryActivateEditModeForPaint };
-}
-
-export function ChunkPaints({
-  node_id,
-  paintTarget,
-  title,
-  onAddPaint,
-  onRemovePaint,
-  onUpdatePaints,
-  additionalContent,
-}: {
-  node_id: string;
-  paintTarget: "fill" | "stroke";
-  title: string;
-  onAddPaint?: (paint: cg.Paint) => void;
-  onRemovePaint?: (index: number) => void;
-  onUpdatePaints?: (paints: cg.Paint[]) => void;
-  additionalContent?: React.ReactNode;
-}) {
-  const instance = useCurrentEditor();
-  const backend = useBackendState();
-  const { content_edit_mode } = useEditorState(instance, (state) => ({
-    content_edit_mode: state.content_edit_mode,
-  }));
-
-  // TODO: LEGACY_PAINT_MODEL
-  const paintData = useNodeState<{
-    paint: cg.Paint;
-    paints: cg.Paint[];
-  }>(node_id, (node) => {
-    if (paintTarget === "fill") {
-      return {
-        paint: node.fill as cg.Paint,
-        paints: node.fill_paints as cg.Paint[],
-      };
-    } else {
-      return {
-        paint: node.stroke as cg.Paint,
-        paints: node.stroke_paints as cg.Paint[],
-      };
-    }
-  });
-
-  const { paint, paints } = paintData;
-
-  const gradientMode =
-    content_edit_mode?.type === "paint/gradient" &&
-    content_edit_mode.node_id === node_id &&
-    (content_edit_mode.paint_target ?? "fill") === paintTarget
-      ? content_edit_mode
-      : undefined;
-  const gradientPaintIndex = gradientMode?.paint_index ?? 0;
-
-  const imageMode =
-    content_edit_mode?.type === "paint/image" &&
-    content_edit_mode.node_id === node_id &&
-    (content_edit_mode.paint_target ?? "fill") === paintTarget
-      ? content_edit_mode
-      : undefined;
-  const imagePaintIndex = imageMode?.paint_index ?? 0;
-
-  // Track which paint is currently open (user-controlled state)
-  const [openPaintIndex, setOpenPaintIndex] = React.useState<number | null>(
-    null
+  const handleSelectGradientStop = React.useCallback(
+    (paintIndex: number, stop: number) => {
+      instance.surface.surfaceSelectGradientStop(node_id, stop, {
+        paintTarget,
+        paintIndex,
+      });
+    },
+    [instance, node_id, paintTarget]
   );
 
   // Determine which paint should be open
@@ -303,49 +189,128 @@ export function ChunkPaints({
 
     // If in image edit mode, open that paint
     if (imageMode) {
-      return imagePaintIndex;
+      return imageMode.paint_index;
     }
 
     return null;
-  }, [openPaintIndex, imageMode, imagePaintIndex]);
+  }, [openPaintIndex, imageMode]);
 
-  // Reset user-controlled state when content edit mode changes to a different node
-  // (but not when it becomes null for the current node - e.g., when switching from gradient to solid)
-  React.useEffect(() => {
-    if (content_edit_mode && content_edit_mode.node_id !== node_id) {
-      setOpenPaintIndex(null);
-    }
-  }, [content_edit_mode, node_id]);
+  const handleOpenChange = React.useCallback(
+    (paintIndex: number, open: boolean) => {
+      if (open) {
+        // User opened a paint - this takes priority
+        tryActivateEditModeForPaint(paintIndex);
+      } else {
+        // User closed the paint
+        instance.surface.surfaceTryExitContentEditMode();
+      }
+    },
+    [tryActivateEditModeForPaint, instance]
+  );
 
-  // Reset open state when node_id changes (different node selected)
-  const prevNodeIdRef = React.useRef(node_id);
-  React.useEffect(() => {
-    if (prevNodeIdRef.current !== node_id) {
-      prevNodeIdRef.current = node_id;
-      setOpenPaintIndex(null);
-    }
-  }, [node_id]);
+  const selectedGradientStop =
+    gradientMode && gradientMode.paint_index === currentlyOpenIndex
+      ? gradientMode.selected_stop
+      : undefined;
 
-  const actions = useNodeActions(node_id)!;
-  const isCanvasBackend = backend === "canvas";
-  const paintList = isCanvasBackend
-    ? Array.isArray(paints) && paints.length > 0
-      ? paints
-      : paint
-        ? [paint]
-        : []
-    : paint
-      ? [paint]
-      : [];
+  return {
+    selectedGradientStop,
+    currentlyOpenIndex,
+    handleSelectGradientStop,
+    handleOpenChange,
+  };
+}
 
+/**
+ * Hook for managing drag and drop sorting logic
+ */
+function usePaintSorting({
+  displayPaintItems,
+  disabled,
+  onValueChange,
+}: {
+  displayPaintItems: PaintItem[];
+  disabled: boolean;
+  onValueChange: (paints: cg.Paint[]) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 4,
+      },
+    })
+  );
+
+  const handleDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      if (disabled) {
+        return;
+      }
+
+      const { active, over } = event;
+
+      if (!over || active.id === over.id) {
+        return;
+      }
+
+      const oldIndex = displayPaintItems.findIndex(
+        (item) => item.id === active.id
+      );
+      const newIndex = displayPaintItems.findIndex(
+        (item) => item.id === over.id
+      );
+
+      if (oldIndex === -1 || newIndex === -1) {
+        return;
+      }
+
+      const newDisplayOrder = arrayMove(displayPaintItems, oldIndex, newIndex);
+      const newPaintOrder = newDisplayOrder
+        .slice()
+        .reverse()
+        .map((item) => item.paint);
+
+      onValueChange(newPaintOrder);
+    },
+    [displayPaintItems, disabled, onValueChange]
+  );
+
+  const modifiers = disabled ? undefined : [restrictToVerticalAxis];
+
+  return {
+    sensors,
+    handleDragEnd,
+    modifiers,
+  };
+}
+
+/**
+ * Universal presentational component for managing paint arrays (fills or strokes).
+ * Does not consume editor or node state directly - accepts values and callbacks.
+ * Only renders the paint list, no header or additional content.
+ */
+export function ChunkPaints({
+  value: paints,
+  onValueChange,
+  contentEditMode,
+}: {
+  value: cg.Paint[];
+  onValueChange: (paints: cg.Paint[]) => void;
+  contentEditMode?: {
+    onSelectGradientStop: (paintIndex: number, stop: number) => void;
+    onOpenChange: (paintIndex: number, open: boolean) => void;
+    selectedGradientStop?: number;
+    openPaintIndex?: number | null;
+  };
+}) {
   const paintItems = React.useMemo(
     () =>
-      paintList.map((paintItem, index) => ({
+      paints.map((paintItem, index) => ({
         id: `paint-${index}`,
         paint: paintItem,
         index,
       })),
-    [paintList]
+    [paints]
   );
 
   const displayPaintItems = React.useMemo(
@@ -353,202 +318,123 @@ export function ChunkPaints({
     [paintItems]
   );
 
-  const shouldEnableSorting =
-    isCanvasBackend && Array.isArray(paints) && paintItems.length > 1;
-
-  const updatePaints = React.useCallback(
-    (nextPaints: cg.Paint[]) => {
-      if (onUpdatePaints) {
-        onUpdatePaints(nextPaints);
-      } else {
-        paintTarget === "fill"
-          ? actions.fill_paints(nextPaints)
-          : actions.stroke_paints(nextPaints);
-      }
-    },
-    [actions, onUpdatePaints, paintTarget]
-  );
-
-  const createPaintsCopy = React.useCallback(() => {
-    return Array.isArray(paints) ? [...paints] : paint ? [paint] : [];
-  }, [paint, paints]);
-
-  const handleValueChange = React.useCallback(
-    (index: number, value: cg.Paint) => {
-      const currentPaints = createPaintsCopy();
-      currentPaints[index] = value;
-      updatePaints(currentPaints);
-    },
-    [createPaintsCopy, updatePaints]
-  );
-
-  const handleTogglePaintActive = React.useCallback(
-    (index: number, active: boolean) => {
-      const currentPaints = createPaintsCopy();
-      const targetPaint = currentPaints[index];
-
-      if (!targetPaint) {
-        return;
-      }
-
-      currentPaints[index] = { ...targetPaint, active };
-      updatePaints(currentPaints);
-    },
-    [createPaintsCopy, updatePaints]
-  );
-
-  const handleRemovePaintAt = React.useCallback(
-    (index: number) => {
-      if (onRemovePaint) {
-        onRemovePaint(index);
-        return;
-      }
-
-      const currentPaints = createPaintsCopy();
-      currentPaints.splice(index, 1);
-      updatePaints(currentPaints);
-    },
-    [createPaintsCopy, onRemovePaint, updatePaints]
-  );
-
-  const handleSelectGradientStop = React.useCallback(
-    (paintIndex: number, stop: number) => {
-      instance.surface.surfaceSelectGradientStop(node_id, stop, {
-        paintTarget,
-        paintIndex,
-      });
-    },
-    [instance, node_id, paintTarget]
-  );
-
-  // Use hook to manage edit mode activation/deactivation
-  const { tryActivateEditModeForPaint } = usePaintEditModeActivation({
-    instance,
-    node_id,
-    paintTarget,
-    paintList,
-    currentlyOpenIndex,
-    gradientMode,
-    imageMode,
-  });
-
-  const handleOpenChange = React.useCallback(
-    (paintIndex: number, open: boolean) => {
-      if (open) {
-        // User opened a paint - this takes priority
-        setOpenPaintIndex(paintIndex);
-        tryActivateEditModeForPaint(paintIndex);
-      } else {
-        // User closed the paint
-        setOpenPaintIndex(null);
-        instance.surface.surfaceTryExitContentEditMode();
-      }
-    },
-    [tryActivateEditModeForPaint, instance]
-  );
+  const disabled = paintItems.length <= 1;
 
   // Use the custom hook for drag and drop sorting
   const { sensors, handleDragEnd, modifiers } = usePaintSorting({
     displayPaintItems,
-    shouldEnableSorting,
-    onUpdatePaints: updatePaints,
+    disabled,
+    onValueChange,
   });
 
-  const handleAddPaint = React.useCallback(() => {
-    const newPaint: cg.Paint = {
-      type: "solid",
-      color: kolor.colorformats.newRGBA32F(
-        0,
-        0,
-        0,
-        paintList.length > 0 ? 0.5 : 1
-      ),
-      active: true,
-    };
+  if (paints.length === 0) {
+    return null;
+  }
 
-    if (onAddPaint) {
-      onAddPaint(newPaint);
-    } else {
-      // Default behavior
-      if (paintTarget === "fill") {
-        actions.addFill(newPaint, "end");
-      } else {
-        actions.addStroke(newPaint, "end");
-      }
-    }
-  }, [actions, paintList.length, paintTarget, onAddPaint]);
-
-  const empty = paintList.length === 0;
+  // If openPaintIndex is omitted, PaintControl should be uncontrolled (manage its own popover open state).
+  // If openPaintIndex is provided (including null), PaintControl becomes controlled.
+  const isOpenControlled = contentEditMode?.openPaintIndex !== undefined;
 
   return (
-    <PropertySection
-      data-empty={empty}
-      className="border-b pb-2 [&[data-empty='true']]:pb-0"
-    >
-      <PropertySectionHeaderItem
-        onClick={isCanvasBackend ? handleAddPaint : undefined}
+    <PropertySectionContent>
+      <DndContext
+        sensors={sensors}
+        onDragEnd={handleDragEnd}
+        modifiers={modifiers}
       >
-        <PropertySectionHeaderLabel>{title}</PropertySectionHeaderLabel>
-        {isCanvasBackend && (
-          <PropertySectionHeaderActions>
-            <Button variant="ghost" size="icon">
-              <PlusIcon className="size-3" />
-            </Button>
-          </PropertySectionHeaderActions>
-        )}
-      </PropertySectionHeaderItem>
-      {!empty && (
-        <PropertySectionContent>
-          <DndContext
-            sensors={sensors}
-            onDragEnd={handleDragEnd}
-            modifiers={modifiers}
-          >
-            <SortableContext
-              items={displayPaintItems.map((item) => item.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <PropertyRows>
-                {displayPaintItems.map(({ id, paint: itemPaint, index }) => {
-                  const selectedGradientStop =
-                    gradientMode && gradientPaintIndex === index
-                      ? gradientMode.selected_stop
-                      : undefined;
+        <SortableContext
+          items={displayPaintItems.map((item) => item.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <PropertyRows>
+            {displayPaintItems.map(({ id, paint: itemPaint, index }) => {
+              const isOpen = isOpenControlled
+                ? contentEditMode?.openPaintIndex === index
+                : undefined;
 
-                  // Use centralized open state logic
-                  const isOpen = currentlyOpenIndex === index;
+              const rowSelectedGradientStop =
+                isOpenControlled &&
+                contentEditMode?.selectedGradientStop !== undefined &&
+                contentEditMode?.openPaintIndex === index
+                  ? contentEditMode.selectedGradientStop
+                  : undefined;
 
-                  return (
-                    <PaintRow
-                      key={id}
-                      id={id}
-                      paint={itemPaint}
-                      index={index}
-                      onToggleActive={handleTogglePaintActive}
-                      onValueChange={handleValueChange}
-                      onRemove={handleRemovePaintAt}
-                      onSelectGradientStop={handleSelectGradientStop}
-                      onOpenChange={handleOpenChange}
-                      selectedGradientStop={selectedGradientStop}
-                      disableSorting={!shouldEnableSorting}
-                      open={isOpen}
-                    />
-                  );
-                })}
-              </PropertyRows>
-            </SortableContext>
-          </DndContext>
-          {additionalContent}
-        </PropertySectionContent>
+              return (
+                <PaintRow
+                  key={id}
+                  id={id}
+                  paint={itemPaint}
+                  onToggleActive={(active) => {
+                    const next = paints.slice();
+                    const target = next[index];
+                    if (!target) return;
+                    next[index] = { ...target, active };
+                    onValueChange(next);
+                  }}
+                  onValueChange={(value) => {
+                    const next = paints.slice();
+                    next[index] = value;
+                    onValueChange(next);
+                  }}
+                  onRemove={() => {
+                    const next = paints.slice();
+                    next.splice(index, 1);
+                    onValueChange(next);
+                  }}
+                  onSelectGradientStop={
+                    contentEditMode?.onSelectGradientStop
+                      ? (stop) =>
+                          contentEditMode.onSelectGradientStop(index, stop)
+                      : undefined
+                  }
+                  onOpenChange={
+                    contentEditMode?.onOpenChange
+                      ? (open) => contentEditMode.onOpenChange(index, open)
+                      : undefined
+                  }
+                  selectedGradientStop={rowSelectedGradientStop}
+                  disableSorting={disabled}
+                  open={isOpen}
+                />
+              );
+            })}
+          </PropertyRows>
+        </SortableContext>
+      </DndContext>
+    </PropertySectionContent>
+  );
+}
+
+/**
+ * Header component for paint sections (fills/strokes).
+ * Handles the title and add button.
+ */
+export function SectionPaintsHeader({
+  title,
+  onAddPaint,
+  showAddButton = false,
+}: {
+  title: string;
+  onAddPaint?: () => void;
+  showAddButton?: boolean;
+}) {
+  return (
+    <PropertySectionHeaderItem onClick={showAddButton ? onAddPaint : undefined}>
+      <PropertySectionHeaderLabel>{title}</PropertySectionHeaderLabel>
+      {showAddButton && (
+        <PropertySectionHeaderActions>
+          <Button variant="ghost" size="icon">
+            <PlusIcon className="size-3" />
+          </Button>
+        </PropertySectionHeaderActions>
       )}
-    </PropertySection>
+    </PropertySectionHeaderItem>
   );
 }
 
 function PaintRow({
   id,
   paint,
-  index,
   onToggleActive,
   onValueChange,
   onRemove,
@@ -560,12 +446,11 @@ function PaintRow({
 }: {
   id: string;
   paint: cg.Paint | undefined;
-  index: number;
-  onToggleActive: (index: number, active: boolean) => void;
-  onValueChange: (index: number, value: cg.Paint) => void;
-  onRemove: (index: number) => void;
-  onSelectGradientStop: (index: number, stop: number) => void;
-  onOpenChange: (index: number, open: boolean) => void;
+  onToggleActive: (active: boolean) => void;
+  onValueChange: (value: cg.Paint) => void;
+  onRemove: () => void;
+  onSelectGradientStop?: (stop: number) => void;
+  onOpenChange?: (open: boolean) => void;
   selectedGradientStop?: number;
   disableSorting?: boolean;
   open?: boolean;
@@ -591,22 +476,24 @@ function PaintRow({
         <Checkbox
           checked={Boolean(paint?.active)}
           onCheckedChange={(checked) => {
-            onToggleActive(index, Boolean(checked));
+            onToggleActive(Boolean(checked));
           }}
         />
         <div className="flex-1">
           <PaintControl
             value={paint}
             onValueChange={(value) => {
-              onValueChange(index, value as cg.Paint);
+              onValueChange(value as cg.Paint);
             }}
             selectedGradientStop={selectedGradientStop}
-            onSelectedGradientStopChange={(stop) => {
-              onSelectGradientStop(index, stop);
-            }}
-            onOpenChange={(open) => {
-              onOpenChange(index, open);
-            }}
+            onSelectedGradientStopChange={
+              onSelectGradientStop
+                ? (stop) => onSelectGradientStop(stop)
+                : undefined
+            }
+            onOpenChange={
+              onOpenChange ? (open) => onOpenChange(open) : undefined
+            }
             open={open}
           />
         </div>
@@ -618,7 +505,7 @@ function PaintRow({
           }}
           onClick={(event) => {
             event.stopPropagation();
-            onRemove(index);
+            onRemove();
           }}
           className="cursor-pointer"
           tabIndex={-1}
