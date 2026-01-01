@@ -2347,6 +2347,7 @@ export namespace grida.program.nodes {
       i.ILayerMaskType,
       i.IZIndex,
       i.IRotation,
+      i.ICornerRadius,
       i.IFill<cg.Paint>,
       i.IStroke {
     readonly type: "polygon";
@@ -2364,6 +2365,7 @@ export namespace grida.program.nodes {
       i.IBlend,
       i.IZIndex,
       i.IRotation,
+      i.ICornerRadius,
       i.IFill<cg.Paint>,
       i.IStroke {
     readonly type: "star";

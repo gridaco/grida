@@ -769,41 +769,70 @@ function __self_evt_on_drag(
           d = -Math.round(dx);
         }
 
-        if (anchor) {
-          const keyMap = {
-            nw: "rectangular_corner_radius_top_left",
-            ne: "rectangular_corner_radius_top_right",
-            se: "rectangular_corner_radius_bottom_right",
-            sw: "rectangular_corner_radius_bottom_left",
-          } as const;
+        // Only rectangle, container, and component support rectangular corner radius
+        // All other node types use unified corner_radius
+        switch (node.type) {
+          case "rectangle":
+          case "container":
+          case "component":
+          case "image":
+          case "video": {
+            if (anchor) {
+              const keyMap = {
+                nw: "rectangular_corner_radius_top_left",
+                ne: "rectangular_corner_radius_top_right",
+                se: "rectangular_corner_radius_bottom_right",
+                sw: "rectangular_corner_radius_bottom_left",
+              } as const;
 
-          const key = keyMap[anchor];
-          const current = (node as any)[key] ?? 0;
-          const nextRadius = current + d;
-          const nextRadiusClamped = Math.floor(
-            Math.min(maxRadius, Math.max(0, nextRadius))
-          );
-          draft.document.nodes[node_id] = nodeReducer(node, {
-            type: "node/change/*",
-            [key]: nextRadiusClamped,
-            node_id,
-          });
-        } else {
-          const current =
-            typeof node.corner_radius == "number" ? node.corner_radius : 0;
-          const nextRadius = current + d;
-          const nextRadiusClamped = Math.floor(
-            Math.min(maxRadius, Math.max(0, nextRadius))
-          );
-          draft.document.nodes[node_id] = nodeReducer(node, {
-            type: "node/change/*",
-            corner_radius: nextRadiusClamped,
-            rectangular_corner_radius_top_left: nextRadiusClamped,
-            rectangular_corner_radius_top_right: nextRadiusClamped,
-            rectangular_corner_radius_bottom_right: nextRadiusClamped,
-            rectangular_corner_radius_bottom_left: nextRadiusClamped,
-            node_id,
-          });
+              const key = keyMap[anchor];
+              const current = (node as any)[key] ?? 0;
+              const nextRadius = current + d;
+              const nextRadiusClamped = Math.floor(
+                Math.min(maxRadius, Math.max(0, nextRadius))
+              );
+              draft.document.nodes[node_id] = nodeReducer(node, {
+                type: "node/change/*",
+                [key]: nextRadiusClamped,
+                node_id,
+              });
+            } else {
+              const current =
+                typeof node.corner_radius == "number" ? node.corner_radius : 0;
+              const nextRadius = current + d;
+              const nextRadiusClamped = Math.floor(
+                Math.min(maxRadius, Math.max(0, nextRadius))
+              );
+              draft.document.nodes[node_id] = nodeReducer(node, {
+                type: "node/change/*",
+                corner_radius: nextRadiusClamped,
+                rectangular_corner_radius_top_left: nextRadiusClamped,
+                rectangular_corner_radius_top_right: nextRadiusClamped,
+                rectangular_corner_radius_bottom_right: nextRadiusClamped,
+                rectangular_corner_radius_bottom_left: nextRadiusClamped,
+                node_id,
+              });
+            }
+            break;
+          }
+          case "polygon":
+          case "star":
+          case "vector":
+          case "boolean": {
+            // These node types use unified corner_radius
+            const current =
+              typeof node.corner_radius == "number" ? node.corner_radius : 0;
+            const nextRadius = current + d;
+            const nextRadiusClamped = Math.floor(
+              Math.min(maxRadius, Math.max(0, nextRadius))
+            );
+            draft.document.nodes[node_id] = nodeReducer(node, {
+              type: "node/change/*",
+              corner_radius: nextRadiusClamped,
+              node_id,
+            });
+            break;
+          }
         }
 
         break;
