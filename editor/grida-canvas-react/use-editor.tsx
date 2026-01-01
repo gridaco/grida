@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { Editor } from "@/grida-canvas/editor";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
@@ -62,6 +64,8 @@ export function useEditor(
   backend: editor.EditorContentRenderingBackend = "dom",
   ui: editor.ui.UIUXProviders = {
     notify: NOTIFY,
+    clipboard: navigator.clipboard,
+    eyedropper: () => new window.EyeDropper(),
   }
 ) {
   const [_editor] = React.useState(() => {

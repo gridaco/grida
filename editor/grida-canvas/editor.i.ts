@@ -4646,10 +4646,37 @@ export namespace editor.ui {
     level?: "info" | "success" | "error" | "warning"
   ) => void;
 
+  interface EyeDropperOpenOptions {
+    /**
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal
+     */
+    signal?: AbortSignal;
+  }
+
+  export type EyeDropper = {
+    /**
+     *
+     * @returns A promise that resolves with the hex color string if a color was picked, or undefined if cancelled.
+     *          The hex string is in sRGB format (#aabbcc).
+     *          @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
+     */
+    open(options?: EyeDropperOpenOptions): Promise<{ sRGBHex: string }>;
+  };
+
   /**
    * UI/Browser dependent UX actions.
    */
   export interface UIUXProviders {
     notify?: UINotifier;
+
+    /**
+     * @default navigator.clipboard
+     */
+    clipboard?: Clipboard;
+
+    /**
+     * @default `() => new window.EyeDropper()`
+     */
+    eyedropper?: () => EyeDropper;
   }
 }

@@ -3935,7 +3935,8 @@ export class EditorSurface
     } = {
       pointer_move_throttle_ms: 30,
     },
-    readonly ui: editor.ui.UIUXProviders = {}
+    readonly ui: editor.ui.UIUXProviders = {},
+    readonly window: (Window & typeof globalThis) | null | undefined = undefined
   ) {
     this.camera = _editor.camera;
     this.__pligin_follow = new EditorFollowPlugin(_editor);
@@ -4662,9 +4663,9 @@ export class EditorSurface
     });
 
     try {
-      await navigator.clipboard.write([item]);
+      await this.ui.clipboard?.write([item]);
     } catch (error) {
-      await navigator.clipboard.writeText(data);
+      await this.ui.clipboard?.writeText(data);
     }
 
     return true;
@@ -5386,25 +5387,17 @@ export class EditorSurface
    * ```
    */
   public async promptColorPicker(): Promise<string | undefined> {
-    if (!window.EyeDropper) {
-      throw new Error(
-        "EyeDropper is not available on this browser (use Chrome)"
-      );
-    }
-
-    const eyeDropper = new window.EyeDropper();
-
     try {
-      const result: {
-        /**
-         * A string representing the selected color, in hexadecimal sRGB format (#aabbcc).
-         * @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
-         */
-        sRGBHex: string;
-      } = await eyeDropper.open();
-      return result.sRGBHex;
+      if (!this.ui.eyedropper) {
+        return undefined;
+      }
+      const i = this.ui.eyedropper();
+      if (!i) {
+        return undefined;
+      }
+      const result = await i.open();
+      return result?.sRGBHex;
     } catch (error) {
-      // User cancelled or error occurred - return undefined
       return undefined;
     }
   }
@@ -5442,7 +5435,7 @@ export class EditorSurface
       } else {
         // No selection - set clipboard color, copy hex, and show toast
         this.a11ySetClipboardColor(color);
-        await window.navigator.clipboard.writeText(hex);
+        await this.ui.clipboard?.writeText(hex);
         this.ui.notify?.(`Copied hex color to clipboard ${hex}`, "success");
       }
     } catch (error: any) {
