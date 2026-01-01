@@ -827,14 +827,12 @@ function PaintTabsContent({
 
   if (isGradientPaint(value)) {
     return (
-      <div className="p-2 space-y-4" data-testid="view-paint-gradient">
-        <GradientControls
-          value={value}
-          onValueChange={onValueChange}
-          selectedGradientStop={selectedGradientStop}
-          onSelectedGradientStopChange={onSelectedGradientStopChange}
-        />
-      </div>
+      <GradientControls
+        value={value}
+        onValueChange={onValueChange}
+        selectedGradientStop={selectedGradientStop}
+        onSelectedGradientStopChange={onSelectedGradientStopChange}
+      />
     );
   }
 
@@ -865,8 +863,8 @@ function GradientControls({
   onSelectedGradientStopChange?: (stop: number) => void;
 }) {
   return (
-    <>
-      <div className="flex items-center justify-between gap-4">
+    <div data-testid="view-paint-gradient" className="pb-4">
+      <header className="flex items-center justify-between gap-4 p-2">
         <PropertyEnum<cg.Paint["type"]>
           enum={gradient_types}
           value={value.type}
@@ -879,14 +877,14 @@ function GradientControls({
           className="w-24"
         />
         <GradientActions value={value} onValueChange={onValueChange} />
-      </div>
+      </header>
       <GradientControl
         value={value}
         onValueChange={onValueChange}
         selectedStop={selectedGradientStop}
         onSelectedStopChange={onSelectedGradientStopChange}
       />
-    </>
+    </div>
   );
 }
 

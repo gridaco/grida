@@ -79,22 +79,28 @@ export function RGBA32FColorControl({
   onValueChange,
   disabled,
   variant = "default",
+  onFocus,
+  onBlur,
 }: {
   value?: kolor.colorformats.RGBA32F;
   disabled?: boolean;
   onValueChange?: (value: kolor.colorformats.RGBA32F) => void;
   variant?: "default" | "with-opacity";
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = React.useState(false);
 
   const handleInputFocus = React.useCallback(() => {
     setIsFocused(true);
-  }, []);
+    onFocus?.();
+  }, [onFocus]);
 
   const handleInputBlur = React.useCallback(() => {
     setIsFocused(false);
-  }, []);
+    onBlur?.();
+  }, [onBlur]);
 
   return (
     <Popover modal={false}>

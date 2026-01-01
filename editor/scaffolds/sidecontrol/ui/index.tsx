@@ -40,6 +40,48 @@ export function PropertyLine({
   );
 }
 
+export function PropertyRowsV2({
+  children,
+  className,
+  ...props
+}: React.ComponentProps<"div"> & {
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className={cn("flex flex-col", className)} {...props}>
+      {children}
+    </div>
+  );
+}
+
+export function PropertyRowV2({
+  children,
+  className,
+  hidden,
+  disabled,
+  focused,
+}: React.PropsWithChildren<{
+  className?: string;
+  hidden?: boolean;
+  disabled?: boolean;
+  focused?: boolean;
+}>) {
+  return (
+    <div
+      data-hidden={hidden}
+      data-disabled={disabled}
+      data-focused={focused}
+      className={cn(
+        "group flex items-start justify-between max-w-full px-2 py-1 data-[hidden='true']:hidden data-[disabled='true']:opacity-50 data-[disabled='true']:pointer-events-none data-[disabled='true']:cursor-not-allowed data-[focused='true']:bg-accent",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function PropertyLineLabel({
   children,
   className,
