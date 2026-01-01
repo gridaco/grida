@@ -2275,6 +2275,7 @@ export namespace grida.program.nodes {
       i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
+      i.IStroke,
       i.IRectangularStrokeWidth,
       Partial<i.IPadding>,
       i.IFlexContainer {
@@ -2900,6 +2901,11 @@ export namespace grida.program.nodes {
         rectangular_corner_radius_bottom_left: 0,
         rectangular_corner_radius_bottom_right: 0,
         style: {},
+        stroke_width: 1,
+        stroke_align: "inside",
+        stroke_cap: "butt",
+        stroke_join: "miter",
+        stroke_miter_limit: 4,
         // children_refs: [],
         ...partial,
       };

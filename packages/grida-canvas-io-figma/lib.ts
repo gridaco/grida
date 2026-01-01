@@ -997,6 +997,7 @@ export namespace iofigma {
               }),
               ...positioning_trait(node),
               ...fills_trait(node.fills),
+              ...stroke_trait(node),
               ...style_trait({}),
               ...corner_radius_trait({ cornerRadius: 0 }),
               ...container_layout_trait({}, false),
