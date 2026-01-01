@@ -30,7 +30,7 @@ const ArtboardList = () => {
   );
 
   const onClickItem = (item: ArtboardData) => {
-    editor.commands.insertNode({
+    const inserted = editor.commands.insertNode({
       type: "container",
       position: "absolute",
       name: item.name,
@@ -43,6 +43,8 @@ const ArtboardList = () => {
       },
       children: [],
     });
+    // Select the inserted container
+    editor.commands.select([inserted], "reset");
     // Reset to cursor tool after insertion (matches behavior of insert tool click)
     editor.surface.surfaceSetTool({ type: "cursor" });
   };
