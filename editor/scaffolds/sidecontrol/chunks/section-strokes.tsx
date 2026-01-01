@@ -2,7 +2,7 @@
 
 import React from "react";
 import kolor from "@grida/color";
-import { PropertyLine, PropertyLineLabel } from "../ui";
+import { PropertyRows, PropertyRow, PropertyLineLabel } from "../ui";
 import { PaintControl } from "../controls/paint";
 import {
   StrokeWidthControl,
@@ -173,8 +173,8 @@ export function SectionStrokes({
   );
 
   const additionalContent = has_stroke_paint && (
-    <div className="mt-4 space-y-2">
-      <PropertyLine>
+    <PropertyRows>
+      <PropertyRow>
         <PropertyLineLabel>Width</PropertyLineLabel>
         {supportsStrokeWidth4 ? (
           <StrokeWidth4Control
@@ -203,29 +203,29 @@ export function SectionStrokes({
             onValueCommit={actions.strokeWidth}
           />
         )}
-      </PropertyLine>
-      <PropertyLine>
+      </PropertyRow>
+      <PropertyRow>
         <PropertyLineLabel>Align</PropertyLineLabel>
         <StrokeAlignControl
           value={stroke_align}
           onValueChange={actions.strokeAlign}
         />
-      </PropertyLine>
-      <PropertyLine hidden={config.stroke_cap === "off"}>
+      </PropertyRow>
+      <PropertyRow hidden={config.stroke_cap === "off"}>
         <PropertyLineLabel>Cap</PropertyLineLabel>
         <StrokeCapControl
           value={stroke_cap}
           onValueChange={actions.strokeCap}
         />
-      </PropertyLine>
-      <PropertyLine hidden={config.stroke_join === "off"}>
+      </PropertyRow>
+      <PropertyRow hidden={config.stroke_join === "off"}>
         <PropertyLineLabel>Join</PropertyLineLabel>
         <StrokeJoinControl
           value={stroke_join}
           onValueChange={actions.strokeJoin}
         />
-      </PropertyLine>
-      <PropertyLine
+      </PropertyRow>
+      <PropertyRow
         hidden={config.stroke_join === "off" || stroke_join !== "miter"}
       >
         <PropertyLineLabel>Miter</PropertyLineLabel>
@@ -233,15 +233,15 @@ export function SectionStrokes({
           value={stroke_miter_limit}
           onValueChange={actions.strokeMiterLimit}
         />
-      </PropertyLine>
-      <PropertyLine>
+      </PropertyRow>
+      <PropertyRow>
         <PropertyLineLabel>Style</PropertyLineLabel>
         <StrokeClassControl
           value={strokeClass}
           onValueChange={handleStrokeClassChange}
         />
-      </PropertyLine>
-      <PropertyLine
+      </PropertyRow>
+      <PropertyRow
         hidden={!stroke_dash_array || stroke_dash_array.length === 0}
       >
         <PropertyLineLabel>Dash</PropertyLineLabel>
@@ -249,8 +249,8 @@ export function SectionStrokes({
           value={stroke_dash_array}
           onValueCommit={actions.strokeDashArray}
         />
-      </PropertyLine>
-    </div>
+      </PropertyRow>
+    </PropertyRows>
   );
 
   return (

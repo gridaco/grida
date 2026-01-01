@@ -2,12 +2,14 @@
 
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
-  SidebarMenuSectionContent,
-  SidebarSection,
-  SidebarSectionHeaderActions,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-} from "@/components/sidebar";
+  PropertySection,
+  PropertySectionContent,
+  PropertySectionHeaderItem,
+  PropertySectionHeaderLabel,
+  PropertySectionHeaderActions,
+  PropertyRow,
+  PropertyLineLabel,
+} from "./ui";
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
 import { FontStyleControl } from "./controls/font-style";
@@ -24,7 +26,6 @@ import { FlexAlignControl } from "./controls/flex-align";
 import { FlexWrapControl } from "./controls/flex-wrap";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
-import { PropertyLine, PropertyLineLabel } from "./ui";
 import { SrcControl } from "./controls/src";
 import { BoxFitControl } from "./controls/box-fit";
 import { PropsControl } from "./controls/props";
@@ -376,9 +377,9 @@ function ModeMixedNodeProperties({
 
   return (
     <div key={sid} className="mt-4 mb-10">
-      <SidebarSection hidden={config.base === "off"} className="border-b pb-4">
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine className="items-center gap-1">
+      <PropertySection hidden={config.base === "off"} className="border-b">
+        <PropertySectionContent>
+          <PropertyRow className="items-center gap-1">
             <Checkbox
               checked={active.mixed ? false : active.value}
               disabled={active.mixed}
@@ -405,34 +406,31 @@ function ModeMixedNodeProperties({
               )}
             </Toggle>
             {/* <small className="ms-2 font-mono">{id}</small> */}
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
       {config.position !== "off" && <SectionMixedPosition mp={mp} />}
-      <SidebarSection
-        hidden={config.layout === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine hidden={config.size === "off"}>
+      <PropertySection hidden={config.layout === "off"} className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow hidden={config.size === "off"}>
             <PropertyLineLabel>Width</PropertyLineLabel>
             <LengthPercentageControl
               value={width?.value}
               onValueCommit={change.width}
             />
-          </PropertyLine>
-          <PropertyLine hidden={config.size === "off"}>
+          </PropertyRow>
+          <PropertyRow hidden={config.size === "off"}>
             <PropertyLineLabel>Height</PropertyLineLabel>
             <LengthPercentageControl
               value={height?.value}
               onValueCommit={change.height}
             />
-          </PropertyLine>
+          </PropertyRow>
           {types.has("container") && (
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Flow</PropertyLineLabel>
               <LayoutControl
                 value={
@@ -456,9 +454,9 @@ function ModeMixedNodeProperties({
                   }
                 }}
               />
-            </PropertyLine>
+            </PropertyRow>
           )}
-          <PropertyLine hidden={!has_flex_container}>
+          <PropertyRow hidden={!has_flex_container}>
             <PropertyLineLabel>Alignment</PropertyLineLabel>
             <FlexAlignControl
               className="w-full"
@@ -483,8 +481,8 @@ function ModeMixedNodeProperties({
                 change.cross_axis_alignment(value.crossAxisAlignment);
               }}
             />
-          </PropertyLine>
-          <PropertyLine hidden={!has_flex_container}>
+          </PropertyRow>
+          <PropertyRow hidden={!has_flex_container}>
             <PropertyLineLabel>Gap</PropertyLineLabel>
             <GapControl
               mode={layout_wrap?.value === "wrap" ? "multiple" : "single"}
@@ -499,8 +497,8 @@ function ModeMixedNodeProperties({
               }}
               onValueCommit={change.gap}
             />
-          </PropertyLine>
-          <PropertyLine hidden={!has_container}>
+          </PropertyRow>
+          <PropertyRow hidden={!has_container}>
             <PropertyLineLabel>Padding</PropertyLineLabel>
             <PaddingControl
               value={{
@@ -523,31 +521,31 @@ function ModeMixedNodeProperties({
               }}
               onValueCommit={change.padding}
             />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection hidden={!has_stylable} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
+      <PropertySection hidden={!has_stylable} className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Appearance</PropertySectionHeaderLabel>
+          <PropertySectionHeaderActions>
             <BlendModeDropdown
               type="layer"
               value={blend_mode?.value}
               onValueChange={change.blend_mode}
             />
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+          </PropertySectionHeaderActions>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
             <PropertyLineLabel>Opacity</PropertyLineLabel>
             <OpacityControl
               value={opacity?.value}
               // onValueChange={change.opacity}
               onValueCommit={change.opacity}
             />
-          </PropertyLine>
+          </PropertyRow>
           {supports_corner_radius && (
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Radius</PropertyLineLabel>
               {corner_radius?.mixed ? (
                 <CornerRadius4Control onValueCommit={change.corner_radius} />
@@ -578,52 +576,52 @@ function ModeMixedNodeProperties({
                   onValueCommit={change.corner_radius}
                 />
               )}
-            </PropertyLine>
+            </PropertyRow>
           )}
           {/* {supports.border(node.type) && (
-              <PropertyLine>
+              <PropertyRow>
                 <PropertyLineLabel>Border</PropertyLineLabel>
                 <BorderControl value={border} onValueChange={actions.border} />
-              </PropertyLine>
+              </PropertyRow>
             )} */}
 
-          {/* <PropertyLine>
+          {/* <PropertyRow>
               <PropertyLineLabel>Shadow</PropertyLineLabel>
               <BoxShadowControl
                 value={{ boxShadow }}
                 onValueChange={actions.boxShadow}
               />
-            </PropertyLine> */}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+            </PropertyRow> */}
+        </PropertySectionContent>
+      </PropertySection>
 
       {/* TODO: */}
-      {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent>
+      {/* <PropertySection hidden={!is_templateinstance} className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Template</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
+          <PropertySectionContent>
             <TemplateControl
               value={component_id}
               onValueChange={actions.component}
             />
-          </SidebarMenuSectionContent>
-        </SidebarSection> */}
-      {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
+          </PropertySectionContent>
+        </PropertySection> */}
+      {/* <PropertySection hidden={!is_templateinstance} className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Props</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
 
           {properties && (
-            <SidebarMenuSectionContent className="space-y-2">
+            <PropertySectionContent>
               <PropsControl
                 properties={properties}
                 props={computed.props || {}}
                 onValueChange={actions.value}
               />
-            </SidebarMenuSectionContent>
+            </PropertySectionContent>
           )}
-        </SidebarSection> */}
+        </PropertySection> */}
       {config.text !== "off" && types.has("text") && (
         <CurrentFontProvider
           description={{
@@ -647,12 +645,12 @@ function ModeMixedNodeProperties({
                 : undefined,
           }}
         >
-          <SidebarSection className="border-b pb-4">
-            <SidebarSectionHeaderItem>
-              <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-            </SidebarSectionHeaderItem>
-            <SidebarMenuSectionContent className="space-y-2">
-              <PropertyLine>
+          <PropertySection className="border-b">
+            <PropertySectionHeaderItem>
+              <PropertySectionHeaderLabel>Text</PropertySectionHeaderLabel>
+            </PropertySectionHeaderItem>
+            <PropertySectionContent>
+              <PropertyRow>
                 <PropertyLineLabel>Font</PropertyLineLabel>
                 <div className="flex-1">
                   <FontFamilyControl
@@ -660,96 +658,93 @@ function ModeMixedNodeProperties({
                     onValueChange={change.font_family}
                   />
                 </div>
-              </PropertyLine>
-              <PropertyLine>
+              </PropertyRow>
+              <PropertyRow>
                 <PropertyLineLabel>Style</PropertyLineLabel>
                 <FontStyleControlScaffold selection={ids} />
-              </PropertyLine>
-              <PropertyLine>
+              </PropertyRow>
+              <PropertyRow>
                 <PropertyLineLabel>Size</PropertyLineLabel>
                 <FontSizeControl
                   value={font_size?.value}
                   onValueCommit={change.font_size}
                 />
-              </PropertyLine>
-              <PropertyLine>
+              </PropertyRow>
+              <PropertyRow>
                 <PropertyLineLabel>Line</PropertyLineLabel>
                 <LineHeightControl
                   value={line_height?.value}
                   onValueCommit={change.line_height}
                 />
-              </PropertyLine>
-              <PropertyLine>
+              </PropertyRow>
+              <PropertyRow>
                 <PropertyLineLabel>Letter</PropertyLineLabel>
                 <LetterSpacingControl
                   value={letter_spacing?.value}
                   onValueCommit={change.letter_spacing}
                 />
-              </PropertyLine>
-              <PropertyLine>
+              </PropertyRow>
+              <PropertyRow>
                 <PropertyLineLabel>Align</PropertyLineLabel>
                 <TextAlignControl
                   value={text_align?.value}
                   onValueChange={change.text_align}
                 />
-              </PropertyLine>
-              <PropertyLine>
+              </PropertyRow>
+              <PropertyRow>
                 <PropertyLineLabel></PropertyLineLabel>
                 <TextAlignVerticalControl
                   value={text_align_vertical?.value}
                   onValueChange={change.text_align_vertical}
                 />
-              </PropertyLine>
-              <PropertyLine>
+              </PropertyRow>
+              <PropertyRow>
                 <PropertyLineLabel>Max Length</PropertyLineLabel>
                 <MaxlengthControl disabled placeholder={"multiple"} />
-              </PropertyLine>
-            </SidebarMenuSectionContent>
-          </SidebarSection>
+              </PropertyRow>
+            </PropertySectionContent>
+          </PropertySection>
         </CurrentFontProvider>
       )}
-      <SidebarSection
+      <PropertySection
         hidden={config.image === "off" || !types.has("image")}
-        className="border-b pb-4"
+        className="border-b"
       >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          {/* <PropertyLine>
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Image</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          {/* <PropertyRow>
               <PropertyLineLabel>Source</PropertyLineLabel>
               <SrcControl value={node.src} onValueChange={actions.src} />
-            </PropertyLine> */}
-          <PropertyLine>
+            </PropertyRow> */}
+          <PropertyRow>
             <PropertyLineLabel>Fit</PropertyLineLabel>
             <BoxFitControl value={fit?.value} onValueChange={change.fit} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection
-        hidden={config.layout === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine hidden={config.size === "off"}>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
+      <PropertySection hidden={config.layout === "off"} className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow hidden={config.size === "off"}>
             <PropertyLineLabel>Width</PropertyLineLabel>
             <LengthPercentageControl
               value={width?.value}
               onValueCommit={change.width}
             />
-          </PropertyLine>
-          <PropertyLine hidden={config.size === "off"}>
+          </PropertyRow>
+          <PropertyRow hidden={config.size === "off"}>
             <PropertyLineLabel>Height</PropertyLineLabel>
             <LengthPercentageControl
               value={height?.value}
               onValueCommit={change.height}
             />
-          </PropertyLine>
+          </PropertyRow>
           {types.has("container") && (
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Flow</PropertyLineLabel>
               <LayoutControl
                 value={
@@ -773,9 +768,9 @@ function ModeMixedNodeProperties({
                   }
                 }}
               />
-            </PropertyLine>
+            </PropertyRow>
           )}
-          <PropertyLine hidden={!has_flex_container}>
+          <PropertyRow hidden={!has_flex_container}>
             <PropertyLineLabel>Alignment</PropertyLineLabel>
             <FlexAlignControl
               className="w-full"
@@ -800,36 +795,36 @@ function ModeMixedNodeProperties({
                 change.cross_axis_alignment(value.crossAxisAlignment);
               }}
             />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
 
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+      <PropertySection className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Fills</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
             <PropertyLineLabel>Fill</PropertyLineLabel>
             {fill?.mixed || fill?.partial ? (
               <PaintControl value={undefined} onValueChange={change.fill} />
             ) : (
               <PaintControl value={fill?.value} onValueChange={change.fill} />
             )}
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
       {/* TODO: Refactor this stroke section to use @editor/scaffolds/sidecontrol/chunks/section-strokes.tsx
           for mixed/multiple selection as well. Currently, this section manually handles stroke width
           visibility (setting to 1 if unset/0) in a "dirty way" - this should be moved to use the
           centralized `ensureStrokeWidth` parameter in `addNodeStroke`/`changeNodePropertyStrokes`. */}
       {supports_stroke && (
-        <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Strokes</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
+        <PropertySection className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Strokes</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
+          <PropertySectionContent>
+            <PropertyRow>
               <PropertyLineLabel>Color</PropertyLineLabel>
               {stroke?.mixed || stroke?.partial ? (
                 <PaintControl
@@ -854,36 +849,36 @@ function ModeMixedNodeProperties({
                   }}
                 />
               )}
-            </PropertyLine>
-            <PropertyLine hidden={!stroke?.value}>
+            </PropertyRow>
+            <PropertyRow hidden={!stroke?.value}>
               <PropertyLineLabel>Width</PropertyLineLabel>
               <StrokeWidthControl
                 value={stroke_width?.value}
                 onValueCommit={change.stroke_width}
               />
-            </PropertyLine>
-            <PropertyLine hidden={!stroke?.value || !supports_stroke_cap}>
+            </PropertyRow>
+            <PropertyRow hidden={!stroke?.value || !supports_stroke_cap}>
               <PropertyLineLabel>Cap</PropertyLineLabel>
               <StrokeCapControl
                 value={stroke_cap?.value}
                 onValueChange={change.stroke_cap}
               />
-            </PropertyLine>
-            <PropertyLine hidden={!stroke?.value}>
+            </PropertyRow>
+            <PropertyRow hidden={!stroke?.value}>
               <PropertyLineLabel>Align</PropertyLineLabel>
               <StrokeAlignControl
                 value={stroke_align?.value}
                 onValueChange={change.stroke_align}
               />
-            </PropertyLine>
-            <PropertyLine hidden={!stroke?.value}>
+            </PropertyRow>
+            <PropertyRow hidden={!stroke?.value}>
               <PropertyLineLabel>Join</PropertyLineLabel>
               <StrokeJoinControl
                 value={stroke_join?.value}
                 onValueChange={change.stroke_join}
               />
-            </PropertyLine>
-            <PropertyLine
+            </PropertyRow>
+            <PropertyRow
               hidden={
                 !stroke?.value ||
                 stroke_join?.value === grida.mixed ||
@@ -896,38 +891,38 @@ function ModeMixedNodeProperties({
                 value={stroke_miter_limit?.value}
                 onValueChange={change.stroke_miter_limit}
               />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+            </PropertyRow>
+          </PropertySectionContent>
+        </PropertySection>
       )}
       {backend === "dom" && (
-        <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Actions</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            {/* <PropertyLine>
+        <PropertySection className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Actions</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
+          <PropertySectionContent>
+            {/* <PropertyRow>
                 <PropertyLineLabel>Link To</PropertyLineLabel>
                 <HrefControl value={node.href} onValueChange={actions.href} />
-              </PropertyLine>
+              </PropertyRow>
               {node.href && (
-                <PropertyLine>
+                <PropertyRow>
                   <PropertyLineLabel>New Tab</PropertyLineLabel>
                   <TargetBlankControl
                     value={node.target}
                     onValueChange={actions.target}
                   />
-                </PropertyLine>
+                </PropertyRow>
               )} */}
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Cursor</PropertyLineLabel>
               <CursorControl
                 value={cursor?.value}
                 onValueChange={change.cursor}
               />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+            </PropertyRow>
+          </PropertySectionContent>
+        </PropertySection>
       )}
       {/* #region selection colors */}
       <SelectionColors />
@@ -1039,9 +1034,9 @@ function ModeNodeProperties({
 
   return (
     <div key={node_id} className="mt-4 mb-10">
-      <SidebarSection hidden={config.base === "off"} className="border-b pb-4">
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine className="items-center gap-1">
+      <PropertySection hidden={config.base === "off"} className="border-b">
+        <PropertySectionContent>
+          <PropertyRow className="items-center gap-1">
             <ConfigurableProperty propertyName="active" propertyType="boolean">
               <Checkbox
                 className="me-1"
@@ -1064,48 +1059,45 @@ function ModeNodeProperties({
                 <LockOpen1Icon className="size-3" />
               )}
             </Toggle>
-          </PropertyLine>
+          </PropertyRow>
 
           {debug && (
-            <PropertyLine className="items-center gap-1">
+            <PropertyRow className="items-center gap-1">
               <PropertyLineLabel>id</PropertyLineLabel>
               <small className="ms-2 font-mono">{id}</small>
-            </PropertyLine>
+            </PropertyRow>
           )}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+        </PropertySectionContent>
+      </PropertySection>
       {config.position !== "off" && <SectionPosition node_id={node_id} />}
 
-      <SidebarSection
+      <PropertySection
         hidden={config.template === "off" || !is_templateinstance}
-        className="border-b pb-4"
+        className="border-b"
       >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Template</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
           <TemplateControl
             value={component_id}
             onValueChange={actions.component}
           />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+        </PropertySectionContent>
+      </PropertySection>
       {config.props !== "off" && is_templateinstance && (
         <SectionProps node_id={node_id} />
       )}
 
       <SectionMask node_id={node_id} editor={instance} />
 
-      <SidebarSection
-        hidden={config.layout === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
+      <PropertySection hidden={config.layout === "off"} className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
           {is_container && (
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Flow</PropertyLineLabel>
               <LayoutControl
                 value={{
@@ -1120,10 +1112,10 @@ function ModeNodeProperties({
                   // }
                 }}
               />
-            </PropertyLine>
+            </PropertyRow>
           )}
           {config.size !== "off" && <SectionDimension node_id={node_id} />}
-          <PropertyLine hidden={!is_flex_container}>
+          <PropertyRow hidden={!is_flex_container}>
             <PropertyLineLabel>Alignment</PropertyLineLabel>
             <FlexAlignControl
               className="w-full"
@@ -1142,15 +1134,15 @@ function ModeNodeProperties({
                 actions.crossAxisAlignment(value.crossAxisAlignment);
               }}
             />
-          </PropertyLine>
-          <PropertyLine hidden={!is_flex_container}>
+          </PropertyRow>
+          <PropertyRow hidden={!is_flex_container}>
             <PropertyLineLabel>Wrap</PropertyLineLabel>
             <FlexWrapControl
               value={layout_wrap}
               onValueChange={actions.layoutWrap}
             />
-          </PropertyLine>
-          <PropertyLine hidden={!is_flex_container}>
+          </PropertyRow>
+          <PropertyRow hidden={!is_flex_container}>
             <PropertyLineLabel>Gap</PropertyLineLabel>
             <GapControl
               mode={layout_wrap === "wrap" ? "multiple" : "single"}
@@ -1160,34 +1152,34 @@ function ModeNodeProperties({
               }}
               onValueCommit={actions.gap}
             />
-          </PropertyLine>
+          </PropertyRow>
           <PropertyPaddingLine node_id={node_id} />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+        </PropertySectionContent>
+      </PropertySection>
 
-      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
+      <PropertySection hidden={!is_stylable} className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Appearance</PropertySectionHeaderLabel>
+          <PropertySectionHeaderActions>
             <BlendModeDropdown
               type="layer"
               value={blend_mode}
               onValueChange={actions.blend_mode}
             />
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
+          </PropertySectionHeaderActions>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
           <PropertyLineOpacity node_id={node_id} />
           {supports.border(node.type, { backend }) && (
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Border</PropertyLineLabel>
               <BorderControl value={border} onValueChange={actions.border} />
-            </PropertyLine>
+            </PropertyRow>
           )}
           {supports.cornerRadius(node.type, { backend }) && (
             <>
               {supports.cornerRadius4(node.type, { backend }) ? (
-                <PropertyLine>
+                <PropertyRow>
                   <PropertyLineLabelWithNumberGesture
                     step={1}
                     sensitivity={0.1}
@@ -1204,9 +1196,9 @@ function ModeNodeProperties({
                     }}
                     onValueCommit={actions.corner_radius}
                   />
-                </PropertyLine>
+                </PropertyRow>
               ) : (
-                <PropertyLine>
+                <PropertyRow>
                   <PropertyLineLabelWithNumberGesture
                     step={1}
                     sensitivity={0.1}
@@ -1218,7 +1210,7 @@ function ModeNodeProperties({
                     value={corner_radius}
                     onValueCommit={actions.corner_radius}
                   />
-                </PropertyLine>
+                </PropertyRow>
               )}
             </>
           )}
@@ -1226,7 +1218,7 @@ function ModeNodeProperties({
             <>
               {point_count != null &&
                 supports.pointCount(node.type, { backend }) && (
-                  <PropertyLine>
+                  <PropertyRow>
                     <PropertyLineLabel>Count</PropertyLineLabel>
                     <InputPropertyNumber
                       mode="fixed"
@@ -1235,10 +1227,10 @@ function ModeNodeProperties({
                       value={point_count}
                       onValueCommit={actions.pointCount}
                     />
-                  </PropertyLine>
+                  </PropertyRow>
                 )}
               {inner_radius != null && type !== "ellipse" && (
-                <PropertyLine>
+                <PropertyRow>
                   <PropertyLineLabel>Ratio</PropertyLineLabel>
                   <InputPropertyNumber
                     mode="fixed"
@@ -1248,12 +1240,12 @@ function ModeNodeProperties({
                     value={inner_radius}
                     onValueCommit={actions.innerRadius}
                   />
-                </PropertyLine>
+                </PropertyRow>
               )}
             </>
           )}
           {supports.arcData(node.type, { backend }) && (
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Arc</PropertyLineLabel>
               <ArcPropertiesControl
                 value={{
@@ -1265,30 +1257,30 @@ function ModeNodeProperties({
                   actions.arcData(v);
                 }}
               />
-            </PropertyLine>
+            </PropertyRow>
           )}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+        </PropertySectionContent>
+      </PropertySection>
 
       {config.text === "on" && is_text && <SectionText node_id={node_id} />}
-      <SidebarSection
+      <PropertySection
         hidden={config.image === "off" || !is_image}
-        className="border-b pb-4"
+        className="border-b"
       >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Image</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
             <PropertyLineLabel>Source</PropertyLineLabel>
             <SrcControl value={node.src} onValueChange={actions.src} />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Fit</PropertyLineLabel>
             <BoxFitControl value={fit} onValueChange={actions.fit} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
 
       <SectionFills node_id={node_id} />
       {supports.stroke(node.type, { backend }) && (
@@ -1304,46 +1296,43 @@ function ModeNodeProperties({
       )}
       <SectionEffects node_id={node_id} />
       {backend === "dom" && (
-        <SidebarSection
-          hidden={config.link === "off"}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Actions</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
+        <PropertySection hidden={config.link === "off"} className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Actions</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
+          <PropertySectionContent>
+            <PropertyRow>
               <PropertyLineLabel>Link To</PropertyLineLabel>
               <HrefControl value={href} onValueChange={actions.href} />
-            </PropertyLine>
+            </PropertyRow>
             {href && (
-              <PropertyLine>
+              <PropertyRow>
                 <PropertyLineLabel>New Tab</PropertyLineLabel>
                 <TargetBlankControl
                   value={target}
                   onValueChange={actions.target}
                 />
-              </PropertyLine>
+              </PropertyRow>
             )}
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Cursor</PropertyLineLabel>
               <CursorControl value={cursor} onValueChange={actions.cursor} />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+            </PropertyRow>
+          </PropertySectionContent>
+        </PropertySection>
       )}
       <SelectionColors />
       {config.export !== "off" && <ExportSection node_id={id} name={name} />}
-      <SidebarSection hidden={config.developer === "off"} className="pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+      <PropertySection hidden={config.developer === "off"} className="pb-4">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Developer</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
             <UserDataControl node_id={id} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
     </div>
   );
 }
@@ -1353,7 +1342,7 @@ function PropertyLineOpacity({ node_id }: { node_id: string }) {
   const opacity = useNodeState(node_id, (node) => node.opacity);
 
   return (
-    <PropertyLine>
+    <PropertyRow>
       <PropertyLineLabelWithNumberGesture
         step={0.01}
         min={0}
@@ -1363,7 +1352,7 @@ function PropertyLineOpacity({ node_id }: { node_id: string }) {
         Opacity
       </PropertyLineLabelWithNumberGesture>
       <OpacityControl value={opacity as any} onValueCommit={actions.opacity} />
-    </PropertyLine>
+    </PropertyRow>
   );
 }
 
@@ -1396,15 +1385,15 @@ function SectionPosition({ node_id }: { node_id: string }) {
   );
 
   return (
-    <SidebarSection hidden={is_single_mode_root} className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <div className="pb-2 border-b">
+    <PropertySection hidden={is_single_mode_root} className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Position</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        <div className="pb-2 border-b px-4">
           <Align disabled={is_root} />
         </div>
-        <PropertyLine>
+        <div className="py-4 px-4">
           <PositioningConstraintsControl
             value={{
               position: position!,
@@ -1419,15 +1408,15 @@ function SectionPosition({ node_id }: { node_id: string }) {
             }}
             onValueCommit={actions.positioning}
           />
-        </PropertyLine>
-        <PropertyLine hidden={is_root}>
+        </div>
+        <PropertyRow hidden={is_root}>
           <PropertyLineLabel>Mode</PropertyLineLabel>
           <PositioningModeControl
             value={position}
             onValueChange={actions.positioningMode}
           />
-        </PropertyLine>
-        <PropertyLine>
+        </PropertyRow>
+        <PropertyRow>
           <PropertyLineLabelWithNumberGesture
             step={1}
             sensitivity={1}
@@ -1436,23 +1425,23 @@ function SectionPosition({ node_id }: { node_id: string }) {
             Rotate
           </PropertyLineLabelWithNumberGesture>
           <RotateControl value={rotation} onValueCommit={actions.rotation} />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+        </PropertyRow>
+      </PropertySectionContent>
+    </PropertySection>
   );
 }
 
 function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <div className="pb-2 border-b">
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Position</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        <div className="pb-2 border-b px-4">
           <Align />
         </div>
-        <PropertyLine>
+        <div className="py-4 px-4">
           <PositioningConstraintsControl
             // TODO:
             value={{
@@ -1464,23 +1453,23 @@ function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
             }}
             // onValueChange={actions.positioning}
           />
-        </PropertyLine>
-        <PropertyLine>
+        </div>
+        <PropertyRow>
           <PropertyLineLabel>Mode</PropertyLineLabel>
           <PositioningModeControl
             value={mp.properties.position!.value}
             onValueChange={mp.actions.positioningMode}
           />
-        </PropertyLine>
-        <PropertyLine>
+        </PropertyRow>
+        <PropertyRow>
           <PropertyLineLabel>Rotate</PropertyLineLabel>
           <RotateControl
             value={mp.properties.rotation?.value}
             onValueCommit={mp.actions.rotation}
           />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+        </PropertyRow>
+      </PropertySectionContent>
+    </PropertySection>
   );
 }
 
@@ -1551,10 +1540,10 @@ function SectionText({ node_id }: { node_id: string }) {
         fontVariations: font_variations,
       }}
     >
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
+      <PropertySection className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Text</PropertySectionHeaderLabel>
+          <PropertySectionHeaderActions>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -1610,10 +1599,10 @@ function SectionText({ node_id }: { node_id: string }) {
                 />
               </DropdownMenuContent>
             </DropdownMenu>
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+          </PropertySectionHeaderActions>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
             <PropertyLineLabel>Font</PropertyLineLabel>
             <div className="flex-1">
               <FontFamilyControl
@@ -1621,19 +1610,19 @@ function SectionText({ node_id }: { node_id: string }) {
                 onValueChange={actions.fontFamily}
               />
             </div>
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Style</PropertyLineLabel>
             <FontStyleControlScaffold selection={[node_id]} />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Size</PropertyLineLabel>
             <FontSizeControl
               value={font_size}
               onValueCommit={actions.fontSize}
             />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabelWithNumberGesture
               step={0.1}
               min={0}
@@ -1645,8 +1634,8 @@ function SectionText({ node_id }: { node_id: string }) {
               value={line_height}
               onValueCommit={actions.lineHeight}
             />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabelWithNumberGesture
               step={0.01}
               onValueChange={actions.letterSpacing}
@@ -1657,23 +1646,23 @@ function SectionText({ node_id }: { node_id: string }) {
               value={letter_spacing}
               onValueCommit={actions.letterSpacing}
             />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <TextAlignControl
               value={text_align}
               onValueChange={actions.textAlign}
             />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel></PropertyLineLabel>
             <TextAlignVerticalControl
               value={text_align_vertical}
               onValueChange={actions.textAlignVertical}
             />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
     </CurrentFontProvider>
   );
 }
@@ -1699,7 +1688,7 @@ function PropertyPaddingLine({ node_id }: { node_id: string }) {
   const is_flex_container = type === "container" && layout === "flex";
 
   return (
-    <PropertyLine hidden={!is_flex_container}>
+    <PropertyRow hidden={!is_flex_container}>
       <PropertyLineLabel>Padding</PropertyLineLabel>
       <PaddingControl
         value={{
@@ -1710,7 +1699,7 @@ function PropertyPaddingLine({ node_id }: { node_id: string }) {
         }}
         onValueCommit={actions.padding}
       />
-    </PropertyLine>
+    </PropertyRow>
   );
 }
 
@@ -1756,24 +1745,24 @@ function SectionProps({ node_id }: { node_id: string }) {
   const computed = useComputedNode(node_id);
 
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Props</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
       {properties && Object.keys(properties).length ? (
-        <SidebarMenuSectionContent className="space-y-2">
+        <PropertySectionContent>
           <PropsControl
             properties={properties}
             props={computed.props || {}}
             onValueChange={actions.value}
           />
-        </SidebarMenuSectionContent>
+        </PropertySectionContent>
       ) : (
-        <SidebarMenuSectionContent className="space-y-2">
+        <PropertySectionContent>
           <p className="text-xs text-muted-foreground">No properties defined</p>
-        </SidebarMenuSectionContent>
+        </PropertySectionContent>
       )}
-    </SidebarSection>
+    </PropertySection>
   );
 }
 
@@ -1786,10 +1775,10 @@ function SectionMask({ node_id, editor }: { node_id: string; editor: Editor }) {
   if (!mask) return null;
 
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Mask</SidebarSectionHeaderLabel>
-        <SidebarSectionHeaderActions>
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Mask</PropertySectionHeaderLabel>
+        <PropertySectionHeaderActions>
           <Button
             variant="ghost"
             size="xs"
@@ -1799,12 +1788,12 @@ function SectionMask({ node_id, editor }: { node_id: string; editor: Editor }) {
           >
             <TrashIcon className="size-3" />
           </Button>
-        </SidebarSectionHeaderActions>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
+        </PropertySectionHeaderActions>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
         <MaskTypeControl value={mask} onValueChange={actions.maskType} />
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+      </PropertySectionContent>
+    </PropertySection>
   );
 }
 
@@ -1861,23 +1850,23 @@ function SectionEffects({ node_id }: { node_id: string }) {
   const empty = effects.length === 0;
 
   return (
-    <SidebarSection
+    <PropertySection
       hidden={!supports.feDropShadow(type, { backend })}
       data-empty={empty}
-      className="border-b pb-4 [&[data-empty='true']]:pb-0"
+      className="border-b [&[data-empty='true']]:pb-0"
     >
-      <SidebarSectionHeaderItem onClick={onAddEffect}>
-        <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
-        <SidebarSectionHeaderActions>
+      <PropertySectionHeaderItem onClick={onAddEffect}>
+        <PropertySectionHeaderLabel>Effects</PropertySectionHeaderLabel>
+        <PropertySectionHeaderActions>
           <Button variant="ghost" size="icon">
             <PlusIcon className="size-3" />
           </Button>
-        </SidebarSectionHeaderActions>
-      </SidebarSectionHeaderItem>
+        </PropertySectionHeaderActions>
+      </PropertySectionHeaderItem>
       {!empty && (
-        <SidebarMenuSectionContent className="space-y-2">
+        <PropertySectionContent>
           {effects.map((effect, index) => (
-            <PropertyLine key={index}>
+            <PropertyRow key={index}>
               <FeControl
                 value={effect}
                 onValueChange={(value) => {
@@ -1894,11 +1883,11 @@ function SectionEffects({ node_id }: { node_id: string }) {
                   ]);
                 }}
               />
-            </PropertyLine>
+            </PropertyRow>
           ))}
-        </SidebarMenuSectionContent>
+        </PropertySectionContent>
       )}
-    </SidebarSection>
+    </PropertySection>
   );
 }
 
@@ -1927,13 +1916,15 @@ function SelectionColors() {
   const displayedPaints = showAllColors ? paints : paints.slice(0, k);
 
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Selection colors</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>
+          Selection colors
+        </PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
         {displayedPaints.map(({ value, ids }, index) => (
-          <PropertyLine key={index} className="group/color-item">
+          <PropertyRow key={index} className="group/color-item">
             <PaintControl
               value={value}
               onValueChange={(value) => {
@@ -1953,7 +1944,7 @@ function SelectionColors() {
                 <Crosshair2Icon className="size-3" />
               </Button>
             </div>
-          </PropertyLine>
+          </PropertyRow>
         ))}
         {shouldShowButton && (
           <Button
@@ -1968,8 +1959,8 @@ function SelectionColors() {
             See all {paints.length} colors
           </Button>
         )}
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+      </PropertySectionContent>
+    </PropertySection>
   );
 }
 

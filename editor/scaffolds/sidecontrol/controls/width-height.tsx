@@ -26,7 +26,7 @@ export function WidthHeightControl({
   onLockChange?: (locked: boolean) => void;
 }) {
   return (
-    <div className="relative flex flex-col gap-2 py-1">
+    <div className="relative flex flex-col gap-2 py-1 px-4">
       {/* Lock icon positioned between label and controls, spanning both rows */}
       <div className="absolute left-16 top-0 bottom-0 z-10 flex items-center justify-center">
         {/* Top bracket connector (L-shaped, pointing to width input) */}

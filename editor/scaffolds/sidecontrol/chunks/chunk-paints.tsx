@@ -18,13 +18,14 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  SidebarMenuSectionContent,
-  SidebarSection,
-  SidebarSectionHeaderActions,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-} from "@/components/sidebar";
-import { PropertyLine } from "../ui";
+  PropertySection,
+  PropertySectionContent,
+  PropertySectionHeaderItem,
+  PropertySectionHeaderLabel,
+  PropertySectionHeaderActions,
+  PropertyRow,
+  PropertyRows,
+} from "../ui";
 import { Button } from "@/components/ui-editor/button";
 import { Checkbox } from "@/components/ui-editor/checkbox";
 import { PlusIcon, MinusIcon } from "@radix-ui/react-icons";
@@ -493,24 +494,24 @@ export function ChunkPaints({
   const empty = paintList.length === 0;
 
   return (
-    <SidebarSection
+    <PropertySection
       data-empty={empty}
-      className="border-b pb-4 [&[data-empty='true']]:pb-0"
+      className="border-b pb-2 [&[data-empty='true']]:pb-0"
     >
-      <SidebarSectionHeaderItem
+      <PropertySectionHeaderItem
         onClick={isCanvasBackend ? handleAddPaint : undefined}
       >
-        <SidebarSectionHeaderLabel>{title}</SidebarSectionHeaderLabel>
+        <PropertySectionHeaderLabel>{title}</PropertySectionHeaderLabel>
         {isCanvasBackend && (
-          <SidebarSectionHeaderActions>
+          <PropertySectionHeaderActions>
             <Button variant="ghost" size="icon">
               <PlusIcon className="size-3" />
             </Button>
-          </SidebarSectionHeaderActions>
+          </PropertySectionHeaderActions>
         )}
-      </SidebarSectionHeaderItem>
+      </PropertySectionHeaderItem>
       {!empty && (
-        <SidebarMenuSectionContent className="space-y-2">
+        <PropertySectionContent>
           <DndContext
             sensors={sensors}
             onDragEnd={handleDragEnd}
@@ -520,7 +521,7 @@ export function ChunkPaints({
               items={displayPaintItems.map((item) => item.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="space-y-2">
+              <PropertyRows>
                 {displayPaintItems.map(({ id, paint: itemPaint, index }) => {
                   const selectedGradientStop =
                     gradientMode && gradientPaintIndex === index
@@ -548,13 +549,13 @@ export function ChunkPaints({
                     />
                   );
                 })}
-              </div>
+              </PropertyRows>
             </SortableContext>
           </DndContext>
           {additionalContent}
-        </SidebarMenuSectionContent>
+        </PropertySectionContent>
       )}
-    </SidebarSection>
+    </PropertySection>
   );
 }
 
@@ -603,14 +604,8 @@ function PaintRow({
   };
 
   return (
-    <PropertyLine>
-      <div
-        ref={setNodeRef}
-        style={style}
-        className="flex items-center w-full gap-2"
-        {...attributes}
-        {...listeners}
-      >
+    <PropertyRow ref={setNodeRef} {...attributes} {...listeners} style={style}>
+      <div className="flex items-center w-full gap-2">
         <Checkbox
           checked={Boolean(paint?.active)}
           onCheckedChange={(checked) => {
@@ -649,6 +644,6 @@ function PaintRow({
           <MinusIcon className="size-3.5" />
         </Button>
       </div>
-    </PropertyLine>
+    </PropertyRow>
   );
 }

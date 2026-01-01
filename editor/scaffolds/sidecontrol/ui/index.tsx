@@ -1,3 +1,4 @@
+import React from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -10,12 +11,16 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkbenchUI } from "@/components/workbench";
+import { Button } from "@/components/ui-editor/button";
 import { cn } from "@/components/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
 import type { TMixed } from "../controls/utils/types";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import grida from "@grida/schema";
 
+/**
+ * @deprecated use PropertyRow instead
+ */
 export function PropertyLine({
   children,
   className,
@@ -32,48 +37,6 @@ export function PropertyLine({
       data-disabled={disabled}
       className={cn(
         "group flex items-start justify-between max-w-full data-[hidden='true']:hidden data-[disabled='true']:opacity-50 data-[disabled='true']:pointer-events-none data-[disabled='true']:cursor-not-allowed",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-export function PropertyRowsV2({
-  children,
-  className,
-  ...props
-}: React.ComponentProps<"div"> & {
-  className?: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className={cn("flex flex-col", className)} {...props}>
-      {children}
-    </div>
-  );
-}
-
-export function PropertyRowV2({
-  children,
-  className,
-  hidden,
-  disabled,
-  focused,
-}: React.PropsWithChildren<{
-  className?: string;
-  hidden?: boolean;
-  disabled?: boolean;
-  focused?: boolean;
-}>) {
-  return (
-    <div
-      data-hidden={hidden}
-      data-disabled={disabled}
-      data-focused={focused}
-      className={cn(
-        "group flex items-start justify-between max-w-full px-2 py-1 data-[hidden='true']:hidden data-[disabled='true']:opacity-50 data-[disabled='true']:pointer-events-none data-[disabled='true']:cursor-not-allowed data-[focused='true']:bg-accent",
         className
       )}
     >
@@ -99,6 +62,153 @@ export function PropertyLineLabel({
     </Label>
   );
 }
+
+export function PropertySection({
+  children,
+  className,
+  hidden,
+  ...props
+}: React.PropsWithChildren<React.HtmlHTMLAttributes<HTMLDivElement>>) {
+  if (hidden) return null;
+  return (
+    <section className={cn("my-1", className)} {...props}>
+      {children}
+    </section>
+  );
+}
+
+export function PropertySectionContent({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  return <div className={cn("w-full pb-2", className)}>{children}</div>;
+}
+
+export function PropertySectionHeaderItem({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { className?: string }) {
+  return (
+    <div
+      {...props}
+      className={cn(
+        "relative group/property-section-header h-8",
+        "w-full px-4 py-1 my-1 hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "text-ellipsis whitespace-nowrap overflow-hidden",
+        "flex justify-between items-center",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function PropertySectionHeaderLabel({
+  children,
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <span
+      className={cn(
+        "text-xs text-start font-normal text-muted-foreground overflow-hidden text-ellipsis group-hover/property-section-header:text-accent-foreground",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function PropertySectionHeaderActions({
+  children,
+  className,
+  visibleOnHover = false,
+}: React.PropsWithChildren<{
+  className?: string;
+  visibleOnHover?: boolean;
+}>) {
+  return (
+    <span
+      className={cn(
+        "flex justify-center text-xs font-normal text-muted-foreground",
+        visibleOnHover &&
+          "invisible group-hover/property-section-header:visible",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export const PropertySectionHeaderAction = React.forwardRef(
+  function PropertySectionHeaderAction(
+    {
+      children,
+      ...props
+    }: React.PropsWithChildren<React.ComponentProps<typeof Button>>,
+    forwardedRef
+  ) {
+    return (
+      <Button
+        ref={forwardedRef as any}
+        {...props}
+        variant="ghost"
+        size="sm"
+        className={cn("size-5 p-0", props.className)}
+      >
+        {children}
+      </Button>
+    );
+  }
+);
+
+export function PropertyRows({
+  children,
+  className,
+  ...props
+}: React.ComponentProps<"div"> & {
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className={cn("flex flex-col", className)} {...props}>
+      {children}
+    </div>
+  );
+}
+export const PropertyRow = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & {
+    className?: string;
+    hidden?: boolean;
+    disabled?: boolean;
+    focused?: boolean;
+  }
+>(function PropertyRow(
+  { children, className, hidden, disabled, focused, ...props },
+  forwardedRef
+) {
+  return (
+    <div
+      ref={forwardedRef}
+      {...props}
+      data-hidden={hidden}
+      data-disabled={disabled}
+      data-focused={focused}
+      className={cn(
+        "group flex items-start justify-between max-w-full px-4 py-1 data-[hidden='true']:hidden data-[disabled='true']:opacity-50 data-[disabled='true']:pointer-events-none data-[disabled='true']:cursor-not-allowed data-[focused='true']:bg-accent",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+});
 
 export function PropertySeparator() {
   return <Separator />;

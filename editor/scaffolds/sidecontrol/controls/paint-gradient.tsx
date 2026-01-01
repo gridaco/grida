@@ -5,7 +5,7 @@ import { MinusIcon, PlusIcon } from "@radix-ui/react-icons";
 import { GradientStopsSlider } from "@/grida-canvas-react-gradient/gradient-stops-slider";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui-editor/button";
-import { PropertyRowsV2, PropertyRowV2 } from "../ui";
+import { PropertyRows, PropertyRow } from "../ui";
 import InputPropertyPercentage from "../ui/percentage";
 import kolor from "@grida/color";
 
@@ -101,7 +101,7 @@ export function GradientControl({
           <PlusIcon className="size-3" />
         </Button>
       </header>
-      <PropertyRowsV2>
+      <PropertyRows>
         {stops.map((stop, index) => (
           <GradientStopRow
             key={index}
@@ -120,7 +120,7 @@ export function GradientControl({
             }}
           />
         ))}
-      </PropertyRowsV2>
+      </PropertyRows>
     </div>
   );
 }
@@ -141,7 +141,7 @@ function GradientStopRow({
   onFocus?: () => void;
 }) {
   return (
-    <PropertyRowV2 className="flex items-center gap-2" focused={focused}>
+    <PropertyRow className="flex items-center gap-2" focused={focused}>
       <div className="flex-1/4">
         <InputPropertyPercentage
           mode="fixed"
@@ -170,6 +170,6 @@ function GradientStopRow({
           <MinusIcon />
         </Button>
       )}
-    </PropertyRowV2>
+    </PropertyRow>
   );
 }
