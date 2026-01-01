@@ -11,8 +11,11 @@ export {
   useToolState,
   useEditorFlagsState,
   useRootTemplateInstanceNode,
+  useNodeState,
+  useBackendState,
   useTemplateDefinition,
 } from "./provider";
+export { useMixedProperties } from "./use-mixed-properties";
 export {
   StandaloneSceneContent,
   UserCustomTemplatesProvider,

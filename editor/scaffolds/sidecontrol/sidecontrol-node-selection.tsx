@@ -103,8 +103,8 @@ import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
 import { ModeVectorEditModeProperties } from "./chunks/mode-vector";
 import { ScaleToolSection } from "./chunks/scale-tool";
-import { SectionFills } from "./chunks/section-fills";
-import { SectionStrokes } from "./chunks/section-strokes";
+import { SectionFills, SectionFillsMixed } from "./chunks/section-fills";
+import { SectionStrokes, SectionStrokesMixed } from "./chunks/section-strokes";
 import { OpsControl } from "./controls/ext-ops";
 import { MaskControl } from "./controls/ext-mask";
 import {
@@ -1582,131 +1582,6 @@ function SectionMixedText({ ids }: { ids: string[] }) {
   );
 }
 
-function SectionStrokesMixed({
-  ids,
-  supports_stroke_cap,
-}: {
-  ids: string[];
-  supports_stroke_cap: boolean;
-}) {
-  const instance = useCurrentEditor();
-
-  const mp = useMixedProperties(ids, (node) => {
-    return {
-      stroke: node.stroke,
-      stroke_width: node.stroke_width,
-      stroke_cap: node.stroke_cap,
-      stroke_align: node.stroke_align,
-      stroke_join: node.stroke_join,
-      stroke_miter_limit: node.stroke_miter_limit,
-    };
-  });
-
-  const stroke = mp.stroke;
-  const stroke_width = mp.stroke_width;
-  const stroke_cap = mp.stroke_cap;
-  const stroke_align = mp.stroke_align;
-  const stroke_join = mp.stroke_join;
-  const stroke_miter_limit = mp.stroke_miter_limit;
-
-  const has_stroke = Boolean(stroke?.value) && stroke?.value !== grida.mixed;
-
-  return (
-    <PropertySection className="border-b">
-      {/* TODO: Refactor this stroke section to use @editor/scaffolds/sidecontrol/chunks/section-strokes.tsx
-          for mixed/multiple selection as well. Currently, this section manually handles stroke width
-          visibility (setting to 1 if unset/0) in a "dirty way" - this should be moved to use the
-          centralized `ensureStrokeWidth` parameter in `addNodeStroke`/`changeNodePropertyStrokes`. */}
-      <PropertySectionHeaderItem>
-        <PropertySectionHeaderLabel>Strokes</PropertySectionHeaderLabel>
-      </PropertySectionHeaderItem>
-      <PropertySectionContent>
-        <PropertyRow>
-          <PropertyLineLabel>Color</PropertyLineLabel>
-          <PaintControl
-            value={stroke?.mixed || stroke?.partial ? undefined : stroke?.value}
-            onValueChange={(value) => {
-              const paints = value === null ? [] : [value as cg.Paint];
-              instance.commands.changeNodePropertyStrokes(ids, paints);
-            }}
-            onValueAdd={(value) => {
-              const paints = value === null ? [] : [value as cg.Paint];
-              // Use centralized ensureStrokeWidth behavior.
-              instance.commands.changeNodePropertyStrokes(ids, paints, true);
-            }}
-          />
-        </PropertyRow>
-        <PropertyRow hidden={!has_stroke}>
-          <PropertyLineLabel>Width</PropertyLineLabel>
-          <StrokeWidthControl
-            value={stroke_width?.value}
-            onValueCommit={(change) => {
-              const target = stroke_width?.ids ?? ids;
-              target.forEach((id) => {
-                instance.commands.changeNodePropertyStrokeWidth(id, change);
-              });
-            }}
-          />
-        </PropertyRow>
-        <PropertyRow hidden={!has_stroke || !supports_stroke_cap}>
-          <PropertyLineLabel>Cap</PropertyLineLabel>
-          <StrokeCapControl
-            value={stroke_cap?.value}
-            onValueChange={(value) => {
-              const target = stroke_cap?.ids ?? ids;
-              target.forEach((id) => {
-                instance.commands.changeNodePropertyStrokeCap(id, value);
-              });
-            }}
-          />
-        </PropertyRow>
-        <PropertyRow hidden={!has_stroke}>
-          <PropertyLineLabel>Align</PropertyLineLabel>
-          <StrokeAlignControl
-            value={stroke_align?.value}
-            onValueChange={(value) => {
-              const target = stroke_align?.ids ?? ids;
-              target.forEach((id) => {
-                instance.commands.changeNodePropertyStrokeAlign(id, value);
-              });
-            }}
-          />
-        </PropertyRow>
-        <PropertyRow hidden={!has_stroke}>
-          <PropertyLineLabel>Join</PropertyLineLabel>
-          <StrokeJoinControl
-            value={stroke_join?.value}
-            onValueChange={(value) => {
-              const target = stroke_join?.ids ?? ids;
-              target.forEach((id) => {
-                instance.commands.changeNodePropertyStrokeJoin(id, value);
-              });
-            }}
-          />
-        </PropertyRow>
-        <PropertyRow
-          hidden={
-            !has_stroke ||
-            stroke_join?.value === grida.mixed ||
-            (stroke_join?.value !== undefined && stroke_join?.value !== "miter")
-          }
-        >
-          <PropertyLineLabel>Miter</PropertyLineLabel>
-          <StrokeMiterLimitControl
-            value={stroke_miter_limit?.value}
-            onValueChange={(value) => {
-              const target = stroke_miter_limit?.ids ?? ids;
-              target.forEach((id) => {
-                instance.commands.changeNodePropertyStrokeMiterLimit(id, value);
-              });
-            }}
-          />
-        </PropertyRow>
-      </PropertySectionContent>
-    </PropertySection>
-  );
-}
-
 function PropertyCornerRadiusRow({ node_id }: { node_id: string }) {
   const backend = useBackendState();
   const actions = useNodeActions(node_id)!;
@@ -1848,37 +1723,6 @@ function PropertyCornerRadiusRowMixed({
         }}
       />
     </PropertyRow>
-  );
-}
-
-function SectionFillsMixed({ ids }: { ids: string[] }) {
-  const instance = useCurrentEditor();
-  const mp = useMixedProperties(ids, (node) => {
-    return {
-      fill: node.fill,
-    };
-  });
-
-  const fill = mp.fill;
-
-  return (
-    <PropertySection className="border-b">
-      <PropertySectionHeaderItem>
-        <PropertySectionHeaderLabel>Fills</PropertySectionHeaderLabel>
-      </PropertySectionHeaderItem>
-      <PropertySectionContent>
-        <PropertyRow>
-          <PropertyLineLabel>Fill</PropertyLineLabel>
-          <PaintControl
-            value={fill?.mixed || fill?.partial ? undefined : fill?.value}
-            onValueChange={(value) => {
-              const paints = value === null ? [] : [value as cg.Paint];
-              instance.commands.changeNodePropertyFills(ids, paints);
-            }}
-          />
-        </PropertyRow>
-      </PropertySectionContent>
-    </PropertySection>
   );
 }
 

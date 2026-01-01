@@ -46,12 +46,6 @@ interface PaintItem {
   index: number;
 }
 
-interface UsePaintSortingProps {
-  displayPaintItems: PaintItem[];
-  shouldEnableSorting: boolean;
-  onUpdatePaints: (paints: cg.Paint[]) => void;
-}
-
 /**
  * Hook for managing drag and drop sorting logic
  */
@@ -59,7 +53,11 @@ function usePaintSorting({
   displayPaintItems,
   shouldEnableSorting,
   onUpdatePaints,
-}: UsePaintSortingProps) {
+}: {
+  displayPaintItems: PaintItem[];
+  shouldEnableSorting: boolean;
+  onUpdatePaints: (paints: cg.Paint[]) => void;
+}) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -111,16 +109,6 @@ function usePaintSorting({
   };
 }
 
-interface UsePaintEditModeActivationProps {
-  instance: Editor;
-  node_id: string;
-  paintTarget: "fill" | "stroke";
-  paintList: cg.Paint[];
-  currentlyOpenIndex: number | null;
-  gradientMode?: editor.state.PaintGradientContentEditMode;
-  imageMode?: editor.state.PaintImageContentEditMode;
-}
-
 /**
  * Hook to manage edit mode activation/deactivation based on paint type changes.
  * Automatically activates gradient/image edit mode when paint type changes while panel is open.
@@ -133,7 +121,15 @@ function usePaintEditModeActivation({
   currentlyOpenIndex,
   gradientMode,
   imageMode,
-}: UsePaintEditModeActivationProps) {
+}: {
+  instance: Editor;
+  node_id: string;
+  paintTarget: "fill" | "stroke";
+  paintList: cg.Paint[];
+  currentlyOpenIndex: number | null;
+  gradientMode?: editor.state.PaintGradientContentEditMode;
+  imageMode?: editor.state.PaintImageContentEditMode;
+}) {
   // Helper function to activate edit mode based on paint type
   const tryActivateEditModeForPaint = React.useCallback(
     (paintIndex: number) => {
@@ -233,16 +229,6 @@ function usePaintEditModeActivation({
   return { tryActivateEditModeForPaint };
 }
 
-export interface ChunkPaintsProps {
-  node_id: string;
-  paintTarget: "fill" | "stroke";
-  title: string;
-  onAddPaint?: (paint: cg.Paint) => void;
-  onRemovePaint?: (index: number) => void;
-  onUpdatePaints?: (paints: cg.Paint[]) => void;
-  additionalContent?: React.ReactNode;
-}
-
 export function ChunkPaints({
   node_id,
   paintTarget,
@@ -251,7 +237,15 @@ export function ChunkPaints({
   onRemovePaint,
   onUpdatePaints,
   additionalContent,
-}: ChunkPaintsProps) {
+}: {
+  node_id: string;
+  paintTarget: "fill" | "stroke";
+  title: string;
+  onAddPaint?: (paint: cg.Paint) => void;
+  onRemovePaint?: (index: number) => void;
+  onUpdatePaints?: (paints: cg.Paint[]) => void;
+  additionalContent?: React.ReactNode;
+}) {
   const instance = useCurrentEditor();
   const backend = useBackendState();
   const { content_edit_mode } = useEditorState(instance, (state) => ({
@@ -551,20 +545,6 @@ export function ChunkPaints({
   );
 }
 
-interface PaintRowProps {
-  id: string;
-  paint: cg.Paint | undefined;
-  index: number;
-  onToggleActive: (index: number, active: boolean) => void;
-  onValueChange: (index: number, value: cg.Paint) => void;
-  onRemove: (index: number) => void;
-  onSelectGradientStop: (index: number, stop: number) => void;
-  onOpenChange: (index: number, open: boolean) => void;
-  selectedGradientStop?: number;
-  disableSorting?: boolean;
-  open?: boolean;
-}
-
 function PaintRow({
   id,
   paint,
@@ -577,7 +557,19 @@ function PaintRow({
   selectedGradientStop,
   disableSorting,
   open,
-}: PaintRowProps) {
+}: {
+  id: string;
+  paint: cg.Paint | undefined;
+  index: number;
+  onToggleActive: (index: number, active: boolean) => void;
+  onValueChange: (index: number, value: cg.Paint) => void;
+  onRemove: (index: number) => void;
+  onSelectGradientStop: (index: number, stop: number) => void;
+  onOpenChange: (index: number, open: boolean) => void;
+  selectedGradientStop?: number;
+  disableSorting?: boolean;
+  open?: boolean;
+}) {
   const {
     attributes,
     listeners,
