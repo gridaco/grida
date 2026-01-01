@@ -2889,7 +2889,7 @@ export class Editor
    * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
    * @param el canvas element
    */
-  public async mount(el: HTMLCanvasElement) {
+  public async mount(el: HTMLCanvasElement, dpr: number = 1) {
     this.log("mount surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
 
@@ -2923,8 +2923,6 @@ export class Editor
           -width / 2,
           -height / 2,
         ]);
-
-        const dpr = window.devicePixelRatio || 1;
 
         const deviceScale: cmath.Transform = [
           [dpr, 0, 0],
