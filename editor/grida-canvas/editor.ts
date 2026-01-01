@@ -37,7 +37,6 @@ import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
-import { toast } from "sonner";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -2689,6 +2688,7 @@ export class Editor
 
   constructor({
     logger = console.log,
+    ui = {},
     backend,
     viewportElement,
     geometry,
@@ -2698,6 +2698,7 @@ export class Editor
     onMount,
   }: {
     logger?: (...args: any[]) => void;
+    ui?: editor.ui.UIUXProviders;
     backend: editor.EditorContentRenderingBackend;
     viewportElement: string | HTMLElement;
     geometry:
@@ -2733,7 +2734,13 @@ export class Editor
       () => this.camera.viewport.size,
       logger
     );
-    this.surface = new EditorSurface(this);
+    this.surface = new EditorSurface(
+      this,
+      {
+        pointer_move_throttle_ms: 30,
+      },
+      ui
+    );
 
     this._m_geometry =
       typeof geometry === "function" ? geometry(this) : geometry;
@@ -3925,9 +3932,12 @@ export class EditorSurface
 
   constructor(
     readonly _editor: Editor,
-    config: { pointer_move_throttle_ms: number } = {
+    config: {
+      pointer_move_throttle_ms: number;
+    } = {
       pointer_move_throttle_ms: 30,
-    }
+    },
+    readonly ui: editor.ui.UIUXProviders = {}
   ) {
     this.camera = _editor.camera;
     this.__pligin_follow = new EditorFollowPlugin(_editor);
@@ -5435,11 +5445,11 @@ export class EditorSurface
         // No selection - set clipboard color, copy hex, and show toast
         this.a11ySetClipboardColor(color);
         await window.navigator.clipboard.writeText(hex);
-        toast.success(`Copied hex color to clipboard ${hex}`);
+        this.ui.notify?.(`Copied hex color to clipboard ${hex}`, "success");
       }
     } catch (error: any) {
       if (error.message) {
-        toast.error(error.message);
+        this.ui.notify?.(error.message, "error");
       }
     }
   }

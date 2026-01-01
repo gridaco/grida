@@ -4632,3 +4632,24 @@ export namespace editor.ascii {
     export const line_root_250C = "┌";
   }
 }
+
+export namespace editor.ui {
+  /**
+   *
+   * ```typescript
+   * let toast: UIToast;
+   * toast?.("Hello", "success");
+   * ```
+   */
+  export type UINotifier = (
+    message: string,
+    level?: "info" | "success" | "error" | "warning"
+  ) => void;
+
+  /**
+   * UI/Browser dependent UX actions.
+   */
+  export interface UIUXProviders {
+    notify?: UINotifier;
+  }
+}
