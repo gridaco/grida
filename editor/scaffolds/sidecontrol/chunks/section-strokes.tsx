@@ -3,7 +3,6 @@
 import React from "react";
 import kolor from "@grida/color";
 import { PropertyRows, PropertyRow, PropertyLineLabel } from "../ui";
-import { PaintControl } from "../controls/paint";
 import {
   StrokeWidthControl,
   StrokeWidth4Control,
@@ -258,7 +257,6 @@ export function SectionStrokes({
       node_id={node_id}
       paintTarget="stroke"
       title="Strokes"
-      ControlComponent={PaintControl}
       onAddPaint={handleAddStroke}
       onRemovePaint={handleRemoveStroke}
       onUpdatePaints={handleUpdateStrokes}

@@ -34,24 +34,27 @@ import {
   useNodeActions,
   useNodeState,
 } from "@/grida-canvas-react/provider";
+import { PaintControl } from "../controls/paint";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
+import type { Editor } from "@/grida-canvas/editor";
 import { editor } from "@/grida-canvas";
 import cg from "@grida/cg";
-import grida from "@grida/schema";
 
-// Hook for managing drag and drop sorting logic
 interface PaintItem {
   id: string;
-  paint: any;
+  paint: cg.Paint;
   index: number;
 }
 
 interface UsePaintSortingProps {
   displayPaintItems: PaintItem[];
   shouldEnableSorting: boolean;
-  onUpdatePaints: (paints: any[]) => void;
+  onUpdatePaints: (paints: cg.Paint[]) => void;
 }
 
+/**
+ * Hook for managing drag and drop sorting logic
+ */
 function usePaintSorting({
   displayPaintItems,
   shouldEnableSorting,
@@ -109,7 +112,7 @@ function usePaintSorting({
 }
 
 interface UsePaintEditModeActivationProps {
-  instance: ReturnType<typeof useCurrentEditor>;
+  instance: Editor;
   node_id: string;
   paintTarget: "fill" | "stroke";
   paintList: cg.Paint[];
@@ -234,18 +237,9 @@ export interface ChunkPaintsProps {
   node_id: string;
   paintTarget: "fill" | "stroke";
   title: string;
-  ControlComponent: React.ComponentType<{
-    value?: grida.program.nodes.i.props.PropsPaintValue;
-    onValueChange?: (value: any) => void;
-    onValueAdd?: (value: any) => void;
-    selectedGradientStop?: number;
-    onSelectedGradientStopChange?: (stop: number) => void;
-    onOpenChange?: (open: boolean) => void;
-    open?: boolean;
-  }>;
   onAddPaint?: (paint: cg.Paint) => void;
   onRemovePaint?: (index: number) => void;
-  onUpdatePaints?: (paints: any[]) => void;
+  onUpdatePaints?: (paints: cg.Paint[]) => void;
   additionalContent?: React.ReactNode;
 }
 
@@ -253,7 +247,6 @@ export function ChunkPaints({
   node_id,
   paintTarget,
   title,
-  ControlComponent,
   onAddPaint,
   onRemovePaint,
   onUpdatePaints,
@@ -370,13 +363,13 @@ export function ChunkPaints({
     isCanvasBackend && Array.isArray(paints) && paintItems.length > 1;
 
   const updatePaints = React.useCallback(
-    (nextPaints: any[]) => {
+    (nextPaints: cg.Paint[]) => {
       if (onUpdatePaints) {
         onUpdatePaints(nextPaints);
       } else {
         paintTarget === "fill"
-          ? actions.fill_paints(nextPaints as any)
-          : actions.stroke_paints(nextPaints as any);
+          ? actions.fill_paints(nextPaints)
+          : actions.stroke_paints(nextPaints);
       }
     },
     [actions, onUpdatePaints, paintTarget]
@@ -387,7 +380,7 @@ export function ChunkPaints({
   }, [paint, paints]);
 
   const handleValueChange = React.useCallback(
-    (index: number, value: any) => {
+    (index: number, value: cg.Paint) => {
       const currentPaints = createPaintsCopy();
       currentPaints[index] = value;
       updatePaints(currentPaints);
@@ -537,7 +530,6 @@ export function ChunkPaints({
                       id={id}
                       paint={itemPaint}
                       index={index}
-                      ControlComponent={ControlComponent}
                       onToggleActive={handleTogglePaintActive}
                       onValueChange={handleValueChange}
                       onRemove={handleRemovePaintAt}
@@ -561,11 +553,10 @@ export function ChunkPaints({
 
 interface PaintRowProps {
   id: string;
-  paint: grida.program.nodes.i.props.PropsPaintValue | undefined;
+  paint: cg.Paint | undefined;
   index: number;
-  ControlComponent: ChunkPaintsProps["ControlComponent"];
   onToggleActive: (index: number, active: boolean) => void;
-  onValueChange: (index: number, value: any) => void;
+  onValueChange: (index: number, value: cg.Paint) => void;
   onRemove: (index: number) => void;
   onSelectGradientStop: (index: number, stop: number) => void;
   onOpenChange: (index: number, open: boolean) => void;
@@ -578,7 +569,6 @@ function PaintRow({
   id,
   paint,
   index,
-  ControlComponent,
   onToggleActive,
   onValueChange,
   onRemove,
@@ -613,10 +603,10 @@ function PaintRow({
           }}
         />
         <div className="flex-1">
-          <ControlComponent
+          <PaintControl
             value={paint}
             onValueChange={(value) => {
-              onValueChange(index, value);
+              onValueChange(index, value as cg.Paint);
             }}
             selectedGradientStop={selectedGradientStop}
             onSelectedGradientStopChange={(stop) => {
