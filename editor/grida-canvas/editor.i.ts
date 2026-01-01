@@ -2821,7 +2821,6 @@ export namespace editor.api {
      * - The returned node IDs can be used by caller to update selection or perform other operations
      */
     insert(payload: InsertPayload, target: NodeID | null): NodeID[];
-    autoSizeTextNode(node_id: string, axis: "width" | "height"): void;
   }
 
   /**

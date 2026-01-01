@@ -1312,14 +1312,14 @@ function NodeOverlay({
   const handleSideDoubleClickVertical = () => {
     // feat: text-node-auto-size
     if (node.type === "text") {
-      editor.autoSizeTextNode(node_id, "height");
+      editor.surface.autoSizeTextNode(node_id, "height");
     }
   };
 
   const handleSideDoubleClickHorizontal = () => {
     // feat: text-node-auto-size
     if (node.type === "text") {
-      editor.autoSizeTextNode(node_id, "width");
+      editor.surface.autoSizeTextNode(node_id, "width");
     }
   };
 
@@ -1327,8 +1327,8 @@ function NodeOverlay({
   const handleDiagonalDoubleClick_NE_SE_SW = () => {
     // feat: text-node-auto-size
     if (node.type === "text") {
-      editor.autoSizeTextNode(node_id, "width");
-      editor.autoSizeTextNode(node_id, "height");
+      editor.surface.autoSizeTextNode(node_id, "width");
+      editor.surface.autoSizeTextNode(node_id, "height");
     }
   };
 
