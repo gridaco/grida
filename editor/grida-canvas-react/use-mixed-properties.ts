@@ -88,50 +88,55 @@ export function useMixedProperties<T extends Record<string, any>>(
  */
 export function useMixedPaints() {
   const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    selection: state.selection,
-    document: state.document,
-    document_ctx: state.document_ctx,
-  }));
+  /**
+   * Subscribe ONLY to:
+   * - `selection`
+   * - derived `ids` (selection + recursive children)
+   * - active fill paints for those ids
+   *
+   * This avoids re-rendering on unrelated document mutations.
+   */
+  const slice = useEditorState(
+    instance,
+    (state) => {
+      const selection = state.selection;
 
-  const selection = state.selection;
+      // selection & its recursive children (stable insertion order)
+      const idsSet = new Set<string>();
+      for (const id of selection) {
+        idsSet.add(id);
+        for (const childId of dq.getChildren(state.document_ctx, id, true)) {
+          idsSet.add(childId);
+        }
+      }
+      const ids = Array.from(idsSet);
 
-  const ids = useMemo(
-    // selection & its recursive children
-    () => [
-      ...selection,
-      ...selection
-        .map((s) => dq.getChildren(state.document_ctx, s, true))
-        .flat(),
-    ],
-    [selection, state.document_ctx]
+      const paintEntries: Array<{ nodeId: string; paint: cg.Paint }> = [];
+      for (const nodeId of ids) {
+        const node = state.document.nodes[
+          nodeId
+        ] as grida.program.nodes.UnknwonNode;
+        if (!node) continue;
+
+        const { paints } = editor.resolvePaints(node, "fill", 0);
+        const activePaints = paints.filter((p) => p?.active !== false);
+        for (const paint of activePaints) {
+          paintEntries.push({ nodeId, paint });
+        }
+      }
+
+      return { selection, ids, paintEntries };
+    },
+    equal
   );
-
-  const allnodes = useMemo(() => {
-    return ids.map((node_id) => {
-      return state.document.nodes[node_id];
-    });
-  }, [ids, state.document.nodes]);
 
   // TODO: @grida/mixed-properties should support array properties (e.g., fill_paints[] per node)
   // Once array handling is added to mixed(), replace this custom logic with normalized nodes + mixed()
-  const paintEntries = useMemo(() => {
-    const entries: Array<{ nodeId: string; paint: cg.Paint }> = [];
-    for (const node of allnodes as grida.program.nodes.UnknwonNode[]) {
-      const { paints } = editor.resolvePaints(node, "fill", 0);
-      const activePaints = paints.filter((p) => p?.active !== false);
-      for (const paint of activePaints) {
-        entries.push({ nodeId: node.id, paint });
-      }
-    }
-    return entries;
-  }, [allnodes]);
-
   const paints = useMemo(() => {
     // Group by paint value (using deep equality)
     const paintGroups: Array<{ value: cg.Paint; ids: string[] }> = [];
 
-    for (const { nodeId, paint } of paintEntries) {
+    for (const { nodeId, paint } of slice.paintEntries) {
       // Find existing group with same paint value
       const existingGroup = paintGroups.find((group) =>
         equal(group.value, paint)
@@ -147,7 +152,7 @@ export function useMixedPaints() {
     }
 
     return paintGroups;
-  }, [paintEntries]);
+  }, [slice.paintEntries]);
 
   const setPaint = useCallback(
     (
@@ -163,10 +168,10 @@ export function useMixedPaints() {
 
   return useMemo(() => {
     return {
-      selection,
-      ids,
+      selection: slice.selection,
+      ids: slice.ids,
       paints,
       setPaint,
     };
-  }, [selection, paints, ids, setPaint]);
+  }, [slice.selection, slice.ids, paints, setPaint]);
 }
