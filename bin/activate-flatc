@@ -1,0 +1,485 @@
+#!/usr/bin/env python3
+
+"""
+Grida: FlatBuffers compiler (flatc) bootstrapper
+
+Why this exists
+---------------
+We intentionally do NOT commit generated FlatBuffers bindings to git (see
+`packages/grida-format/.gitignore`). The package build step runs `flatc` (see
+`packages/grida-format/package.json`), so CI and Vercel builds must have a
+deterministic way to obtain `flatc`.
+
+FlatBuffers does not ship `flatc` via npm, so this script installs a prebuilt
+release binary from GitHub Releases, following:
+- https://flatbuffers.dev/building/#downloading-binaries
+
+Version lock
+------------
+This script is LOCKED to FlatBuffers release:
+- v25.12.19: https://github.com/google/flatbuffers/releases/tag/v25.12.19
+
+It pins the expected SHA-256 for each asset and refuses to run if verification
+fails.
+
+Targets
+-------
+Primary targets are Linux (GitHub Actions + Vercel). macOS/Windows are supported
+for developer convenience.
+
+How to use
+----------
+Most useful modes:
+
+- Export env vars (for CI/Vercel):
+    eval "$(python3 bin/activate-flatc)"
+
+  This prints shell-compatible exports to stdout:
+    - sets FLATC to the installed binary
+    - prepends its directory to PATH
+
+- Execute flatc via this script (no PATH changes needed):
+    python3 bin/activate-flatc -- --version
+    python3 bin/activate-flatc -- --ts --ts-no-import-ext -o out schema.fbs
+
+- Just print the resolved binary path:
+    python3 bin/activate-flatc --print-bin
+
+Cache location
+--------------
+The downloaded and extracted binary is cached under a machine-local cache dir:
+  - Linux:   ${XDG_CACHE_HOME:-~/.cache}/grida/flatbuffers/v25.12.19/
+  - macOS:   ~/Library/Caches/grida/flatbuffers/v25.12.19/
+  - Windows: %LOCALAPPDATA%\\grida\\flatbuffers\\v25.12.19\\
+
+You can override the base cache dir with:
+  GRIDA_CACHE_DIR=/some/path
+
+This keeps installs fast across repeated CI steps.
+
+Python requirements
+-------------------
+This script uses ONLY Python standard library modules. It is intended to run
+with the OS-provided `python3` (e.g. on Vercel/GitHub Actions).
+
+Zero-dependency policy
+----------------------
+- No pip / site-packages dependencies
+- No custom Python runtime setup
+- No reliance on external tools (e.g. curl/wget/brew/apt)
+"""
+
+import hashlib
+import os
+import platform
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import ssl
+import urllib.request
+import zipfile
+from typing import Dict, List, Optional, Tuple
+
+
+FLATBUFFERS_VERSION_TAG = "v25.12.19"
+FLATBUFFERS_VERSION_NUMBER = "25.12.19"
+
+# Assets + checksums as published in the release.
+# Source: https://github.com/google/flatbuffers/releases/tag/v25.12.19
+ASSETS_SHA256: Dict[str, str] = {
+    "Linux.flatc.binary.clang++-18.zip": "sha256:50c1915deeeb714f2a05c8ec795bd1af898d251a62e2774067703b29188efc90",
+    "Linux.flatc.binary.g++-13.zip": "sha256:9f87066dc5dfa7fe02090b55bab5f3e55df03e32c9b0cdf229004ade7d091039",
+    "Mac.flatc.binary.zip": "sha256:9340a5f9900b95e34ccadcb06bceec91180cc8b83098d5e966ed6d8d590cbba2",
+    "MacIntel.flatc.binary.zip": "sha256:b1b0c5bd2b4a19282d461e5ba725f41399af23ef42f4277605b75148996f2f4b",
+    "Windows.flatc.binary.zip": "sha256:fff9445c9db907227bc64b54cc98743084c4949282aa4e576cff6a955724ddc8",
+}
+
+
+ResolvedAsset = Tuple[str, str]  # (asset_name, sha256)
+
+
+def _repo_root() -> str:
+    # bin/activate-flatc -> <repo>/bin/activate-flatc
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def _machine_cache_base_dir() -> str:
+    """
+    Resolve a machine-local cache dir.
+
+    Preference order:
+    - GRIDA_CACHE_DIR (explicit override)
+    - XDG_CACHE_HOME (Linux and sometimes CI)
+    - platform-specific defaults
+    - temp dir fallback (for minimal CI/container environments)
+    """
+    override = os.environ.get("GRIDA_CACHE_DIR")
+    if override:
+        return os.path.abspath(os.path.expanduser(override))
+
+    xdg = os.environ.get("XDG_CACHE_HOME")
+    if xdg:
+        return os.path.abspath(os.path.expanduser(xdg))
+
+    home = os.path.expanduser("~")
+    sysname = sys.platform
+
+    if sysname.startswith("linux"):
+        if home and home != "~":
+            return os.path.join(home, ".cache")
+        return os.path.join(tempfile.gettempdir(), "cache")
+
+    if sysname == "darwin":
+        if home and home != "~":
+            return os.path.join(home, "Library", "Caches")
+        return os.path.join(tempfile.gettempdir(), "cache")
+
+    if sysname in {"win32", "cygwin", "msys"}:
+        local = os.environ.get("LOCALAPPDATA")
+        if local:
+            return local
+        if home and home != "~":
+            return os.path.join(home, "AppData", "Local")
+        return os.path.join(tempfile.gettempdir(), "cache")
+
+    return os.path.join(tempfile.gettempdir(), "cache")
+
+
+def _cache_root() -> str:
+    # Machine-local cache (do not write to repo).
+    return os.path.join(
+        _machine_cache_base_dir(), "grida", "flatbuffers", FLATBUFFERS_VERSION_TAG
+    )
+
+
+def _downloads_dir() -> str:
+    return os.path.join(_cache_root(), "downloads")
+
+
+def _install_dir(asset_name: str) -> str:
+    # Keep installs separated by asset name for debugging / multi-platform dev.
+    safe = asset_name.replace("/", "_")
+    return os.path.join(_cache_root(), "install", safe)
+
+
+def _release_url(asset_name: str) -> str:
+    return (
+        f"https://github.com/google/flatbuffers/releases/download/"
+        f"{FLATBUFFERS_VERSION_TAG}/{asset_name}"
+    )
+
+
+def _sha256_file(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _normalize_sha256(value: str) -> str:
+    """
+    Accept both "deadbeef..." and "sha256:deadbeef..." formats.
+    """
+    v = (value or "").strip().lower()
+    if v.startswith("sha256:"):
+        v = v[len("sha256:") :].strip()
+    return v
+
+
+def _ensure_dir(path: str) -> None:
+    os.makedirs(path, exist_ok=True)
+
+
+def _download_asset(asset: ResolvedAsset) -> str:
+    _ensure_dir(_downloads_dir())
+    asset_name, asset_sha = asset
+    expected_sha = _normalize_sha256(asset_sha)
+    download_path = os.path.join(_downloads_dir(), asset_name)
+
+    # If already present and matches, reuse.
+    if os.path.exists(download_path):
+        got = _sha256_file(download_path)
+        if got.lower() == expected_sha:
+            return download_path
+        # Corrupt/old file - delete and re-download.
+        os.remove(download_path)
+
+    url = _release_url(asset_name)
+    try:
+        with urllib.request.urlopen(url) as r, open(download_path, "wb") as f:
+            shutil.copyfileobj(r, f)
+    except Exception:
+        # Some environments (notably macOS python.org builds) can lack a properly
+        # configured CA bundle, causing CERTIFICATE_VERIFY_FAILED for HTTPS.
+        # Retry with a best-effort SSL context that points at a known system CA
+        # bundle path when available.
+        ctx = _best_effort_ssl_context()
+        if ctx is None:
+            raise
+        with (
+            urllib.request.urlopen(url, context=ctx) as r,
+            open(download_path, "wb") as f,
+        ):
+            shutil.copyfileobj(r, f)
+
+    got = _sha256_file(download_path)
+    if got.lower() != expected_sha:
+        raise RuntimeError(
+            f"SHA256 mismatch for {asset_name}\n"
+            f"  expected: {expected_sha}\n"
+            f"  got:      {got}\n"
+            f"  url:      {url}\n"
+        )
+    return download_path
+
+
+def _best_effort_ssl_context() -> Optional[ssl.SSLContext]:
+    """
+    Create an SSL context that prefers system CA bundle paths.
+
+    This keeps TLS verification ON while improving portability when the Python
+    runtime doesn't ship / locate CA certificates.
+    """
+    try:
+        default = ssl.create_default_context()
+    except Exception:
+        default = None
+
+    candidates = []
+    try:
+        paths = ssl.get_default_verify_paths()
+        # These may be None/empty depending on the Python build.
+        if getattr(paths, "cafile", None):
+            candidates.append(paths.cafile)
+        if getattr(paths, "capath", None):
+            candidates.append(paths.capath)
+    except Exception:
+        pass
+
+    # Common system CA bundle locations.
+    candidates.extend(
+        [
+            "/etc/ssl/cert.pem",  # macOS (system), some BSDs
+            "/etc/ssl/certs/ca-certificates.crt",  # Debian/Ubuntu
+            "/etc/pki/tls/certs/ca-bundle.crt",  # RHEL/CentOS/Fedora
+            "/etc/ssl/ca-bundle.pem",  # SUSE
+        ]
+    )
+
+    for p in candidates:
+        if not p:
+            continue
+        if os.path.isfile(p):
+            try:
+                return ssl.create_default_context(cafile=p)
+            except Exception:
+                continue
+        if os.path.isdir(p):
+            try:
+                return ssl.create_default_context(capath=p)
+            except Exception:
+                continue
+
+    return default
+
+
+def _find_flatc_in_dir(root: str) -> Optional[str]:
+    want = {"flatc", "flatc.exe"}
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for fn in filenames:
+            if fn in want:
+                return os.path.join(dirpath, fn)
+    return None
+
+
+def _make_executable(path: str) -> None:
+    try:
+        st = os.stat(path)
+        os.chmod(path, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except OSError:
+        # Best-effort; may not matter on Windows.
+        pass
+
+
+def _install_asset(asset: ResolvedAsset) -> str:
+    """
+    Returns absolute path to extracted flatc binary.
+    """
+    asset_name, _asset_sha = asset
+    install_dir = _install_dir(asset_name)
+    flatc_marker = os.path.join(install_dir, ".flatc.path")
+    if os.path.exists(flatc_marker):
+        try:
+            with open(flatc_marker, "r", encoding="utf-8") as f:
+                p = f.read().strip()
+            if p and os.path.exists(p):
+                return p
+        except OSError:
+            pass
+
+    # Fresh install (wipe install dir to avoid stale contents).
+    if os.path.exists(install_dir):
+        shutil.rmtree(install_dir)
+    _ensure_dir(install_dir)
+
+    zip_path = _download_asset(asset)
+    with zipfile.ZipFile(zip_path) as z:
+        z.extractall(install_dir)
+
+    flatc_path = _find_flatc_in_dir(install_dir)
+    if not flatc_path:
+        raise RuntimeError(
+            f"Could not find flatc inside extracted archive: {zip_path}\n"
+            f"install_dir: {install_dir}"
+        )
+
+    _make_executable(flatc_path)
+
+    with open(flatc_marker, "w", encoding="utf-8") as f:
+        f.write(flatc_path)
+        f.write("\n")
+
+    return flatc_path
+
+
+def _flatc_works(flatc_path: str) -> bool:
+    try:
+        p = subprocess.run(
+            [flatc_path, "--version"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except OSError:
+        return False
+
+    if p.returncode != 0:
+        return False
+
+    out = (p.stdout or "").strip()
+    # Typical output looks like: "flatc version 25.12.19"
+    return FLATBUFFERS_VERSION_NUMBER in out
+
+
+def _resolve_asset_candidates() -> List[ResolvedAsset]:
+    sysname = sys.platform
+    machine = platform.machine().lower()
+
+    if sysname.startswith("linux"):
+        if machine in {"x86_64", "amd64"}:
+            # Try clang++-18 first, then g++-13 as fallback in case of runtime
+            # linker incompatibilities on a given environment.
+            return [
+                (
+                    "Linux.flatc.binary.clang++-18.zip",
+                    ASSETS_SHA256["Linux.flatc.binary.clang++-18.zip"],
+                ),
+                (
+                    "Linux.flatc.binary.g++-13.zip",
+                    ASSETS_SHA256["Linux.flatc.binary.g++-13.zip"],
+                ),
+            ]
+        raise RuntimeError(f"Unsupported Linux architecture for flatc: {machine}")
+
+    if sysname == "darwin":
+        # Apple Silicon
+        if machine in {"arm64", "aarch64"}:
+            return [("Mac.flatc.binary.zip", ASSETS_SHA256["Mac.flatc.binary.zip"])]
+        # Intel
+        return [
+            ("MacIntel.flatc.binary.zip", ASSETS_SHA256["MacIntel.flatc.binary.zip"])
+        ]
+
+    if sysname in {"win32", "cygwin", "msys"}:
+        return [("Windows.flatc.binary.zip", ASSETS_SHA256["Windows.flatc.binary.zip"])]
+
+    raise RuntimeError(f"Unsupported platform for flatc bootstrap: {sysname}")
+
+
+def resolve_flatc() -> str:
+    """
+    Resolve an executable flatc path for the current platform.
+    """
+    last_error: Optional[Exception] = None
+    for asset in _resolve_asset_candidates():
+        try:
+            flatc = _install_asset(asset)
+            if _flatc_works(flatc):
+                return flatc
+        except Exception as e:
+            last_error = e
+            continue
+
+    if last_error:
+        raise RuntimeError(
+            f"Failed to install a working flatc: {last_error}"
+        ) from last_error
+    raise RuntimeError("Failed to install a working flatc (unknown error)")
+
+
+def _sh_quote(s: str) -> str:
+    # Minimal safe quoting for POSIX shells: wrap with single quotes and escape.
+    return "'" + s.replace("'", "'\"'\"'") + "'"
+
+
+def print_env_exports(flatc_path: str) -> None:
+    flatc_dir = os.path.dirname(flatc_path)
+    print(f"export FLATC={_sh_quote(flatc_path)}")
+    print(f"export PATH={_sh_quote(flatc_dir)}:$PATH")
+
+
+def main(argv: List[str]) -> int:
+    if sys.version_info < (3, 8):
+        raise RuntimeError(
+            f"bin/activate-flatc requires Python >= 3.8 (found {sys.version.split()[0]}). "
+            "Please run with `python3`."
+        )
+    # Modes:
+    #   - default: print exports
+    #   - --print-bin: print flatc path
+    #   - --print-path: print flatc directory
+    #   - -- (args...): exec flatc with args
+    mode = "print-env"
+    exec_args: List[str] = []
+
+    if len(argv) >= 2:
+        if argv[1] == "--":
+            mode = "exec"
+            exec_args = argv[2:]
+        elif argv[1] == "--print-bin":
+            mode = "print-bin"
+        elif argv[1] == "--print-path":
+            mode = "print-path"
+        elif argv[1] in {"-h", "--help"}:
+            print(__doc__.strip())
+            return 0
+        else:
+            # Treat any other args as flatc args (convenience).
+            mode = "exec"
+            exec_args = argv[1:]
+
+    flatc = resolve_flatc()
+
+    if mode == "print-bin":
+        print(flatc)
+        return 0
+    if mode == "print-path":
+        print(os.path.dirname(flatc))
+        return 0
+    if mode == "print-env":
+        print_env_exports(flatc)
+        return 0
+
+    # Exec mode
+    if not exec_args:
+        exec_args = ["--version"]
+    os.execv(flatc, [flatc, *exec_args])
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
