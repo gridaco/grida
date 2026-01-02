@@ -4636,8 +4636,8 @@ export namespace editor.ui {
   /**
    *
    * ```typescript
-   * let toast: UIToast;
-   * toast?.("Hello", "success");
+   * let notifier: UINotifier;
+   * notifier?.("Hello", "success");
    * ```
    */
   export type UINotifier = (
@@ -4659,7 +4659,9 @@ export namespace editor.ui {
      *          The hex string is in sRGB format (#aabbcc).
      *          @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
      */
-    open(options?: EyeDropperOpenOptions): Promise<{ sRGBHex: string }>;
+    open(
+      options?: EyeDropperOpenOptions
+    ): Promise<{ sRGBHex: string } | undefined>;
   };
 
   /**

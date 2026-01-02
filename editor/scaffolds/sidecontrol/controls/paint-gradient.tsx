@@ -68,9 +68,7 @@ export function GradientControl({
     };
 
     const sortedStops = [...stops, newStop].sort((a, b) => a.offset - b.offset);
-    const newIndex = sortedStops.findIndex(
-      (s) => s.offset === newOffset && s.color === newStop.color
-    );
+    const newIndex = sortedStops.indexOf(newStop);
 
     onValueChange?.({ ...value, stops: sortedStops });
     onSelectedStopChange?.(newIndex);

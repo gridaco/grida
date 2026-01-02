@@ -181,6 +181,19 @@ export function SectionFillsMixed({ ids }: { ids: string[] }) {
   const paintsAreIdentical = paintArrays !== null;
   const commonPaints = paintsAreIdentical ? paintArrays : [];
 
+  const handleAddPaint = React.useCallback(() => {
+    const newPaint = getNextFillPaint(commonPaints);
+    const currentPaints = [...commonPaints, newPaint];
+    instance.commands.changeNodePropertyFills(ids, currentPaints);
+  }, [commonPaints, ids, instance]);
+
+  const handleValueChange = React.useCallback(
+    (paints: cg.Paint[]) => {
+      instance.commands.changeNodePropertyFills(ids, paints);
+    },
+    [ids, instance]
+  );
+
   if (!paintsAreIdentical) {
     return (
       <PropertySection className="border-b">
@@ -197,19 +210,6 @@ export function SectionFillsMixed({ ids }: { ids: string[] }) {
       </PropertySection>
     );
   }
-
-  const handleAddPaint = React.useCallback(() => {
-    const newPaint = getNextFillPaint(commonPaints);
-    const currentPaints = [...commonPaints, newPaint];
-    instance.commands.changeNodePropertyFills(ids, currentPaints);
-  }, [commonPaints, ids, instance]);
-
-  const handleValueChange = React.useCallback(
-    (paints: cg.Paint[]) => {
-      instance.commands.changeNodePropertyFills(ids, paints);
-    },
-    [ids, instance]
-  );
 
   const empty = commonPaints.length === 0;
 
