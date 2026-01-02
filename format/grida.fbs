@@ -30,15 +30,15 @@ file_identifier "GRID";
 // Core primitives (Rust `crates/grida-canvas/src/cg/**` aligned)
 // -----------------------------------------------------------------------------
 
-/// Packed u32 node identifier (actor:8 | counter:24).
+/// Node identifier (temporary: string-based for compatibility with current editor).
+///
+/// TODO: Update to use packed u32 (actor:8 | counter:24) for better performance.
 /// Range: 0..=4_294_967_295.
 ///
-/// Wrapper struct for better semantics (instead of using naked `uint` everywhere).
-///
-/// Note: this is still stored as a packed `uint` on the wire; the wrapper just
-/// documents intent and makes it easier to evolve later.
-struct NodeIdentifier {
-  packed:uint;
+/// Current implementation uses string IDs to match TS editor model.
+/// Future: migrate to struct NodeIdentifier { packed:uint; } for efficiency.
+table NodeIdentifier {
+  id:string (id: 0);
 }
 
 /// Rust: `CGPoint { x: f32, y: f32 }`
@@ -1099,20 +1099,82 @@ table StrokeStyle {
   stroke_dash_array:[float] (id: 4);
 }
 
+/// A single stop in a variable-width stroke profile.
+///
+/// - `u` is the normalized position along the stroke in [0, 1].
+/// - `r` is the half-width ("radius") at this position in pixels.
+table VariableWidthStop {
+  u:float (id: 0);
+  r:float (id: 1);
+}
+
+/// Variable-width stroke profile.
+///
+/// Notes:
+/// - This matches TS `cg.VariableWidthProfile` and Rust `cg::varwidth::{WidthStop, VarWidthProfile}` at the wire level.
+/// - `base` is intentionally not stored here; renderers should derive a base half-width from the node's `stroke_width`
+///   when `stops` is empty (see Rust `VarWidthSampler` behavior).
+table VariableWidthProfile {
+  stops:[VariableWidthStop] (id: 0);
+}
+
 // -----------------------------------------------------------------------------
 // Layout model (aligned to Rust `UniformNodeLayout` + SQL draft)
 // -----------------------------------------------------------------------------
 
+/// Explicit length value models (archive input model; CSS-ish).
+///
+/// NOTE: FlatBuffers unions can only include tables, not scalars/structs.
+table Auto {}
+
+table Px {
+  value:float = 0.0 (id: 0);
+}
+
+table Percent {
+  /// 0..100 domain (matching TS `css.Percentage.value`)
+  value:float = 0.0 (id: 0);
+}
+
+/// Length input union.
+///
+/// Canonical mapping:
+/// - TS `"auto"` -> `Auto`
+/// - TS `number` or `{type:"length", unit:"px"}` -> `Px`
+/// - TS `{type:"percentage"}` -> `Percent`
+union Length {
+  Auto = 1,
+  Px = 2,
+  Percent = 3
+}
+
+
+
 table LayoutDimensions {
-  layout_target_width:float = 0.0 (id: 0);
-  layout_target_height:float = 0.0 (id: 1);
-  layout_min_width:float = 0.0 (id: 2);
-  layout_max_width:float = 0.0 (id: 3);
-  layout_min_height:float = 0.0 (id: 4);
-  layout_max_height:float = 0.0 (id: 5);
-  /// (width, height) ratio pair.
-  layout_target_aspect_ratio_width:float = 0.0 (id: 6);
-  layout_target_aspect_ratio_height:float = 0.0 (id: 7);
+  layout_target_width:Length (id: 1);
+  layout_target_height:Length (id: 3);
+  layout_min_width:float = 0.0 (id: 4);
+  layout_max_width:float = 0.0 (id: 5);
+  layout_min_height:float = 0.0 (id: 6);
+  layout_max_height:float = 0.0 (id: 7);
+  /// Preferred layout aspect ratio.
+  ///
+  /// Represents a proportional relationship between width and height expressed
+  /// as a ratio pair (e.g. `[16, 9]`, `[4, 3]`, `[1, 1]`).
+  ///
+  /// Notes:
+  /// - This does not define geometry by itself. It is a sizing preference that
+  ///   layout engines may consult when resolving under-specified dimensions
+  ///   (e.g. when either width or height is "auto") or when proportional sizing
+  ///   is explicitly required by the layout model.
+  /// - When both width and height are definitively specified, this should have
+  ///   no effect and must not override explicit dimensions.
+  /// - Layout engines may ignore this if aspect-ratio-aware sizing is not supported.
+  ///
+  /// Encoding:
+  /// - Stored as a tuple (width, height) for parity with TS `layout_target_aspect_ratio?: [number, number]`.
+  /// - `0,0` means "unset" (archive sentinel).
+  layout_target_aspect_ratio:CGSize (id: 8);
 }
 
 table LayoutContainerStyle {
@@ -1138,6 +1200,8 @@ table Layout {
   layout_dimensions:LayoutDimensions (id: 3);
   layout_container:LayoutContainerStyle (id: 4);
   layout_child:LayoutChildStyle (id: 5);
+  /// Rotation in degrees.
+  rotation:float = 0.0 (id: 6);
 }
 
 // -----------------------------------------------------------------------------
@@ -1326,10 +1390,8 @@ table VectorNodeProperties {
   stroke_paints:[PaintStackItem] (id: 3);
   stroke_style:StrokeStyle (id: 4);
   stroke_width:float = 1.0 (id: 5);
-  /// Variable-width stroke profile (opaque).
-  stroke_width_profile_encoding:BinaryEncoding = Unknown (id: 6);
-  stroke_width_profile:[ubyte] (id: 7);
-  effects:NodeEffectsTrait (id: 8);
+  stroke_width_profile:VariableWidthProfile (id: 6);
+  effects:NodeEffectsTrait (id: 7);
 }
 
 table BooleanOperationNodeProperties {

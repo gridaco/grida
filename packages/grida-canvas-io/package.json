@@ -12,10 +12,13 @@
     "fast-png": "^6.3.0",
     "fast-xml-parser": "^5.2.3",
     "fflate": "^0.8.2",
+    "flatbuffers": "^25.9.23",
     "image-size": "^2.0.2"
   },
   "devDependencies": {
     "@grida/cg": "workspace:*",
-    "@grida/schema": "workspace:*"
+    "@grida/format": "workspace:*",
+    "@grida/schema": "workspace:*",
+    "@grida/vn": "workspace:*"
   }
 }
