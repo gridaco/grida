@@ -184,7 +184,7 @@ describe("archive comprehensive", () => {
   function saveArtifact(name: string, data: Uint8Array): string {
     const artifactPath = path.join(artifactsDir, `${name}.zip`);
     fs.writeFileSync(artifactPath, data);
-    console.log(`Saved artifact: ${artifactPath}`);
+    // console.log(`Saved artifact: ${artifactPath}`);
     return artifactPath;
   }
 
@@ -628,9 +628,9 @@ describe("archive comprehensive", () => {
       const jpgPacked = io.archive.pack(mockDocumentData, jpgFiles);
       const largePacked = io.archive.pack(mockDocumentData, largeFiles);
 
-      console.log(`PNG files archive size: ${pngPacked.length} bytes`);
-      console.log(`JPG files archive size: ${jpgPacked.length} bytes`);
-      console.log(`Large files archive size: ${largePacked.length} bytes`);
+      // console.log(`PNG files archive size: ${pngPacked.length} bytes`);
+      // console.log(`JPG files archive size: ${jpgPacked.length} bytes`);
+      // console.log(`Large files archive size: ${largePacked.length} bytes`);
 
       expect(pngPacked.length).toBeGreaterThan(0);
       expect(jpgPacked.length).toBeGreaterThan(0);
