@@ -1,0 +1,1439 @@
+// =============================================================================
+// Grida — Universal Document Schema (FlatBuffers) (DRAFT)
+// =============================================================================
+//
+// Goal:
+// - A single, universal, evolvable, binary document format for large documents.
+// - Aligned to:
+//   - Rust runtime model: `crates/grida-canvas/src/node/schema.rs`
+//   - TS document model: `packages/grida-canvas-schema/grida.ts`
+//   - DB draft STI model: `supabase/drafts/20251214_grida_canvas_document_model.sql`
+//
+// Key decisions (draft):
+// - Node IDs are stored as packed u32 (actor:8 | counter:24), matching the DB draft.
+//   - TS `grida.id.u32` can pack/unpack/format to/from string.
+// - Document is a flat node map + explicit ordered link list (no nested children arrays).
+// - Node payload is modeled via a FlatBuffers union for forward evolution.
+//
+// NOTE:
+// - This is a first pass draft. Some complex nested types (e.g. vector_network) are
+//   represented as opaque bytes with a declared encoding, until their full spec is
+//   stabilized.
+// =============================================================================
+
+namespace grida;
+
+file_extension "grida";
+file_identifier "GRID";
+
+// -----------------------------------------------------------------------------
+// Core primitives (Rust `crates/grida-canvas/src/cg/**` aligned)
+// -----------------------------------------------------------------------------
+
+/// Packed u32 node identifier (actor:8 | counter:24).
+/// Range: 0..=4_294_967_295.
+///
+/// Wrapper struct for better semantics (instead of using naked `uint` everywhere).
+///
+/// Note: this is still stored as a packed `uint` on the wire; the wrapper just
+/// documents intent and makes it easier to evolve later.
+struct NodeIdentifier {
+  packed:uint;
+}
+
+/// Rust: `CGPoint { x: f32, y: f32 }`
+struct CGPoint {
+  x:float;
+  y:float;
+}
+
+/// Rust: `Alignment(pub f32, pub f32)` (cNDC, range typically [-1, 1])
+struct Alignment {
+  x:float;
+  y:float;
+}
+
+/// Rust: `Uv(pub f32, pub f32)` (normalized [0, 1] domain)
+struct UV {
+  u:float;
+  v:float;
+}
+
+/// Rust: (no dedicated cg struct) used throughout as (w,h). Keep for schema convenience.
+struct CGSize {
+  width:float;
+  height:float;
+}
+
+/// RGBA in linear float space (0..1).
+struct RGBA32F {
+  r:float;
+  g:float;
+  b:float;
+  a:float;
+}
+
+/// Rust: `CGTransform2D { m00..m12: f32 }` (and compatible with math2 `AffineTransform`).
+///
+/// Matrix layout:
+/// [ m00  m01  m02 ]
+/// [ m10  m11  m12 ]
+/// [  0    0    1  ]
+///
+/// Struct representation (no defaults in FlatBuffers structs).
+struct CGTransform2D {
+  m00:float;
+  m01:float;
+  m02:float;
+  m10:float;
+  m11:float;
+  m12:float;
+}
+
+/// Rust: `Radius { rx: f32, ry: f32 }`
+struct CGRadius {
+  rx:float;
+  ry:float;
+}
+
+struct EdgeInsets {
+  top:float;
+  right:float;
+  bottom:float;
+  left:float;
+}
+
+/// Rust: `RectangularCornerRadius { tl,tr,bl,br: Radius }`
+struct RectangularCornerRadius {
+  tl:CGRadius;
+  tr:CGRadius;
+  bl:CGRadius;
+  br:CGRadius;
+}
+
+/// Per-side stroke widths (archive model).
+///
+/// Struct representation. Note: structs cannot be null/omitted; all-zeros can be
+/// interpreted as "not used" by codec/runtime if desired.
+struct RectangularStrokeWidth {
+  stroke_top_width:float;
+  stroke_right_width:float;
+  stroke_bottom_width:float;
+  stroke_left_width:float;
+}
+
+// -----------------------------------------------------------------------------
+// Enums (string mapping handled by codec layers)
+// -----------------------------------------------------------------------------
+
+enum NodeType : byte {
+  // Structural
+  Scene = 0,
+  InitialContainer = 1,
+  Container = 2,
+  Group = 3,
+
+  // Shapes
+  Rectangle = 4,
+  Ellipse = 5,
+  Line = 6,
+  Polygon = 7,
+  RegularPolygon = 8,
+  RegularStarPolygon = 9,
+
+  // Vector / path ops
+  Path = 10,
+  Vector = 11,
+  BooleanOperation = 12,
+
+  // Text / media
+  TextSpan = 13,
+  Image = 14,
+
+  // Fallback
+  Error = 15,
+}
+
+/// Rust: `ImageMaskType`
+enum ImageMaskType : byte {
+  Alpha = 0,
+  Luminance = 1
+}
+
+/// Rust: `LayerMaskType::Image(ImageMaskType)`
+table LayerMaskTypeImage {
+  image_mask_type:ImageMaskType = Alpha (id: 0);
+}
+
+/// Rust: `LayerMaskType::Geometry`
+table LayerMaskTypeGeometry {}
+
+/// Rust: `LayerMaskType`
+union LayerMaskType {
+  LayerMaskTypeImage = 1,
+  LayerMaskTypeGeometry = 2
+}
+
+/// Rust: `BlendMode` (does not include pass-through)
+enum BlendMode : byte {
+  Normal = 0,
+  Multiply = 1,
+  Screen = 2,
+  Overlay = 3,
+  Darken = 4,
+  Lighten = 5,
+  ColorDodge = 6,
+  ColorBurn = 7,
+  HardLight = 8,
+  SoftLight = 9,
+  Difference = 10,
+  Exclusion = 11,
+  Hue = 12,
+  Saturation = 13,
+  Color = 14,
+  Luminosity = 15
+}
+
+/// Archive model: flattened blend mode with pass-through included.
+///
+/// This duplicates `BlendMode` variants and adds `pass_through`, avoiding a union/table wrapper.
+enum LayerBlendMode : byte {
+  Normal = 0,
+  Multiply = 1,
+  Screen = 2,
+  Overlay = 3,
+  Darken = 4,
+  Lighten = 5,
+  ColorDodge = 6,
+  ColorBurn = 7,
+  HardLight = 8,
+  SoftLight = 9,
+  Difference = 10,
+  Exclusion = 11,
+  Hue = 12,
+  Saturation = 13,
+  Color = 14,
+  Luminosity = 15,
+
+  /// Archive-only sentinel: corresponds to Rust `LayerBlendMode::PassThrough`.
+  /// Set to 100 to avoid confusing it with `BlendMode` ids.
+  PassThrough = 100
+}
+
+/// Rust: `Axis`
+enum Axis : byte {
+  Horizontal = 0,
+  Vertical = 1
+}
+
+/// Rust: `TileMode`
+enum TileMode : byte {
+  Clamp = 0,
+  Repeated = 1,
+  Mirror = 2,
+  Decal = 3
+}
+
+/// Rust: `math2::box_fit::BoxFit`
+enum BoxFit : byte {
+  Contain = 0,
+  Cover = 1,
+  Fill = 2,
+  None = 3
+}
+
+/// Rust: `ImageRepeat`
+enum ImageRepeat : byte {
+  RepeatX = 0,
+  RepeatY = 1,
+  Repeat = 2
+}
+
+enum LayoutMode : byte {
+  Normal = 0,
+  Flex = 1
+}
+
+enum LayoutWrap : byte {
+  None = 0,
+  Wrap = 1,
+  NoWrap = 2
+}
+
+enum LayoutPositionBasis : byte {
+  Cartesian = 0,
+  Inset = 1
+}
+
+enum LayoutPositioning : byte {
+  Auto = 0,
+  Absolute = 1
+}
+
+enum MainAxisAlignment : byte {
+  None = 0,
+  Start = 1,
+  End = 2,
+  Center = 3,
+  SpaceBetween = 4,
+  SpaceAround = 5,
+  SpaceEvenly = 6,
+  Stretch = 7
+}
+
+enum CrossAxisAlignment : byte {
+  None = 0,
+  Start = 1,
+  End = 2,
+  Center = 3,
+  Stretch = 4
+}
+
+enum StrokeAlign : byte {
+  Inside = 0,
+  Center = 1,
+  Outside = 2
+}
+
+enum StrokeCap : byte {
+  Butt = 0,
+  Round = 1,
+  Square = 2
+}
+
+enum StrokeJoin : byte {
+  Miter = 0,
+  Round = 1,
+  Bevel = 2
+}
+
+enum TextAlign : byte {
+  Left = 0,
+  Right = 1,
+  Center = 2,
+  Justify = 3
+}
+
+enum TextAlignVertical : byte {
+  Top = 0,
+  Center = 1,
+  Bottom = 2
+}
+
+enum BooleanPathOperation : byte {
+  Union = 0,
+  Intersection = 1,
+  Difference = 2,
+  Xor = 3
+}
+
+enum BinaryEncoding : byte {
+  Unknown = 0,
+  JsonUtf8 = 1,
+  Cbor = 2,
+  NestedFlatbuffer = 3
+}
+
+enum SceneConstraintsChildren : byte {
+  Single = 0,
+  Multiple = 1
+}
+
+/// Rust: `FillRule`
+enum FillRule : byte {
+  NonZero = 0,
+  EvenOdd = 1
+}
+
+// -----------------------------------------------------------------------------
+// Text style (Rust `cg::types::TextStyleRec` aligned)
+// -----------------------------------------------------------------------------
+
+/// Rust: `TextTransform`
+enum TextTransform : byte {
+  None = 0,
+  Uppercase = 1,
+  Lowercase = 2,
+  Capitalize = 3
+}
+
+/// Rust: `TextDecorationLine`
+enum TextDecorationLine : byte {
+  None = 0,
+  Underline = 1,
+  Overline = 2,
+  LineThrough = 3
+}
+
+/// Rust: `TextDecorationStyle`
+enum TextDecorationStyle : byte {
+  Solid = 0,
+  Double = 1,
+  Dotted = 2,
+  Dashed = 3,
+  Wavy = 4
+}
+
+/// Rust: `FontWeight(pub u32)`
+struct FontWeight {
+  value:uint;
+}
+
+/// Rust: `FontOpticalSizing` (Auto | None | Fixed(f32))
+enum FontOpticalSizingKind : byte {
+  Auto = 0,
+  None = 1,
+  Fixed = 2
+}
+
+struct FontOpticalSizing {
+  kind:FontOpticalSizingKind;
+  fixed_value:float;
+}
+
+/// Rust: `TextLineHeight` (Normal | Fixed(f32) | Factor(f32))
+enum TextLineHeightKind : byte {
+  Normal = 0,
+  Fixed = 1,
+  Factor = 2
+}
+
+struct TextLineHeight {
+  kind:TextLineHeightKind;
+  fixed_value:float;
+  factor_value:float;
+}
+
+/// Rust: `TextLetterSpacing` (Fixed(f32) | Factor(f32))
+enum TextLetterSpacingKind : byte {
+  Fixed = 0,
+  Factor = 1
+}
+
+struct TextLetterSpacing {
+  kind:TextLetterSpacingKind;
+  fixed_value:float;
+  factor_value:float;
+}
+
+/// Rust: `TextWordSpacing` (Fixed(f32) | Factor(f32))
+enum TextWordSpacingKind : byte {
+  Fixed = 0,
+  Factor = 1
+}
+
+struct TextWordSpacing {
+  kind:TextWordSpacingKind;
+  fixed_value:float;
+  factor_value:float;
+}
+
+/// OpenType feature tags (strong enum).
+///
+/// Source of truth: `docs/reference/open-type-features.md`.
+///
+/// Notes:
+/// - Values are stable and ordered lexicographically by the 4-char OpenType tag.
+/// - `Unknown` exists to allow forward compatibility when parsing documents that
+///   contain tags not yet in this enum (codec may map unknown tags to `Unknown`).
+enum OpenTypeFeature : ushort {
+  Unknown = 0,
+  AALT = 1,
+  ABVF = 2,
+  ABVM = 3,
+  ABVS = 4,
+  AFRC = 5,
+  AKHN = 6,
+  APKN = 7,
+  BLWF = 8,
+  BLWM = 9,
+  BLWS = 10,
+  C2PC = 11,
+  C2SC = 12,
+  CALT = 13,
+  CASE = 14,
+  CCMP = 15,
+  CFAR = 16,
+  CHWS = 17,
+  CJCT = 18,
+  CLIG = 19,
+  CPCT = 20,
+  CPSP = 21,
+  CSWH = 22,
+  CURS = 23,
+  CV01 = 24,
+  CV02 = 25,
+  CV03 = 26,
+  CV04 = 27,
+  CV05 = 28,
+  CV06 = 29,
+  CV07 = 30,
+  CV08 = 31,
+  CV09 = 32,
+  CV10 = 33,
+  CV11 = 34,
+  CV12 = 35,
+  CV13 = 36,
+  CV14 = 37,
+  CV15 = 38,
+  CV16 = 39,
+  CV17 = 40,
+  CV18 = 41,
+  CV19 = 42,
+  CV20 = 43,
+  CV21 = 44,
+  CV22 = 45,
+  CV23 = 46,
+  CV24 = 47,
+  CV25 = 48,
+  CV26 = 49,
+  CV27 = 50,
+  CV28 = 51,
+  CV29 = 52,
+  CV30 = 53,
+  CV31 = 54,
+  CV32 = 55,
+  CV33 = 56,
+  CV34 = 57,
+  CV35 = 58,
+  CV36 = 59,
+  CV37 = 60,
+  CV38 = 61,
+  CV39 = 62,
+  CV40 = 63,
+  CV41 = 64,
+  CV42 = 65,
+  CV43 = 66,
+  CV44 = 67,
+  CV45 = 68,
+  CV46 = 69,
+  CV47 = 70,
+  CV48 = 71,
+  CV49 = 72,
+  CV50 = 73,
+  CV51 = 74,
+  CV52 = 75,
+  CV53 = 76,
+  CV54 = 77,
+  CV55 = 78,
+  CV56 = 79,
+  CV57 = 80,
+  CV58 = 81,
+  CV59 = 82,
+  CV60 = 83,
+  CV61 = 84,
+  CV62 = 85,
+  CV63 = 86,
+  CV64 = 87,
+  CV65 = 88,
+  CV66 = 89,
+  CV67 = 90,
+  CV68 = 91,
+  CV69 = 92,
+  CV70 = 93,
+  CV71 = 94,
+  CV72 = 95,
+  CV73 = 96,
+  CV74 = 97,
+  CV75 = 98,
+  CV76 = 99,
+  CV77 = 100,
+  CV78 = 101,
+  CV79 = 102,
+  CV80 = 103,
+  CV81 = 104,
+  CV82 = 105,
+  CV83 = 106,
+  CV84 = 107,
+  CV85 = 108,
+  CV86 = 109,
+  CV87 = 110,
+  CV88 = 111,
+  CV89 = 112,
+  CV90 = 113,
+  CV91 = 114,
+  CV92 = 115,
+  CV93 = 116,
+  CV94 = 117,
+  CV95 = 118,
+  CV96 = 119,
+  CV97 = 120,
+  CV98 = 121,
+  CV99 = 122,
+  DIST = 123,
+  DLIG = 124,
+  DNOM = 125,
+  DTLS = 126,
+  EXPT = 127,
+  FALT = 128,
+  FIN2 = 129,
+  FIN3 = 130,
+  FINA = 131,
+  FLAC = 132,
+  FRAC = 133,
+  FWID = 134,
+  HALF = 135,
+  HALN = 136,
+  HALT = 137,
+  HIST = 138,
+  HKNA = 139,
+  HLIG = 140,
+  HNGL = 141,
+  HOJO = 142,
+  HWID = 143,
+  INIT = 144,
+  ISOL = 145,
+  ITAL = 146,
+  JALT = 147,
+  JP04 = 148,
+  JP78 = 149,
+  JP83 = 150,
+  JP90 = 151,
+  KERN = 152,
+  LFBD = 153,
+  LIGA = 154,
+  LJMO = 155,
+  LNUM = 156,
+  LOCL = 157,
+  LTRA = 158,
+  LTRM = 159,
+  MARK = 160,
+  MED2 = 161,
+  MEDI = 162,
+  MGRK = 163,
+  MKMK = 164,
+  MSET = 165,
+  NALT = 166,
+  NLCK = 167,
+  NUKT = 168,
+  NUMR = 169,
+  ONUM = 170,
+  OPBD = 171,
+  ORDN = 172,
+  ORNM = 173,
+  PALT = 174,
+  PCAP = 175,
+  PKNA = 176,
+  PNUM = 177,
+  PREF = 178,
+  PRES = 179,
+  PSTF = 180,
+  PSTS = 181,
+  PWID = 182,
+  QWID = 183,
+  RAND = 184,
+  RCLT = 185,
+  RKRF = 186,
+  RLIG = 187,
+  RPHF = 188,
+  RTBD = 189,
+  RTLA = 190,
+  RTLM = 191,
+  RUBY = 192,
+  RVRN = 193,
+  SALT = 194,
+  SINF = 195,
+  SIZE = 196,
+  SMCP = 197,
+  SMPL = 198,
+  SS01 = 199,
+  SS02 = 200,
+  SS03 = 201,
+  SS04 = 202,
+  SS05 = 203,
+  SS06 = 204,
+  SS07 = 205,
+  SS08 = 206,
+  SS09 = 207,
+  SS10 = 208,
+  SS11 = 209,
+  SS12 = 210,
+  SS13 = 211,
+  SS14 = 212,
+  SS15 = 213,
+  SS16 = 214,
+  SS17 = 215,
+  SS18 = 216,
+  SS19 = 217,
+  SS20 = 218,
+  SSTY = 219,
+  STCH = 220,
+  SUBS = 221,
+  SUPS = 222,
+  SWSH = 223,
+  TITL = 224,
+  TJMO = 225,
+  TNAM = 226,
+  TNUM = 227,
+  TRAD = 228,
+  TWID = 229,
+  UNIC = 230,
+  VALT = 231,
+  VAPK = 232,
+  VATU = 233,
+  VCHW = 234,
+  VERT = 235,
+  VHAL = 236,
+  VJMO = 237,
+  VKNA = 238,
+  VKRN = 239,
+  VPAL = 240,
+  VRT2 = 241,
+  VRTR = 242,
+  ZERO = 243,
+}
+
+/// Rust: `FontFeature { tag: String, value: bool }`
+table FontFeature {
+  open_type_feature:OpenTypeFeature = Unknown (id: 0);
+  open_type_feature_value:bool = false (id: 1);
+}
+
+/// Rust: `FontVariation { axis: String, value: f32 }`
+table FontVariation {
+  variation_axis:string (id: 0);
+  variation_value:float = 0.0 (id: 1);
+}
+
+/// Rust: `TextDecorationRec`
+///
+/// Archive model notes:
+/// - `decoration_color` uses RGBA32F (float space) to match this schema's color choice.
+/// - When `decoration_color.a == 0`, runtimes may treat it as "unset" if desired.
+table TextDecorationRec {
+  text_decoration_line:TextDecorationLine = None (id: 0);
+  text_decoration_color:RGBA32F (id: 1);
+  text_decoration_style:TextDecorationStyle = Solid (id: 2);
+  text_decoration_skip_ink:bool = true (id: 3);
+  text_decoration_thickness:float = 1.0 (id: 4);
+}
+
+/// Rust: `TextStyleRec`
+table TextStyleRec {
+  text_decoration:TextDecorationRec (id: 0);
+
+  font_family:string (id: 1);
+  font_size:float = 0.0 (id: 2);
+  font_weight:FontWeight (id: 3);
+  font_width:float = 0.0 (id: 4);
+  font_style_italic:bool = false (id: 5);
+  font_kerning:bool = true (id: 6);
+  font_optical_sizing:FontOpticalSizing (id: 7);
+
+  font_features:[FontFeature] (id: 8);
+  font_variations:[FontVariation] (id: 9);
+
+  letter_spacing:TextLetterSpacing (id: 10);
+  word_spacing:TextWordSpacing (id: 11);
+  line_height:TextLineHeight (id: 12);
+  text_transform:TextTransform = None (id: 13);
+}
+
+// -----------------------------------------------------------------------------
+// Node traits (composable building blocks)
+// -----------------------------------------------------------------------------
+//
+// Motivation:
+// - Keep node model "trait-based" (similar to TS trait composition), so each concern
+//   has a dedicated schema type.
+// - Makes future TS↔FBS mapping predictable: each TS trait maps to a single table.
+//
+// Notes:
+// - FlatBuffers has no inheritance; traits are expressed via table composition.
+// - Traits are tables (not structs) so we can use defaults + optional presence.
+//
+// -----------------------------------------------------------------------------
+
+/// Base node identity / visibility trait.
+table NodeBaseTrait {
+  name:string (id: 0);
+  active:bool = true (id: 1);
+  locked:bool = false (id: 2);
+}
+
+/// Blend / mask trait (shared by all nodes).
+table NodeBlendTrait {
+  opacity:float = 1.0 (id: 0);
+  /// Blend mode (archive model).
+  ///
+  /// Default is `pass_through`.
+  blend_mode:LayerBlendMode = PassThrough (id: 1);
+  /// Rust: `LayerMaskType` (union; default is Image(alpha) since it's the first union member)
+  mask_type:LayerMaskType (id: 3);
+}
+
+// -----------------------------------------------------------------------------
+// Scene-related structures
+// -----------------------------------------------------------------------------
+
+struct Guide2D {
+  axis:Axis;
+  guide_offset:float;
+}
+
+table EdgePointPosition2D {
+  x:float (id: 0);
+  y:float (id: 1);
+}
+
+table EdgePointNodeAnchor {
+  target:NodeIdentifier (id: 0); // node ID
+}
+
+union EdgePoint {
+  EdgePointPosition2D = 1,
+  EdgePointNodeAnchor = 2
+}
+
+table Edge2D {
+  id:string (id: 0);
+  a:EdgePoint (id: 2);
+  b:EdgePoint (id: 4);
+}
+
+// -----------------------------------------------------------------------------
+// Paints (Rust `cg::types` aligned)
+// -----------------------------------------------------------------------------
+
+struct GradientStop {
+  stop_offset:float;
+  stop_color:RGBA32F;
+}
+
+table SolidPaint {
+  active:bool = true (id: 0);
+  color:RGBA32F (id: 1);
+  blend_mode:BlendMode = Normal (id: 2);
+}
+
+table LinearGradientPaint {
+  active:bool = true (id: 0);
+  /// Rust: `xy1: Alignment`
+  xy1:Alignment (id: 1);
+  /// Rust: `xy2: Alignment`
+  xy2:Alignment (id: 2);
+  tile_mode:TileMode = Clamp (id: 3);
+  /// Rust: `transform: AffineTransform`
+  transform:CGTransform2D (id: 4);
+  stops:[GradientStop] (id: 5);
+  opacity:float = 1.0 (id: 6);
+  blend_mode:BlendMode = Normal (id: 7);
+}
+
+table RadialGradientPaint {
+  active:bool = true (id: 0);
+  /// Rust: `transform: AffineTransform`
+  transform:CGTransform2D (id: 1);
+  stops:[GradientStop] (id: 2);
+  opacity:float = 1.0 (id: 3);
+  blend_mode:BlendMode = Normal (id: 4);
+  tile_mode:TileMode = Clamp (id: 5);
+}
+
+table DiamondGradientPaint {
+  active:bool = true (id: 0);
+  transform:CGTransform2D (id: 1);
+  stops:[GradientStop] (id: 2);
+  opacity:float = 1.0 (id: 3);
+  blend_mode:BlendMode = Normal (id: 4);
+}
+
+table SweepGradientPaint {
+  active:bool = true (id: 0);
+  transform:CGTransform2D (id: 1);
+  stops:[GradientStop] (id: 2);
+  opacity:float = 1.0 (id: 3);
+  blend_mode:BlendMode = Normal (id: 4);
+}
+
+/// Rust: `ResourceRef::HASH(String)`
+table ResourceRefHASH {
+  hash:string (id: 0);
+}
+
+/// Rust: `ResourceRef::RID(String)`
+table ResourceRefRID {
+  rid:string (id: 0);
+}
+
+/// Rust: `ResourceRef`
+union ResourceRef {
+  ResourceRefHASH = 1,
+  ResourceRefRID = 2
+}
+
+/// Rust: `ImageFilters`
+struct ImageFilters {
+  exposure:float;
+  contrast:float;
+  saturation:float;
+  temperature:float;
+  tint:float;
+  highlights:float;
+  shadows:float;
+}
+
+/// Rust: `ImageTile`
+struct ImageTile {
+  scale:float;
+  repeat:ImageRepeat;
+}
+
+/// Rust: `ImagePaintFit::Fit(BoxFit)`
+table ImagePaintFitFit {
+  box_fit:BoxFit = Cover (id: 0);
+}
+
+/// Rust: `ImagePaintFit::Transform(AffineTransform)`
+table ImagePaintFitTransform {
+  transform:CGTransform2D (id: 0);
+}
+
+/// Rust: `ImagePaintFit::Tile(ImageTile)`
+table ImagePaintFitTile {
+  tile:ImageTile (id: 0);
+}
+
+/// Rust: `ImagePaintFit`
+union ImagePaintFit {
+  ImagePaintFitFit = 1,
+  ImagePaintFitTransform = 2,
+  ImagePaintFitTile = 3
+}
+
+/// Rust: `ImagePaint`
+table ImagePaint {
+  active:bool = true (id: 0);
+  image:ResourceRef (id: 2);
+  quarter_turns:ubyte = 0 (id: 3);
+  /// NOTE: Rust field name is `alignement` (typo preserved for 1:1)
+  alignement:Alignment (id: 4);
+  fit:ImagePaintFit (id: 6);
+  opacity:float = 1.0 (id: 7);
+  blend_mode:BlendMode = Normal (id: 8);
+  filters:ImageFilters (id: 9);
+}
+
+union Paint {
+  SolidPaint = 1,
+  LinearGradientPaint = 2,
+  RadialGradientPaint = 3,
+  SweepGradientPaint = 4,
+  DiamondGradientPaint = 5,
+  ImagePaint = 6
+}
+
+table PaintStackItem {
+  paint:Paint (id: 1);
+}
+
+// -----------------------------------------------------------------------------
+// Vector Network (Rust `vectornetwork/vn.rs` aligned)
+// -----------------------------------------------------------------------------
+
+/// Rust: `(f32, f32)` vertex
+///
+/// Stored as CGPoint (same coordinate space as node local geometry).
+/// Indexed by position in the `vertices` array.
+struct VectorNetworkVertex {
+  vertex_position:CGPoint;
+}
+
+/// Rust: `VectorNetworkSegment { a, b, ta, tb }`
+///
+/// `tangent_a` / `tangent_b` are relative tangent vectors used for cubic béziers.
+/// When both tangents are zero, the segment is a straight line.
+struct VectorNetworkSegment {
+  segment_vertex_a:uint;
+  segment_vertex_b:uint;
+  tangent_a:CGPoint;
+  tangent_b:CGPoint;
+}
+
+/// Rust: `VectorNetworkLoop(pub Vec<usize>)`
+///
+/// A closed contour defined by indices into `segments`.
+table VectorNetworkLoop {
+  loop_segment_indices:[uint] (id: 0);
+}
+
+/// Rust: `VectorNetworkRegion { loops, fill_rule, fills }`
+///
+/// Archive model uses `region_fill_paints` (empty = no fill) instead of Option wrappers.
+table VectorNetworkRegion {
+  region_loops:[VectorNetworkLoop] (id: 0);
+  region_fill_rule:FillRule = NonZero (id: 1);
+  region_fill_paints:[PaintStackItem] (id: 2);
+}
+
+/// Rust: `VectorNetwork { vertices, segments, regions }`
+table VectorNetwork {
+  vertices:[CGPoint] (id: 0);
+  segments:[VectorNetworkSegment] (id: 1);
+  regions:[VectorNetworkRegion] (id: 2);
+}
+
+// -----------------------------------------------------------------------------
+// Effects (Rust `cg::fe` + `node::schema::LayerEffects` aligned)
+// -----------------------------------------------------------------------------
+
+/// Rust: `FeGaussianBlur { radius: f32 }`
+struct FeGaussianBlur {
+  radius:float;
+}
+
+/// Rust: `FeProgressiveBlur { start: Alignment, end: Alignment, radius, radius2 }`
+struct FeProgressiveBlur {
+  start:Alignment;
+  end:Alignment;
+  radius:float;
+  radius2:float;
+}
+
+/// Rust: `FeBlur` (enum)
+enum FeBlurKind : byte {
+  Gaussian = 0,
+  Progressive = 1
+}
+
+/// Struct-tagged representation of Rust `FeBlur`.
+struct FeBlur {
+  kind:FeBlurKind;
+  gaussian:FeGaussianBlur;
+  progressive:FeProgressiveBlur;
+}
+
+/// Rust: `FeLayerBlur { blur: FeBlur, active: bool }`
+struct FeLayerBlur {
+  blur:FeBlur;
+  active:bool;
+}
+
+/// Rust: `FeBackdropBlur { blur: FeBlur, active: bool }`
+struct FeBackdropBlur {
+  blur:FeBlur;
+  active:bool;
+}
+
+/// Rust: `FeShadow { dx, dy, blur, spread, color, active }`
+struct FeShadow {
+  dx:float;
+  dy:float;
+  blur:float;
+  spread:float;
+  color:RGBA32F;
+  active:bool;
+}
+
+/// Rust: `FilterShadowEffect` (enum)
+enum FilterShadowEffectKind : byte {
+  DropShadow = 0,
+  InnerShadow = 1
+}
+
+/// Struct-tagged representation of Rust `FilterShadowEffect`.
+struct FilterShadowEffect {
+  kind:FilterShadowEffectKind;
+  shadow:FeShadow;
+}
+
+/// Rust: `NoiseEffectColors` (enum)
+enum NoiseEffectColorsKind : byte {
+  Mono = 0,
+  Duo = 1,
+  Multi = 2
+}
+
+/// Struct-tagged representation of Rust `NoiseEffectColors`.
+struct NoiseEffectColors {
+  kind:NoiseEffectColorsKind;
+  mono_color:RGBA32F;
+  duo_color1:RGBA32F;
+  duo_color2:RGBA32F;
+  multi_opacity:float;
+}
+
+/// Rust: `FeNoiseEffect`
+struct FeNoiseEffect {
+  noise_size:float;
+  density:float;
+  num_octaves:int;
+  seed:float;
+  coloring:NoiseEffectColors;
+  active:bool;
+  blend_mode:BlendMode;
+}
+
+/// Rust: `FeLiquidGlass`
+struct FeLiquidGlass {
+  light_intensity:float;
+  light_angle:float;
+  refraction:float;
+  depth:float;
+  dispersion:float;
+  blur_radius:float;
+  active:bool;
+}
+
+/// Effects trait used by nodes (Rust: `LayerEffects`).
+///
+/// Note: must be a table because it contains vectors (FlatBuffers structs cannot contain vectors).
+table NodeEffectsTrait {
+  fe_blur:FeLayerBlur (id: 0);
+  fe_backdrop_blur:FeBackdropBlur (id: 1);
+  fe_glass:FeLiquidGlass (id: 2);
+  fe_shadows:[FilterShadowEffect] (id: 3);
+  fe_noises:[FeNoiseEffect] (id: 4);
+}
+
+// -----------------------------------------------------------------------------
+// Stroke (draft)
+// -----------------------------------------------------------------------------
+
+table StrokeStyle {
+  stroke_align:StrokeAlign = Inside (id: 0);
+  stroke_cap:StrokeCap = Butt (id: 1);
+  stroke_join:StrokeJoin = Miter (id: 2);
+  stroke_miter_limit:float = 4.0 (id: 3);
+  /// dash array in logical pixels. Empty or omitted means "no dash".
+  stroke_dash_array:[float] (id: 4);
+}
+
+// -----------------------------------------------------------------------------
+// Layout model (aligned to Rust `UniformNodeLayout` + SQL draft)
+// -----------------------------------------------------------------------------
+
+table LayoutDimensions {
+  layout_target_width:float = 0.0 (id: 0);
+  layout_target_height:float = 0.0 (id: 1);
+  layout_min_width:float = 0.0 (id: 2);
+  layout_max_width:float = 0.0 (id: 3);
+  layout_min_height:float = 0.0 (id: 4);
+  layout_max_height:float = 0.0 (id: 5);
+  /// (width, height) ratio pair.
+  layout_target_aspect_ratio_width:float = 0.0 (id: 6);
+  layout_target_aspect_ratio_height:float = 0.0 (id: 7);
+}
+
+table LayoutContainerStyle {
+  layout_mode:LayoutMode = Normal (id: 0);
+  layout_direction:Axis = Horizontal (id: 1);
+  layout_wrap:LayoutWrap = None (id: 2);
+  layout_main_axis_alignment:MainAxisAlignment = None (id: 3);
+  layout_cross_axis_alignment:CrossAxisAlignment = None (id: 4);
+  layout_padding:EdgeInsets (id: 5);
+  layout_main_axis_gap:float (id: 6);
+  layout_cross_axis_gap:float (id: 7);
+}
+
+table LayoutChildStyle {
+  layout_positioning:LayoutPositioning = Auto (id: 0);
+  layout_grow:float = 0.0 (id: 1);
+}
+
+table Layout {
+  layout_position_basis:LayoutPositionBasis = Cartesian (id: 0);
+  layout_position:CGPoint (id: 1);
+  layout_inset:EdgeInsets (id: 2);
+  layout_dimensions:LayoutDimensions (id: 3);
+  layout_container:LayoutContainerStyle (id: 4);
+  layout_child:LayoutChildStyle (id: 5);
+}
+
+// -----------------------------------------------------------------------------
+// Resources / repositories (draft, for document-embedded registries)
+// -----------------------------------------------------------------------------
+
+enum ImageMime : byte {
+  Unknown = 0,
+  ImagePng = 1,
+  ImageJpeg = 2,
+  ImageWebp = 3,
+  ImageGif = 4
+}
+
+table ImageRef {
+  mime:ImageMime = Unknown (id: 0);
+  url:string (id: 1);
+  width:uint (id: 2);
+  height:uint (id: 3);
+  bytes:ulong (id: 4);
+}
+
+table ImagesRepository {
+  /// Keyed by resource id (implementation-defined string key).
+  keys:[string] (id: 0);
+  values:[ImageRef] (id: 1);
+}
+
+table BitmapData {
+  /// Opaque bitmap payload.
+  encoding:BinaryEncoding = Unknown (id: 0);
+  data:[ubyte] (id: 1);
+}
+
+table BitmapEntry {
+  id:string (id: 0);
+  version:uint = 0 (id: 1);
+  width:uint = 0 (id: 2);
+  height:uint = 0 (id: 3);
+  payload:BitmapData (id: 4);
+}
+
+table BitmapsRepository {
+  entries:[BitmapEntry] (id: 0);
+}
+
+// -----------------------------------------------------------------------------
+// Node payloads (draft; matches Rust Node variants at a coarse level)
+// -----------------------------------------------------------------------------
+
+table SceneNodeProperties {
+  constraints_children:SceneConstraintsChildren = Multiple (id: 0);
+  order:float = 0.0 (id: 1);
+  background_color:RGBA32F (id: 2);
+  guides:[Guide2D] (id: 3);
+  edges:[Edge2D] (id: 4);
+}
+
+table InitialContainerNodeProperties {
+  /// Viewport-filling flex container. Purely structural.
+  container:LayoutContainerStyle (id: 0);
+}
+
+table ContainerNodeProperties {
+  rotation:float = 0.0 (id: 0);
+  corner_radius:RectangularCornerRadius (id: 1);
+  corner_smoothing:float = 0.0 (id: 2);
+  fill_paints:[PaintStackItem] (id: 3);
+  stroke_paints:[PaintStackItem] (id: 4);
+  stroke_style:StrokeStyle (id: 5);
+  stroke_width:float = 0.0 (id: 6);
+  rectangular_stroke_width:RectangularStrokeWidth (id: 7);
+  effects:NodeEffectsTrait (id: 8);
+  /// Content-only clip flag (children only).
+  clip:bool = false (id: 9);
+}
+
+table GroupNodeProperties {
+  // Group is mostly transform + blend/mask at Node level.
+}
+
+table RectangleNodeProperties {
+  size:CGSize (id: 0);
+  rotation:float = 0.0 (id: 1);
+  corner_radius:RectangularCornerRadius (id: 2);
+  corner_smoothing:float = 0.0 (id: 3);
+  fill_paints:[PaintStackItem] (id: 4);
+  stroke_paints:[PaintStackItem] (id: 5);
+  stroke_style:StrokeStyle (id: 6);
+  stroke_width:float = 0.0 (id: 7);
+  rectangular_stroke_width:RectangularStrokeWidth (id: 8);
+  effects:NodeEffectsTrait (id: 9);
+}
+
+table EllipseNodeProperties {
+  size:CGSize (id: 0);
+  rotation:float = 0.0 (id: 1);
+  /// Arc/ring support
+  start_angle:float = 0.0 (id: 2);
+  angle:float = 0.0 (id: 3);
+  inner_radius:float = 0.0 (id: 4); // 0..1
+  corner_radius:float = 0.0 (id: 5);
+  fill_paints:[PaintStackItem] (id: 6);
+  stroke_paints:[PaintStackItem] (id: 7);
+  stroke_style:StrokeStyle (id: 8);
+  /// Ellipse uses singular stroke widths in Rust.
+  stroke_width:float = 0.0 (id: 9);
+  effects:NodeEffectsTrait (id: 10);
+}
+
+table PolygonNodeProperties {
+  points:[CGPoint] (id: 0);
+  corner_radius:float = 0.0 (id: 1);
+  fill_paints:[PaintStackItem] (id: 2);
+  stroke_paints:[PaintStackItem] (id: 3);
+  stroke_style:StrokeStyle (id: 4);
+  stroke_width:float = 0.0 (id: 5);
+  effects:NodeEffectsTrait (id: 6);
+}
+
+table RegularPolygonNodeProperties {
+  size:CGSize (id: 0);
+  point_count:uint (id: 1);
+  corner_radius:float = 0.0 (id: 2);
+  fill_paints:[PaintStackItem] (id: 3);
+  stroke_paints:[PaintStackItem] (id: 4);
+  stroke_style:StrokeStyle (id: 5);
+  stroke_width:float = 0.0 (id: 6);
+  effects:NodeEffectsTrait (id: 7);
+}
+
+table RegularStarPolygonNodeProperties {
+  size:CGSize (id: 0);
+  point_count:uint (id: 1);
+  inner_radius:float (id: 2);
+  corner_radius:float = 0.0 (id: 3);
+  fill_paints:[PaintStackItem] (id: 4);
+  stroke_paints:[PaintStackItem] (id: 5);
+  stroke_style:StrokeStyle (id: 6);
+  stroke_width:float = 0.0 (id: 7);
+  effects:NodeEffectsTrait (id: 8);
+}
+
+table LineNodeProperties {
+  /// Height is semantically 0; width stored in `size.width`.
+  size:CGSize (id: 0);
+  stroke_paints:[PaintStackItem] (id: 1);
+  stroke_width:float = 1.0 (id: 2);
+  stroke_style:StrokeStyle (id: 3);
+  effects:NodeEffectsTrait (id: 4);
+}
+
+table TextSpanNodeProperties {
+  text:string (id: 0);
+  width:float = 0.0 (id: 1);
+  height:float = 0.0 (id: 2);
+  /// Text style (Rust: `TextStyleRec`).
+  text_style:TextStyleRec (id: 3);
+  text_align:TextAlign = Left (id: 4);
+  text_align_vertical:TextAlignVertical = Top (id: 5);
+  max_lines:uint = 0 (id: 6);
+  ellipsis:string (id: 7);
+  fill_paints:[PaintStackItem] (id: 8);
+  stroke_paints:[PaintStackItem] (id: 9);
+  stroke_style:StrokeStyle (id: 10);
+  stroke_width:float = 0.0 (id: 11);
+  effects:NodeEffectsTrait (id: 12);
+}
+
+table PathNodeProperties {
+  svg_path_data:string (id: 0);
+  fill_paints:[PaintStackItem] (id: 1);
+  stroke_paints:[PaintStackItem] (id: 2);
+  stroke_style:StrokeStyle (id: 3);
+  stroke_width:float = 0.0 (id: 4);
+  effects:NodeEffectsTrait (id: 5);
+}
+
+table VectorNodeProperties {
+  /// Strongly typed vector network geometry + regions.
+  ///
+  /// When null/empty, the node is treated as having no vector geometry.
+  vector_network:VectorNetwork (id: 0);
+  corner_radius:float = 0.0 (id: 1);
+  fill_paints:[PaintStackItem] (id: 2);
+  stroke_paints:[PaintStackItem] (id: 3);
+  stroke_style:StrokeStyle (id: 4);
+  stroke_width:float = 1.0 (id: 5);
+  /// Variable-width stroke profile (opaque).
+  stroke_width_profile_encoding:BinaryEncoding = Unknown (id: 6);
+  stroke_width_profile:[ubyte] (id: 7);
+  effects:NodeEffectsTrait (id: 8);
+}
+
+table BooleanOperationNodeProperties {
+  op:BooleanPathOperation (id: 0);
+  corner_radius:float = 0.0 (id: 1);
+  fill_paints:[PaintStackItem] (id: 2);
+  stroke_paints:[PaintStackItem] (id: 3);
+  stroke_style:StrokeStyle (id: 4);
+  stroke_width:float = 0.0 (id: 5);
+  effects:NodeEffectsTrait (id: 6);
+}
+
+table ImageNodeProperties {
+  size:CGSize (id: 0);
+  rotation:float = 0.0 (id: 1);
+  corner_radius:RectangularCornerRadius (id: 2);
+  corner_smoothing:float = 0.0 (id: 3);
+  fill:ImagePaint (id: 4);
+  stroke_paints:[PaintStackItem] (id: 5);
+  stroke_style:StrokeStyle (id: 6);
+  stroke_width:float = 0.0 (id: 7);
+  rectangular_stroke_width:RectangularStrokeWidth (id: 8);
+  effects:NodeEffectsTrait (id: 9);
+  /// ResourceRef is kept indirect via `fill.resource_id` for now.
+}
+
+table ErrorNodeProperties {
+  size:CGSize (id: 0);
+  error:string (id: 1);
+}
+
+union NodeData {
+  InitialContainerNodeProperties = 1,
+  ContainerNodeProperties = 2,
+  GroupNodeProperties = 3,
+  RectangleNodeProperties = 4,
+  EllipseNodeProperties = 5,
+  PolygonNodeProperties = 6,
+  RegularPolygonNodeProperties = 7,
+  RegularStarPolygonNodeProperties = 8,
+  LineNodeProperties = 9,
+  TextSpanNodeProperties = 10,
+  PathNodeProperties = 11,
+  VectorNodeProperties = 12,
+  BooleanOperationNodeProperties = 13,
+  ImageNodeProperties = 14,
+  ErrorNodeProperties = 15,
+  SceneNodeProperties = 16
+}
+
+// -----------------------------------------------------------------------------
+// Nodes & hierarchy
+// -----------------------------------------------------------------------------
+
+table Node {
+  /// Packed u32 id.
+  id:NodeIdentifier (id: 0);
+
+  type:NodeType (id: 1);
+  /// Trait: base node metadata
+  base:NodeBaseTrait (id: 2);
+  /// Trait: blend / mask
+  blend:NodeBlendTrait (id: 3);
+
+  /// Ordered children (archive model).
+  ///
+  /// The vector order is the canonical child order.
+  children:[NodeIdentifier] (id: 4);
+
+  /// Geometry transform baseline (identity by default).
+  transform:CGTransform2D (id: 5);
+
+  /// Layout (optional, depending on node type / usage).
+  layout:Layout (id: 6);
+
+  /// Variant payload.
+  data:NodeData (id: 8);
+}
+
+// -----------------------------------------------------------------------------
+// Document root
+// -----------------------------------------------------------------------------
+
+table CanvasDocument {
+  /// Schema version string (keep in sync with TS `grida.program.document.SCHEMA_VERSION`).
+  schema_version:string (id: 0);
+
+  /// Flat node repository.
+  nodes:[Node] (id: 1);
+
+  /// Scene node ids (scene nodes are also stored in `nodes`).
+  scenes:[NodeIdentifier] (id: 2);
+
+  /// Entry scene id (optional).
+  entry_scene_id:NodeIdentifier (id: 3);
+
+  /// Embedded registries (optional).
+  images:ImagesRepository (id: 4);
+  bitmaps:BitmapsRepository (id: 5);
+}
+
+/// Top-level wrapper (allows future multi-document bundles, signatures, etc.)
+table GridaFile {
+  document:CanvasDocument (id: 0);
+}
+
+root_type GridaFile;
