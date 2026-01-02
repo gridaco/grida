@@ -163,6 +163,31 @@ export function NodeHierarchyList() {
     (state) => state.document.nodes,
     (a, b) => a === b
   );
+  /**
+   * TODO(perf): `state.document.nodes` is a broad subscription.
+   *
+   * Today, *any* node change (position, fill, etc.) produces a new `document.nodes`
+   * object reference, so this rerenders the entire hierarchy list.
+   *
+   * We want hierarchy UI to rerender only when:
+   * - the hierarchy structure changes (parent/children order), or
+   * - per-row "display fields" change (name/locked/active/type/icon-related),
+   * - selection/hover/expanded changes.
+   *
+   * Option A (manual fetch on hierarchy changes):
+   * - Stop subscribing to `document.nodes`.
+   * - Read the minimum data for the current visible items on-demand (e.g. via
+   *   `useNodeState(node_id, selector)` inside each row).
+   * - Trigger a refetch / tree rebuild only when hierarchy changes (e.g. when
+   *   `document_ctx` changes, or a dedicated "hierarchy revision" signal changes).
+   *
+   * Option B (introduce a narrow invalidation mechanism):
+   * - Add a lightweight revision counter to editor state that increments only when
+   *   mask-related fields or hierarchy structure changes (e.g. `mask_revision`,
+   *   `hierarchy_revision`), and subscribe to that instead.
+   * - Alternative: listen to editor patches (subscribeWithSelector) and locally bump
+   *   a `maskRevision` when patches touch `document.nodes[*].mask` / children links.
+   */
 
   const {
     id,
@@ -181,6 +206,16 @@ export function NodeHierarchyList() {
       }),
     [children, document_ctx, nodes]
   );
+  /**
+   * TODO(perf): mask indicators are relationship-derived (sibling-order dependent).
+   *
+   * `computeNodeMaskMap` currently needs access to the full `nodes` map to detect
+   * which siblings are mask nodes, so a single node's `mask` toggle can affect many
+   * other rows ("masked" indicators).
+   *
+   * This is the main blocker for decoupling the hierarchy list from `document.nodes`.
+   * See TODO above for approaches (revision signal or patch-based invalidation).
+   */
 
   // Track user's manual expansion state - preserve across selection changes
   const [userExpandedItems, setUserExpandedItems] = useState<string[]>([]);

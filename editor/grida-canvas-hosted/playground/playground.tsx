@@ -249,8 +249,9 @@ export default function CanvasPlayground({
     let cancelled = false;
     setCanvasReady(false);
 
+    const dpr = window.devicePixelRatio || 1;
     instance
-      .mount(canvasElement)
+      .mount(canvasElement, dpr)
       .then(() => {
         if (!cancelled) {
           setCanvasReady(true);

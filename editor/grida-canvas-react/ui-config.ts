@@ -73,7 +73,18 @@ export const MIN_RESIZE_HANDLE_SIZE_FOR_DIAGONAL_PRIORITY_UI_SIZE = 36;
  * @remarks
  * We keep this centralized so z-ordering can be tracked/tuned in one place.
  */
-export const FLOATING_BAR_Z_INDEX = 999;
+export const FLOATING_BAR_Z_INDEX = 100;
+
+/**
+ * Z-index for the ruler overlay.
+ *
+ * Must be higher than the floating bar (title bar) so the ruler remains visible
+ * and interactive above container title bars.
+ *
+ * @remarks
+ * We keep this centralized so z-ordering can be tracked/tuned in one place.
+ */
+export const RULER_Z_INDEX = 110;
 
 /**
  * Workbench accent colors in hex format.

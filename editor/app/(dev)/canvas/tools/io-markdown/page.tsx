@@ -150,7 +150,8 @@ function useCanvasSurfaceMount(editorInstance: GridaEditor) {
     activeCanvasRef.current = canvasNode;
     let cancelled = false;
 
-    editorInstance.mount(canvasNode).catch((error) => {
+    const dpr = window.devicePixelRatio || 1;
+    editorInstance.mount(canvasNode, dpr).catch((error) => {
       if (!cancelled) {
         console.error("Failed to mount canvas surface", error);
       }

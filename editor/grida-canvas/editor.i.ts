@@ -2821,7 +2821,6 @@ export namespace editor.api {
      * - The returned node IDs can be used by caller to update selection or perform other operations
      */
     insert(payload: InsertPayload, target: NodeID | null): NodeID[];
-    autoSizeTextNode(node_id: string, axis: "width" | "height"): void;
   }
 
   /**
@@ -4630,5 +4629,55 @@ export namespace editor.ascii {
     export const line_tee_251C = "├";
     export const line_corner_2514 = "└";
     export const line_root_250C = "┌";
+  }
+}
+
+export namespace editor.ui {
+  /**
+   *
+   * ```typescript
+   * let notifier: UINotifier;
+   * notifier?.("Hello", "success");
+   * ```
+   */
+  export type UINotifier = (
+    message: string,
+    level?: "info" | "success" | "error" | "warning"
+  ) => void;
+
+  interface EyeDropperOpenOptions {
+    /**
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal
+     */
+    signal?: AbortSignal;
+  }
+
+  export type EyeDropper = {
+    /**
+     *
+     * @returns A promise that resolves with the hex color string if a color was picked, or undefined if cancelled.
+     *          The hex string is in sRGB format (#aabbcc).
+     *          @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
+     */
+    open(
+      options?: EyeDropperOpenOptions
+    ): Promise<{ sRGBHex: string } | undefined>;
+  };
+
+  /**
+   * UI/Browser dependent UX actions.
+   */
+  export interface UIUXProviders {
+    notify?: UINotifier;
+
+    /**
+     * @default navigator.clipboard
+     */
+    clipboard?: Clipboard;
+
+    /**
+     * @default `() => new window.EyeDropper()`
+     */
+    eyedropper?: () => EyeDropper;
   }
 }

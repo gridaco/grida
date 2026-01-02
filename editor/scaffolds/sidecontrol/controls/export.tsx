@@ -24,13 +24,15 @@ import {
 } from "@radix-ui/react-icons";
 import type grida from "@grida/schema";
 import {
-  SidebarSection,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-  SidebarSectionHeaderActions,
-  SidebarMenuSectionContent,
-} from "@/components/sidebar";
-import { PropertyLine, PropertyEnum } from "../ui";
+  PropertySection,
+  PropertySectionContent,
+  PropertySectionHeaderItem,
+  PropertySectionHeaderLabel,
+  PropertySectionHeaderActions,
+  PropertyRows,
+  PropertyRow,
+  PropertyEnum,
+} from "../ui";
 import {
   Popover,
   PopoverContent,
@@ -178,28 +180,28 @@ export function ExportSection({
   };
 
   return (
-    <SidebarSection
+    <PropertySection
       data-empty={!hasConfigs}
-      className="border-b pb-4 [&[data-empty='true']]:pb-0"
+      className="border-b [&[data-empty='true']]:pb-0"
     >
-      <SidebarSectionHeaderItem onClick={onAddConfig}>
-        <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
-        <SidebarSectionHeaderActions>
+      <PropertySectionHeaderItem onClick={onAddConfig}>
+        <PropertySectionHeaderLabel>Export</PropertySectionHeaderLabel>
+        <PropertySectionHeaderActions>
           <Button variant="ghost" size="icon">
             <PlusIcon className="size-3" />
           </Button>
-        </SidebarSectionHeaderActions>
-      </SidebarSectionHeaderItem>
+        </PropertySectionHeaderActions>
+      </PropertySectionHeaderItem>
       {hasConfigs && (
-        <SidebarMenuSectionContent className="space-y-2">
+        <PropertySectionContent>
           <ExportNodeControl node_id={node_id} name={name} />
-        </SidebarMenuSectionContent>
+        </PropertySectionContent>
       )}
-    </SidebarSection>
+    </PropertySection>
   );
 }
 
-export function ExportNodeControl({
+function ExportNodeControl({
   node_id,
   name,
   disabled,
@@ -331,17 +333,19 @@ export function ExportNodeControl({
 
   return (
     <>
-      {exportConfigs.map((config, index) => (
-        <ExportConfigRow
-          key={index}
-          config={config}
-          onRemove={() => onRemoveConfig(index)}
-          onUpdate={(updates) => onUpdateConfig(index, updates)}
-          disabled={disabled}
-        />
-      ))}
+      <PropertyRows>
+        {exportConfigs.map((config, index) => (
+          <ExportConfigRow
+            key={index}
+            config={config}
+            onRemove={() => onRemoveConfig(index)}
+            onUpdate={(updates) => onUpdateConfig(index, updates)}
+            disabled={disabled}
+          />
+        ))}
+      </PropertyRows>
       {exportConfigs.length >= 1 && (
-        <PropertyLine>
+        <PropertyRow>
           <Button
             variant="outline"
             size="xs"
@@ -360,7 +364,7 @@ export function ExportNodeControl({
               </span>
             )}
           </Button>
-        </PropertyLine>
+        </PropertyRow>
       )}
     </>
   );
@@ -447,7 +451,7 @@ function ExportConfigRow({
 
   return (
     <Popover modal={false}>
-      <PropertyLine>
+      <PropertyRow>
         <div className="flex items-center w-full gap-2">
           <div
             aria-disabled={isDisabled}
@@ -544,7 +548,7 @@ function ExportConfigRow({
           onUpdate={onUpdate}
           disabled={disabled}
         />
-      </PropertyLine>
+      </PropertyRow>
     </Popover>
   );
 }
@@ -818,12 +822,12 @@ export function ExportMultipleLayers({
   };
 
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <PropertyLine>
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Export</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent className="space-y-2">
+        <PropertyRow>
           <Button
             variant="outline"
             size="xs"
@@ -842,8 +846,8 @@ export function ExportMultipleLayers({
               </span>
             )}
           </Button>
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+        </PropertyRow>
+      </PropertySectionContent>
+    </PropertySection>
   );
 }

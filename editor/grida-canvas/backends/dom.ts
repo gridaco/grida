@@ -38,16 +38,44 @@ export namespace domapi {
     }
 
     get offset(): cmath.Vector2 {
-      const rect = this.getViewport()!.getBoundingClientRect();
+      const viewport = this.getViewport();
+      if (!viewport) {
+        return [0, 0];
+      }
+      const rect = viewport.getBoundingClientRect();
       return [rect.left, rect.top];
     }
 
     get rect() {
-      return this.getViewport()!.getBoundingClientRect();
+      const viewport = this.getViewport();
+      if (!viewport) {
+        // Return default rect when viewport element doesn't exist yet
+        return {
+          left: 0,
+          top: 0,
+          right: typeof window !== "undefined" ? window.innerWidth : 0,
+          bottom: typeof window !== "undefined" ? window.innerHeight : 0,
+          width: typeof window !== "undefined" ? window.innerWidth : 0,
+          height: typeof window !== "undefined" ? window.innerHeight : 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      }
+      return viewport.getBoundingClientRect();
     }
 
     get size() {
-      const rect = this.getViewport()!.getBoundingClientRect();
+      const viewport = this.getViewport();
+      if (!viewport) {
+        // Return default size when viewport element doesn't exist yet
+        // This can happen during initial render before ViewportRoot mounts
+        return {
+          width: typeof window !== "undefined" ? window.innerWidth : 0,
+          height: typeof window !== "undefined" ? window.innerHeight : 0,
+        };
+      }
+      const rect = viewport.getBoundingClientRect();
       return {
         width: rect.width,
         height: rect.height,
@@ -55,11 +83,35 @@ export namespace domapi {
     }
 
     getViewportRect() {
-      return this.getViewport()!.getBoundingClientRect();
+      const viewport = this.getViewport();
+      if (!viewport) {
+        // Return default rect when viewport element doesn't exist yet
+        return {
+          left: 0,
+          top: 0,
+          right: typeof window !== "undefined" ? window.innerWidth : 0,
+          bottom: typeof window !== "undefined" ? window.innerHeight : 0,
+          width: typeof window !== "undefined" ? window.innerWidth : 0,
+          height: typeof window !== "undefined" ? window.innerHeight : 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      }
+      return viewport.getBoundingClientRect();
     }
 
     getViewportSize(): { width: number; height: number } {
-      const rect = this.getViewport()!.getBoundingClientRect();
+      const viewport = this.getViewport();
+      if (!viewport) {
+        // Return default size when viewport element doesn't exist yet
+        // This can happen during initial render before ViewportRoot mounts
+        return {
+          width: typeof window !== "undefined" ? window.innerWidth : 0,
+          height: typeof window !== "undefined" ? window.innerHeight : 0,
+        };
+      }
+      const rect = viewport.getBoundingClientRect();
       return {
         width: rect.width,
         height: rect.height,

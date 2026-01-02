@@ -2,12 +2,14 @@
 
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
-  SidebarMenuSectionContent,
-  SidebarSection,
-  SidebarSectionHeaderActions,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-} from "@/components/sidebar";
+  PropertySection,
+  PropertySectionContent,
+  PropertySectionHeaderItem,
+  PropertySectionHeaderLabel,
+  PropertySectionHeaderActions,
+  PropertyRow,
+  PropertyLineLabel,
+} from "./ui";
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
 import { FontStyleControl } from "./controls/font-style";
@@ -24,7 +26,6 @@ import { FlexAlignControl } from "./controls/flex-align";
 import { FlexWrapControl } from "./controls/flex-wrap";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
-import { PropertyLine, PropertyLineLabel } from "./ui";
 import { SrcControl } from "./controls/src";
 import { BoxFitControl } from "./controls/box-fit";
 import { PropsControl } from "./controls/props";
@@ -67,7 +68,6 @@ import { StrokeCapControl } from "./controls/stroke-cap";
 import { StrokeAlignControl } from "./controls/stroke-align";
 import { StrokeJoinControl } from "./controls/stroke-join";
 import { StrokeMiterLimitControl } from "./controls/stroke-miter-limit";
-import grida from "@grida/schema";
 import {
   useCurrentSceneState,
   useEditorFlagsState,
@@ -97,22 +97,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
-import { dq } from "@/grida-canvas/query";
 import { TextDetails } from "./controls/widgets/text-details";
-import cg from "@grida/cg";
 import { FeControl } from "./controls/fe";
 import InputPropertyNumber from "./ui/number";
 import { ArcPropertiesControl } from "./controls/arc-properties";
 import { ModeVectorEditModeProperties } from "./chunks/mode-vector";
 import { ScaleToolSection } from "./chunks/scale-tool";
-import { SectionFills } from "./chunks/section-fills";
-import { SectionStrokes } from "./chunks/section-strokes";
+import { SectionFills, SectionFillsMixed } from "./chunks/section-fills";
+import { SectionStrokes, SectionStrokesMixed } from "./chunks/section-strokes";
 import { OpsControl } from "./controls/ext-ops";
 import { MaskControl } from "./controls/ext-mask";
 import {
   useMixedProperties,
   useMixedPaints,
-  MixedPropertiesEditor,
 } from "@/grida-canvas-react/use-mixed-properties";
 import { editor } from "@/grida-canvas";
 import {
@@ -121,7 +118,10 @@ import {
 } from "./controls/context/font";
 import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gesture";
 import { MaskTypeControl } from "./controls/mask-type";
+import { dq } from "@/grida-canvas/query";
 import { Editor } from "@/grida-canvas/editor";
+import grida from "@grida/schema";
+import cg from "@grida/cg";
 
 function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   const editor = useCurrentEditor();
@@ -292,642 +292,219 @@ function ModeMixedNodeProperties({
   config?: ControlsConfig;
 }) {
   const backend = useBackendState();
-  const mp = useMixedProperties(ids);
-  const { nodes, properties, actions: change } = mp;
-  const {
-    name,
-    active,
-    locked,
-    opacity,
-    corner_radius,
-    rectangular_corner_radius_top_left,
-    rectangular_corner_radius_top_right,
-    rectangular_corner_radius_bottom_right,
-    rectangular_corner_radius_bottom_left,
-    fill,
-    stroke,
-    stroke_width,
-    stroke_cap,
-    stroke_align,
-    stroke_join,
-    stroke_miter_limit,
-    width,
-    height,
-    fit,
-    font_family,
-    font_weight,
-    font_style_italic,
-    font_postscript_name,
-    font_optical_sizing,
-    font_variations,
-    font_size,
-    line_height,
-    letter_spacing,
-    text_align,
-    text_align_vertical,
+  const instance = useCurrentEditor();
 
-    //
-    layout,
-    direction,
-    main_axis_alignment,
-    cross_axis_alignment,
-    main_axis_gap,
-    cross_axis_gap,
-    layout_wrap,
-    padding_top,
-    padding_right,
-    padding_bottom,
-    padding_left,
-    //
-    cursor,
-    blend_mode,
+  // Minimal "base" selector for mixed selection (not performance sensitive, but avoids deprecated hook).
+  const mp = useMixedProperties(ids, (node) => ({
+    type: node.type,
+    name: node.name,
+    active: node.active,
+    locked: node.locked,
+    fit: node.fit,
+    cursor: node.cursor,
+    blend_mode: node.blend_mode,
+  }));
 
-    // component_id,
-    // style,
-    // type,
-    // properties,
-    // position,
-    // rotation,
-    // left,
-    // top,
-    // right,
-    // bottom,
-    // maxLength,
-    // border,
-    // userdata,
-  } = properties;
+  const { name, active, locked, fit, cursor, blend_mode } = mp;
 
   const sid = ids.join(",");
   // const is_root = ids.length === 0 && scene.children.includes(ids[0]); // assuming when root is selected, only root is selected
-  const types = new Set(nodes.map((n) => n.type));
+  const types = new Set((mp.type?.values ?? []).map((v) => v.value));
   const _types = Array.from(types);
 
   const supports_corner_radius = _types.some((t) =>
     supports.cornerRadius(t, { backend })
   );
+  const supports_corner_radius4 = _types.some((t) =>
+    supports.cornerRadius4(t, { backend })
+  );
   const supports_stroke = _types.some((t) => supports.stroke(t, { backend }));
   const supports_stroke_cap = _types.some((t) =>
     supports.strokeCap(t, { backend })
   );
-  const has_container = types.has("container");
-  const has_flex_container =
-    has_container && nodes.some((n) => "layout" in n && n.layout === "flex");
-  const has_stylable = nodes.some((n) => n.type !== "template_instance");
+  const has_stylable = (mp.type?.values ?? []).some(
+    (v) => v.value !== "template_instance"
+  );
 
   return (
     <div key={sid} className="mt-4 mb-10">
-      <SidebarSection hidden={config.base === "off"} className="border-b pb-4">
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine className="items-center gap-1">
+      <PropertySection hidden={config.base === "off"} className="border-b">
+        <PropertySectionContent>
+          <PropertyRow className="items-center gap-1">
             <Checkbox
               checked={active.mixed ? false : active.value}
               disabled={active.mixed}
-              onCheckedChange={change.active}
+              onCheckedChange={(value) => {
+                const target = active?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.doc.getNodeById(id).active = Boolean(value);
+                });
+              }}
               className="me-1"
             />
             <NameControl
               value={name.mixed ? `${ids.length} selections` : name.value}
               disabled={name.mixed}
-              onValueChange={change.name}
+              onValueChange={(value) => {
+                const target = name?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.doc.getNodeById(id).name = value;
+                });
+              }}
             />
             <Toggle
               variant="outline"
               size="sm"
               disabled={locked.mixed}
               pressed={locked.mixed ? true : locked.value}
-              onPressedChange={change.locked}
+              onPressedChange={(value) => {
+                const target = locked?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.doc.getNodeById(id).locked = Boolean(value);
+                });
+              }}
               className="size-6 p-0.5 aspect-square"
             >
-              {locked ? (
+              {locked.mixed ? (
+                <LockClosedIcon className="size-3" />
+              ) : locked.value ? (
                 <LockClosedIcon className="size-3" />
               ) : (
                 <LockOpen1Icon className="size-3" />
               )}
             </Toggle>
             {/* <small className="ms-2 font-mono">{id}</small> */}
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      {config.position !== "off" && <SectionMixedPosition mp={mp} />}
-      <SidebarSection
-        hidden={config.layout === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine hidden={config.size === "off"}>
-            <PropertyLineLabel>Width</PropertyLineLabel>
-            <LengthPercentageControl
-              value={width?.value}
-              onValueCommit={change.width}
-            />
-          </PropertyLine>
-          <PropertyLine hidden={config.size === "off"}>
-            <PropertyLineLabel>Height</PropertyLineLabel>
-            <LengthPercentageControl
-              value={height?.value}
-              onValueCommit={change.height}
-            />
-          </PropertyLine>
-          {types.has("container") && (
-            <PropertyLine>
-              <PropertyLineLabel>Flow</PropertyLineLabel>
-              <LayoutControl
-                value={
-                  layout?.value === grida.mixed ||
-                  direction?.value === grida.mixed ||
-                  layout?.value === undefined ||
-                  (layout?.value === "flex" && direction?.value === undefined)
-                    ? undefined
-                    : {
-                        layoutMode: layout?.value ?? "flow",
-                        direction:
-                          layout?.value === "flex"
-                            ? direction?.value
-                            : undefined,
-                      }
-                }
-                onValueChange={(value) => {
-                  change.layout(value.layoutMode);
-                  if (value.direction) {
-                    change.direction(value.direction);
-                  }
-                }}
-              />
-            </PropertyLine>
-          )}
-          <PropertyLine hidden={!has_flex_container}>
-            <PropertyLineLabel>Alignment</PropertyLineLabel>
-            <FlexAlignControl
-              className="w-full"
-              direction={
-                direction?.value === grida.mixed
-                  ? "horizontal"
-                  : (direction?.value ?? "horizontal")
-              }
-              value={
-                main_axis_alignment?.value === grida.mixed ||
-                cross_axis_alignment?.value === grida.mixed ||
-                main_axis_alignment?.value === undefined ||
-                cross_axis_alignment?.value === undefined
-                  ? undefined
-                  : {
-                      mainAxisAlignment: main_axis_alignment.value,
-                      crossAxisAlignment: cross_axis_alignment.value,
-                    }
-              }
-              onValueChange={(value) => {
-                change.main_axis_alignment(value.mainAxisAlignment);
-                change.cross_axis_alignment(value.crossAxisAlignment);
-              }}
-            />
-          </PropertyLine>
-          <PropertyLine hidden={!has_flex_container}>
-            <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl
-              mode={layout_wrap?.value === "wrap" ? "multiple" : "single"}
-              value={{
-                main_axis_gap:
-                  main_axis_gap?.mixed || main_axis_gap?.value === undefined
-                    ? grida.mixed
-                    : (main_axis_gap.value ?? 0),
-                cross_axis_gap: cross_axis_gap?.mixed
-                  ? grida.mixed
-                  : cross_axis_gap?.value,
-              }}
-              onValueCommit={change.gap}
-            />
-          </PropertyLine>
-          <PropertyLine hidden={!has_container}>
-            <PropertyLineLabel>Padding</PropertyLineLabel>
-            <PaddingControl
-              value={{
-                padding_top:
-                  padding_top?.mixed || padding_top?.value === undefined
-                    ? grida.mixed
-                    : (padding_top.value ?? 0),
-                padding_right:
-                  padding_right?.mixed || padding_right?.value === undefined
-                    ? grida.mixed
-                    : (padding_right?.value ?? 0),
-                padding_bottom:
-                  padding_bottom?.mixed || padding_bottom?.value === undefined
-                    ? grida.mixed
-                    : (padding_bottom?.value ?? 0),
-                padding_left:
-                  padding_left?.mixed || padding_left?.value === undefined
-                    ? grida.mixed
-                    : (padding_left?.value ?? 0),
-              }}
-              onValueCommit={change.padding}
-            />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection hidden={!has_stylable} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
+      {config.position !== "off" && <SectionMixedPosition ids={ids} />}
+      <SectionLayoutMixed ids={ids} config={config} />
+      <PropertySection hidden={!has_stylable} className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Appearance</PropertySectionHeaderLabel>
+          <PropertySectionHeaderActions>
             <BlendModeDropdown
               type="layer"
               value={blend_mode?.value}
-              onValueChange={change.blend_mode}
+              onValueChange={(value) => {
+                const target = blend_mode?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.doc.getNodeById(id).blend_mode = value;
+                });
+              }}
             />
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Opacity</PropertyLineLabel>
-            <OpacityControl
-              value={opacity?.value}
-              // onValueChange={change.opacity}
-              onValueCommit={change.opacity}
-            />
-          </PropertyLine>
-          {supports_corner_radius && (
-            <PropertyLine>
-              <PropertyLineLabel>Radius</PropertyLineLabel>
-              {corner_radius?.mixed ? (
-                <CornerRadius4Control onValueCommit={change.corner_radius} />
-              ) : (
-                <CornerRadius4Control
-                  value={{
-                    rectangular_corner_radius_top_left:
-                      typeof rectangular_corner_radius_top_left?.value ===
-                      "number"
-                        ? rectangular_corner_radius_top_left?.value
-                        : undefined,
-                    rectangular_corner_radius_top_right:
-                      typeof rectangular_corner_radius_top_right?.value ===
-                      "number"
-                        ? rectangular_corner_radius_top_right?.value
-                        : undefined,
-                    rectangular_corner_radius_bottom_right:
-                      typeof rectangular_corner_radius_bottom_right?.value ===
-                      "number"
-                        ? rectangular_corner_radius_bottom_right?.value
-                        : undefined,
-                    rectangular_corner_radius_bottom_left:
-                      typeof rectangular_corner_radius_bottom_left?.value ===
-                      "number"
-                        ? rectangular_corner_radius_bottom_left?.value
-                        : undefined,
-                  }}
-                  onValueCommit={change.corner_radius}
-                />
-              )}
-            </PropertyLine>
-          )}
-          {/* {supports.border(node.type) && (
-              <PropertyLine>
-                <PropertyLineLabel>Border</PropertyLineLabel>
-                <BorderControl value={border} onValueChange={actions.border} />
-              </PropertyLine>
-            )} */}
-
-          {/* <PropertyLine>
-              <PropertyLineLabel>Shadow</PropertyLineLabel>
-              <BoxShadowControl
-                value={{ boxShadow }}
-                onValueChange={actions.boxShadow}
-              />
-            </PropertyLine> */}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertySectionHeaderActions>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
+            <PropertyOpacityRowMixed ids={ids} />
+          </PropertyRow>
+          <PropertyCornerRadiusRowMixed
+            ids={ids}
+            supported={supports_corner_radius}
+            supports_corner_radius4={supports_corner_radius4}
+          />
+        </PropertySectionContent>
+      </PropertySection>
 
       {/* TODO: */}
-      {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent>
+      {/* <PropertySection hidden={!is_templateinstance} className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Template</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
+          <PropertySectionContent>
             <TemplateControl
               value={component_id}
               onValueChange={actions.component}
             />
-          </SidebarMenuSectionContent>
-        </SidebarSection> */}
-      {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
+          </PropertySectionContent>
+        </PropertySection> */}
+      {/* <PropertySection hidden={!is_templateinstance} className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Props</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
 
           {properties && (
-            <SidebarMenuSectionContent className="space-y-2">
+            <PropertySectionContent>
               <PropsControl
                 properties={properties}
                 props={computed.props || {}}
                 onValueChange={actions.value}
               />
-            </SidebarMenuSectionContent>
+            </PropertySectionContent>
           )}
-        </SidebarSection> */}
+        </PropertySection> */}
       {config.text !== "off" && types.has("text") && (
-        <CurrentFontProvider
-          description={{
-            fontFamily:
-              typeof font_family?.value === "string" ? font_family.value : "",
-            fontPostscriptName:
-              typeof font_postscript_name?.value === "string"
-                ? font_postscript_name.value
-                : undefined,
-            fontWeight:
-              typeof font_weight?.value === "number"
-                ? font_weight.value
-                : undefined,
-            fontStyleItalic:
-              typeof font_style_italic?.value === "boolean"
-                ? font_style_italic.value
-                : undefined,
-            fontVariations:
-              typeof font_variations?.value === "object"
-                ? (font_variations.value as Record<string, number>)
-                : undefined,
-          }}
-        >
-          <SidebarSection className="border-b pb-4">
-            <SidebarSectionHeaderItem>
-              <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-            </SidebarSectionHeaderItem>
-            <SidebarMenuSectionContent className="space-y-2">
-              <PropertyLine>
-                <PropertyLineLabel>Font</PropertyLineLabel>
-                <div className="flex-1">
-                  <FontFamilyControl
-                    value={font_family?.value}
-                    onValueChange={change.font_family}
-                  />
-                </div>
-              </PropertyLine>
-              <PropertyLine>
-                <PropertyLineLabel>Style</PropertyLineLabel>
-                <FontStyleControlScaffold selection={ids} />
-              </PropertyLine>
-              <PropertyLine>
-                <PropertyLineLabel>Size</PropertyLineLabel>
-                <FontSizeControl
-                  value={font_size?.value}
-                  onValueCommit={change.font_size}
-                />
-              </PropertyLine>
-              <PropertyLine>
-                <PropertyLineLabel>Line</PropertyLineLabel>
-                <LineHeightControl
-                  value={line_height?.value}
-                  onValueCommit={change.line_height}
-                />
-              </PropertyLine>
-              <PropertyLine>
-                <PropertyLineLabel>Letter</PropertyLineLabel>
-                <LetterSpacingControl
-                  value={letter_spacing?.value}
-                  onValueCommit={change.letter_spacing}
-                />
-              </PropertyLine>
-              <PropertyLine>
-                <PropertyLineLabel>Align</PropertyLineLabel>
-                <TextAlignControl
-                  value={text_align?.value}
-                  onValueChange={change.text_align}
-                />
-              </PropertyLine>
-              <PropertyLine>
-                <PropertyLineLabel></PropertyLineLabel>
-                <TextAlignVerticalControl
-                  value={text_align_vertical?.value}
-                  onValueChange={change.text_align_vertical}
-                />
-              </PropertyLine>
-              <PropertyLine>
-                <PropertyLineLabel>Max Length</PropertyLineLabel>
-                <MaxlengthControl disabled placeholder={"multiple"} />
-              </PropertyLine>
-            </SidebarMenuSectionContent>
-          </SidebarSection>
-        </CurrentFontProvider>
+        <SectionMixedText ids={ids} />
       )}
-      <SidebarSection
+      <PropertySection
         hidden={config.image === "off" || !types.has("image")}
-        className="border-b pb-4"
+        className="border-b"
       >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          {/* <PropertyLine>
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Image</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          {/* <PropertyRow>
               <PropertyLineLabel>Source</PropertyLineLabel>
               <SrcControl value={node.src} onValueChange={actions.src} />
-            </PropertyLine> */}
-          <PropertyLine>
+            </PropertyRow> */}
+          <PropertyRow>
             <PropertyLineLabel>Fit</PropertyLineLabel>
-            <BoxFitControl value={fit?.value} onValueChange={change.fit} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection
-        hidden={config.layout === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine hidden={config.size === "off"}>
-            <PropertyLineLabel>Width</PropertyLineLabel>
-            <LengthPercentageControl
-              value={width?.value}
-              onValueCommit={change.width}
-            />
-          </PropertyLine>
-          <PropertyLine hidden={config.size === "off"}>
-            <PropertyLineLabel>Height</PropertyLineLabel>
-            <LengthPercentageControl
-              value={height?.value}
-              onValueCommit={change.height}
-            />
-          </PropertyLine>
-          {types.has("container") && (
-            <PropertyLine>
-              <PropertyLineLabel>Flow</PropertyLineLabel>
-              <LayoutControl
-                value={
-                  layout?.value === grida.mixed ||
-                  direction?.value === grida.mixed ||
-                  layout?.value === undefined ||
-                  (layout?.value === "flex" && direction?.value === undefined)
-                    ? undefined
-                    : {
-                        layoutMode: layout?.value ?? "flow",
-                        direction:
-                          layout?.value === "flex"
-                            ? direction?.value
-                            : undefined,
-                      }
-                }
-                onValueChange={(value) => {
-                  change.layout(value.layoutMode);
-                  if (value.direction) {
-                    change.direction(value.direction);
-                  }
-                }}
-              />
-            </PropertyLine>
-          )}
-          <PropertyLine hidden={!has_flex_container}>
-            <PropertyLineLabel>Alignment</PropertyLineLabel>
-            <FlexAlignControl
-              className="w-full"
-              direction={
-                direction?.value === grida.mixed
-                  ? "horizontal"
-                  : (direction?.value ?? "horizontal")
-              }
-              value={
-                main_axis_alignment?.value === grida.mixed ||
-                cross_axis_alignment?.value === grida.mixed ||
-                main_axis_alignment?.value === undefined ||
-                cross_axis_alignment?.value === undefined
-                  ? undefined
-                  : {
-                      mainAxisAlignment: main_axis_alignment.value,
-                      crossAxisAlignment: cross_axis_alignment.value,
-                    }
-              }
+            <BoxFitControl
+              value={fit?.value}
               onValueChange={(value) => {
-                change.main_axis_alignment(value.mainAxisAlignment);
-                change.cross_axis_alignment(value.crossAxisAlignment);
+                const target = fit?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeNodePropertyFit(id, value);
+                });
               }}
             />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
 
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Fills</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Fill</PropertyLineLabel>
-            {fill?.mixed || fill?.partial ? (
-              <PaintControl value={undefined} onValueChange={change.fill} />
-            ) : (
-              <PaintControl value={fill?.value} onValueChange={change.fill} />
-            )}
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      {/* TODO: Refactor this stroke section to use @editor/scaffolds/sidecontrol/chunks/section-strokes.tsx
-          for mixed/multiple selection as well. Currently, this section manually handles stroke width
-          visibility (setting to 1 if unset/0) in a "dirty way" - this should be moved to use the
-          centralized `ensureStrokeWidth` parameter in `addNodeStroke`/`changeNodePropertyStrokes`. */}
+      <SectionFillsMixed ids={ids} />
+
       {supports_stroke && (
-        <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Strokes</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Color</PropertyLineLabel>
-              {stroke?.mixed || stroke?.partial ? (
-                <PaintControl
-                  value={undefined}
-                  onValueChange={change.stroke}
-                  onValueAdd={(value) => {
-                    change.stroke(value);
-                    if (!stroke_width?.value || stroke_width?.value === 0) {
-                      change.stroke_width({ type: "set", value: 1 });
-                    }
-                  }}
-                />
-              ) : (
-                <PaintControl
-                  value={stroke?.value}
-                  onValueChange={change.stroke}
-                  onValueAdd={(value) => {
-                    change.stroke(value);
-                    if (!stroke_width?.value || stroke_width?.value === 0) {
-                      change.stroke_width({ type: "set", value: 1 });
-                    }
-                  }}
-                />
-              )}
-            </PropertyLine>
-            <PropertyLine hidden={!stroke?.value}>
-              <PropertyLineLabel>Width</PropertyLineLabel>
-              <StrokeWidthControl
-                value={stroke_width?.value}
-                onValueCommit={change.stroke_width}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!stroke?.value || !supports_stroke_cap}>
-              <PropertyLineLabel>Cap</PropertyLineLabel>
-              <StrokeCapControl
-                value={stroke_cap?.value}
-                onValueChange={change.stroke_cap}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!stroke?.value}>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <StrokeAlignControl
-                value={stroke_align?.value}
-                onValueChange={change.stroke_align}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!stroke?.value}>
-              <PropertyLineLabel>Join</PropertyLineLabel>
-              <StrokeJoinControl
-                value={stroke_join?.value}
-                onValueChange={change.stroke_join}
-              />
-            </PropertyLine>
-            <PropertyLine
-              hidden={
-                !stroke?.value ||
-                stroke_join?.value === grida.mixed ||
-                (stroke_join?.value !== undefined &&
-                  stroke_join?.value !== "miter")
-              }
-            >
-              <PropertyLineLabel>Miter</PropertyLineLabel>
-              <StrokeMiterLimitControl
-                value={stroke_miter_limit?.value}
-                onValueChange={change.stroke_miter_limit}
-              />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+        <SectionStrokesMixed
+          ids={ids}
+          supports_stroke_cap={supports_stroke_cap}
+        />
       )}
       {backend === "dom" && (
-        <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Actions</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            {/* <PropertyLine>
+        <PropertySection className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Actions</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
+          <PropertySectionContent>
+            {/* <PropertyRow>
                 <PropertyLineLabel>Link To</PropertyLineLabel>
                 <HrefControl value={node.href} onValueChange={actions.href} />
-              </PropertyLine>
+              </PropertyRow>
               {node.href && (
-                <PropertyLine>
+                <PropertyRow>
                   <PropertyLineLabel>New Tab</PropertyLineLabel>
                   <TargetBlankControl
                     value={node.target}
                     onValueChange={actions.target}
                   />
-                </PropertyLine>
+                </PropertyRow>
               )} */}
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Cursor</PropertyLineLabel>
               <CursorControl
                 value={cursor?.value}
-                onValueChange={change.cursor}
+                onValueChange={(value) => {
+                  const target = cursor?.ids ?? ids;
+                  target.forEach((id) => {
+                    instance.commands.changeNodePropertyMouseCursor(id, value);
+                  });
+                }}
               />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+            </PropertyRow>
+          </PropertySectionContent>
+        </PropertySection>
       )}
       {/* #region selection colors */}
       <SelectionColors />
@@ -960,14 +537,6 @@ function ModeNodeProperties({
     src: node.src,
     type: node.type,
     blend_mode: node.blend_mode,
-    corner_radius: node.corner_radius,
-    rectangular_corner_radius_top_left: node.rectangular_corner_radius_top_left,
-    rectangular_corner_radius_top_right:
-      node.rectangular_corner_radius_top_right,
-    rectangular_corner_radius_bottom_right:
-      node.rectangular_corner_radius_bottom_right,
-    rectangular_corner_radius_bottom_left:
-      node.rectangular_corner_radius_bottom_left,
     point_count: node.point_count,
     inner_radius: node.inner_radius,
     angle: node.angle,
@@ -977,14 +546,6 @@ function ModeNodeProperties({
 
     //
     border: node.border,
-    //
-    layout: node.layout,
-    direction: node.direction,
-    main_axis_alignment: node.main_axis_alignment,
-    cross_axis_alignment: node.cross_axis_alignment,
-    main_axis_gap: node.main_axis_gap,
-    cross_axis_gap: node.cross_axis_gap,
-    layout_wrap: node.layout_wrap,
 
     //
     href: node.href,
@@ -1000,11 +561,6 @@ function ModeNodeProperties({
     component_id,
     type,
     blend_mode,
-    corner_radius,
-    rectangular_corner_radius_top_left,
-    rectangular_corner_radius_top_right,
-    rectangular_corner_radius_bottom_right,
-    rectangular_corner_radius_bottom_left,
     point_count,
     inner_radius,
     angle,
@@ -1014,14 +570,6 @@ function ModeNodeProperties({
 
     //
     border,
-    //
-    layout,
-    direction,
-    main_axis_alignment,
-    cross_axis_alignment,
-    main_axis_gap,
-    cross_axis_gap,
-    layout_wrap,
 
     //
     href,
@@ -1034,14 +582,13 @@ function ModeNodeProperties({
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
-  const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
   return (
     <div key={node_id} className="mt-4 mb-10">
-      <SidebarSection hidden={config.base === "off"} className="border-b pb-4">
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine className="items-center gap-1">
+      <PropertySection hidden={config.base === "off"} className="border-b">
+        <PropertySectionContent>
+          <PropertyRow className="items-center gap-1">
             <ConfigurableProperty propertyName="active" propertyType="boolean">
               <Checkbox
                 className="me-1"
@@ -1064,169 +611,65 @@ function ModeNodeProperties({
                 <LockOpen1Icon className="size-3" />
               )}
             </Toggle>
-          </PropertyLine>
+          </PropertyRow>
 
           {debug && (
-            <PropertyLine className="items-center gap-1">
+            <PropertyRow className="items-center gap-1">
               <PropertyLineLabel>id</PropertyLineLabel>
               <small className="ms-2 font-mono">{id}</small>
-            </PropertyLine>
+            </PropertyRow>
           )}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+        </PropertySectionContent>
+      </PropertySection>
       {config.position !== "off" && <SectionPosition node_id={node_id} />}
 
-      <SidebarSection
+      <PropertySection
         hidden={config.template === "off" || !is_templateinstance}
-        className="border-b pb-4"
+        className="border-b"
       >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Template</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
           <TemplateControl
             value={component_id}
             onValueChange={actions.component}
           />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+        </PropertySectionContent>
+      </PropertySection>
       {config.props !== "off" && is_templateinstance && (
         <SectionProps node_id={node_id} />
       )}
 
       <SectionMask node_id={node_id} editor={instance} />
 
-      <SidebarSection
-        hidden={config.layout === "off"}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          {is_container && (
-            <PropertyLine>
-              <PropertyLineLabel>Flow</PropertyLineLabel>
-              <LayoutControl
-                value={{
-                  layoutMode: layout ?? "flow",
-                  direction: layout === "flex" ? direction : undefined,
-                }}
-                onValueChange={(value) => {
-                  instance.commands.reLayout(node_id, value.key);
-                  // actions.layout(value.layoutMode);
-                  // if (value.direction) {
-                  //   actions.direction(value.direction);
-                  // }
-                }}
-              />
-            </PropertyLine>
-          )}
-          {config.size !== "off" && <SectionDimension node_id={node_id} />}
-          <PropertyLine hidden={!is_flex_container}>
-            <PropertyLineLabel>Alignment</PropertyLineLabel>
-            <FlexAlignControl
-              className="w-full"
-              direction={direction ?? "horizontal"}
-              value={
-                main_axis_alignment !== undefined &&
-                cross_axis_alignment !== undefined
-                  ? {
-                      mainAxisAlignment: main_axis_alignment,
-                      crossAxisAlignment: cross_axis_alignment,
-                    }
-                  : undefined
-              }
-              onValueChange={(value) => {
-                actions.mainAxisAlignment(value.mainAxisAlignment);
-                actions.crossAxisAlignment(value.crossAxisAlignment);
-              }}
-            />
-          </PropertyLine>
-          <PropertyLine hidden={!is_flex_container}>
-            <PropertyLineLabel>Wrap</PropertyLineLabel>
-            <FlexWrapControl
-              value={layout_wrap}
-              onValueChange={actions.layoutWrap}
-            />
-          </PropertyLine>
-          <PropertyLine hidden={!is_flex_container}>
-            <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl
-              mode={layout_wrap === "wrap" ? "multiple" : "single"}
-              value={{
-                main_axis_gap: main_axis_gap!,
-                cross_axis_gap: cross_axis_gap,
-              }}
-              onValueCommit={actions.gap}
-            />
-          </PropertyLine>
-          <PropertyPaddingLine node_id={node_id} />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      <SectionLayout node_id={node_id} config={config} />
 
-      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Appearance</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
+      <PropertySection hidden={!is_stylable} className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Appearance</PropertySectionHeaderLabel>
+          <PropertySectionHeaderActions>
             <BlendModeDropdown
               type="layer"
               value={blend_mode}
               onValueChange={actions.blend_mode}
             />
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLineOpacity node_id={node_id} />
+          </PropertySectionHeaderActions>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyOpacityRow node_id={node_id} />
           {supports.border(node.type, { backend }) && (
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Border</PropertyLineLabel>
               <BorderControl value={border} onValueChange={actions.border} />
-            </PropertyLine>
+            </PropertyRow>
           )}
-          {supports.cornerRadius(node.type, { backend }) && (
-            <>
-              {supports.cornerRadius4(node.type, { backend }) ? (
-                <PropertyLine>
-                  <PropertyLineLabelWithNumberGesture
-                    step={1}
-                    sensitivity={0.1}
-                    onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
-                  >
-                    Radius
-                  </PropertyLineLabelWithNumberGesture>
-                  <CornerRadius4Control
-                    value={{
-                      rectangular_corner_radius_top_left,
-                      rectangular_corner_radius_top_right,
-                      rectangular_corner_radius_bottom_right,
-                      rectangular_corner_radius_bottom_left,
-                    }}
-                    onValueCommit={actions.corner_radius}
-                  />
-                </PropertyLine>
-              ) : (
-                <PropertyLine>
-                  <PropertyLineLabelWithNumberGesture
-                    step={1}
-                    sensitivity={0.1}
-                    onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
-                  >
-                    Radius
-                  </PropertyLineLabelWithNumberGesture>
-                  <CornerRadiusControl
-                    value={corner_radius}
-                    onValueCommit={actions.corner_radius}
-                  />
-                </PropertyLine>
-              )}
-            </>
-          )}
+          <PropertyCornerRadiusRow node_id={node_id} />
           {(point_count != null || inner_radius != null) && (
             <>
               {point_count != null &&
                 supports.pointCount(node.type, { backend }) && (
-                  <PropertyLine>
+                  <PropertyRow>
                     <PropertyLineLabel>Count</PropertyLineLabel>
                     <InputPropertyNumber
                       mode="fixed"
@@ -1235,10 +678,10 @@ function ModeNodeProperties({
                       value={point_count}
                       onValueCommit={actions.pointCount}
                     />
-                  </PropertyLine>
+                  </PropertyRow>
                 )}
               {inner_radius != null && type !== "ellipse" && (
-                <PropertyLine>
+                <PropertyRow>
                   <PropertyLineLabel>Ratio</PropertyLineLabel>
                   <InputPropertyNumber
                     mode="fixed"
@@ -1248,12 +691,12 @@ function ModeNodeProperties({
                     value={inner_radius}
                     onValueCommit={actions.innerRadius}
                   />
-                </PropertyLine>
+                </PropertyRow>
               )}
             </>
           )}
           {supports.arcData(node.type, { backend }) && (
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Arc</PropertyLineLabel>
               <ArcPropertiesControl
                 value={{
@@ -1265,30 +708,30 @@ function ModeNodeProperties({
                   actions.arcData(v);
                 }}
               />
-            </PropertyLine>
+            </PropertyRow>
           )}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+        </PropertySectionContent>
+      </PropertySection>
 
       {config.text === "on" && is_text && <SectionText node_id={node_id} />}
-      <SidebarSection
+      <PropertySection
         hidden={config.image === "off" || !is_image}
-        className="border-b pb-4"
+        className="border-b"
       >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Image</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
             <PropertyLineLabel>Source</PropertyLineLabel>
             <SrcControl value={node.src} onValueChange={actions.src} />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Fit</PropertyLineLabel>
             <BoxFitControl value={fit} onValueChange={actions.fit} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
 
       <SectionFills node_id={node_id} />
       {supports.stroke(node.type, { backend }) && (
@@ -1304,56 +747,53 @@ function ModeNodeProperties({
       )}
       <SectionEffects node_id={node_id} />
       {backend === "dom" && (
-        <SidebarSection
-          hidden={config.link === "off"}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Actions</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
+        <PropertySection hidden={config.link === "off"} className="border-b">
+          <PropertySectionHeaderItem>
+            <PropertySectionHeaderLabel>Actions</PropertySectionHeaderLabel>
+          </PropertySectionHeaderItem>
+          <PropertySectionContent>
+            <PropertyRow>
               <PropertyLineLabel>Link To</PropertyLineLabel>
               <HrefControl value={href} onValueChange={actions.href} />
-            </PropertyLine>
+            </PropertyRow>
             {href && (
-              <PropertyLine>
+              <PropertyRow>
                 <PropertyLineLabel>New Tab</PropertyLineLabel>
                 <TargetBlankControl
                   value={target}
                   onValueChange={actions.target}
                 />
-              </PropertyLine>
+              </PropertyRow>
             )}
-            <PropertyLine>
+            <PropertyRow>
               <PropertyLineLabel>Cursor</PropertyLineLabel>
               <CursorControl value={cursor} onValueChange={actions.cursor} />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+            </PropertyRow>
+          </PropertySectionContent>
+        </PropertySection>
       )}
       <SelectionColors />
       {config.export !== "off" && <ExportSection node_id={id} name={name} />}
-      <SidebarSection hidden={config.developer === "off"} className="pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+      <PropertySection hidden={config.developer === "off"} className="pb-4">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Developer</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
             <UserDataControl node_id={id} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
     </div>
   );
 }
 
-function PropertyLineOpacity({ node_id }: { node_id: string }) {
+function PropertyOpacityRow({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const opacity = useNodeState(node_id, (node) => node.opacity);
 
   return (
-    <PropertyLine>
+    <PropertyRow>
       <PropertyLineLabelWithNumberGesture
         step={0.01}
         min={0}
@@ -1362,8 +802,30 @@ function PropertyLineOpacity({ node_id }: { node_id: string }) {
       >
         Opacity
       </PropertyLineLabelWithNumberGesture>
-      <OpacityControl value={opacity as any} onValueCommit={actions.opacity} />
-    </PropertyLine>
+      <OpacityControl value={opacity} onValueCommit={actions.opacity} />
+    </PropertyRow>
+  );
+}
+
+function PropertyOpacityRowMixed({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => ({
+    opacity: node.opacity,
+  }));
+
+  return (
+    <>
+      <PropertyLineLabel>Opacity</PropertyLineLabel>
+      <OpacityControl
+        value={mp.opacity?.value}
+        onValueCommit={(change) => {
+          const target = mp.opacity?.ids ?? ids;
+          target.forEach((id) => {
+            instance.doc.getNodeById(id)?.changeOpacity(change);
+          });
+        }}
+      />
+    </>
   );
 }
 
@@ -1396,15 +858,15 @@ function SectionPosition({ node_id }: { node_id: string }) {
   );
 
   return (
-    <SidebarSection hidden={is_single_mode_root} className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <div className="pb-2 border-b">
+    <PropertySection hidden={is_single_mode_root} className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Position</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        <div className="pb-2 border-b px-4">
           <Align disabled={is_root} />
         </div>
-        <PropertyLine>
+        <div className="py-4 px-4">
           <PositioningConstraintsControl
             value={{
               position: position!,
@@ -1419,15 +881,15 @@ function SectionPosition({ node_id }: { node_id: string }) {
             }}
             onValueCommit={actions.positioning}
           />
-        </PropertyLine>
-        <PropertyLine hidden={is_root}>
+        </div>
+        <PropertyRow hidden={is_root}>
           <PropertyLineLabel>Mode</PropertyLineLabel>
           <PositioningModeControl
             value={position}
             onValueChange={actions.positioningMode}
           />
-        </PropertyLine>
-        <PropertyLine>
+        </PropertyRow>
+        <PropertyRow>
           <PropertyLineLabelWithNumberGesture
             step={1}
             sensitivity={1}
@@ -1436,51 +898,342 @@ function SectionPosition({ node_id }: { node_id: string }) {
             Rotate
           </PropertyLineLabelWithNumberGesture>
           <RotateControl value={rotation} onValueCommit={actions.rotation} />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+        </PropertyRow>
+      </PropertySectionContent>
+    </PropertySection>
   );
 }
 
-function SectionMixedPosition({ mp }: { mp: MixedPropertiesEditor }) {
+function SectionMixedPosition({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => {
+    return {
+      position: node.position,
+      top: node.top,
+      left: node.left,
+      right: node.right,
+      bottom: node.bottom,
+      rotation: node.rotation,
+    };
+  });
+
+  const position =
+    mp.position?.value === grida.mixed || mp.position?.value === undefined
+      ? "relative"
+      : mp.position.value;
+
+  const constraints_value: grida.program.nodes.i.IPositioning = {
+    position,
+    top: typeof mp.top?.value === "number" ? mp.top.value : undefined,
+    left: typeof mp.left?.value === "number" ? mp.left.value : undefined,
+    right: typeof mp.right?.value === "number" ? mp.right.value : undefined,
+    bottom: typeof mp.bottom?.value === "number" ? mp.bottom.value : undefined,
+  };
+
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
-        <div className="pb-2 border-b">
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Position</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        <div className="pb-2 border-b px-4">
           <Align />
         </div>
-        <PropertyLine>
+        <div className="py-4 px-4">
           <PositioningConstraintsControl
-            // TODO:
-            value={{
-              position: "relative",
-              top: undefined,
-              left: undefined,
-              right: undefined,
-              bottom: undefined,
+            value={constraints_value}
+            onValueCommit={(value) => {
+              // Apply full constraint set to all selected nodes for consistency.
+              ids.forEach((id) => {
+                instance.commands.changeNodePropertyPositioning(id, value);
+              });
             }}
-            // onValueChange={actions.positioning}
           />
-        </PropertyLine>
-        <PropertyLine>
+        </div>
+        <PropertyRow>
           <PropertyLineLabel>Mode</PropertyLineLabel>
           <PositioningModeControl
-            value={mp.properties.position!.value}
-            onValueChange={mp.actions.positioningMode}
+            value={mp.position?.value}
+            onValueChange={(value) => {
+              ids.forEach((id) => {
+                instance.commands.changeNodePropertyPositioningMode(id, value);
+              });
+            }}
           />
-        </PropertyLine>
-        <PropertyLine>
+        </PropertyRow>
+        <PropertyRow>
           <PropertyLineLabel>Rotate</PropertyLineLabel>
           <RotateControl
-            value={mp.properties.rotation?.value}
-            onValueCommit={mp.actions.rotation}
+            value={mp.rotation?.value}
+            onValueCommit={(change) => {
+              const target = mp.rotation?.ids ?? ids;
+              target.forEach((id) => {
+                instance.doc.getNodeById(id)?.changeRotation(change);
+              });
+            }}
           />
-        </PropertyLine>
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+        </PropertyRow>
+      </PropertySectionContent>
+    </PropertySection>
+  );
+}
+
+function SectionLayout({
+  node_id,
+  config,
+}: {
+  node_id: string;
+  config: ControlsConfig;
+}) {
+  const instance = useCurrentEditor();
+  const actions = useNodeActions(node_id)!;
+  const {
+    type,
+    layout,
+    direction,
+    main_axis_alignment,
+    cross_axis_alignment,
+    main_axis_gap,
+    cross_axis_gap,
+    layout_wrap,
+  } = useNodeState(node_id, (node) => ({
+    type: node.type,
+    layout: node.layout,
+    direction: node.direction,
+    main_axis_alignment: node.main_axis_alignment,
+    cross_axis_alignment: node.cross_axis_alignment,
+    main_axis_gap: node.main_axis_gap,
+    cross_axis_gap: node.cross_axis_gap,
+    layout_wrap: node.layout_wrap,
+  }));
+
+  const is_container = type === "container";
+  const is_flex_container = is_container && layout === "flex";
+
+  return (
+    <PropertySection hidden={config.layout === "off"} className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        {is_container && (
+          <PropertyRow>
+            <PropertyLineLabel>Flow</PropertyLineLabel>
+            <LayoutControl
+              value={{
+                layoutMode: layout ?? "flow",
+                direction: layout === "flex" ? direction : undefined,
+              }}
+              onValueChange={(value) => {
+                instance.commands.reLayout(node_id, value.key);
+              }}
+            />
+          </PropertyRow>
+        )}
+        {config.size !== "off" && <SectionDimension node_id={node_id} />}
+        <PropertyRow hidden={!is_flex_container}>
+          <PropertyLineLabel>Alignment</PropertyLineLabel>
+          <FlexAlignControl
+            className="w-full"
+            direction={direction ?? "horizontal"}
+            value={
+              main_axis_alignment !== undefined &&
+              cross_axis_alignment !== undefined
+                ? {
+                    mainAxisAlignment: main_axis_alignment,
+                    crossAxisAlignment: cross_axis_alignment,
+                  }
+                : undefined
+            }
+            onValueChange={(value) => {
+              actions.mainAxisAlignment(value.mainAxisAlignment);
+              actions.crossAxisAlignment(value.crossAxisAlignment);
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={!is_flex_container}>
+          <PropertyLineLabel>Wrap</PropertyLineLabel>
+          <FlexWrapControl
+            value={layout_wrap}
+            onValueChange={actions.layoutWrap}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={!is_flex_container}>
+          <PropertyLineLabel>Gap</PropertyLineLabel>
+          <GapControl
+            mode={layout_wrap === "wrap" ? "multiple" : "single"}
+            value={{
+              main_axis_gap: main_axis_gap!,
+              cross_axis_gap: cross_axis_gap,
+            }}
+            onValueCommit={actions.gap}
+          />
+        </PropertyRow>
+        <PropertyPaddingRow node_id={node_id} />
+      </PropertySectionContent>
+    </PropertySection>
+  );
+}
+
+function SectionLayoutMixed({
+  ids,
+  config,
+}: {
+  ids: string[];
+  config: ControlsConfig;
+}) {
+  const instance = useCurrentEditor();
+
+  const mp = useMixedProperties(ids, (node) => ({
+    type: node.type,
+    width: node.width,
+    height: node.height,
+    layout: node.layout,
+    direction: node.direction,
+    main_axis_alignment: node.main_axis_alignment,
+    cross_axis_alignment: node.cross_axis_alignment,
+    main_axis_gap: node.main_axis_gap,
+    cross_axis_gap: node.cross_axis_gap,
+    layout_wrap: node.layout_wrap,
+  }));
+
+  const containerIds =
+    mp.type?.values?.find((v) => v.value === "container")?.ids ?? [];
+  const has_container = containerIds.length > 0;
+
+  const flexIds = new Set(
+    mp.layout?.values?.find((v) => v.value === "flex")?.ids ?? []
+  );
+  const containerFlexIds = containerIds.filter((id) => flexIds.has(id));
+  const has_flex_container = containerFlexIds.length > 0;
+
+  return (
+    <PropertySection hidden={config.layout === "off"} className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Layout</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
+        <PropertyRow hidden={config.size === "off"}>
+          <PropertyLineLabel>Width</PropertyLineLabel>
+          <LengthPercentageControl
+            value={mp.width?.value}
+            onValueCommit={(value) => {
+              const target = mp.width?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodeSize(id, "width", value);
+              });
+            }}
+          />
+        </PropertyRow>
+        <PropertyRow hidden={config.size === "off"}>
+          <PropertyLineLabel>Height</PropertyLineLabel>
+          <LengthPercentageControl
+            value={mp.height?.value}
+            onValueCommit={(value) => {
+              const target = mp.height?.ids ?? ids;
+              target.forEach((id) => {
+                instance.commands.changeNodeSize(id, "height", value);
+              });
+            }}
+          />
+        </PropertyRow>
+
+        {has_container && (
+          <PropertyRow>
+            <PropertyLineLabel>Flow</PropertyLineLabel>
+            <LayoutControl
+              value={
+                mp.layout?.value === grida.mixed ||
+                mp.direction?.value === grida.mixed ||
+                mp.layout?.value === undefined ||
+                (mp.layout?.value === "flex" &&
+                  mp.direction?.value === undefined)
+                  ? undefined
+                  : {
+                      layoutMode: mp.layout?.value ?? "flow",
+                      direction:
+                        mp.layout?.value === "flex"
+                          ? mp.direction?.value
+                          : undefined,
+                    }
+              }
+              onValueChange={(value) => {
+                containerIds.forEach((id) => {
+                  instance.commands.changeContainerNodeLayout(
+                    id,
+                    value.layoutMode
+                  );
+                  if (value.direction) {
+                    instance.commands.changeFlexContainerNodeDirection(
+                      id,
+                      value.direction
+                    );
+                  }
+                });
+              }}
+            />
+          </PropertyRow>
+        )}
+
+        <PropertyRow hidden={!has_flex_container}>
+          <PropertyLineLabel>Alignment</PropertyLineLabel>
+          <FlexAlignControl
+            className="w-full"
+            direction={
+              mp.direction?.value === grida.mixed
+                ? "horizontal"
+                : (mp.direction?.value ?? "horizontal")
+            }
+            value={
+              mp.main_axis_alignment?.value === grida.mixed ||
+              mp.cross_axis_alignment?.value === grida.mixed ||
+              mp.main_axis_alignment?.value === undefined ||
+              mp.cross_axis_alignment?.value === undefined
+                ? undefined
+                : {
+                    mainAxisAlignment: mp.main_axis_alignment.value,
+                    crossAxisAlignment: mp.cross_axis_alignment.value,
+                  }
+            }
+            onValueChange={(value) => {
+              containerFlexIds.forEach((id) => {
+                instance.commands.changeFlexContainerNodeMainAxisAlignment(
+                  id,
+                  value.mainAxisAlignment
+                );
+                instance.commands.changeFlexContainerNodeCrossAxisAlignment(
+                  id,
+                  value.crossAxisAlignment
+                );
+              });
+            }}
+          />
+        </PropertyRow>
+
+        <PropertyRow hidden={!has_flex_container}>
+          <PropertyLineLabel>Gap</PropertyLineLabel>
+          <GapControl
+            mode={mp.layout_wrap?.value === "wrap" ? "multiple" : "single"}
+            value={{
+              main_axis_gap:
+                mp.main_axis_gap?.mixed || mp.main_axis_gap?.value === undefined
+                  ? grida.mixed
+                  : (mp.main_axis_gap.value ?? 0),
+              cross_axis_gap: mp.cross_axis_gap?.mixed
+                ? grida.mixed
+                : mp.cross_axis_gap?.value,
+            }}
+            onValueCommit={(value) => {
+              containerFlexIds.forEach((id) => {
+                instance.commands.changeFlexContainerNodeGap(id, value);
+              });
+            }}
+          />
+        </PropertyRow>
+
+        <PropertyPaddingRowMixed ids={ids} />
+      </PropertySectionContent>
+    </PropertySection>
   );
 }
 
@@ -1551,10 +1304,10 @@ function SectionText({ node_id }: { node_id: string }) {
         fontVariations: font_variations,
       }}
     >
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-          <SidebarSectionHeaderActions>
+      <PropertySection className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Text</PropertySectionHeaderLabel>
+          <PropertySectionHeaderActions>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -1610,10 +1363,10 @@ function SectionText({ node_id }: { node_id: string }) {
                 />
               </DropdownMenuContent>
             </DropdownMenu>
-          </SidebarSectionHeaderActions>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+          </PropertySectionHeaderActions>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
             <PropertyLineLabel>Font</PropertyLineLabel>
             <div className="flex-1">
               <FontFamilyControl
@@ -1621,19 +1374,19 @@ function SectionText({ node_id }: { node_id: string }) {
                 onValueChange={actions.fontFamily}
               />
             </div>
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Style</PropertyLineLabel>
             <FontStyleControlScaffold selection={[node_id]} />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Size</PropertyLineLabel>
             <FontSizeControl
               value={font_size}
               onValueCommit={actions.fontSize}
             />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabelWithNumberGesture
               step={0.1}
               min={0}
@@ -1645,8 +1398,8 @@ function SectionText({ node_id }: { node_id: string }) {
               value={line_height}
               onValueCommit={actions.lineHeight}
             />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabelWithNumberGesture
               step={0.01}
               onValueChange={actions.letterSpacing}
@@ -1657,28 +1410,323 @@ function SectionText({ node_id }: { node_id: string }) {
               value={letter_spacing}
               onValueCommit={actions.letterSpacing}
             />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <TextAlignControl
               value={text_align}
               onValueChange={actions.textAlign}
             />
-          </PropertyLine>
-          <PropertyLine>
+          </PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel></PropertyLineLabel>
             <TextAlignVerticalControl
               value={text_align_vertical}
               onValueChange={actions.textAlignVertical}
             />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
     </CurrentFontProvider>
   );
 }
 
-function PropertyPaddingLine({ node_id }: { node_id: string }) {
+function SectionMixedText({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => {
+    const t = node as grida.program.nodes.TextNode;
+    return {
+      font_family: t.font_family,
+      font_postscript_name: t.font_postscript_name,
+      font_weight: t.font_weight,
+      font_style_italic: t.font_style_italic,
+      font_variations: t.font_variations,
+      font_optical_sizing: t.font_optical_sizing,
+      font_size: t.font_size,
+      line_height: t.line_height,
+      letter_spacing: t.letter_spacing,
+      text_align: t.text_align,
+      text_align_vertical: t.text_align_vertical,
+      // max_length: t.max_length,
+    };
+  });
+
+  const {
+    font_family,
+    font_postscript_name,
+    font_weight,
+    font_style_italic,
+    font_variations,
+    font_optical_sizing,
+    font_size,
+    line_height,
+    letter_spacing,
+    text_align,
+    text_align_vertical,
+    // max_length,
+  } = mp;
+
+  return (
+    <CurrentFontProvider
+      description={{
+        fontFamily:
+          typeof font_family?.value === "string" ? font_family.value : "",
+        fontPostscriptName:
+          typeof font_postscript_name?.value === "string"
+            ? font_postscript_name.value
+            : undefined,
+        fontWeight:
+          typeof font_weight?.value === "number"
+            ? font_weight.value
+            : undefined,
+        fontStyleItalic:
+          typeof font_style_italic?.value === "boolean"
+            ? font_style_italic.value
+            : undefined,
+        fontVariations:
+          typeof font_variations?.value === "object"
+            ? (font_variations.value as Record<string, number>)
+            : undefined,
+      }}
+    >
+      <PropertySection className="border-b">
+        <PropertySectionHeaderItem>
+          <PropertySectionHeaderLabel>Text</PropertySectionHeaderLabel>
+        </PropertySectionHeaderItem>
+        <PropertySectionContent>
+          <PropertyRow>
+            <PropertyLineLabel>Font</PropertyLineLabel>
+            <div className="flex-1">
+              <FontFamilyControl
+                value={font_family?.value}
+                onValueChange={(value: string) => {
+                  const target = font_family?.ids ?? ids;
+                  target.forEach((id) => {
+                    instance.changeTextNodeFontFamilySync(id, value);
+                  });
+                }}
+              />
+            </div>
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Style</PropertyLineLabel>
+            <FontStyleControlScaffold selection={ids} />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Size</PropertyLineLabel>
+            <FontSizeControl
+              value={font_size?.value}
+              onValueCommit={(change) => {
+                const target = font_size?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeFontSize(id, change);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Line</PropertyLineLabel>
+            <LineHeightControl
+              value={line_height?.value}
+              onValueCommit={(change) => {
+                const target = line_height?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeLineHeight(id, change);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Letter</PropertyLineLabel>
+            <LetterSpacingControl
+              value={letter_spacing?.value}
+              onValueCommit={(change) => {
+                const target = letter_spacing?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeLetterSpacing(id, change);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Align</PropertyLineLabel>
+            <TextAlignControl
+              value={text_align?.value}
+              onValueChange={(value) => {
+                const target = text_align?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeTextAlign(id, value);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel></PropertyLineLabel>
+            <TextAlignVerticalControl
+              value={text_align_vertical?.value}
+              onValueChange={(value) => {
+                const target = text_align_vertical?.ids ?? ids;
+                target.forEach((id) => {
+                  instance.commands.changeTextNodeTextAlignVertical(id, value);
+                });
+              }}
+            />
+          </PropertyRow>
+          <PropertyRow>
+            <PropertyLineLabel>Max Length</PropertyLineLabel>
+            <MaxlengthControl disabled placeholder={"multiple"} />
+          </PropertyRow>
+        </PropertySectionContent>
+      </PropertySection>
+    </CurrentFontProvider>
+  );
+}
+
+function PropertyCornerRadiusRow({ node_id }: { node_id: string }) {
+  const backend = useBackendState();
+  const actions = useNodeActions(node_id)!;
+  const {
+    type,
+    corner_radius,
+    rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left,
+  } = useNodeState(node_id, (node) => ({
+    type: node.type,
+    corner_radius: node.corner_radius,
+    rectangular_corner_radius_top_left: node.rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right:
+      node.rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right:
+      node.rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left:
+      node.rectangular_corner_radius_bottom_left,
+  }));
+
+  if (!supports.cornerRadius(type, { backend })) return null;
+
+  return supports.cornerRadius4(type, { backend }) ? (
+    <PropertyRow>
+      <PropertyLineLabelWithNumberGesture
+        step={1}
+        sensitivity={0.1}
+        onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
+      >
+        Radius
+      </PropertyLineLabelWithNumberGesture>
+      <CornerRadius4Control
+        value={{
+          rectangular_corner_radius_top_left,
+          rectangular_corner_radius_top_right,
+          rectangular_corner_radius_bottom_right,
+          rectangular_corner_radius_bottom_left,
+        }}
+        onValueCommit={actions.corner_radius}
+      />
+    </PropertyRow>
+  ) : (
+    <PropertyRow>
+      <PropertyLineLabelWithNumberGesture
+        step={1}
+        sensitivity={0.1}
+        onValueChange={(c) => actions.cornerRadiusDelta(c.value)}
+      >
+        Radius
+      </PropertyLineLabelWithNumberGesture>
+      <CornerRadiusControl
+        value={corner_radius}
+        onValueCommit={actions.corner_radius}
+      />
+    </PropertyRow>
+  );
+}
+
+function PropertyCornerRadiusRowMixed({
+  ids,
+  supported,
+  supports_corner_radius4,
+}: {
+  ids: string[];
+  supported: boolean;
+  supports_corner_radius4: boolean;
+}) {
+  const instance = useCurrentEditor();
+
+  const mp = useMixedProperties(ids, (node) => ({
+    corner_radius: node.corner_radius,
+    rectangular_corner_radius_top_left: node.rectangular_corner_radius_top_left,
+    rectangular_corner_radius_top_right:
+      node.rectangular_corner_radius_top_right,
+    rectangular_corner_radius_bottom_right:
+      node.rectangular_corner_radius_bottom_right,
+    rectangular_corner_radius_bottom_left:
+      node.rectangular_corner_radius_bottom_left,
+  }));
+
+  if (!supported) return null;
+
+  if (supports_corner_radius4) {
+    const tl = mp.rectangular_corner_radius_top_left;
+    const tr = mp.rectangular_corner_radius_top_right;
+    const br = mp.rectangular_corner_radius_bottom_right;
+    const bl = mp.rectangular_corner_radius_bottom_left;
+
+    const corners_value =
+      typeof tl?.value === "number" &&
+      !tl.mixed &&
+      typeof tr?.value === "number" &&
+      !tr.mixed &&
+      typeof br?.value === "number" &&
+      !br.mixed &&
+      typeof bl?.value === "number" &&
+      !bl.mixed
+        ? {
+            rectangular_corner_radius_top_left: tl.value,
+            rectangular_corner_radius_top_right: tr.value,
+            rectangular_corner_radius_bottom_right: br.value,
+            rectangular_corner_radius_bottom_left: bl.value,
+          }
+        : undefined;
+
+    return (
+      <PropertyRow>
+        <PropertyLineLabel>Radius</PropertyLineLabel>
+        <CornerRadius4Control
+          value={corners_value}
+          onValueCommit={(value) => {
+            const target = mp.corner_radius?.ids ?? ids;
+            target.forEach((id) => {
+              instance.commands.changeNodePropertyCornerRadius(id, value);
+            });
+          }}
+        />
+      </PropertyRow>
+    );
+  }
+
+  return (
+    <PropertyRow>
+      <PropertyLineLabel>Radius</PropertyLineLabel>
+      <CornerRadiusControl
+        value={
+          typeof mp.corner_radius?.value === "number"
+            ? mp.corner_radius.value
+            : 0
+        }
+        disabled={mp.corner_radius?.mixed}
+        onValueCommit={(value) => {
+          const target = mp.corner_radius?.ids ?? ids;
+          target.forEach((id) => {
+            instance.commands.changeNodePropertyCornerRadius(id, value);
+          });
+        }}
+      />
+    </PropertyRow>
+  );
+}
+
+function PropertyPaddingRow({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const {
     padding_top,
@@ -1699,7 +1747,7 @@ function PropertyPaddingLine({ node_id }: { node_id: string }) {
   const is_flex_container = type === "container" && layout === "flex";
 
   return (
-    <PropertyLine hidden={!is_flex_container}>
+    <PropertyRow hidden={!is_flex_container}>
       <PropertyLineLabel>Padding</PropertyLineLabel>
       <PaddingControl
         value={{
@@ -1710,7 +1758,55 @@ function PropertyPaddingLine({ node_id }: { node_id: string }) {
         }}
         onValueCommit={actions.padding}
       />
-    </PropertyLine>
+    </PropertyRow>
+  );
+}
+
+function PropertyPaddingRowMixed({ ids }: { ids: string[] }) {
+  const instance = useCurrentEditor();
+  const mp = useMixedProperties(ids, (node) => {
+    return {
+      type: node.type,
+      padding_top: node.padding_top,
+      padding_right: node.padding_right,
+      padding_bottom: node.padding_bottom,
+      padding_left: node.padding_left,
+    };
+  });
+
+  const containerIds =
+    mp.type?.values?.find((v) => v.value === "container")?.ids ?? [];
+  const has_container = containerIds.length > 0;
+
+  return (
+    <PropertyRow hidden={!has_container}>
+      <PropertyLineLabel>Padding</PropertyLineLabel>
+      <PaddingControl
+        value={{
+          padding_top:
+            mp.padding_top?.mixed || mp.padding_top?.value === undefined
+              ? grida.mixed
+              : (mp.padding_top.value ?? 0),
+          padding_right:
+            mp.padding_right?.mixed || mp.padding_right?.value === undefined
+              ? grida.mixed
+              : (mp.padding_right.value ?? 0),
+          padding_bottom:
+            mp.padding_bottom?.mixed || mp.padding_bottom?.value === undefined
+              ? grida.mixed
+              : (mp.padding_bottom.value ?? 0),
+          padding_left:
+            mp.padding_left?.mixed || mp.padding_left?.value === undefined
+              ? grida.mixed
+              : (mp.padding_left.value ?? 0),
+        }}
+        onValueCommit={(value) => {
+          containerIds.forEach((id) => {
+            instance.commands.changeContainerNodePadding(id, value);
+          });
+        }}
+      />
+    </PropertyRow>
   );
 }
 
@@ -1721,9 +1817,7 @@ function SectionDimension({ node_id }: { node_id: string }) {
     (node) => ({
       width: node.width,
       height: node.height,
-      layout_target_aspect_ratio: (node as any).layout_target_aspect_ratio as
-        | [number, number]
-        | undefined,
+      layout_target_aspect_ratio: node.layout_target_aspect_ratio,
     })
   );
 
@@ -1756,24 +1850,24 @@ function SectionProps({ node_id }: { node_id: string }) {
   const computed = useComputedNode(node_id);
 
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Props</PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
       {properties && Object.keys(properties).length ? (
-        <SidebarMenuSectionContent className="space-y-2">
+        <PropertySectionContent>
           <PropsControl
             properties={properties}
             props={computed.props || {}}
             onValueChange={actions.value}
           />
-        </SidebarMenuSectionContent>
+        </PropertySectionContent>
       ) : (
-        <SidebarMenuSectionContent className="space-y-2">
+        <PropertySectionContent>
           <p className="text-xs text-muted-foreground">No properties defined</p>
-        </SidebarMenuSectionContent>
+        </PropertySectionContent>
       )}
-    </SidebarSection>
+    </PropertySection>
   );
 }
 
@@ -1786,10 +1880,10 @@ function SectionMask({ node_id, editor }: { node_id: string; editor: Editor }) {
   if (!mask) return null;
 
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Mask</SidebarSectionHeaderLabel>
-        <SidebarSectionHeaderActions>
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>Mask</PropertySectionHeaderLabel>
+        <PropertySectionHeaderActions>
           <Button
             variant="ghost"
             size="xs"
@@ -1799,12 +1893,12 @@ function SectionMask({ node_id, editor }: { node_id: string; editor: Editor }) {
           >
             <TrashIcon className="size-3" />
           </Button>
-        </SidebarSectionHeaderActions>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
+        </PropertySectionHeaderActions>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
         <MaskTypeControl value={mask} onValueChange={actions.maskType} />
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+      </PropertySectionContent>
+    </PropertySection>
   );
 }
 
@@ -1861,23 +1955,23 @@ function SectionEffects({ node_id }: { node_id: string }) {
   const empty = effects.length === 0;
 
   return (
-    <SidebarSection
+    <PropertySection
       hidden={!supports.feDropShadow(type, { backend })}
       data-empty={empty}
-      className="border-b pb-4 [&[data-empty='true']]:pb-0"
+      className="border-b [&[data-empty='true']]:pb-0"
     >
-      <SidebarSectionHeaderItem onClick={onAddEffect}>
-        <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
-        <SidebarSectionHeaderActions>
+      <PropertySectionHeaderItem onClick={onAddEffect}>
+        <PropertySectionHeaderLabel>Effects</PropertySectionHeaderLabel>
+        <PropertySectionHeaderActions>
           <Button variant="ghost" size="icon">
             <PlusIcon className="size-3" />
           </Button>
-        </SidebarSectionHeaderActions>
-      </SidebarSectionHeaderItem>
+        </PropertySectionHeaderActions>
+      </PropertySectionHeaderItem>
       {!empty && (
-        <SidebarMenuSectionContent className="space-y-2">
+        <PropertySectionContent>
           {effects.map((effect, index) => (
-            <PropertyLine key={index}>
+            <PropertyRow key={index}>
               <FeControl
                 value={effect}
                 onValueChange={(value) => {
@@ -1894,11 +1988,11 @@ function SectionEffects({ node_id }: { node_id: string }) {
                   ]);
                 }}
               />
-            </PropertyLine>
+            </PropertyRow>
           ))}
-        </SidebarMenuSectionContent>
+        </PropertySectionContent>
       )}
-    </SidebarSection>
+    </PropertySection>
   );
 }
 
@@ -1927,13 +2021,15 @@ function SelectionColors() {
   const displayedPaints = showAllColors ? paints : paints.slice(0, k);
 
   return (
-    <SidebarSection className="border-b pb-4">
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Selection colors</SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuSectionContent className="space-y-2">
+    <PropertySection className="border-b">
+      <PropertySectionHeaderItem>
+        <PropertySectionHeaderLabel>
+          Selection colors
+        </PropertySectionHeaderLabel>
+      </PropertySectionHeaderItem>
+      <PropertySectionContent>
         {displayedPaints.map(({ value, ids }, index) => (
-          <PropertyLine key={index} className="group/color-item">
+          <PropertyRow key={index} className="group/color-item">
             <PaintControl
               value={value}
               onValueChange={(value) => {
@@ -1953,7 +2049,7 @@ function SelectionColors() {
                 <Crosshair2Icon className="size-3" />
               </Button>
             </div>
-          </PropertyLine>
+          </PropertyRow>
         ))}
         {shouldShowButton && (
           <Button
@@ -1968,8 +2064,8 @@ function SelectionColors() {
             See all {paints.length} colors
           </Button>
         )}
-      </SidebarMenuSectionContent>
-    </SidebarSection>
+      </PropertySectionContent>
+    </PropertySection>
   );
 }
 

@@ -1,12 +1,12 @@
 import equal from "fast-deep-equal";
 
-type MixedProperties<T, S> = {
+export type MixedProperties<T, S> = {
   [K in keyof T]: MixedProperty<T[K], S>;
 };
 
-type MixedPropertyType = "number" | "string" | "boolean" | "object";
+export type MixedPropertyType = "number" | "string" | "boolean" | "object";
 
-type MixedProperty<T, S> = {
+export type MixedProperty<T, S> = {
   type: MixedPropertyType;
   partial: boolean;
   ids: string[];
@@ -17,7 +17,7 @@ type MixedProperty<T, S> = {
   }[];
 } & ({ value: T; mixed: false } | { value: S; mixed: true });
 
-type KeyIgnoreFn<T> = (key: keyof T | string) => boolean;
+export type KeyIgnoreFn<T> = (key: keyof T | string) => boolean;
 type CompareFn<T = any> = (a: T, b: T) => boolean;
 export type PropertyCompareFn<T> = <K extends keyof T>(
   key: K,
@@ -25,7 +25,7 @@ export type PropertyCompareFn<T> = <K extends keyof T>(
   b: T[K]
 ) => boolean;
 
-type MixedOptions<T, S> = {
+export type MixedOptions<T, S> = {
   idKey: keyof T;
   ignoredKey?: (keyof T)[] | KeyIgnoreFn<T>;
   compare?: PropertyCompareFn<T>;

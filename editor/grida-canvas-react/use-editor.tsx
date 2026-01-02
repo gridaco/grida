@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { Editor } from "@/grida-canvas/editor";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
@@ -12,6 +14,26 @@ import {
   DOMFontParserInterfaceProvider,
   DOMDefaultExportInterfaceProvider,
 } from "@/grida-canvas/backends";
+import { toast } from "sonner";
+
+const NOTIFY: editor.ui.UINotifier = (message, level) => {
+  switch (level) {
+    case "info":
+      toast.info(message);
+      break;
+    case "success":
+      toast.success(message);
+      break;
+    case "error":
+      toast.error(message);
+      break;
+    case "warning":
+      toast.warning(message);
+      break;
+    default:
+      toast.message(message);
+  }
+};
 
 const __DEFAULT_STATE: editor.state.IEditorStateInit = {
   debug: false,
@@ -39,7 +61,12 @@ const __DEFAULT_STATE: editor.state.IEditorStateInit = {
 
 export function useEditor(
   init?: editor.state.IEditorStateInit,
-  backend: editor.EditorContentRenderingBackend = "dom"
+  backend: editor.EditorContentRenderingBackend = "dom",
+  ui: editor.ui.UIUXProviders = {
+    notify: NOTIFY,
+    clipboard: navigator.clipboard,
+    eyedropper: () => new window.EyeDropper(),
+  }
 ) {
   const [_editor] = React.useState(() => {
     switch (backend) {
@@ -54,6 +81,7 @@ export function useEditor(
             font_collection: (_) => new DOMFontManagerAgentInterfaceProvider(_),
             font_parser: (_) => new DOMFontParserInterfaceProvider(_),
           },
+          ui: ui ?? {},
         });
       }
       case "canvas": {
@@ -62,6 +90,7 @@ export function useEditor(
           viewportElement: domapi.k.VIEWPORT_ELEMENT_ID,
           geometry: (_) => new NoopGeometryQueryInterfaceProvider(),
           initialState: init ?? __DEFAULT_STATE,
+          ui: ui ?? {},
         });
       }
     }

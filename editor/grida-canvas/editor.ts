@@ -37,7 +37,6 @@ import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
-import { toast } from "sonner";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -2689,6 +2688,7 @@ export class Editor
 
   constructor({
     logger = console.log,
+    ui = {},
     backend,
     viewportElement,
     geometry,
@@ -2698,6 +2698,7 @@ export class Editor
     onMount,
   }: {
     logger?: (...args: any[]) => void;
+    ui?: editor.ui.UIUXProviders;
     backend: editor.EditorContentRenderingBackend;
     viewportElement: string | HTMLElement;
     geometry:
@@ -2733,7 +2734,13 @@ export class Editor
       () => this.camera.viewport.size,
       logger
     );
-    this.surface = new EditorSurface(this);
+    this.surface = new EditorSurface(
+      this,
+      {
+        pointer_move_throttle_ms: 30,
+      },
+      ui
+    );
 
     this._m_geometry =
       typeof geometry === "function" ? geometry(this) : geometry;
@@ -2882,7 +2889,7 @@ export class Editor
    * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
    * @param el canvas element
    */
-  public async mount(el: HTMLCanvasElement) {
+  public async mount(el: HTMLCanvasElement, dpr: number = 1) {
     this.log("mount surface");
     assert(this.backend === "canvas", "Editor is not using canvas backend");
 
@@ -2916,8 +2923,6 @@ export class Editor
           -width / 2,
           -height / 2,
         ]);
-
-        const dpr = window.devicePixelRatio || 1;
 
         const deviceScale: cmath.Transform = [
           [dpr, 0, 0],
@@ -3520,77 +3525,6 @@ export class Editor
     }
   }
 
-  /**
-   * removes explicit width or height value from the text node, making them sized "auto", based on the content.
-   */
-  autoSizeTextNode(node_id: string, axis: "width" | "height") {
-    const node = this.doc.getNodeSnapshotById(
-      node_id
-    ) as grida.program.nodes.UnknwonNode;
-    if (node.type !== "text") return;
-
-    const prev = this.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
-    if (!prev) return;
-
-    const h_align = node.text_align;
-    const v_align = node.text_align_vertical;
-
-    // FIXME: nested raf.
-    // why this is needed?
-    // currently, the api does not expose a way or contains value for textlayout size, not the box size.
-    // since we can't pre-calculate the delta, this is the dirty hack to first resize, then get the next size, shift delta.
-    // => need api/data that holds actual textlayout size (non box size)
-
-    requestAnimationFrame(() => {
-      this.doc.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        [axis]: "auto",
-      });
-
-      requestAnimationFrame(() => {
-        const next = this.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
-        if (!next) return;
-
-        if (axis === "width") {
-          const diff = prev.width - next.width;
-          if (diff === 0) return;
-          let left = prev.x;
-          switch (h_align) {
-            case "right":
-              left = prev.x + diff;
-              break;
-            case "center":
-              left = prev.x + diff / 2;
-              break;
-            default:
-              return;
-          }
-          this.doc.changeNodePropertyPositioning(node_id, {
-            left: cmath.quantize(left, 1),
-          });
-        } else {
-          const diff = prev.height - next.height;
-          if (diff === 0) return;
-          let top = prev.y;
-          switch (v_align) {
-            case "bottom":
-              top = prev.y + diff;
-              break;
-            case "center":
-              top = prev.y + diff / 2;
-              break;
-            default:
-              return;
-          }
-          this.doc.changeNodePropertyPositioning(node_id, {
-            top: cmath.quantize(top, 1),
-          });
-        }
-      });
-    });
-  }
-
   // #endregion IRulerActions implementation
 
   // #region IVectorInterfaceActions implementation
@@ -3925,9 +3859,13 @@ export class EditorSurface
 
   constructor(
     readonly _editor: Editor,
-    config: { pointer_move_throttle_ms: number } = {
+    config: {
+      pointer_move_throttle_ms: number;
+    } = {
       pointer_move_throttle_ms: 30,
-    }
+    },
+    readonly ui: editor.ui.UIUXProviders = {},
+    readonly window: (Window & typeof globalThis) | null | undefined = undefined
   ) {
     this.camera = _editor.camera;
     this.__pligin_follow = new EditorFollowPlugin(_editor);
@@ -4447,11 +4385,9 @@ export class EditorSurface
   }
 
   surfaceDrag(event: TCanvasEventTargetDragGestureState) {
-    requestAnimationFrame(() => {
-      this._editor.doc.dispatch({
-        type: "event-target/event/on-drag",
-        event,
-      });
+    this._editor.doc.dispatch({
+      type: "event-target/event/on-drag",
+      event,
     });
   }
 
@@ -4654,9 +4590,9 @@ export class EditorSurface
     });
 
     try {
-      await navigator.clipboard.write([item]);
+      await this.ui.clipboard?.write([item]);
     } catch (error) {
-      await navigator.clipboard.writeText(data);
+      await this.ui.clipboard?.writeText(data);
     }
 
     return true;
@@ -5378,25 +5314,17 @@ export class EditorSurface
    * ```
    */
   public async promptColorPicker(): Promise<string | undefined> {
-    if (!window.EyeDropper) {
-      throw new Error(
-        "EyeDropper is not available on this browser (use Chrome)"
-      );
-    }
-
-    const eyeDropper = new window.EyeDropper();
-
     try {
-      const result: {
-        /**
-         * A string representing the selected color, in hexadecimal sRGB format (#aabbcc).
-         * @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
-         */
-        sRGBHex: string;
-      } = await eyeDropper.open();
-      return result.sRGBHex;
+      if (!this.ui.eyedropper) {
+        return undefined;
+      }
+      const i = this.ui.eyedropper();
+      if (!i) {
+        return undefined;
+      }
+      const result = await i.open();
+      return result?.sRGBHex;
     } catch (error) {
-      // User cancelled or error occurred - return undefined
       return undefined;
     }
   }
@@ -5434,14 +5362,87 @@ export class EditorSurface
       } else {
         // No selection - set clipboard color, copy hex, and show toast
         this.a11ySetClipboardColor(color);
-        await window.navigator.clipboard.writeText(hex);
-        toast.success(`Copied hex color to clipboard ${hex}`);
+        await this.ui.clipboard?.writeText(hex);
+        this.ui.notify?.(`Copied hex color to clipboard ${hex}`, "success");
       }
     } catch (error: any) {
       if (error.message) {
-        toast.error(error.message);
+        this.ui.notify?.(error.message, "error");
       }
     }
+  }
+
+  /**
+   * removes explicit width or height value from the text node, making them sized "auto", based on the content.
+   */
+  autoSizeTextNode(node_id: string, axis: "width" | "height") {
+    const node = this._editor.doc.getNodeSnapshotById(
+      node_id
+    ) as grida.program.nodes.UnknwonNode;
+    if (node.type !== "text") return;
+
+    const prev =
+      this._editor.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
+    if (!prev) return;
+
+    const h_align = node.text_align;
+    const v_align = node.text_align_vertical;
+
+    // FIXME: nested raf.
+    // why this is needed?
+    // currently, the api does not expose a way or contains value for textlayout size, not the box size.
+    // since we can't pre-calculate the delta, this is the dirty hack to first resize, then get the next size, shift delta.
+    // => need api/data that holds actual textlayout size (non box size)
+
+    requestAnimationFrame(() => {
+      this._editor.doc.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        [axis]: "auto",
+      });
+
+      requestAnimationFrame(() => {
+        const next =
+          this._editor.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
+        if (!next) return;
+
+        if (axis === "width") {
+          const diff = prev.width - next.width;
+          if (diff === 0) return;
+          let left = prev.x;
+          switch (h_align) {
+            case "right":
+              left = prev.x + diff;
+              break;
+            case "center":
+              left = prev.x + diff / 2;
+              break;
+            default:
+              return;
+          }
+          this._editor.doc.changeNodePropertyPositioning(node_id, {
+            left: cmath.quantize(left, 1),
+          });
+        } else {
+          const diff = prev.height - next.height;
+          if (diff === 0) return;
+          let top = prev.y;
+          switch (v_align) {
+            case "bottom":
+              top = prev.y + diff;
+              break;
+            case "center":
+              top = prev.y + diff / 2;
+              break;
+            default:
+              return;
+          }
+          this._editor.doc.changeNodePropertyPositioning(node_id, {
+            top: cmath.quantize(top, 1),
+          });
+        }
+      });
+    });
   }
 
   // ==============================================================
