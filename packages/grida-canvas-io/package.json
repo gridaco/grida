@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@grida/cmath": "workspace:*",
+    "@grida/format": "workspace:*",
     "fast-png": "^6.3.0",
     "fast-xml-parser": "^5.2.3",
     "fflate": "^0.8.2",
@@ -17,7 +18,6 @@
   },
   "devDependencies": {
     "@grida/cg": "workspace:*",
-    "@grida/format": "workspace:*",
     "@grida/schema": "workspace:*",
     "@grida/vn": "workspace:*"
   }

@@ -11,13 +11,13 @@ This package contains **generated-only** TypeScript code produced from [`format/
 The TypeScript bindings are generated at build-time via the `prebuild` hook. To regenerate manually:
 
 ```bash
-pnpm --filter @grida/format gen
+pnpm --filter @grida/format flatc:generate
 ```
 
 Or from this directory:
 
 ```bash
-pnpm gen
+pnpm flatc:generate
 ```
 
 This will regenerate `src/grida.ts` and `src/grida/**` from the source schema.
