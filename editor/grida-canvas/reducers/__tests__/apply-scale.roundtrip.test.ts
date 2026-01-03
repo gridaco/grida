@@ -9,7 +9,7 @@ import * as path from "path";
 /**
  * Fixture support note:
  * This test currently targets the Grida schema version specifier `20251209`
- * (e.g. `0.0.4-beta+20251209`) and loads all `*-20251209.grida` fixtures.
+ * (e.g. `0.0.4-beta+20251209`) and loads all `*-20251209.snapshot.zip` fixtures.
  */
 const FIXTURE_VERSION_SPECIFIER = "20251209";
 
@@ -217,7 +217,7 @@ function listFixturePathsByVersionSpecifier(
   // Keep this scoped to fixtures/test-grida (see fixtures/test-grida/README.md)
   // to avoid crawling huge fixture trees (fonts/images/etc).
   const dir = path.resolve(__dirname, "../../../../fixtures/test-grida");
-  const suffix = `-${versionSpecifier}.grida`;
+  const suffix = `-${versionSpecifier}.snapshot.zip`;
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   return entries
     .filter((e) => e.isFile() && e.name.endsWith(suffix))
@@ -229,9 +229,8 @@ function loadFixtureDocument(fixturePath: string): {
   scene_id: string;
   document: grida.program.document.Document;
 } {
-  const buf = fs.readFileSync(fixturePath);
-  const unpacked = io.archive.unpack(new Uint8Array(buf));
-  const model = unpacked.document; // JSONDocumentFileModel
+  const zipData = fs.readFileSync(fixturePath);
+  const model = io.snapshot.zip.unpack(zipData);
   const scene_id =
     model.document.entry_scene_id ?? model.document.scenes_ref?.[0];
   if (!scene_id) throw new Error("fixture document has no entry_scene_id");
@@ -379,7 +378,7 @@ describe("apply-scale round-trip (accuracy)", () => {
 
   if (!fixturePaths.length) {
     throw new Error(
-      `No fixtures found matching *-${FIXTURE_VERSION_SPECIFIER}.grida under fixtures/test-grida`
+      `No fixtures found matching *-${FIXTURE_VERSION_SPECIFIER}.snapshot.zip under fixtures/test-grida`
     );
   }
 

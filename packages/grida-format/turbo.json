@@ -1,0 +1,18 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "generate": {
+      "inputs": ["$TURBO_DEFAULT$", "../../format/grida.fbs"],
+      "outputs": ["src/grida.ts", "src/grida/**"]
+    },
+    "build": {
+      "dependsOn": ["generate", "^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["generate"]
+    },
+    "test": {
+      "dependsOn": ["generate"]
+    }
+  }
+}

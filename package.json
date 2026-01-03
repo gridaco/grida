@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:packages": "turbo run dev --filter=./packages/*",
+    "generate": "turbo run generate",
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",

@@ -1,0 +1,24 @@
+{
+  "name": "@grida/format",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "flatc:clean": "rm -rf src/grida src/grida.ts",
+    "flatc:generate": "pnpm flatc:clean && python3 ../../bin/activate-flatc -- --ts --ts-no-import-ext -o src ../../format/grida.fbs",
+    "generate": "pnpm flatc:generate",
+    "prebuild": "pnpm flatc:generate",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "flatbuffers": "^25.9.23"
+  }
+}
