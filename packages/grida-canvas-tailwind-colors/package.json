@@ -15,7 +15,7 @@
     "data"
   ],
   "scripts": {
-    "generate": "deno run --allow-read --allow-write --allow-net scripts/generate.ts",
+    "generate": "deno run --allow-read --allow-write --allow-net --allow-env --no-prompt scripts/generate.ts",
     "prepublishOnly": "pnpm generate"
   },
   "files": [
