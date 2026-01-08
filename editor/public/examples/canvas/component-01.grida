@@ -1,5 +1,5 @@
 {
-  "version": "0.89.0-beta+20251219",
+  "version": "0.90.0-beta+20260108",
   "document": {
     "nodes": {
       "component": {
@@ -56,7 +56,7 @@
         "rotation": 0,
         "opacity": 1,
         "z_index": 0,
-        "type": "text",
+        "type": "tspan",
         "text": "Programmable Design",
         "position": "absolute",
         "left": 59,
@@ -86,13 +86,13 @@
       },
       "description": {
         "id": "description",
-        "name": "text",
+        "name": "tspan",
         "active": true,
         "locked": false,
         "rotation": 0,
         "opacity": 1,
         "z_index": 0,
-        "type": "text",
+        "type": "tspan",
         "text": "Text values can be programmed via `props`",
         "position": "absolute",
         "left": 59,

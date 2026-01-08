@@ -87,7 +87,7 @@ export namespace prototypes {
   } satisfies grida.program.nodes.NodePrototype;
 
   export const text = {
-    type: "text",
+    type: "tspan",
     width: "auto",
     height: "auto",
     position: "relative",
@@ -158,7 +158,7 @@ export namespace prototypes {
     },
     children: [
       {
-        type: "text",
+        type: "tspan",
         name: "label",
         width: "auto",
         height: "auto",

@@ -191,7 +191,7 @@ describe("format roundtrip", () => {
             constraints: { children: "multiple" },
           },
           [nodeId]: {
-            type: "text",
+            type: "tspan",
             id: nodeId,
             name: "Text",
             active: true,
@@ -224,7 +224,7 @@ describe("format roundtrip", () => {
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "text") throw new Error("Expected text node");
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
       node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.width).toBe("auto");
@@ -597,7 +597,7 @@ describe("format roundtrip", () => {
             constraints: { children: "multiple" },
           },
           [nodeId]: {
-            type: "text",
+            type: "tspan",
             id: nodeId,
             name: "Text",
             active: true,
@@ -630,10 +630,10 @@ describe("format roundtrip", () => {
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "text") throw new Error("Expected text node");
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
       node satisfies grida.program.nodes.TextSpanNode;
 
-      expect(node.type).toBe("text");
+      expect(node.type).toBe("tspan");
       expect(node.name).toBe("Text");
       expect(node.active).toBe(true);
       expect(node.locked).toBe(false);
@@ -1125,7 +1125,7 @@ describe("format roundtrip", () => {
             stroke_join: "miter",
           } satisfies grida.program.nodes.RectangleNode,
           [textId]: {
-            type: "text",
+            type: "tspan",
             id: textId,
             name: "Text",
             active: true,
@@ -1202,7 +1202,7 @@ describe("format roundtrip", () => {
 
       // Verify all nodes roundtrip correctly
       expect(decoded.nodes[rectId]?.type).toBe("rectangle");
-      expect(decoded.nodes[textId]?.type).toBe("text");
+      expect(decoded.nodes[textId]?.type).toBe("tspan");
       expect(decoded.nodes[containerId]?.type).toBe("container");
       expect(decoded.nodes[groupId]?.type).toBe("group");
 
@@ -1295,7 +1295,7 @@ describe("format roundtrip", () => {
             constraints: { children: "multiple" },
           },
           [nodeId]: {
-            type: "text",
+            type: "tspan",
             id: nodeId,
             name: "Text",
             active: true,
@@ -1328,7 +1328,7 @@ describe("format roundtrip", () => {
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "text") throw new Error("Expected text node");
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
       node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.opacity).toBeCloseTo(0.8, 5);
@@ -1353,7 +1353,7 @@ describe("format roundtrip", () => {
             constraints: { children: "multiple" },
           },
           [nodeId]: {
-            type: "text",
+            type: "tspan",
             id: nodeId,
             name: "Text",
             active: true,
@@ -1386,7 +1386,7 @@ describe("format roundtrip", () => {
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "text") throw new Error("Expected text node");
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
       node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.font_size).toBe(24);
@@ -1409,7 +1409,7 @@ describe("format roundtrip", () => {
             constraints: { children: "multiple" },
           },
           [nodeId]: {
-            type: "text",
+            type: "tspan",
             id: nodeId,
             name: "Text",
             active: true,
@@ -1442,7 +1442,7 @@ describe("format roundtrip", () => {
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "text") throw new Error("Expected text node");
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
       node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.font_weight).toBe(700);
@@ -1465,7 +1465,7 @@ describe("format roundtrip", () => {
             constraints: { children: "multiple" },
           },
           [nodeId]: {
-            type: "text",
+            type: "tspan",
             id: nodeId,
             name: "Text",
             active: true,
@@ -1498,7 +1498,7 @@ describe("format roundtrip", () => {
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "text") throw new Error("Expected text node");
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
       node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.font_kerning).toBe(false);
@@ -1521,7 +1521,7 @@ describe("format roundtrip", () => {
             constraints: { children: "multiple" },
           },
           [nodeId]: {
-            type: "text",
+            type: "tspan",
             id: nodeId,
             name: "Text",
             active: true,
@@ -1554,7 +1554,7 @@ describe("format roundtrip", () => {
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "text") throw new Error("Expected text node");
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
       node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.font_size).toBe(18);

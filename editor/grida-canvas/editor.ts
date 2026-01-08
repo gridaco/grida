@@ -755,6 +755,7 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
+  // TODO: rename to createTextSpanNode
   public createTextNode(
     text = ""
   ): NodeProxy<grida.program.nodes.TextSpanNode> {
@@ -764,7 +765,7 @@ class EditorDocumentStore
       {
         id: id,
         prototype: {
-          type: "text",
+          type: "tspan",
           _$id: id,
           text: text,
           width: "auto",
@@ -2977,7 +2978,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.89.0-beta+20251219",
+          version: "0.90.0-beta+20260108",
           document: payloadDocument,
         });
         surface.loadScene(p);
@@ -3333,7 +3334,7 @@ export class Editor
     const node = this.doc.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextSpanNode;
-    if (node.type !== "text") return false;
+    if (node.type !== "tspan") return false;
 
     const isBold = node.font_weight === 700;
     const next_weight = isBold ? 400 : 700;
@@ -3364,7 +3365,7 @@ export class Editor
     const node = this.doc.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.TextSpanNode;
-    if (node.type !== "text") return false;
+    if (node.type !== "tspan") return false;
 
     const next_italic = !node.font_style_italic;
     const fontFamily = node.font_family;
@@ -3486,7 +3487,7 @@ export class Editor
       node_id
     ) as grida.program.nodes.TextSpanNode;
     assert(node, "node is not found");
-    assert(node.type === "text", "node is not a text node");
+    assert(node.type === "tspan", "node is not a text node");
 
     // load the font family & prepare
     await this.loadFontSync({ family: fontFamily });
@@ -5085,7 +5086,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeTextAlign(node_id, textAlign);
       }
     }
@@ -5098,7 +5099,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeTextAlignVertical(
           node_id,
           textAlignVertical
@@ -5114,7 +5115,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeFontSize(node_id, {
           type: "delta",
           value: delta,
@@ -5130,7 +5131,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeLineHeight(node_id, {
           type: "delta",
           value: delta,
@@ -5146,7 +5147,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeLetterSpacing(node_id, {
           type: "delta",
           value: delta,
@@ -5162,7 +5163,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         const fontFamily = node.font_family;
         if (!fontFamily) continue;
 
@@ -5378,7 +5379,7 @@ export class EditorSurface
     const node = this._editor.doc.getNodeSnapshotById(
       node_id
     ) as grida.program.nodes.UnknwonNode;
-    if (node.type !== "text") return;
+    if (node.type !== "tspan") return;
 
     const prev =
       this._editor.geometryProvider.getNodeAbsoluteBoundingRect(node_id);

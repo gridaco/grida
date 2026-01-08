@@ -96,7 +96,7 @@ export function SectionStrokes({
     type: node.type,
   }));
 
-  const is_text_node = type === "text";
+  const is_text_node = type === "tspan";
   const isCanvasBackend = backend === "canvas";
   const supportsStrokeWidth4 = supports.strokeWidth4(type, { backend });
 

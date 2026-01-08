@@ -872,8 +872,8 @@ pub enum JSONNode {
     RegularStarPolygon(JSONRegularStarPolygonNode),
     #[serde(rename = "line")]
     Line(JSONLineNode),
-    #[serde(rename = "text")]
-    Text(JSONTextNode),
+    #[serde(rename = "tspan", alias = "text")]
+    TextSpan(JSONTextSpanNode),
     #[serde(rename = "boolean")]
     BooleanOperation(JSONBooleanOperationNode),
     #[serde(rename = "image")]
@@ -978,7 +978,7 @@ pub struct JSONGroupNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JSONTextNode {
+pub struct JSONTextSpanNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
@@ -1348,8 +1348,8 @@ impl From<JSONContainerNode> for ContainerNodeRec {
     }
 }
 
-impl From<JSONTextNode> for TextSpanNodeRec {
-    fn from(node: JSONTextNode) -> Self {
+impl From<JSONTextSpanNode> for TextSpanNodeRec {
+    fn from(node: JSONTextSpanNode) -> Self {
         // For text nodes, width can be Auto or fixed Length
         let width = match node.base.width {
             CSSDimension::Auto => None,
@@ -1933,7 +1933,7 @@ impl From<JSONNode> for Node {
         match node {
             JSONNode::Group(group) => Node::Group(group.into()),
             JSONNode::Container(container) => Node::Container(container.into()),
-            JSONNode::Text(text) => Node::TextSpan(text.into()),
+            JSONNode::TextSpan(text) => Node::TextSpan(text.into()),
             JSONNode::Vector(vector) => vector.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),
@@ -2500,7 +2500,7 @@ mod tests {
         let json_text_auto = r#"{
             "id": "text-1",
             "name": "Auto Width Text",
-            "type": "text",
+            "type": "tspan",
             "text": "Hello World",
             "left": 100.0,
             "top": 100.0,
@@ -2512,7 +2512,7 @@ mod tests {
             serde_json::from_str(json_text_auto).expect("failed to deserialize text node");
 
         match text_node {
-            JSONNode::Text(text) => {
+            JSONNode::TextSpan(text) => {
                 assert_eq!(text.base.width, CSSDimension::Auto);
                 assert_eq!(text.base.height, CSSDimension::Auto);
             }
@@ -2523,7 +2523,7 @@ mod tests {
         let json_text_fixed = r#"{
             "id": "text-2",
             "name": "Fixed Width Text",
-            "type": "text",
+            "type": "tspan",
             "text": "Hello World",
             "left": 100.0,
             "top": 100.0,
@@ -2535,7 +2535,7 @@ mod tests {
             .expect("failed to deserialize text node with fixed width");
 
         match text_node_fixed {
-            JSONNode::Text(text) => {
+            JSONNode::TextSpan(text) => {
                 assert_eq!(text.base.width, CSSDimension::LengthPX(200.0));
                 assert_eq!(text.base.height, CSSDimension::Auto);
             }
@@ -2572,7 +2572,7 @@ mod tests {
         // Test "auto" case
         let json_auto = r#"{
             "id": "text-1",
-            "type": "text",
+            "type": "tspan",
             "text": "Test",
             "left": 0,
             "top": 0,
@@ -2580,7 +2580,7 @@ mod tests {
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_auto).expect("Failed to parse 'auto'");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
         } else {
             panic!("Expected Text node");
@@ -2589,7 +2589,7 @@ mod tests {
         // Test "none" case
         let json_none = r#"{
             "id": "text-2",
-            "type": "text",
+            "type": "tspan",
             "text": "Test",
             "left": 0,
             "top": 0,
@@ -2597,7 +2597,7 @@ mod tests {
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_none).expect("Failed to parse 'none'");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::None));
         } else {
             panic!("Expected Text node");
@@ -2606,7 +2606,7 @@ mod tests {
         // Test numeric case
         let json_fixed = r#"{
             "id": "text-3",
-            "type": "text",
+            "type": "tspan",
             "text": "Test",
             "left": 0,
             "top": 0,
@@ -2614,7 +2614,7 @@ mod tests {
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_fixed).expect("Failed to parse numeric");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             match text.font_optical_sizing {
                 FontOpticalSizing::Fixed(value) => assert_eq!(value, 16.5),
                 _ => panic!("Expected Fixed variant"),
@@ -2626,7 +2626,7 @@ mod tests {
         // Test invalid string fallback to Auto (via serde default)
         let json_invalid = r#"{
             "id": "text-4",
-            "type": "text",
+            "type": "tspan",
             "text": "Test",
             "left": 0,
             "top": 0,
@@ -2634,7 +2634,7 @@ mod tests {
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_invalid).expect("Failed to parse invalid");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
         } else {
             panic!("Expected Text node");
@@ -2647,7 +2647,7 @@ mod tests {
         let json_none = r#"{
             "id": "text-1",
             "name": "text",
-            "type": "text",
+            "type": "tspan",
             "text": "Text",
             "left": 100,
             "top": 100,
@@ -2656,7 +2656,7 @@ mod tests {
 
         let node: JSONNode =
             serde_json::from_str(json_none).expect("Failed to parse 'none' variant");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::None));
         } else {
             panic!("Expected Text node");
@@ -2666,7 +2666,7 @@ mod tests {
         let json_fixed = r#"{
             "id": "text-2",
             "name": "text",
-            "type": "text",
+            "type": "tspan",
             "text": "Text",
             "left": 100,
             "top": 100,
@@ -2675,7 +2675,7 @@ mod tests {
 
         let node: JSONNode =
             serde_json::from_str(json_fixed).expect("Failed to parse numeric variant");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             match text.font_optical_sizing {
                 FontOpticalSizing::Fixed(value) => assert_eq!(value, 16.5),
                 _ => panic!("Expected Fixed variant"),
@@ -2688,7 +2688,7 @@ mod tests {
         let json_default = r#"{
             "id": "text-3",
             "name": "text",
-            "type": "text",
+            "type": "tspan",
             "text": "Text",
             "left": 100,
             "top": 100
@@ -2696,7 +2696,7 @@ mod tests {
 
         let node: JSONNode =
             serde_json::from_str(json_default).expect("Failed to parse default variant");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
         } else {
             panic!("Expected Text node");
@@ -3084,7 +3084,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.89.0-beta+20251219",
+            "version": "0.90.0-beta+20260108",
             "document": {
                 "nodes": {
                     "main": {
@@ -3141,7 +3141,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.89.0-beta+20251219",
+            "version": "0.90.0-beta+20260108",
             "document": {
                 "nodes": {
                     "main": {
@@ -3208,7 +3208,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.89.0-beta+20251219",
+            "version": "0.90.0-beta+20260108",
             "document": {
                 "nodes": {
                     "main": {
@@ -3542,7 +3542,7 @@ mod tests {
         let json = r#"{
             "id": "text-1",
             "name": "Blurred Text",
-            "type": "text",
+            "type": "tspan",
             "text": "Hello World",
             "left": 100.0,
             "top": 100.0,
@@ -3561,7 +3561,7 @@ mod tests {
             serde_json::from_str(json).expect("failed to deserialize text with blur");
 
         match node {
-            JSONNode::Text(text) => {
+            JSONNode::TextSpan(text) => {
                 let converted: TextSpanNodeRec = text.into();
                 assert!(converted.effects.blur.is_some());
                 match &converted.effects.blur.as_ref().unwrap().blur {

@@ -181,7 +181,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 548,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -218,7 +218,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 54,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -904,7 +904,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 290,
-        "type": "text",
+        "type": "tspan",
         "width": 629,
         "z_index": 0
       },
@@ -994,7 +994,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 101,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -2150,7 +2150,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 54,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -2186,7 +2186,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 80,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -2995,7 +2995,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 0,
-        "type": "text",
+        "type": "tspan",
         "width": 629,
         "z_index": 0
       },
@@ -4498,7 +4498,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 734,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -4586,7 +4586,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 10,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -5251,7 +5251,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 180,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -5854,7 +5854,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 54,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -5890,7 +5890,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 10,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -5975,7 +5975,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 825,
-        "type": "text",
+        "type": "tspan",
         "width": 878,
         "z_index": 0
       },
@@ -6011,7 +6011,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 145,
-        "type": "text",
+        "type": "tspan",
         "width": 629,
         "z_index": 0
       },
@@ -6049,7 +6049,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 60,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -6488,7 +6488,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 60,
-        "type": "text",
+        "type": "tspan",
         "width": 804,
         "z_index": 0
       },
@@ -6525,7 +6525,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 54,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -9126,7 +9126,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 125,
-        "type": "text",
+        "type": "tspan",
         "width": 804,
         "z_index": 0
       },
@@ -9214,7 +9214,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 0,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -9252,7 +9252,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 272,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -9578,7 +9578,7 @@
         "text_align": "left",
         "text_align_vertical": "top",
         "top": 54,
-        "type": "text",
+        "type": "tspan",
         "width": "auto",
         "z_index": 0
       },
@@ -9966,5 +9966,5 @@
       "main"
     ]
   },
-  "version": "0.89.0-beta+20251219"
+  "version": "0.90.0-beta+20260108"
 }

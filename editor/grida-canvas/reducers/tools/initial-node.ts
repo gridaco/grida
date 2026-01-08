@@ -114,7 +114,7 @@ export default function initialNode(
         ...layer,
         ...layout_child,
         ...editor.config.fonts.DEFAULT_TEXT_STYLE_INTER,
-        type: "text",
+        type: "tspan",
         text_align: "left",
         text_align_vertical: "top",
         fill: constraints.fill === "fill_paints" ? undefined : black,

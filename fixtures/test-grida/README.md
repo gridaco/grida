@@ -11,7 +11,7 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 
 - **Prefix**: `d[n]` is a simple counter (`d1`, `d2`, `d3`, ...).
 - **Schema version specifier**: we encode the schema version **build metadata date** as `yyyymmdd`.
-  - Example: schema version `0.90.0-beta+20260100` → version specifier `20260100`
+  - Example: schema version `0.90.0-beta+20260108` → version specifier `20260108`
   - **Note**: this `yyyymmdd` is **not** the authoring date of the file.
 
 ### Support expectations (important)
@@ -24,4 +24,4 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 
 - **2026-01-03**: Migrated from legacy `.grida` (JSON/ZIP) format to new `.grida` (ZIP/FlatBuffer) binary format. Legacy snapshot files are now stored as `.snapshot.zip` for test fixtures.
 
-> Current Version: `0.90.0-beta+20260100` (last updated: 2026-01-03)
+> Current Version: `0.90.0-beta+20260108` (last updated: 2026-01-08)

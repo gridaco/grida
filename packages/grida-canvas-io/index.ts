@@ -127,7 +127,7 @@ export namespace io {
       }
       let __text_plain = "";
       for (const p of payload.prototypes) {
-        if (p.type === "text") {
+        if (p.type === "tspan") {
           __text_plain += p.text + "\n";
         }
       }

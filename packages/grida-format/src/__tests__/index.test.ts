@@ -15,7 +15,7 @@ describe("@grida/format", () => {
     const builder = new flatbuffers.Builder(1024);
 
     // Build schema version string
-    const schemaVersion = builder.createString("0.89.0-beta+20251219");
+    const schemaVersion = builder.createString("0.90.0-beta+20260108");
 
     // Build empty arrays for nodes, links, scenes
     const nodesOffset = fbs.CanvasDocument.createNodesVector(builder, []);
@@ -46,7 +46,7 @@ describe("@grida/format", () => {
     const document = gridaFile.document();
 
     expect(document).toBeDefined();
-    expect(document?.schemaVersion()).toBe("0.89.0-beta+20251219");
+    expect(document?.schemaVersion()).toBe("0.90.0-beta+20260108");
     expect(document?.nodesLength()).toBe(0);
     expect(document?.scenesLength()).toBe(0);
   });

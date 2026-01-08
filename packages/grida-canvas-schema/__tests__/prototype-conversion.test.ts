@@ -4,7 +4,7 @@ describe("create_packed_scene_document_from_prototype", () => {
   describe("single node without children", () => {
     it("should create a document with single text node", () => {
       const prototype: grida.program.nodes.TextNodePrototype = {
-        type: "text",
+        type: "tspan",
         text: "Hello World",
       };
 
@@ -17,7 +17,7 @@ describe("create_packed_scene_document_from_prototype", () => {
       // Should have exactly one node
       expect(Object.keys(result.nodes)).toHaveLength(1);
       expect(result.nodes["node-0"]).toMatchObject({
-        type: "text",
+        type: "tspan",
         text: "Hello World",
         id: "node-0",
       });
@@ -60,8 +60,8 @@ describe("create_packed_scene_document_from_prototype", () => {
         width: 200,
         height: 100,
         children: [
-          { type: "text", text: "Hello" },
-          { type: "text", text: "World" },
+          { type: "tspan", text: "Hello" },
+          { type: "tspan", text: "World" },
         ],
       };
 
@@ -80,11 +80,11 @@ describe("create_packed_scene_document_from_prototype", () => {
         height: 100,
       });
       expect(result.nodes["id-1"]).toMatchObject({
-        type: "text",
+        type: "tspan",
         text: "Hello",
       });
       expect(result.nodes["id-2"]).toMatchObject({
-        type: "text",
+        type: "tspan",
         text: "World",
       });
 
@@ -101,7 +101,7 @@ describe("create_packed_scene_document_from_prototype", () => {
       const prototype: grida.program.nodes.GroupNodePrototype = {
         type: "group",
         children: [
-          { type: "text", text: "Title" },
+          { type: "tspan", text: "Title" },
           { type: "rectangle", width: 50, height: 50 },
           { type: "ellipse", width: 40, height: 40 },
         ],
@@ -116,7 +116,7 @@ describe("create_packed_scene_document_from_prototype", () => {
 
       expect(Object.keys(result.nodes)).toHaveLength(4);
       expect(result.nodes["n0"].type).toBe("group");
-      expect(result.nodes["n1"].type).toBe("text");
+      expect(result.nodes["n1"].type).toBe("tspan");
       expect(result.nodes["n2"].type).toBe("rectangle");
       expect(result.nodes["n3"].type).toBe("ellipse");
 
@@ -140,7 +140,7 @@ describe("create_packed_scene_document_from_prototype", () => {
                 type: "container",
                 width: 200,
                 height: 100,
-                children: [{ type: "text", text: "Deeply nested" }],
+                children: [{ type: "tspan", text: "Deeply nested" }],
               },
             ],
           },
@@ -165,7 +165,7 @@ describe("create_packed_scene_document_from_prototype", () => {
 
       // Check the deepest text node
       expect(result.nodes["deep-3"]).toMatchObject({
-        type: "text",
+        type: "tspan",
         text: "Deeply nested",
       });
     });
@@ -181,8 +181,8 @@ describe("create_packed_scene_document_from_prototype", () => {
             width: 200,
             height: 100,
             children: [
-              { type: "text", text: "Branch 1.1" },
-              { type: "text", text: "Branch 1.2" },
+              { type: "tspan", text: "Branch 1.1" },
+              { type: "tspan", text: "Branch 1.2" },
             ],
           },
           {
@@ -197,7 +197,7 @@ describe("create_packed_scene_document_from_prototype", () => {
               },
             ],
           },
-          { type: "text", text: "Sibling" },
+          { type: "tspan", text: "Sibling" },
         ],
       };
 
@@ -236,7 +236,7 @@ describe("create_packed_scene_document_from_prototype", () => {
         children: [
           {
             _$id: "custom-child",
-            type: "text",
+            type: "tspan",
             text: "Fixed ID",
           },
         ],
@@ -268,11 +268,11 @@ describe("create_packed_scene_document_from_prototype", () => {
         type: "container",
         width: 100,
         height: 100,
-        children: [{ type: "text", text: "Child" }],
+        children: [{ type: "tspan", text: "Child" }],
       };
 
       const textPrototype: grida.program.nodes.TextNodePrototype = {
-        type: "text",
+        type: "tspan",
         text: "No children",
       };
 
@@ -324,7 +324,7 @@ describe("create_packed_scene_document_from_prototype", () => {
         top: 20,
         children: [
           {
-            type: "text",
+            type: "tspan",
             name: "MyText",
             text: "Hello",
             left: 5,
@@ -375,10 +375,10 @@ describe("create_packed_scene_document_from_prototype", () => {
             position: "absolute",
             left: 0,
             top: 0,
-          } as any,
+          } satisfies Partial<grida.program.nodes.ContainerNode> as any,
           child1: {
             id: "child1",
-            type: "text",
+            type: "tspan",
             name: "Child1",
             active: true,
             locked: false,
@@ -386,10 +386,10 @@ describe("create_packed_scene_document_from_prototype", () => {
             position: "absolute",
             left: 10,
             top: 10,
-          } as any,
+          } satisfies Partial<grida.program.nodes.TextSpanNode> as any,
           child2: {
             id: "child2",
-            type: "text",
+            type: "tspan",
             name: "Child2",
             active: true,
             locked: false,
@@ -397,7 +397,7 @@ describe("create_packed_scene_document_from_prototype", () => {
             position: "absolute",
             left: 10,
             top: 40,
-          } as any,
+          } satisfies Partial<grida.program.nodes.TextSpanNode> as any,
         },
         links: {
           root: ["child1", "child2"],
@@ -440,11 +440,11 @@ describe("create_packed_scene_document_from_prototype", () => {
       expect(newRoot.height).toBe(200);
 
       const newChild1 = newDoc.nodes["new-1"] as any;
-      expect(newChild1.type).toBe("text");
+      expect(newChild1.type).toBe("tspan");
       expect(newChild1.text).toBe("First");
 
       const newChild2 = newDoc.nodes["new-2"] as any;
-      expect(newChild2.type).toBe("text");
+      expect(newChild2.type).toBe("tspan");
       expect(newChild2.text).toBe("Second");
     });
   });

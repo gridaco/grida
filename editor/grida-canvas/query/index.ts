@@ -599,7 +599,7 @@ export namespace dq {
       return this.nodeids
         .map((id) => this.nodes[id])
         .filter(
-          (node) => node.type === "text"
+          (node) => node.type === "tspan"
         ) as grida.program.nodes.TextSpanNode[];
     }
 

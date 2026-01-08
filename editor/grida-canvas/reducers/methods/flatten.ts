@@ -19,7 +19,7 @@ export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "ellipse",
   "line",
   // TODO: only supported by wasm backend, need backend check or seperate api (e.g. vector.textToVectorNetwork())
-  "text",
+  "tspan",
   "vector",
   "boolean",
 ]);

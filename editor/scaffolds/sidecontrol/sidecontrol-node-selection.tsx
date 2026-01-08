@@ -434,7 +434,7 @@ function ModeMixedNodeProperties({
             </PropertySectionContent>
           )}
         </PropertySection> */}
-      {config.text !== "off" && types.has("text") && (
+      {config.text !== "off" && types.has("tspan") && (
         <SectionMixedText ids={ids} />
       )}
       <PropertySection
@@ -579,7 +579,7 @@ function ModeNodeProperties({
 
   // const istemplate = type?.startsWith("templates/");
   const is_templateinstance = type === "template_instance";
-  const is_text = type === "text";
+  const is_text = type === "tspan";
   const is_image = type === "image";
   const is_container = type === "container";
   const is_stylable = type !== "template_instance";

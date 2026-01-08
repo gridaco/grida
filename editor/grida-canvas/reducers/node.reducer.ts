@@ -276,7 +276,7 @@ const safe_properties: Partial<
       node.type === "image" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
-      node.type === "text" ||
+      node.type === "tspan" ||
       node.type === "richtext" ||
       node.type === "container" ||
       node.type === "component",
@@ -383,7 +383,7 @@ const safe_properties: Partial<
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
-      node.type === "text",
+      node.type === "tspan",
     apply: (draft, value, prev) => {
       const target = draft as grida.program.nodes.UnknownNodeProperties;
       const next = value as unknown as PaintValue | null;
@@ -417,7 +417,7 @@ const safe_properties: Partial<
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
-      node.type === "text",
+      node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).stroke_width = ranged(
         0,
@@ -476,7 +476,7 @@ const safe_properties: Partial<
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
-      node.type === "text",
+      node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).stroke_align = value;
     },
@@ -731,139 +731,139 @@ const safe_properties: Partial<
     },
   }),
   text_align: defineNodeProperty<"text_align">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_align = value;
     },
   }),
   text_align_vertical: defineNodeProperty<"text_align_vertical">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_align_vertical = value;
     },
   }),
   text_decoration_line: defineNodeProperty<"text_decoration_line">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_line = value;
     },
   }),
   text_decoration_style: defineNodeProperty<"text_decoration_style">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_style = value;
     },
   }),
   text_decoration_color: defineNodeProperty<"text_decoration_color">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_color = value;
     },
   }),
   text_decoration_skip_ink: defineNodeProperty<"text_decoration_skip_ink">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_skip_ink = value;
     },
   }),
   text_decoration_thickness: defineNodeProperty<"text_decoration_thickness">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_thickness = value;
     },
   }),
   text_transform: defineNodeProperty<"text_transform">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_transform = value;
     },
   }),
   font_style_italic: defineNodeProperty<"font_style_italic">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_style_italic = value;
     },
   }),
   font_postscript_name: defineNodeProperty<"font_postscript_name">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_postscript_name = value;
     },
   }),
   font_weight: defineNodeProperty<"font_weight">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_weight = value;
     },
   }),
   font_kerning: defineNodeProperty<"font_kerning">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_kerning = value;
     },
   }),
   font_width: defineNodeProperty<"font_width">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_width = value;
     },
   }),
   font_features: defineNodeProperty<"font_features">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_features = value;
     },
   }),
   font_variations: defineNodeProperty<"font_variations">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_variations = value;
     },
   }),
   font_optical_sizing: defineNodeProperty<"font_optical_sizing">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_optical_sizing = value;
     },
   }),
   font_size: defineNodeProperty<"font_size">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_size = ranged(1, value);
     },
   }),
   line_height: defineNodeProperty<"line_height">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).line_height = ranged(0, value);
     },
   }),
   letter_spacing: defineNodeProperty<"letter_spacing">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).letter_spacing = value;
     },
   }),
   word_spacing: defineNodeProperty<"word_spacing">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).word_spacing = value;
     },
   }),
   max_length: defineNodeProperty<"max_length">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).max_length = value;
     },
   }),
   max_lines: defineNodeProperty<"max_lines">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).max_lines = value ? ranged(1, value) : null;
     },
   }),
   text: defineNodeProperty<"text">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text = value ?? null;
     },
@@ -955,7 +955,7 @@ export default function nodeReducer<
         break;
       }
       case "node/change/fontFamily": {
-        assert(draft.type === "text");
+        assert(draft.type === "tspan");
         draft.font_family = action.fontFamily;
         break;
       }

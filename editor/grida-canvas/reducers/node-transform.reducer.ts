@@ -178,7 +178,7 @@ export default function updateNodeTransform(
       }
 
       // For text nodes, use ceil to ensure we don't cut off content
-      if (draft.type === "text") {
+      if (draft.type === "tspan") {
         _draft.width = Math.ceil(Math.max(scaled.width, 0));
       } else {
         _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
@@ -188,10 +188,10 @@ export default function updateNodeTransform(
         _draft.height = 0;
       } else {
         const preserveAutoHeight =
-          draft.type === "text" && !heightWasNumber && movement[1] === 0;
+          draft.type === "tspan" && !heightWasNumber && movement[1] === 0;
         if (!preserveAutoHeight) {
           // For text nodes, use ceil to ensure we don't cut off content
-          if (draft.type === "text") {
+          if (draft.type === "tspan") {
             _draft.height = Math.ceil(Math.max(scaled.height, 0));
           } else {
             _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
@@ -221,7 +221,7 @@ export default function updateNodeTransform(
 
       // size
       // For text nodes, use ceil to ensure we don't cut off content
-      if (draft.type === "text") {
+      if (draft.type === "tspan") {
         _draft.width = Math.ceil(Math.max(currentWidth + dx, 0));
       } else {
         _draft.width = cmath.quantize(Math.max(currentWidth + dx, 0), 1);
@@ -231,7 +231,7 @@ export default function updateNodeTransform(
         _draft.height = 0;
       } else {
         // For text nodes, use ceil to ensure we don't cut off content
-        if (draft.type === "text") {
+        if (draft.type === "tspan") {
           _draft.height = Math.ceil(Math.max(currentHeight + dy, 0));
         } else {
           _draft.height = cmath.quantize(Math.max(currentHeight + dy, 0), 1);

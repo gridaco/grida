@@ -53,7 +53,7 @@ export function NodeTypeIcon({
       return <Component1Icon className={className} />;
     case "image":
       return <ImageIcon className={className} />;
-    case "text":
+    case "tspan":
       return <TextIcon className={className} />;
     case "instance":
       return <ComponentInstanceIcon className={className} />;

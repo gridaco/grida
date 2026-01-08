@@ -267,7 +267,7 @@ export namespace schema.parametric_scale {
     }
 
     // Text
-    if (node.type === "text") {
+    if (node.type === "tspan") {
       scale_number_in_place(node, "font_size", s);
     }
 

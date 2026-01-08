@@ -530,7 +530,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.89.0-beta+20251219";
+  export const SCHEMA_VERSION = "0.90.0-beta+20260108";
 
   /**
    * JSON-serializable value type
@@ -2194,7 +2194,7 @@ export namespace grida.program.nodes {
       i.ITextNodeStyle,
       i.ITextValue,
       i.ITextStroke {
-    readonly type: "text";
+    readonly type: "tspan";
 
     /**
      * tspan cannot have max lines. this will be removed in the future.
@@ -2211,7 +2211,7 @@ export namespace grida.program.nodes {
       i.ITextValue & i.ITextStyle,
       i.IComputedTextValue & i.IComputedTextNodeStyle
     > {
-    readonly type: "text";
+    readonly type: "tspan";
     max_lines?: number | null;
   }
 
@@ -2673,7 +2673,7 @@ export namespace grida.program.nodes {
         case "image":
         case "line":
         case "richtext":
-        case "text":
+        case "tspan":
         case "vector":
         case "polygon":
         case "star":

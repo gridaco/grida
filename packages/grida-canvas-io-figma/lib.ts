@@ -1073,7 +1073,7 @@ export namespace iofigma {
               ...text_stroke_trait(node),
               ...style_trait({}),
               ...effects_trait(node.effects),
-              type: "text",
+              type: "tspan",
               text: node.characters,
               position: "absolute",
               left: constraints.left,

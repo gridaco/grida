@@ -316,7 +316,7 @@ function __init_canvas(
   // check the version
   if (
     (data as SchemaMayVaryDocumentServerObject).__schema_version !==
-    "0.89.0-beta+20251219"
+    "0.90.0-beta+20260108"
   ) {
     return {
       __schema_version: (data as SchemaMayVaryDocumentServerObject)
@@ -349,7 +349,7 @@ function __init_form_start_page_state(
 
   // check the version
   if (
-    (data as FormStartPageSchema).__schema_version !== "0.89.0-beta+20251219"
+    (data as FormStartPageSchema).__schema_version !== "0.90.0-beta+20260108"
   ) {
     return {
       __schema_version: (data as FormStartPageSchema).__schema_version,

@@ -135,7 +135,7 @@ export function self_start_gesture_scale(
     ) {
       if (typeof n.width !== "number") {
         n.width =
-          node.type === "text"
+          node.type === "tspan"
             ? Math.ceil(rect.width)
             : cmath.quantize(rect.width, 1);
       }
@@ -155,7 +155,7 @@ export function self_start_gesture_scale(
           n.height = 0;
         } else {
           n.height =
-            node.type === "text"
+            node.type === "tspan"
               ? Math.ceil(rect.height)
               : cmath.quantize(rect.height, 1);
         }

@@ -184,7 +184,7 @@ function __self_evt_on_click(
       self_selectNode(draft, "reset", nnode.id);
 
       // if the node is text, enter content edit mode
-      if (nnode.type === "text") {
+      if (nnode.type === "tspan") {
         draft.content_edit_mode = { type: "text", node_id: nnode.id };
       }
       break;

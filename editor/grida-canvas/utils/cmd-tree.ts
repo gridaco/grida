@@ -17,7 +17,7 @@ const TYPE_LABELS: Partial<Record<Node["type"], string>> = {
   scene: "Scene",
   container: "Frame",
   group: "Group",
-  text: "Text",
+  tspan: "TextSpan",
   rectangle: "Rect",
   ellipse: "Ellipse",
   polygon: "Polygon",
@@ -40,7 +40,7 @@ const ICON_MAP: Partial<Record<Node["type"], keyof TreeAsciiChars>> = {
   group: "symbol_group_2B1A",
   instance: "symbol_group_2B1A",
   template_instance: "symbol_group_2B1A",
-  text: "symbol_text_270E",
+  tspan: "symbol_text_270E",
   rectangle: "symbol_rect_25FC",
   image: "symbol_rect_25FC",
   video: "symbol_rect_25FC",
@@ -225,7 +225,7 @@ function formatNodeLabel(node: Node, chars: TreeAsciiChars): string {
 
 function nodeMetadata(node: Node): string[] {
   switch (node.type) {
-    case "text":
+    case "tspan":
       return textMetadata(node);
     case "polygon": {
       const metadata = defaultMetadata(node);

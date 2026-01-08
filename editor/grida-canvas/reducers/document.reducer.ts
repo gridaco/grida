@@ -2053,7 +2053,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const { node_id } = <NodeToggleUnderlineAction>action;
         const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
-        if (node.type !== "text") return;
+        if (node.type !== "tspan") return;
 
         const isUnderline = node.text_decoration_line === "underline";
         node.text_decoration_line = isUnderline ? "none" : "underline";
@@ -2065,7 +2065,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const { node_id } = <NodeToggleLineThroughAction>action;
         const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
-        if (node.type !== "text") return;
+        if (node.type !== "tspan") return;
 
         const isLineThrough = node.text_decoration_line === "line-through";
         node.text_decoration_line = isLineThrough ? "none" : "line-through";

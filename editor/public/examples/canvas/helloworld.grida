@@ -1,5 +1,5 @@
 {
-  "version": "0.89.0-beta+20251219",
+  "version": "0.90.0-beta+20260108",
   "document": {
     "nodes": {
       "454:341": {
@@ -40,13 +40,13 @@
       },
       "454:342": {
         "id": "454:342",
-        "name": "text",
+        "name": "tspan",
         "active": true,
         "locked": false,
         "rotation": 0,
         "opacity": 1,
         "z_index": 0,
-        "type": "text",
+        "type": "tspan",
         "text": "Hello World !",
         "position": "absolute",
         "left": 59,
@@ -78,13 +78,13 @@
       },
       "454:343": {
         "id": "454:343",
-        "name": "text",
+        "name": "tspan",
         "active": true,
         "locked": false,
         "rotation": 0,
         "opacity": 1,
         "z_index": 0,
-        "type": "text",
+        "type": "tspan",
         "text": "Welcome to Grida Canvas V0",
         "position": "absolute",
         "left": 59,

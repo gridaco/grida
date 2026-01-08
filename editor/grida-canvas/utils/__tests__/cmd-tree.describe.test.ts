@@ -45,7 +45,7 @@ describe("describeDocumentTree", () => {
       },
       text: {
         id: "text",
-        type: "text",
+        type: "tspan",
         name: "Title",
         active: true,
         locked: false,
@@ -111,7 +111,7 @@ describe("describeDocumentTree", () => {
     const expected = [
       "└─ ⛶  Document (nodes=4, scenes=1, entry=scene)",
       "   └─ ⛶  Frame HeroSection  (type=container, id=frame)  [1280×720]  fill=#111111  opacity=0.9",
-      '      ├─ ✎  Text Title  (type=text, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700',
+      '      ├─ ✎  TextSpan Title  (type=tspan, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700',
       "      └─ ◼  Rect Button  (type=rectangle, id=button)  [160×48]  fill=#3B82F6  radius=8",
     ].join("\n");
 
@@ -126,7 +126,7 @@ describe("describeDocumentTree", () => {
 
     const expected = [
       "└─ ⛶  Frame HeroSection  (type=container, id=frame)  [1280×720]  fill=#111111  opacity=0.9",
-      '   ├─ ✎  Text Title  (type=text, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700',
+      '   ├─ ✎  TextSpan Title  (type=tspan, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700',
       "   └─ ◼  Rect Button  (type=rectangle, id=button)  [160×48]  fill=#3B82F6  radius=8",
     ].join("\n");
 

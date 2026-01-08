@@ -279,7 +279,7 @@ _005.definition = {
   links: {},
   nodes: {
     "005.title": {
-      type: "text",
+      type: "tspan",
       id: "005.title",
       name: "Title",
       active: true,

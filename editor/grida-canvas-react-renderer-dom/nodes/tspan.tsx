@@ -2,7 +2,7 @@ import React from "react";
 import type grida from "@grida/schema";
 import queryattributes from "./utils/attributes";
 
-export const TextWidget = ({
+export const TextSpanWidget = ({
   text,
   style,
   max_lines,
@@ -17,4 +17,4 @@ export const TextWidget = ({
   );
 };
 
-TextWidget.type = "text";
+TextSpanWidget.type = "tspan";

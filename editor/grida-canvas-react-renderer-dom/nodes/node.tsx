@@ -86,7 +86,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "container":
       case "image":
       case "video":
-      case "text":
+      case "tspan":
       case "bitmap":
       case "vector":
       case "line":
@@ -187,7 +187,7 @@ export function NodeElement<P extends Record<string, any>>({
               renderprops as grida.program.nodes.i.IComputedCSSStylable,
               {
                 fill: fillings[node.type],
-                hasTextStyle: node.type === "text",
+                hasTextStyle: node.type === "tspan",
               }
             ),
             // hard override user-select
@@ -211,7 +211,7 @@ const fillings = {
   scene: "background",
   boolean: "none",
   group: "none",
-  text: "color",
+  tspan: "color",
   container: "background",
   component: "background",
   iframe: "background",

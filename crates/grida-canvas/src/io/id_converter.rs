@@ -143,7 +143,7 @@ impl IdConverter {
             JSONNode::RegularPolygon(polygon) => Node::from(JSONNode::RegularPolygon(polygon)),
             JSONNode::RegularStarPolygon(star) => Node::from(JSONNode::RegularStarPolygon(star)),
             JSONNode::Line(line) => Node::from(JSONNode::Line(line)),
-            JSONNode::Text(text) => Node::TextSpan(TextSpanNodeRec::from(text)),
+            JSONNode::TextSpan(text) => Node::TextSpan(TextSpanNodeRec::from(text)),
             JSONNode::BooleanOperation(bool_op) => Node::from(JSONNode::BooleanOperation(bool_op)),
             JSONNode::Image(image) => Node::from(JSONNode::Image(image)),
             JSONNode::Unknown(unknown) => Node::from(JSONNode::Unknown(unknown)),

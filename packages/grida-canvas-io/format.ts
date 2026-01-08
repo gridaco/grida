@@ -263,7 +263,7 @@ export namespace format {
       ["scene", fbs.NodeType.Scene],
       ["container", fbs.NodeType.Container],
       ["rectangle", fbs.NodeType.Rectangle],
-      ["text", fbs.NodeType.TextSpan],
+      ["tspan", fbs.NodeType.TextSpan],
       ["group", fbs.NodeType.Group],
       ["ellipse", fbs.NodeType.Ellipse],
       ["line", fbs.NodeType.Line],
@@ -280,7 +280,7 @@ export namespace format {
       [fbs.NodeType.Scene, "scene"],
       [fbs.NodeType.Container, "container"],
       [fbs.NodeType.Rectangle, "rectangle"],
-      [fbs.NodeType.TextSpan, "text"],
+      [fbs.NodeType.TextSpan, "tspan"],
       [fbs.NodeType.Group, "group"],
       [fbs.NodeType.Ellipse, "ellipse"],
       [fbs.NodeType.Line, "line"],
@@ -1424,7 +1424,7 @@ export namespace format {
             nodeType = fbs.Node.LineNode;
             break;
           }
-          case "text": {
+          case "tspan": {
             const textNode = node as grida.program.nodes.TextSpanNode;
             const propertiesOffset = format.node.encode.nodeData.text(
               builder,
@@ -4670,6 +4670,7 @@ export namespace format {
           let fontSize: number = 14;
           let fontWeight: number = 400;
           let fontKerning: boolean = true;
+          let fontFamily: string | undefined = undefined;
           if (textProps) {
             textAlign = format.styling.decode.textAlign(textProps.textAlign());
             textAlignVertical = format.styling.decode.textAlignVertical(
@@ -4686,6 +4687,10 @@ export namespace format {
                 );
               }
               // Decode font properties
+              const fontFamilyValue = textStyle.fontFamily();
+              if (fontFamilyValue) {
+                fontFamily = fontFamilyValue;
+              }
               const fontSizeValue = textStyle.fontSize();
               if (fontSizeValue !== 0) {
                 fontSize = fontSizeValue;
@@ -4745,7 +4750,7 @@ export namespace format {
           }
 
           return {
-            type: "text",
+            type: "tspan",
             id,
             name: baseName,
             active: baseActive,
@@ -4760,6 +4765,7 @@ export namespace format {
             ...layoutFields,
             // text content and properties
             text: textProps?.text() ?? null,
+            font_family: fontFamily,
             font_size: fontSize,
             font_weight: fontWeight,
             font_kerning: fontKerning,
