@@ -2082,10 +2082,18 @@ export namespace grida.program.nodes {
       props: Record<string, schema.Value>;
     }
 
-    // TODO: add layout trait
     export interface ILayerTrait extends IBlend, ILayerMaskType, IEffects {
       z_index?: number;
     }
+
+    export interface IBasicShapeTrait
+      extends i.ICornerRadius,
+        i.IFill<cg.Paint>,
+        i.IStroke {}
+
+    export interface IRectangularShapeTrait
+      extends IRectangularCornerRadius,
+        IRectangularStrokeWidth {}
 
     export interface ILayoutTrait
       extends ILayoutTargetAspectRatio,
@@ -2210,8 +2218,7 @@ export namespace grida.program.nodes {
       i.IHotspotTrait,
       i.IBoxFit,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
-      i.IRectangularStrokeWidth,
+      i.IRectangularShapeTrait,
       i.ISourceValue {
     readonly type: "image";
     alt?: string;
@@ -2259,8 +2266,7 @@ export namespace grida.program.nodes {
       i.IHotspotTrait,
       i.IBoxFit,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
-      i.IRectangularStrokeWidth,
+      i.IRectangularShapeTrait,
       i.ISourceValue {
     readonly type: "video";
 
@@ -2285,8 +2291,7 @@ export namespace grida.program.nodes {
       i.ILayoutContainerTrait,
       i.IHotspotTrait,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
-      i.IRectangularStrokeWidth,
+      i.IRectangularShapeTrait,
       i.IStroke,
       i.IFill<cg.Paint> {
     readonly type: "container";
@@ -2309,7 +2314,7 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.ICSSStylable,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
+      i.IRectangularShapeTrait,
       i.ISourceValue {
     readonly type: "iframe";
   }
@@ -2347,10 +2352,8 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
-      i.IHotspotTrait,
-      i.ICornerRadius,
-      i.IFill<cg.Paint>,
-      i.IStroke {
+      i.IBasicShapeTrait,
+      i.IHotspotTrait {
     readonly type: "polygon";
     point_count: number;
   }
@@ -2360,10 +2363,8 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
-      i.IHotspotTrait,
-      i.ICornerRadius,
-      i.IFill<cg.Paint>,
-      i.IStroke {
+      i.IBasicShapeTrait,
+      i.IHotspotTrait {
     readonly type: "star";
     point_count: number;
     inner_radius: number;
@@ -2374,10 +2375,8 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
-      i.IHotspotTrait,
-      i.ICornerRadius,
-      i.IFill<cg.Paint>,
-      i.IStroke {
+      i.IBasicShapeTrait,
+      i.IHotspotTrait {
     readonly type: "vector";
 
     /**
@@ -2439,12 +2438,9 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
-      i.IHotspotTrait,
-      i.IFill<cg.Paint>,
-      i.IStroke,
-      i.IRectangularStrokeWidth,
-      i.ICornerRadius,
-      i.IRectangularCornerRadius {
+      i.IBasicShapeTrait,
+      i.IRectangularShapeTrait,
+      i.IHotspotTrait {
     readonly type: "rectangle";
   }
 
@@ -2472,9 +2468,8 @@ export namespace grida.program.nodes {
       i.ILayerTrait,
       i.ILayoutChildTrait,
       i.IHotspotTrait,
-      i.IEllipseArcData,
-      i.IFill<cg.Paint>,
-      i.IStroke {
+      i.IBasicShapeTrait,
+      i.IEllipseArcData {
     type: "ellipse";
   }
 
@@ -2494,7 +2489,7 @@ export namespace grida.program.nodes {
       i.ILayoutContainerTrait,
       i.IHotspotTrait,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
+      i.IRectangularShapeTrait,
       Partial<i.IPadding>,
       i.IFlexContainer,
       i.IProperties {
