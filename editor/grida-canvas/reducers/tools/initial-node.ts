@@ -80,6 +80,19 @@ export default function initialNode(
     left: 0,
   };
 
+  const layer: grida.program.nodes.i.ILayerTrait = {
+    opacity: 1,
+    blend_mode: cg.def.LAYER_BLENDMODE,
+    z_index: 0,
+  };
+
+  const layout_child: grida.program.nodes.i.ILayoutChildTrait = {
+    position: "absolute",
+    rotation: 0,
+    width: 100,
+    height: 100,
+  };
+
   const styles: grida.program.nodes.i.ICSSStylable = {
     opacity: 1,
     blend_mode: cg.def.LAYER_BLENDMODE,
@@ -98,8 +111,8 @@ export default function initialNode(
     case "text": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         ...editor.config.fonts.DEFAULT_TEXT_STYLE_INTER,
         type: "text",
         text_align: "left",
@@ -122,8 +135,8 @@ export default function initialNode(
     case "container": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         style: {
           overflow: "clip",
         },
@@ -215,8 +228,8 @@ export default function initialNode(
     case "ellipse": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "ellipse",
         width: 100,
         height: 100,
@@ -235,8 +248,8 @@ export default function initialNode(
     case "rectangle": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "rectangle",
         corner_radius: 0,
         rectangular_corner_radius_top_left: 0,
@@ -257,8 +270,8 @@ export default function initialNode(
     case "polygon": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "polygon",
         point_count: 3,
         corner_radius: 0,
@@ -276,8 +289,8 @@ export default function initialNode(
     case "star": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "star",
         point_count: 5,
         inner_radius: 0.5,
@@ -296,8 +309,8 @@ export default function initialNode(
     case "line": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "line",
         stroke: constraints.stroke === "stroke_paints" ? undefined : black,
         stroke_paints:

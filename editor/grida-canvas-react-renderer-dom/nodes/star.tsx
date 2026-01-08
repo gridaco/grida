@@ -3,6 +3,7 @@ import { svg } from "@/grida-canvas-utils/svg";
 import queryattributes from "./utils/attributes";
 import React, { useMemo } from "react";
 import vn from "@grida/vn";
+import { css } from "@/grida-canvas-utils/css";
 
 export function RegularStarPolygonWidget({
   width,
@@ -23,25 +24,29 @@ export function RegularStarPolygonWidget({
     ? svg.paint.defs(stroke)
     : { defs: undefined, ref: "none" };
 
+  // Generate star in normalized coordinate system (0-100)
+  // This makes it resolution-independent and works with any CSS dimension type
   const points = useMemo(() => {
     const v = vn.fromRegularStarPolygon({
       x: 0,
       y: 0,
-      width,
-      height,
+      width: 100,
+      height: 100,
       points: point_count,
       innerRadius: inner_radius,
     });
 
     return v.vertices.map((v) => `${v[0]},${v[1]}`).join(" ");
-  }, [width, height, point_count, inner_radius]);
+  }, [point_count, inner_radius]);
 
   return (
     <svg
       {...queryattributes(props)}
       style={{ ...style, overflow: "visible" }}
-      width={width}
-      height={height}
+      width={css.toDimension(width)}
+      height={css.toDimension(height)}
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
     >
       {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
       {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import queryattributes from "./utils/attributes";
 import grida from "@grida/schema";
 import assert from "assert";
+import { css } from "@/grida-canvas-utils/css";
 
 export const BitmapWidget = ({
   context,
@@ -14,6 +15,9 @@ export const BitmapWidget = ({
   const { objectFit, objectPosition, ...divStyles } = style || {};
 
   const imagedata = context.bitmaps[imageRef];
+  // FIXME: this will fail with relative dimensions
+  const widthNum = css.toPxNumber(width);
+  const heightNum = css.toPxNumber(height);
 
   return (
     <div
@@ -21,8 +25,8 @@ export const BitmapWidget = ({
       {...queryattributes(props)}
     >
       <BitmapViewer
-        width={width}
-        height={height}
+        width={widthNum}
+        height={heightNum}
         data={imagedata.data}
         frame={imagedata.version}
       />

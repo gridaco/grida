@@ -327,14 +327,19 @@ function self_update_gesture_resize_scale(
       targetAspectRatio !== undefined;
 
     if (!parent_id || is_scene_parent) {
-      updateNodeTransform(node as any, {
-        type: "scale",
-        rect: initial_rect,
-        origin: origin,
-        movement,
-        preserveAspectRatio: should_preserve_aspect_ratio,
-        targetAspectRatio: targetAspectRatio,
-      });
+      updateNodeTransform(
+        node,
+        {
+          type: "scale",
+          rect: initial_rect,
+          origin: origin,
+          movement,
+          preserveAspectRatio: should_preserve_aspect_ratio,
+          targetAspectRatio: targetAspectRatio,
+        },
+        context.geometry,
+        node_id
+      );
     } else {
       const parent_rect =
         context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
@@ -360,18 +365,22 @@ function self_update_gesture_resize_scale(
         parent_rect.y,
       ]);
 
-      updateNodeTransform(node as any, {
-        type: "scale",
-        rect: relative_rect,
-        origin: relative_origin,
-        movement,
-        preserveAspectRatio: should_preserve_aspect_ratio,
-        targetAspectRatio: targetAspectRatio,
-      });
+      updateNodeTransform(
+        node,
+        {
+          type: "scale",
+          rect: relative_rect,
+          origin: relative_origin,
+          movement,
+          preserveAspectRatio: should_preserve_aspect_ratio,
+          targetAspectRatio: targetAspectRatio,
+        },
+        context.geometry,
+        node_id
+      );
     }
 
     if (initial_node.type === "vector") {
-      const vector_node = node as grida.program.nodes.VectorNode;
       const initial_dimensions: cmath.Rectangle = {
         x: 0,
         y: 0,
@@ -379,11 +388,17 @@ function self_update_gesture_resize_scale(
         height: initial_rect.height,
       };
 
+      // Use geometry query to get resolved dimensions instead of fallback
+      const final_rect = context.geometry.getNodeAbsoluteBoundingRect(node_id);
+      assert(
+        final_rect,
+        `Node ${node_id} does not have a bounding rect after transform`
+      );
       const final_dimensions: cmath.Rectangle = {
         x: 0,
         y: 0,
-        width: vector_node.width ?? 0,
-        height: vector_node.height ?? 0,
+        width: final_rect.width,
+        height: final_rect.height,
       };
 
       let scale: cmath.Vector2;

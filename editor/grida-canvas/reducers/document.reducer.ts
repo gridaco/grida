@@ -920,10 +920,15 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
           const node = draft.document.nodes[node_id];
-          updateNodeTransform(node, {
-            type: "resize",
-            delta: [dx, dy],
-          });
+          updateNodeTransform(
+            node,
+            {
+              type: "resize",
+              delta: [dx, dy],
+            },
+            context.geometry,
+            node_id
+          );
         }
       });
     }
@@ -1177,11 +1182,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           return updateState(state, (draft) => {
             const node = dq.__getNodeById(draft, node_id);
-            updateNodeTransform(node, {
-              type: "translate",
-              dx,
-              dy,
-            });
+            updateNodeTransform(
+              node,
+              {
+                type: "translate",
+                dx,
+                dy,
+              },
+              context.geometry,
+              node_id
+            );
           });
         }
 
@@ -1205,11 +1215,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         let i = 0;
         for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(draft, node_id);
-          updateNodeTransform(node, {
-            type: "translate",
-            dx: deltas[i].dx,
-            dy: deltas[i].dy,
-          });
+          updateNodeTransform(
+            node,
+            {
+              type: "translate",
+              dx: deltas[i].dx,
+              dy: deltas[i].dy,
+            },
+            context.geometry,
+            node_id
+          );
           i++;
         }
       });
@@ -1242,11 +1257,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         let i = 0;
         for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(draft, node_id);
-          updateNodeTransform(node, {
-            type: "translate",
-            dx: deltas[i].dx,
-            dy: deltas[i].dy,
-          });
+          updateNodeTransform(
+            node,
+            {
+              type: "translate",
+              dx: deltas[i].dx,
+              dy: deltas[i].dy,
+            },
+            context.geometry,
+            node_id
+          );
           i++;
         }
       });

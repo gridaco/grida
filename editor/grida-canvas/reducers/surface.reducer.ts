@@ -880,10 +880,11 @@ function __self_start_gesture_rotate(
     offset: cmath.Vector2;
   }
 ) {
-  const { rotation } = dq.__getNodeById(
+  const node = dq.__getNodeById(
     draft,
     selection
-  ) as grida.program.nodes.i.IRotation;
+  ) as grida.program.nodes.UnknownNodeProperties;
+  const rotation = node.rotation as number;
 
   draft.gesture = {
     type: "rotate",

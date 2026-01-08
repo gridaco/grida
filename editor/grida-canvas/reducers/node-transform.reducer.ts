@@ -1,5 +1,7 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
+import { editor } from "@/grida-canvas";
+import assert from "assert";
 
 type NodeTransformAction =
   | {
@@ -73,10 +75,14 @@ type NodeTransformAction =
  * @mutates draft
  * @param draft node
  * @param action scale, translate, resize, position
+ * @param geometry Geometry query interface for resolving node dimensions
+ * @param nodeId Node ID for geometry queries
  */
 export default function updateNodeTransform(
   draft: grida.program.nodes.Node,
-  action: NodeTransformAction
+  action: NodeTransformAction,
+  geometry: editor.api.IDocumentGeometryQuery,
+  nodeId: string
 ) {
   // Scene nodes cannot be transformed
   if (draft.type === "scene") {
@@ -199,8 +205,15 @@ export default function updateNodeTransform(
       const { delta } = action;
       const [dx, dy] = delta;
 
-      const _draft = draft as grida.program.nodes.i.IFixedDimension &
-        grida.program.nodes.i.IPositioning;
+      const _draft = draft as grida.program.nodes.i.ILayoutTrait;
+
+      // Get resolved dimensions from geometry cache
+      // This is necessary when width/height are relative (e.g., percentages, viewport units)
+      const rect = geometry.getNodeAbsoluteBoundingRect(nodeId);
+      assert(rect, `Bounding rect for node ${nodeId} must be defined`);
+
+      const currentWidth = rect.width;
+      const currentHeight = rect.height;
 
       // right, bottom
       if (_draft.right) _draft.right -= dx;
@@ -209,9 +222,9 @@ export default function updateNodeTransform(
       // size
       // For text nodes, use ceil to ensure we don't cut off content
       if (draft.type === "text") {
-        _draft.width = Math.ceil(Math.max(_draft.width + dx, 0));
+        _draft.width = Math.ceil(Math.max(currentWidth + dx, 0));
       } else {
-        _draft.width = cmath.quantize(Math.max(_draft.width + dx, 0), 1);
+        _draft.width = cmath.quantize(Math.max(currentWidth + dx, 0), 1);
       }
 
       if (draft.type === "line") {
@@ -219,9 +232,9 @@ export default function updateNodeTransform(
       } else {
         // For text nodes, use ceil to ensure we don't cut off content
         if (draft.type === "text") {
-          _draft.height = Math.ceil(Math.max(_draft.height + dy, 0));
+          _draft.height = Math.ceil(Math.max(currentHeight + dy, 0));
         } else {
-          _draft.height = cmath.quantize(Math.max(_draft.height + dy, 0), 1);
+          _draft.height = cmath.quantize(Math.max(currentHeight + dy, 0), 1);
         }
       }
       break;

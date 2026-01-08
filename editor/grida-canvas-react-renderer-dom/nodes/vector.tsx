@@ -3,6 +3,7 @@ import { svg } from "@/grida-canvas-utils/svg";
 import { useMemo } from "react";
 import queryattributes from "./utils/attributes";
 import vn from "@grida/vn";
+import { css } from "@/grida-canvas-utils/css";
 
 /**
  * @deprecated - not ready - do not use in production
@@ -20,9 +21,6 @@ export function VectorWidget({
   fill_rule,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
-  const width = Math.max(_width, 1);
-  const height = Math.max(_height, 1);
-
   const { defs: fillDefs, ref: fillDef } = fill
     ? svg.paint.defs(fill)
     : {
@@ -39,6 +37,17 @@ export function VectorWidget({
 
   const d = useMemo(() => vn.toSVGPathData(vector_network), [vector_network]);
 
+  // Calculate bounding box from vector network to use as viewBox
+  // This makes it resolution-independent and works with any CSS dimension type
+  const viewBox = useMemo(() => {
+    const bbox = vn.getBBox(vector_network);
+    // Ensure minimum dimensions to avoid division by zero
+    const minSize = 1;
+    const viewBoxWidth = Math.max(bbox.width, minSize);
+    const viewBoxHeight = Math.max(bbox.height, minSize);
+    return `${bbox.x} ${bbox.y} ${viewBoxWidth} ${viewBoxHeight}`;
+  }, [vector_network]);
+
   return (
     <svg
       {...queryattributes(props)}
@@ -46,9 +55,10 @@ export function VectorWidget({
         ...style,
         overflow: "visible",
       }}
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
+      width={css.toDimension(_width)}
+      height={css.toDimension(_height)}
+      viewBox={viewBox}
+      preserveAspectRatio="none"
     >
       {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
       {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}

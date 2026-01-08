@@ -110,6 +110,10 @@ export function on_brush(
 
   const image = draft.document.bitmaps[node.imageRef];
 
+  // Get resolved dimensions from geometry cache
+  const rect = context.geometry.getNodeAbsoluteBoundingRect(node.id);
+  assert(rect, `Bounding rect for node ${node.id} must be defined`);
+
   // set up the editor from global.
   let bme: BitmapLayerEditor;
   if (
@@ -123,8 +127,8 @@ export function on_brush(
       {
         x: nodepos[0],
         y: nodepos[1],
-        width: node.width,
-        height: node.height,
+        width: rect.width,
+        height: rect.height,
       },
       image.data,
       image.version

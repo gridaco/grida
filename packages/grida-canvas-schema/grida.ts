@@ -1502,7 +1502,7 @@ export namespace grida.program.nodes {
        * @default 0
        * @type {number} integer
        */
-      z_index: number;
+      z_index?: number;
     }
 
     /**
@@ -1859,14 +1859,6 @@ export namespace grida.program.nodes {
       target?: "_self" | "_blank" | undefined;
     }
 
-    /**
-     * does not represent any specific rule or logic, just a data structure, depends on the context
-     */
-    export interface IFixedDimension {
-      width: number;
-      height: number;
-    }
-
     export interface ICSSDimension {
       width: css.LengthPercentage | "auto";
       height: css.LengthPercentage | "auto";
@@ -2091,11 +2083,22 @@ export namespace grida.program.nodes {
     }
 
     // TODO: add layout trait
-    export interface ILayerTrait
-      extends IBlend,
-        ILayerMaskType,
-        IEffects,
-        IZIndex {}
+    export interface ILayerTrait extends IBlend, ILayerMaskType, IEffects {
+      z_index?: number;
+    }
+
+    export interface ILayoutTrait
+      extends ILayoutTargetAspectRatio,
+        IPositioning {
+      rotation: number;
+      width: css.LengthPercentage | "auto";
+      height: css.LengthPercentage | "auto";
+    }
+
+    export interface ILayoutChildTrait extends ILayoutTrait {}
+    export interface ILayoutContainerTrait
+      extends ILayoutTrait,
+        IFlexContainer {}
 
     export interface IHotspotTrait extends IHrefable, IMouseCursor {}
   }
@@ -2164,12 +2167,11 @@ export namespace grida.program.nodes {
   export interface BooleanPathOperationNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IBlend,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IExpandable,
       i.IFill<cg.Paint>,
       i.IStroke,
-      i.IRotation,
-      i.IPositioning,
       i.ICornerRadius {
     type: "boolean";
     op: cg.BooleanOperation;
@@ -2179,8 +2181,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IHotspotTrait,
-      i.ICSSStylable,
       i.ITextNodeStyle,
       i.ITextValue,
       i.ITextStroke {
@@ -2204,8 +2206,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IHotspotTrait,
-      i.ICSSStylable,
       i.IBoxFit,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
@@ -2252,11 +2254,10 @@ export namespace grida.program.nodes {
   export interface VideoNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IBlend,
-      i.ICSSStylable,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IHotspotTrait,
       i.IBoxFit,
-      i.IHrefable,
-      i.IMouseCursor,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IRectangularStrokeWidth,
@@ -2280,16 +2281,15 @@ export namespace grida.program.nodes {
   export interface ContainerNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IBlend,
-      i.ICSSStylable,
-      i.IEffects,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IHotspotTrait,
       i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IRectangularStrokeWidth,
       i.IStroke,
+      i.IFill<cg.Paint>,
       Partial<i.IPadding>,
       i.IFlexContainer {
     readonly type: "container";
@@ -2336,12 +2336,8 @@ export namespace grida.program.nodes {
   export interface BitmapNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IBlend,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IZIndex,
-      i.IRotation,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IFill<cg.Paint> {
     readonly type: "bitmap";
     readonly imageRef: string;
@@ -2353,11 +2349,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IHotspotTrait,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IRotation,
       i.ICornerRadius,
       i.IFill<cg.Paint>,
       i.IStroke {
@@ -2369,11 +2362,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IHotspotTrait,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IRotation,
       i.ICornerRadius,
       i.IFill<cg.Paint>,
       i.IStroke {
@@ -2386,11 +2376,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IHotspotTrait,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IRotation,
       i.ICornerRadius,
       i.IFill<cg.Paint>,
       i.IStroke {
@@ -2428,11 +2415,8 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.ILayerTrait,
       i.IHotspotTrait,
-      i.IPositioning,
-      i.IStroke,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IRotation {
+      i.ILayoutChildTrait,
+      i.IStroke {
     readonly type: "line";
     height: 0;
   }
@@ -2457,11 +2441,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IHotspotTrait,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke,
       i.IRectangularStrokeWidth,
@@ -2492,12 +2473,9 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IHotspotTrait,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
       i.IEllipseArcData,
-      i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke {
     type: "ellipse";
@@ -2516,6 +2494,7 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutContainerTrait,
       i.IHotspotTrait,
       i.IExpandable,
       i.ICornerRadius,
@@ -2532,8 +2511,8 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
+      i.ILayoutContainerTrait,
       i.IHotspotTrait,
-      i.IPositioning,
       i.IProperties,
       i.IProps {
     readonly type: "instance";
@@ -2889,7 +2868,6 @@ export namespace grida.program.nodes {
         rectangular_corner_radius_top_right: 0,
         rectangular_corner_radius_bottom_left: 0,
         rectangular_corner_radius_bottom_right: 0,
-        style: {},
         stroke_width: 1,
         stroke_align: "inside",
         stroke_cap: "butt",

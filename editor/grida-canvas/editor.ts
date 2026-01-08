@@ -716,8 +716,7 @@ class EditorDocumentStore
       currentColor: kolor.colorformats.RGBA32F.BLACK,
     });
     if (result) {
-      result = result as grida.program.nodes.i.IPositioning &
-        grida.program.nodes.i.IFixedDimension;
+      result = result as grida.program.nodes.i.ILayoutTrait;
 
       // Use explicit scene-level target for programmatic SVG node creation
       this.insert(

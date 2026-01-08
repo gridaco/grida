@@ -287,7 +287,6 @@ _005.definition = {
       opacity: 1,
       rotation: 0,
       position: "relative",
-      style: {},
       width: "auto",
       height: "auto",
       font_weight: 400,

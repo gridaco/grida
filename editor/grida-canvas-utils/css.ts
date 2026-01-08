@@ -265,6 +265,29 @@ export namespace css {
     }
   }
 
+  /**
+   * Converts LengthPercentage | "auto" to a numeric pixel value.
+   * Returns 0 for "auto" or non-px units (as a fallback).
+   * For percentage values, returns the percentage value (0-100).
+   */
+  export function toPxNumber(
+    value: grida.program.css.LengthPercentage | "auto"
+  ): number {
+    if (!value || value === "auto") return 0;
+    if (typeof value === "number") {
+      return value;
+    }
+    if (value.type === "length") {
+      // Only convert px units to numbers; other units default to 0
+      return value.unit === "px" ? value.value : 0;
+    }
+    if (value.type === "percentage") {
+      // For percentage, return the percentage value (0-100)
+      return value.value;
+    }
+    return 0;
+  }
+
   export function toReactCSSBorder(
     border: grida.program.css.Border
   ): Pick<React.CSSProperties, "borderStyle" | "borderColor" | "borderWidth"> {

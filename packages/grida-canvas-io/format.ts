@@ -4618,7 +4618,6 @@ export namespace format {
             expanded: false,
             opacity,
             z_index: 0,
-            style: {},
             href: undefined,
             target: undefined,
             cursor: undefined,
@@ -4762,7 +4761,6 @@ export namespace format {
             name: baseName,
             active: baseActive,
             locked: baseLocked,
-            style: {},
             opacity,
             z_index: 0,
             // fill_paints and stroke_paints from TextSpanNodeProperties
@@ -4944,16 +4942,19 @@ export namespace format {
             active: systemNode.active(),
             locked: systemNode.locked(),
             opacity,
+            z_index: 0,
             expanded: false, // IExpandable
             // fill_paints and stroke_paints from BooleanOperationNode
             ...(fillPaints ? { fill_paints: fillPaints } : {}),
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
-            // geometry via layout (IPositioning, IRotation, but not IFixedDimension)
+            // geometry via layout (IPositioning, IRotation, ILayoutTrait)
             position: layoutFields.position ?? "absolute",
             left: layoutFields.left,
             top: layoutFields.top,
             right: layoutFields.right,
             bottom: layoutFields.bottom,
+            width: layoutFields.width ?? "auto",
+            height: layoutFields.height ?? "auto",
             rotation: layoutFields.rotation ?? 0,
             op,
             corner_radius: cornerRadiusProps.corner_radius,
