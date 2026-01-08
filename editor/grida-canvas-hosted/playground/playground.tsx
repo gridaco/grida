@@ -116,6 +116,7 @@ import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provid
 import { PlaygroundMenuContent } from "./uxhost-menu";
 import { Library } from "../library/library";
 import { io } from "@grida/io";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 /**
  * Hook for accessing the playground OPFS handle.
@@ -135,6 +136,41 @@ function usePlaygroundOPFS(): io.opfs.Handle | null {
       return null;
     }
   }, []);
+}
+
+function usePlaygroundDirtyFlag(instance: Editor, enabled: boolean) {
+  const [dirty, setDirty] = useState(false);
+
+  const markSaved = useCallback(() => {
+    setDirty(false);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) {
+      // Avoid extra subscriptions/overhead in demo contexts (e.g. /home embed).
+      setDirty(false);
+      return;
+    }
+
+    // Start clean for the current session.
+    setDirty(false);
+
+    const unsubscribe = instance.doc.subscribeWithSelector(
+      (state) => state.document,
+      (_store, _next, _prev, action) => {
+        // Reset means "loaded/initialized", not a user edit.
+        if (action?.type === "document/reset") {
+          setDirty(false);
+          return;
+        }
+        setDirty(true);
+      }
+    );
+
+    return unsubscribe;
+  }, [enabled, instance]);
+
+  return { dirty, markSaved };
 }
 
 // Custom hook for managing UI layout state
@@ -232,6 +268,13 @@ export type CanvasPlaygroundProps = {
   document?: editor.state.IEditorStateInit;
   room_id?: string;
   backend?: "dom" | "canvas";
+  /**
+   * Opt-in. When enabled, warn on navigation/close if there are unsaved changes.
+   *
+   * IMPORTANT: `playground` is also used in demo contexts (e.g. /home embed),
+   * so this is intentionally off by default.
+   */
+  warnOnUnsavedChanges?: boolean;
 } & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
@@ -240,12 +283,17 @@ export default function CanvasPlayground({
   templates,
   src,
   room_id,
+  warnOnUnsavedChanges = false,
 }: CanvasPlaygroundProps) {
   const instance = useEditor(document, backend);
   useDisableSwipeBack();
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
   const opfs = usePlaygroundOPFS();
+  const { dirty, markSaved } = usePlaygroundDirtyFlag(
+    instance,
+    warnOnUnsavedChanges
+  );
   const [documentReady, setDocumentReady] = useState(() => !src);
   const [canvasReady, setCanvasReady] = useState(false);
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(
@@ -256,6 +304,13 @@ export default function CanvasPlayground({
   const handleCanvasRef = useCallback((node: HTMLCanvasElement | null) => {
     setCanvasElement(node);
   }, []);
+
+  useUnsavedChangesWarning(() => {
+    if (!warnOnUnsavedChanges) return false;
+    // Keep local dev convenient (previous behavior).
+    // if (process.env.NODE_ENV === "development") return false;
+    return dirty;
+  });
 
   useEffect(() => {
     if (backend !== "canvas") {
@@ -404,7 +459,11 @@ export default function CanvasPlayground({
                   <main className="w-full h-full select-none relative">
                     <WindowGlobalCurrentEditorProvider />
                     <UserCustomTemplatesProvider templates={templates}>
-                      <Consumer backend={backend} canvasRef={handleCanvasRef} />
+                      <Consumer
+                        backend={backend}
+                        canvasRef={handleCanvasRef}
+                        onSaved={markSaved}
+                      />
                     </UserCustomTemplatesProvider>
                   </main>
                 </SidebarProvider>
@@ -420,9 +479,11 @@ export default function CanvasPlayground({
 function Consumer({
   backend,
   canvasRef,
+  onSaved,
 }: {
   backend: "dom" | "canvas";
   canvasRef?: (canvas: HTMLCanvasElement | null) => void;
+  onSaved: () => void;
 }) {
   const {
     ui,
@@ -502,6 +563,7 @@ function Consumer({
           const document = instance.getSnapshot().document;
           const bytes = io.GRID.encode(document);
           await opfs.get("document.grida").write(bytes);
+          onSaved();
           toast.success("Saved", {
             position: "bottom-left",
           });
