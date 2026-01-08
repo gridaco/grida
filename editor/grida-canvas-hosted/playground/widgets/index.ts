@@ -186,6 +186,7 @@ export namespace prototypes {
     name: "avatar",
     layout_target_width: 48,
     layout_target_height: 48,
+    clips_content: true,
     position: "relative",
     z_index: 0,
     opacity: 1,

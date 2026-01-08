@@ -1063,6 +1063,7 @@ pub struct ContainerNodeRec {
     ///
     /// This flag is intentionally equivalent to an **overflow/content** clip.
     /// If a future “shape clip (self + children)” is added, it will be modeled as a separate attribute.
+    /// TODO: rename to clips_content
     pub clip: ContainerClipFlag,
 }
 

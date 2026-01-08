@@ -2487,6 +2487,14 @@ class EditorDocumentStore
     });
   }
 
+  changeContainerNodeClipsContent(node_id: string, clips_content: boolean) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      clips_content,
+    });
+  }
+
   changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis) {
     this.dispatch({
       type: "node/change/*",

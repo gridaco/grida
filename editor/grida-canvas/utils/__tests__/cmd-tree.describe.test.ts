@@ -24,6 +24,7 @@ describe("describeDocumentTree", () => {
         name: "HeroSection",
         active: true,
         locked: false,
+        clips_content: false,
         rotation: 0,
         z_index: 0,
         position: "absolute",

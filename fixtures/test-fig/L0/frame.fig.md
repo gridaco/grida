@@ -54,15 +54,25 @@ To distinguish a GROUP-originated FRAME from a real FRAME:
 
 The `frameMaskDisabled` property in the Kiwi schema indicates frame clipping behavior:
 
-| Property            | Regular FRAME | FRAME with clip checked | GROUP-originated FRAME |
-| ------------------- | ------------- | ----------------------- | ---------------------- |
-| `frameMaskDisabled` | `true`        | `false`                 | `false`                |
-| `resizeToFit`       | `undefined`   | `undefined`             | `true`                 |
+| Property            | Regular FRAME (no clip) | FRAME with clip enabled | GROUP-originated FRAME |
+| ------------------- | ----------------------- | ----------------------- | ---------------------- |
+| `frameMaskDisabled` | `true`                  | `false`                 | `false`                |
+| `resizeToFit`       | `undefined`             | `undefined`             | `true`                 |
 
-**Note:**
+**Semantics (verified):**
 
-- `frameMaskDisabled: true` appears to be the default for regular FRAME nodes (clipping enabled by default)
-- `frameMaskDisabled: false` is seen in both "FRAME with clip checked" and GROUP-originated FRAMEs
-- The exact meaning and relationship of `frameMaskDisabled` needs further investigation
+- `frameMaskDisabled: true` = clipping is **disabled** (no clip)
+- `frameMaskDisabled: false` = clipping is **enabled** (with clip)
+- `frameMaskDisabled: undefined` = default behavior (clipping **enabled**)
+
+**Note:** Regular FRAME nodes in Figma typically have `frameMaskDisabled: true` explicitly set (clipping disabled), but when the property is `undefined`, the default behavior is clipping enabled.
+
+**Mapping to Grida `clips_content`:**
+
+- `frameMaskDisabled: true` → `clips_content: false` (no clipping)
+- `frameMaskDisabled: false` → `clips_content: true` (with clipping)
+- `frameMaskDisabled: undefined` → `clips_content: true` (default: with clipping)
+
+**Note:** The property name is counterintuitive - `frameMaskDisabled: true` means the mask (clipping) is disabled, not that the frame is disabled.
 
 See [`docs/wg/feat-fig/glossary/fig.kiwi.md`](https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi.md) for detailed documentation.

@@ -62,12 +62,7 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { supports } from "@/grida-canvas/utils/supports";
-import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
-import { StrokeCapControl } from "./controls/stroke-cap";
-import { StrokeAlignControl } from "./controls/stroke-align";
-import { StrokeJoinControl } from "./controls/stroke-join";
-import { StrokeMiterLimitControl } from "./controls/stroke-miter-limit";
 import {
   useCurrentSceneState,
   useEditorFlagsState,
@@ -78,7 +73,7 @@ import {
   useContentEditModeMinimalState,
   useToolState,
 } from "@/grida-canvas-react/provider";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@/components/ui-editor/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
 import { Button } from "@/components/ui-editor/button";
@@ -996,6 +991,7 @@ function SectionLayout({
     main_axis_gap,
     cross_axis_gap,
     layout_wrap,
+    clips_content,
   } = useNodeState(node_id, (node) => ({
     type: node.type,
     layout: node.layout,
@@ -1005,6 +1001,7 @@ function SectionLayout({
     main_axis_gap: node.main_axis_gap,
     cross_axis_gap: node.cross_axis_gap,
     layout_wrap: node.layout_wrap,
+    clips_content: (node as grida.program.nodes.ContainerNode).clips_content,
   }));
 
   const is_container = type === "container";
@@ -1070,6 +1067,23 @@ function SectionLayout({
           />
         </PropertyRow>
         <PropertyPaddingRow node_id={node_id} />
+        {is_container && (
+          <PropertyRow className="items-center justify-start gap-2">
+            <Checkbox
+              id="control-clips_content"
+              checked={clips_content ?? false}
+              onCheckedChange={(checked) => {
+                actions.clipsContent(Boolean(checked));
+              }}
+            />
+            <PropertyLineLabel
+              htmlFor="control-clips-content"
+              className="w-auto min-w-auto text-foreground"
+            >
+              Clip content
+            </PropertyLineLabel>
+          </PropertyRow>
+        )}
       </PropertySectionContent>
     </PropertySection>
   );
@@ -1095,6 +1109,10 @@ function SectionLayoutMixed({
     main_axis_gap: node.main_axis_gap,
     cross_axis_gap: node.cross_axis_gap,
     layout_wrap: node.layout_wrap,
+    clips_content:
+      node.type === "container"
+        ? (node as grida.program.nodes.ContainerNode).clips_content
+        : undefined,
   }));
 
   const containerIds =
@@ -1232,6 +1250,33 @@ function SectionLayoutMixed({
         </PropertyRow>
 
         <PropertyPaddingRowMixed ids={ids} />
+
+        {has_container && (
+          <PropertyRow className="items-center justify-start gap-2">
+            <Checkbox
+              id="control-clips_content"
+              checked={
+                mp.clips_content?.mixed
+                  ? "indeterminate"
+                  : (mp.clips_content?.value ?? false)
+              }
+              onCheckedChange={(checked) => {
+                containerIds.forEach((id) => {
+                  instance.commands.changeContainerNodeClipsContent(
+                    id,
+                    Boolean(checked)
+                  );
+                });
+              }}
+            />
+            <PropertyLineLabel
+              htmlFor="control-clips_content"
+              className="w-auto min-w-auto text-foreground"
+            >
+              Clip content
+            </PropertyLineLabel>
+          </PropertyRow>
+        )}
       </PropertySectionContent>
     </PropertySection>
   );

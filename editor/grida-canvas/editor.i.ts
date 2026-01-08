@@ -3645,6 +3645,10 @@ export namespace editor.api {
       node_id: NodeID,
       layout: grida.program.nodes.i.IFlexContainer["layout"]
     ): void;
+    changeContainerNodeClipsContent(
+      node_id: NodeID,
+      clips_content: boolean
+    ): void;
 
     changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis): void;
     changeFlexContainerNodeMainAxisAlignment(

@@ -2312,6 +2312,7 @@ export namespace grida.program.nodes {
       i.IStroke,
       i.IFill<cg.Paint> {
     readonly type: "container";
+    clips_content: boolean;
     //
   }
 
@@ -2651,6 +2652,7 @@ export namespace grida.program.nodes {
             z_index: 0,
             rotation: 0,
             corner_radius: 0,
+            clips_content: true,
             ...factory_default_traits.DEFAULT_RECTANGULAR_CORNER_RADIUS,
             ...prototypeWithoutChildren,
             id: id,
@@ -2880,6 +2882,7 @@ export namespace grida.program.nodes {
         stroke_cap: "butt",
         stroke_join: "miter",
         stroke_miter_limit: 4,
+        clips_content: true,
         // children_refs: [],
         ...partial,
       };

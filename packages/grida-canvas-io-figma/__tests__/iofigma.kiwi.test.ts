@@ -75,7 +75,14 @@ describe("iofigma.kiwi.factory.node", () => {
 
       expect(restApiNode).toBeDefined();
       expect(restApiNode?.type).toBe("FRAME");
-      expect((restApiNode as figrest.FrameNode).clipsContent).toBe(true);
+      // frameMaskDisabled: true → clipsContent: false (no clipping)
+      // frameMaskDisabled: undefined → clipsContent: true (default, with clipping)
+      // Check based on actual value
+      if (frameNode?.frameMaskDisabled === true) {
+        expect((restApiNode as figrest.FrameNode).clipsContent).toBe(false);
+      } else {
+        expect((restApiNode as figrest.FrameNode).clipsContent).toBe(true);
+      }
       // Real FRAMEs can have fills, but this one might not
       expect(Array.isArray((restApiNode as figrest.FrameNode).fills)).toBe(
         true
@@ -150,7 +157,8 @@ describe("iofigma.kiwi.factory.node", () => {
 
       expect(restApiNode).toBeDefined();
       expect(restApiNode?.type).toBe("FRAME");
-      expect((restApiNode as figrest.FrameNode).clipsContent).toBe(true);
+      // frameMaskDisabled: true → clipsContent: false (no clipping)
+      expect((restApiNode as figrest.FrameNode).clipsContent).toBe(false);
       expect(Array.isArray((restApiNode as figrest.FrameNode).fills)).toBe(
         true
       );
@@ -274,11 +282,11 @@ describe("iofigma.kiwi.factory.node", () => {
       expect(frameWithClipRest?.type).toBe("FRAME");
       expect(groupRest?.type).toBe("GROUP");
 
-      // Regular FRAME: frameMaskDisabled=true → clipsContent=true
-      expect((regularRest as any)?.clipsContent).toBe(true);
+      // Regular FRAME: frameMaskDisabled=true → clipsContent=false (mask disabled = clipping disabled)
+      expect((regularRest as any)?.clipsContent).toBe(false);
 
-      // FRAME with clip: frameMaskDisabled=false → clipsContent=false
-      expect((frameWithClipRest as any)?.clipsContent).toBe(false);
+      // FRAME with clip: frameMaskDisabled=false → clipsContent=true (mask enabled = clipping enabled)
+      expect((frameWithClipRest as any)?.clipsContent).toBe(true);
 
       // GROUP: handled separately, always clipsContent=false
       expect((groupRest as any)?.clipsContent).toBe(false);

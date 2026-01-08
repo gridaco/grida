@@ -137,9 +137,6 @@ export default function initialNode(
         ...base,
         ...layer,
         ...layout_child,
-        style: {
-          overflow: "clip",
-        },
         fill: constraints.fill === "fill_paints" ? undefined : white,
         fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
         type: "container",
@@ -158,6 +155,7 @@ export default function initialNode(
         stroke_join: "miter",
         main_axis_gap: 0,
         cross_axis_gap: 0,
+        clips_content: true,
         ...seed,
       } satisfies grida.program.nodes.ContainerNode;
     }

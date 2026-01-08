@@ -968,6 +968,12 @@ pub struct JSONContainerNode {
     pub main_axis_gap: f32,
     #[serde(rename = "cross_axis_gap", alias = "crossAxisGap", default)]
     pub cross_axis_gap: f32,
+    #[serde(
+        rename = "clips_content",
+        alias = "clipsContent",
+        default = "default_false"
+    )]
+    pub clips_content: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1207,6 +1213,9 @@ fn default_active() -> bool {
 fn default_locked() -> bool {
     false
 }
+fn default_false() -> bool {
+    false
+}
 fn default_opacity() -> f32 {
     1.0
 }
@@ -1299,7 +1308,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 node.base.fe_noises,
             ),
             // Children populated from links after conversion
-            clip: true,
+            clip: node.clips_content,
             mask: node.base.mask.map(|m| m.into()),
             layout_container: LayoutContainerStyle {
                 layout_mode: node.layout.into(),

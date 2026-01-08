@@ -272,6 +272,8 @@ export function useNodeActions(node_id: string | undefined) {
       gap: (
         value: number | { main_axis_gap: number; cross_axis_gap: number }
       ) => instance.commands.changeFlexContainerNodeGap(node_id, value),
+      clipsContent: (value: boolean) =>
+        instance.commands.changeContainerNodeClipsContent(node_id, value),
 
       // css style
       aspectRatio: (value?: number) =>

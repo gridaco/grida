@@ -1002,6 +1002,7 @@ export namespace iofigma {
               ...corner_radius_trait({ cornerRadius: 0 }),
               ...container_layout_trait({}, false),
               type: "container",
+              clips_content: false,
             } satisfies grida.program.nodes.ContainerNode;
           }
           //
@@ -1021,6 +1022,9 @@ export namespace iofigma {
               ...container_layout_trait(node, true),
               ...effects_trait(node.effects),
               type: "container",
+              // In Figma, FRAME/COMPONENT/INSTANCE clip by default unless explicitly disabled
+              // So undefined means "use default" which is "clipping enabled" (true)
+              clips_content: node.clipsContent !== false,
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -1676,17 +1680,21 @@ export namespace iofigma {
        * HasFramePropertiesTrait - Clips content
        * Maps frameMaskDisabled to clipsContent.
        *
-       * Mapping:
-       * - frameMaskDisabled: true → clipsContent: true (mask disabled = clipping enabled)
-       * - frameMaskDisabled: false → clipsContent: false (mask enabled = clipping disabled)
-       * - frameMaskDisabled: undefined → clipsContent: false (default, no clipping)
+       * Mapping (CORRECTED based on fixture analysis):
+       * - frameMaskDisabled: true → clipsContent: false (mask disabled = clipping disabled)
+       * - frameMaskDisabled: false → clipsContent: true (mask enabled = clipping enabled)
+       * - frameMaskDisabled: undefined → clipsContent: true (default, clipping enabled - Figma frames clip by default)
        *
        * Note: This is separate from GROUP detection. GROUPs are handled separately
        * in the frame() function and always have clipsContent: false.
        */
       function kiwi_frame_clip_trait(nc: figkiwi.NodeChange) {
-        // Map frameMaskDisabled directly to clipsContent, default to false
-        const clipsContent = nc.frameMaskDisabled ?? false;
+        // Map frameMaskDisabled to clipsContent
+        // In Figma, frames clip by default unless explicitly disabled
+        // frameMaskDisabled: true means clipping is DISABLED
+        // frameMaskDisabled: false means clipping is ENABLED
+        // undefined means "use default" which is "clipping enabled" (true)
+        const clipsContent = nc.frameMaskDisabled !== true;
         return { clipsContent };
       }
 
@@ -1838,9 +1846,9 @@ export namespace iofigma {
        *
        * Figma converts GROUP nodes to FRAME nodes in both clipboard and .fig files.
        * We can detect GROUP-originated FRAMEs using:
-       * - frameMaskDisabled === false (real FRAMEs have true)
-       * - resizeToFit === true (real FRAMEs don't have this property)
-       * - No paints: fillPaints, strokePaints, and backgroundPaints are all empty/undefined
+       * - frameMaskDisabled === false (note: real FRAMEs can have either true or false, so this alone is not sufficient)
+       * - resizeToFit === true (real FRAMEs typically have undefined)
+       * - No paints: fillPaints, strokePaints, and backgroundPaints are all empty/undefined (GROUPs never have paints)
        *   (GROUPs don't have fills or strokes, so this is an additional safety check)
        *
        * See: https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi.md for detailed documentation

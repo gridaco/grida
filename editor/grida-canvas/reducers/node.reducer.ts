@@ -679,6 +679,12 @@ const safe_properties: Partial<
       (draft as UN).padding_left = value;
     },
   }),
+  clips_content: defineNodeProperty<"clips_content">({
+    assert: (node) => node.type === "container",
+    apply: (draft, value, prev) => {
+      (draft as UN).clips_content = value;
+    },
+  }),
   layout: defineNodeProperty<"layout">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {

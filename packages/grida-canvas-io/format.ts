@@ -1435,13 +1435,11 @@ export namespace format {
             fbs.ContainerNode.addCornerRadius(builder, cornerRadiusOffset);
             fbs.ContainerNode.addFillPaints(builder, fillPaintsOffset);
             fbs.ContainerNode.addStrokePaints(builder, strokePaintsOffset);
-            const containerWithClips =
-              containerNode as grida.program.nodes.ContainerNode &
-                Partial<{ clips_content: boolean }>;
+
             fbs.ContainerNode.addClipsContent(
               builder,
-              "clips_content" in containerWithClips
-                ? (containerWithClips.clips_content ?? false)
+              "clips_content" in containerNode
+                ? (containerNode.clips_content ?? false)
                 : false
             );
             nodeOffset = fbs.ContainerNode.endContainerNode(builder);
@@ -4711,7 +4709,7 @@ export namespace format {
               strokeGeometryProps.rectangular_stroke_width_bottom,
             rectangular_stroke_width_left:
               strokeGeometryProps.rectangular_stroke_width_left,
-            ...(clipsContent ? { clips_content: clipsContent } : {}),
+            clips_content: clipsContent ?? false,
             ...layoutFields,
             rotation: layoutFields.rotation ?? 0,
             ...(effects || {}),
