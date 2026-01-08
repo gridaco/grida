@@ -832,7 +832,6 @@ export namespace format {
           if (node.max_lines !== undefined && node.max_lines !== null) {
             fbs.TextSpanNodeProperties.addMaxLines(builder, node.max_lines);
           }
-          // ellipsis is not part of the TS TextNode interface yet, skip encoding
           const dataOffset =
             fbs.TextSpanNodeProperties.endTextSpanNodeProperties(builder);
           return { dataOffset };
@@ -884,28 +883,30 @@ export namespace format {
 
         // Encode effects
         let effectsOffset: flatbuffers.Offset | undefined = undefined;
+        const nodeWithEffects = node as grida.program.nodes.Node &
+          Partial<grida.program.nodes.i.IEffects>;
         if (
-          (node as any).fe_blur ||
-          (node as any).fe_backdrop_blur ||
-          (node as any).fe_shadows ||
-          (node as any).fe_liquid_glass ||
-          (node as any).fe_noises
+          nodeWithEffects.fe_blur ||
+          nodeWithEffects.fe_backdrop_blur ||
+          nodeWithEffects.fe_shadows ||
+          nodeWithEffects.fe_liquid_glass ||
+          nodeWithEffects.fe_noises
         ) {
           effectsOffset = format.effects.encode.layerEffects(builder, {
-            ...((node as any).fe_blur
-              ? { fe_blur: (node as any).fe_blur }
+            ...(nodeWithEffects.fe_blur
+              ? { fe_blur: nodeWithEffects.fe_blur }
               : {}),
-            ...((node as any).fe_backdrop_blur
-              ? { fe_backdrop_blur: (node as any).fe_backdrop_blur }
+            ...(nodeWithEffects.fe_backdrop_blur
+              ? { fe_backdrop_blur: nodeWithEffects.fe_backdrop_blur }
               : {}),
-            ...((node as any).fe_shadows
-              ? { fe_shadows: (node as any).fe_shadows }
+            ...(nodeWithEffects.fe_shadows
+              ? { fe_shadows: nodeWithEffects.fe_shadows }
               : {}),
-            ...((node as any).fe_liquid_glass
-              ? { fe_liquid_glass: (node as any).fe_liquid_glass }
+            ...(nodeWithEffects.fe_liquid_glass
+              ? { fe_liquid_glass: nodeWithEffects.fe_liquid_glass }
               : {}),
-            ...((node as any).fe_noises
-              ? { fe_noises: (node as any).fe_noises }
+            ...(nodeWithEffects.fe_noises
+              ? { fe_noises: nodeWithEffects.fe_noises }
               : {}),
           });
         }
@@ -921,7 +922,9 @@ export namespace format {
         }
 
         fbs.LayerTrait.startLayerTrait(builder);
-        fbs.LayerTrait.addOpacity(builder, (node as any).opacity ?? 1.0);
+        const nodeWithOpacity = node as grida.program.nodes.Node &
+          Partial<Pick<grida.program.nodes.UnknownNode, "opacity">>;
+        fbs.LayerTrait.addOpacity(builder, nodeWithOpacity.opacity ?? 1.0);
         fbs.LayerTrait.addBlendMode(builder, blendMode);
         fbs.LayerTrait.addMaskTypeType(
           builder,
@@ -1389,9 +1392,14 @@ export namespace format {
             fbs.ContainerNode.addCornerRadius(builder, cornerRadiusOffset);
             fbs.ContainerNode.addFillPaints(builder, fillPaintsOffset);
             fbs.ContainerNode.addStrokePaints(builder, strokePaintsOffset);
+            const containerWithClips =
+              containerNode as grida.program.nodes.ContainerNode &
+                Partial<{ clips_content: boolean }>;
             fbs.ContainerNode.addClipsContent(
               builder,
-              (containerNode as any).clips_content ?? false
+              "clips_content" in containerWithClips
+                ? (containerWithClips.clips_content ?? false)
+                : false
             );
             nodeOffset = fbs.ContainerNode.endContainerNode(builder);
             nodeType = fbs.Node.ContainerNode;
@@ -1449,11 +1457,17 @@ export namespace format {
                 stroke_cap: vectorNode.stroke_cap,
                 stroke_join: vectorNode.stroke_join,
               });
+            const vectorWithSmoothing =
+              vectorNode as grida.program.nodes.VectorNode &
+                Partial<grida.program.nodes.i.IRectangularCornerRadius>;
             const cornerRadiusOffset = format.shape.encode.cornerRadiusTrait(
               builder,
               {
                 corner_radius: vectorNode.corner_radius,
-                corner_smoothing: (vectorNode as any).corner_smoothing,
+                corner_smoothing:
+                  "corner_smoothing" in vectorWithSmoothing
+                    ? vectorWithSmoothing.corner_smoothing
+                    : undefined,
               }
             );
             const fillPaintsFiltered = vectorNode.fill_paints?.filter(isPaint);
@@ -1497,11 +1511,17 @@ export namespace format {
                 stroke_cap: booleanNode.stroke_cap,
                 stroke_join: booleanNode.stroke_join,
               });
+            const booleanWithSmoothing =
+              booleanNode as grida.program.nodes.BooleanPathOperationNode &
+                Partial<grida.program.nodes.i.IRectangularCornerRadius>;
             const cornerRadiusOffset = format.shape.encode.cornerRadiusTrait(
               builder,
               {
                 corner_radius: booleanNode.corner_radius,
-                corner_smoothing: (booleanNode as any).corner_smoothing,
+                corner_smoothing:
+                  "corner_smoothing" in booleanWithSmoothing
+                    ? booleanWithSmoothing.corner_smoothing
+                    : undefined,
               }
             );
             const fillPaintsFiltered = booleanNode.fill_paints?.filter(isPaint);
@@ -4781,11 +4801,10 @@ export namespace format {
             text_align: textAlign,
             text_align_vertical: textAlignVertical,
             ...(fontFeatures ? { font_features: fontFeatures } : {}),
-            ...(textProps?.maxLines() !== undefined
+            // Decode max_lines: treat 0 as "unset" (FlatBuffers defaults uint to 0, but 0 is invalid for max_lines)
+            // Valid values start from 1 (similar to CSS -webkit-line-clamp)
+            ...(textProps?.maxLines() !== undefined && textProps.maxLines() > 0
               ? { max_lines: textProps.maxLines() }
-              : {}),
-            ...(textProps?.ellipsis()
-              ? { ellipsis: textProps.ellipsis()! }
               : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.TextSpanNode;
@@ -5099,12 +5118,17 @@ export namespace format {
           }
 
           // Access node and layer fields from typed node (for all other node types)
-          const nodeWithLayer = typedNode as Exclude<
-            typeof typedNode,
-            fbs.SceneNode | fbs.BasicShapeNode
-          >;
-          const systemNode = (nodeWithLayer as any).node()!;
-          const layer = (nodeWithLayer as any).layer()!;
+          // All node types except SceneNode and BasicShapeNode have node() and layer() methods
+          type NodeWithLayer =
+            | fbs.ContainerNode
+            | fbs.TextSpanNode
+            | fbs.LineNode
+            | fbs.VectorNode
+            | fbs.BooleanOperationNode
+            | fbs.GroupNode;
+          const nodeWithLayer = typedNode as NodeWithLayer;
+          const systemNode = nodeWithLayer.node()!;
+          const layer = nodeWithLayer.layer()!;
 
           const idString = systemNode.id()!.id()!;
           const id = format.node.unpackId(idString);

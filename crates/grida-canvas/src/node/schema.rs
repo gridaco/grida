@@ -2170,7 +2170,10 @@ pub struct TextSpanNodeRec {
     pub text_align_vertical: TextAlignVertical,
 
     /// Maximum number of lines to render.
-    /// If `None`, the text will be rendered until the end of the text. ellipsis will be applied if the text is too long.
+    ///
+    /// - If `None`, the text will be rendered until the end of the text. Ellipsis will be applied if the text is too long.
+    /// - If `Some(0)`, this is treated as "unset" (same as `None`). This handles FlatBuffers defaults where unset `uint` fields default to `0`.
+    /// - Valid values start from `1` (similar to CSS `-webkit-line-clamp` where `0` means no limit and valid values start from `1`).
     pub max_lines: Option<usize>,
 
     /// Ellipsis text to be shown when the text is too long.

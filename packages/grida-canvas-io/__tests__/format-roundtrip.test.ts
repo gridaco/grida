@@ -1339,6 +1339,122 @@ describe("format roundtrip", () => {
 
       expect(node.opacity).toBeCloseTo(0.8, 5);
     });
+
+    it("roundtrips max_lines for TextSpanNode", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+
+      const doc = {
+        nodes: {
+          [sceneId]: {
+            type: "scene",
+            id: sceneId,
+            name: "Scene",
+            active: true,
+            locked: false,
+            guides: [],
+            edges: [],
+            constraints: { children: "multiple" },
+          },
+          [nodeId]: {
+            type: "tspan",
+            id: nodeId,
+            name: "Text",
+            active: true,
+            locked: false,
+            opacity: 1,
+            z_index: 0,
+            position: "absolute",
+            left: 0,
+            top: 0,
+            layout_target_width: 100,
+            layout_target_height: 50,
+            rotation: 0,
+            text: "This is a long text that should be truncated",
+            font_size: 14,
+            font_weight: 400,
+            font_kerning: true,
+            text_decoration_line: "none",
+            text_align: "left",
+            text_align_vertical: "top",
+            max_lines: 3,
+          } satisfies grida.program.nodes.TextSpanNode,
+        },
+        links: { [sceneId]: [nodeId] },
+        scenes_ref: [sceneId],
+        entry_scene_id: sceneId,
+        images: {},
+        bitmaps: {},
+        properties: {},
+      } satisfies grida.program.document.Document;
+
+      const bytes = format.document.encode.toFlatbuffer(doc);
+      const decoded = format.document.decode.fromFlatbuffer(bytes);
+      const node = decoded.nodes[nodeId];
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
+      node satisfies grida.program.nodes.TextSpanNode;
+
+      // max_lines should be preserved correctly after roundtrip
+      expect(node.max_lines).toBe(3);
+    });
+
+    it("roundtrips TextSpanNode without max_lines (undefined)", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+
+      const doc = {
+        nodes: {
+          [sceneId]: {
+            type: "scene",
+            id: sceneId,
+            name: "Scene",
+            active: true,
+            locked: false,
+            guides: [],
+            edges: [],
+            constraints: { children: "multiple" },
+          },
+          [nodeId]: {
+            type: "tspan",
+            id: nodeId,
+            name: "Text",
+            active: true,
+            locked: false,
+            opacity: 1,
+            z_index: 0,
+            position: "absolute",
+            left: 0,
+            top: 0,
+            layout_target_width: 100,
+            layout_target_height: 50,
+            rotation: 0,
+            text: "This is a long text",
+            font_size: 14,
+            font_weight: 400,
+            font_kerning: true,
+            text_decoration_line: "none",
+            text_align: "left",
+            text_align_vertical: "top",
+            // max_lines is intentionally not set
+          } satisfies grida.program.nodes.TextSpanNode,
+        },
+        links: { [sceneId]: [nodeId] },
+        scenes_ref: [sceneId],
+        entry_scene_id: sceneId,
+        images: {},
+        bitmaps: {},
+        properties: {},
+      } satisfies grida.program.document.Document;
+
+      const bytes = format.document.encode.toFlatbuffer(doc);
+      const decoded = format.document.decode.fromFlatbuffer(bytes);
+      const node = decoded.nodes[nodeId];
+      if (!node || node.type !== "tspan") throw new Error("Expected text node");
+      node satisfies grida.program.nodes.TextSpanNode;
+
+      // max_lines should remain undefined when not set
+      expect(node.max_lines).toBeUndefined();
+    });
   });
 
   describe("text font properties", () => {

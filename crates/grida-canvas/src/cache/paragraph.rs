@@ -241,8 +241,11 @@ impl ParagraphCache {
         paragraph_style.set_apply_rounding_hack(false);
 
         // Set max lines if specified
-        if let Some(max_lines) = max_lines {
-            paragraph_style.set_max_lines(*max_lines);
+        // Note: 0 is treated as "unset" (similar to CSS -webkit-line-clamp where 0 means no limit).
+        // This handles the case where FlatBuffers defaults uint fields to 0, which should be
+        // interpreted as "not set" rather than a valid value. Valid values start from 1.
+        if let Some(max_lines) = max_lines.filter(|&m| m > 0) {
+            paragraph_style.set_max_lines(max_lines);
             paragraph_style.set_ellipsis(ellipsis.as_ref().unwrap_or(&"...".to_string()));
         }
 
@@ -391,8 +394,12 @@ impl ParagraphCache {
         paragraph_style.set_text_align(align.clone().into());
         paragraph_style.set_apply_rounding_hack(false);
 
-        if let Some(max_lines) = max_lines {
-            paragraph_style.set_max_lines(*max_lines);
+        // Set max lines if specified
+        // Note: 0 is treated as "unset" (similar to CSS -webkit-line-clamp where 0 means no limit).
+        // This handles the case where FlatBuffers defaults uint fields to 0, which should be
+        // interpreted as "not set" rather than a valid value. Valid values start from 1.
+        if let Some(max_lines) = max_lines.filter(|&m| m > 0) {
+            paragraph_style.set_max_lines(max_lines);
             paragraph_style.set_ellipsis(ellipsis.as_ref().unwrap_or(&"...".to_string()));
         }
 
