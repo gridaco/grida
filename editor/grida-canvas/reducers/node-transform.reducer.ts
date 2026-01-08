@@ -170,7 +170,7 @@ export default function updateNodeTransform(
       const _draft = draft as grida.program.nodes.i.ICSSDimension &
         grida.program.nodes.i.IPositioning;
 
-      const heightWasNumber = typeof _draft.height === "number";
+      const heightWasNumber = typeof _draft.layout_target_height === "number";
 
       if (_draft.position === "absolute") {
         _draft.left = cmath.quantize(scaled.x, 1);
@@ -179,22 +179,28 @@ export default function updateNodeTransform(
 
       // For text nodes, use ceil to ensure we don't cut off content
       if (draft.type === "tspan") {
-        _draft.width = Math.ceil(Math.max(scaled.width, 0));
+        _draft.layout_target_width = Math.ceil(Math.max(scaled.width, 0));
       } else {
-        _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
+        _draft.layout_target_width = cmath.quantize(
+          Math.max(scaled.width, 0),
+          1
+        );
       }
 
       if (draft.type === "line") {
-        _draft.height = 0;
+        _draft.layout_target_height = 0;
       } else {
         const preserveAutoHeight =
           draft.type === "tspan" && !heightWasNumber && movement[1] === 0;
         if (!preserveAutoHeight) {
           // For text nodes, use ceil to ensure we don't cut off content
           if (draft.type === "tspan") {
-            _draft.height = Math.ceil(Math.max(scaled.height, 0));
+            _draft.layout_target_height = Math.ceil(Math.max(scaled.height, 0));
           } else {
-            _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
+            _draft.layout_target_height = cmath.quantize(
+              Math.max(scaled.height, 0),
+              1
+            );
           }
         }
       }
@@ -222,19 +228,27 @@ export default function updateNodeTransform(
       // size
       // For text nodes, use ceil to ensure we don't cut off content
       if (draft.type === "tspan") {
-        _draft.width = Math.ceil(Math.max(currentWidth + dx, 0));
+        _draft.layout_target_width = Math.ceil(Math.max(currentWidth + dx, 0));
       } else {
-        _draft.width = cmath.quantize(Math.max(currentWidth + dx, 0), 1);
+        _draft.layout_target_width = cmath.quantize(
+          Math.max(currentWidth + dx, 0),
+          1
+        );
       }
 
       if (draft.type === "line") {
-        _draft.height = 0;
+        _draft.layout_target_height = 0;
       } else {
         // For text nodes, use ceil to ensure we don't cut off content
         if (draft.type === "tspan") {
-          _draft.height = Math.ceil(Math.max(currentHeight + dy, 0));
+          _draft.layout_target_height = Math.ceil(
+            Math.max(currentHeight + dy, 0)
+          );
         } else {
-          _draft.height = cmath.quantize(Math.max(currentHeight + dy, 0), 1);
+          _draft.layout_target_height = cmath.quantize(
+            Math.max(currentHeight + dy, 0),
+            1
+          );
         }
       }
       break;

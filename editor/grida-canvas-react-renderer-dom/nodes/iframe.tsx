@@ -5,8 +5,8 @@ import { css } from "@/grida-canvas-utils/css";
 
 export const IFrameWidget = ({
   style,
-  width,
-  height,
+  layout_target_width: width,
+  layout_target_height: height,
   src,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.HTMLIFrameNode>) => {

@@ -402,8 +402,8 @@ export namespace iofigma {
           position: "absolute" as const,
           left: node.relativeTransform?.[0][2] ?? 0,
           top: node.relativeTransform?.[1][2] ?? 0,
-          width: szx,
-          height: szy,
+          layout_target_width: szx,
+          layout_target_height: szy,
           layout_target_aspect_ratio,
         };
       }
@@ -763,8 +763,8 @@ export namespace iofigma {
                 : effects_trait(undefined)),
               type: "vector",
               vector_network: vectorNetwork,
-              width: bbox.width,
-              height: bbox.height,
+              layout_target_width: bbox.width,
+              layout_target_height: bbox.height,
               fill_rule: map.windingRuleMap[geometry.windingRule] ?? "nonzero",
             };
           } catch (e) {
@@ -1080,11 +1080,11 @@ export namespace iofigma {
               top: constraints.top,
               right: constraints.right,
               bottom: constraints.bottom,
-              width:
+              layout_target_width:
                 figma_text_resizing_model === "WIDTH_AND_HEIGHT"
                   ? "auto"
                   : fixedwidth,
-              height:
+              layout_target_height:
                 figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
                 figma_text_resizing_model === "HEIGHT"
                   ? "auto"
@@ -1155,8 +1155,8 @@ export namespace iofigma {
               position: "absolute",
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: 0,
+              layout_target_width: node.size!.x,
+              layout_target_height: 0,
             } satisfies grida.program.nodes.LineNode;
           }
           case "SLICE": {

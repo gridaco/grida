@@ -1086,8 +1086,8 @@ function SectionLayoutMixed({
 
   const mp = useMixedProperties(ids, (node) => ({
     type: node.type,
-    width: node.width,
-    height: node.height,
+    width: node.layout_target_width,
+    height: node.layout_target_height,
     layout: node.layout,
     direction: node.direction,
     main_axis_alignment: node.main_axis_alignment,
@@ -1815,8 +1815,8 @@ function SectionDimension({ node_id }: { node_id: string }) {
   const { width, height, layout_target_aspect_ratio } = useNodeState(
     node_id,
     (node) => ({
-      width: node.width,
-      height: node.height,
+      width: node.layout_target_width,
+      height: node.layout_target_height,
       layout_target_aspect_ratio: node.layout_target_aspect_ratio,
     })
   );

@@ -210,8 +210,8 @@ export function on_path_pointer_down(
     const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
     node.left = new_pos[0];
     node.top = new_pos[1];
-    node.width = bb_b.width;
-    node.height = bb_b.height;
+    node.layout_target_width = bb_b.width;
+    node.layout_target_height = bb_b.height;
     node.vector_network = vne.value;
 
     if (typeof a_point !== "number") {
@@ -249,8 +249,8 @@ export function on_path_pointer_down(
       const new_pos2 = cmath.vector2.add([node.left!, node.top!], delta2);
       node.left = new_pos2[0];
       node.top = new_pos2[1];
-      node.width = bb_b2.width;
-      node.height = bb_b2.height;
+      node.layout_target_width = bb_b2.width;
+      node.layout_target_height = bb_b2.height;
       node.vector_network = vne.value;
 
       draft.content_edit_mode.selection.selected_vertices = [new_vertex_idx];
@@ -323,8 +323,8 @@ export function on_path_pointer_down(
 
   node.left = new_pos[0];
   node.top = new_pos[1];
-  node.width = bb_b.width;
-  node.height = bb_b.height;
+  node.layout_target_width = bb_b.width;
+  node.layout_target_height = bb_b.height;
 
   node.vector_network = vne.value;
   draft.content_edit_mode.selection.selected_vertices = [new_vertex_idx];
@@ -369,8 +369,8 @@ export function create_new_vector_node(
     left: 0,
     top: 0,
     opacity: 1,
-    width: 0,
-    height: 0,
+    layout_target_width: 0,
+    layout_target_height: 0,
     rotation: 0,
     z_index: 0,
     stroke: {
@@ -558,8 +558,8 @@ export function on_drag_gesture_curve(
 
   node.left = new_pos[0];
   node.top = new_pos[1];
-  node.width = bb.width;
-  node.height = bb.height;
+  node.layout_target_width = bb.width;
+  node.layout_target_height = bb.height;
 
   node.vector_network = vne.value;
 }
@@ -671,8 +671,8 @@ export function on_drag_gesture_translate_vector_controls(
   const new_pos = cmath.vector2.add(initial_position, delta);
   node.left = new_pos[0];
   node.top = new_pos[1];
-  node.width = bb_b.width;
-  node.height = bb_b.height;
+  node.layout_target_width = bb_b.width;
+  node.layout_target_height = bb_b.height;
 
   node.vector_network = vne.value;
 }
@@ -698,8 +698,8 @@ export function on_draw_pointer_down(
     left: 0,
     top: 0,
     opacity: 1,
-    width: 0,
-    height: 0,
+    layout_target_width: 0,
+    layout_target_height: 0,
     rotation: 0,
     z_index: 0,
     stroke: {
@@ -708,7 +708,7 @@ export function on_draw_pointer_down(
       active: true,
     },
     stroke_cap: "butt",
-  } as const;
+  } satisfies Partial<grida.program.nodes.UnknwonNode>;
 
   switch (tool) {
     case "pencil": {
@@ -838,8 +838,8 @@ export function on_drag_gesture_draw(
   const new_pos = cmath.vector2.add(origin, snapped_offset);
   node.left = new_pos[0];
   node.top = new_pos[1];
-  node.width = bb.width;
-  node.height = bb.height;
+  node.layout_target_width = bb.width;
+  node.layout_target_height = bb.height;
   node.vector_network = vne.value;
 }
 

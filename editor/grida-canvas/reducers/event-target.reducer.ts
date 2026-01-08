@@ -163,8 +163,9 @@ function __self_evt_on_click(
         // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
         const center_translate_delta: cmath.Vector2 =
           // (if width and height is fixed number) - can be 'auto' for text node
-          typeof _nnode.width === "number" && typeof _nnode.height === "number"
-            ? [_nnode.width / 2, _nnode.height / 2]
+          typeof _nnode.layout_target_width === "number" &&
+          typeof _nnode.layout_target_height === "number"
+            ? [_nnode.layout_target_width / 2, _nnode.layout_target_height / 2]
             : [0, 0];
 
         const nnode_relative_position = cmath.vector2.quantize(
@@ -471,8 +472,8 @@ function __self_evt_on_drag_start(
         {
           left: initial_rect.x,
           top: initial_rect.y,
-          width: initial_rect.width,
-          height: initial_rect.height as 0, // casting for line node
+          layout_target_width: initial_rect.width,
+          layout_target_height: initial_rect.height as 0, // casting for line node
         },
         context.paint_constraints
       );
@@ -743,9 +744,12 @@ function __self_evt_on_drag(
         let fixed_width: number | undefined;
         let fixed_height: number | undefined;
 
-        if ("width" in node && "height" in node) {
-          const width = node.width;
-          const height = node.height;
+        if (
+          grida.program.nodes.hasLayoutWidth(node) &&
+          grida.program.nodes.hasLayoutHeight(node)
+        ) {
+          const width = node.layout_target_width;
+          const height = node.layout_target_height;
           if (typeof width === "number" && typeof height === "number") {
             fixed_width = width;
             fixed_height = height;

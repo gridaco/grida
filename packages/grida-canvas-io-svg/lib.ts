@@ -247,8 +247,8 @@ export namespace iosvg {
           stroke_join,
           stroke_miter_limit,
           stroke_dash_array,
-          width: bbox.width,
-          height: bbox.height,
+          layout_target_width: bbox.width,
+          layout_target_height: bbox.height,
           left: position.left,
           top: position.top,
           fill_rule: fill_rule,
@@ -297,8 +297,8 @@ export namespace iosvg {
       position: "absolute",
       left: 0,
       top: 0,
-      width: width,
-      height: height,
+      layout_target_width: width,
+      layout_target_height: height,
       children: convertedChildren,
     } satisfies grida.program.nodes.ContainerNodePrototype;
   }

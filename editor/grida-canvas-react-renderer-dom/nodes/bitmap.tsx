@@ -6,8 +6,8 @@ import { css } from "@/grida-canvas-utils/css";
 
 export const BitmapWidget = ({
   context,
-  width,
-  height,
+  layout_target_width: width,
+  layout_target_height: height,
   imageRef,
   style,
   ...props

@@ -721,8 +721,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           left: 0,
           top: 0,
           opacity: 1,
-          width: 0,
-          height: 0,
+          layout_target_width: 0,
+          layout_target_height: 0,
           rotation: 0,
           z_index: 0,
           stroke: { type: "solid", color: black, active: true },
@@ -1395,8 +1395,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               type: "container",
               // layout
               layout: "flex",
-              width: "auto",
-              height: "auto",
+              layout_target_width: "auto",
+              layout_target_height: "auto",
               top: cmath.quantize(layout.union.y, 1),
               left: cmath.quantize(layout.union.x, 1),
               direction: layout.direction,
@@ -2225,8 +2225,8 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
     vector_network: union_net,
     left: 0,
     top: 0,
-    width: 0,
-    height: 0,
+    layout_target_width: 0,
+    layout_target_height: 0,
   };
 
   normalizeVectorNodeBBox(node);

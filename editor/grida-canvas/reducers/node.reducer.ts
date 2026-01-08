@@ -199,21 +199,21 @@ const safe_properties: Partial<
       (draft as UN).bottom = value;
     },
   }),
-  width: defineNodeProperty<"width">({
+  layout_target_width: defineNodeProperty<"layout_target_width">({
     apply: (draft, value, prev) => {
       if (typeof value === "number") {
-        draft.width = ranged(0, value);
+        draft.layout_target_width = ranged(0, value);
       } else {
-        (draft as UN).width = value;
+        (draft as UN).layout_target_width = value;
       }
     },
   }),
-  height: defineNodeProperty<"height">({
+  layout_target_height: defineNodeProperty<"layout_target_height">({
     apply: (draft, value, prev) => {
       if (typeof value === "number") {
-        draft.height = ranged(0, value);
+        draft.layout_target_height = ranged(0, value);
       } else {
-        (draft as UN).height = value;
+        (draft as UN).layout_target_height = value;
       }
     },
   }),

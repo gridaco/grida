@@ -745,8 +745,8 @@ class EditorDocumentStore
           type: "image",
           _$id: id,
           src: image.url,
-          width: image.width,
-          height: image.height,
+          layout_target_width: image.width,
+          layout_target_height: image.height,
         },
       },
       this.mstate.scene_id ?? null
@@ -768,8 +768,8 @@ class EditorDocumentStore
           type: "tspan",
           _$id: id,
           text: text,
-          width: "auto",
-          height: "auto",
+          layout_target_width: "auto",
+          layout_target_height: "auto",
           fill: {
             type: "solid",
             color: kolor.colorformats.RGBA32F.BLACK,
@@ -792,8 +792,8 @@ class EditorDocumentStore
         prototype: {
           type: "rectangle",
           _$id: id,
-          width: 100,
-          height: 100,
+          layout_target_width: 100,
+          layout_target_height: 100,
           fill: {
             type: "solid",
             color: kolor.colorformats.RGBA32F.BLACK,
@@ -1732,11 +1732,24 @@ class EditorDocumentStore
     axis: "width" | "height",
     value: grida.program.css.LengthPercentage | "auto"
   ) {
-    this.dispatch({
-      type: "node/change/*",
-      node_id: node_id,
-      [axis]: value,
-    });
+    switch (axis) {
+      case "width": {
+        this.dispatch({
+          type: "node/change/*",
+          node_id: node_id,
+          layout_target_width: value,
+        });
+        break;
+      }
+      case "height": {
+        this.dispatch({
+          type: "node/change/*",
+          node_id: node_id,
+          layout_target_height: value,
+        });
+        break;
+      }
+    }
   }
 
   changeNodePropertyFills(node_id: string | string[], fills: cg.Paint[]) {

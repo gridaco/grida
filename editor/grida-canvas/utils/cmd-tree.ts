@@ -229,15 +229,15 @@ function nodeMetadata(node: Node): string[] {
       return textMetadata(node);
     case "polygon": {
       const metadata = defaultMetadata(node);
-      const sides = readNumber(node, "pointCount");
+      const sides = readNumber(node, "point_count");
       if (sides !== undefined) metadata.push(`sides=${formatNumber(sides)}`);
       return metadata;
     }
     case "star": {
       const metadata = defaultMetadata(node);
-      const sides = readNumber(node, "pointCount");
+      const sides = readNumber(node, "point_count");
       if (sides !== undefined) metadata.push(`sides=${formatNumber(sides)}`);
-      const inner = readNumber(node, "innerRadius");
+      const inner = readNumber(node, "inner_radius");
       if (inner !== undefined) metadata.push(`inner=${formatNumber(inner)}`);
       return metadata;
     }
@@ -251,14 +251,14 @@ function textMetadata(node: Node): string[] {
   const text = extractText(node);
   if (text) meta.push(`"${text}"`);
 
-  const font = readString(node, "fontFamily");
+  const font = readString(node, "font_family");
   if (font) meta.push(`font=${font}`);
 
-  const size = readNumber(node, "fontSize");
+  const size = readNumber(node, "font_size");
   if (size !== undefined) meta.push(`size=${formatNumber(size)}`);
 
   const weight =
-    readString(node, "fontWeight") ?? readNumber(node, "fontWeight");
+    readString(node, "font_weight") ?? readNumber(node, "font_weight");
   if (weight !== undefined) meta.push(`weight=${weight}`);
 
   return meta;
@@ -266,8 +266,8 @@ function textMetadata(node: Node): string[] {
 
 function defaultMetadata(node: Node): string[] {
   const meta: string[] = [];
-  const width = readNumber(node, "width");
-  const height = readNumber(node, "height");
+  const width = readNumber(node, "layout_target_width");
+  const height = readNumber(node, "layout_target_height");
   if (width !== undefined && height !== undefined) {
     meta.push(`[${formatNumber(width)}×${formatNumber(height)}]`);
   }
@@ -318,7 +318,7 @@ function resolvePaint(node: Node): any | null {
 }
 
 function formatCornerRadius(node: Node): string | null {
-  const uniform = readNumber(node, "cornerRadius");
+  const uniform = readNumber(node, "corner_radius");
   if (uniform !== undefined && uniform > 0) {
     return `radius=${formatNumber(uniform)}`;
   }
@@ -332,6 +332,9 @@ function formatCornerRadius(node: Node): string | null {
 
   const defined = corners.filter((value) => value !== undefined);
   if (!defined.length) return null;
+
+  // If all defined values are 0, omit radius
+  if (defined.every((value) => value === 0)) return null;
 
   if (defined.every((value) => value === defined[0])) {
     return `radius=${formatNumber(defined[0]!)}`;
@@ -392,12 +395,18 @@ function toHex(value: number): string {
   return value.toString(16).padStart(2, "0").toUpperCase();
 }
 
-function readNumber(node: Node, key: string): number | undefined {
+function readNumber(
+  node: Node,
+  key: keyof grida.program.nodes.UnknwonNode
+): number | undefined {
   const value = (node as any)[key];
   return typeof value === "number" ? value : undefined;
 }
 
-function readString(node: Node, key: string): string | undefined {
+function readString(
+  node: Node,
+  key: keyof grida.program.nodes.UnknwonNode
+): string | undefined {
   const value = (node as any)[key];
   return typeof value === "string" && value.length ? value : undefined;
 }

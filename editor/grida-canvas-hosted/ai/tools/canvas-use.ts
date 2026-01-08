@@ -328,8 +328,8 @@ export namespace canvas_use {
           const node = editor.commands.createRectangleNode();
           node.$.position = "absolute";
           node.$.name = params.name || "image";
-          node.$.width = params.width || image_ref.width;
-          node.$.height = params.height || image_ref.height;
+          node.$.layout_target_width = params.width || image_ref.width;
+          node.$.layout_target_height = params.height || image_ref.height;
           node.$.fill_paints = [
             {
               type: "image",

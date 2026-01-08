@@ -6,8 +6,8 @@ import { css } from "@/grida-canvas-utils/css";
 export const ImageWidget = ({
   src,
   alt,
-  width,
-  height,
+  layout_target_width: width,
+  layout_target_height: height,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.ImageNode>) => {

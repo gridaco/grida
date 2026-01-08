@@ -121,8 +121,8 @@ export function self_updateVectorNodeVectorNetwork<R>(
 
   node.left = new_pos[0];
   node.top = new_pos[1];
-  node.width = bb_b.width;
-  node.height = bb_b.height;
+  node.layout_target_width = bb_b.width;
+  node.layout_target_height = bb_b.height;
 
   node.vector_network = vne.value;
 
@@ -150,8 +150,8 @@ export function normalizeVectorNodeBBox(
 
   node.left = (node.left ?? 0) + delta[0];
   node.top = (node.top ?? 0) + delta[1];
-  node.width = bb.width;
-  node.height = bb.height;
+  node.layout_target_width = bb.width;
+  node.layout_target_height = bb.height;
   node.vector_network = vne.value;
 
   return delta;

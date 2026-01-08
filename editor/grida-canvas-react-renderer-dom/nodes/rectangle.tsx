@@ -6,8 +6,8 @@ import { useMemo } from "react";
 
 export function RectangleWidget({
   style,
-  width,
-  height,
+  layout_target_width: width,
+  layout_target_height: height,
   fill,
   stroke,
   stroke_width,

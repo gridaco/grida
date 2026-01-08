@@ -1386,6 +1386,18 @@ export namespace grida.program.nodes {
     return "children" in prototype && Array.isArray(prototype.children);
   }
 
+  export function hasLayoutWidth(node: Node): node is Node & {
+    layout_target_width: UnknwonNode["layout_target_width"];
+  } {
+    return "layout_target_width" in node;
+  }
+
+  export function hasLayoutHeight(node: Node): node is Node & {
+    layout_target_height: UnknwonNode["layout_target_height"];
+  } {
+    return "layout_target_height" in node;
+  }
+
   // #endregion node prototypes
 
   /**
@@ -1860,8 +1872,8 @@ export namespace grida.program.nodes {
     }
 
     export interface ICSSDimension {
-      width: css.LengthPercentage | "auto";
-      height: css.LengthPercentage | "auto";
+      layout_target_width: css.LengthPercentage | "auto";
+      layout_target_height: css.LengthPercentage | "auto";
     }
 
     /**
@@ -2099,8 +2111,8 @@ export namespace grida.program.nodes {
       extends ILayoutTargetAspectRatio,
         IPositioning {
       rotation: number;
-      width: css.LengthPercentage | "auto";
-      height: css.LengthPercentage | "auto";
+      layout_target_width: css.LengthPercentage | "auto";
+      layout_target_height: css.LengthPercentage | "auto";
     }
 
     export interface ILayoutChildTrait extends ILayoutTrait {}
@@ -2419,7 +2431,6 @@ export namespace grida.program.nodes {
       i.ILayoutChildTrait,
       i.IStroke {
     readonly type: "line";
-    height: 0;
   }
 
   export interface ComputedLineNode extends LineNode {
@@ -2571,8 +2582,8 @@ export namespace grida.program.nodes {
         props: {},
         overrides: cloneWithUndefinedValues(nodes),
         template_id: def.name,
-        width: "auto",
-        height: "auto",
+        layout_target_width: "auto",
+        layout_target_height: "auto",
         ...seed,
       };
       //
@@ -2614,8 +2625,8 @@ export namespace grida.program.nodes {
             blend_mode: cg.def.LAYER_BLENDMODE,
             z_index: 0,
             rotation: 0,
-            width: 0,
-            height: 0,
+            layout_target_width: 0,
+            layout_target_height: 0,
             position: "absolute",
             top: 0,
             left: 0,
@@ -2688,8 +2699,8 @@ export namespace grida.program.nodes {
             opacity: 1,
             z_index: 0,
             rotation: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             position: "absolute",
             ...prototype,
             id: id,
@@ -2857,8 +2868,8 @@ export namespace grida.program.nodes {
         padding_right: 0,
         padding_bottom: 0,
         padding_left: 0,
-        width: 100,
-        height: 100,
+        layout_target_width: 100,
+        layout_target_height: 100,
         corner_radius: 0,
         rectangular_corner_radius_top_left: 0,
         rectangular_corner_radius_top_right: 0,

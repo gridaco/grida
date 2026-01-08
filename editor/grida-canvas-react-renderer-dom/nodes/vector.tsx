@@ -10,8 +10,8 @@ import { css } from "@/grida-canvas-utils/css";
  * @returns
  */
 export function VectorWidget({
-  width: _width,
-  height: _height,
+  layout_target_width: _width,
+  layout_target_height: _height,
   fill,
   stroke,
   stroke_width,

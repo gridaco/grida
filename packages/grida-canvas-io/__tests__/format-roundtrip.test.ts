@@ -32,8 +32,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -89,8 +89,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             right: 12,
             bottom: 34,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -146,8 +146,8 @@ describe("format roundtrip", () => {
             position: "relative",
             left: 5,
             top: 10,
-            width: 50,
-            height: 50,
+            layout_target_width: 50,
+            layout_target_height: 50,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -201,8 +201,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: "auto",
-            height: "auto",
+            layout_target_width: "auto",
+            layout_target_height: "auto",
             rotation: 0,
             text: null,
             font_size: 14,
@@ -227,8 +227,8 @@ describe("format roundtrip", () => {
       if (!node || node.type !== "tspan") throw new Error("Expected text node");
       node satisfies grida.program.nodes.TextSpanNode;
 
-      expect(node.width).toBe("auto");
-      expect(node.height).toBe("auto");
+      expect(node.layout_target_width).toBe("auto");
+      expect(node.layout_target_height).toBe("auto");
     });
 
     it("roundtrips px width/height", () => {
@@ -258,8 +258,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -281,8 +281,8 @@ describe("format roundtrip", () => {
         throw new Error("Expected rectangle node");
       node satisfies grida.program.nodes.RectangleNode;
 
-      expect(node.width).toBe(100);
-      expect(node.height).toBe(200);
+      expect(node.layout_target_width).toBe(100);
+      expect(node.layout_target_height).toBe(200);
     });
 
     it("roundtrips percentage width/height (ContainerNode supports percentage)", () => {
@@ -301,8 +301,8 @@ describe("format roundtrip", () => {
         position: "absolute",
         left: 0,
         top: 0,
-        width: { type: "percentage" as const, value: 50 },
-        height: { type: "percentage" as const, value: 75 },
+        layout_target_width: { type: "percentage" as const, value: 50 },
+        layout_target_height: { type: "percentage" as const, value: 75 },
         rotation: 0,
         layout: "flow" as const,
         direction: "horizontal" as const,
@@ -347,8 +347,14 @@ describe("format roundtrip", () => {
         throw new Error("Expected container node");
       node satisfies grida.program.nodes.ContainerNode;
 
-      expect(node.width).toEqual({ type: "percentage", value: 50 });
-      expect(node.height).toEqual({ type: "percentage", value: 75 });
+      expect(node.layout_target_width).toEqual({
+        type: "percentage",
+        value: 50,
+      });
+      expect(node.layout_target_height).toEqual({
+        type: "percentage",
+        value: 75,
+      });
     });
   });
 
@@ -545,8 +551,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 45,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -574,8 +580,8 @@ describe("format roundtrip", () => {
       expect(node.locked).toBe(false);
       expect(node.left).toBe(10);
       expect(node.top).toBe(20);
-      expect(node.width).toBe(100);
-      expect(node.height).toBe(200);
+      expect(node.layout_target_width).toBe(100);
+      expect(node.layout_target_height).toBe(200);
       expect(node.rotation).toBe(45);
       // Note: opacity, z_index, stroke properties are not currently decoded from node data
     });
@@ -607,8 +613,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 200,
-            height: 50,
+            layout_target_width: 200,
+            layout_target_height: 50,
             rotation: 0,
             text: null,
             font_size: 14,
@@ -637,8 +643,8 @@ describe("format roundtrip", () => {
       expect(node.name).toBe("Text");
       expect(node.active).toBe(true);
       expect(node.locked).toBe(false);
-      expect(node.width).toBe(200);
-      expect(node.height).toBe(50);
+      expect(node.layout_target_width).toBe(200);
+      expect(node.layout_target_height).toBe(50);
       // Note: text content, font properties, text alignment are not currently decoded from TextSpanNodeProperties
     });
 
@@ -669,8 +675,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 400,
-            height: 300,
+            layout_target_width: 400,
+            layout_target_height: 300,
             rotation: 0,
             layout: "flex",
             direction: "horizontal",
@@ -885,8 +891,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             fit,
           } satisfies grida.program.nodes.ImageNode,
@@ -988,8 +994,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 45.5,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -1048,8 +1054,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             layout: "flex" as const,
             direction: "horizontal" as const,
@@ -1117,8 +1123,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 30,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -1135,8 +1141,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             right: 12,
             bottom: 34,
-            width: "auto",
-            height: "auto",
+            layout_target_width: "auto",
+            layout_target_height: "auto",
             rotation: 5,
             text: null,
             font_size: 14,
@@ -1157,8 +1163,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 1,
             top: 2,
-            width: { type: "percentage" as const, value: 50 },
-            height: 100,
+            layout_target_width: { type: "percentage" as const, value: 50 },
+            layout_target_height: 100,
             rotation: 0,
             layout: "flex" as const,
             direction: "vertical" as const,
@@ -1252,8 +1258,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -1305,8 +1311,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 50,
+            layout_target_width: 100,
+            layout_target_height: 50,
             rotation: 0,
             text: "Test",
             font_size: 14,
@@ -1363,8 +1369,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 50,
+            layout_target_width: 100,
+            layout_target_height: 50,
             rotation: 0,
             text: "Test",
             font_size: 24,
@@ -1419,8 +1425,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 50,
+            layout_target_width: 100,
+            layout_target_height: 50,
             rotation: 0,
             text: "Test",
             font_size: 14,
@@ -1475,8 +1481,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 50,
+            layout_target_width: 100,
+            layout_target_height: 50,
             rotation: 0,
             text: "Test",
             font_size: 14,
@@ -1531,8 +1537,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 50,
+            layout_target_width: 100,
+            layout_target_height: 50,
             rotation: 0,
             text: "Test",
             font_size: 18,
@@ -1590,8 +1596,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 80,
+            layout_target_width: 100,
+            layout_target_height: 80,
             rotation: 0,
             angle_offset: 0,
             angle: 360,
@@ -1618,8 +1624,8 @@ describe("format roundtrip", () => {
 
       expect(node.type).toBe("ellipse");
       expect(node.name).toBe("Ellipse");
-      expect(node.width).toBe(100);
-      expect(node.height).toBe(80);
+      expect(node.layout_target_width).toBe(100);
+      expect(node.layout_target_height).toBe(80);
       expect(node.angle_offset).toBe(0);
       expect(node.angle).toBe(360);
       expect(node.inner_radius).toBe(0);
@@ -1655,8 +1661,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 80,
+            layout_target_width: 100,
+            layout_target_height: 80,
             rotation: 0,
             angle_offset: 45, // Non-default: 45 degrees
             angle: 180, // Non-default: half circle
@@ -1683,8 +1689,8 @@ describe("format roundtrip", () => {
 
       expect(node.type).toBe("ellipse");
       expect(node.name).toBe("Ellipse Arc");
-      expect(node.width).toBe(100);
-      expect(node.height).toBe(80);
+      expect(node.layout_target_width).toBe(100);
+      expect(node.layout_target_height).toBe(80);
       // Verify arc data is preserved
       expect(node.angle_offset).toBe(45);
       expect(node.angle).toBe(180);
@@ -1721,8 +1727,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 80,
+            layout_target_width: 100,
+            layout_target_height: 80,
             rotation: 0,
             angle_offset: 0,
             angle: 0, // Explicit zero (should be preserved)
@@ -1782,8 +1788,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 200,
-            height: 0,
+            layout_target_width: 200,
+            layout_target_height: 0,
             rotation: 45,
             stroke_width: 3,
             stroke_cap: "square",
@@ -1806,8 +1812,8 @@ describe("format roundtrip", () => {
 
       expect(node.type).toBe("line");
       expect(node.name).toBe("Line");
-      expect(node.width).toBe(200);
-      expect(node.height).toBe(0);
+      expect(node.layout_target_width).toBe(200);
+      expect(node.layout_target_height).toBe(0);
       expect(node.rotation).toBe(45);
       expect(node.stroke_width).toBe(3);
       expect(node.stroke_cap).toBe("square");
@@ -1841,8 +1847,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 150,
-            height: 150,
+            layout_target_width: 150,
+            layout_target_height: 150,
             rotation: 0,
             corner_radius: 5,
             stroke_width: 1,
@@ -1881,8 +1887,8 @@ describe("format roundtrip", () => {
 
       expect(node.type).toBe("vector");
       expect(node.name).toBe("Vector");
-      expect(node.width).toBe(150);
-      expect(node.height).toBe(150);
+      expect(node.layout_target_width).toBe(150);
+      expect(node.layout_target_height).toBe(150);
       expect(node.corner_radius).toBe(5);
       expect(node.stroke_width).toBe(1);
       // Verify vector_network roundtrip
@@ -1933,8 +1939,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             op: "difference",
             corner_radius: 0,
@@ -1993,8 +1999,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             point_count: 6,
             corner_radius: 2,
@@ -2020,8 +2026,8 @@ describe("format roundtrip", () => {
 
       expect(node.type).toBe("polygon");
       expect(node.name).toBe("Polygon");
-      expect(node.width).toBe(100);
-      expect(node.height).toBe(100);
+      expect(node.layout_target_width).toBe(100);
+      expect(node.layout_target_height).toBe(100);
       expect(node.point_count).toBe(6);
       expect(node.corner_radius).toBe(2);
       expect(node.stroke_width).toBe(1);
@@ -2054,8 +2060,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 120,
-            height: 120,
+            layout_target_width: 120,
+            layout_target_height: 120,
             rotation: 0,
             point_count: 5,
             inner_radius: 0.4,
@@ -2081,8 +2087,8 @@ describe("format roundtrip", () => {
 
       expect(node.type).toBe("star");
       expect(node.name).toBe("Star");
-      expect(node.width).toBe(120);
-      expect(node.height).toBe(120);
+      expect(node.layout_target_width).toBe(120);
+      expect(node.layout_target_height).toBe(120);
       expect(node.point_count).toBe(5);
       expect(node.inner_radius).toBeCloseTo(0.4, 5);
       expect(node.corner_radius).toBe(1);
@@ -2118,8 +2124,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -2191,8 +2197,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -2278,8 +2284,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -2373,8 +2379,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -2462,8 +2468,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -2560,8 +2566,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -2619,8 +2625,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             layout: "flow",
             direction: "horizontal",
@@ -2721,8 +2727,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 2,
             stroke_cap: "butt",
@@ -2794,8 +2800,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 10,
             top: 20,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 3,
             stroke_cap: "round",
@@ -2883,8 +2889,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             angle_offset: 0,
             angle: 0,
@@ -2975,8 +2981,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             corner_radius: 0,
             stroke_width: 2,
@@ -3079,8 +3085,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             op: "union",
             corner_radius: 0,
@@ -3173,8 +3179,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             layout: "flow",
             direction: "horizontal",
@@ -3273,8 +3279,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             layout: "flow",
             direction: "horizontal",
@@ -3347,8 +3353,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -3411,8 +3417,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             layout: "flow",
             direction: "horizontal",
@@ -3505,8 +3511,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 200,
+            layout_target_width: 100,
+            layout_target_height: 200,
             rotation: 0,
             stroke_width: 0,
             stroke_cap: "butt",
@@ -3571,8 +3577,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             layout: "flow",
             direction: "horizontal",
@@ -3653,8 +3659,8 @@ describe("format roundtrip", () => {
             position: "absolute",
             left: 0,
             top: 0,
-            width: 100,
-            height: 100,
+            layout_target_width: 100,
+            layout_target_height: 100,
             rotation: 0,
             layout: "flow",
             direction: "horizontal",

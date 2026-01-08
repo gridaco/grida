@@ -69,8 +69,8 @@ export namespace css {
       left,
       bottom,
       right,
-      width,
-      height,
+      layout_target_width: width,
+      layout_target_height: height,
       z_index,
       opacity,
       blend_mode,
@@ -271,21 +271,18 @@ export namespace css {
    * For percentage values, returns the percentage value (0-100).
    */
   export function toPxNumber(
-    value: grida.program.css.LengthPercentage | "auto"
+    value: grida.program.css.LengthPercentage | "auto",
+    fallback = 0
   ): number {
-    if (!value || value === "auto") return 0;
+    if (!value || value === "auto") return fallback;
     if (typeof value === "number") {
       return value;
     }
     if (value.type === "length") {
       // Only convert px units to numbers; other units default to 0
-      return value.unit === "px" ? value.value : 0;
+      return value.unit === "px" ? value.value : fallback;
     }
-    if (value.type === "percentage") {
-      // For percentage, return the percentage value (0-100)
-      return value.value;
-    }
-    return 0;
+    return fallback;
   }
 
   export function toReactCSSBorder(

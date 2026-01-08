@@ -67,8 +67,8 @@ export function useInsertFile() {
       node.$.name = name;
       node.$.left = x;
       node.$.top = y;
-      node.$.width = image.width;
-      node.$.height = image.height;
+      node.$.layout_target_width = image.width;
+      node.$.layout_target_height = image.height;
       node.$.fill_paints = [
         {
           type: "image",
@@ -97,13 +97,15 @@ export function useInsertFile() {
       const node = await instance.commands.createNodeFromSvg(svg);
 
       const center_dx =
-        typeof node.$.width === "number" && node.$.width > 0
-          ? node.$.width / 2
+        typeof node.$.layout_target_width === "number" &&
+        node.$.layout_target_width > 0
+          ? node.$.layout_target_width / 2
           : 0;
 
       const center_dy =
-        typeof node.$.height === "number" && node.$.height > 0
-          ? node.$.height / 2
+        typeof node.$.layout_target_height === "number" &&
+        node.$.layout_target_height > 0
+          ? node.$.layout_target_height / 2
           : 0;
 
       const [x, y] = instance.camera.clientPointToCanvasPoint(
@@ -561,8 +563,8 @@ export function useDataTransferEventTarget() {
               node.$.name = name || "Photo";
               node.$.left = x;
               node.$.top = y;
-              node.$.width = width || imageRef.width;
-              node.$.height = height || imageRef.height;
+              node.$.layout_target_width = width || imageRef.width;
+              node.$.layout_target_height = height || imageRef.height;
               node.$.fill_paints = [
                 {
                   type: "image",

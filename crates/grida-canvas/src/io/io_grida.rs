@@ -733,13 +733,15 @@ pub struct JSONUnknownNodeProperties {
     pub style: Option<HashMap<String, serde_json::Value>>,
     // geometry - defaults to 0 for non-intrinsic size nodes
     #[serde(
-        rename = "width",
+        rename = "layout_target_width",
+        alias = "width",
         default = "default_width_css",
         deserialize_with = "de_css_dimension"
     )]
     pub width: CSSDimension,
     #[serde(
-        rename = "height",
+        rename = "layout_target_height",
+        alias = "height",
         default = "default_height_css",
         deserialize_with = "de_css_dimension"
     )]

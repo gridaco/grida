@@ -2600,8 +2600,14 @@ export namespace format {
             | grida.program.nodes.RegularPolygonNode
             | grida.program.nodes.RegularStarPolygonNode
         ): { type: fbs.CanonicalLayerShape; offset: flatbuffers.Offset } {
-          const width = typeof node.width === "number" ? node.width : 0;
-          const height = typeof node.height === "number" ? node.height : 0;
+          const width =
+            typeof node.layout_target_width === "number"
+              ? node.layout_target_width
+              : 0;
+          const height =
+            typeof node.layout_target_height === "number"
+              ? node.layout_target_height
+              : 0;
 
           switch (nodeType) {
             case "rectangle":
@@ -3771,8 +3777,8 @@ export namespace format {
           | "top"
           | "right"
           | "bottom"
-          | "width"
-          | "height"
+          | "layout_target_width"
+          | "layout_target_height"
           | "rotation"
         > &
           Partial<
@@ -3811,8 +3817,8 @@ export namespace format {
         // Encode dimensions
         const dimensionsOffset = dimensions(
           builder,
-          node.width ?? "auto",
-          node.height ?? "auto"
+          node.layout_target_width ?? "auto",
+          node.layout_target_height ?? "auto"
         );
 
         // Encode container style (optional)
@@ -4031,8 +4037,8 @@ export namespace format {
           top,
           right,
           bottom,
-          width,
-          height,
+          layout_target_width: width,
+          layout_target_height: height,
           rotation: layout.rotation(),
           ...containerFields,
         };
@@ -4108,11 +4114,11 @@ export namespace format {
           let layoutOffset: number | undefined = undefined;
           if (
             "position" in node &&
-            "width" in node &&
-            "height" in node &&
+            "layout_target_width" in node &&
+            "layout_target_height" in node &&
             node.position &&
-            node.width !== undefined &&
-            node.height !== undefined
+            node.layout_target_width !== undefined &&
+            node.layout_target_height !== undefined
           ) {
             layoutOffset = format.layout.encode.nodeLayout(
               builder,
@@ -4123,8 +4129,8 @@ export namespace format {
                 | "top"
                 | "right"
                 | "bottom"
-                | "width"
-                | "height"
+                | "layout_target_width"
+                | "layout_target_height"
                 | "rotation"
               > &
                 Partial<
@@ -4473,10 +4479,12 @@ export namespace format {
 
           // Common fields for all basic shapes
           // Note: width/height now come from layoutFields, not from shapeData
-          const width =
-            typeof layoutFields.width === "number" ? layoutFields.width : 0;
-          const height =
-            typeof layoutFields.height === "number" ? layoutFields.height : 0;
+          const layout_target_width:
+            | grida.program.css.LengthPercentage
+            | "auto" = layoutFields.layout_target_width ?? "auto";
+          const layout_target_height:
+            | grida.program.css.LengthPercentage
+            | "auto" = layoutFields.layout_target_height ?? "auto";
           const baseFields = {
             id,
             name: name || tsNodeType,
@@ -4484,8 +4492,8 @@ export namespace format {
             locked,
             opacity,
             z_index: 0,
-            width,
-            height,
+            layout_target_width,
+            layout_target_height,
             position: layoutFields.position ?? "absolute",
             left: layoutFields.left,
             top: layoutFields.top,
@@ -4498,7 +4506,7 @@ export namespace format {
             ...(fillPaints.length > 0 ? { fill_paints: fillPaints } : {}),
             ...(strokePaints.length > 0 ? { stroke_paints: strokePaints } : {}),
             ...(effects || {}),
-          };
+          } satisfies Partial<grida.program.nodes.UnknwonNode>;
 
           // Shape-specific fields
           switch (tsNodeType) {
@@ -4804,7 +4812,9 @@ export namespace format {
 
           // Convert width to number for IFixedDimension (height is always 0 for lines)
           const width =
-            typeof layoutFields.width === "number" ? layoutFields.width : 0;
+            typeof layoutFields.layout_target_width === "number"
+              ? layoutFields.layout_target_width
+              : 0;
 
           const baseName = systemNode.name() ?? "line";
 
@@ -4824,8 +4834,8 @@ export namespace format {
             top: layoutFields.top,
             right: layoutFields.right,
             bottom: layoutFields.bottom,
-            width,
-            height: 0,
+            layout_target_width: width,
+            layout_target_height: 0,
             rotation: layoutFields.rotation ?? 0,
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
@@ -4866,9 +4876,13 @@ export namespace format {
 
           // Convert width/height to numbers for IFixedDimension
           const width =
-            typeof layoutFields.width === "number" ? layoutFields.width : 0;
+            typeof layoutFields.layout_target_width === "number"
+              ? layoutFields.layout_target_width
+              : 0;
           const height =
-            typeof layoutFields.height === "number" ? layoutFields.height : 0;
+            typeof layoutFields.layout_target_height === "number"
+              ? layoutFields.layout_target_height
+              : 0;
 
           const baseName = systemNode.name() ?? "vector";
 
@@ -4889,8 +4903,8 @@ export namespace format {
             top: layoutFields.top,
             right: layoutFields.right,
             bottom: layoutFields.bottom,
-            width,
-            height,
+            layout_target_width: width,
+            layout_target_height: height,
             rotation: layoutFields.rotation ?? 0,
             // vector-specific properties
             corner_radius: cornerRadiusProps.corner_radius,
@@ -4947,8 +4961,8 @@ export namespace format {
             top: layoutFields.top,
             right: layoutFields.right,
             bottom: layoutFields.bottom,
-            width: layoutFields.width ?? "auto",
-            height: layoutFields.height ?? "auto",
+            layout_target_width: layoutFields.layout_target_width ?? "auto",
+            layout_target_height: layoutFields.layout_target_height ?? "auto",
             rotation: layoutFields.rotation ?? 0,
             op,
             corner_radius: cornerRadiusProps.corner_radius,

@@ -32,8 +32,8 @@ interface NodeElementProps<P extends Record<string, any>> {
   position?: "absolute" | "relative";
   left?: number;
   top?: number;
-  width?: grida.program.nodes.i.ICSSDimension["width"];
-  height?: grida.program.nodes.i.ICSSDimension["height"];
+  width?: grida.program.nodes.i.ICSSDimension["layout_target_width"];
+  height?: grida.program.nodes.i.ICSSDimension["layout_target_height"];
   fill?: cg.Paint;
 }
 
@@ -141,8 +141,8 @@ export function NodeElement<P extends Record<string, any>>({
     position: DEFAULT_POSITION ?? node.position,
     left: DEFAULT_LEFT ?? node.left,
     top: DEFAULT_TOP ?? node.top,
-    width: DEFAULT_WIDTH ?? node.width,
-    height: DEFAULT_HEIGHT ?? node.height,
+    layout_target_width: DEFAULT_WIDTH ?? node.layout_target_width,
+    layout_target_height: (DEFAULT_HEIGHT ?? node.layout_target_height) as any,
     fill_rule: node.fill_rule,
     stroke: node.stroke,
     stroke_width: node.stroke_width,

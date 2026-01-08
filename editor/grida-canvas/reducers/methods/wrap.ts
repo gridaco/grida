@@ -117,8 +117,8 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
     } satisfies grida.program.nodes.NodePrototype;
 
     if (prototype.type === "container") {
-      prototype.width = union.width;
-      prototype.height = union.height;
+      prototype.layout_target_width = union.width;
+      prototype.layout_target_height = union.height;
     }
 
     const wrapperId = self_insertSubDocument(

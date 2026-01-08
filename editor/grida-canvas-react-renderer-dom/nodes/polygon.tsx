@@ -6,8 +6,8 @@ import vn from "@grida/vn";
 import { css } from "@/grida-canvas-utils/css";
 
 export function RegularPolygonWidget({
-  width,
-  height,
+  layout_target_width: width,
+  layout_target_height: height,
   point_count,
   fill,
   stroke,

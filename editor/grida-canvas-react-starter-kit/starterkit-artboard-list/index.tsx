@@ -34,8 +34,8 @@ const ArtboardList = () => {
       type: "container",
       position: "absolute",
       name: item.name,
-      width: item.width,
-      height: item.height,
+      layout_target_width: item.width,
+      layout_target_height: item.height,
       fill: {
         type: "solid",
         color: kolor.colorformats.RGBA32F.WHITE,

@@ -10,6 +10,7 @@ import schema from "../schema";
 import updateNodeTransform from "../node-transform.reducer";
 import { getSnapTargets, threshold } from "../tools/snap";
 import { snapObjectsResize } from "../tools/snap-resize";
+import { css } from "@/grida-canvas-utils/css";
 
 /**
  * Scale gesture orchestration.
@@ -133,8 +134,8 @@ export function self_start_gesture_scale(
       direction === "nw" ||
       direction === "sw"
     ) {
-      if (typeof n.width !== "number") {
-        n.width =
+      if (typeof n.layout_target_width !== "number") {
+        n.layout_target_width =
           node.type === "tspan"
             ? Math.ceil(rect.width)
             : cmath.quantize(rect.width, 1);
@@ -150,11 +151,11 @@ export function self_start_gesture_scale(
       direction === "se" ||
       direction === "sw"
     ) {
-      if (typeof n.height !== "number") {
+      if (typeof n.layout_target_height !== "number") {
         if (node.type === "line") {
-          n.height = 0;
+          n.layout_target_height = 0;
         } else {
-          n.height =
+          n.layout_target_height =
             node.type === "tspan"
               ? Math.ceil(rect.height)
               : cmath.quantize(rect.height, 1);
@@ -487,7 +488,12 @@ function collectAutoSpaceRootsFromGesture(args: {
     const o = toRecord(initial_node);
     if (!o) continue;
     if (o["position"] !== "absolute") continue;
-    if (typeof o["width"] !== "number" || typeof o["height"] !== "number")
+    if (
+      !grida.program.nodes.hasLayoutWidth(initial_node) ||
+      !grida.program.nodes.hasLayoutHeight(initial_node) ||
+      initial_node.layout_target_width === "auto" ||
+      initial_node.layout_target_height === "auto"
+    )
       continue;
 
     const initialRect = initial_rect_by_root_id[root_id];
@@ -523,7 +529,12 @@ function collectAutoSpaceRootsForCommand(args: {
     const o = toRecord(node);
     if (!o) continue;
     if (o["position"] !== "absolute") continue;
-    if (typeof o["width"] !== "number" || typeof o["height"] !== "number")
+    if (
+      !grida.program.nodes.hasLayoutWidth(node) ||
+      !grida.program.nodes.hasLayoutHeight(node) ||
+      node.layout_target_width === "auto" ||
+      node.layout_target_height === "auto"
+    )
       continue;
 
     const rect =
@@ -532,8 +543,8 @@ function collectAutoSpaceRootsForCommand(args: {
         ? {
             x: o["left"],
             y: o["top"],
-            width: o["width"],
-            height: o["height"],
+            width: css.toPxNumber(node.layout_target_width),
+            height: css.toPxNumber(node.layout_target_height),
           }
         : null);
 

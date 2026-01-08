@@ -47,8 +47,8 @@ export function prepare_bitmap_node(
       z_index: 0,
       left: x,
       top: y,
-      width: width,
-      height: height,
+      layout_target_width: width,
+      layout_target_height: height,
       imageRef: new_bitmap_ref_id,
     };
 
@@ -159,8 +159,8 @@ export function on_brush(
   // transform node
   node.left = bme.x;
   node.top = bme.y;
-  node.width = bme.width;
-  node.height = bme.height;
+  node.layout_target_width = bme.width;
+  node.layout_target_height = bme.height;
 
   if (is_gesture) {
     if (draft.gesture.type === "idle") {

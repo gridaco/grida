@@ -234,8 +234,8 @@ export namespace schema.parametric_scale {
     scale_number_in_place(n, "top", s);
     scale_number_in_place(n, "right", s);
     scale_number_in_place(n, "bottom", s);
-    scale_number_in_place(n, "width", s);
-    scale_number_in_place(n, "height", s);
+    scale_number_in_place(n, "layout_target_width", s);
+    scale_number_in_place(n, "layout_target_height", s);
 
     // General geometry-ish lengths
     scale_number_in_place(n, "corner_radius", s);
