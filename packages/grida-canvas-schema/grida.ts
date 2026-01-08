@@ -1480,6 +1480,7 @@ export namespace grida.program.nodes {
       /**
        * @default undefined
        */
+      // TODO: rename to mask_type
       mask?: cg.LayerMaskType | null | undefined;
     }
 
@@ -2088,6 +2089,15 @@ export namespace grida.program.nodes {
        */
       props: Record<string, schema.Value>;
     }
+
+    // TODO: add layout trait
+    export interface ILayerTrait
+      extends IBlend,
+        ILayerMaskType,
+        IEffects,
+        IZIndex {}
+
+    export interface IHotspotTrait extends IHrefable, IMouseCursor {}
   }
 
   type __ReplaceSubset<T, TSubset extends Partial<T>, TNew> = Omit<
@@ -2156,9 +2166,9 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.IBlend,
       i.IExpandable,
-      i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke,
+      i.IRotation,
       i.IPositioning,
       i.ICornerRadius {
     type: "boolean";
@@ -2168,10 +2178,9 @@ export namespace grida.program.nodes {
   export interface TextNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.ICSSStylable,
-      i.IEffects,
-      i.IHrefable,
-      i.IMouseCursor,
       i.ITextNodeStyle,
       i.ITextValue,
       i.ITextStroke {
@@ -2194,11 +2203,10 @@ export namespace grida.program.nodes {
   export interface ImageNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.ICSSStylable,
-      i.IEffects,
       i.IBoxFit,
-      i.IHrefable,
-      i.IMouseCursor,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IRectangularStrokeWidth,
@@ -2224,6 +2232,7 @@ export namespace grida.program.nodes {
   export interface HTMLRichTextNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.ICSSStylable,
       i.IHrefable,
       i.IMouseCursor,
@@ -2243,6 +2252,7 @@ export namespace grida.program.nodes {
   export interface VideoNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.ICSSStylable,
       i.IBoxFit,
       i.IHrefable,
@@ -2270,6 +2280,7 @@ export namespace grida.program.nodes {
   export interface ContainerNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.ICSSStylable,
       i.IEffects,
       i.IHrefable,
@@ -2277,8 +2288,8 @@ export namespace grida.program.nodes {
       i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
-      i.IStroke,
       i.IRectangularStrokeWidth,
+      i.IStroke,
       Partial<i.IPadding>,
       i.IFlexContainer {
     readonly type: "container";
@@ -2325,10 +2336,10 @@ export namespace grida.program.nodes {
   export interface BitmapNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.IPositioning,
       i.IFixedDimension,
       i.ILayoutTargetAspectRatio,
-      i.IBlend,
       i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint> {
@@ -2341,14 +2352,11 @@ export namespace grida.program.nodes {
   export interface RegularPolygonNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.IPositioning,
       i.IFixedDimension,
       i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.ILayerMaskType,
-      i.IZIndex,
       i.IRotation,
       i.ICornerRadius,
       i.IFill<cg.Paint>,
@@ -2360,13 +2368,11 @@ export namespace grida.program.nodes {
   export interface RegularStarPolygonNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.IPositioning,
       i.IFixedDimension,
       i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.IZIndex,
       i.IRotation,
       i.ICornerRadius,
       i.IFill<cg.Paint>,
@@ -2379,13 +2385,11 @@ export namespace grida.program.nodes {
   export interface VectorNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.IPositioning,
       i.IFixedDimension,
       i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.IZIndex,
       i.IRotation,
       i.ICornerRadius,
       i.IFill<cg.Paint>,
@@ -2422,15 +2426,12 @@ export namespace grida.program.nodes {
   export interface LineNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.IPositioning,
       i.IStroke,
       i.IFixedDimension,
       i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.ILayerMaskType,
-      i.IZIndex,
       i.IRotation {
     readonly type: "line";
     height: 0;
@@ -2455,19 +2456,15 @@ export namespace grida.program.nodes {
   export interface RectangleNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.IPositioning,
-      // i.ICSSDimension,
       i.IFixedDimension,
       i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
       i.IStroke,
       i.IRectangularStrokeWidth,
-      i.IEffects,
       i.ICornerRadius,
       i.IRectangularCornerRadius {
     readonly type: "rectangle";
@@ -2494,20 +2491,15 @@ export namespace grida.program.nodes {
   export interface EllipseNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.IPositioning,
-      // i.ICSSDimension,
       i.IFixedDimension,
       i.ILayoutTargetAspectRatio,
       i.IEllipseArcData,
-      i.IBlend,
-      i.ILayerMaskType,
-      i.IZIndex,
       i.IRotation,
       i.IFill<cg.Paint>,
-      i.IStroke,
-      i.IEffects {
+      i.IStroke {
     type: "ellipse";
   }
 
@@ -2523,9 +2515,8 @@ export namespace grida.program.nodes {
   export interface ComponentNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.ICSSStylable,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
@@ -2540,11 +2531,9 @@ export namespace grida.program.nodes {
   export interface InstanceNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IBlend,
+      i.ILayerTrait,
+      i.IHotspotTrait,
       i.IPositioning,
-      // i.ICSSStylable,
-      i.IHrefable,
-      i.IMouseCursor,
       i.IProperties,
       i.IProps {
     readonly type: "instance";
@@ -2568,8 +2557,7 @@ export namespace grida.program.nodes {
   export interface TemplateInstanceNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.IHotspotTrait,
       i.IPositioning,
       i.ICSSDimension,
       i.IProperties,
