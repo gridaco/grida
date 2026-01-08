@@ -143,7 +143,6 @@ export default function initialNode(
         fill: constraints.fill === "fill_paints" ? undefined : white,
         fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
         type: "container",
-        expanded: false,
         corner_radius: 0,
         padding_top: 0,
         padding_right: 0,

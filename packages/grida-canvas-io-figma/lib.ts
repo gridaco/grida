@@ -1032,7 +1032,6 @@ export namespace iofigma {
               ...base_node_trait(node),
               ...positioning_trait(node),
               type: "group",
-              expanded: false,
             } satisfies grida.program.nodes.GroupNode;
           }
           case "TEXT": {
@@ -1144,7 +1143,6 @@ export namespace iofigma {
               ...effects_trait(node.effects),
               type: "boolean",
               op: mapBooleanOperation(node.booleanOperation),
-              expanded: false,
             } satisfies grida.program.nodes.BooleanPathOperationNode;
           }
           case "LINE": {
@@ -1175,7 +1173,6 @@ export namespace iofigma {
               ...base_node_trait(node),
               ...positioning_trait(node),
               type: "group",
-              expanded: false,
             } satisfies grida.program.nodes.GroupNode;
           }
 

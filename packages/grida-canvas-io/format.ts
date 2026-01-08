@@ -3899,17 +3899,7 @@ export namespace format {
 
       export function nodeLayout(
         layout: fbs.Layout
-      ): Pick<
-        grida.program.nodes.i.ICSSStylable,
-        | "position"
-        | "left"
-        | "top"
-        | "right"
-        | "bottom"
-        | "width"
-        | "height"
-        | "rotation"
-      > &
+      ): grida.program.nodes.i.ILayoutTrait &
         Partial<
           Pick<
             grida.program.nodes.ContainerNode,
@@ -4615,7 +4605,6 @@ export namespace format {
             name: baseName,
             active: baseActive,
             locked: baseLocked,
-            expanded: false,
             opacity,
             z_index: 0,
             href: undefined,
@@ -4943,7 +4932,6 @@ export namespace format {
             locked: systemNode.locked(),
             opacity,
             z_index: 0,
-            expanded: false, // IExpandable
             // fill_paints and stroke_paints from BooleanOperationNode
             ...(fillPaints ? { fill_paints: fillPaints } : {}),
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
@@ -4986,7 +4974,6 @@ export namespace format {
             active: systemNode.active(),
             locked: systemNode.locked(),
             opacity,
-            expanded: false,
             ...layoutFields,
             position: layoutFields.position ?? "relative",
             ...(effects || {}),

@@ -2096,8 +2096,10 @@ export namespace grida.program.nodes {
     }
 
     export interface ILayoutChildTrait extends ILayoutTrait {}
+
     export interface ILayoutContainerTrait
       extends ILayoutTrait,
+        Partial<i.IPadding>,
         IFlexContainer {}
 
     export interface IHotspotTrait extends IHrefable, IMouseCursor {}
@@ -2153,7 +2155,6 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.IBlend,
-      i.IExpandable,
       i.IPositioning {
     type: "group";
     //
@@ -2169,7 +2170,6 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
-      i.IExpandable,
       i.IFill<cg.Paint>,
       i.IStroke,
       i.ICornerRadius {
@@ -2282,16 +2282,13 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
-      i.ILayoutChildTrait,
+      i.ILayoutContainerTrait,
       i.IHotspotTrait,
-      i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       i.IRectangularStrokeWidth,
       i.IStroke,
-      i.IFill<cg.Paint>,
-      Partial<i.IPadding>,
-      i.IFlexContainer {
+      i.IFill<cg.Paint> {
     readonly type: "container";
     //
   }
@@ -2496,7 +2493,6 @@ export namespace grida.program.nodes {
       i.ILayerTrait,
       i.ILayoutContainerTrait,
       i.IHotspotTrait,
-      i.IExpandable,
       i.ICornerRadius,
       i.IRectangularCornerRadius,
       Partial<i.IPadding>,
@@ -2845,7 +2841,6 @@ export namespace grida.program.nodes {
         name: "container",
         active: true,
         locked: false,
-        expanded: false,
         rotation: 0,
         z_index: 0,
         opacity: 1,
