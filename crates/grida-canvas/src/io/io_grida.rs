@@ -2109,8 +2109,8 @@ mod corner_radius_tests {
             "left": 0,
             "top": 0,
             "rotation": 0,
-            "width": 100,
-            "height": 50,
+            "layout_target_width": 100,
+            "layout_target_height": 50,
             "corner_radius": [12, 8, 4, 2]
         });
 
@@ -2151,8 +2151,8 @@ mod padding_tests {
             "left": 0,
             "top": 0,
             "rotation": 0,
-            "width": 200,
-            "height": 200,
+            "layout_target_width": 200,
+            "layout_target_height": 200,
             "padding_top": 10.0,
             "padding_right": 15.0,
             "padding_bottom": 20.0,
@@ -2186,8 +2186,8 @@ mod padding_tests {
             "left": 0,
             "top": 0,
             "rotation": 0,
-            "width": 200,
-            "height": 200,
+            "layout_target_width": 200,
+            "layout_target_height": 200,
             "padding_top": 10.0,
             "padding_left": 20.0,
             "layout": "flex"
@@ -2218,8 +2218,8 @@ mod padding_tests {
             "left": 0,
             "top": 0,
             "rotation": 0,
-            "width": 200,
-            "height": 200,
+            "layout_target_width": 200,
+            "layout_target_height": 200,
             "layout": "flex"
         });
 
@@ -2375,8 +2375,8 @@ mod tests {
             "op": "union",
             "left": 100.0,
             "top": 100.0,
-            "width": 200.0,
-            "height": 200.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 200.0,
             "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
         }"#;
 
@@ -2506,8 +2506,8 @@ mod tests {
             "text": "Hello World",
             "left": 100.0,
             "top": 100.0,
-            "width": "auto",
-            "height": "auto"
+            "layout_target_width": "auto",
+            "layout_target_height": "auto"
         }"#;
 
         let text_node: JSONNode =
@@ -2529,8 +2529,8 @@ mod tests {
             "text": "Hello World",
             "left": 100.0,
             "top": 100.0,
-            "width": 200.0,
-            "height": "auto"
+            "layout_target_width": 200.0,
+            "layout_target_height": "auto"
         }"#;
 
         let text_node_fixed: JSONNode = serde_json::from_str(json_text_fixed)
@@ -2551,8 +2551,8 @@ mod tests {
             "type": "rectangle",
             "left": 100.0,
             "top": 100.0,
-            "width": "auto",
-            "height": "auto",
+            "layout_target_width": "auto",
+            "layout_target_height": "auto",
             "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
         }"#;
 
@@ -2828,8 +2828,8 @@ mod tests {
             "type": "rectangle",
             "left": 0.0,
             "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "blend_mode": "pass-through"
         }"#;
 
@@ -2854,8 +2854,8 @@ mod tests {
             "type": "rectangle",
             "left": 0.0,
             "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "blend_mode": "normal"
         }"#;
 
@@ -2894,8 +2894,8 @@ mod tests {
             "type": "rectangle",
             "left": 0.0,
             "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "blend_mode": "multiply"
         }"#;
 
@@ -2939,8 +2939,8 @@ mod tests {
             "type": "rectangle",
             "left": 0.0,
             "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "mask": "geometry"
         }"#;
 
@@ -2962,8 +2962,8 @@ mod tests {
             "type": "rectangle",
             "left": 0.0,
             "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "mask": "alpha"
         }"#;
 
@@ -2985,8 +2985,8 @@ mod tests {
             "type": "rectangle",
             "left": 0.0,
             "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "mask": "luminance"
         }"#;
 
@@ -3106,8 +3106,8 @@ mod tests {
                         "type": "rectangle",
                         "left": 100,
                         "top": 100,
-                        "width": 200,
-                        "height": 150
+                        "layout_target_width": 200,
+                        "layout_target_height": 150
                     }
                 },
                 "links": {
@@ -3163,8 +3163,8 @@ mod tests {
                         "type": "container",
                         "left": 0,
                         "top": 0,
-                        "width": 500,
-                        "height": 500
+                        "layout_target_width": 500,
+                        "layout_target_height": 500
                     },
                     "rect1": {
                         "id": "rect1",
@@ -3172,8 +3172,8 @@ mod tests {
                         "type": "rectangle",
                         "left": 10,
                         "top": 10,
-                        "width": 100,
-                        "height": 100
+                        "layout_target_width": 100,
+                        "layout_target_height": 100
                     }
                 },
                 "links": {
@@ -3230,8 +3230,8 @@ mod tests {
                         "type": "container",
                         "left": 0,
                         "top": 0,
-                        "width": 500,
-                        "height": 500
+                        "layout_target_width": 500,
+                        "layout_target_height": 500
                     },
                     "container2": {
                         "id": "container2",
@@ -3239,8 +3239,8 @@ mod tests {
                         "type": "container",
                         "left": 10,
                         "top": 10,
-                        "width": 400,
-                        "height": 400
+                        "layout_target_width": 400,
+                        "layout_target_height": 400
                     },
                     "rect1": {
                         "id": "rect1",
@@ -3248,8 +3248,8 @@ mod tests {
                         "type": "rectangle",
                         "left": 20,
                         "top": 20,
-                        "width": 100,
-                        "height": 100
+                        "layout_target_width": 100,
+                        "layout_target_height": 100
                     }
                 },
                 "links": {
@@ -3361,8 +3361,8 @@ mod tests {
             "type": "rectangle",
             "left": 100.0,
             "top": 100.0,
-            "width": 200.0,
-            "height": 200.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 200.0,
             "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
@@ -3402,8 +3402,8 @@ mod tests {
             "type": "rectangle",
             "left": 100.0,
             "top": 100.0,
-            "width": 200.0,
-            "height": 400.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 400.0,
             "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
@@ -3454,8 +3454,8 @@ mod tests {
             "type": "rectangle",
             "left": 100.0,
             "top": 100.0,
-            "width": 200.0,
-            "height": 200.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 200.0,
             "fe_backdrop_blur": {
                 "type": "backdrop-filter-blur",
                 "blur": {
@@ -3495,8 +3495,8 @@ mod tests {
             "type": "rectangle",
             "left": 100.0,
             "top": 100.0,
-            "width": 200.0,
-            "height": 300.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 300.0,
             "fe_backdrop_blur": {
                 "type": "backdrop-filter-blur",
                 "blur": {
@@ -3548,8 +3548,8 @@ mod tests {
             "text": "Hello World",
             "left": 100.0,
             "top": 100.0,
-            "width": 200.0,
-            "height": "auto",
+            "layout_target_width": 200.0,
+            "layout_target_height": "auto",
             "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
@@ -3650,8 +3650,8 @@ mod tests {
             "type": "container",
             "left": 0.0,
             "top": 0.0,
-            "width": 300.0,
-            "height": 400.0,
+            "layout_target_width": 300.0,
+            "layout_target_height": 400.0,
             "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
@@ -3715,8 +3715,8 @@ mod tests {
             "type": "container",
             "left": 100.0,
             "top": 100.0,
-            "width": 400.0,
-            "height": 300.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
             "layout": "flex",
             "direction": "vertical"
         }"#;
@@ -3754,8 +3754,8 @@ mod tests {
             "type": "container",
             "left": 0.0,
             "top": 0.0,
-            "width": 600.0,
-            "height": 400.0,
+            "layout_target_width": 600.0,
+            "layout_target_height": 400.0,
             "layout": "flex",
             "direction": "horizontal",
             "main_axis_alignment": "space-between",
@@ -3801,8 +3801,8 @@ mod tests {
             "type": "container",
             "left": 0.0,
             "top": 0.0,
-            "width": 400.0,
-            "height": 300.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
             "layout": "flex",
             "padding_top": 20.0,
             "padding_right": 20.0,
@@ -3844,8 +3844,8 @@ mod tests {
             "type": "container",
             "left": 50.0,
             "top": 50.0,
-            "width": 500.0,
-            "height": 400.0,
+            "layout_target_width": 500.0,
+            "layout_target_height": 400.0,
             "layout": "flex",
             "direction": "vertical",
             "padding_top": 15.0,
@@ -3908,8 +3908,8 @@ mod tests {
             "type": "container",
             "left": 0.0,
             "top": 0.0,
-            "width": 400.0,
-            "height": 300.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
             "layout": "flex",
             "main_axis_gap": 20.0,
             "cross_axis_gap": 10.0
@@ -3945,8 +3945,8 @@ mod tests {
             "type": "container",
             "left": 0.0,
             "top": 0.0,
-            "width": 400.0,
-            "height": 300.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
             "layout": "flex",
             "layout_wrap": "wrap"
         }"#;
@@ -3974,8 +3974,8 @@ mod tests {
             "type": "container",
             "left": 0.0,
             "top": 0.0,
-            "width": 400.0,
-            "height": 300.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
             "layout": "flex",
             "layout_wrap": "nowrap"
         }"#;
@@ -4005,8 +4005,8 @@ mod tests {
             "type": "rectangle",
             "left": 100.0,
             "top": 100.0,
-            "width": 200.0,
-            "height": 200.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 200.0,
             "corner_radius": 50.0,
             "corner_smoothing": 0.6
         }"#;
@@ -4037,8 +4037,8 @@ mod tests {
             "type": "container",
             "left": 0.0,
             "top": 0.0,
-            "width": 300.0,
-            "height": 300.0,
+            "layout_target_width": 300.0,
+            "layout_target_height": 300.0,
             "corner_radius": 40.0,
             "corner_smoothing": 1.0
         }"#;
@@ -4066,8 +4066,8 @@ mod tests {
             "src": "test.png",
             "left": 0.0,
             "top": 0.0,
-            "width": 250.0,
-            "height": 250.0,
+            "layout_target_width": 250.0,
+            "layout_target_height": 250.0,
             "corner_radius": 30.0,
             "corner_smoothing": 0.8
         }"#;
@@ -4099,8 +4099,8 @@ mod tests {
             "type": "container",
             "left": 100.0,
             "top": 100.0,
-            "width": 600.0,
-            "height": 500.0,
+            "layout_target_width": 600.0,
+            "layout_target_height": 500.0,
             "layout": "flex",
             "direction": "horizontal",
             "layout_wrap": "wrap",

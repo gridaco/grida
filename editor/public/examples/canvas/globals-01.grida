@@ -15,8 +15,8 @@
         "position": "relative",
         "left": 0,
         "top": 0,
-        "width": 960,
-        "height": 540,
+        "layout_target_width": 960,
+        "layout_target_height": 540,
         "corner_radius": 0,
         "fill_paints": [
           {
@@ -44,8 +44,8 @@
         "position": "absolute",
         "left": 59,
         "top": 251,
-        "width": "auto",
-        "height": "auto",
+        "layout_target_width": "auto",
+        "layout_target_height": "auto",
         "style": {},
         "text_align": "left",
         "text_align_vertical": "top",
