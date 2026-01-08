@@ -136,7 +136,9 @@ struct CGPoint {
   y:float;
 }
 
-/// Rust: `Alignment(pub f32, pub f32)` (cNDC, range typically [-1, 1])
+/// `Alignment(pub f32, pub f32)` (cNDC, range typically [-1, 1])
+/// 
+/// Alignment(0,0) is the center of the rectangle.
 struct Alignment {
   x:float;
   y:float;
@@ -1155,8 +1157,6 @@ table Layout {
   layout_dimensions:LayoutDimensions (id: 3);
   layout_container:LayoutContainerStyle (id: 4);
   layout_child:LayoutChildStyle (id: 5);
-  /// Rotation in degrees.
-  rotation:float = 0.0 (id: 6);
 }
 
 // -----------------------------------------------------------------------------
@@ -1197,16 +1197,6 @@ table SystemNodeTrait {
 /// Shared layer fields used by all layer-node variants.
 /// Layer is what usually user think of as a node. each layer is non-virtual, a real render target.
 table LayerTrait {
-  opacity:float = 1.0;
-  /// Blend mode (archive model).
-  ///
-  /// Default is `pass_through`.
-  blend_mode:LayerBlendMode = PassThrough;
-  /// Rust: `LayerMaskType` (union; default is Image(alpha) since it's the first union member)
-  mask_type:LayerMaskType;
-
-  effects:LayerEffects;
-
   /// Parent reference (optional; root nodes omit this).
   ///
   /// When present, this node is a child of the referenced parent.
@@ -1220,11 +1210,29 @@ table LayerTrait {
   /// 2. Sort by `parent.position` (lexicographic comparison)
   parent:ParentReference (required);
 
+  /// opacity of the layer.
+  opacity:float = 1.0;
+
+  /// Blend mode (archive model).
+  ///
+  /// Default is `pass_through`.
+  blend_mode:LayerBlendMode = PassThrough;
+
+  /// Rust: `LayerMaskType` (union; default is Image(alpha) since it's the first union member)
+  mask_type:LayerMaskType;
+
+  /// layer effects.
+  effects:LayerEffects;
+
   /// Geometry transform baseline (identity by default).
-  relative_transform_snapshot:CGTransform2D;
+  // relative_transform_snapshot:CGTransform2D;
 
   /// Layout (optional, depending on node type / usage).
   layout:Layout;
+
+  /// post-layout transform, this reflects how css transform is applied after the layout is resolved. this is currently how grida handles rotation. in the future, this might change.
+  post_layout_transform:CGTransform2D;
+  post_layout_transform_origin:Alignment;
 }
 
 

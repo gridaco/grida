@@ -922,27 +922,70 @@ export namespace format {
         }
 
         fbs.LayerTrait.startLayerTrait(builder);
+
+        // Field order: parent (required), opacity, blend_mode, mask_type, effects, layout, post_layout_transform, post_layout_transform_origin
+
+        // 1. Parent (required field)
+        if (parentReferenceOffset !== undefined) {
+          fbs.LayerTrait.addParent(builder, parentReferenceOffset);
+        }
+
+        // 2. Opacity
         const nodeWithOpacity = node as grida.program.nodes.Node &
           Partial<Pick<grida.program.nodes.UnknownNode, "opacity">>;
         fbs.LayerTrait.addOpacity(builder, nodeWithOpacity.opacity ?? 1.0);
+
+        // 3. Blend mode
         fbs.LayerTrait.addBlendMode(builder, blendMode);
+
+        // 4. Mask type
         fbs.LayerTrait.addMaskTypeType(
           builder,
           fbs.LayerMaskType.LayerMaskTypeImage
         );
         fbs.LayerTrait.addMaskType(builder, maskTypeOffset);
+
+        // 5. Effects
         if (effectsOffset !== undefined) {
           fbs.LayerTrait.addEffects(builder, effectsOffset);
         }
-        if (parentReferenceOffset !== undefined) {
-          fbs.LayerTrait.addParent(builder, parentReferenceOffset);
-        }
-        // Create transform struct inline (must be done while table is being built)
-        const transformOffset = structs.cgTransform2D(builder);
-        fbs.LayerTrait.addRelativeTransformSnapshot(builder, transformOffset);
+
+        // 6. Layout
         if (layoutOffset) {
           fbs.LayerTrait.addLayout(builder, layoutOffset);
         }
+
+        // 7. Post-layout transform (rotation as transform matrix)
+        // Convert rotation (degrees) to a rotation transform matrix
+        const nodeWithRotation = node as grida.program.nodes.Node &
+          Partial<Pick<grida.program.nodes.UnknownNode, "rotation">>;
+        const rotationDegrees = nodeWithRotation.rotation ?? 0;
+        const rotationRad = (rotationDegrees * Math.PI) / 180;
+        const cos = Math.cos(rotationRad);
+        const sin = Math.sin(rotationRad);
+
+        // Pure rotation matrix: [cos, -sin, 0], [sin, cos, 0]
+        const postLayoutTransformOffset = structs.cgTransform2D(
+          builder,
+          cos, // m00
+          -sin, // m01
+          0, // m02
+          sin, // m10
+          cos, // m11
+          0 // m12
+        );
+        fbs.LayerTrait.addPostLayoutTransform(
+          builder,
+          postLayoutTransformOffset
+        );
+
+        // 8. Post-layout transform origin (default to center: 0, 0 in Alignment coordinates)
+        const transformOriginOffset = structs.alignment(builder, 0, 0);
+        fbs.LayerTrait.addPostLayoutTransformOrigin(
+          builder,
+          transformOriginOffset
+        );
+
         return fbs.LayerTrait.endLayerTrait(builder);
       }
 
@@ -3786,7 +3829,7 @@ export namespace format {
        * Encodes a TS node's layout-related inputs into a FlatBuffers `Layout` table.
        *
        * Uses canonical fields: layout_position_basis, layout_position, layout_inset,
-       * layout_dimensions (with Length unions for target width/height), rotation.
+       * layout_dimensions (with Length unions for target width/height).
        */
       export function nodeLayout(
         builder: Builder,
@@ -3799,7 +3842,6 @@ export namespace format {
           | "bottom"
           | "layout_target_width"
           | "layout_target_height"
-          | "rotation"
         > &
           Partial<
             Pick<
@@ -3874,7 +3916,6 @@ export namespace format {
           fbs.Layout.addLayoutInset(builder, insetOffset);
         }
         fbs.Layout.addLayoutDimensions(builder, dimensionsOffset);
-        fbs.Layout.addRotation(builder, node.rotation ?? 0);
         if (containerOffset) {
           fbs.Layout.addLayoutContainer(builder, containerOffset);
         }
@@ -4059,7 +4100,7 @@ export namespace format {
           bottom,
           layout_target_width: width,
           layout_target_height: height,
-          rotation: layout.rotation(),
+          rotation: 0, // Rotation is now extracted from post_layout_transform, not Layout
           ...containerFields,
         };
       }
@@ -4151,7 +4192,6 @@ export namespace format {
                 | "bottom"
                 | "layout_target_width"
                 | "layout_target_height"
-                | "rotation"
               > &
                 Partial<
                   Pick<
@@ -4673,6 +4713,7 @@ export namespace format {
               strokeGeometryProps.rectangular_stroke_width_left,
             ...(clipsContent ? { clips_content: clipsContent } : {}),
             ...layoutFields,
+            rotation: layoutFields.rotation ?? 0,
             ...(effects || {}),
           } satisfies grida.program.nodes.ContainerNode;
         }
@@ -5021,6 +5062,22 @@ export namespace format {
       }
 
       /**
+       * Extracts rotation angle (in degrees) from a CGTransform2D rotation matrix.
+       * Assumes a pure rotation matrix (no scaling/skew).
+       */
+      function extractRotationFromTransform(
+        transform: fbs.CGTransform2D | null
+      ): number {
+        if (!transform) return 0;
+        // Rotation = atan2(m10, m00) in radians, then convert to degrees
+        // For a pure rotation matrix: [cos, -sin, 0], [sin, cos, 0]
+        const m10 = transform.m10();
+        const m00 = transform.m00();
+        const rotationRad = Math.atan2(m10, m00);
+        return (rotationRad * 180) / Math.PI;
+      }
+
+      /**
        * Decodes a FlatBuffers binary to a TypeScript Document.
        *
        * @param bytes - The FlatBuffers binary data
@@ -5085,9 +5142,14 @@ export namespace format {
             const idString = systemNode.id()!.id()!;
             const id = format.node.unpackId(idString);
             const layout = layer.layout();
-            const layoutFields = layout
+            let layoutFields = layout
               ? format.layout.decode.nodeLayout(layout)
               : ({} as ReturnType<typeof format.layout.decode.nodeLayout>);
+
+            // Extract rotation from post_layout_transform
+            const postLayoutTransform = layer.postLayoutTransform();
+            const rotation = extractRotationFromTransform(postLayoutTransform);
+            layoutFields = { ...layoutFields, rotation: rotation ?? 0 };
 
             // Decode parent reference
             const parent = layer.parent()!;
@@ -5142,9 +5204,14 @@ export namespace format {
 
           // Layout (canonical fields)
           const layout = layer.layout();
-          const layoutFields = layout
+          let layoutFields = layout
             ? format.layout.decode.nodeLayout(layout)
             : ({} as ReturnType<typeof format.layout.decode.nodeLayout>);
+
+          // Extract rotation from post_layout_transform
+          const postLayoutTransform = layer.postLayoutTransform();
+          const rotation = extractRotationFromTransform(postLayoutTransform);
+          layoutFields = { ...layoutFields, rotation: rotation ?? 0 };
 
           // Decode opacity from layer
           const opacity = layer.opacity() ?? 1.0;

@@ -1017,7 +1017,8 @@ describe("format roundtrip", () => {
         throw new Error("Expected rectangle node");
       node satisfies grida.program.nodes.RectangleNode;
 
-      expect(node.rotation).toBe(45.5);
+      // Floating point precision: rotation is converted from degrees to radians and back
+      expect(node.rotation).toBeCloseTo(45.5, 5);
     });
   });
 
