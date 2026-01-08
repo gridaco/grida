@@ -119,23 +119,49 @@ import { io } from "@grida/io";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 /**
+ * Generates a filesystem-safe key from a URL path.
+ * Used to create deterministic OPFS keys for examples/embedded canvases.
+ */
+function generateFileKeyFromSrc(src: string): string {
+  try {
+    const url = new URL(src, window.location.origin);
+    // Use pathname + search params to create a unique key
+    const path = url.pathname + url.search;
+    // Sanitize: replace slashes and special chars with hyphens, remove leading/trailing
+    return path
+      .replace(/^\/+|\/+$/g, "") // Remove leading/trailing slashes
+      .replace(/[^a-zA-Z0-9._-]/g, "-") // Replace non-safe chars with hyphens
+      .replace(/-+/g, "-") // Collapse multiple hyphens
+      .toLowerCase()
+      .slice(0, 100); // Limit length for filesystem safety
+  } catch {
+    // Fallback: simple sanitization if URL parsing fails
+    return src
+      .replace(/[^a-zA-Z0-9._-]/g, "-")
+      .replace(/-+/g, "-")
+      .toLowerCase()
+      .slice(0, 100);
+  }
+}
+
+/**
  * Hook for accessing the playground OPFS handle.
  * Returns null if OPFS is not supported or handle creation fails.
  */
-function usePlaygroundOPFS(): io.opfs.Handle | null {
+function usePlaygroundOPFS(filekey: string): io.opfs.Handle | null {
   return useMemo(() => {
     if (!io.opfs.Handle.isSupported()) {
       return null;
     }
     try {
       return new io.opfs.Handle({
-        directory: ["playground", "current"],
+        directory: ["playground", filekey],
       });
     } catch (error) {
       console.error("Failed to create OPFS handle:", error);
       return null;
     }
-  }, []);
+  }, [filekey]);
 }
 
 function usePlaygroundDirtyFlag(instance: Editor, enabled: boolean) {
@@ -269,6 +295,18 @@ export type CanvasPlaygroundProps = {
   room_id?: string;
   backend?: "dom" | "canvas";
   /**
+   * OPFS file key. Determines which OPFS directory to use for persistence.
+   * - Defaults to "current" for the main editor
+   * - Examples/embeds should provide a unique key (or it will be auto-generated from `src`)
+   *
+   * @example
+   * ```tsx
+   * <PlaygroundCanvas filekey="my-project" />
+   * <PlaygroundCanvas src="/examples/demo.grida" /> // auto-generates key from src
+   * ```
+   */
+  filekey?: string;
+  /**
    * Opt-in. When enabled, warn on navigation/close if there are unsaved changes.
    *
    * IMPORTANT: `playground` is also used in demo contexts (e.g. /home embed),
@@ -283,13 +321,21 @@ export default function CanvasPlayground({
   templates,
   src,
   room_id,
+  filekey,
   warnOnUnsavedChanges = false,
 }: CanvasPlaygroundProps) {
+  // Determine filekey: explicit prop > auto-generated from src > default "current"
+  const resolvedFilekey = useMemo(() => {
+    if (filekey) return filekey;
+    if (src) return generateFileKeyFromSrc(src);
+    return "current";
+  }, [filekey, src]);
+
   const instance = useEditor(document, backend);
   useDisableSwipeBack();
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
-  const opfs = usePlaygroundOPFS();
+  const opfs = usePlaygroundOPFS(resolvedFilekey);
   const { dirty, markSaved } = usePlaygroundDirtyFlag(
     instance,
     warnOnUnsavedChanges
@@ -463,6 +509,7 @@ export default function CanvasPlayground({
                         backend={backend}
                         canvasRef={handleCanvasRef}
                         onSaved={markSaved}
+                        filekey={resolvedFilekey}
                       />
                     </UserCustomTemplatesProvider>
                   </main>
@@ -480,10 +527,12 @@ function Consumer({
   backend,
   canvasRef,
   onSaved,
+  filekey,
 }: {
   backend: "dom" | "canvas";
   canvasRef?: (canvas: HTMLCanvasElement | null) => void;
   onSaved: () => void;
+  filekey: string;
 }) {
   const {
     ui,
@@ -493,7 +542,7 @@ function Consumer({
     setRightSidebarTab,
   } = useUILayout();
   const instance = useCurrentEditor();
-  const opfs = usePlaygroundOPFS();
+  const opfs = usePlaygroundOPFS(filekey);
   const debug = useEditorState(instance, (state) => state.debug);
   const libraryWindowControls = useFloatingWindowControls({
     defaultOpen: false,
