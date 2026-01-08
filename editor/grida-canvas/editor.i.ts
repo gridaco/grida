@@ -144,7 +144,7 @@ export namespace editor {
    * @returns Object containing resolved paints array and valid index
    */
   export function resolvePaints(
-    node: grida.program.nodes.UnknwonNode,
+    node: grida.program.nodes.UnknownNode,
     target: "fill" | "stroke",
     paintIndex: number = 0
   ): { paints: cg.Paint[]; resolvedIndex: number } {
@@ -1290,7 +1290,7 @@ export namespace editor.state {
      * Snapshot of the node before entering vector edit mode. Used to revert the node
      * when no edits were performed.
      */
-    original: grida.program.nodes.UnknwonNode | null;
+    original: grida.program.nodes.UnknownNode | null;
 
     /**
      * clipboard data for vector content copy/paste
@@ -3819,7 +3819,7 @@ export namespace editor.api {
      * Change text alignment for text nodes.
      *
      * Applies the specified text alignment to text nodes in the selection.
-     * Only affects nodes with type "text".
+     * Only affects nodes with type "tspan".
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
      * @param textAlign - The text alignment to apply: "left", "right", "center", or "justify"
@@ -3838,7 +3838,7 @@ export namespace editor.api {
      * Change vertical text alignment for text nodes.
      *
      * Applies the specified vertical text alignment to text nodes in the selection.
-     * Only affects nodes with type "text".
+     * Only affects nodes with type "tspan".
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
      * @param textAlignVertical - The vertical text alignment to apply: "top", "center", or "bottom"
@@ -3862,7 +3862,7 @@ export namespace editor.api {
      * Change font size for text nodes.
      *
      * Applies a delta change to the font size of text nodes in the selection.
-     * Only affects nodes with type "text". Positive delta increases font size,
+     * Only affects nodes with type "tspan". Positive delta increases font size,
      * negative delta decreases it.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
@@ -3884,7 +3884,7 @@ export namespace editor.api {
      * Change line height for text nodes.
      *
      * Applies a delta change to the line height of text nodes in the selection.
-     * Only affects nodes with type "text". Positive delta increases line height,
+     * Only affects nodes with type "tspan". Positive delta increases line height,
      * negative delta decreases it.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
@@ -3904,7 +3904,7 @@ export namespace editor.api {
      * Change letter spacing for text nodes.
      *
      * Applies a delta change to the letter spacing of text nodes in the selection.
-     * Only affects nodes with type "text". Positive delta increases letter spacing,
+     * Only affects nodes with type "tspan". Positive delta increases letter spacing,
      * negative delta decreases it.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
@@ -3927,7 +3927,7 @@ export namespace editor.api {
      * Change font weight for text nodes.
      *
      * Changes the font weight to the next or previous available weight for the font family.
-     * Only affects nodes with type "text". Queries the font family to get available weights
+     * Only affects nodes with type "tspan". Queries the font family to get available weights
      * and selects the next/previous valid weight.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID

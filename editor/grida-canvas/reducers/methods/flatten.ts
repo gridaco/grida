@@ -71,12 +71,12 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   if (!v) return null;
 
   const vectornode: grida.program.nodes.VectorNode = {
-    ...(node as grida.program.nodes.UnknwonNode),
+    ...(node as grida.program.nodes.UnknownNode),
     type: "vector",
     id: node.id,
     active: node.active,
     corner_radius: modeProperties.cornerRadius(node),
-    fill_rule: (node as grida.program.nodes.UnknwonNode).fill_rule ?? "nonzero",
+    fill_rule: (node as grida.program.nodes.UnknownNode).fill_rule ?? "nonzero",
     vector_network: v,
     layout_target_width: rect.width,
     layout_target_height: rect.height,

@@ -128,7 +128,7 @@ export function __self_try_enter_content_edit_mode_vector(
   context: ReducerContext
 ) {
   const node = dq.__getNodeById(draft, node_id);
-  const nodeSnapshot: grida.program.nodes.UnknwonNode = JSON.parse(
+  const nodeSnapshot: grida.program.nodes.UnknownNode = JSON.parse(
     JSON.stringify(node)
   );
 

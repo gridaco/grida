@@ -163,7 +163,7 @@ export function NodeElement<P extends Record<string, any>>({
   } satisfies grida.program.document.IGlobalRenderingContext &
     (
       | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
-      | grida.program.nodes.UnknwonComputedNode
+      | grida.program.nodes.UnknownComputedNode
     );
 
   if (!node.active) return <></>;

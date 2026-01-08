@@ -1219,9 +1219,9 @@ export namespace grida.program.nodes {
     | ComputedTemplateInstanceNode;
 
   /**
-   * Unknwon node utility type - use within the correct context
+   * Unknown node utility type - use within the correct context
    */
-  export type UnknwonComputedNode = Omit<
+  export type UnknownComputedNode = Omit<
     Partial<ComputedTextSpanNode> &
       Partial<ComputedImageNode> &
       Partial<ComputedBitmapNode> &
@@ -1243,9 +1243,9 @@ export namespace grida.program.nodes {
     i.ISceneNode;
 
   /**
-   * Unknwon node utility type - use within the correct context
+   * Unknown node utility type - use within the correct context
    */
-  export type UnknwonNode = Omit<
+  export type UnknownNode = Omit<
     Partial<BooleanPathOperationNode> &
       Partial<GroupNode> &
       Partial<TextSpanNode> &
@@ -1270,7 +1270,7 @@ export namespace grida.program.nodes {
   } & i.IBaseNode &
     i.ISceneNode;
 
-  export type UnknownNodeProperties<T = unknown> = Record<keyof UnknwonNode, T>;
+  export type UnknownNodeProperties<T = unknown> = Record<keyof UnknownNode, T>;
 
   // #region node prototypes
 
@@ -1387,13 +1387,13 @@ export namespace grida.program.nodes {
   }
 
   export function hasLayoutWidth(node: Node): node is Node & {
-    layout_target_width: UnknwonNode["layout_target_width"];
+    layout_target_width: UnknownNode["layout_target_width"];
   } {
     return "layout_target_width" in node;
   }
 
   export function hasLayoutHeight(node: Node): node is Node & {
-    layout_target_height: UnknwonNode["layout_target_height"];
+    layout_target_height: UnknownNode["layout_target_height"];
   } {
     return "layout_target_height" in node;
   }
@@ -2675,7 +2675,7 @@ export namespace grida.program.nodes {
             rotation: 0,
             ...prototypeWithoutChildren,
             id: id,
-          } as UnknwonNode;
+          } as UnknownNode;
         }
         // TODO:
         case "bitmap":
@@ -2704,7 +2704,7 @@ export namespace grida.program.nodes {
             position: "absolute",
             ...prototype,
             id: id,
-          } as UnknwonNode;
+          } as UnknownNode;
         }
         default:
           throw new Error(

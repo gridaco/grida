@@ -6,8 +6,8 @@ import assert from "assert";
 import cmath from "@grida/cmath";
 import { editor } from "@/grida-canvas";
 
-type UN = grida.program.nodes.UnknwonNode;
-type DYN_TODO = grida.program.nodes.UnknwonNode | any; // TODO: remove casting of this usage.
+type UN = grida.program.nodes.UnknownNode;
+type DYN_TODO = grida.program.nodes.UnknownNode | any; // TODO: remove casting of this usage.
 
 type PaintValue = grida.program.nodes.i.props.PropsPaintValue;
 
@@ -128,13 +128,13 @@ function insertPaintAtIndex(
 }
 
 function defineNodeProperty<
-  K extends keyof grida.program.nodes.UnknwonNode,
+  K extends keyof grida.program.nodes.UnknownNode,
 >(handlers: {
-  assert?: (node: grida.program.nodes.UnknwonNode) => boolean;
+  assert?: (node: grida.program.nodes.UnknownNode) => boolean;
   apply: (
     draft: grida.program.nodes.UnknownNodeProperties,
-    value: NonNullable<grida.program.nodes.UnknwonNode[K]>,
-    prev?: grida.program.nodes.UnknwonNode[K]
+    value: NonNullable<grida.program.nodes.UnknownNode[K]>,
+    prev?: grida.program.nodes.UnknownNode[K]
   ) => void;
 }) {
   return handlers;
@@ -146,7 +146,7 @@ function defineNodeProperty<
 const safe_properties: Partial<
   Omit<
     grida.program.nodes.UnknownNodeProperties<{
-      assert?: (node: grida.program.nodes.UnknwonNode) => boolean;
+      assert?: (node: grida.program.nodes.UnknownNode) => boolean;
       apply: (
         draft: grida.program.nodes.UnknownNodeProperties,
         value: any,
@@ -870,10 +870,10 @@ const safe_properties: Partial<
   }),
 };
 
-function applyNodeProperty<K extends keyof grida.program.nodes.UnknwonNode>(
+function applyNodeProperty<K extends keyof grida.program.nodes.UnknownNode>(
   draft: grida.program.nodes.UnknownNodeProperties,
   key: K,
-  value: grida.program.nodes.UnknwonNode[K]
+  value: grida.program.nodes.UnknownNode[K]
 ) {
   if (!(key in safe_properties)) {
     throw new Error(`property handler not found: "${key}"`);
@@ -897,7 +897,7 @@ export default function nodeReducer<
         for (const [key, value] of Object.entries(values)) {
           applyNodeProperty(
             draft as grida.program.nodes.UnknownNodeProperties,
-            key as keyof grida.program.nodes.UnknwonNode,
+            key as keyof grida.program.nodes.UnknownNode,
             value
           );
         }

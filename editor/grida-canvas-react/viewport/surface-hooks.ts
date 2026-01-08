@@ -399,7 +399,7 @@ export function useSingleSelection(
       boundingSurfaceRect: boundingSurfaceRect,
       distribution: distribution,
       node: {
-        ...(node as grida.program.nodes.UnknwonNode),
+        ...(node as grida.program.nodes.UnknownNode),
         meta: {
           is_flex_parent,
           is_component_consumer,

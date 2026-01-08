@@ -397,7 +397,7 @@ function toHex(value: number): string {
 
 function readNumber(
   node: Node,
-  key: keyof grida.program.nodes.UnknwonNode
+  key: keyof grida.program.nodes.UnknownNode
 ): number | undefined {
   const value = (node as any)[key];
   return typeof value === "number" ? value : undefined;
@@ -405,7 +405,7 @@ function readNumber(
 
 function readString(
   node: Node,
-  key: keyof grida.program.nodes.UnknwonNode
+  key: keyof grida.program.nodes.UnknownNode
 ): string | undefined {
   const value = (node as any)[key];
   return typeof value === "string" && value.length ? value : undefined;

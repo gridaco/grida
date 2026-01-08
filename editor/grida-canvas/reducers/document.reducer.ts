@@ -372,7 +372,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const node = dq.__getNodeById(state, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         const { paints, resolvedIndex } = editor.resolvePaints(
-          node as grida.program.nodes.UnknwonNode,
+          node as grida.program.nodes.UnknownNode,
           paint_target,
           paint_index
         );
@@ -964,7 +964,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             return updateState(state, (draft) => {
               const node = dq.__getNodeById(draft, node_id);
               const { paints, resolvedIndex } = editor.resolvePaints(
-                node as grida.program.nodes.UnknwonNode,
+                node as grida.program.nodes.UnknownNode,
                 paint_target,
                 paint_index
               );
@@ -1876,7 +1876,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const node = dq.__getNodeById(draft, node_id)!;
         const paintTarget = paint_target ?? "fill";
         const { paints, resolvedIndex } = editor.resolvePaints(
-          node as grida.program.nodes.UnknwonNode,
+          node as grida.program.nodes.UnknownNode,
           paintTarget,
           paint_index ?? 0
         );

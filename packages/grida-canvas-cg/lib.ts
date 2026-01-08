@@ -72,7 +72,7 @@ export namespace cg {
   /**
    * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
    */
-  export type RGBA_UNKNWON = {
+  export type RGBA_UNKNOWN = {
     r: number;
     g: number;
     b: number;

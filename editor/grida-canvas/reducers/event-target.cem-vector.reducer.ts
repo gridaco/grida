@@ -708,7 +708,7 @@ export function on_draw_pointer_down(
       active: true,
     },
     stroke_cap: "butt",
-  } satisfies Partial<grida.program.nodes.UnknwonNode>;
+  } satisfies Partial<grida.program.nodes.UnknownNode>;
 
   switch (tool) {
     case "pencil": {

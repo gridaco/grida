@@ -316,7 +316,7 @@ function pickTextAndVectorTargetsFromFixture(
   text_id: string | null;
   vector_id: string | null;
 } {
-  const nodes = doc.nodes as Record<string, any>;
+  const nodes = doc.nodes as Record<string, grida.program.nodes.Node>;
   const scene_id = doc.entry_scene_id ?? doc.scenes_ref[0];
   if (!scene_id) throw new Error("fixture document has no entry scene id");
 
@@ -325,7 +325,7 @@ function pickTextAndVectorTargetsFromFixture(
   const text_id =
     entries.find(
       ([, n]) =>
-        n.type === "text" &&
+        n.type === "tspan" &&
         n.position === "absolute" &&
         typeof n.left === "number" &&
         typeof n.top === "number" &&
@@ -340,9 +340,11 @@ function pickTextAndVectorTargetsFromFixture(
   return { text_id, vector_id };
 }
 
-function isScaleTrackableNode(node: any): boolean {
+function isScaleTrackableNode(
+  node: grida.program.nodes.Node | null | undefined
+): boolean {
   if (!node) return false;
-  if (node.type === "text") {
+  if (node.type === "tspan") {
     return (
       node.position === "absolute" &&
       typeof node.left === "number" &&

@@ -31,7 +31,7 @@ type WithId<T extends Record<string, any>> = T & { id: string };
  */
 export function useMixedProperties<T extends Record<string, any>>(
   ids: string[],
-  selector: (node: grida.program.nodes.UnknwonNode) => T,
+  selector: (node: grida.program.nodes.UnknownNode) => T,
   options?: {
     /**
      * Keys to ignore in the mixed analysis.
@@ -62,7 +62,7 @@ export function useMixedProperties<T extends Record<string, any>>(
       ids.map((id) => {
         const node = state.document.nodes[
           id
-        ] as grida.program.nodes.UnknwonNode;
+        ] as grida.program.nodes.UnknownNode;
         return { ...selector(node), id } as WithId<T>;
       }),
     options?.isEqual
@@ -115,7 +115,7 @@ export function useMixedPaints() {
       for (const nodeId of ids) {
         const node = state.document.nodes[
           nodeId
-        ] as grida.program.nodes.UnknwonNode;
+        ] as grida.program.nodes.UnknownNode;
         if (!node) continue;
 
         const { paints } = editor.resolvePaints(node, "fill", 0);

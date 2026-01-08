@@ -158,7 +158,7 @@ function __self_evt_on_click(
       }
 
       try {
-        const _nnode = nnode as grida.program.nodes.UnknwonNode;
+        const _nnode = nnode as grida.program.nodes.UnknownNode;
 
         // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
         const center_translate_delta: cmath.Vector2 =

@@ -3771,7 +3771,7 @@ export namespace format {
       export function nodeLayout(
         builder: Builder,
         node: Pick<
-          grida.program.nodes.UnknwonNode,
+          grida.program.nodes.UnknownNode,
           | "position"
           | "left"
           | "top"
@@ -4123,7 +4123,7 @@ export namespace format {
             layoutOffset = format.layout.encode.nodeLayout(
               builder,
               node as Pick<
-                grida.program.nodes.UnknwonNode,
+                grida.program.nodes.UnknownNode,
                 | "position"
                 | "left"
                 | "top"
@@ -4506,7 +4506,7 @@ export namespace format {
             ...(fillPaints.length > 0 ? { fill_paints: fillPaints } : {}),
             ...(strokePaints.length > 0 ? { stroke_paints: strokePaints } : {}),
             ...(effects || {}),
-          } satisfies Partial<grida.program.nodes.UnknwonNode>;
+          } satisfies Partial<grida.program.nodes.UnknownNode>;
 
           // Shape-specific fields
           switch (tsNodeType) {

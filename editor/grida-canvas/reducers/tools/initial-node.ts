@@ -58,7 +58,7 @@ export default function initialNode(
     | "star"
     | "line",
   idfac: () => string,
-  seed: Partial<Omit<grida.program.nodes.UnknwonNode, "type">> = {},
+  seed: Partial<Omit<grida.program.nodes.UnknownNode, "type">> = {},
   constraints: {
     fill?: "fill" | "fill_paints";
     stroke?: "stroke" | "stroke_paints";

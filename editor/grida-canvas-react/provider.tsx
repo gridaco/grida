@@ -719,7 +719,7 @@ export function useRootTemplateInstanceNode(root_id: string) {
   );
 }
 
-export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
+export type NodeWithMeta = grida.program.nodes.UnknownNode & {
   meta: {
     is_component_consumer: boolean;
     is_flex_parent: boolean;
@@ -728,12 +728,12 @@ export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
 
 export function useNodeState<Selected>(
   node_id: string,
-  selector: (state: grida.program.nodes.UnknwonNode) => Selected
+  selector: (state: grida.program.nodes.UnknownNode) => Selected
 ) {
   const instance = useCurrentEditor();
   return useEditorState(instance, (state) => {
     const node = state.document.nodes[node_id];
-    return selector(node as grida.program.nodes.UnknwonNode);
+    return selector(node as grida.program.nodes.UnknownNode);
   });
 }
 
@@ -802,12 +802,12 @@ export function useNode(node_id: string): NodeWithMeta {
     node_definition = templates[template_id].nodes[node_id];
   }
 
-  const node: grida.program.nodes.UnknwonNode = useMemo(() => {
+  const node: grida.program.nodes.UnknownNode = useMemo(() => {
     return Object.assign(
       {},
       node_definition,
       node_change || {}
-    ) as grida.program.nodes.UnknwonNode;
+    ) as grida.program.nodes.UnknownNode;
   }, [node_definition, node_change]);
 
   const is_flex_parent = node.type === "container" && node.layout === "flex";
@@ -829,7 +829,7 @@ export function useNode(node_id: string): NodeWithMeta {
  */
 export function useComputedNode(
   node_id: string
-): grida.program.nodes.UnknwonComputedNode {
+): grida.program.nodes.UnknownComputedNode {
   const { props, text, html, src, href, fill } = useNodeState(
     node_id,
     (node) => ({
@@ -854,7 +854,7 @@ export function useComputedNode(
     true
   );
 
-  return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknwonComputedNode;
+  return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknownComputedNode;
 }
 
 export function useTemplateDefinition(template_id: string) {

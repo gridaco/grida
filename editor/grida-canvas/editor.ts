@@ -39,8 +39,8 @@ import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 
 function resolveNumberChangeValue(
-  node: grida.program.nodes.UnknwonNode,
-  key: keyof grida.program.nodes.UnknwonNode,
+  node: grida.program.nodes.UnknownNode,
+  key: keyof grida.program.nodes.UnknownNode,
   change: editor.api.NumberChange
 ): number {
   switch (change.type) {
@@ -1732,24 +1732,18 @@ class EditorDocumentStore
     axis: "width" | "height",
     value: grida.program.css.LengthPercentage | "auto"
   ) {
-    switch (axis) {
-      case "width": {
-        this.dispatch({
-          type: "node/change/*",
-          node_id: node_id,
-          layout_target_width: value,
-        });
-        break;
-      }
-      case "height": {
-        this.dispatch({
-          type: "node/change/*",
-          node_id: node_id,
-          layout_target_height: value,
-        });
-        break;
-      }
-    }
+    const axis_property_map: Record<
+      "width" | "height",
+      keyof grida.program.nodes.UnknownNode
+    > = {
+      width: "layout_target_width",
+      height: "layout_target_height",
+    };
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      [axis_property_map[axis]]: value,
+    });
   }
 
   changeNodePropertyFills(node_id: string | string[], fills: cg.Paint[]) {
@@ -1805,12 +1799,12 @@ class EditorDocumentStore
       // Note: resolvePaints returns the full paints array regardless of paintIndex
       // The paintIndex parameter (0) is only used for resolvedIndex calculation, which we ignore
       const { paints: currentFills } = editor.resolvePaints(
-        node as grida.program.nodes.UnknwonNode,
+        node as grida.program.nodes.UnknownNode,
         "fill",
         0
       );
       const { paints: currentStrokes } = editor.resolvePaints(
-        node as grida.program.nodes.UnknwonNode,
+        node as grida.program.nodes.UnknownNode,
         "stroke",
         0
       );
@@ -1882,7 +1876,7 @@ class EditorDocumentStore
   ) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
         "stroke_width",
         strokeWidth
       );
@@ -2045,7 +2039,7 @@ class EditorDocumentStore
   ): void {
     const node = this.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.UnknwonNode;
+    ) as grida.program.nodes.UnknownNode;
 
     const applyDelta = (
       currentValue: number | undefined,
@@ -2191,7 +2185,7 @@ class EditorDocumentStore
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
         "font_size",
         fontSize
       );
@@ -2300,7 +2294,7 @@ class EditorDocumentStore
   ) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
         "line_height",
         lineHeight
       );
@@ -2327,7 +2321,7 @@ class EditorDocumentStore
         value = undefined;
       } else {
         value = resolveNumberChangeValue(
-          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
           "letter_spacing",
           letterSpacing as editor.api.NumberChange
         );
@@ -2356,7 +2350,7 @@ class EditorDocumentStore
         value = undefined;
       } else {
         value = resolveNumberChangeValue(
-          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
           "word_spacing",
           wordSpacing as editor.api.NumberChange
         );
@@ -4938,7 +4932,7 @@ export class EditorSurface
       if (node) {
         const paintTarget = paint_target ?? "fill";
         const { paints, resolvedIndex } = editor.resolvePaints(
-          node as grida.program.nodes.UnknwonNode,
+          node as grida.program.nodes.UnknownNode,
           paintTarget,
           paint_index ?? 0
         );
@@ -5391,9 +5385,16 @@ export class EditorSurface
   autoSizeTextNode(node_id: string, axis: "width" | "height") {
     const node = this._editor.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.UnknwonNode;
+    ) as grida.program.nodes.UnknownNode;
     if (node.type !== "tspan") return;
 
+    const axis_property_map: Record<
+      "width" | "height",
+      keyof grida.program.nodes.UnknownNode
+    > = {
+      width: "layout_target_width",
+      height: "layout_target_height",
+    };
     const prev =
       this._editor.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
     if (!prev) return;
@@ -5411,7 +5412,7 @@ export class EditorSurface
       this._editor.doc.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        [axis]: "auto",
+        [axis_property_map[axis]]: "auto",
       });
 
       requestAnimationFrame(() => {
@@ -5617,7 +5618,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#name}
+   * {@link grida.program.nodes.UnknownNode#name}
    */
   set name(name: string) {
     this.doc.dispatch({
@@ -5628,14 +5629,14 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#name}
+   * {@link grida.program.nodes.UnknownNode#name}
    */
   get name() {
     return this.$.name;
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#active}
+   * {@link grida.program.nodes.UnknownNode#active}
    */
   set active(active: boolean) {
     this.doc.dispatch({
@@ -5646,14 +5647,14 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#active}
+   * {@link grida.program.nodes.UnknownNode#active}
    */
   get active() {
     return this.$.active;
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#locked}
+   * {@link grida.program.nodes.UnknownNode#locked}
    */
   set locked(locked: boolean) {
     this.doc.dispatch({
@@ -5664,14 +5665,14 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#locked}
+   * {@link grida.program.nodes.UnknownNode#locked}
    */
   get locked() {
     return this.$.locked;
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#rotation}
+   * {@link grida.program.nodes.UnknownNode#rotation}
    */
   set rotation(rotation: number) {
     this.doc.dispatch({
@@ -5685,7 +5686,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
     const value = resolveNumberChangeValue(
       this.doc.getNodeSnapshotById(
         this.node_id
-      ) as grida.program.nodes.UnknwonNode,
+      ) as grida.program.nodes.UnknownNode,
       "rotation",
       change
     );
@@ -5697,7 +5698,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   };
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#opacity}
+   * {@link grida.program.nodes.UnknownNode#opacity}
    */
   set opacity(opacity: number) {
     this.doc.dispatch({
@@ -5711,7 +5712,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
     const value = resolveNumberChangeValue(
       this.doc.getNodeSnapshotById(
         this.node_id
-      ) as grida.program.nodes.UnknwonNode,
+      ) as grida.program.nodes.UnknownNode,
       "opacity",
       change
     );
@@ -5724,7 +5725,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#blend_mode}
+   * {@link grida.program.nodes.UnknownNode#blend_mode}
    */
   set blend_mode(blend_mode: cg.LayerBlendMode) {
     this.doc.dispatch({
@@ -5735,7 +5736,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#mask}
+   * {@link grida.program.nodes.UnknownNode#mask}
    */
   set mask(mask: cg.LayerMaskType | null | undefined) {
     this.doc.dispatch({
