@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// <search>
+// "Leave site?" (chrome default)
+// "Changes you made may not be saved." (chrome default)
+
 /**
  * Hook to warn users about unsaved changes when leaving the page
  * @param isDirty - Function that returns whether there are unsaved changes

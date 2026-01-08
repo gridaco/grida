@@ -115,6 +115,27 @@ import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { PlaygroundMenuContent } from "./uxhost-menu";
 import { Library } from "../library/library";
+import { io } from "@grida/io";
+
+/**
+ * Hook for accessing the playground OPFS handle.
+ * Returns null if OPFS is not supported or handle creation fails.
+ */
+function usePlaygroundOPFS(): io.opfs.Handle | null {
+  return useMemo(() => {
+    if (!io.opfs.Handle.isSupported()) {
+      return null;
+    }
+    try {
+      return new io.opfs.Handle({
+        directory: ["playground", "current"],
+      });
+    } catch (error) {
+      console.error("Failed to create OPFS handle:", error);
+      return null;
+    }
+  }, []);
+}
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -224,6 +245,7 @@ export default function CanvasPlayground({
   useDisableSwipeBack();
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
+  const opfs = usePlaygroundOPFS();
   const [documentReady, setDocumentReady] = useState(() => !src);
   const [canvasReady, setCanvasReady] = useState(false);
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(
@@ -273,44 +295,82 @@ export default function CanvasPlayground({
   useEffect(() => {
     let cancelled = false;
 
-    if (!src) {
-      setDocumentReady(!!document);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const controller = new AbortController();
-    setDocumentReady(false);
-
     const load = async () => {
-      try {
-        const res = await fetch(src, { signal: controller.signal });
-        if (!res.ok) {
-          throw new Error(
-            `Failed to fetch document: ${res.status} ${res.statusText}`
+      if (src) {
+        // If src is provided, load it and persist to OPFS
+        const controller = new AbortController();
+        setDocumentReady(false);
+
+        try {
+          const res = await fetch(src, { signal: controller.signal });
+          if (!res.ok) {
+            throw new Error(
+              `Failed to fetch document: ${res.status} ${res.statusText}`
+            );
+          }
+          const file = await res.json();
+          if (cancelled) {
+            return;
+          }
+          instance.commands.reset(
+            editor.state.init({
+              editable: true,
+              document: file.document,
+            }),
+            src
           );
+
+          // Persist loaded document to OPFS
+          if (opfs) {
+            try {
+              const bytes = io.GRID.encode(file.document);
+              await opfs.get("document.grida").write(bytes);
+            } catch (error) {
+              console.error("Failed to persist src to OPFS:", error);
+            }
+          }
+        } catch (error) {
+          if (controller.signal.aborted) {
+            return;
+          }
+          console.error("Failed to load playground document", error);
+        } finally {
+          if (!cancelled) {
+            setDocumentReady(true);
+          }
         }
-        const file = await res.json();
-        if (cancelled) {
-          return;
+      } else {
+        // No src: try to load from OPFS, otherwise use provided document or empty
+        setDocumentReady(false);
+
+        try {
+          if (opfs) {
+            const bytes = await opfs.get("document.grida").read();
+            if (bytes && !cancelled) {
+              const loadedDocument = io.GRID.decode(bytes);
+              instance.commands.reset(
+                editor.state.init({
+                  editable: true,
+                  document: loadedDocument,
+                }),
+                "opfs"
+              );
+              setDocumentReady(true);
+              return;
+            }
+          }
+        } catch (error) {
+          // File not found or other error - continue to fallback
+          if (error instanceof Error && error.message.includes("not found")) {
+            // File doesn't exist yet - this is fine, continue to fallback
+          } else {
+            console.error("Failed to load from OPFS:", error);
+          }
         }
-        console.log("file.document", file.document);
-        instance.commands.reset(
-          editor.state.init({
-            editable: true,
-            document: file.document,
-          }),
-          src
-        );
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-        console.error("Failed to load playground document", error);
-      } finally {
+
+        // Fallback to provided document or empty
         if (!cancelled) {
-          setDocumentReady(true);
+          setDocumentReady(!!document);
         }
       }
     };
@@ -319,9 +379,8 @@ export default function CanvasPlayground({
 
     return () => {
       cancelled = true;
-      controller.abort();
     };
-  }, [document, instance, src]);
+  }, [document, instance, src, opfs]);
 
   const ready = documentReady && canvasReady;
 
@@ -373,6 +432,7 @@ function Consumer({
     setRightSidebarTab,
   } = useUILayout();
   const instance = useCurrentEditor();
+  const opfs = usePlaygroundOPFS();
   const debug = useEditorState(instance, (state) => state.debug);
   const libraryWindowControls = useFloatingWindowControls({
     defaultOpen: false,
@@ -433,10 +493,25 @@ function Consumer({
     });
   });
 
+  // Cmd/Ctrl+S: save to OPFS
   useHotkeys(
     "meta+s, ctrl+s",
-    () => {
-      onExport();
+    async () => {
+      if (opfs) {
+        try {
+          const document = instance.getSnapshot().document;
+          const bytes = io.GRID.encode(document);
+          await opfs.get("document.grida").write(bytes);
+          toast.success("Saved", {
+            position: "bottom-left",
+          });
+        } catch (error) {
+          console.error("Failed to save to OPFS:", error);
+          toast.error("Failed to save", {
+            position: "bottom-left",
+          });
+        }
+      }
     },
     {
       preventDefault: true,

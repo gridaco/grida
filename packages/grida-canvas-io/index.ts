@@ -5,6 +5,9 @@ import { XMLParser } from "fast-xml-parser";
 import { imageSize } from "image-size";
 import { format } from "./format";
 
+// Type alias to avoid namespace shadowing inside io namespace
+type GridaDocument = grida.program.document.Document;
+
 const IMAGE_TYPE_TO_MIME_TYPE: Record<
   string,
   grida.program.document.ImageType
@@ -1012,6 +1015,309 @@ export namespace io {
       }
 
       return { document, manifest, images, bitmaps };
+    }
+  }
+
+  export namespace GRID {
+    /**
+     * Encodes a Grida document to raw FlatBuffers bytes.
+     *
+     * This is a minimal API for persisting documents without ZIP containers.
+     * Non-persisted fields (images, bitmaps) are stripped before encoding.
+     *
+     * @param document - The Grida document to encode
+     * @param schemaVersion - Optional schema version (defaults to current)
+     * @returns Uint8Array containing raw FlatBuffers bytes
+     *
+     * @example
+     * ```typescript
+     * const bytes = io.grida.encode(document);
+     * await opfs.writeBytes(bytes);
+     * ```
+     */
+    export function encode(
+      document: GridaDocument,
+      schemaVersion: string = grida.program.document.SCHEMA_VERSION
+    ): Uint8Array {
+      // Strip non-persisted fields (images, bitmaps) before encoding
+      const { images, bitmaps, ...persistedDocument } = document;
+      return format.document.encode.toFlatbuffer(
+        persistedDocument as GridaDocument,
+        schemaVersion
+      );
+    }
+
+    /**
+     * Decodes raw FlatBuffers bytes to a Grida document.
+     *
+     * @param bytes - Raw FlatBuffers bytes (must start with "GRID" magic)
+     * @returns Decoded Grida document (with empty images/bitmaps)
+     *
+     * @example
+     * ```typescript
+     * const bytes = await opfs.readBytes();
+     * const document = io.grida.decode(bytes);
+     * ```
+     */
+    export function decode(bytes: Uint8Array): GridaDocument {
+      const document = format.document.decode.fromFlatbuffer(bytes);
+      // Ensure images and bitmaps are empty (they're not persisted)
+      return {
+        ...document,
+        images: {},
+        bitmaps: {},
+      };
+    }
+  }
+
+  /**
+   * Grida-specific OPFS (Origin Private File System) adapter.
+   *
+   * Provides utilities for persisting Grida documents and assets to the browser's
+   * Origin Private File System. This is a Grida-specific adapter that works with
+   * a fixed file structure within a configurable directory path.
+   *
+   * **Fixed Structure:**
+   * - `document.grida` - Raw FlatBuffers bytes of the Grida document
+   * - `thumbnail.png` - Document thumbnail (reserved for future)
+   * - `images/` - Image assets directory (reserved for future)
+   *
+   * **Usage:**
+   * ```typescript
+   * const handle = new io.opfs.Handle({
+   *   directory: ["playground", "current"]
+   * });
+   *
+   * // Read document
+   * const bytes = await handle.get('document.grida').read();
+   * const document = io.GRID.decode(bytes);
+   *
+   * // Write document
+   * const encoded = io.GRID.encode(document);
+   * await handle.get('document.grida').write(encoded);
+   *
+   * // Delete document
+   * await handle.get('document.grida').delete();
+   * ```
+   *
+   * @remarks
+   * - All methods throw errors on failure (no silent failures)
+   * - OPFS is only available in secure contexts (HTTPS or localhost)
+   * - Directory path segments are created automatically if they don't exist
+   */
+  export namespace opfs {
+    /**
+     * Configuration for Grida OPFS storage.
+     * Defines the directory path where Grida files are stored.
+     *
+     * Fixed structure within the directory:
+     * - document.grida (raw FlatBuffers bytes)
+     * - thumbnail.png (reserved for future)
+     * - images/ (reserved for future)
+     */
+    export interface Config {
+      /**
+       * Directory path segments (e.g., ["playground", "current"])
+       * Will be created if they don't exist.
+       */
+      directory: string[];
+    }
+
+    /**
+     * Strongly-typed file keys for Grida OPFS structure.
+     */
+    export type FileKey = "document.grida" | "thumbnail.png";
+
+    /**
+     * File handle interface for OPFS file operations.
+     */
+    export interface FileHandle {
+      /**
+       * Reads the file from OPFS.
+       * @returns Raw bytes
+       * @throws If file not found or read fails
+       */
+      read(): Promise<Uint8Array>;
+
+      /**
+       * Writes bytes to the file in OPFS.
+       * @param bytes - Raw bytes to write
+       * @throws If write fails
+       */
+      write(bytes: Uint8Array): Promise<void>;
+
+      /**
+       * Deletes the file from OPFS.
+       * @throws If delete fails (except if file doesn't exist)
+       */
+      delete(): Promise<void>;
+    }
+
+    /**
+     * OPFS handle for accessing Grida files.
+     *
+     * Provides strongly-typed access to files in the Grida OPFS structure.
+     * Directory is created automatically on first access.
+     *
+     * @example
+     * ```typescript
+     * const handle = new io.opfs.Handle({
+     *   directory: ["playground", "current"]
+     * });
+     *
+     * // Read document
+     * const bytes = await handle.get('document.grida').read();
+     * const document = io.GRID.decode(bytes);
+     *
+     * // Write document
+     * const encoded = io.GRID.encode(document);
+     * await handle.get('document.grida').write(encoded);
+     *
+     * // Delete document
+     * await handle.get('document.grida').delete();
+     * ```
+     */
+    export class Handle {
+      private _dirHandle: FileSystemDirectoryHandle | null = null;
+      private _dirHandlePromise: Promise<FileSystemDirectoryHandle> | null =
+        null;
+      private _fileHandles = new Map<FileKey, FileHandle>();
+
+      constructor(private readonly config: Config) {
+        if (!Handle.isSupported()) {
+          throw new Error("OPFS is not supported in this environment");
+        }
+      }
+
+      /**
+       * Checks if OPFS is supported in the current environment.
+       */
+      static isSupported(): boolean {
+        return (
+          typeof window !== "undefined" &&
+          "storage" in navigator &&
+          "getDirectory" in navigator.storage &&
+          window.isSecureContext
+        );
+      }
+
+      /**
+       * Gets or creates the directory handle (cached).
+       */
+      private async getDirectoryHandle(): Promise<FileSystemDirectoryHandle> {
+        if (this._dirHandle) {
+          return this._dirHandle;
+        }
+
+        if (this._dirHandlePromise) {
+          return this._dirHandlePromise;
+        }
+
+        this._dirHandlePromise = (async () => {
+          try {
+            const root = await navigator.storage.getDirectory();
+            let currentDir = root;
+
+            for (const segment of this.config.directory) {
+              currentDir = await currentDir.getDirectoryHandle(segment, {
+                create: true,
+              });
+            }
+
+            this._dirHandle = currentDir;
+            return currentDir;
+          } catch (error) {
+            this._dirHandlePromise = null;
+            throw new Error(
+              `Failed to get OPFS directory: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        })();
+
+        return this._dirHandlePromise;
+      }
+
+      /**
+       * Creates a file handle for the given filename.
+       */
+      private createFileHandle(filename: FileKey): FileHandle {
+        return {
+          read: async (): Promise<Uint8Array> => {
+            const dir = await this.getDirectoryHandle();
+
+            try {
+              const fileHandle = await dir.getFileHandle(filename);
+              const file = await fileHandle.getFile();
+              const bytes = new Uint8Array(await file.arrayBuffer());
+              return bytes;
+            } catch (error) {
+              if (
+                error instanceof DOMException &&
+                (error.name === "NotFoundError" ||
+                  error.name === "TypeMismatchError")
+              ) {
+                throw new Error(`${filename} not found in OPFS`);
+              }
+              throw new Error(
+                `Failed to read OPFS ${filename}: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+          },
+
+          write: async (bytes: Uint8Array): Promise<void> => {
+            const dir = await this.getDirectoryHandle();
+
+            try {
+              const fileHandle = await dir.getFileHandle(filename, {
+                create: true,
+              });
+              const writable = await fileHandle.createWritable();
+              await writable.write(
+                bytes as unknown as FileSystemWriteChunkType
+              );
+              await writable.close();
+            } catch (error) {
+              throw new Error(
+                `Failed to write OPFS ${filename}: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+          },
+
+          delete: async (): Promise<void> => {
+            const dir = await this.getDirectoryHandle();
+
+            try {
+              await dir.removeEntry(filename);
+            } catch (error) {
+              // File doesn't exist - this is not an error
+              if (
+                error instanceof DOMException &&
+                error.name === "NotFoundError"
+              ) {
+                return;
+              }
+              throw new Error(
+                `Failed to delete OPFS ${filename}: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+          },
+        };
+      }
+
+      /**
+       * Strongly-typed file accessor.
+       * @example
+       * ```typescript
+       * const bytes = await handle.get('document.grida').read();
+       * await handle.get('document.grida').write(bytes);
+       * ```
+       */
+      get(key: FileKey): FileHandle {
+        if (!this._fileHandles.has(key)) {
+          this._fileHandles.set(key, this.createFileHandle(key));
+        }
+        return this._fileHandles.get(key)!;
+      }
     }
   }
 
