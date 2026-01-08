@@ -65,6 +65,7 @@ import cg from "@grida/cg";
 import vn from "@grida/vn";
 import tree from "@grida/tree";
 import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
+import { generateKeyBetween } from "@grida/sequence";
 import "core-js/features/object/group-by";
 
 /**
@@ -115,6 +116,23 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         return state;
       }
 
+      // Calculate auto-incremented position
+      // Get all existing scenes sorted by position
+      const existingScenes = state.document.scenes_ref
+        .map((id) => state.document.nodes[id] as grida.program.nodes.SceneNode)
+        .filter(
+          (node): node is grida.program.nodes.SceneNode =>
+            node?.type === "scene"
+        )
+        .sort((a, b) => (a.position ?? "").localeCompare(b.position ?? ""));
+
+      // Generate position after the last scene (or "a0" if no scenes exist)
+      const lastPosition =
+        existingScenes.length > 0
+          ? (existingScenes[existingScenes.length - 1]?.position ?? null)
+          : null;
+      const newPosition = generateKeyBetween(lastPosition, null);
+
       // Create scene as a SceneNode
       const new_scene_node: grida.program.nodes.SceneNode = {
         type: "scene",
@@ -125,7 +143,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         constraints: {
           children: scene?.constraints?.children ?? "multiple",
         },
-        order: scene?.order ?? scene_count,
+        position: scene?.position ?? newPosition,
         guides: scene?.guides ?? [],
         edges: scene?.edges ?? [],
         background_color: scene?.background_color,
@@ -194,12 +212,31 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const origin_children = state.document.links[scene_id] || [];
       const new_scene_id = context.idgen.next();
 
+      // Calculate auto-incremented position after the original scene
+      const existingScenes = state.document.scenes_ref
+        .map((id) => state.document.nodes[id] as grida.program.nodes.SceneNode)
+        .filter(
+          (node): node is grida.program.nodes.SceneNode =>
+            node?.type === "scene"
+        )
+        .sort((a, b) => (a.position ?? "").localeCompare(b.position ?? ""));
+
+      // Find the original scene's position and generate next position
+      const originPosition = origin_node.position ?? null;
+      const originIndex = existingScenes.findIndex((s) => s.id === scene_id);
+      const nextScene =
+        originIndex >= 0 && originIndex < existingScenes.length - 1
+          ? existingScenes[originIndex + 1]
+          : null;
+      const nextPosition = nextScene?.position ?? null;
+      const newPosition = generateKeyBetween(originPosition, nextPosition);
+
       // Create duplicated SceneNode
       const new_scene_node: grida.program.nodes.SceneNode = {
         ...origin_node,
         id: new_scene_id,
         name: origin_node.name + " copy",
-        order: origin_node.order ? origin_node.order + 1 : undefined,
+        position: newPosition,
       };
 
       return updateState(state, (draft) => {
@@ -569,7 +606,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             if (delta) {
               sub.scene.children_refs.forEach((node_id) => {
                 const node = sub.nodes[node_id];
-                if ("position" in node && node.position === "absolute") {
+                if (
+                  "position" in node &&
+                  node.position === "absolute" &&
+                  "left" in node &&
+                  "top" in node
+                ) {
                   node.left = (node.left ?? 0) + delta[0];
                   node.top = (node.top ?? 0) + delta[1];
                 }
@@ -586,7 +628,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               if (parent_rect) {
                 sub.scene.children_refs.forEach((node_id) => {
                   const node = sub.nodes[node_id];
-                  if ("position" in node && node.position === "absolute") {
+                  if (
+                    "position" in node &&
+                    node.position === "absolute" &&
+                    "left" in node &&
+                    "top" in node
+                  ) {
                     node.left = (node.left ?? 0) - parent_rect.x;
                     node.top = (node.top ?? 0) - parent_rect.y;
                   }
@@ -797,7 +844,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       sub.scene.children_refs.forEach((node_id) => {
         const node = sub.nodes[node_id];
-        if ("position" in node && node.position === "absolute") {
+        if (
+          "position" in node &&
+          node.position === "absolute" &&
+          "left" in node &&
+          "top" in node
+        ) {
           node.left = (node.left ?? 0) + placement.x;
           node.top = (node.top ?? 0) + placement.y;
         }
@@ -811,7 +863,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         if (parent_rect) {
           sub.scene.children_refs.forEach((node_id) => {
             const node = sub.nodes[node_id];
-            if ("position" in node && node.position === "absolute") {
+            if (
+              "position" in node &&
+              node.position === "absolute" &&
+              "left" in node &&
+              "top" in node
+            ) {
               node.left = (node.left ?? 0) - parent_rect.x;
               node.top = (node.top ?? 0) - parent_rect.y;
             }
@@ -1010,7 +1067,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           .filter((node) => {
             if ("position" in node) {
               return (
+                "position" in node &&
                 node.position === "relative" &&
+                "top" in node &&
+                "right" in node &&
+                "bottom" in node &&
+                "left" in node &&
                 node.top === undefined &&
                 node.right === undefined &&
                 node.bottom === undefined &&

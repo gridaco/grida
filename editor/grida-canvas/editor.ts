@@ -2817,14 +2817,12 @@ export class Editor
   }
 
   public archive(): Blob {
-    const documentData = {
-      version: "0.89.0-beta+20251219",
-      document: this.getSnapshot().document,
-    } satisfies io.JSONDocumentFileModel;
-
-    const blob = new Blob([io.archive.pack(documentData) as BlobPart], {
-      type: "application/zip",
-    });
+    const blob = new Blob(
+      [io.archive.pack(this.getSnapshot().document) as BlobPart],
+      {
+        type: "application/zip",
+      }
+    );
 
     return blob;
   }

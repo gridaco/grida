@@ -105,7 +105,7 @@ export function ScenesList() {
 
   const scenes = useMemo(() => {
     return Object.values(scenesmap).sort(
-      (a, b) => (a.order ?? 0) - (b.order ?? 0)
+      (a, b) => (a.position ?? "").localeCompare(b.position ?? "")
     );
   }, [scenesmap]);
 

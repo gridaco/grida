@@ -409,6 +409,9 @@ importers:
       '@grida/schema':
         specifier: workspace:*
         version: link:../packages/grida-canvas-schema
+      '@grida/sequence':
+        specifier: workspace:*
+        version: link:../packages/grida-canvas-sequence
       '@grida/tailwindcss-colors':
         specifier: ^4
         version: 4.0.0
@@ -1126,6 +1129,9 @@ importers:
       '@grida/format':
         specifier: workspace:*
         version: link:../grida-format
+      '@grida/sequence':
+        specifier: workspace:*
+        version: link:../grida-canvas-sequence
       fast-png:
         specifier: ^6.3.0
         version: 6.3.0

@@ -28,7 +28,6 @@ const document: editor.state.IEditorStateInit = {
         constraints: {
           children: "multiple",
         },
-        order: 1,
       },
       scene_join: {
         type: "scene",
@@ -41,7 +40,6 @@ const document: editor.state.IEditorStateInit = {
         constraints: {
           children: "multiple",
         },
-        order: 2,
       },
       scene_portal: {
         type: "scene",
@@ -54,7 +52,6 @@ const document: editor.state.IEditorStateInit = {
         constraints: {
           children: "multiple",
         },
-        order: 3,
       },
       invite: {
         id: "invite",

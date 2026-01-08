@@ -46,6 +46,7 @@
     "@grida/pixel-grid": "workspace:*",
     "@grida/ruler": "workspace:*",
     "@grida/schema": "workspace:*",
+    "@grida/sequence": "workspace:*",
     "@grida/tailwindcss-colors": "^4",
     "@grida/tokens": "workspace:*",
     "@grida/transparency-grid": "workspace:*",

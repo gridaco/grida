@@ -1,9 +1,9 @@
-import type grida from "@grida/schema";
-import type cmath from "@grida/cmath";
+import grida from "@grida/schema";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { encode, decode, type PngDataArray } from "fast-png";
 import { XMLParser } from "fast-xml-parser";
 import { imageSize } from "image-size";
+import { format } from "./format";
 
 const IMAGE_TYPE_TO_MIME_TYPE: Record<
   string,
@@ -599,35 +599,14 @@ export namespace io {
   }
 
   /**
-   * Grida Document File model
-   * .grida file is a JSON file that contains the document structure and metadata.
+   * Snapshot model (JSON)
    *
-   * used for web usage
+   * This is NOT a supported `.grida` file format. It's intended for tests and
+   * legacy conversion only.
    */
-  export interface JSONDocumentFileModel {
-    version: typeof grida.program.document.SCHEMA_VERSION;
+  export interface SnapshotDocumentModel {
+    version: string;
     document: grida.program.document.Document;
-  }
-
-  /**
-   * Archive File model
-   * .grida file is a ZIP archive that contains the JSON document file and resources.
-   *
-   * used for archives & desktop usage
-   */
-  export interface ArchiveFileModel {
-    version: typeof grida.program.document.SCHEMA_VERSION;
-    document: JSONDocumentFileModel;
-
-    /**
-     * raw images, uploaded by the user
-     */
-    images: Record<string, Uint8ClampedArray>;
-
-    /**
-     * bitmaps modified by the user
-     */
-    bitmaps: Record<string, cmath.raster.Bitmap>;
   }
 
   /**
@@ -654,58 +633,145 @@ export namespace io {
   }
 
   /**
-   * Checks if a File contains valid JSON.
-   *
-   * This function performs a two-step validation:
-   * 1. Reads a 1KB sample and verifies it starts with "{" or "[".
-   * 2. If the sample passes the heuristic, reads the full file and attempts to parse it with JSON.parse.
-   *
-   * @param file - The File to validate.
-   * @returns A Promise that resolves to the parsed JSON object if the file contains valid JSON,
-   * or `false` if the file is not valid JSON.
+   * Checks if bytes are a raw FlatBuffers .grida buffer by verifying the file
+   * identifier ("GRID") at bytes[4..7].
    */
-  export async function is_json(file: File): Promise<false | any> {
-    try {
-      // Step 1: Heuristic check with a 1KB sample.
-      const sample = await file.slice(0, 1024).text();
-      if (!sample.trim().startsWith("{") && !sample.trim().startsWith("[")) {
-        return false;
+  export function is_grid(bytes: Uint8Array): boolean {
+    return (
+      bytes.length >= 8 &&
+      bytes[4] === 0x47 && // G
+      bytes[5] === 0x52 && // R
+      bytes[6] === 0x49 && // I
+      bytes[7] === 0x44 // D
+    );
+  }
+
+  export namespace fileformat {
+    export type Kind = "grida" | "zip" | "unknown";
+
+    export type Detected =
+      | { kind: "grida"; bytes: Uint8Array }
+      | {
+          kind: "zip";
+          bytes: Uint8Array;
+          archive: {
+            manifest: io.archive.Manifest;
+            document: Uint8Array;
+            images: Record<string, Uint8Array>;
+            bitmaps: Record<string, io.Bitmap>;
+          };
+        }
+      | { kind: "unknown"; bytes?: Uint8Array };
+
+    /**
+     * Detects the .grida file format and returns a processed result so callers
+     * don't repeat expensive work (unzip).
+     */
+    export async function detect(file: File): Promise<Detected> {
+      // ZIP? (cheap: reads 4 bytes)
+      const head4 = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      const isZip =
+        head4.length >= 4 &&
+        head4[0] === 0x50 &&
+        head4[1] === 0x4b &&
+        (head4[2] === 0x03 || head4[2] === 0x05);
+
+      if (isZip) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        try {
+          const files = unzipSync(bytes);
+
+          // FlatBuffers container manifest?
+          if (files["manifest.json"]) {
+            const manifestJson = strFromU8(files["manifest.json"]);
+            const manifest = JSON.parse(manifestJson) as io.archive.Manifest;
+
+            const document = files["document.grida"] ?? null;
+
+            if (manifest.document_file === "document.grida" && document) {
+              if (!document) return { kind: "unknown", bytes };
+
+              const images: Record<string, Uint8Array> = {};
+              const prefix = "images/";
+              for (const [path, data] of Object.entries(files)) {
+                if (path.startsWith(prefix) && path !== prefix) {
+                  images[path.slice(prefix.length)] = data;
+                }
+              }
+
+              const bitmaps: Record<string, io.Bitmap> = {};
+              const bmpPrefix = "bitmaps/";
+              for (const [path, data] of Object.entries(files)) {
+                if (
+                  path.startsWith(bmpPrefix) &&
+                  path.endsWith(".png") &&
+                  path !== bmpPrefix
+                ) {
+                  const key = path.slice(bmpPrefix.length, -4);
+                  try {
+                    const pngd = decode(data);
+                    bitmaps[key] = {
+                      version: 0,
+                      width: pngd.width,
+                      height: pngd.height,
+                      data: __norm_png_data(pngd.data),
+                    };
+                  } catch {
+                    // ignore invalid bitmap
+                  }
+                }
+              }
+
+              return {
+                kind: "zip",
+                bytes,
+                archive: { manifest, document, images, bitmaps },
+              };
+            }
+          }
+        } catch {
+          // Invalid ZIP; fall through
+        }
+
+        return { kind: "unknown", bytes };
       }
 
-      // Step 2: Read the full file and validate JSON structure.
-      const fullText = await file.text();
-      return JSON.parse(fullText);
-    } catch {
-      return false;
+      // Raw FlatBuffers? (cheap: reads 8 bytes)
+      const head8 = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+      if (io.is_grid(head8)) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        return { kind: "grida", bytes };
+      }
+
+      return { kind: "unknown" };
     }
   }
 
   export async function load(file: File): Promise<LoadedDocument> {
-    if (await is_zip(file)) {
-      const buffer = await file.arrayBuffer();
-      const unpacked = archive.unpack(new Uint8Array(buffer));
+    const detected = await fileformat.detect(file);
+
+    // Handle FlatBuffers ZIP container
+    if (detected.kind === "zip") {
       const {
-        version,
-        document: { document },
+        document: fbBytes,
         images: _x_images,
         bitmaps: _x_bitmaps,
-      } = unpacked;
+      } = detected.archive;
 
-      // convert images to blob URLs and create ImageRef objects
+      // Decode FlatBuffers document
+      const document = format.document.decode.fromFlatbuffer(fbBytes);
+
+      // Convert images
       const images: Record<string, grida.program.document.ImageRef> = {};
       for (const [key, imageData] of Object.entries(_x_images)) {
-        // Get image dimensions using image-size package
         const dimensions = imageSize(new Uint8Array(imageData));
         if (!dimensions || !dimensions.width || !dimensions.height) {
           throw new Error(`Failed to get dimensions for image: ${key}`);
         }
-
         const { width, height, type } = dimensions;
-
         const mimeType = IMAGE_TYPE_TO_MIME_TYPE[type || "png"] || "image/png";
         const blob = new Blob([imageData as BlobPart], { type: mimeType });
         const url = URL.createObjectURL(blob);
-
         images[url] = {
           url,
           width,
@@ -715,104 +781,173 @@ export namespace io {
         };
       }
 
-      // load bitmaps
-      const bitmaps: LoadedDocument["document"]["bitmaps"] = {};
-      for (const key in _x_bitmaps) {
-        const bitmap = _x_bitmaps[key];
-        bitmaps[key] = {
-          version: 0,
-          data: bitmap.data,
-          width: bitmap.width,
-          height: bitmap.height,
-        };
-      }
-
       return {
-        version,
-        document: { ...document, bitmaps: bitmaps, images: images },
+        version: grida.program.document.SCHEMA_VERSION,
+        document: { ...document, images, bitmaps: _x_bitmaps },
       } satisfies LoadedDocument;
     }
 
-    const maybe_json = await is_json(file);
-    if (maybe_json) {
-      return json.parse(maybe_json);
+    // Handle raw FlatBuffers binary
+    if (detected.kind === "grida") {
+      const document = format.document.decode.fromFlatbuffer(detected.bytes);
+      return {
+        version: grida.program.document.SCHEMA_VERSION,
+        document: { ...document, images: {}, bitmaps: {} },
+      } satisfies LoadedDocument;
     }
 
     throw new Error(`Unsupported file type: ${file.type}`);
   }
 
-  export namespace json {
-    export function parse(content: string | any): JSONDocumentFileModel {
-      const json: JSONDocumentFileModel =
-        typeof content === "string" ? JSON.parse(content) : content;
-
-      const bitmaps = json.document.bitmaps ?? {};
-
-      // serialize by type
-      // url    | string
-      // bitmap | Array => Uint8ClampedArray
-      for (const key of Object.keys(bitmaps)) {
-        const entry = bitmaps[key];
-        if (Array.isArray(entry.data)) {
-          entry.data = new Uint8ClampedArray(entry.data);
-        }
-      }
-
-      return {
-        version: json.version,
-        document: {
-          nodes: json.document.nodes,
-          links: json.document.links,
-          scenes_ref: json.document.scenes_ref,
-          entry_scene_id: json.document.entry_scene_id,
-          bitmaps: bitmaps,
-          images: json.document.images ?? {},
-          properties: json.document.properties ?? {},
-          metadata: json.document.metadata,
-        },
-      } satisfies JSONDocumentFileModel;
+  /**
+   * Snapshot (JSON) helpers.
+   *
+   * This is intentionally "as-is" JSON:
+   * - no ZIP container
+   * - no normalization/conversion
+   */
+  export namespace snapshot {
+    export function parse(content: string | any): any {
+      return typeof content === "string" ? JSON.parse(content) : content;
     }
 
-    export function stringify(model: JSONDocumentFileModel): string {
-      return JSON.stringify(model, (key, value) => {
-        if (value instanceof Uint8ClampedArray) {
-          return Array.from(value);
+    export function stringify(model: unknown): string {
+      return JSON.stringify(model);
+    }
+
+    /**
+     * Internal snapshot ZIP format (`.snapshot.zip`).
+     *
+     * This is a test-only format that stores snapshot JSON in a ZIP archive.
+     * It's used for fixtures and internal testing purposes only.
+     * Not part of the public `.grida` file format specification.
+     */
+    export namespace zip {
+      /**
+       * Packs a snapshot document model into a `.snapshot.zip` file.
+       *
+       * @param model - The snapshot document model to pack
+       * @returns Uint8Array containing the ZIP archive with `snapshot.json` inside
+       */
+      export function pack(model: SnapshotDocumentModel): Uint8Array {
+        const json = stringify(model);
+        return zipSync({
+          "snapshot.json": strToU8(json),
+        });
+      }
+
+      /**
+       * Unpacks a `.snapshot.zip` file into a snapshot document model.
+       *
+       * @param zipData - The ZIP archive bytes
+       * @returns The parsed snapshot document model
+       * @throws If the ZIP is invalid or missing `snapshot.json`
+       */
+      export function unpack(zipData: Uint8Array): SnapshotDocumentModel {
+        const files = unzipSync(zipData);
+        const snapshotJson = strFromU8(files["snapshot.json"]);
+        if (!snapshotJson) {
+          throw new Error("Missing snapshot.json in zip file");
         }
-        return value;
-      });
+        return parse(snapshotJson) as SnapshotDocumentModel;
+      }
     }
   }
 
-  export namespace archive {
-    export function pack(
-      mem: JSONDocumentFileModel,
-      images?: Record<string, Uint8ClampedArray>
-    ): Uint8Array {
-      const archive_targeted_document = {
-        version: mem.version,
-        document: {
-          ...mem.document,
-          // remove bitmaps from document
-          // TODO: in the future, reduce this to zip-local path references
-          bitmaps: {},
-        },
-      } satisfies ArchiveFileModel["document"];
+  export type Bitmap = {
+    version: number;
+    width: number;
+    height: number;
+    data: Uint8ClampedArray;
+  };
 
-      const files: Record<string, Uint8Array> = {
-        "document.json": strToU8(io.json.stringify(archive_targeted_document)),
-        "images/": new Uint8Array(), // ensures images folder exists
-        "bitmaps/": new Uint8Array(), // ensures bitmaps folder exists
+  export namespace archive {
+    /**
+     * Grida `.grida` archive (ZIP) format.
+     *
+     * A `.grida` file can be:
+     * - raw FlatBuffers (starts with file identifier "GRID")
+     * - ZIP archive containing:
+     *   - `manifest.json`
+     *   - `document.grida`
+     *   - optional `images/*`
+     */
+    export interface Manifest {
+      document_file: "document.grida";
+      /**
+       * Optional schema version string associated with the document.
+       *
+       * This is not used for routing; it's informational/diagnostic only.
+       */
+      version?: string;
+    }
+
+    export function pack(
+      document: grida.program.document.Document,
+      images?: Record<string, Uint8Array>,
+      schemaVersion?: string,
+      bitmaps?: Record<string, io.Bitmap>
+    ): Uint8Array;
+    export function pack(
+      fbBytes: Uint8Array,
+      images?: Record<string, Uint8Array>,
+      schemaVersion?: string,
+      bitmaps?: Record<string, io.Bitmap>
+    ): Uint8Array;
+
+    /**
+     * Packs a `.grida` ZIP archive.
+     *
+     * Accepts either:
+     * - a Grida document model (will be encoded to FlatBuffers)
+     * - raw FlatBuffers bytes (document.grida payload)
+     */
+    export function pack(
+      documentOrFbBytes: grida.program.document.Document | Uint8Array,
+      images?: Record<string, Uint8Array>,
+      schemaVersion: string = grida.program.document.SCHEMA_VERSION,
+      bitmaps?: Record<string, io.Bitmap>
+    ): Uint8Array {
+      const inferredBitmaps: Record<string, io.Bitmap> | undefined =
+        bitmaps ??
+        (documentOrFbBytes instanceof Uint8Array
+          ? undefined
+          : ((documentOrFbBytes as any).bitmaps as Record<string, io.Bitmap>));
+
+      const fbBytes =
+        documentOrFbBytes instanceof Uint8Array
+          ? documentOrFbBytes
+          : format.document.encode.toFlatbuffer(
+              {
+                ...(documentOrFbBytes as any),
+                bitmaps: {},
+              } as grida.program.document.Document,
+              schemaVersion
+            );
+
+      const manifest: Manifest = {
+        document_file: "document.grida",
+        version: schemaVersion,
       };
 
-      // Add raw images to archive
-      if (images) {
+      const files: Record<string, Uint8Array> = {
+        "manifest.json": strToU8(JSON.stringify(manifest)),
+        "document.grida": fbBytes,
+        ...(images &&
+          Object.keys(images).length > 0 && { "images/": new Uint8Array() }), // Ensure folder exists
+      };
+
+      // Add images
+      if (images && Object.keys(images).length > 0) {
         for (const [key, imageData] of Object.entries(images)) {
-          files[`images/${key}`] = new Uint8Array(imageData);
+          files[`images/${key}`] = imageData;
         }
       }
 
-      if (mem.document.bitmaps) {
-        for (const [key, bitmap] of Object.entries(mem.document.bitmaps)) {
+      // Add bitmaps (PNG)
+      if (inferredBitmaps && Object.keys(inferredBitmaps).length > 0) {
+        files["bitmaps/"] = new Uint8Array(); // ensure folder exists
+        for (const [key, bitmap] of Object.entries(inferredBitmaps)) {
           files[`bitmaps/${key}.png`] = new Uint8Array(
             encode({
               data: bitmap.data,
@@ -822,42 +957,61 @@ export namespace io {
           );
         }
       }
+
       return zipSync(files);
     }
 
-    export function unpack(zipData: Uint8Array): io.ArchiveFileModel {
+    /**
+     * Unpacks a ZIP `.grida` archive into its components.
+     */
+    export function unpack(zipData: Uint8Array): {
+      document: Uint8Array;
+      manifest: Manifest;
+      images: Record<string, Uint8Array>;
+      bitmaps: Record<string, io.Bitmap>;
+    } {
       const files = unzipSync(zipData);
-      const documentJson = strFromU8(files["document.json"]);
-      const document = io.json.parse(documentJson);
-      const bitmaps: Record<string, cmath.raster.Bitmap> = {};
-      const images: Record<string, Uint8ClampedArray> = {};
 
-      for (const key in files) {
+      // Parse manifest
+      const manifestJson = strFromU8(files["manifest.json"]);
+      const manifest = JSON.parse(manifestJson) as Manifest;
+
+      // Extract document
+      const document = files["document.grida"];
+      if (!document) {
+        throw new Error("Missing document file: document.grida");
+      }
+
+      // Extract images
+      const images: Record<string, Uint8Array> = {};
+      const prefix = "images/";
+      for (const [path, data] of Object.entries(files)) {
+        if (path.startsWith(prefix) && path !== prefix) {
+          const key = path.slice(prefix.length);
+          images[key] = data;
+        }
+      }
+
+      const bitmaps: Record<string, io.Bitmap> = {};
+      const bmpPrefix = "bitmaps/";
+      for (const [path, data] of Object.entries(files)) {
         if (
-          key.startsWith("bitmaps/") &&
-          key.endsWith(".png") &&
-          key !== "bitmaps/"
+          path.startsWith(bmpPrefix) &&
+          path.endsWith(".png") &&
+          path !== bmpPrefix
         ) {
-          const filename = key.substring("bitmaps/".length); // e.g "bitmaps/ref.png" => "ref.png"
-          const filekey = filename.substring(0, filename.length - 4); // e.g. "ref.png" => "ref"
-          const pngd = decode(files[key]);
-          bitmaps[filekey] = {
+          const key = path.slice(bmpPrefix.length, -4);
+          const pngd = decode(data);
+          bitmaps[key] = {
+            version: 0,
             width: pngd.width,
             height: pngd.height,
             data: __norm_png_data(pngd.data),
           };
-        } else if (key.startsWith("images/") && key !== "images/") {
-          const filename = key.substring("images/".length); // e.g "images/photo.jpg" => "photo.jpg"
-          images[filename] = new Uint8ClampedArray(files[key]);
         }
       }
 
-      return {
-        version: document.version,
-        document: document,
-        images: images,
-        bitmaps: bitmaps,
-      } satisfies io.ArchiveFileModel;
+      return { document, manifest, images, bitmaps };
     }
   }
 

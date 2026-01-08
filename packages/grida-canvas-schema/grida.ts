@@ -890,6 +890,8 @@ export namespace grida.program.document {
    * @deprecated This interface is being migrated to {@link nodes.SceneNode} which is stored in the nodes repository.
    * The Scene interface is kept for backward compatibility during the migration period.
    * New code should use SceneNode stored in document.nodes instead of document.scenes.
+   *
+   * TODO: safely remove this
    */
   export interface Scene
     extends document.ISceneBackground,
@@ -916,10 +918,7 @@ export namespace grida.program.document {
       children: "single" | "multiple";
     };
 
-    /**
-     * optional order of the scene
-     */
-    order?: number;
+    position?: string;
   }
 
   /**
@@ -2126,7 +2125,10 @@ export namespace grida.program.nodes {
     constraints: {
       children: "single" | "multiple";
     };
-    order?: number;
+    /// Fractional index position string for ordering among siblings.
+    /// Empty string means "unsorted" or "default position".
+    /// Children are sorted by lexicographic comparison of position strings.
+    position?: string;
   }
 
   /**
@@ -2810,7 +2812,6 @@ export namespace grida.program.nodes {
         active: true,
         locked: false,
         constraints: scene.constraints,
-        order: scene.order,
         guides: scene.guides,
         edges: scene.edges,
         background_color: scene.background_color,

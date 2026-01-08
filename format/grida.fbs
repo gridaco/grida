@@ -7,7 +7,6 @@
 // - Aligned to:
 //   - Rust runtime model: `crates/grida-canvas/src/node/schema.rs`
 //   - TS document model: `packages/grida-canvas-schema/grida.ts`
-//   - DB draft STI model: `supabase/drafts/20251214_grida_canvas_document_model.sql`
 //
 // Key decisions (draft):
 // - Node IDs are stored as packed u32 (actor:8 | counter:24), matching the DB draft.
@@ -15,10 +14,74 @@
 // - Document is a flat node map + explicit ordered link list (no nested children arrays).
 // - Node payload is modeled via a FlatBuffers union for forward evolution.
 //
+// -----------------------------------------------------------------------------
+// CAUTION — FlatBuffers semantics & schema design rules (READ BEFORE EDITING)
+// -----------------------------------------------------------------------------
+//
+// FlatBuffers has specific semantics that materially affect how this schema
+// behaves, evolves, and remains backward-compatible. The following rules are
+// *intentional constraints* on how this schema must be extended.
+//
+// 1) Scalars are always readable — "unset" does NOT exist
+//    -----------------------------------------------------
+//    - Scalar fields (float, int, enum, bool) in FlatBuffers tables always have
+//      a readable value at decode time.
+//    - There is NO way to distinguish:
+//        "value explicitly set by author"
+//        vs
+//        "value implicitly returned by FlatBuffers default (usually 0)"
+//    - Therefore:
+//        * If `0` (or the default enum value) has real semantic meaning,
+//          it MUST NOT be used to represent "unset".
+//        * Using sentinel values like `0` or `(0,0)` to mean "unset" is fragile
+//          and must be avoided unless the value domain makes it impossible for
+//          the sentinel to be valid.
+//
+//    REQUIRED RULE:
+//    - If the distinction between "unset" and "set" matters, the value MUST be
+//      wrapped in a nullable table or expressed via a union.
+//    - Do NOT rely on scalar defaults to encode intent.
+//
+//
+// 2) Prefer tables over structs — structs are permanent and inflexible
+//    ------------------------------------------------------------------
+//    - FlatBuffers structs:
+//        * are always present
+//        * cannot be null
+//        * cannot have defaults
+//        * cannot evolve (no fields can be added later)
+//    - Once a struct is introduced, its binary layout is frozen forever.
+//
+//    REQUIRED RULE:
+//    - Use `struct` ONLY for:
+//        * pure mathematical data
+//        * fixed-size, value-only types
+//        * domains where `0` is always a valid value
+//        * types that are extremely unlikely to ever gain optional fields,
+//          modes, variants, or semantic extensions
+//
+//    - Use `table` for:
+//        * anything optional
+//        * anything user-authored
+//        * anything with semantic meaning beyond raw math
+//        * anything that may plausibly evolve in the future
+//
+//    When in doubt: USE A TABLE.
+//
+//
+// 3) Schema evolution principle
+//    --------------------------
+//    This schema is designed for long-term evolution.
+//    Any change that:
+//      - makes it impossible to distinguish user intent
+//      - introduces ambiguous defaults
+//      - freezes a value shape prematurely
+//    will make future evolution harder or unsafe.
+//
+//    Prefer explicitness and nullability over compactness.
+// -----------------------------------------------------------------------------
 // NOTE:
-// - This is a first pass draft. Some complex nested types (e.g. vector_network) are
-//   represented as opaque bytes with a declared encoding, until their full spec is
-//   stabilized.
+// - This is a first pass draft.
 // =============================================================================
 
 namespace grida;
@@ -38,7 +101,33 @@ file_identifier "GRID";
 /// Current implementation uses string IDs to match TS editor model.
 /// Future: migrate to struct NodeIdentifier { packed:uint; } for efficiency.
 table NodeIdentifier {
-  id:string (id: 0);
+  /// Required: unique identifier string for the node.
+  id:string (id: 0, required);
+}
+
+/// Parent reference with fractional index position for ordering.
+///
+/// Uses fractional indexing (orderable strings) to enable conflict-free
+/// ordering in collaborative systems. The position string is designed to
+/// sort correctly when compared lexicographically.
+///
+/// Examples of fractional index strings: "!", " ~\"", "Qd&", "QeU", "Qe7", "QeO"
+///
+/// Reference: Figma uses this same pattern (see `ParentIndex` in fig.kiwi).
+/// This enables:
+/// - Flat node structure (no nested children arrays)
+/// - Efficient node moves (single node update, no parent reordering)
+/// - Concurrent editing friendly ordering
+///
+/// Note: Table (not struct) because it contains NodeIdentifier (a table).
+/// This field is optional (can be null for root nodes).
+table ParentReference {
+  /// Parent node identifier
+  parent_id:NodeIdentifier (required, id: 0);
+  /// Fractional index position string for ordering among siblings.
+  /// Empty string means "unsorted" or "default position".
+  /// Children are sorted by lexicographic comparison of position strings.
+  position:string (id: 1);
 }
 
 /// Rust: `CGPoint { x: f32, y: f32 }`
@@ -126,52 +215,40 @@ struct RectangularStrokeWidth {
 // Enums (string mapping handled by codec layers)
 // -----------------------------------------------------------------------------
 
+/// node type
 enum NodeType : byte {
-  // Structural
-  Scene = 0,
-  InitialContainer = 1,
-  Container = 2,
-  Group = 3,
+  Exception,
+  Scene,
 
-  // Shapes
-  Rectangle = 4,
-  Ellipse = 5,
-  Line = 6,
-  Polygon = 7,
-  RegularPolygon = 8,
-  RegularStarPolygon = 9,
+  // groups and containers
+  Group,
+  InitialContainer,
+  Container,
+  BooleanOperation,
 
-  // Vector / path ops
-  Path = 10,
-  Vector = 11,
-  BooleanOperation = 12,
+  // shapes
+  Rectangle,
+  Ellipse,
+  Polygon,
+  RegularPolygon,
+  RegularStarPolygon,
+  Path,
+  Line,
+  Vector,
 
-  // Text / media
-  TextSpan = 13,
-  Image = 14,
-
-  // Fallback
-  Error = 15,
+  // text
+  TextSpan,
 }
 
-/// Rust: `ImageMaskType`
-enum ImageMaskType : byte {
-  Alpha = 0,
-  Luminance = 1
-}
-
-/// Rust: `LayerMaskType::Image(ImageMaskType)`
-table LayerMaskTypeImage {
-  image_mask_type:ImageMaskType = Alpha (id: 0);
-}
-
-/// Rust: `LayerMaskType::Geometry`
-table LayerMaskTypeGeometry {}
-
-/// Rust: `LayerMaskType`
-union LayerMaskType {
-  LayerMaskTypeImage = 1,
-  LayerMaskTypeGeometry = 2
+// TODO: remove this
+/// shape node type (flag within BasicShapeNode)
+enum BasicShapeNodeType : byte {
+  Rectangle = 0,
+  Ellipse = 1,
+  Polygon = 2,
+  RegularPolygon = 3,
+  RegularStarPolygon = 4,
+  Path = 5,
 }
 
 /// Rust: `BlendMode` (does not include pass-through)
@@ -345,6 +422,26 @@ enum FillRule : byte {
   EvenOdd = 1
 }
 
+/// Rust: `ImageMaskType`
+enum ImageMaskType : byte {
+  Alpha = 0,
+  Luminance = 1
+}
+
+/// Rust: `LayerMaskType::Image(ImageMaskType)`
+table LayerMaskTypeImage {
+  image_mask_type:ImageMaskType = Alpha (id: 0);
+}
+
+/// Rust: `LayerMaskType::Geometry`
+table LayerMaskTypeGeometry {}
+
+/// Rust: `LayerMaskType`
+union LayerMaskType {
+  LayerMaskTypeImage = 1,
+  LayerMaskTypeGeometry = 2
+}
+
 // -----------------------------------------------------------------------------
 // Text style (Rust `cg::types::TextStyleRec` aligned)
 // -----------------------------------------------------------------------------
@@ -410,6 +507,7 @@ enum TextLetterSpacingKind : byte {
   Factor = 1
 }
 
+// TODO: review this
 struct TextLetterSpacing {
   kind:TextLetterSpacingKind;
   fixed_value:float;
@@ -428,271 +526,37 @@ struct TextWordSpacing {
   factor_value:float;
 }
 
-/// OpenType feature tags (strong enum).
+/// OpenType feature tag (4-byte ASCII, standard OpenType format).
 ///
-/// Source of truth: `docs/reference/open-type-features.md`.
+/// OpenType feature tags are exactly 4 characters, stored as 4 bytes.
+/// This matches the binary OpenType format where tags are stored as [u8; 4].
 ///
-/// Notes:
-/// - Values are stable and ordered lexicographically by the 4-char OpenType tag.
-/// - `Unknown` exists to allow forward compatibility when parsing documents that
-///   contain tags not yet in this enum (codec may map unknown tags to `Unknown`).
-enum OpenTypeFeature : ushort {
-  Unknown = 0,
-  AALT = 1,
-  ABVF = 2,
-  ABVM = 3,
-  ABVS = 4,
-  AFRC = 5,
-  AKHN = 6,
-  APKN = 7,
-  BLWF = 8,
-  BLWM = 9,
-  BLWS = 10,
-  C2PC = 11,
-  C2SC = 12,
-  CALT = 13,
-  CASE = 14,
-  CCMP = 15,
-  CFAR = 16,
-  CHWS = 17,
-  CJCT = 18,
-  CLIG = 19,
-  CPCT = 20,
-  CPSP = 21,
-  CSWH = 22,
-  CURS = 23,
-  CV01 = 24,
-  CV02 = 25,
-  CV03 = 26,
-  CV04 = 27,
-  CV05 = 28,
-  CV06 = 29,
-  CV07 = 30,
-  CV08 = 31,
-  CV09 = 32,
-  CV10 = 33,
-  CV11 = 34,
-  CV12 = 35,
-  CV13 = 36,
-  CV14 = 37,
-  CV15 = 38,
-  CV16 = 39,
-  CV17 = 40,
-  CV18 = 41,
-  CV19 = 42,
-  CV20 = 43,
-  CV21 = 44,
-  CV22 = 45,
-  CV23 = 46,
-  CV24 = 47,
-  CV25 = 48,
-  CV26 = 49,
-  CV27 = 50,
-  CV28 = 51,
-  CV29 = 52,
-  CV30 = 53,
-  CV31 = 54,
-  CV32 = 55,
-  CV33 = 56,
-  CV34 = 57,
-  CV35 = 58,
-  CV36 = 59,
-  CV37 = 60,
-  CV38 = 61,
-  CV39 = 62,
-  CV40 = 63,
-  CV41 = 64,
-  CV42 = 65,
-  CV43 = 66,
-  CV44 = 67,
-  CV45 = 68,
-  CV46 = 69,
-  CV47 = 70,
-  CV48 = 71,
-  CV49 = 72,
-  CV50 = 73,
-  CV51 = 74,
-  CV52 = 75,
-  CV53 = 76,
-  CV54 = 77,
-  CV55 = 78,
-  CV56 = 79,
-  CV57 = 80,
-  CV58 = 81,
-  CV59 = 82,
-  CV60 = 83,
-  CV61 = 84,
-  CV62 = 85,
-  CV63 = 86,
-  CV64 = 87,
-  CV65 = 88,
-  CV66 = 89,
-  CV67 = 90,
-  CV68 = 91,
-  CV69 = 92,
-  CV70 = 93,
-  CV71 = 94,
-  CV72 = 95,
-  CV73 = 96,
-  CV74 = 97,
-  CV75 = 98,
-  CV76 = 99,
-  CV77 = 100,
-  CV78 = 101,
-  CV79 = 102,
-  CV80 = 103,
-  CV81 = 104,
-  CV82 = 105,
-  CV83 = 106,
-  CV84 = 107,
-  CV85 = 108,
-  CV86 = 109,
-  CV87 = 110,
-  CV88 = 111,
-  CV89 = 112,
-  CV90 = 113,
-  CV91 = 114,
-  CV92 = 115,
-  CV93 = 116,
-  CV94 = 117,
-  CV95 = 118,
-  CV96 = 119,
-  CV97 = 120,
-  CV98 = 121,
-  CV99 = 122,
-  DIST = 123,
-  DLIG = 124,
-  DNOM = 125,
-  DTLS = 126,
-  EXPT = 127,
-  FALT = 128,
-  FIN2 = 129,
-  FIN3 = 130,
-  FINA = 131,
-  FLAC = 132,
-  FRAC = 133,
-  FWID = 134,
-  HALF = 135,
-  HALN = 136,
-  HALT = 137,
-  HIST = 138,
-  HKNA = 139,
-  HLIG = 140,
-  HNGL = 141,
-  HOJO = 142,
-  HWID = 143,
-  INIT = 144,
-  ISOL = 145,
-  ITAL = 146,
-  JALT = 147,
-  JP04 = 148,
-  JP78 = 149,
-  JP83 = 150,
-  JP90 = 151,
-  KERN = 152,
-  LFBD = 153,
-  LIGA = 154,
-  LJMO = 155,
-  LNUM = 156,
-  LOCL = 157,
-  LTRA = 158,
-  LTRM = 159,
-  MARK = 160,
-  MED2 = 161,
-  MEDI = 162,
-  MGRK = 163,
-  MKMK = 164,
-  MSET = 165,
-  NALT = 166,
-  NLCK = 167,
-  NUKT = 168,
-  NUMR = 169,
-  ONUM = 170,
-  OPBD = 171,
-  ORDN = 172,
-  ORNM = 173,
-  PALT = 174,
-  PCAP = 175,
-  PKNA = 176,
-  PNUM = 177,
-  PREF = 178,
-  PRES = 179,
-  PSTF = 180,
-  PSTS = 181,
-  PWID = 182,
-  QWID = 183,
-  RAND = 184,
-  RCLT = 185,
-  RKRF = 186,
-  RLIG = 187,
-  RPHF = 188,
-  RTBD = 189,
-  RTLA = 190,
-  RTLM = 191,
-  RUBY = 192,
-  RVRN = 193,
-  SALT = 194,
-  SINF = 195,
-  SIZE = 196,
-  SMCP = 197,
-  SMPL = 198,
-  SS01 = 199,
-  SS02 = 200,
-  SS03 = 201,
-  SS04 = 202,
-  SS05 = 203,
-  SS06 = 204,
-  SS07 = 205,
-  SS08 = 206,
-  SS09 = 207,
-  SS10 = 208,
-  SS11 = 209,
-  SS12 = 210,
-  SS13 = 211,
-  SS14 = 212,
-  SS15 = 213,
-  SS16 = 214,
-  SS17 = 215,
-  SS18 = 216,
-  SS19 = 217,
-  SS20 = 218,
-  SSTY = 219,
-  STCH = 220,
-  SUBS = 221,
-  SUPS = 222,
-  SWSH = 223,
-  TITL = 224,
-  TJMO = 225,
-  TNAM = 226,
-  TNUM = 227,
-  TRAD = 228,
-  TWID = 229,
-  UNIC = 230,
-  VALT = 231,
-  VAPK = 232,
-  VATU = 233,
-  VCHW = 234,
-  VERT = 235,
-  VHAL = 236,
-  VJMO = 237,
-  VKNA = 238,
-  VKRN = 239,
-  VPAL = 240,
-  VRT2 = 241,
-  VRTR = 242,
-  ZERO = 243,
+/// Examples:
+///   "kern" = {a:0x6B, b:0x65, c:0x72, d:0x6E}
+///   "liga" = {a:0x6C, b:0x69, c:0x67, d:0x61}
+///   "ss01" = {a:0x73, b:0x73, c:0x30, d:0x31}
+///
+/// Codecs should convert between string tags (e.g., "kern") and this struct.
+/// This approach allows any 4-character OpenType tag without schema evolution.
+struct OpenTypeFeatureTag {
+  a:ubyte;
+  b:ubyte;
+  c:ubyte;
+  d:ubyte;
 }
 
 /// Rust: `FontFeature { tag: String, value: bool }`
 table FontFeature {
-  open_type_feature:OpenTypeFeature = Unknown (id: 0);
-  open_type_feature_value:bool = false (id: 1);
+  /// OpenType feature tag (4-byte encoding).
+  /// Codecs should convert between string ("kern") and OpenTypeFeatureTag struct.
+  open_type_feature_tag:OpenTypeFeatureTag (id: 0);
+  open_type_feature_value:bool (id: 1);
 }
 
 /// Rust: `FontVariation { axis: String, value: f32 }`
 table FontVariation {
-  variation_axis:string (id: 0);
-  variation_value:float = 0.0 (id: 1);
+  variation_axis:string (required, id: 0);
+  variation_value:float (id: 1);
 }
 
 /// Rust: `TextDecorationRec`
@@ -712,9 +576,9 @@ table TextDecorationRec {
 table TextStyleRec {
   text_decoration:TextDecorationRec (id: 0);
 
-  font_family:string (id: 1);
-  font_size:float = 0.0 (id: 2);
-  font_weight:FontWeight (id: 3);
+  font_family:string (required, id: 1);
+  font_size:float = 14.0 (id: 2);
+  font_weight:FontWeight (required, id: 3);
   font_width:float = 0.0 (id: 4);
   font_style_italic:bool = false (id: 5);
   font_kerning:bool = true (id: 6);
@@ -727,68 +591,6 @@ table TextStyleRec {
   word_spacing:TextWordSpacing (id: 11);
   line_height:TextLineHeight (id: 12);
   text_transform:TextTransform = None (id: 13);
-}
-
-// -----------------------------------------------------------------------------
-// Node traits (composable building blocks)
-// -----------------------------------------------------------------------------
-//
-// Motivation:
-// - Keep node model "trait-based" (similar to TS trait composition), so each concern
-//   has a dedicated schema type.
-// - Makes future TS↔FBS mapping predictable: each TS trait maps to a single table.
-//
-// Notes:
-// - FlatBuffers has no inheritance; traits are expressed via table composition.
-// - Traits are tables (not structs) so we can use defaults + optional presence.
-//
-// -----------------------------------------------------------------------------
-
-/// Base node identity / visibility trait.
-table NodeBaseTrait {
-  name:string (id: 0);
-  active:bool = true (id: 1);
-  locked:bool = false (id: 2);
-}
-
-/// Blend / mask trait (shared by all nodes).
-table NodeBlendTrait {
-  opacity:float = 1.0 (id: 0);
-  /// Blend mode (archive model).
-  ///
-  /// Default is `pass_through`.
-  blend_mode:LayerBlendMode = PassThrough (id: 1);
-  /// Rust: `LayerMaskType` (union; default is Image(alpha) since it's the first union member)
-  mask_type:LayerMaskType (id: 3);
-}
-
-// -----------------------------------------------------------------------------
-// Scene-related structures
-// -----------------------------------------------------------------------------
-
-struct Guide2D {
-  axis:Axis;
-  guide_offset:float;
-}
-
-table EdgePointPosition2D {
-  x:float (id: 0);
-  y:float (id: 1);
-}
-
-table EdgePointNodeAnchor {
-  target:NodeIdentifier (id: 0); // node ID
-}
-
-union EdgePoint {
-  EdgePointPosition2D = 1,
-  EdgePointNodeAnchor = 2
-}
-
-table Edge2D {
-  id:string (id: 0);
-  a:EdgePoint (id: 2);
-  b:EdgePoint (id: 4);
 }
 
 // -----------------------------------------------------------------------------
@@ -927,6 +729,39 @@ table PaintStackItem {
   paint:Paint (id: 1);
 }
 
+
+// -----------------------------------------------------------------------------
+// Scene-related structures
+// -----------------------------------------------------------------------------
+
+
+// TODO: rename to UXGuide2D
+table Guide2D {
+  axis:Axis;
+  guide_offset:float;
+}
+
+table EdgePointPosition2D {
+  x:float (id: 0);
+  y:float (id: 1);
+}
+
+table EdgePointNodeAnchor {
+  target:NodeIdentifier (id: 0); // node ID
+}
+
+union EdgePoint {
+  EdgePointPosition2D = 1,
+  EdgePointNodeAnchor = 2
+}
+
+table Edge2D {
+  id:string (id: 0);
+  a:EdgePoint (id: 2);
+  b:EdgePoint (id: 4);
+}
+
+
 // -----------------------------------------------------------------------------
 // Vector Network (Rust `vectornetwork/vn.rs` aligned)
 // -----------------------------------------------------------------------------
@@ -967,7 +802,7 @@ table VectorNetworkRegion {
 }
 
 /// Rust: `VectorNetwork { vertices, segments, regions }`
-table VectorNetwork {
+table VectorNetworkData {
   vertices:[CGPoint] (id: 0);
   segments:[VectorNetworkSegment] (id: 1);
   regions:[VectorNetworkRegion] (id: 2);
@@ -978,12 +813,12 @@ table VectorNetwork {
 // -----------------------------------------------------------------------------
 
 /// Rust: `FeGaussianBlur { radius: f32 }`
-struct FeGaussianBlur {
+table FeGaussianBlur {
   radius:float;
 }
 
 /// Rust: `FeProgressiveBlur { start: Alignment, end: Alignment, radius, radius2 }`
-struct FeProgressiveBlur {
+table FeProgressiveBlur {
   start:Alignment;
   end:Alignment;
   radius:float;
@@ -997,26 +832,26 @@ enum FeBlurKind : byte {
 }
 
 /// Struct-tagged representation of Rust `FeBlur`.
-struct FeBlur {
+table FeBlur {
   kind:FeBlurKind;
   gaussian:FeGaussianBlur;
   progressive:FeProgressiveBlur;
 }
 
 /// Rust: `FeLayerBlur { blur: FeBlur, active: bool }`
-struct FeLayerBlur {
+table FeLayerBlur {
   blur:FeBlur;
   active:bool;
 }
 
 /// Rust: `FeBackdropBlur { blur: FeBlur, active: bool }`
-struct FeBackdropBlur {
+table FeBackdropBlur {
   blur:FeBlur;
   active:bool;
 }
 
 /// Rust: `FeShadow { dx, dy, blur, spread, color, active }`
-struct FeShadow {
+table FeShadow {
   dx:float;
   dy:float;
   blur:float;
@@ -1032,7 +867,7 @@ enum FilterShadowEffectKind : byte {
 }
 
 /// Struct-tagged representation of Rust `FilterShadowEffect`.
-struct FilterShadowEffect {
+table FilterShadowEffect {
   kind:FilterShadowEffectKind;
   shadow:FeShadow;
 }
@@ -1045,7 +880,7 @@ enum NoiseEffectColorsKind : byte {
 }
 
 /// Struct-tagged representation of Rust `NoiseEffectColors`.
-struct NoiseEffectColors {
+table NoiseEffectColors {
   kind:NoiseEffectColorsKind;
   mono_color:RGBA32F;
   duo_color1:RGBA32F;
@@ -1054,7 +889,7 @@ struct NoiseEffectColors {
 }
 
 /// Rust: `FeNoiseEffect`
-struct FeNoiseEffect {
+table FeNoiseEffect {
   noise_size:float;
   density:float;
   num_octaves:int;
@@ -1065,7 +900,7 @@ struct FeNoiseEffect {
 }
 
 /// Rust: `FeLiquidGlass`
-struct FeLiquidGlass {
+table FeLiquidGlass {
   light_intensity:float;
   light_angle:float;
   refraction:float;
@@ -1075,10 +910,11 @@ struct FeLiquidGlass {
   active:bool;
 }
 
+
 /// Effects trait used by nodes (Rust: `LayerEffects`).
 ///
 /// Note: must be a table because it contains vectors (FlatBuffers structs cannot contain vectors).
-table NodeEffectsTrait {
+table LayerEffects {
   fe_blur:FeLayerBlur (id: 0);
   fe_backdrop_blur:FeBackdropBlur (id: 1);
   fe_glass:FeLiquidGlass (id: 2);
@@ -1118,8 +954,137 @@ table VariableWidthProfile {
   stops:[VariableWidthStop] (id: 0);
 }
 
+
+
 // -----------------------------------------------------------------------------
-// Layout model (aligned to Rust `UniformNodeLayout` + SQL draft)
+// Node traits (composable building blocks)
+// -----------------------------------------------------------------------------
+//
+// Motivation:
+// - Keep node model "trait-based" (similar to TS trait composition), so each concern
+//   has a dedicated schema type.
+// - Makes future TS↔FBS mapping predictable: each TS trait maps to a single table.
+//
+// Notes:
+// - FlatBuffers has no inheritance; traits are expressed via table composition.
+// - Traits are tables (not structs) so we can use defaults + optional presence.
+//
+// -----------------------------------------------------------------------------
+
+table StrokeGeometryTrait {
+  stroke_width:float;
+  stroke_style:StrokeStyle;
+  stroke_width_profile:VariableWidthProfile;
+}
+
+table RectangularStrokeGeometryTrait {
+  rectangular_stroke_width:RectangularStrokeWidth;
+  stroke_style:StrokeStyle;
+  stroke_width_profile:VariableWidthProfile;
+}
+
+table CorerRadiusTrait {
+  corner_radius:CGRadius;
+  corner_smoothing:float;
+}
+
+table RectangularCornerRadiusTrait {
+  rectangular_corner_radius:RectangularCornerRadius;
+  corner_smoothing:float;
+}
+
+
+// =============================================================================
+// Primitive Shapes Geometry Descriptors
+// =============================================================================
+
+
+/// Rust: `EllipticalRingSectorShape` (arc/ring sector data for ellipses)
+table CanonicalEllipticalShapeRingSectorParameters {
+  /// Inner radius ratio (0..1)
+  inner_radius_ratio:float = 0.0 (id: 0);
+  /// Start angle in degrees
+  start_angle:float = 0.0 (id: 1);
+  /// Sweep angle in degrees (end_angle = start_angle + angle)
+  angle:float = 360.0 (id: 2);
+}
+
+/// rectangle, rounded rectangle
+table CanonicalShapeRectangular {
+  // inherently has no property, as the size is defined by the layout. this is pure base shape description.
+}
+
+/// circle, ellipse by default and also can represent ring, sector, ring+sector
+table CanonicalShapeElliptical {
+  ring_sector_data:CanonicalEllipticalShapeRingSectorParameters;
+}
+
+/// polygon (any shapes defined by points)
+table CanonicalShapePointsPolygon {
+  // in 0-1 normalized coordinates (if its not normaized, it should be scaled to fit the box)
+  points:[CGPoint];
+  fill_rule:FillRule;
+}
+
+/// regular polygon
+table CanonicalShapeRegularPolygon {
+  point_count:uint;
+}
+
+/// regular star-ish polygon
+table CanonicalShapeRegularStarPolygon {
+  point_count:uint;
+  inner_radius_ratio:float;
+}
+
+/// path
+table CanonicalShapePath {
+  // svg-compat path data in 0-1 normalized coordinates (if its not normaized, it should be scaled to fit the box)
+  d:string;
+  fill_rule:FillRule;
+}
+
+/// Canonical layer shape descriptor (geometry-only, layout-resolved).
+///
+/// `CanonicalLayerShape` is a *minimal*, *layout-independent* description of a
+/// primitive shape used by layer-backed nodes (e.g. `BasicShapeNode`).
+///
+/// Core semantics:
+/// - This union intentionally does NOT encode size (no width/height).
+/// - The concrete geometry is produced by mapping the selected shape variant into
+///   the node’s resolved layout box at render time.
+/// - Shape-specific parameters are expressed in normalized or ratio form:
+///     * points/polygon/path use 0..1 normalized coordinates (scaled to the box)
+///     * ellipse ring/sector uses ratios + angles (interpreted in the box)
+/// - All styling (fills, strokes, effects, corner traits, etc.) lives outside the
+///   shape descriptor on the owning node/traits. This union is geometry-only.
+///
+/// Evolution rules:
+/// - New primitive shape variants may be added by introducing a new `CanonicalShape*`
+///   table and adding it to this union (additive change).
+/// - Consumers must tolerate unknown union members (e.g. skip, treat as `UnknownNode`,
+///   or fall back to a rectangle) rather than hard-failing, to preserve forward
+///   compatibility.
+///
+/// Notes:
+/// - The “Canonical” prefix indicates the representation is the stable, box-mapped
+///   geometry form used in the archive, not a fully resolved mesh/path at a fixed size.
+/// - Even when a variant currently has no fields (e.g. rectangular), it is kept as a
+///   distinct member to preserve explicit author intent and allow future extensions
+///   without changing other variants.
+union CanonicalLayerShape {
+  CanonicalShapeRectangular,
+  CanonicalShapeElliptical,
+  CanonicalShapePointsPolygon,
+  CanonicalShapeRegularPolygon,
+  CanonicalShapeRegularStarPolygon,
+  CanonicalShapePath,
+}
+
+
+
+// -----------------------------------------------------------------------------
+// Layout model (aligned to Rust `UniformNodeLayout`)
 // -----------------------------------------------------------------------------
 
 /// Explicit length value models (archive input model; CSS-ish).
@@ -1148,8 +1113,6 @@ union Length {
   Percent = 3
 }
 
-
-
 table LayoutDimensions {
   layout_target_width:Length (id: 1);
   layout_target_height:Length (id: 3);
@@ -1173,7 +1136,6 @@ table LayoutDimensions {
   ///
   /// Encoding:
   /// - Stored as a tuple (width, height) for parity with TS `layout_target_aspect_ratio?: [number, number]`.
-  /// - `0,0` means "unset" (archive sentinel).
   layout_target_aspect_ratio:CGSize (id: 8);
 }
 
@@ -1190,7 +1152,7 @@ table LayoutContainerStyle {
 
 table LayoutChildStyle {
   layout_positioning:LayoutPositioning = Auto (id: 0);
-  layout_grow:float = 0.0 (id: 1);
+  layout_grow:float (id: 1);
 }
 
 table Layout {
@@ -1205,270 +1167,278 @@ table Layout {
 }
 
 // -----------------------------------------------------------------------------
-// Resources / repositories (draft, for document-embedded registries)
-// -----------------------------------------------------------------------------
-
-enum ImageMime : byte {
-  Unknown = 0,
-  ImagePng = 1,
-  ImageJpeg = 2,
-  ImageWebp = 3,
-  ImageGif = 4
-}
-
-table ImageRef {
-  mime:ImageMime = Unknown (id: 0);
-  url:string (id: 1);
-  width:uint (id: 2);
-  height:uint (id: 3);
-  bytes:ulong (id: 4);
-}
-
-table ImagesRepository {
-  /// Keyed by resource id (implementation-defined string key).
-  keys:[string] (id: 0);
-  values:[ImageRef] (id: 1);
-}
-
-table BitmapData {
-  /// Opaque bitmap payload.
-  encoding:BinaryEncoding = Unknown (id: 0);
-  data:[ubyte] (id: 1);
-}
-
-table BitmapEntry {
-  id:string (id: 0);
-  version:uint = 0 (id: 1);
-  width:uint = 0 (id: 2);
-  height:uint = 0 (id: 3);
-  payload:BitmapData (id: 4);
-}
-
-table BitmapsRepository {
-  entries:[BitmapEntry] (id: 0);
-}
-
-// -----------------------------------------------------------------------------
 // Node payloads (draft; matches Rust Node variants at a coarse level)
 // -----------------------------------------------------------------------------
 
-table SceneNodeProperties {
-  constraints_children:SceneConstraintsChildren = Multiple (id: 0);
-  order:float = 0.0 (id: 1);
-  background_color:RGBA32F (id: 2);
-  guides:[Guide2D] (id: 3);
-  edges:[Edge2D] (id: 4);
-}
-
-table InitialContainerNodeProperties {
-  /// Viewport-filling flex container. Purely structural.
-  container:LayoutContainerStyle (id: 0);
-}
-
-table ContainerNodeProperties {
-  rotation:float = 0.0 (id: 0);
-  corner_radius:RectangularCornerRadius (id: 1);
-  corner_smoothing:float = 0.0 (id: 2);
-  fill_paints:[PaintStackItem] (id: 3);
-  stroke_paints:[PaintStackItem] (id: 4);
-  stroke_style:StrokeStyle (id: 5);
-  stroke_width:float = 0.0 (id: 6);
-  rectangular_stroke_width:RectangularStrokeWidth (id: 7);
-  effects:NodeEffectsTrait (id: 8);
-  /// Content-only clip flag (children only).
-  clip:bool = false (id: 9);
-}
-
-table GroupNodeProperties {
-  // Group is mostly transform + blend/mask at Node level.
-}
-
-table RectangleNodeProperties {
-  size:CGSize (id: 0);
-  rotation:float = 0.0 (id: 1);
-  corner_radius:RectangularCornerRadius (id: 2);
-  corner_smoothing:float = 0.0 (id: 3);
-  fill_paints:[PaintStackItem] (id: 4);
-  stroke_paints:[PaintStackItem] (id: 5);
-  stroke_style:StrokeStyle (id: 6);
-  stroke_width:float = 0.0 (id: 7);
-  rectangular_stroke_width:RectangularStrokeWidth (id: 8);
-  effects:NodeEffectsTrait (id: 9);
-}
-
-table EllipseNodeProperties {
-  size:CGSize (id: 0);
-  rotation:float = 0.0 (id: 1);
-  /// Arc/ring support
-  start_angle:float = 0.0 (id: 2);
-  angle:float = 0.0 (id: 3);
-  inner_radius:float = 0.0 (id: 4); // 0..1
-  corner_radius:float = 0.0 (id: 5);
-  fill_paints:[PaintStackItem] (id: 6);
-  stroke_paints:[PaintStackItem] (id: 7);
-  stroke_style:StrokeStyle (id: 8);
-  /// Ellipse uses singular stroke widths in Rust.
-  stroke_width:float = 0.0 (id: 9);
-  effects:NodeEffectsTrait (id: 10);
-}
-
-table PolygonNodeProperties {
-  points:[CGPoint] (id: 0);
-  corner_radius:float = 0.0 (id: 1);
-  fill_paints:[PaintStackItem] (id: 2);
-  stroke_paints:[PaintStackItem] (id: 3);
-  stroke_style:StrokeStyle (id: 4);
-  stroke_width:float = 0.0 (id: 5);
-  effects:NodeEffectsTrait (id: 6);
-}
-
-table RegularPolygonNodeProperties {
-  size:CGSize (id: 0);
-  point_count:uint (id: 1);
-  corner_radius:float = 0.0 (id: 2);
-  fill_paints:[PaintStackItem] (id: 3);
-  stroke_paints:[PaintStackItem] (id: 4);
-  stroke_style:StrokeStyle (id: 5);
-  stroke_width:float = 0.0 (id: 6);
-  effects:NodeEffectsTrait (id: 7);
-}
-
-table RegularStarPolygonNodeProperties {
-  size:CGSize (id: 0);
-  point_count:uint (id: 1);
-  inner_radius:float (id: 2);
-  corner_radius:float = 0.0 (id: 3);
-  fill_paints:[PaintStackItem] (id: 4);
-  stroke_paints:[PaintStackItem] (id: 5);
-  stroke_style:StrokeStyle (id: 6);
-  stroke_width:float = 0.0 (id: 7);
-  effects:NodeEffectsTrait (id: 8);
-}
-
-table LineNodeProperties {
-  /// Height is semantically 0; width stored in `size.width`.
-  size:CGSize (id: 0);
-  stroke_paints:[PaintStackItem] (id: 1);
-  stroke_width:float = 1.0 (id: 2);
-  stroke_style:StrokeStyle (id: 3);
-  effects:NodeEffectsTrait (id: 4);
-}
 
 table TextSpanNodeProperties {
-  text:string (id: 0);
-  width:float = 0.0 (id: 1);
-  height:float = 0.0 (id: 2);
-  /// Text style (Rust: `TextStyleRec`).
-  text_style:TextStyleRec (id: 3);
-  text_align:TextAlign = Left (id: 4);
-  text_align_vertical:TextAlignVertical = Top (id: 5);
-  max_lines:uint = 0 (id: 6);
-  ellipsis:string (id: 7);
-  fill_paints:[PaintStackItem] (id: 8);
-  stroke_paints:[PaintStackItem] (id: 9);
-  stroke_style:StrokeStyle (id: 10);
-  stroke_width:float = 0.0 (id: 11);
-  effects:NodeEffectsTrait (id: 12);
-}
-
-table PathNodeProperties {
-  svg_path_data:string (id: 0);
-  fill_paints:[PaintStackItem] (id: 1);
-  stroke_paints:[PaintStackItem] (id: 2);
-  stroke_style:StrokeStyle (id: 3);
-  stroke_width:float = 0.0 (id: 4);
-  effects:NodeEffectsTrait (id: 5);
-}
-
-table VectorNodeProperties {
-  /// Strongly typed vector network geometry + regions.
-  ///
-  /// When null/empty, the node is treated as having no vector geometry.
-  vector_network:VectorNetwork (id: 0);
-  corner_radius:float = 0.0 (id: 1);
-  fill_paints:[PaintStackItem] (id: 2);
-  stroke_paints:[PaintStackItem] (id: 3);
-  stroke_style:StrokeStyle (id: 4);
-  stroke_width:float = 1.0 (id: 5);
-  stroke_width_profile:VariableWidthProfile (id: 6);
-  effects:NodeEffectsTrait (id: 7);
-}
-
-table BooleanOperationNodeProperties {
-  op:BooleanPathOperation (id: 0);
-  corner_radius:float = 0.0 (id: 1);
-  fill_paints:[PaintStackItem] (id: 2);
-  stroke_paints:[PaintStackItem] (id: 3);
-  stroke_style:StrokeStyle (id: 4);
-  stroke_width:float = 0.0 (id: 5);
-  effects:NodeEffectsTrait (id: 6);
-}
-
-table ImageNodeProperties {
-  size:CGSize (id: 0);
-  rotation:float = 0.0 (id: 1);
-  corner_radius:RectangularCornerRadius (id: 2);
-  corner_smoothing:float = 0.0 (id: 3);
-  fill:ImagePaint (id: 4);
-  stroke_paints:[PaintStackItem] (id: 5);
-  stroke_style:StrokeStyle (id: 6);
-  stroke_width:float = 0.0 (id: 7);
-  rectangular_stroke_width:RectangularStrokeWidth (id: 8);
-  effects:NodeEffectsTrait (id: 9);
-  /// ResourceRef is kept indirect via `fill.resource_id` for now.
-}
-
-table ErrorNodeProperties {
-  size:CGSize (id: 0);
-  error:string (id: 1);
-}
-
-union NodeData {
-  InitialContainerNodeProperties = 1,
-  ContainerNodeProperties = 2,
-  GroupNodeProperties = 3,
-  RectangleNodeProperties = 4,
-  EllipseNodeProperties = 5,
-  PolygonNodeProperties = 6,
-  RegularPolygonNodeProperties = 7,
-  RegularStarPolygonNodeProperties = 8,
-  LineNodeProperties = 9,
-  TextSpanNodeProperties = 10,
-  PathNodeProperties = 11,
-  VectorNodeProperties = 12,
-  BooleanOperationNodeProperties = 13,
-  ImageNodeProperties = 14,
-  ErrorNodeProperties = 15,
-  SceneNodeProperties = 16
+  stroke_geometry:StrokeGeometryTrait;
+  fill_paints:[PaintStackItem];
+  stroke_paints:[PaintStackItem];
+  text:string;
+  text_style:TextStyleRec;
+  text_align:TextAlign;
+  text_align_vertical:TextAlignVertical;
+  max_lines:uint;
+  ellipsis:string;
 }
 
 // -----------------------------------------------------------------------------
 // Nodes & hierarchy
 // -----------------------------------------------------------------------------
 
-table Node {
-  /// Packed u32 id.
-  id:NodeIdentifier (id: 0);
 
-  type:NodeType (id: 1);
-  /// Trait: base node metadata
-  base:NodeBaseTrait (id: 2);
-  /// Trait: blend / mask
-  blend:NodeBlendTrait (id: 3);
+/// Universal node trait.
+table SystemNodeTrait {
+  /// unique identifier for the node. (required)
+  id:NodeIdentifier (required);
+  /// name of the node. (optional)
+  name:string;
+  /// whether the node is active. (visible, active)
+  active:bool;
+  /// whether the node is locked. (locked, editor)
+  locked:bool;
+}
 
-  /// Ordered children (archive model).
+
+/// Shared layer fields used by all layer-node variants.
+/// Layer is what usually user think of as a node. each layer is non-virtual, a real render target.
+table LayerTrait {
+  opacity:float = 1.0;
+  /// Blend mode (archive model).
   ///
-  /// The vector order is the canonical child order.
-  children:[NodeIdentifier] (id: 4);
+  /// Default is `pass_through`.
+  blend_mode:LayerBlendMode = PassThrough;
+  /// Rust: `LayerMaskType` (union; default is Image(alpha) since it's the first union member)
+  mask_type:LayerMaskType;
+
+  effects:LayerEffects;
+
+  /// Parent reference (optional; root nodes omit this).
+  ///
+  /// When present, this node is a child of the referenced parent.
+  /// Children are ordered by `position` (lexicographic sort).
+  ///
+  /// Reference: Aligned with Figma's `ParentIndex` pattern (fig.kiwi).
+  /// This replaces the previous `children:[NodeIdentifier]` array model.
+  ///
+  /// To compute children of a parent node:
+  /// 1. Filter all nodes where `parent.parent_id == parent.id`
+  /// 2. Sort by `parent.position` (lexicographic comparison)
+  parent:ParentReference (required);
 
   /// Geometry transform baseline (identity by default).
-  transform:CGTransform2D (id: 5);
+  relative_transform_snapshot:CGTransform2D;
 
   /// Layout (optional, depending on node type / usage).
-  layout:Layout (id: 6);
+  layout:Layout;
+}
 
-  /// Variant payload.
-  data:NodeData (id: 8);
+
+/// Placeholder, unused.
+table UnknownNode {
+  node:SystemNodeTrait (required);
+}
+
+/// Node variant: Scene.
+///
+/// SceneNode is special and doesn't use NodeCommon like other nodes.
+/// It inlines only the relevant fields from NodeCommon.
+table SceneNode {
+  node:SystemNodeTrait (required);
+
+  /// Scene-specific properties.
+  constraints_children:SceneConstraintsChildren;
+  /// Scene background color (solid color only, RGBA32F).
+  ///
+  /// This is a simple solid color background. For gradient or image backgrounds,
+  /// use a background container node instead.
+  scene_background_color:RGBA32F;
+  guides:[Guide2D];
+  edges:[Edge2D];
+  /// Fractional index position string for ordering among siblings.
+  /// Empty string means "unsorted" or "default position".
+  /// Children are sorted by lexicographic comparison of position strings.
+  position:string;
+}
+
+/// Node variant: Initial container.
+table InitialContainerNode {
+  node:SystemNodeTrait (required);
+  layer:LayerTrait (required);
+}
+
+/// Node variant: Container.
+table ContainerNode {
+  node:SystemNodeTrait (required);
+  layer:LayerTrait (required);
+  stroke_geometry:RectangularStrokeGeometryTrait;
+  corner_radius:RectangularCornerRadiusTrait;
+  fill_paints:[PaintStackItem];
+  stroke_paints:[PaintStackItem];
+  /// Content-only clip flag (children only).
+  clips_content:bool;
+}
+
+// TODO: review the group model from scratch.
+/// Node variant: Group.
+table GroupNode {
+  node: SystemNodeTrait (required);
+  layer:LayerTrait (required);
+}
+
+// TODO: review the shape, should boolop have direct child ?
+/// Node variant: Boolean operation.
+table BooleanOperationNode {
+  node: SystemNodeTrait (required);
+  layer: LayerTrait (required);
+  op:BooleanPathOperation = Union;
+  corner_radius:CorerRadiusTrait;
+  fill_paints:[PaintStackItem];
+  stroke_geometry:StrokeGeometryTrait;
+  stroke_paints:[PaintStackItem];
+}
+
+table BasicShapeNode {
+  node:SystemNodeTrait (required);
+  layer:LayerTrait (required);
+
+  // TODO: remove this
+  /// shape of the type, must align with the shape. this is kept to keep the node type semantics.
+  type:BasicShapeNodeType;
+  shape:CanonicalLayerShape;
+  corner_radius:float;
+  corner_smoothing:float;
+  
+  fill_paints:[PaintStackItem];
+  
+  stroke_style:StrokeStyle;
+  stroke_width:float;
+  stroke_width_profile:VariableWidthProfile;
+  rectangular_corner_radius:RectangularCornerRadius;
+  rectangular_stroke_width:RectangularStrokeWidth;
+
+  stroke_paints:[PaintStackItem];
+}
+
+/// Node variant: Line.
+table LineNode {
+  node: SystemNodeTrait (required);
+  layer:LayerTrait (required);
+  stroke_geometry:StrokeGeometryTrait;
+  stroke_paints:[PaintStackItem];
+}
+
+/// Node variant: Vector.
+table VectorNode {
+  node:SystemNodeTrait (required);
+  layer:LayerTrait (required);
+  stroke_geometry:StrokeGeometryTrait;
+  stroke_paints:[PaintStackItem];
+  corner_radius:CorerRadiusTrait;
+  fill_paints:[PaintStackItem];
+  vector_network_data:VectorNetworkData;
+}
+
+/// Node variant: Text span.
+table TextSpanNode {
+  node:SystemNodeTrait (required);
+  layer:LayerTrait (required);
+  properties:TextSpanNodeProperties;
+}
+
+
+// -----------------------------------------------------------------------------
+// Node encoding model: union-per-variant (why this, not an "all-flat" Node table)
+// -----------------------------------------------------------------------------
+//
+// We model nodes as a FlatBuffers `union Node { SceneNode, ContainerNode, ... }`
+// instead of a single mega-table like:
+//
+//   table Node {
+//     type: NodeType;
+//     ...hundreds of optional fields for every possible node kind...
+//   }
+//
+// Rationale (why union is better here):
+//
+// 1) Prevents "optional-field explosion"
+//    - A universal design document accumulates many fields that only apply to a
+//      small subset of node kinds (e.g. vector networks, text properties, boolean ops).
+//    - In an all-flat table, every new node feature adds more optional fields and
+//      conditional decoding paths across *all* runtimes.
+//    - With a union, each variant table contains only the fields relevant to that
+//      node kind, keeping the schema and codecs smaller and easier to evolve.
+//
+// 2) Stronger invariants, fewer impossible states
+//    - All-flat encodings tend to allow invalid combinations (a node kind with a
+//      mismatched set of payload fields).
+//    - With a union, the schema itself encodes a large portion of correctness:
+//      the presence of `VectorNetworkData` implies `VectorNode`, `op` implies
+//      `BooleanOperationNode`, etc.
+//    - This reduces corruption risk and lowers validation surface area.
+//
+// 3) Cleaner evolution story for new node kinds
+//    - Adding a new node kind becomes additive:
+//        - define `NewNodeVariant` table
+//        - add it to the `union Node`
+//    - Existing variants remain unchanged (no need to touch a giant central Node table).
+//    - This reduces migration churn and makes "forward evolution" easier to reason about.
+//
+// 4) Better runtime ergonomics (Rust/TS)
+//    - Engines naturally branch by node kind:
+//        - Rust: `match node { Node::TextSpan(t) => ..., Node::Vector(v) => ... }`
+//        - TS: switch on discriminated variant
+//    - Compared to "type + optional fields", union decoding avoids repetitive
+//      `if type == ... then read ... else ignore` patterns.
+//
+// 5) Variant granularity is an intentional modeling choice
+//    - The union does not imply "one variant per API class". Variants are chosen
+//      to reflect *distinct semantic payload shapes* that matter for correctness,
+//      editing behavior, and long-term evolution.
+//    - Some families that are distinct at the API level may still share a single
+//      storage representation when their payload structure is fundamentally the same.
+//
+// 6) Shared geometry family: `BasicShapeNode` is a deliberate bundling
+//    - At the API level there may be separate concepts (e.g. Rectangle, Ellipse, Polygon),
+//      but they share a large, coherent set of fields and behaviors in the archive model
+//      (fills/strokes, corner parameters, minimal-shape descriptor, etc.).
+//    - Encoding them as one variant reduces schema surface area and keeps codecs simpler,
+//      while still preserving the specific shape identity via `shape: CanonicalLayerShape`
+//      (and temporarily via `type: BasicShapeNodeType` during transition).
+//    - Net effect: fewer variants where it doesn’t buy us stronger invariants, and fewer
+//      chances for drift between near-identical tables across versions.
+//
+// Notes / constraints:
+// - FlatBuffers unions can only contain tables, which aligns well with variant payloads.
+// - Forward compatibility relies on consumers being able to treat unknown union members
+//   as `UnknownNode` (or skip) rather than hard-failing.
+// - Shared concerns (identity, hierarchy, transform, layout, effects) are intentionally
+//   factored into reusable traits (`SystemNodeTrait`, `LayerTrait`) so variant tables
+//   stay small and consistent.
+//
+// This design intentionally favors:
+// - correctness by construction
+// - smaller, more maintainable codecs
+// - additive evolution as node kinds/features grow
+//
+// at the cost of:
+// - one level of indirection per node (variant table)
+// - care needed for unknown-variant handling across versions
+union Node {
+  UnknownNode,
+  SceneNode,
+  // groups and containers, hierarchial modifiers
+  GroupNode,
+  InitialContainerNode,
+  ContainerNode,
+  BooleanOperationNode,
+  // primitive shapes
+  BasicShapeNode,
+  LineNode,
+  VectorNode,
+  // texts
+  TextSpanNode,
 }
 
 // -----------------------------------------------------------------------------
@@ -1480,17 +1450,10 @@ table CanvasDocument {
   schema_version:string (id: 0);
 
   /// Flat node repository.
-  nodes:[Node] (id: 1);
+  nodes:[Node] (id: 2);
 
   /// Scene node ids (scene nodes are also stored in `nodes`).
-  scenes:[NodeIdentifier] (id: 2);
-
-  /// Entry scene id (optional).
-  entry_scene_id:NodeIdentifier (id: 3);
-
-  /// Embedded registries (optional).
-  images:ImagesRepository (id: 4);
-  bitmaps:BitmapsRepository (id: 5);
+  scenes:[NodeIdentifier] (id: 3);
 }
 
 /// Top-level wrapper (allows future multi-document bundles, signatures, etc.)

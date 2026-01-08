@@ -133,7 +133,6 @@ const document: editor.state.IEditorStateInit = {
         constraints: {
           children: "multiple",
         },
-        order: 0,
       },
     },
   },

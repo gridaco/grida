@@ -3,6 +3,9 @@
     "noImplicitAny": true,
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "module": "esnext",
+    "target": "es2020"
   }
 }

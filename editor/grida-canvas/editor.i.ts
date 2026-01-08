@@ -1598,7 +1598,7 @@ export namespace editor.state {
             active: true,
             locked: false,
             constraints: scene.constraints,
-            order: scene.order,
+            position: scene.position,
             guides: scene.guides,
             edges: scene.edges,
             background_color: scene.background_color,
