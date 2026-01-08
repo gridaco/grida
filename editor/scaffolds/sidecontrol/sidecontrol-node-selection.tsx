@@ -1265,7 +1265,7 @@ function SectionText({ node_id }: { node_id: string }) {
     font_kerning,
     font_width,
   } = useNodeState(node_id, (_node) => {
-    const node = _node as grida.program.nodes.TextNode;
+    const node = _node as grida.program.nodes.TextSpanNode;
     return {
       text: node.text,
       font_family: node.font_family,
@@ -1434,7 +1434,7 @@ function SectionText({ node_id }: { node_id: string }) {
 function SectionMixedText({ ids }: { ids: string[] }) {
   const instance = useCurrentEditor();
   const mp = useMixedProperties(ids, (node) => {
-    const t = node as grida.program.nodes.TextNode;
+    const t = node as grida.program.nodes.TextSpanNode;
     return {
       font_family: t.font_family,
       font_postscript_name: t.font_postscript_name,

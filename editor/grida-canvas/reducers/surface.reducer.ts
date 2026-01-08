@@ -375,7 +375,7 @@ function __self_before_exit_content_edit_mode(
       const current = dq.__getNodeById(
         draft,
         mode.node_id
-      ) as grida.program.nodes.TextNode;
+      ) as grida.program.nodes.TextSpanNode;
       // when text is empty, remove that. - (when perfectly empty)
       if (typeof current.text === "string" && current.text === "") {
         self_try_remove_node(draft, mode.node_id);

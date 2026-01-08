@@ -676,7 +676,7 @@ export namespace format {
          */
         export function text(
           builder: Builder,
-          node: grida.program.nodes.TextNode
+          node: grida.program.nodes.TextSpanNode
         ): { dataOffset: flatbuffers.Offset } {
           // Create string offset BEFORE starting nested table
           let textOffset: flatbuffers.Offset | null = null;
@@ -1425,7 +1425,7 @@ export namespace format {
             break;
           }
           case "text": {
-            const textNode = node as grida.program.nodes.TextNode;
+            const textNode = node as grida.program.nodes.TextSpanNode;
             const propertiesOffset = format.node.encode.nodeData.text(
               builder,
               textNode
@@ -4660,7 +4660,7 @@ export namespace format {
           opacity: number,
           layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
           effects?: grida.program.nodes.i.IEffects
-        ): grida.program.nodes.TextNode {
+        ): grida.program.nodes.TextSpanNode {
           const textProps = n.properties();
 
           // Decode text alignment from TextSpanNodeProperties
@@ -4774,7 +4774,7 @@ export namespace format {
               ? { ellipsis: textProps.ellipsis()! }
               : {}),
             ...(effects || {}),
-          } satisfies grida.program.nodes.TextNode;
+          } satisfies grida.program.nodes.TextSpanNode;
         }
 
         /**

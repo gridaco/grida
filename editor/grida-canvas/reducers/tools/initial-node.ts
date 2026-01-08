@@ -130,7 +130,7 @@ export default function initialNode(
         stroke_align: "outside",
         word_spacing: 0,
         ...seed,
-      } satisfies grida.program.nodes.TextNode;
+      } satisfies grida.program.nodes.TextSpanNode;
     }
     case "container": {
       return {

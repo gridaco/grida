@@ -211,7 +211,7 @@ describe("format roundtrip", () => {
             text_decoration_line: "none",
             text_align: "left",
             text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextNode,
+          } satisfies grida.program.nodes.TextSpanNode,
         },
         links: { [sceneId]: [nodeId] },
         scenes_ref: [sceneId],
@@ -225,7 +225,7 @@ describe("format roundtrip", () => {
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
       if (!node || node.type !== "text") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextNode;
+      node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.width).toBe("auto");
       expect(node.height).toBe("auto");
@@ -617,7 +617,7 @@ describe("format roundtrip", () => {
             text_decoration_line: "none",
             text_align: "left",
             text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextNode,
+          } satisfies grida.program.nodes.TextSpanNode,
         },
         links: { [sceneId]: [nodeId] },
         scenes_ref: [sceneId],
@@ -631,7 +631,7 @@ describe("format roundtrip", () => {
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
       if (!node || node.type !== "text") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextNode;
+      node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.type).toBe("text");
       expect(node.name).toBe("Text");
@@ -1145,7 +1145,7 @@ describe("format roundtrip", () => {
             text_decoration_line: "none",
             text_align: "left",
             text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextNode,
+          } satisfies grida.program.nodes.TextSpanNode,
           [containerId]: {
             type: "container",
             id: containerId,
@@ -1315,7 +1315,7 @@ describe("format roundtrip", () => {
             text_decoration_line: "none",
             text_align: "left",
             text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextNode,
+          } satisfies grida.program.nodes.TextSpanNode,
         },
         links: { [sceneId]: [nodeId] },
         scenes_ref: [sceneId],
@@ -1329,7 +1329,7 @@ describe("format roundtrip", () => {
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
       if (!node || node.type !== "text") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextNode;
+      node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.opacity).toBeCloseTo(0.8, 5);
     });
@@ -1373,7 +1373,7 @@ describe("format roundtrip", () => {
             text_decoration_line: "none",
             text_align: "left",
             text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextNode,
+          } satisfies grida.program.nodes.TextSpanNode,
         },
         links: { [sceneId]: [nodeId] },
         scenes_ref: [sceneId],
@@ -1387,7 +1387,7 @@ describe("format roundtrip", () => {
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
       if (!node || node.type !== "text") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextNode;
+      node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.font_size).toBe(24);
     });
@@ -1429,7 +1429,7 @@ describe("format roundtrip", () => {
             text_decoration_line: "none",
             text_align: "left",
             text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextNode,
+          } satisfies grida.program.nodes.TextSpanNode,
         },
         links: { [sceneId]: [nodeId] },
         scenes_ref: [sceneId],
@@ -1443,7 +1443,7 @@ describe("format roundtrip", () => {
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
       if (!node || node.type !== "text") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextNode;
+      node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.font_weight).toBe(700);
     });
@@ -1485,7 +1485,7 @@ describe("format roundtrip", () => {
             text_decoration_line: "none",
             text_align: "left",
             text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextNode,
+          } satisfies grida.program.nodes.TextSpanNode,
         },
         links: { [sceneId]: [nodeId] },
         scenes_ref: [sceneId],
@@ -1499,7 +1499,7 @@ describe("format roundtrip", () => {
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
       if (!node || node.type !== "text") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextNode;
+      node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.font_kerning).toBe(false);
     });
@@ -1541,7 +1541,7 @@ describe("format roundtrip", () => {
             text_decoration_line: "none",
             text_align: "left",
             text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextNode,
+          } satisfies grida.program.nodes.TextSpanNode,
         },
         links: { [sceneId]: [nodeId] },
         scenes_ref: [sceneId],
@@ -1555,7 +1555,7 @@ describe("format roundtrip", () => {
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
       if (!node || node.type !== "text") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextNode;
+      node satisfies grida.program.nodes.TextSpanNode;
 
       expect(node.font_size).toBe(18);
       expect(node.font_weight).toBe(600);

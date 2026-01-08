@@ -7,7 +7,7 @@ export const TextWidget = ({
   style,
   max_lines,
   ...props
-}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.TextNode>) => {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.TextSpanNode>) => {
   const children = text?.toString();
 
   return (

@@ -595,12 +595,12 @@ export namespace dq {
       return Object.keys(this.nodes);
     }
 
-    textnodes(): Array<grida.program.nodes.TextNode> {
+    textnodes(): Array<grida.program.nodes.TextSpanNode> {
       return this.nodeids
         .map((id) => this.nodes[id])
         .filter(
           (node) => node.type === "text"
-        ) as grida.program.nodes.TextNode[];
+        ) as grida.program.nodes.TextSpanNode[];
     }
 
     fonts(): Array<string> {

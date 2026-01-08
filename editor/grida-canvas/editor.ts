@@ -755,7 +755,9 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
-  public createTextNode(text = ""): NodeProxy<grida.program.nodes.TextNode> {
+  public createTextNode(
+    text = ""
+  ): NodeProxy<grida.program.nodes.TextSpanNode> {
     const id = this.idgen.next();
     // Use explicit scene-level target for programmatic text node creation
     this.insert(
@@ -2133,7 +2135,7 @@ class EditorDocumentStore
   ): void {
     const node = this.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
     const features = Object.assign({}, node.font_features ?? {});
     features[feature] = value;
 
@@ -2150,7 +2152,7 @@ class EditorDocumentStore
   ): void {
     const node = this.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
     const variations = Object.assign({}, node.font_variations ?? {});
     variations[key] = value;
 
@@ -2302,7 +2304,7 @@ class EditorDocumentStore
   changeTextNodeLetterSpacing(
     node_id: string,
     letterSpacing: editor.api.TChange<
-      grida.program.nodes.TextNode["letter_spacing"]
+      grida.program.nodes.TextSpanNode["letter_spacing"]
     >
   ) {
     try {
@@ -2331,7 +2333,7 @@ class EditorDocumentStore
   changeTextNodeWordSpacing(
     node_id: string,
     wordSpacing: editor.api.TChange<
-      grida.program.nodes.TextNode["word_spacing"]
+      grida.program.nodes.TextSpanNode["word_spacing"]
     >
   ) {
     try {
@@ -3330,7 +3332,7 @@ export class Editor
   toggleTextNodeBold(node_id: string) {
     const node = this.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
     if (node.type !== "text") return false;
 
     const isBold = node.font_weight === 700;
@@ -3361,7 +3363,7 @@ export class Editor
   toggleTextNodeItalic(node_id: string) {
     const node = this.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
     if (node.type !== "text") return false;
 
     const next_italic = !node.font_style_italic;
@@ -3397,7 +3399,7 @@ export class Editor
 
     const node = this.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
 
     const prev: grida.program.nodes.i.IFontStyle = {
       font_postscript_name: node.font_postscript_name,
@@ -3482,7 +3484,7 @@ export class Editor
   ) {
     const node = this.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
     assert(node, "node is not found");
     assert(node.type === "text", "node is not a text node");
 

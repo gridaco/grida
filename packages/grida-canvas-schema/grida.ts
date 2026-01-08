@@ -1185,7 +1185,7 @@ export namespace grida.program.nodes {
     | SceneNode
     | BooleanPathOperationNode
     | GroupNode
-    | TextNode
+    | TextSpanNode
     | ImageNode
     | VideoNode
     | ContainerNode
@@ -1203,7 +1203,7 @@ export namespace grida.program.nodes {
     | TemplateInstanceNode;
 
   export type ComputedNode =
-    | ComputedTextNode
+    | ComputedTextSpanNode
     | ComputedBitmapNode
     | ComputedImageNode
     | ComputedVideoNode
@@ -1222,7 +1222,7 @@ export namespace grida.program.nodes {
    * Unknwon node utility type - use within the correct context
    */
   export type UnknwonComputedNode = Omit<
-    Partial<ComputedTextNode> &
+    Partial<ComputedTextSpanNode> &
       Partial<ComputedImageNode> &
       Partial<ComputedBitmapNode> &
       Partial<ComputedVideoNode> &
@@ -1248,7 +1248,7 @@ export namespace grida.program.nodes {
   export type UnknwonNode = Omit<
     Partial<BooleanPathOperationNode> &
       Partial<GroupNode> &
-      Partial<TextNode> &
+      Partial<TextSpanNode> &
       Partial<BitmapNode> &
       Partial<ImageNode> &
       Partial<VideoNode> &
@@ -1287,7 +1287,7 @@ export namespace grida.program.nodes {
       __IPrototypeNodeChildren
   >;
   export type TextNodePrototype = __TPrototypeNode<
-    Omit<Partial<TextNode>, __base_scene_node_properties>
+    Omit<Partial<TextSpanNode>, __base_scene_node_properties>
   >;
   export type ImageNodePrototype = __TPrototypeNode<
     Omit<Partial<ImageNode>, __base_scene_node_properties>
@@ -2185,7 +2185,7 @@ export namespace grida.program.nodes {
     op: cg.BooleanOperation;
   }
 
-  export interface TextNode
+  export interface TextSpanNode
     extends i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
@@ -2196,13 +2196,18 @@ export namespace grida.program.nodes {
       i.ITextStroke {
     readonly type: "text";
 
+    /**
+     * tspan cannot have max lines. this will be removed in the future.
+     * current interpretation: tspan was previously text node, we keep max lines for legacy reasons.
+     * when cleaned, tspan shall not be a root text node.
+     */
     max_lines?: number | null;
     // text_auto_resize: "none" | "width" | "height" | "auto";
   }
 
-  export interface ComputedTextNode
+  export interface ComputedTextSpanNode
     extends __ReplaceSubset<
-      TextNode,
+      TextSpanNode,
       i.ITextValue & i.ITextStyle,
       i.IComputedTextValue & i.IComputedTextNodeStyle
     > {
@@ -2234,7 +2239,7 @@ export namespace grida.program.nodes {
    *
    * Note:
    * - Limited to HTML environment
-   * - {@link TextNode} also supports rich styling, but only limited to text spans.
+   * - {@link TextSpanNode} also supports rich styling, but only limited to text spans.
    *
    * RichText can hold any html-like text content, including text spans, links, images, etc.
    */

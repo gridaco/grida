@@ -57,7 +57,7 @@ export namespace css {
       Partial<grida.program.nodes.i.IPadding> &
       Partial<grida.program.nodes.i.IEffects> &
       Partial<grida.program.nodes.i.IFlexContainer> &
-      Partial<Pick<grida.program.nodes.TextNode, "max_lines">>,
+      Partial<Pick<grida.program.nodes.TextSpanNode, "max_lines">>,
     config: {
       hasTextStyle: boolean;
       fill: "color" | "background" | "fill" | "none";

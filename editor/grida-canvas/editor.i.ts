@@ -3110,7 +3110,7 @@ export namespace editor.api {
     createImageNode(
       image: grida.program.document.ImageRef
     ): NodeProxy<grida.program.nodes.ImageNode>;
-    createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
+    createTextNode(text: string): NodeProxy<grida.program.nodes.TextSpanNode>;
     createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
 
     /**
@@ -3724,15 +3724,15 @@ export namespace editor.api {
     ): void;
     changeTextNodeLineHeight(
       node_id: NodeID,
-      lineHeight: TChange<grida.program.nodes.TextNode["line_height"]>
+      lineHeight: TChange<grida.program.nodes.TextSpanNode["line_height"]>
     ): void;
     changeTextNodeLetterSpacing(
       node_id: NodeID,
-      letterSpacing: TChange<grida.program.nodes.TextNode["letter_spacing"]>
+      letterSpacing: TChange<grida.program.nodes.TextSpanNode["letter_spacing"]>
     ): void;
     changeTextNodeWordSpacing(
       node_id: NodeID,
-      wordSpacing: TChange<grida.program.nodes.TextNode["word_spacing"]>
+      wordSpacing: TChange<grida.program.nodes.TextSpanNode["word_spacing"]>
     ): void;
     changeTextNodeMaxlength(
       node_id: NodeID,
