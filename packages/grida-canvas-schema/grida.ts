@@ -2673,6 +2673,7 @@ export namespace grida.program.nodes {
         case "polygon":
         case "star":
         case "video": {
+          // FIXME: no expect error
           // @ts-expect-error
           return {
             name: prototype.type,

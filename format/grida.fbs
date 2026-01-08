@@ -404,13 +404,6 @@ enum BooleanPathOperation : byte {
   Xor = 3
 }
 
-enum BinaryEncoding : byte {
-  Unknown = 0,
-  JsonUtf8 = 1,
-  Cbor = 2,
-  NestedFlatbuffer = 3
-}
-
 enum SceneConstraintsChildren : byte {
   Single = 0,
   Multiple = 1
