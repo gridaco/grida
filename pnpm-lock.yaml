@@ -1123,12 +1123,18 @@ importers:
 
   packages/grida-canvas-io:
     dependencies:
+      '@grida/cg':
+        specifier: workspace:*
+        version: link:../grida-canvas-cg
       '@grida/cmath':
         specifier: workspace:*
         version: link:../grida-cmath
       '@grida/format':
         specifier: workspace:*
         version: link:../grida-format
+      '@grida/schema':
+        specifier: workspace:*
+        version: link:../grida-canvas-schema
       '@grida/sequence':
         specifier: workspace:*
         version: link:../grida-canvas-sequence
@@ -1148,12 +1154,6 @@ importers:
         specifier: ^2.0.2
         version: 2.0.2
     devDependencies:
-      '@grida/cg':
-        specifier: workspace:*
-        version: link:../grida-canvas-cg
-      '@grida/schema':
-        specifier: workspace:*
-        version: link:../grida-canvas-schema
       '@grida/vn':
         specifier: workspace:*
         version: link:../grida-canvas-vn
