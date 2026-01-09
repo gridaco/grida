@@ -230,10 +230,10 @@ export namespace schema.parametric_scale {
     const n = node as NodeScaleProps;
 
     // Layout-ish lengths (treat as regular numeric fields; do not bake non-numeric values)
-    scale_number_in_place(n, "left", s);
-    scale_number_in_place(n, "top", s);
-    scale_number_in_place(n, "right", s);
-    scale_number_in_place(n, "bottom", s);
+    scale_number_in_place(n, "layout_inset_left", s);
+    scale_number_in_place(n, "layout_inset_top", s);
+    scale_number_in_place(n, "layout_inset_right", s);
+    scale_number_in_place(n, "layout_inset_bottom", s);
     scale_number_in_place(n, "layout_target_width", s);
     scale_number_in_place(n, "layout_target_height", s);
 

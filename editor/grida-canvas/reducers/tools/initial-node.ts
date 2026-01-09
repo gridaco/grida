@@ -76,8 +76,8 @@ export default function initialNode(
 
   const position: grida.program.nodes.i.IPositioning = {
     position: "absolute",
-    top: 0,
-    left: 0,
+    layout_inset_top: 0,
+    layout_inset_left: 0,
   };
 
   const layer: grida.program.nodes.i.ILayerTrait = {

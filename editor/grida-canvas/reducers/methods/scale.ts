@@ -456,9 +456,14 @@ function resolveScaleOriginPoint(
     : cmath.rect.getCardinalPoint(bounds, origin);
 }
 
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (value && typeof value === "object")
-    return value as Record<string, unknown>;
+function toRecord(
+  node: grida.program.nodes.Node
+): Record<grida.program.nodes.UnknownNodePropertiesKey, unknown> | null {
+  if (node && typeof node === "object")
+    return node as Record<
+      grida.program.nodes.UnknownNodePropertiesKey,
+      unknown
+    >;
   return null;
 }
 
@@ -502,8 +507,8 @@ function collectAutoSpaceRootsFromGesture(args: {
     roots.push({
       id: root_id,
       initialRect,
-      hasLeft: typeof o["left"] === "number",
-      hasTop: typeof o["top"] === "number",
+      hasLeft: typeof o["layout_inset_left"] === "number",
+      hasTop: typeof o["layout_inset_top"] === "number",
     });
   }
 
@@ -539,10 +544,11 @@ function collectAutoSpaceRootsForCommand(args: {
 
     const rect =
       args.context.geometry.getNodeAbsoluteBoundingRect(root_id) ??
-      (typeof o["left"] === "number" && typeof o["top"] === "number"
+      (typeof o["layout_inset_left"] === "number" &&
+      typeof o["layout_inset_top"] === "number"
         ? {
-            x: o["left"],
-            y: o["top"],
+            x: o["layout_inset_left"] as number,
+            y: o["layout_inset_top"] as number,
             width: css.toPxNumber(node.layout_target_width),
             height: css.toPxNumber(node.layout_target_height),
           }
@@ -553,8 +559,8 @@ function collectAutoSpaceRootsForCommand(args: {
     roots.push({
       id: root_id,
       initialRect: rect,
-      hasLeft: typeof o["left"] === "number",
-      hasTop: typeof o["top"] === "number",
+      hasLeft: typeof o["layout_inset_left"] === "number",
+      hasTop: typeof o["layout_inset_top"] === "number",
     });
   }
 
@@ -586,11 +592,11 @@ function applyAutoSpaceRootLeftTopOverride(args: {
 
     if (root.hasLeft) {
       // selection-root override (only if authored as numeric)
-      o["left"] = scaled.x;
+      o["layout_inset_left"] = scaled.x;
     }
     if (root.hasTop) {
       // selection-root override (only if authored as numeric)
-      o["top"] = scaled.y;
+      o["layout_inset_top"] = scaled.y;
     }
   }
 }

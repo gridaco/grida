@@ -129,8 +129,13 @@ function createGeometryStub(
   ): { x: number; y: number; width: number; height: number } | null {
     if (!node) return null;
     if (node.position !== "absolute") return null;
-    if ("left" in node && typeof node.left !== "number") return null;
-    if ("top" in node && typeof node.top !== "number") return null;
+    if (
+      "layout_inset_left" in node &&
+      typeof node.layout_inset_left !== "number"
+    )
+      return null;
+    if ("layout_inset_top" in node && typeof node.layout_inset_top !== "number")
+      return null;
 
     // Many real-world text nodes are authored with `width/height: "auto"`.
     // The real editor geometry provider measures the rendered box; for tests
@@ -148,8 +153,16 @@ function createGeometryStub(
           ? css.toPxNumber(tspanNode.layout_target_height)
           : fontSize * 1.2;
         return {
-          x: "left" in tspanNode ? (tspanNode.left ?? 0) : 0,
-          y: "top" in tspanNode ? (tspanNode.top ?? 0) : 0,
+          x:
+            ("layout_inset_left" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+            tspanNode
+              ? (tspanNode.layout_inset_left ?? 0)
+              : 0,
+          y:
+            ("layout_inset_top" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+            tspanNode
+              ? (tspanNode.layout_inset_top ?? 0)
+              : 0,
           width: w,
           height: h,
         };
@@ -167,8 +180,16 @@ function createGeometryStub(
     const height = css.toPxNumber(node.layout_target_height);
 
     return {
-      x: "left" in node ? (node.left ?? 0) : 0,
-      y: "top" in node ? (node.top ?? 0) : 0,
+      x:
+        ("layout_inset_left" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+        node
+          ? (node.layout_inset_left ?? 0)
+          : 0,
+      y:
+        ("layout_inset_top" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+        node
+          ? (node.layout_inset_top ?? 0)
+          : 0,
       width,
       height,
     };
@@ -276,11 +297,11 @@ function initEditorStateFromFixture(args: {
   return state;
 }
 
-function hasNumericAbsoluteBox(node: any): boolean {
+function hasNumericAbsoluteBox(node: grida.program.nodes.UnknownNode): boolean {
   return (
     node?.position === "absolute" &&
-    typeof node.left === "number" &&
-    typeof node.top === "number" &&
+    typeof node.layout_inset_left === "number" &&
+    typeof node.layout_inset_top === "number" &&
     typeof node.layout_target_width === "number" &&
     typeof node.layout_target_height === "number"
   );
@@ -327,8 +348,8 @@ function pickTextAndVectorTargetsFromFixture(
       ([, n]) =>
         n.type === "tspan" &&
         n.position === "absolute" &&
-        typeof n.left === "number" &&
-        typeof n.top === "number" &&
+        typeof n.layout_inset_left === "number" &&
+        typeof n.layout_inset_top === "number" &&
         typeof n.font_size === "number"
     )?.[0] ?? null;
   const vector_id =
@@ -347,12 +368,13 @@ function isScaleTrackableNode(
   if (node.type === "tspan") {
     return (
       node.position === "absolute" &&
-      typeof node.left === "number" &&
-      typeof node.top === "number" &&
+      typeof node.layout_inset_left === "number" &&
+      typeof node.layout_inset_top === "number" &&
       typeof node.font_size === "number"
     );
   }
-  if (!hasNumericAbsoluteBox(node)) return false;
+  if (!hasNumericAbsoluteBox(node as grida.program.nodes.UnknownNode))
+    return false;
   return node.type === "container" || node.type === "vector";
 }
 
@@ -561,8 +583,8 @@ it("origin semantics: auto overrides root left/top but global does not", () => {
         active: true,
         locked: false,
         position: "absolute",
-        left: 10,
-        top: 20,
+        layout_inset_left: 10,
+        layout_inset_top: 20,
         layout_target_width: 100,
         layout_target_height: 50,
         rotation: 0,
@@ -627,12 +649,12 @@ it("origin semantics: auto overrides root left/top but global does not", () => {
   expect(g.layout_target_width).toBe(200);
 
   // but only `auto` keeps the center fixed by shifting left/top
-  expect(a.left).toBe(-40); // center at x=60, new half-width=100 => 60-100=-40
-  expect(a.top).toBe(-5); // center at y=45, new half-height=50 => 45-50=-5
+  expect(a.layout_inset_left).toBe(-40); // center at x=60, new half-width=100 => 60-100=-40
+  expect(a.layout_inset_top).toBe(-5); // center at y=45, new half-height=50 => 45-50=-5
 
   // `global` simply multiplies coordinates
-  expect(g.left).toBe(20);
-  expect(g.top).toBe(40);
+  expect(g.layout_inset_left).toBe(20);
+  expect(g.layout_inset_top).toBe(40);
 });
 
 it.skip("UB/TODO: origin semantics for depth=2 selection root (scene -> container -> node)", () => {

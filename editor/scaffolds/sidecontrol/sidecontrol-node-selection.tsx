@@ -845,10 +845,10 @@ function SectionPosition({ node_id }: { node_id: string }) {
     (node) => ({
       position: node.position,
       rotation: node.rotation,
-      top: node.top,
-      left: node.left,
-      right: node.right,
-      bottom: node.bottom,
+      top: node.layout_inset_top,
+      left: node.layout_inset_left,
+      right: node.layout_inset_right,
+      bottom: node.layout_inset_bottom,
     })
   );
 
@@ -865,10 +865,10 @@ function SectionPosition({ node_id }: { node_id: string }) {
           <PositioningConstraintsControl
             value={{
               position: position!,
-              top,
-              left,
-              right,
-              bottom,
+              layout_inset_top: top,
+              layout_inset_left: left,
+              layout_inset_right: right,
+              layout_inset_bottom: bottom,
             }}
             disabled={{
               right: is_root,
@@ -904,10 +904,10 @@ function SectionMixedPosition({ ids }: { ids: string[] }) {
   const mp = useMixedProperties(ids, (node) => {
     return {
       position: node.position,
-      top: node.top,
-      left: node.left,
-      right: node.right,
-      bottom: node.bottom,
+      top: node.layout_inset_top,
+      left: node.layout_inset_left,
+      right: node.layout_inset_right,
+      bottom: node.layout_inset_bottom,
       rotation: node.rotation,
     };
   });
@@ -919,10 +919,14 @@ function SectionMixedPosition({ ids }: { ids: string[] }) {
 
   const constraints_value: grida.program.nodes.i.IPositioning = {
     position,
-    top: typeof mp.top?.value === "number" ? mp.top.value : undefined,
-    left: typeof mp.left?.value === "number" ? mp.left.value : undefined,
-    right: typeof mp.right?.value === "number" ? mp.right.value : undefined,
-    bottom: typeof mp.bottom?.value === "number" ? mp.bottom.value : undefined,
+    layout_inset_top:
+      typeof mp.top?.value === "number" ? mp.top.value : undefined,
+    layout_inset_left:
+      typeof mp.left?.value === "number" ? mp.left.value : undefined,
+    layout_inset_right:
+      typeof mp.right?.value === "number" ? mp.right.value : undefined,
+    layout_inset_bottom:
+      typeof mp.bottom?.value === "number" ? mp.bottom.value : undefined,
   };
 
   return (

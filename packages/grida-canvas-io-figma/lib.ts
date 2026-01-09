@@ -383,7 +383,15 @@ export namespace iofigma {
               relativeTransform?: any;
               size?: any;
             }
-      ) {
+      ): Pick<
+        grida.program.nodes.ContainerNode,
+        | "position"
+        | "layout_inset_left"
+        | "layout_inset_top"
+        | "layout_target_width"
+        | "layout_target_height"
+        | "layout_target_aspect_ratio"
+      > {
         const szx = node.size?.x ?? 0;
         const szy = node.size?.y ?? 0;
 
@@ -400,8 +408,8 @@ export namespace iofigma {
 
         return {
           position: "absolute" as const,
-          left: node.relativeTransform?.[0][2] ?? 0,
-          top: node.relativeTransform?.[1][2] ?? 0,
+          layout_inset_left: node.relativeTransform?.[0][2] ?? 0,
+          layout_inset_top: node.relativeTransform?.[1][2] ?? 0,
           layout_target_width: szx,
           layout_target_height: szy,
           layout_target_aspect_ratio,
@@ -933,8 +941,8 @@ export namespace iofigma {
         const rootNode = processNode(node) as grida.program.nodes.ContainerNode;
         // Keep absolute positioning from Figma (all Figma nodes are absolute by default)
         // rootNode.position = "relative";
-        // rootNode.left = 0;
-        // rootNode.top = 0;
+        // rootNode.layout_inset_left = 0;
+        // rootNode.layout_inset_top = 0;
 
         if (!rootNode) {
           throw new Error("Failed to process root node");
@@ -1080,10 +1088,10 @@ export namespace iofigma {
               type: "tspan",
               text: node.characters,
               position: "absolute",
-              left: constraints.left,
-              top: constraints.top,
-              right: constraints.right,
-              bottom: constraints.bottom,
+              layout_inset_left: constraints.left,
+              layout_inset_top: constraints.top,
+              layout_inset_right: constraints.right,
+              layout_inset_bottom: constraints.bottom,
               layout_target_width:
                 figma_text_resizing_model === "WIDTH_AND_HEIGHT"
                   ? "auto"
@@ -1157,8 +1165,8 @@ export namespace iofigma {
               ...effects_trait(node.effects),
               type: "line",
               position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
+              layout_inset_left: node.relativeTransform![0][2],
+              layout_inset_top: node.relativeTransform![1][2],
               layout_target_width: node.size!.x,
               layout_target_height: 0,
             } satisfies grida.program.nodes.LineNode;

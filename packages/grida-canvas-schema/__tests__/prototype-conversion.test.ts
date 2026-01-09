@@ -338,15 +338,15 @@ describe("create_packed_scene_document_from_prototype", () => {
         name: "MyContainer",
         layout_target_width: 200,
         layout_target_height: 150,
-        left: 10,
-        top: 20,
+        layout_inset_left: 10,
+        layout_inset_top: 20,
         children: [
           {
             type: "tspan",
             name: "MyText",
             text: "Hello",
-            left: 5,
-            top: 5,
+            layout_inset_left: 5,
+            layout_inset_top: 5,
           },
         ],
       };
@@ -364,14 +364,16 @@ describe("create_packed_scene_document_from_prototype", () => {
       expect(container.name).toBe("MyContainer");
       expect(container.layout_target_width).toBe(200);
       expect(container.layout_target_height).toBe(150);
-      expect(container.left).toBe(10);
-      expect(container.top).toBe(20);
+      expect(container.layout_inset_left).toBe(10);
+      expect(container.layout_inset_top).toBe(20);
 
-      const text = result.nodes["prop-1"] as any;
+      const text = result.nodes[
+        "prop-1"
+      ] as Partial<grida.program.nodes.TextSpanNode>;
       expect(text.name).toBe("MyText");
       expect(text.text).toBe("Hello");
-      expect(text.left).toBe(5);
-      expect(text.top).toBe(5);
+      expect(text.layout_inset_left).toBe(5);
+      expect(text.layout_inset_top).toBe(5);
 
       // Critical: nodes should NOT have children property
       expect("children" in container).toBe(false);
@@ -393,8 +395,8 @@ describe("create_packed_scene_document_from_prototype", () => {
             layout_target_width: 300,
             layout_target_height: 200,
             position: "absolute",
-            left: 0,
-            top: 0,
+            layout_inset_left: 0,
+            layout_inset_top: 0,
           } satisfies Partial<grida.program.nodes.ContainerNode> as any,
           child1: {
             id: "child1",
@@ -404,8 +406,8 @@ describe("create_packed_scene_document_from_prototype", () => {
             locked: false,
             text: "First",
             position: "absolute",
-            left: 10,
-            top: 10,
+            layout_inset_left: 10,
+            layout_inset_top: 10,
           } satisfies Partial<grida.program.nodes.TextSpanNode> as any,
           child2: {
             id: "child2",
@@ -415,8 +417,8 @@ describe("create_packed_scene_document_from_prototype", () => {
             locked: false,
             text: "Second",
             position: "absolute",
-            left: 10,
-            top: 40,
+            layout_inset_left: 10,
+            layout_inset_top: 40,
           } satisfies Partial<grida.program.nodes.TextSpanNode> as any,
         },
         links: {

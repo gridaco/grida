@@ -703,8 +703,8 @@ pub struct JSONUnknownNodeProperties {
     pub name: Option<String>,
     #[serde(rename = "active", default = "default_active")]
     pub active: bool,
-    #[serde(rename = "locked", default = "default_locked")]
-    pub locked: bool,
+    // #[serde(rename = "locked", default = "default_locked")]
+    // pub locked: bool,
     // blend
     #[serde(rename = "opacity", default = "default_opacity")]
     pub opacity: f32,
@@ -712,25 +712,21 @@ pub struct JSONUnknownNodeProperties {
     pub blend_mode: JSONLayerBlendMode,
     #[serde(rename = "mask")]
     pub mask: Option<JSONLayerMaskType>,
-    #[serde(rename = "z_index", alias = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
+    // #[serde(rename = "z_index", alias = "zIndex", default = "default_z_index")]
+    // pub z_index: i32,
     // css
     #[serde(rename = "position")]
     pub position: Option<CSSPosition>,
-    #[serde(rename = "left")]
-    pub left: Option<f32>,
-    #[serde(rename = "top")]
-    pub top: Option<f32>,
-    #[serde(rename = "right")]
-    pub right: Option<f32>,
-    #[serde(rename = "bottom")]
-    pub bottom: Option<f32>,
+    #[serde(rename = "layout_inset_left", alias = "left")]
+    pub layout_inset_left: Option<f32>,
+    #[serde(rename = "layout_inset_top", alias = "top")]
+    pub layout_inset_top: Option<f32>,
+    #[serde(rename = "layout_inset_right", alias = "right")]
+    pub layout_inset_right: Option<f32>,
+    #[serde(rename = "layout_inset_bottom", alias = "bottom")]
+    pub layout_inset_bottom: Option<f32>,
     #[serde(rename = "rotation", default = "default_rotation")]
     pub rotation: f32,
-    #[serde(rename = "border")]
-    pub border: Option<CSSBorder>,
-    #[serde(rename = "style")]
-    pub style: Option<HashMap<String, serde_json::Value>>,
     // geometry - defaults to 0 for non-intrinsic size nodes
     #[serde(
         rename = "layout_target_width",
@@ -1237,8 +1233,8 @@ fn default_image_scale() -> f32 {
 impl From<JSONGroupNode> for GroupNodeRec {
     fn from(node: JSONGroupNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1275,10 +1271,10 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             active: node.base.active,
             rotation: node.base.rotation,
             position: json_position_to_layout_basis(
-                node.base.left,
-                node.base.top,
-                node.base.right,
-                node.base.bottom,
+                node.base.layout_inset_left,
+                node.base.layout_inset_top,
+                node.base.layout_inset_right,
+                node.base.layout_inset_bottom,
             ),
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
@@ -1375,8 +1371,8 @@ impl From<JSONTextSpanNode> for TextSpanNodeRec {
         TextSpanNodeRec {
             active: node.base.active,
             transform: AffineTransform::from_box_center(
-                node.base.left.unwrap_or(0.0),
-                node.base.top.unwrap_or(0.0),
+                node.base.layout_inset_left.unwrap_or(0.0),
+                node.base.layout_inset_top.unwrap_or(0.0),
                 node.base.width.length(0.0),
                 node.base.height.length(0.0),
                 node.base.rotation,
@@ -1459,8 +1455,8 @@ impl From<JSONEllipseNode> for Node {
         let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1518,8 +1514,8 @@ impl From<JSONRectangleNode> for Node {
         let stroke_width: StrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1578,8 +1574,8 @@ impl From<JSONImageNode> for Node {
         let stroke_width: StrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1680,8 +1676,8 @@ impl From<JSONRegularPolygonNode> for Node {
         let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1738,8 +1734,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
         let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1794,8 +1790,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
 impl From<JSONLineNode> for Node {
     fn from(node: JSONLineNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1839,8 +1835,8 @@ impl From<JSONLineNode> for Node {
 impl From<JSONVectorNode> for Node {
     fn from(node: JSONVectorNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1899,8 +1895,8 @@ impl From<JSONBooleanOperationNode> for Node {
 
         // TODO: boolean operation's transform should be handled differently
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -2115,8 +2111,8 @@ mod corner_radius_tests {
             "blend_mode": "normal",
             "z_index": 0,
             "position": "absolute",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "rotation": 0,
             "layout_target_width": 100,
             "layout_target_height": 50,
@@ -2157,8 +2153,8 @@ mod padding_tests {
             "blend_mode": "normal",
             "z_index": 0,
             "position": "absolute",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "rotation": 0,
             "layout_target_width": 200,
             "layout_target_height": 200,
@@ -2192,8 +2188,8 @@ mod padding_tests {
             "blend_mode": "normal",
             "z_index": 0,
             "position": "absolute",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "rotation": 0,
             "layout_target_width": 200,
             "layout_target_height": 200,
@@ -2224,8 +2220,8 @@ mod padding_tests {
             "blend_mode": "normal",
             "z_index": 0,
             "position": "absolute",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "rotation": 0,
             "layout_target_width": 200,
             "layout_target_height": 200,
@@ -2382,8 +2378,8 @@ mod tests {
             "name": "Boolean Operation",
             "type": "boolean",
             "op": "union",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 200.0,
             "layout_target_height": 200.0,
             "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
@@ -2400,8 +2396,8 @@ mod tests {
                     Some("Boolean Operation".to_string())
                 );
                 assert_eq!(boolean_node.op, BooleanPathOperation::Union);
-                assert_eq!(boolean_node.base.left, Some(100.0));
-                assert_eq!(boolean_node.base.top, Some(100.0));
+                assert_eq!(boolean_node.base.layout_inset_left, Some(100.0));
+                assert_eq!(boolean_node.base.layout_inset_top, Some(100.0));
                 assert_eq!(boolean_node.base.width, CSSDimension::LengthPX(200.0));
                 assert_eq!(boolean_node.base.height, CSSDimension::LengthPX(200.0));
             }
@@ -2513,8 +2509,8 @@ mod tests {
             "name": "Auto Width Text",
             "type": "tspan",
             "text": "Hello World",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": "auto",
             "layout_target_height": "auto"
         }"#;
@@ -2536,8 +2532,8 @@ mod tests {
             "name": "Fixed Width Text",
             "type": "tspan",
             "text": "Hello World",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 200.0,
             "layout_target_height": "auto"
         }"#;
@@ -2558,8 +2554,8 @@ mod tests {
             "id": "rect-1",
             "name": "Auto Width Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": "auto",
             "layout_target_height": "auto",
             "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
@@ -2585,8 +2581,8 @@ mod tests {
             "id": "text-1",
             "type": "tspan",
             "text": "Test",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "font_optical_sizing": "auto"
         }"#;
 
@@ -2602,8 +2598,8 @@ mod tests {
             "id": "text-2",
             "type": "tspan",
             "text": "Test",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "font_optical_sizing": "none"
         }"#;
 
@@ -2619,8 +2615,8 @@ mod tests {
             "id": "text-3",
             "type": "tspan",
             "text": "Test",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "font_optical_sizing": 16.5
         }"#;
 
@@ -2639,8 +2635,8 @@ mod tests {
             "id": "text-4",
             "type": "tspan",
             "text": "Test",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "font_optical_sizing": "invalid_value"
         }"#;
 
@@ -2660,8 +2656,8 @@ mod tests {
             "name": "text",
             "type": "tspan",
             "text": "Text",
-            "left": 100,
-            "top": 100,
+            "layout_inset_left": 100,
+            "layout_inset_top": 100,
             "font_optical_sizing": "none"
         }"#;
 
@@ -2679,8 +2675,8 @@ mod tests {
             "name": "text",
             "type": "tspan",
             "text": "Text",
-            "left": 100,
-            "top": 100,
+            "layout_inset_left": 100,
+            "layout_inset_top": 100,
             "font_optical_sizing": 16.5
         }"#;
 
@@ -2701,8 +2697,8 @@ mod tests {
             "name": "text",
             "type": "tspan",
             "text": "Text",
-            "left": 100,
-            "top": 100
+            "layout_inset_left": 100,
+            "layout_inset_top": 100
         }"#;
 
         let node: JSONNode =
@@ -2835,8 +2831,8 @@ mod tests {
             "id": "rect-pt",
             "name": "PassThrough Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 100.0,
             "layout_target_height": 100.0,
             "blend_mode": "pass-through"
@@ -2861,8 +2857,8 @@ mod tests {
             "id": "rect-normal",
             "name": "Normal Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 100.0,
             "layout_target_height": 100.0,
             "blend_mode": "normal"
@@ -2901,8 +2897,8 @@ mod tests {
             "id": "rect-multiply",
             "name": "Multiply Blend Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 100.0,
             "layout_target_height": 100.0,
             "blend_mode": "multiply"
@@ -2946,8 +2942,8 @@ mod tests {
             "id": "rect-geometry-mask",
             "name": "Geometry Mask Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 100.0,
             "layout_target_height": 100.0,
             "mask": "geometry"
@@ -2969,8 +2965,8 @@ mod tests {
             "id": "rect-alpha-mask",
             "name": "Alpha Mask Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 100.0,
             "layout_target_height": 100.0,
             "mask": "alpha"
@@ -2992,8 +2988,8 @@ mod tests {
             "id": "rect-luminance-mask",
             "name": "Luminance Mask Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 100.0,
             "layout_target_height": 100.0,
             "mask": "luminance"
@@ -3113,8 +3109,8 @@ mod tests {
                         "id": "rect1",
                         "name": "Rectangle",
                         "type": "rectangle",
-                        "left": 100,
-                        "top": 100,
+                        "layout_inset_left": 100,
+                        "layout_inset_top": 100,
                         "layout_target_width": 200,
                         "layout_target_height": 150
                     }
@@ -3170,8 +3166,8 @@ mod tests {
                         "id": "container1",
                         "name": "Container",
                         "type": "container",
-                        "left": 0,
-                        "top": 0,
+                        "layout_inset_left": 0,
+                        "layout_inset_top": 0,
                         "layout_target_width": 500,
                         "layout_target_height": 500
                     },
@@ -3179,8 +3175,8 @@ mod tests {
                         "id": "rect1",
                         "name": "Rectangle",
                         "type": "rectangle",
-                        "left": 10,
-                        "top": 10,
+                        "layout_inset_left": 10,
+                        "layout_inset_top": 10,
                         "layout_target_width": 100,
                         "layout_target_height": 100
                     }
@@ -3237,8 +3233,8 @@ mod tests {
                         "id": "container1",
                         "name": "Container 1",
                         "type": "container",
-                        "left": 0,
-                        "top": 0,
+                        "layout_inset_left": 0,
+                        "layout_inset_top": 0,
                         "layout_target_width": 500,
                         "layout_target_height": 500
                     },
@@ -3246,8 +3242,8 @@ mod tests {
                         "id": "container2",
                         "name": "Container 2",
                         "type": "container",
-                        "left": 10,
-                        "top": 10,
+                        "layout_inset_left": 10,
+                        "layout_inset_top": 10,
                         "layout_target_width": 400,
                         "layout_target_height": 400
                     },
@@ -3255,8 +3251,8 @@ mod tests {
                         "id": "rect1",
                         "name": "Rectangle",
                         "type": "rectangle",
-                        "left": 20,
-                        "top": 20,
+                        "layout_inset_left": 20,
+                        "layout_inset_top": 20,
                         "layout_target_width": 100,
                         "layout_target_height": 100
                     }
@@ -3368,8 +3364,8 @@ mod tests {
             "id": "rect-1",
             "name": "Blurred Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 200.0,
             "layout_target_height": 200.0,
             "fe_blur": {
@@ -3409,8 +3405,8 @@ mod tests {
             "id": "rect-2",
             "name": "Progressive Blur Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 200.0,
             "layout_target_height": 400.0,
             "fe_blur": {
@@ -3461,8 +3457,8 @@ mod tests {
             "id": "rect-3",
             "name": "Backdrop Blur Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 200.0,
             "layout_target_height": 200.0,
             "fe_backdrop_blur": {
@@ -3502,8 +3498,8 @@ mod tests {
             "id": "rect-4",
             "name": "Progressive Backdrop Blur Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 200.0,
             "layout_target_height": 300.0,
             "fe_backdrop_blur": {
@@ -3555,8 +3551,8 @@ mod tests {
             "name": "Blurred Text",
             "type": "tspan",
             "text": "Hello World",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 200.0,
             "layout_target_height": "auto",
             "fe_blur": {
@@ -3657,8 +3653,8 @@ mod tests {
             "id": "container-1",
             "name": "Container with Blurs",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 300.0,
             "layout_target_height": 400.0,
             "fe_blur": {
@@ -3722,8 +3718,8 @@ mod tests {
             "id": "container-layout",
             "name": "Container with Layout",
             "type": "container",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 400.0,
             "layout_target_height": 300.0,
             "layout": "flex",
@@ -3761,8 +3757,8 @@ mod tests {
             "id": "container-aligned",
             "name": "Container with Alignments",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 600.0,
             "layout_target_height": 400.0,
             "layout": "flex",
@@ -3808,8 +3804,8 @@ mod tests {
             "id": "container-padded",
             "name": "Container with Padding",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 400.0,
             "layout_target_height": 300.0,
             "layout": "flex",
@@ -3851,8 +3847,8 @@ mod tests {
             "id": "container-complete",
             "name": "Complete Layout Container",
             "type": "container",
-            "left": 50.0,
-            "top": 50.0,
+            "layout_inset_left": 50.0,
+            "layout_inset_top": 50.0,
             "layout_target_width": 500.0,
             "layout_target_height": 400.0,
             "layout": "flex",
@@ -3915,8 +3911,8 @@ mod tests {
             "id": "container-gap",
             "name": "Container with Gap",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 400.0,
             "layout_target_height": 300.0,
             "layout": "flex",
@@ -3952,8 +3948,8 @@ mod tests {
             "id": "container-wrap",
             "name": "Container with Wrap",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 400.0,
             "layout_target_height": 300.0,
             "layout": "flex",
@@ -3981,8 +3977,8 @@ mod tests {
             "id": "container-nowrap",
             "name": "Container with NoWrap",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 400.0,
             "layout_target_height": 300.0,
             "layout": "flex",
@@ -4012,8 +4008,8 @@ mod tests {
             "id": "rect-smooth",
             "name": "Smooth Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 200.0,
             "layout_target_height": 200.0,
             "corner_radius": 50.0,
@@ -4044,8 +4040,8 @@ mod tests {
             "id": "container-smooth",
             "name": "Smooth Container",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 300.0,
             "layout_target_height": 300.0,
             "corner_radius": 40.0,
@@ -4073,8 +4069,8 @@ mod tests {
             "name": "Smooth Image",
             "type": "image",
             "src": "test.png",
-            "left": 0.0,
-            "top": 0.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
             "layout_target_width": 250.0,
             "layout_target_height": 250.0,
             "corner_radius": 30.0,
@@ -4106,8 +4102,8 @@ mod tests {
             "id": "container-all",
             "name": "All Layout Properties",
             "type": "container",
-            "left": 100.0,
-            "top": 100.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
             "layout_target_width": 600.0,
             "layout_target_height": 500.0,
             "layout": "flex",

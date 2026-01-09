@@ -65,10 +65,10 @@ export namespace css {
   ): React.CSSProperties {
     const {
       position,
-      top,
-      left,
-      bottom,
-      right,
+      layout_inset_top: top,
+      layout_inset_left: left,
+      layout_inset_bottom: bottom,
+      layout_inset_right: right,
       layout_target_width: width,
       layout_target_height: height,
       z_index,

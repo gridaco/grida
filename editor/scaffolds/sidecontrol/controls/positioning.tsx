@@ -55,12 +55,12 @@ export function PositioningConstraintsControl({
           placeholder="--"
           aria-label="Top"
           type="number"
-          value={value.top ?? ""}
+          value={value.layout_inset_top ?? ""}
           disabled={disabled?.top}
           onValueCommit={(v) => {
             onValueCommit?.({
               ...value,
-              top: v,
+              layout_inset_top: v,
             });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}
@@ -72,22 +72,22 @@ export function PositioningConstraintsControl({
           placeholder="--"
           type="number"
           aria-label="Left"
-          value={value.left ?? ""}
+          value={value.layout_inset_left ?? ""}
           disabled={disabled?.left}
           onValueCommit={(v) => {
             onValueCommit?.({
               ...value,
-              left: v,
+              layout_inset_left: v,
             });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-auto")}
         />
         <ConstraintsBox
           constraint={{
-            left: value.left !== undefined,
-            right: value.right !== undefined,
-            top: value.top !== undefined,
-            bottom: value.bottom !== undefined,
+            left: value.layout_inset_left !== undefined,
+            right: value.layout_inset_right !== undefined,
+            top: value.layout_inset_top !== undefined,
+            bottom: value.layout_inset_bottom !== undefined,
           }}
           disabled={disabled}
           onConstraintChange={(side, checked) => {
@@ -102,12 +102,12 @@ export function PositioningConstraintsControl({
           placeholder="--"
           type="number"
           aria-label="Right"
-          value={value.right ?? ""}
+          value={value.layout_inset_right ?? ""}
           disabled={disabled?.right}
           onValueCommit={(v) => {
             onValueCommit?.({
               ...value,
-              right: v,
+              layout_inset_right: v,
             });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-auto")}
@@ -119,12 +119,12 @@ export function PositioningConstraintsControl({
           placeholder="--"
           type="number"
           aria-label="Bottom"
-          value={value.bottom ?? ""}
+          value={value.layout_inset_bottom ?? ""}
           disabled={disabled?.bottom}
           onValueCommit={(v) => {
             onValueCommit?.({
               ...value,
-              bottom: v,
+              layout_inset_bottom: v,
             });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}

@@ -45,8 +45,8 @@ export function prepare_bitmap_node(
       opacity: 1,
       rotation: 0,
       z_index: 0,
-      left: x,
-      top: y,
+      layout_inset_left: x,
+      layout_inset_top: y,
       layout_target_width: width,
       layout_target_height: height,
       imageRef: new_bitmap_ref_id,
@@ -106,7 +106,10 @@ export function on_brush(
 
   const node = prepare_bitmap_node(draft, node_id, context);
 
-  const nodepos: cmath.Vector2 = [node.left!, node.top!];
+  const nodepos: cmath.Vector2 = [
+    node.layout_inset_left!,
+    node.layout_inset_top!,
+  ];
 
   const image = draft.document.bitmaps[node.imageRef];
 
@@ -157,8 +160,8 @@ export function on_brush(
   };
 
   // transform node
-  node.left = bme.x;
-  node.top = bme.y;
+  node.layout_inset_left = bme.x;
+  node.layout_inset_top = bme.y;
   node.layout_target_width = bme.width;
   node.layout_target_height = bme.height;
 

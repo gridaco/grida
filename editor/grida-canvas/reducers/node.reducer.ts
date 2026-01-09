@@ -7,6 +7,8 @@ import cmath from "@grida/cmath";
 import { editor } from "@/grida-canvas";
 
 type UN = grida.program.nodes.UnknownNode;
+// UnknownNodeProperties Keys
+type UNPK = grida.program.nodes.UnknownNodePropertiesKey;
 type DYN_TODO = grida.program.nodes.UnknownNode | any; // TODO: remove casting of this usage.
 
 type PaintValue = grida.program.nodes.i.props.PropsPaintValue;
@@ -179,24 +181,24 @@ const safe_properties: Partial<
       (draft as UN).position = value;
     },
   }),
-  left: defineNodeProperty<"left">({
+  layout_inset_left: defineNodeProperty<"layout_inset_left">({
     apply: (draft, value, prev) => {
-      (draft as UN).left = value;
+      (draft as UN).layout_inset_left = value;
     },
   }),
-  top: defineNodeProperty<"top">({
+  layout_inset_top: defineNodeProperty<"layout_inset_top">({
     apply: (draft, value, prev) => {
-      (draft as UN).top = value;
+      (draft as UN).layout_inset_top = value;
     },
   }),
-  right: defineNodeProperty<"right">({
+  layout_inset_right: defineNodeProperty<"layout_inset_right">({
     apply: (draft, value, prev) => {
-      (draft as UN).right = value;
+      (draft as UN).layout_inset_right = value;
     },
   }),
-  bottom: defineNodeProperty<"bottom">({
+  layout_inset_bottom: defineNodeProperty<"layout_inset_bottom">({
     apply: (draft, value, prev) => {
-      (draft as UN).bottom = value;
+      (draft as UN).layout_inset_bottom = value;
     },
   }),
   layout_target_width: defineNodeProperty<"layout_target_width">({
@@ -912,15 +914,17 @@ export default function nodeReducer<
       // keep
       case "node/change/positioning": {
         const pos = draft as grida.program.nodes.i.IPositioning;
-        if ("position" in action) {
-          if (action.position) {
-            pos.position = action.position;
-          }
+        if (("position" satisfies UNPK) in action && action.position) {
+          pos.position = action.position;
         }
-        if ("left" in action) pos.left = action.left;
-        if ("top" in action) pos.top = action.top;
-        if ("right" in action) pos.right = action.right;
-        if ("bottom" in action) pos.bottom = action.bottom;
+        if (("layout_inset_left" satisfies UNPK) in action)
+          pos.layout_inset_left = action.layout_inset_left;
+        if (("layout_inset_top" satisfies UNPK) in action)
+          pos.layout_inset_top = action.layout_inset_top;
+        if (("layout_inset_right" satisfies UNPK) in action)
+          pos.layout_inset_right = action.layout_inset_right;
+        if (("layout_inset_bottom" satisfies UNPK) in action)
+          pos.layout_inset_bottom = action.layout_inset_bottom;
         break;
       }
       // keep
@@ -932,10 +936,14 @@ export default function nodeReducer<
             break;
           }
           case "relative": {
-            (draft as grida.program.nodes.i.IPositioning).left = undefined;
-            (draft as grida.program.nodes.i.IPositioning).top = undefined;
-            (draft as grida.program.nodes.i.IPositioning).right = undefined;
-            (draft as grida.program.nodes.i.IPositioning).bottom = undefined;
+            (draft as grida.program.nodes.i.IPositioning).layout_inset_left =
+              undefined;
+            (draft as grida.program.nodes.i.IPositioning).layout_inset_top =
+              undefined;
+            (draft as grida.program.nodes.i.IPositioning).layout_inset_right =
+              undefined;
+            (draft as grida.program.nodes.i.IPositioning).layout_inset_bottom =
+              undefined;
           }
         }
         break;

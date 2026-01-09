@@ -1705,10 +1705,15 @@ function Edge({
       case "position":
         return cmath.vector2.transform([p.x, p.y], transform);
       case "anchor":
+        // TODO: unstable with layout properties, use geometry query instead
         try {
-          const n = editor.commands.getNodeSnapshotById(p.target);
-          const cx = (n as any).left + (n as any).width / 2;
-          const cy = (n as any).top + (n as any).height / 2;
+          const n = editor.commands.getNodeSnapshotById(
+            p.target
+          ) as grida.program.nodes.UnknownNode;
+          const cx =
+            n.layout_inset_left! + (n.layout_target_width as number) / 2;
+          const cy =
+            n.layout_inset_top! + (n.layout_target_height as number) / 2;
           return cmath.vector2.transform([cx, cy], transform);
         } catch (e) {}
     }

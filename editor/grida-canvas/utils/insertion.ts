@@ -22,8 +22,8 @@ export function getPackedSubtreeBoundingRect(
   for (const node_id of sub.scene.children_refs) {
     const node = sub.nodes[node_id];
     const r: cmath.Rectangle = {
-      x: "left" in node ? (node.left ?? 0) : 0,
-      y: "top" in node ? (node.top ?? 0) : 0,
+      x: "layout_inset_left" in node ? (node.layout_inset_left ?? 0) : 0,
+      y: "layout_inset_top" in node ? (node.layout_inset_top ?? 0) : 0,
       width:
         grida.program.nodes.hasLayoutWidth(node) &&
         node.layout_target_width !== undefined

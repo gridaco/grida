@@ -420,7 +420,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           const mode =
             draft.content_edit_mode as editor.state.VectorContentEditMode;
           mode.clipboard = copied;
-          mode.clipboard_node_position = [node.left ?? 0, node.top ?? 0];
+          mode.clipboard_node_position = [
+            node.layout_inset_left ?? 0,
+            node.layout_inset_top ?? 0,
+          ];
           draft.user_clipboard = undefined;
           if (action.type === "cut") {
             __self_delete_vector_network_selection(draft, mode);
@@ -531,8 +534,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           let net_to_union = net;
           if (mode.clipboard_node_position) {
             const delta: [number, number] = [
-              mode.clipboard_node_position[0] - (node.left ?? 0),
-              mode.clipboard_node_position[1] - (node.top ?? 0),
+              mode.clipboard_node_position[0] - (node.layout_inset_left ?? 0),
+              mode.clipboard_node_position[1] - (node.layout_inset_top ?? 0),
             ];
             net_to_union = vn.VectorNetworkEditor.translate(net, delta);
           }
@@ -609,11 +612,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 if (
                   "position" in node &&
                   node.position === "absolute" &&
-                  "left" in node &&
-                  "top" in node
+                  "layout_inset_left" in node &&
+                  "layout_inset_top" in node
                 ) {
-                  node.left = (node.left ?? 0) + delta[0];
-                  node.top = (node.top ?? 0) + delta[1];
+                  node.layout_inset_left =
+                    (node.layout_inset_left ?? 0) + delta[0];
+                  node.layout_inset_top =
+                    (node.layout_inset_top ?? 0) + delta[1];
                 }
               });
               box.x += delta[0];
@@ -631,11 +636,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                   if (
                     "position" in node &&
                     node.position === "absolute" &&
-                    "left" in node &&
-                    "top" in node
+                    "layout_inset_left" in node &&
+                    "layout_inset_top" in node
                   ) {
-                    node.left = (node.left ?? 0) - parent_rect.x;
-                    node.top = (node.top ?? 0) - parent_rect.y;
+                    node.layout_inset_left =
+                      (node.layout_inset_left ?? 0) - parent_rect.x;
+                    node.layout_inset_top =
+                      (node.layout_inset_top ?? 0) - parent_rect.y;
                   }
                 });
               }
@@ -664,8 +671,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           let net_to_union = net;
           if (mode.clipboard && mode.clipboard_node_position) {
             const delta: [number, number] = [
-              mode.clipboard_node_position[0] - (node.left ?? 0),
-              mode.clipboard_node_position[1] - (node.top ?? 0),
+              mode.clipboard_node_position[0] - (node.layout_inset_left ?? 0),
+              mode.clipboard_node_position[1] - (node.layout_inset_top ?? 0),
             ];
             if (JSON.stringify(mode.clipboard) === JSON.stringify(net)) {
               net_to_union = vn.VectorNetworkEditor.translate(net, delta);
@@ -718,8 +725,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           active: true,
           locked: false,
           position: "absolute",
-          left: 0,
-          top: 0,
+          layout_inset_left: 0,
+          layout_inset_top: 0,
           opacity: 1,
           layout_target_width: 0,
           layout_target_height: 0,
@@ -847,11 +854,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         if (
           "position" in node &&
           node.position === "absolute" &&
-          "left" in node &&
-          "top" in node
+          "layout_inset_left" in node &&
+          "layout_inset_top" in node
         ) {
-          node.left = (node.left ?? 0) + placement.x;
-          node.top = (node.top ?? 0) + placement.y;
+          node.layout_inset_left = (node.layout_inset_left ?? 0) + placement.x;
+          node.layout_inset_top = (node.layout_inset_top ?? 0) + placement.y;
         }
       });
 
@@ -866,11 +873,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             if (
               "position" in node &&
               node.position === "absolute" &&
-              "left" in node &&
-              "top" in node
+              "layout_inset_left" in node &&
+              "layout_inset_top" in node
             ) {
-              node.left = (node.left ?? 0) - parent_rect.x;
-              node.top = (node.top ?? 0) - parent_rect.y;
+              node.layout_inset_left =
+                (node.layout_inset_left ?? 0) - parent_rect.x;
+              node.layout_inset_top =
+                (node.layout_inset_top ?? 0) - parent_rect.y;
             }
           });
         }
@@ -1016,14 +1025,19 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               const scene = getScene(draft.document, draft.scene_id!);
               const agent_points = vertices.map((i) =>
                 cmath.vector2.add(node.vector_network.vertices[i], [
-                  node.left!,
-                  node.top!,
+                  node.layout_inset_left!,
+                  node.layout_inset_top!,
                 ])
               );
               const anchor_points = node.vector_network.vertices
                 .map((v, i) => ({ p: v, i }))
                 .filter(({ i }) => !vertices.includes(i))
-                .map(({ p }) => cmath.vector2.add(p, [node.left!, node.top!]));
+                .map(({ p }) =>
+                  cmath.vector2.add(p, [
+                    node.layout_inset_left!,
+                    node.layout_inset_top!,
+                  ])
+                );
 
               const should_snap =
                 draft.gesture_modifiers.translate_with_force_disable_snap !==
@@ -1074,14 +1088,14 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               return (
                 "position" in node &&
                 node.position === "relative" &&
-                "top" in node &&
-                "right" in node &&
-                "bottom" in node &&
-                "left" in node &&
-                node.top === undefined &&
-                node.right === undefined &&
-                node.bottom === undefined &&
-                node.left === undefined
+                "layout_inset_top" in node &&
+                "layout_inset_right" in node &&
+                "layout_inset_bottom" in node &&
+                "layout_inset_left" in node &&
+                node.layout_inset_top === undefined &&
+                node.layout_inset_right === undefined &&
+                node.layout_inset_bottom === undefined &&
+                node.layout_inset_left === undefined
               );
             }
           })
@@ -1333,10 +1347,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             ] as grida.program.nodes.i.IPositioning) = {
               ...child,
               position: "relative",
-              top: undefined,
-              right: undefined,
-              bottom: undefined,
-              left: undefined,
+              layout_inset_top: undefined,
+              layout_inset_right: undefined,
+              layout_inset_bottom: undefined,
+              layout_inset_left: undefined,
             };
           });
 
@@ -1397,8 +1411,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               layout: "flex",
               layout_target_width: "auto",
               layout_target_height: "auto",
-              top: cmath.quantize(layout.union.y, 1),
-              left: cmath.quantize(layout.union.x, 1),
+              layout_inset_top: cmath.quantize(layout.union.y, 1),
+              layout_inset_left: cmath.quantize(layout.union.x, 1),
               direction: layout.direction,
               main_axis_gap: cmath.quantize(layout.spacing, 1),
               cross_axis_gap: cmath.quantize(layout.spacing, 1),
@@ -1443,10 +1457,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               ] as grida.program.nodes.i.IPositioning) = {
                 ...child,
                 position: "relative",
-                top: undefined,
-                right: undefined,
-                bottom: undefined,
-                left: undefined,
+                layout_inset_top: undefined,
+                layout_inset_right: undefined,
+                layout_inset_bottom: undefined,
+                layout_inset_left: undefined,
               };
             });
 
@@ -2223,15 +2237,15 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
     ...base,
     id,
     vector_network: union_net,
-    left: 0,
-    top: 0,
+    layout_inset_left: 0,
+    layout_inset_top: 0,
     layout_target_width: 0,
     layout_target_height: 0,
   };
 
   normalizeVectorNodeBBox(node);
-  node.left! -= parent_rect.x;
-  node.top! -= parent_rect.y;
+  node.layout_inset_left! -= parent_rect.x;
+  node.layout_inset_top! -= parent_rect.y;
 
   self_try_insert_node(draft, parent_id, node);
   __self_delete_nodes(draft, group, "on");

@@ -1460,10 +1460,10 @@ class EditorDocumentStore
 
           this.changeNodePropertyPositioning(id, {
             position: "absolute",
-            left: cmath.quantize(relativeLeft, 1),
-            top: cmath.quantize(relativeTop, 1),
-            right: undefined,
-            bottom: undefined,
+            layout_inset_left: cmath.quantize(relativeLeft, 1),
+            layout_inset_top: cmath.quantize(relativeTop, 1),
+            layout_inset_right: undefined,
+            layout_inset_bottom: undefined,
           });
         });
         break;
@@ -5443,7 +5443,7 @@ export class EditorSurface
               return;
           }
           this._editor.doc.changeNodePropertyPositioning(node_id, {
-            left: cmath.quantize(left, 1),
+            layout_inset_left: cmath.quantize(left, 1),
           });
         } else {
           const diff = prev.height - next.height;
@@ -5460,7 +5460,7 @@ export class EditorSurface
               return;
           }
           this._editor.doc.changeNodePropertyPositioning(node_id, {
-            top: cmath.quantize(top, 1),
+            layout_inset_top: cmath.quantize(top, 1),
           });
         }
       });

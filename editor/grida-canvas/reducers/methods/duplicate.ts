@@ -47,11 +47,19 @@ export function self_duplicateNode<S extends editor.state.IEditorState>(
     // apply the delta
     if (nextdelta) {
       const clone_node = draft.document.nodes[clone_id];
-      if ("left" in clone_node && typeof clone_node.left === "number") {
-        clone_node.left = (clone_node.left ?? 0) + nextdelta[0];
+      if (
+        "layout_inset_left" in clone_node &&
+        typeof clone_node.layout_inset_left === "number"
+      ) {
+        clone_node.layout_inset_left =
+          (clone_node.layout_inset_left ?? 0) + nextdelta[0];
       }
-      if ("top" in clone_node && typeof clone_node.top === "number") {
-        clone_node.top = (clone_node.top ?? 0) + nextdelta[1];
+      if (
+        "layout_inset_top" in clone_node &&
+        typeof clone_node.layout_inset_top === "number"
+      ) {
+        clone_node.layout_inset_top =
+          (clone_node.layout_inset_top ?? 0) + nextdelta[1];
       }
       draft.document.nodes[clone_id] = clone_node;
     }

@@ -3834,10 +3834,10 @@ export namespace format {
         node: Pick<
           grida.program.nodes.UnknownNode,
           | "position"
-          | "left"
-          | "top"
-          | "right"
-          | "bottom"
+          | "layout_inset_left"
+          | "layout_inset_top"
+          | "layout_inset_right"
+          | "layout_inset_bottom"
           | "layout_target_width"
           | "layout_target_height"
         > &
@@ -3860,10 +3860,10 @@ export namespace format {
       ): number {
         const positioning = {
           position: node.position ?? "relative",
-          left: node.left,
-          top: node.top,
-          right: node.right,
-          bottom: node.bottom,
+          left: node.layout_inset_left,
+          top: node.layout_inset_top,
+          right: node.layout_inset_right,
+          bottom: node.layout_inset_bottom,
         };
 
         // Determine position basis: use Inset if right/bottom are set, otherwise Cartesian
@@ -4092,10 +4092,10 @@ export namespace format {
 
         return {
           position,
-          left,
-          top,
-          right,
-          bottom,
+          layout_inset_left: left,
+          layout_inset_top: top,
+          layout_inset_right: right,
+          layout_inset_bottom: bottom,
           layout_target_width: width,
           layout_target_height: height,
           rotation: 0, // Rotation is now extracted from post_layout_transform, not Layout
@@ -4184,10 +4184,10 @@ export namespace format {
               node as Pick<
                 grida.program.nodes.UnknownNode,
                 | "position"
-                | "left"
-                | "top"
-                | "right"
-                | "bottom"
+                | "layout_inset_left"
+                | "layout_inset_top"
+                | "layout_inset_right"
+                | "layout_inset_bottom"
                 | "layout_target_width"
                 | "layout_target_height"
               > &
@@ -4553,10 +4553,10 @@ export namespace format {
             layout_target_width,
             layout_target_height,
             position: layoutFields.position ?? "absolute",
-            left: layoutFields.left,
-            top: layoutFields.top,
-            right: layoutFields.right,
-            bottom: layoutFields.bottom,
+            layout_inset_left: layoutFields.layout_inset_left,
+            layout_inset_top: layoutFields.layout_inset_top,
+            layout_inset_right: layoutFields.layout_inset_right,
+            layout_inset_bottom: layoutFields.layout_inset_bottom,
             rotation: layoutFields.rotation ?? 0,
             stroke_width: strokeWidth,
             stroke_cap: strokeCap,
@@ -4888,10 +4888,10 @@ export namespace format {
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             // geometry via layout (height is always 0 for lines)
             position: layoutFields.position ?? "absolute",
-            left: layoutFields.left,
-            top: layoutFields.top,
-            right: layoutFields.right,
-            bottom: layoutFields.bottom,
+            layout_inset_left: layoutFields.layout_inset_left,
+            layout_inset_top: layoutFields.layout_inset_top,
+            layout_inset_right: layoutFields.layout_inset_right,
+            layout_inset_bottom: layoutFields.layout_inset_bottom,
             layout_target_width: width,
             layout_target_height: 0,
             rotation: layoutFields.rotation ?? 0,
@@ -4957,10 +4957,10 @@ export namespace format {
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             // geometry via layout (fixed dimensions)
             position: layoutFields.position ?? "absolute",
-            left: layoutFields.left,
-            top: layoutFields.top,
-            right: layoutFields.right,
-            bottom: layoutFields.bottom,
+            layout_inset_left: layoutFields.layout_inset_left,
+            layout_inset_top: layoutFields.layout_inset_top,
+            layout_inset_right: layoutFields.layout_inset_right,
+            layout_inset_bottom: layoutFields.layout_inset_bottom,
             layout_target_width: width,
             layout_target_height: height,
             rotation: layoutFields.rotation ?? 0,
@@ -5015,10 +5015,10 @@ export namespace format {
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             // geometry via layout (IPositioning, IRotation, ILayoutTrait)
             position: layoutFields.position ?? "absolute",
-            left: layoutFields.left,
-            top: layoutFields.top,
-            right: layoutFields.right,
-            bottom: layoutFields.bottom,
+            layout_inset_left: layoutFields.layout_inset_left,
+            layout_inset_top: layoutFields.layout_inset_top,
+            layout_inset_right: layoutFields.layout_inset_right,
+            layout_inset_bottom: layoutFields.layout_inset_bottom,
             layout_target_width: layoutFields.layout_target_width ?? "auto",
             layout_target_height: layoutFields.layout_target_height ?? "auto",
             rotation: layoutFields.rotation ?? 0,

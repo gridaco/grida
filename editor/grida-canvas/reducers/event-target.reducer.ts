@@ -174,8 +174,8 @@ function __self_evt_on_click(
         );
 
         _nnode.position = "absolute";
-        _nnode.left! = nnode_relative_position[0];
-        _nnode.top! = nnode_relative_position[1];
+        _nnode.layout_inset_left! = nnode_relative_position[0];
+        _nnode.layout_inset_top! = nnode_relative_position[1];
       } catch (e) {
         reportError(e);
       }
@@ -470,8 +470,8 @@ function __self_evt_on_drag_start(
         draft.tool.node,
         () => context.idgen.next(),
         {
-          left: initial_rect.x,
-          top: initial_rect.y,
+          layout_inset_left: initial_rect.x,
+          layout_inset_top: initial_rect.y,
           layout_target_width: initial_rect.width,
           layout_target_height: initial_rect.height as 0, // casting for line node
         },
@@ -845,7 +845,8 @@ function __self_evt_on_drag(
       case "gap": {
         const { layout, axis, initial_gap, min_gap } = draft.gesture;
         const delta = movement[axis === "x" ? 0 : 1];
-        const side: "left" | "top" = axis === "x" ? "left" : "top";
+        const side: "layout_inset_left" | "layout_inset_top" =
+          axis === "x" ? "layout_inset_left" : "layout_inset_top";
 
         switch (layout.type) {
           case "group": {
@@ -1095,9 +1096,10 @@ function __before_end_insert_and_resize(
         draft,
         id
       ) as grida.program.nodes.i.IPositioning;
-      if (typeof child.left === "number")
-        child.left = rect.x - container_rect.x;
-      if (typeof child.top === "number") child.top = rect.y - container_rect.y;
+      if (typeof child.layout_inset_left === "number")
+        child.layout_inset_left = rect.x - container_rect.x;
+      if (typeof child.layout_inset_top === "number")
+        child.layout_inset_top = rect.y - container_rect.y;
     }
   });
 }
@@ -1135,8 +1137,8 @@ function __self_maybe_end_gesture(
       const node = draft.document.nodes[
         draft.gesture.node_id
       ] as grida.program.nodes.i.IPositioning;
-      node.left = placement.rect.x;
-      node.top = placement.rect.y;
+      node.layout_inset_left = placement.rect.x;
+      node.layout_inset_top = placement.rect.y;
 
       break;
     }

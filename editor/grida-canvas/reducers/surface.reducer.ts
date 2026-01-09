@@ -332,8 +332,8 @@ function __try_restore_vector_mode_original_node(
     // TODO: need to implement this by having the initial xy position and comparing that diff.
     // // while the vector data itself is not changed, the position of the node may have been changed. - keep that.
     // // this happens when translating the node, by dragging the region. - when even the data is translated, it's 0,0 relative, so the data itself may be identical.
-    // left: current.left,
-    // top: current.top,
+    // layout_inset_left: current.layout_inset_left,
+    // layout_inset_top: current.layout_inset_top,
   } as grida.program.nodes.Node;
   //
 }
@@ -601,7 +601,7 @@ function __self_start_gesture(
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
-        initial_position: [node.left!, node.top!],
+        initial_position: [node.layout_inset_left!, node.layout_inset_top!],
         initial_absolute_position: absolute_position,
       };
       break;
@@ -630,7 +630,7 @@ function __self_start_gesture(
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
-        initial_position: [node.left!, node.top!],
+        initial_position: [node.layout_inset_left!, node.layout_inset_top!],
         initial_absolute_position: absolute_position,
       };
       break;
@@ -668,8 +668,8 @@ function __self_start_gesture(
         // Get absolute vertices (similar to useVariableWithEditor)
         const vne = new vn.VectorNetworkEditor(node.vector_network);
         const absolute_vertices = vne.getVerticesAbsolute([
-          node.left!,
-          node.top!,
+          node.layout_inset_left!,
+          node.layout_inset_top!,
         ]);
 
         const a = absolute_vertices[segment.a];
@@ -692,7 +692,7 @@ function __self_start_gesture(
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
-        initial_position: [node.left!, node.top!],
+        initial_position: [node.layout_inset_left!, node.layout_inset_top!],
         initial_absolute_position: absolute_position,
         initial_angle: initial_angle,
         initial_curve_position: curve_position,

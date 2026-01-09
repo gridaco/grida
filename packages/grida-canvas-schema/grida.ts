@@ -1181,8 +1181,9 @@ export namespace grida.program.nodes {
   export type NodeID = id.NodeIdentifier;
   export type NodeType = Node["type"];
 
-  export type Node =
-    | SceneNode
+  export type Node = SceneNode | LayerNode;
+
+  export type LayerNode =
     | BooleanPathOperationNode
     | GroupNode
     | TextSpanNode
@@ -1271,6 +1272,7 @@ export namespace grida.program.nodes {
     i.ISceneNode;
 
   export type UnknownNodeProperties<T = unknown> = Record<keyof UnknownNode, T>;
+  export type UnknownNodePropertiesKey = keyof UnknownNodeProperties;
 
   // #region node prototypes
 
@@ -1879,14 +1881,14 @@ export namespace grida.program.nodes {
     /**
      * Relative DOM Positioning model
      *
-     * by default, use position: relative, left: 0, top: 0 - to avoid unexpected layout issues
+     * by default, use position: relative, layout_inset_left: 0, layout_inset_top: 0 - to avoid unexpected layout issues
      */
     export interface IPositioning {
       position: "absolute" | "relative";
-      left?: number | undefined;
-      top?: number | undefined;
-      right?: number | undefined;
-      bottom?: number | undefined;
+      layout_inset_left?: number | undefined;
+      layout_inset_top?: number | undefined;
+      layout_inset_right?: number | undefined;
+      layout_inset_bottom?: number | undefined;
       // x: number;
       // y: number;
     }
@@ -2629,8 +2631,8 @@ export namespace grida.program.nodes {
             layout_target_width: 0,
             layout_target_height: 0,
             position: "absolute",
-            top: 0,
-            left: 0,
+            layout_inset_top: 0,
+            layout_inset_left: 0,
             corner_radius: 0,
             ...factory_default_traits.DEFAULT_RECTANGULAR_CORNER_RADIUS,
             stroke_width: 0,

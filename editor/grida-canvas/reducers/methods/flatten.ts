@@ -80,8 +80,10 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
     vector_network: v,
     layout_target_width: rect.width,
     layout_target_height: rect.height,
-    left: (node as any).left!,
-    top: (node as any).top!,
+    layout_inset_left: (node as grida.program.nodes.UnknownNode)
+      .layout_inset_left!,
+    layout_inset_top: (node as grida.program.nodes.UnknownNode)
+      .layout_inset_top!,
   } as grida.program.nodes.VectorNode;
 
   __dangerously_delete_non_vector_properties(vectornode);

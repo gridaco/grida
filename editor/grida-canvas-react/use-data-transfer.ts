@@ -65,8 +65,8 @@ export function useInsertFile() {
       const node = instance.commands.createRectangleNode();
       node.$.position = "absolute";
       node.$.name = name;
-      node.$.left = x;
-      node.$.top = y;
+      node.$.layout_inset_left = x;
+      node.$.layout_inset_top = y;
       node.$.layout_target_width = image.width;
       node.$.layout_target_height = image.height;
       node.$.fill_paints = [
@@ -116,8 +116,8 @@ export function useInsertFile() {
       );
 
       node.$.name = name;
-      node.$.left = x;
-      node.$.top = y;
+      node.$.layout_inset_left = x;
+      node.$.layout_inset_top = y;
     },
     [instance]
   );
@@ -284,8 +284,8 @@ export function useDataTransferEventTarget() {
       const node = instance.commands.createTextNode(text);
       node.$.name = text;
       node.$.text = text;
-      node.$.left = x;
-      node.$.top = y;
+      node.$.layout_inset_left = x;
+      node.$.layout_inset_top = y;
       node.$.fill = {
         type: "solid",
         color: kolor.colorformats.RGBA32F.BLACK,
@@ -561,8 +561,8 @@ export function useDataTransferEventTarget() {
               const node = instance.commands.createRectangleNode();
               node.$.position = "absolute";
               node.$.name = name || "Photo";
-              node.$.left = x;
-              node.$.top = y;
+              node.$.layout_inset_left = x;
+              node.$.layout_inset_top = y;
               node.$.layout_target_width = width || imageRef.width;
               node.$.layout_target_height = height || imageRef.height;
               node.$.fill_paints = [

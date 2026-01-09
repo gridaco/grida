@@ -33,8 +33,8 @@ describe("getPackedSubtreeBoundingRect", () => {
         a: {
           id: "a",
           type: "rectangle",
-          left: 10,
-          top: 10,
+          layout_inset_left: 10,
+          layout_inset_top: 10,
           layout_target_width: 20,
           layout_target_height: 20,
           position: "absolute",
@@ -42,8 +42,8 @@ describe("getPackedSubtreeBoundingRect", () => {
         b: {
           id: "b",
           type: "rectangle",
-          left: 40,
-          top: 40,
+          layout_inset_left: 40,
+          layout_inset_top: 40,
           layout_target_width: 20,
           layout_target_height: 20,
           position: "absolute",
