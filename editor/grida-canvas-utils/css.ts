@@ -96,8 +96,8 @@ export namespace css {
       layout_direction: direction,
       layout_main_axis_alignment,
       layout_cross_axis_alignment,
-      main_axis_gap,
-      cross_axis_gap,
+      layout_main_axis_gap,
+      layout_cross_axis_gap,
       //
       max_lines,
       //
@@ -168,8 +168,8 @@ export namespace css {
       result["alignItems"] = layout_cross_axis_alignment;
       result["gap"] =
         direction === "horizontal"
-          ? `${main_axis_gap}px ${cross_axis_gap}px`
-          : `${cross_axis_gap}px ${main_axis_gap}px`;
+          ? `${layout_main_axis_gap}px ${layout_cross_axis_gap}px`
+          : `${layout_cross_axis_gap}px ${layout_main_axis_gap}px`;
     }
 
     switch (config.fill) {

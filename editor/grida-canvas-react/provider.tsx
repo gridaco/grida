@@ -270,7 +270,9 @@ export function useNodeActions(node_id: string | undefined) {
           value
         ),
       gap: (
-        value: number | { main_axis_gap: number; cross_axis_gap: number }
+        value:
+          | number
+          | { layout_main_axis_gap: number; layout_cross_axis_gap: number }
       ) => instance.commands.changeFlexContainerNodeGap(node_id, value),
       clipsContent: (value: boolean) =>
         instance.commands.changeContainerNodeClipsContent(node_id, value),

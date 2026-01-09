@@ -1644,7 +1644,7 @@ export namespace grida.program.nodes {
        *
        * @default 0
        */
-      main_axis_gap: number;
+      layout_main_axis_gap: number;
 
       /**
        * the gap between the children in cross axis - takes effect when layout is set to `flex`
@@ -1653,7 +1653,7 @@ export namespace grida.program.nodes {
        *
        * @default 0
        */
-      cross_axis_gap: number;
+      layout_cross_axis_gap: number;
     }
 
     /**
@@ -2866,8 +2866,8 @@ export namespace grida.program.nodes {
         layout_direction: "horizontal",
         layout_main_axis_alignment: "start",
         layout_cross_axis_alignment: "start",
-        main_axis_gap: 0,
-        cross_axis_gap: 0,
+        layout_main_axis_gap: 0,
+        layout_cross_axis_gap: 0,
         padding_top: 0,
         padding_right: 0,
         padding_bottom: 0,

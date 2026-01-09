@@ -960,10 +960,10 @@ pub struct JSONContainerNode {
     pub layout_main_axis_alignment: Option<MainAxisAlignment>,
     #[serde(rename = "layout_cross_axis_alignment", alias = "crossAxisAlignment")]
     pub layout_cross_axis_alignment: Option<CrossAxisAlignment>,
-    #[serde(rename = "main_axis_gap", alias = "mainAxisGap", default)]
-    pub main_axis_gap: f32,
-    #[serde(rename = "cross_axis_gap", alias = "crossAxisGap", default)]
-    pub cross_axis_gap: f32,
+    #[serde(rename = "layout_main_axis_gap", alias = "mainAxisGap", default)]
+    pub layout_main_axis_gap: f32,
+    #[serde(rename = "layout_cross_axis_gap", alias = "crossAxisGap", default)]
+    pub layout_cross_axis_gap: f32,
     #[serde(
         rename = "clips_content",
         alias = "clipsContent",
@@ -1325,10 +1325,10 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                         Some(padding)
                     }
                 },
-                layout_gap: if node.main_axis_gap > 0.0 || node.cross_axis_gap > 0.0 {
+                layout_gap: if node.layout_main_axis_gap > 0.0 || node.layout_cross_axis_gap > 0.0 {
                     Some(LayoutGap {
-                        main_axis_gap: node.main_axis_gap,
-                        cross_axis_gap: node.cross_axis_gap,
+                        main_axis_gap: node.layout_main_axis_gap,
+                        cross_axis_gap: node.layout_cross_axis_gap,
                     })
                 } else {
                     None
@@ -3916,8 +3916,8 @@ mod tests {
             "layout_target_width": 400.0,
             "layout_target_height": 300.0,
             "layout_mode": "flex",
-            "main_axis_gap": 20.0,
-            "cross_axis_gap": 10.0
+            "layout_main_axis_gap": 20.0,
+            "layout_cross_axis_gap": 10.0
         }"#;
 
         let node: JSONNode =
@@ -3926,8 +3926,8 @@ mod tests {
         match node {
             JSONNode::Container(container) => {
                 // Verify gap fields (non-optional now)
-                assert_eq!(container.main_axis_gap, 20.0);
-                assert_eq!(container.cross_axis_gap, 10.0);
+                assert_eq!(container.layout_main_axis_gap, 20.0);
+                assert_eq!(container.layout_cross_axis_gap, 10.0);
 
                 // Verify conversion to LayoutGap
                 let converted: ContainerNodeRec = container.into();
@@ -4113,8 +4113,8 @@ mod tests {
             "padding_right": 20.0,
             "padding_bottom": 20.0,
             "padding_left": 20.0,
-            "main_axis_gap": 30.0,
-            "cross_axis_gap": 15.0,
+            "layout_main_axis_gap": 30.0,
+            "layout_cross_axis_gap": 15.0,
             "layout_main_axis_alignment": "space-between",
             "layout_cross_axis_alignment": "center"
         }"#;
@@ -4132,8 +4132,8 @@ mod tests {
                 assert_eq!(container.padding_right, 20.0);
                 assert_eq!(container.padding_bottom, 20.0);
                 assert_eq!(container.padding_left, 20.0);
-                assert_eq!(container.main_axis_gap, 30.0);
-                assert_eq!(container.cross_axis_gap, 15.0);
+                assert_eq!(container.layout_main_axis_gap, 30.0);
+                assert_eq!(container.layout_cross_axis_gap, 15.0);
                 assert!(matches!(
                     container.layout_main_axis_alignment,
                     Some(MainAxisAlignment::SpaceBetween)

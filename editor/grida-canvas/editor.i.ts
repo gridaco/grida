@@ -3661,7 +3661,9 @@ export namespace editor.api {
     ): void;
     changeFlexContainerNodeGap(
       node_id: string,
-      gap: number | { main_axis_gap: number; cross_axis_gap: number }
+      gap:
+        | number
+        | { layout_main_axis_gap: number; layout_cross_axis_gap: number }
     ): void;
     changeFlexContainerNodeWrap(node_id: string, wrap: "wrap" | "nowrap"): void;
 

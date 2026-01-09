@@ -896,8 +896,8 @@ function __self_evt_on_drag(
             draft.document.nodes[layout.group] = nodeReducer(container, {
               type: "node/change/*",
               node_id: container.id,
-              main_axis_gap: gap,
-              cross_axis_gap: gap,
+              layout_main_axis_gap: gap,
+              layout_cross_axis_gap: gap,
             });
 
             draft.gesture.gap = gap;

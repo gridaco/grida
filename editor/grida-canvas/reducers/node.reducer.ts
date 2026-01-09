@@ -700,8 +700,8 @@ const safe_properties: Partial<
           draft.layout_main_axis_alignment = "start";
         if (!draft.layout_cross_axis_alignment)
           draft.layout_cross_axis_alignment = "start";
-        if (!draft.main_axis_gap) draft.main_axis_gap = 0;
-        if (!draft.cross_axis_gap) draft.cross_axis_gap = 0;
+        if (!draft.layout_main_axis_gap) draft.layout_main_axis_gap = 0;
+        if (!draft.layout_cross_axis_gap) draft.layout_cross_axis_gap = 0;
       }
     },
   }),
@@ -724,16 +724,16 @@ const safe_properties: Partial<
         (draft as UN).layout_cross_axis_alignment = value;
       },
     }),
-  main_axis_gap: defineNodeProperty<"main_axis_gap">({
+  layout_main_axis_gap: defineNodeProperty<"layout_main_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).main_axis_gap = value;
+      (draft as UN).layout_main_axis_gap = value;
     },
   }),
-  cross_axis_gap: defineNodeProperty<"cross_axis_gap">({
+  layout_cross_axis_gap: defineNodeProperty<"layout_cross_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).cross_axis_gap = value;
+      (draft as UN).layout_cross_axis_gap = value;
     },
   }),
   layout_wrap: defineNodeProperty<"layout_wrap">({

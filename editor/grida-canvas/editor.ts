@@ -1445,8 +1445,8 @@ class EditorDocumentStore
             node_id: node_id,
             layout_mode: "flow",
             layout_direction: undefined,
-            main_axis_gap: undefined,
-            cross_axis_gap: undefined,
+            layout_main_axis_gap: undefined,
+            layout_cross_axis_gap: undefined,
             layout_main_axis_alignment: undefined,
             layout_cross_axis_alignment: undefined,
             layout_wrap: undefined,
@@ -2527,13 +2527,17 @@ class EditorDocumentStore
   }
   changeFlexContainerNodeGap(
     node_id: string,
-    gap: number | { main_axis_gap: number; cross_axis_gap: number }
+    gap:
+      | number
+      | { layout_main_axis_gap: number; layout_cross_axis_gap: number }
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      main_axis_gap: typeof gap === "number" ? gap : gap.main_axis_gap,
-      cross_axis_gap: typeof gap === "number" ? gap : gap.cross_axis_gap,
+      layout_main_axis_gap:
+        typeof gap === "number" ? gap : gap.layout_main_axis_gap,
+      layout_cross_axis_gap:
+        typeof gap === "number" ? gap : gap.layout_cross_axis_gap,
     });
   }
   changeFlexContainerNodeWrap(node_id: string, layoutWrap: "wrap" | "nowrap") {

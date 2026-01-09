@@ -610,8 +610,9 @@ export namespace iofigma {
           layout_direction: "horizontal" as const,
           layout_main_axis_alignment: "start" as const,
           layout_cross_axis_alignment: "start" as const,
-          main_axis_gap: node.itemSpacing ?? 0,
-          cross_axis_gap: node.counterAxisSpacing ?? node.itemSpacing ?? 0,
+          layout_main_axis_gap: node.itemSpacing ?? 0,
+          layout_cross_axis_gap:
+            node.counterAxisSpacing ?? node.itemSpacing ?? 0,
         };
       }
 

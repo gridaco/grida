@@ -797,7 +797,7 @@ function __self_start_gesture(
           "the selection is not a flex container"
         );
         // (we only support main axis gap for now) - ignoring the input axis.
-        const { layout_direction: direction, main_axis_gap } = node;
+        const { layout_direction: direction, layout_main_axis_gap } = node;
 
         const children = dq.getChildren(draft.document_ctx, selection);
 
@@ -813,8 +813,8 @@ function __self_start_gesture(
           axis: direction === "horizontal" ? "x" : "y",
           layout,
           min_gap: 0,
-          initial_gap: main_axis_gap,
-          gap: main_axis_gap,
+          initial_gap: layout_main_axis_gap,
+          gap: layout_main_axis_gap,
           movement: cmath.vector2.zero,
           first: cmath.vector2.zero,
           last: cmath.vector2.zero,

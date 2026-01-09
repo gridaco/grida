@@ -250,8 +250,8 @@ export namespace schema.parametric_scale {
     scale_number_in_place(n, "padding_bottom", s);
     scale_number_in_place(n, "padding_left", s);
 
-    scale_number_in_place(n, "main_axis_gap", s);
-    scale_number_in_place(n, "cross_axis_gap", s);
+    scale_number_in_place(n, "layout_main_axis_gap", s);
+    scale_number_in_place(n, "layout_cross_axis_gap", s);
 
     // Stroke
     scale_number_in_place(n, "stroke_width", s);

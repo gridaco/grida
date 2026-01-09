@@ -153,8 +153,8 @@ export default function initialNode(
         stroke_align: "inside",
         stroke_cap: "butt",
         stroke_join: "miter",
-        main_axis_gap: 0,
-        cross_axis_gap: 0,
+        layout_main_axis_gap: 0,
+        layout_cross_axis_gap: 0,
         clips_content: true,
         ...seed,
       } satisfies grida.program.nodes.ContainerNode;

@@ -134,40 +134,40 @@ This section tracks only **parameters that are relevant to parameter-space scali
 
 Reference: `packages/grida-canvas-schema/grida.ts`
 
-| name                                     | role        | scale (Y/N) | reason / notes                                                                       |
-| ---------------------------------------- | ----------- | ----------: | ------------------------------------------------------------------------------------ |
-| `left`, `top`, `right`, `bottom`         | layout      |           Y | Absolute/offset lengths; scale relative to anchor.                                   |
-| `width`, `height`                        | layout      |         Y\* | Scale only numeric/px-like lengths. Do not scale `%`, viewport units, or `\"auto\"`. |
-| `rotation`                               | transform   |           N | Angle in degrees; scaling does not change angles.                                    |
-| `corner_radius`                          | shape       |           Y | Length.                                                                              |
-| `rectangular_corner_radius_top_left`     | shape-rect  |           Y | Length.                                                                              |
-| `rectangular_corner_radius_top_right`    | shape-rect  |           Y | Length.                                                                              |
-| `rectangular_corner_radius_bottom_left`  | shape-rect  |           Y | Length.                                                                              |
-| `rectangular_corner_radius_bottom_right` | shape-rect  |           Y | Length.                                                                              |
-| `corner_smoothing`                       | shape       |           N | Unitless smoothing factor.                                                           |
-| `padding` (and per-side fields)          | layout      |           Y | Length(s).                                                                           |
-| `main_axis_gap`, `cross_axis_gap`        | layout      |           Y | Length gaps.                                                                         |
-| `stroke_width`                           | stroke      |           Y | Length (thickness).                                                                  |
-| `stroke_dash_array`                      | stroke      |           Y | Dash/gap lengths.                                                                    |
-| `rectangular_stroke_width_top`           | stroke-rect |           Y | Length.                                                                              |
-| `rectangular_stroke_width_right`         | stroke-rect |           Y | Length.                                                                              |
-| `rectangular_stroke_width_bottom`        | stroke-rect |           Y | Length.                                                                              |
-| `rectangular_stroke_width_left`          | stroke-rect |           Y | Length.                                                                              |
-| `stroke_width_profile`                   | stroke      |         Y\* | See **Stroke width profile (`cg.VariableWidthProfile`)** for per-stop field scaling. |
-| `angle`, `angle_offset`                  | shape       |           N | Degrees (ellipse arc).                                                               |
-| `inner_radius` (ellipse arc / star)      | shape       |           N | Ratio 0..1; keep topology.                                                           |
-| `font_size`                              | text        |           Y | Length (px-like).                                                                    |
-| `letter_spacing`, `word_spacing`         | text        |           N | Stored as em-percentage; scaling font size already scales absolute spacing.          |
-| `line_height`                            | text        |           N | Stored as percentage; keep relative line-height.                                     |
-| `fe_blur`                                | effect      |         Y\* | See **Filter effects** section; radii scale, normalized progressive coords do not.   |
-| `fe_backdrop_blur`                       | effect      |         Y\* | See **Filter effects** section.                                                      |
-| `fe_shadows`                             | effect      |         Y\* | See **Filter effects** section.                                                      |
-| `fe_liquid_glass`                        | effect      |         Y\* | See **Filter effects** section.                                                      |
-| `fe_noises`                              | effect      |         Y\* | See **Filter effects** section; notably `noise_size` scales.                         |
-| `vector_network`                         | vector      |           Y | Control point coordinates are geometric.                                             |
-| `paths`                                  | vector      |           Y | Path geometry coordinates are geometric.                                             |
-| `guides[].offset`                        | scene       |           N | See **Ambiguous / implementation-defined properties**.                               |
-| `edges[]` position points (`x`,`y`)      | scene       |           N | See **Ambiguous / implementation-defined properties**.                               |
+| name                                            | role        | scale (Y/N) | reason / notes                                                                       |
+| ----------------------------------------------- | ----------- | ----------: | ------------------------------------------------------------------------------------ |
+| `left`, `top`, `right`, `bottom`                | layout      |           Y | Absolute/offset lengths; scale relative to anchor.                                   |
+| `width`, `height`                               | layout      |         Y\* | Scale only numeric/px-like lengths. Do not scale `%`, viewport units, or `\"auto\"`. |
+| `rotation`                                      | transform   |           N | Angle in degrees; scaling does not change angles.                                    |
+| `corner_radius`                                 | shape       |           Y | Length.                                                                              |
+| `rectangular_corner_radius_top_left`            | shape-rect  |           Y | Length.                                                                              |
+| `rectangular_corner_radius_top_right`           | shape-rect  |           Y | Length.                                                                              |
+| `rectangular_corner_radius_bottom_left`         | shape-rect  |           Y | Length.                                                                              |
+| `rectangular_corner_radius_bottom_right`        | shape-rect  |           Y | Length.                                                                              |
+| `corner_smoothing`                              | shape       |           N | Unitless smoothing factor.                                                           |
+| `padding` (and per-side fields)                 | layout      |           Y | Length(s).                                                                           |
+| `layout_main_axis_gap`, `layout_cross_axis_gap` | layout      |           Y | Length gaps.                                                                         |
+| `stroke_width`                                  | stroke      |           Y | Length (thickness).                                                                  |
+| `stroke_dash_array`                             | stroke      |           Y | Dash/gap lengths.                                                                    |
+| `rectangular_stroke_width_top`                  | stroke-rect |           Y | Length.                                                                              |
+| `rectangular_stroke_width_right`                | stroke-rect |           Y | Length.                                                                              |
+| `rectangular_stroke_width_bottom`               | stroke-rect |           Y | Length.                                                                              |
+| `rectangular_stroke_width_left`                 | stroke-rect |           Y | Length.                                                                              |
+| `stroke_width_profile`                          | stroke      |         Y\* | See **Stroke width profile (`cg.VariableWidthProfile`)** for per-stop field scaling. |
+| `angle`, `angle_offset`                         | shape       |           N | Degrees (ellipse arc).                                                               |
+| `inner_radius` (ellipse arc / star)             | shape       |           N | Ratio 0..1; keep topology.                                                           |
+| `font_size`                                     | text        |           Y | Length (px-like).                                                                    |
+| `letter_spacing`, `word_spacing`                | text        |           N | Stored as em-percentage; scaling font size already scales absolute spacing.          |
+| `line_height`                                   | text        |           N | Stored as percentage; keep relative line-height.                                     |
+| `fe_blur`                                       | effect      |         Y\* | See **Filter effects** section; radii scale, normalized progressive coords do not.   |
+| `fe_backdrop_blur`                              | effect      |         Y\* | See **Filter effects** section.                                                      |
+| `fe_shadows`                                    | effect      |         Y\* | See **Filter effects** section.                                                      |
+| `fe_liquid_glass`                               | effect      |         Y\* | See **Filter effects** section.                                                      |
+| `fe_noises`                                     | effect      |         Y\* | See **Filter effects** section; notably `noise_size` scales.                         |
+| `vector_network`                                | vector      |           Y | Control point coordinates are geometric.                                             |
+| `paths`                                         | vector      |           Y | Path geometry coordinates are geometric.                                             |
+| `guides[].offset`                               | scene       |           N | See **Ambiguous / implementation-defined properties**.                               |
+| `edges[]` position points (`x`,`y`)             | scene       |           N | See **Ambiguous / implementation-defined properties**.                               |
 
 ## Properties not tracked (irrelevant to parameter-space scaling)
 

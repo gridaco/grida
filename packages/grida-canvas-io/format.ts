@@ -3758,8 +3758,8 @@ export namespace format {
             | "layout_wrap"
             | "layout_main_axis_alignment"
             | "layout_cross_axis_alignment"
-            | "main_axis_gap"
-            | "cross_axis_gap"
+            | "layout_main_axis_gap"
+            | "layout_cross_axis_gap"
             | "padding_top"
             | "padding_right"
             | "padding_bottom"
@@ -3801,11 +3801,11 @@ export namespace format {
         fbs.LayoutContainerStyle.addLayoutPadding(builder, paddingOffset);
         fbs.LayoutContainerStyle.addLayoutMainAxisGap(
           builder,
-          node.main_axis_gap ?? 0
+          node.layout_main_axis_gap ?? 0
         );
         fbs.LayoutContainerStyle.addLayoutCrossAxisGap(
           builder,
-          node.cross_axis_gap ?? 0
+          node.layout_cross_axis_gap ?? 0
         );
         return fbs.LayoutContainerStyle.endLayoutContainerStyle(builder);
       }
@@ -3851,8 +3851,8 @@ export namespace format {
               | "layout_wrap"
               | "layout_main_axis_alignment"
               | "layout_cross_axis_alignment"
-              | "main_axis_gap"
-              | "cross_axis_gap"
+              | "layout_main_axis_gap"
+              | "layout_cross_axis_gap"
               | "padding_top"
               | "padding_right"
               | "padding_bottom"
@@ -3975,8 +3975,8 @@ export namespace format {
             | "layout_wrap"
             | "layout_main_axis_alignment"
             | "layout_cross_axis_alignment"
-            | "main_axis_gap"
-            | "cross_axis_gap"
+            | "layout_main_axis_gap"
+            | "layout_cross_axis_gap"
             | "padding_top"
             | "padding_right"
             | "padding_bottom"
@@ -4082,8 +4082,9 @@ export namespace format {
             containerFields.layout_cross_axis_alignment = crossAxis;
           }
 
-          containerFields.main_axis_gap = container.layoutMainAxisGap();
-          containerFields.cross_axis_gap = container.layoutCrossAxisGap();
+          containerFields.layout_main_axis_gap = container.layoutMainAxisGap();
+          containerFields.layout_cross_axis_gap =
+            container.layoutCrossAxisGap();
 
           const padding = container.layoutPadding();
           if (padding) {
@@ -4203,8 +4204,8 @@ export namespace format {
                     | "layout_wrap"
                     | "layout_main_axis_alignment"
                     | "layout_cross_axis_alignment"
-                    | "main_axis_gap"
-                    | "cross_axis_gap"
+                    | "layout_main_axis_gap"
+                    | "layout_cross_axis_gap"
                     | "padding_top"
                     | "padding_right"
                     | "padding_bottom"
@@ -4686,8 +4687,8 @@ export namespace format {
             layout_direction: "horizontal" as cg.Axis,
             layout_main_axis_alignment: "start" as cg.MainAxisAlignment,
             layout_cross_axis_alignment: "start" as cg.CrossAxisAlignment,
-            main_axis_gap: 0,
-            cross_axis_gap: 0,
+            layout_main_axis_gap: 0,
+            layout_cross_axis_gap: 0,
             padding_top: 0,
             padding_right: 0,
             padding_bottom: 0,

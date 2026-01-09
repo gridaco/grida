@@ -992,8 +992,8 @@ function SectionLayout({
     layout_direction,
     layout_main_axis_alignment,
     layout_cross_axis_alignment,
-    main_axis_gap,
-    cross_axis_gap,
+    layout_main_axis_gap,
+    layout_cross_axis_gap,
     layout_wrap,
     clips_content,
   } = useNodeState(node_id, (node) => ({
@@ -1002,8 +1002,8 @@ function SectionLayout({
     layout_direction: node.layout_direction,
     layout_main_axis_alignment: node.layout_main_axis_alignment,
     layout_cross_axis_alignment: node.layout_cross_axis_alignment,
-    main_axis_gap: node.main_axis_gap,
-    cross_axis_gap: node.cross_axis_gap,
+    layout_main_axis_gap: node.layout_main_axis_gap,
+    layout_cross_axis_gap: node.layout_cross_axis_gap,
     layout_wrap: node.layout_wrap,
     clips_content: (node as grida.program.nodes.ContainerNode).clips_content,
   }));
@@ -1065,8 +1065,8 @@ function SectionLayout({
           <GapControl
             mode={layout_wrap === "wrap" ? "multiple" : "single"}
             value={{
-              main_axis_gap: main_axis_gap!,
-              cross_axis_gap: cross_axis_gap,
+              layout_main_axis_gap: layout_main_axis_gap!,
+              layout_cross_axis_gap: layout_cross_axis_gap,
             }}
             onValueCommit={actions.gap}
           />
@@ -1111,8 +1111,8 @@ function SectionLayoutMixed({
     layout_direction: node.layout_direction,
     layout_main_axis_alignment: node.layout_main_axis_alignment,
     layout_cross_axis_alignment: node.layout_cross_axis_alignment,
-    main_axis_gap: node.main_axis_gap,
-    cross_axis_gap: node.cross_axis_gap,
+    layout_main_axis_gap: node.layout_main_axis_gap,
+    layout_cross_axis_gap: node.layout_cross_axis_gap,
     layout_wrap: node.layout_wrap,
     clips_content:
       node.type === "container"
@@ -1238,13 +1238,14 @@ function SectionLayoutMixed({
           <GapControl
             mode={mp.layout_wrap?.value === "wrap" ? "multiple" : "single"}
             value={{
-              main_axis_gap:
-                mp.main_axis_gap?.mixed || mp.main_axis_gap?.value === undefined
+              layout_main_axis_gap:
+                mp.layout_main_axis_gap?.mixed ||
+                mp.layout_main_axis_gap?.value === undefined
                   ? grida.mixed
-                  : (mp.main_axis_gap.value ?? 0),
-              cross_axis_gap: mp.cross_axis_gap?.mixed
+                  : (mp.layout_main_axis_gap.value ?? 0),
+              layout_cross_axis_gap: mp.layout_cross_axis_gap?.mixed
                 ? grida.mixed
-                : mp.cross_axis_gap?.value,
+                : mp.layout_cross_axis_gap?.value,
             }}
             onValueCommit={(value) => {
               containerFlexIds.forEach((id) => {
