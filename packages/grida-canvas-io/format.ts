@@ -780,6 +780,36 @@ export namespace format {
               letterSpacingValue // factor_value (em-based)
             )
           );
+          // Add word_spacing struct (field 11)
+          const wordSpacingValue = node.word_spacing ?? 0;
+          const wordSpacingKindEnum =
+            wordSpacingValue !== 0
+              ? fbs.TextWordSpacingKind.Factor
+              : fbs.TextWordSpacingKind.Fixed;
+          fbs.TextStyleRec.addWordSpacing(
+            builder,
+            fbs.TextWordSpacing.createTextWordSpacing(
+              builder,
+              wordSpacingKindEnum,
+              0, // fixed_value (not used when kind is Factor)
+              wordSpacingValue // factor_value (em-based)
+            )
+          );
+          // Add line_height struct (field 12)
+          const lineHeightValue = node.line_height ?? 0;
+          const lineHeightKindEnum =
+            lineHeightValue !== 0
+              ? fbs.TextLineHeightKind.Factor
+              : fbs.TextLineHeightKind.Normal;
+          fbs.TextStyleRec.addLineHeight(
+            builder,
+            fbs.TextLineHeight.createTextLineHeight(
+              builder,
+              lineHeightKindEnum,
+              0, // fixed_value (not used when kind is Factor or Normal)
+              lineHeightValue // factor_value (em-based)
+            )
+          );
           const textStyleOffset = fbs.TextStyleRec.endTextStyleRec(builder);
 
           // Encode StrokeGeometryTrait BEFORE starting TextSpanNodeProperties
@@ -1344,26 +1374,13 @@ export namespace format {
             builder,
             rectangularCornerRadiusOffsetInline
           );
+
           const rectangularStrokeWidthOffsetInline =
-            shapeNode.type === "rectangle"
-              ? fbs.RectangularStrokeWidth.createRectangularStrokeWidth(
-                  builder,
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_stroke_width_top ?? 0,
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_stroke_width_right ?? 0,
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_stroke_width_bottom ?? 0,
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_stroke_width_left ?? 0
-                )
-              : fbs.RectangularStrokeWidth.createRectangularStrokeWidth(
-                  builder,
-                  0,
-                  0,
-                  0,
-                  0
-                );
+            format.shape.encode.rectangular_stroke_width_from(
+              builder,
+              shapeNode.type === "rectangle" ? shapeNode : "default"
+            );
+
           fbs.BasicShapeNode.addRectangularStrokeWidth(
             builder,
             rectangularStrokeWidthOffsetInline
@@ -1392,6 +1409,7 @@ export namespace format {
               format.shape.encode.rectangularStrokeGeometryTrait(builder, {
                 stroke_cap: containerNode.stroke_cap,
                 stroke_join: containerNode.stroke_join,
+                stroke_width: containerNode.stroke_width,
                 rectangular_stroke_width_top:
                   containerNode.rectangular_stroke_width_top,
                 rectangular_stroke_width_right:
@@ -2326,6 +2344,34 @@ export namespace format {
   export namespace shape {
     export namespace encode {
       /**
+       * Helper function to create RectangularStrokeWidth from a node.
+       * Falls back to stroke_width if rectangular_stroke_width_* fields are missing.
+       */
+      export function rectangular_stroke_width_from(
+        builder: Builder,
+        node:
+          | (Partial<grida.program.nodes.i.IRectangularShapeTrait> &
+              Partial<grida.program.nodes.i.IStroke>)
+          | "default"
+      ): number {
+        if (node === "default") {
+          return fbs.RectangularStrokeWidth.createRectangularStrokeWidth(
+            builder,
+            0,
+            0,
+            0,
+            0
+          );
+        }
+        return fbs.RectangularStrokeWidth.createRectangularStrokeWidth(
+          builder,
+          node.rectangular_stroke_width_top ?? node.stroke_width ?? 0,
+          node.rectangular_stroke_width_right ?? node.stroke_width ?? 0,
+          node.rectangular_stroke_width_bottom ?? node.stroke_width ?? 0,
+          node.rectangular_stroke_width_left ?? node.stroke_width ?? 0
+        );
+      }
+      /**
        * Helper to create StrokeStyle table.
        */
       function createStrokeStyle(
@@ -2398,6 +2444,7 @@ export namespace format {
         node: Partial<{
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
+          stroke_width?: number;
           rectangular_stroke_width_top?: number;
           rectangular_stroke_width_right?: number;
           rectangular_stroke_width_bottom?: number;
@@ -2420,15 +2467,11 @@ export namespace format {
         const strokeWidthProfileOffset =
           fbs.VariableWidthProfile.endVariableWidthProfile(builder);
 
-        // Create RectangularStrokeWidth struct
-        const rectangularStrokeWidthOffset =
-          fbs.RectangularStrokeWidth.createRectangularStrokeWidth(
-            builder,
-            node.rectangular_stroke_width_top ?? 0,
-            node.rectangular_stroke_width_right ?? 0,
-            node.rectangular_stroke_width_bottom ?? 0,
-            node.rectangular_stroke_width_left ?? 0
-          );
+        // Create RectangularStrokeWidth struct using helper function
+        const rectangularStrokeWidthOffset = rectangular_stroke_width_from(
+          builder,
+          node
+        );
 
         // Create RectangularStrokeGeometryTrait table
         fbs.RectangularStrokeGeometryTrait.startRectangularStrokeGeometryTrait(
@@ -4743,6 +4786,9 @@ export namespace format {
           let fontWeight: number = 400;
           let fontKerning: boolean = true;
           let fontFamily: string | undefined = undefined;
+          let letterSpacing: number | undefined = undefined;
+          let wordSpacing: number | undefined = undefined;
+          let lineHeight: number | undefined = undefined;
           if (textProps) {
             textAlign = format.styling.decode.textAlign(textProps.textAlign());
             textAlignVertical = format.styling.decode.textAlignVertical(
@@ -4772,6 +4818,53 @@ export namespace format {
                 fontWeight = fontWeightStruct.value();
               }
               fontKerning = textStyle.fontKerning();
+
+              // Decode letter_spacing (field 10)
+              const letterSpacingStruct = textStyle.letterSpacing();
+              if (letterSpacingStruct) {
+                const letterSpacingKind = letterSpacingStruct.kind();
+                const letterSpacingValue =
+                  letterSpacingKind === fbs.TextLetterSpacingKind.Factor
+                    ? letterSpacingStruct.factorValue()
+                    : letterSpacingStruct.fixedValue();
+                // Only set if non-zero (0 means unset/default, encoded when undefined)
+                if (letterSpacingValue !== 0) {
+                  letterSpacing = letterSpacingValue;
+                }
+              }
+
+              // Decode word_spacing (field 11)
+              const wordSpacingStruct = textStyle.wordSpacing();
+              if (wordSpacingStruct) {
+                const wordSpacingKind = wordSpacingStruct.kind();
+                const wordSpacingValue =
+                  wordSpacingKind === fbs.TextWordSpacingKind.Factor
+                    ? wordSpacingStruct.factorValue()
+                    : wordSpacingStruct.fixedValue();
+                // Only set if non-zero (0 means unset/default, encoded when undefined)
+                if (wordSpacingValue !== 0) {
+                  wordSpacing = wordSpacingValue;
+                }
+              }
+
+              // Decode line_height (field 12)
+              const lineHeightStruct = textStyle.lineHeight();
+              if (lineHeightStruct) {
+                const lineHeightKind = lineHeightStruct.kind();
+                if (lineHeightKind === fbs.TextLineHeightKind.Normal) {
+                  // Normal line height - means undefined/default
+                  lineHeight = undefined;
+                } else {
+                  const lineHeightValue =
+                    lineHeightKind === fbs.TextLineHeightKind.Factor
+                      ? lineHeightStruct.factorValue()
+                      : lineHeightStruct.fixedValue();
+                  // Only set if non-zero (0 means unset/default, encoded when undefined)
+                  if (lineHeightValue !== 0) {
+                    lineHeight = lineHeightValue;
+                  }
+                }
+              }
             }
           }
 
@@ -4844,6 +4937,11 @@ export namespace format {
             text_decoration_line: textDecorationLine,
             text_align: textAlign,
             text_align_vertical: textAlignVertical,
+            ...(letterSpacing !== undefined
+              ? { letter_spacing: letterSpacing }
+              : {}),
+            ...(wordSpacing !== undefined ? { word_spacing: wordSpacing } : {}),
+            ...(lineHeight !== undefined ? { line_height: lineHeight } : {}),
             ...(fontFeatures ? { font_features: fontFeatures } : {}),
             // Decode max_lines: treat 0 as "unset" (FlatBuffers defaults uint to 0, but 0 is invalid for max_lines)
             // Valid values start from 1 (similar to CSS -webkit-line-clamp)

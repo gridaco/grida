@@ -3,173 +3,360 @@ import type grida from "@grida/schema";
 import cg from "@grida/cg";
 import { format } from "../format";
 
+// Base objects for common node types
+const baseScene = (id: string): grida.program.nodes.SceneNode => ({
+  type: "scene",
+  id,
+  name: "Scene",
+  active: true,
+  locked: false,
+  guides: [],
+  edges: [],
+  constraints: { children: "multiple" },
+});
+
+const baseRectangle = (id: string): grida.program.nodes.RectangleNode => ({
+  type: "rectangle",
+  id,
+  name: "Rect",
+  active: true,
+  locked: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 100,
+  rotation: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+});
+
+const baseTextSpan = (id: string): grida.program.nodes.TextSpanNode => ({
+  type: "tspan",
+  id,
+  name: "Text",
+  active: true,
+  locked: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 50,
+  rotation: 0,
+  text: null,
+  font_size: 14,
+  font_weight: 400,
+  font_kerning: true,
+  text_decoration_line: "none",
+  text_align: "left",
+  text_align_vertical: "top",
+});
+
+const baseContainer = (id: string): grida.program.nodes.ContainerNode => ({
+  type: "container",
+  id,
+  name: "Container",
+  active: true,
+  locked: false,
+  clips_content: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 100,
+  rotation: 0,
+  layout_mode: "flow",
+  layout_direction: "horizontal",
+  layout_main_axis_alignment: "start",
+  layout_cross_axis_alignment: "start",
+  layout_main_axis_gap: 0,
+  layout_cross_axis_gap: 0,
+  layout_padding_top: 0,
+  layout_padding_right: 0,
+  layout_padding_bottom: 0,
+  layout_padding_left: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+});
+
+const baseEllipse = (id: string): grida.program.nodes.EllipseNode => ({
+  type: "ellipse",
+  id,
+  name: "Ellipse",
+  active: true,
+  locked: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 100,
+  rotation: 0,
+  angle_offset: 0,
+  angle: 360,
+  inner_radius: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+});
+
+const baseGroup = (id: string): grida.program.nodes.GroupNode => ({
+  type: "group",
+  id,
+  name: "Group",
+  active: true,
+  locked: false,
+  opacity: 1,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+});
+
+const baseLine = (id: string): grida.program.nodes.LineNode => ({
+  type: "line",
+  id,
+  name: "Line",
+  active: true,
+  locked: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 0,
+  rotation: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+});
+
+const baseVector = (id: string): grida.program.nodes.VectorNode => ({
+  type: "vector",
+  id,
+  name: "Vector",
+  active: true,
+  locked: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 100,
+  rotation: 0,
+  corner_radius: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+  vector_network: {
+    vertices: [],
+    segments: [],
+  },
+});
+
+const baseBoolean = (
+  id: string
+): grida.program.nodes.BooleanPathOperationNode => ({
+  type: "boolean",
+  id,
+  name: "Boolean",
+  active: true,
+  locked: false,
+  opacity: 1,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 100,
+  rotation: 0,
+  op: "union",
+  corner_radius: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+});
+
+const basePolygon = (id: string): grida.program.nodes.RegularPolygonNode => ({
+  type: "polygon",
+  id,
+  name: "Polygon",
+  active: true,
+  locked: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 100,
+  rotation: 0,
+  point_count: 3,
+  corner_radius: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+});
+
+const baseStar = (id: string): grida.program.nodes.RegularStarPolygonNode => ({
+  type: "star",
+  id,
+  name: "Star",
+  active: true,
+  locked: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 100,
+  rotation: 0,
+  point_count: 5,
+  inner_radius: 0.5,
+  corner_radius: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+});
+
+// Helper function to create a document from nodes
+function createDocument(
+  sceneId: string,
+  nodes: Record<string, grida.program.nodes.Node>,
+  entrySceneId: string = sceneId
+): grida.program.document.Document {
+  return {
+    nodes: {
+      [sceneId]: baseScene(sceneId),
+      ...nodes,
+    },
+    links: { [sceneId]: Object.keys(nodes) },
+    scenes_ref: [sceneId],
+    entry_scene_id: entrySceneId,
+    images: {},
+    bitmaps: {},
+    properties: {},
+  } satisfies grida.program.document.Document;
+}
+
+// Helper for SceneNode-only documents
+function createSceneDocument(
+  sceneId: string,
+  scene: grida.program.nodes.SceneNode,
+  entrySceneId: string = sceneId
+): grida.program.document.Document {
+  return {
+    nodes: { [sceneId]: scene },
+    links: {},
+    scenes_ref: [sceneId],
+    entry_scene_id: entrySceneId,
+    images: {},
+    bitmaps: {},
+    properties: {},
+  } satisfies grida.program.document.Document;
+}
+
+// Helper function to run roundtrip test
+function roundtripTest<T extends grida.program.nodes.Node>(
+  doc: grida.program.document.Document,
+  nodeId: string,
+  type: T["type"],
+  assertions: (node: T) => void
+) {
+  const bytes = format.document.encode.toFlatbuffer(doc);
+  const decoded = format.document.decode.fromFlatbuffer(bytes);
+  const node = decoded.nodes[nodeId];
+  if (!node || node.type !== type) throw new Error(`Expected ${type} node`);
+  assertions(node as T);
+}
+
 describe("format roundtrip", () => {
   describe("positioning modes", () => {
     it("roundtrips cartesian positioning (left/top)", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      node satisfies grida.program.nodes.RectangleNode;
-
-      expect(node.layout_positioning).toBe("absolute");
-      expect(node.layout_inset_left).toBe(10);
-      expect(node.layout_inset_top).toBe(20);
-      expect(node.layout_inset_right).toBeUndefined();
-      expect(node.layout_inset_bottom).toBeUndefined();
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (node) => {
+          expect(node.layout_positioning).toBe("absolute");
+          expect(node.layout_inset_left).toBe(10);
+          expect(node.layout_inset_top).toBe(20);
+          expect(node.layout_inset_right).toBeUndefined();
+          expect(node.layout_inset_bottom).toBeUndefined();
+        }
+      );
     });
 
     it("roundtrips inset positioning (right/bottom)", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_right: 12,
-            layout_inset_bottom: 34,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: undefined,
+          layout_inset_top: undefined,
+          layout_inset_right: 12,
+          layout_inset_bottom: 34,
+          layout_target_width: 100,
+          layout_target_height: 200,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      node satisfies grida.program.nodes.RectangleNode;
-
-      expect(node.layout_positioning).toBe("absolute");
-      expect(node.layout_inset_right).toBe(12);
-      expect(node.layout_inset_bottom).toBe(34);
-      expect(node.layout_inset_left).toBeUndefined();
-      expect(node.layout_inset_top).toBeUndefined();
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (node) => {
+          expect(node.layout_positioning).toBe("absolute");
+          expect(node.layout_inset_right).toBe(12);
+          expect(node.layout_inset_bottom).toBe(34);
+          expect(node.layout_inset_left).toBeUndefined();
+          expect(node.layout_inset_top).toBeUndefined();
+        }
+      );
     });
 
     it("roundtrips relative positioning", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "relative",
-            layout_inset_left: 5,
-            layout_inset_top: 10,
-            layout_target_width: 50,
-            layout_target_height: 50,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_positioning: "relative",
+          layout_inset_left: 5,
+          layout_inset_top: 10,
+          layout_target_width: 50,
+          layout_target_height: 50,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      node satisfies grida.program.nodes.RectangleNode;
-
-      expect(node.layout_positioning).toBe("relative");
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (node) => {
+          expect(node.layout_positioning).toBe("relative");
+        }
+      );
     });
   });
 
@@ -177,604 +364,335 @@ describe("format roundtrip", () => {
     it("roundtrips auto width/height (TextNode supports auto)", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: "auto",
-            layout_target_height: "auto",
-            rotation: 0,
-            text: null,
-            font_size: 14,
-            font_weight: 400,
-            font_kerning: true,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          layout_target_width: "auto",
+          layout_target_height: "auto",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
-
-      expect(node.layout_target_width).toBe("auto");
-      expect(node.layout_target_height).toBe("auto");
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.layout_target_width).toBe("auto");
+          expect(node.layout_target_height).toBe("auto");
+        }
+      );
     });
 
     it("roundtrips px width/height", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_target_width: 100,
+          layout_target_height: 200,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      node satisfies grida.program.nodes.RectangleNode;
-
-      expect(node.layout_target_width).toBe(100);
-      expect(node.layout_target_height).toBe(200);
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (node) => {
+          expect(node.layout_target_width).toBe(100);
+          expect(node.layout_target_height).toBe(200);
+        }
+      );
     });
 
     it("roundtrips percentage width/height (ContainerNode supports percentage)", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const containerNode: grida.program.nodes.ContainerNode = {
-        type: "container",
-        id: nodeId,
-        name: "Container",
-        active: true,
-        locked: false,
-        clips_content: false,
-
-        opacity: 1,
-        z_index: 0,
-        layout_positioning: "absolute",
-        layout_inset_left: 0,
-        layout_inset_top: 0,
-        layout_target_width: { type: "percentage" as const, value: 50 },
-        layout_target_height: { type: "percentage" as const, value: 75 },
-        rotation: 0,
-        layout_mode: "flow" as const,
-        layout_direction: "horizontal" as const,
-        layout_main_axis_alignment: "start" as const,
-        layout_cross_axis_alignment: "start" as const,
-        layout_main_axis_gap: 0,
-        layout_cross_axis_gap: 0,
-        layout_padding_top: 0,
-        layout_padding_right: 0,
-        layout_padding_bottom: 0,
-        layout_padding_left: 0,
-        stroke_width: 0,
-        stroke_cap: "butt",
-        stroke_join: "miter",
-      };
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: containerNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          layout_target_width: { type: "percentage" as const, value: 50 },
+          layout_target_height: { type: "percentage" as const, value: 75 },
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      node satisfies grida.program.nodes.ContainerNode;
-
-      expect(node.layout_target_width).toEqual({
-        type: "percentage",
-        value: 50,
       });
-      expect(node.layout_target_height).toEqual({
-        type: "percentage",
-        value: 75,
-      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (node) => {
+          expect(node.layout_target_width).toEqual({
+            type: "percentage",
+            value: 50,
+          });
+          expect(node.layout_target_height).toEqual({
+            type: "percentage",
+            value: 75,
+          });
+        }
+      );
     });
   });
 
   describe("node types", () => {
     it("roundtrips SceneNode", () => {
       const sceneId = "0-1";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "single" },
-          },
-        },
-        links: {},
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const scene = decoded.nodes[sceneId];
-      if (!scene || scene.type !== "scene")
-        throw new Error("Expected scene node");
-      scene satisfies grida.program.nodes.SceneNode;
-
-      expect(scene.type).toBe("scene");
-      expect(scene.name).toBe("Scene");
-      expect(scene.active).toBe(true);
-      expect(scene.locked).toBe(false);
-      expect(scene.constraints.children).toBe("single");
+      const doc = createSceneDocument(sceneId, {
+        ...baseScene(sceneId),
+        constraints: { children: "single" },
+      });
+      roundtripTest<grida.program.nodes.SceneNode>(
+        doc,
+        sceneId,
+        "scene",
+        (scene) => {
+          expect(scene.type).toBe("scene");
+          expect(scene.name).toBe("Scene");
+          expect(scene.active).toBe(true);
+          expect(scene.locked).toBe(false);
+          expect(scene.constraints.children).toBe("single");
+        }
+      );
     });
 
     it("roundtrips SceneNode with position", () => {
       const sceneId = "0-1";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-            position: "Qd&",
-          },
-        },
-        links: {},
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const scene = decoded.nodes[sceneId];
-      if (!scene || scene.type !== "scene")
-        throw new Error("Expected scene node");
-      scene satisfies grida.program.nodes.SceneNode;
-
-      expect(scene.type).toBe("scene");
-      expect(scene.name).toBe("Scene");
-      expect(scene.position).toBe("Qd&");
-      expect(scene.constraints.children).toBe("multiple");
+      const doc = createSceneDocument(sceneId, {
+        ...baseScene(sceneId),
+        position: "Qd&",
+      });
+      roundtripTest<grida.program.nodes.SceneNode>(
+        doc,
+        sceneId,
+        "scene",
+        (scene) => {
+          expect(scene.type).toBe("scene");
+          expect(scene.name).toBe("Scene");
+          expect(scene.position).toBe("Qd&");
+          expect(scene.constraints.children).toBe("multiple");
+        }
+      );
     });
 
     it("roundtrips SceneNode with background_color", () => {
       const sceneId = "0-1";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-            background_color: {
-              r: 0.5,
-              g: 0.75,
-              b: 1.0,
-              a: 1.0,
-            } as cg.RGBA32F,
-          },
-        },
-        links: {},
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const scene = decoded.nodes[sceneId];
-      if (!scene || scene.type !== "scene")
-        throw new Error("Expected scene node");
-      scene satisfies grida.program.nodes.SceneNode;
-
-      expect(scene.type).toBe("scene");
-      expect(scene.background_color).toBeDefined();
-      if (
-        scene.background_color &&
-        typeof scene.background_color === "object" &&
-        "r" in scene.background_color
-      ) {
-        expect(scene.background_color.r).toBeCloseTo(0.5);
-        expect(scene.background_color.g).toBeCloseTo(0.75);
-        expect(scene.background_color.b).toBeCloseTo(1.0);
-        expect(scene.background_color.a).toBeCloseTo(1.0);
-      } else {
-        throw new Error("Expected background_color to be RGBA32F object");
-      }
+      const doc = createSceneDocument(sceneId, {
+        ...baseScene(sceneId),
+        background_color: {
+          r: 0.5,
+          g: 0.75,
+          b: 1.0,
+          a: 1.0,
+        } as cg.RGBA32F,
+      });
+      roundtripTest<grida.program.nodes.SceneNode>(
+        doc,
+        sceneId,
+        "scene",
+        (scene) => {
+          expect(scene.type).toBe("scene");
+          expect(scene.background_color).toBeDefined();
+          if (
+            scene.background_color &&
+            typeof scene.background_color === "object" &&
+            "r" in scene.background_color
+          ) {
+            expect(scene.background_color.r).toBeCloseTo(0.5);
+            expect(scene.background_color.g).toBeCloseTo(0.75);
+            expect(scene.background_color.b).toBeCloseTo(1.0);
+            expect(scene.background_color.a).toBeCloseTo(1.0);
+          } else {
+            throw new Error("Expected background_color to be RGBA32F object");
+          }
+        }
+      );
     });
 
     it("roundtrips SceneNode without background_color", () => {
       const sceneId = "0-1";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-        },
-        links: {},
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const scene = decoded.nodes[sceneId];
-      if (!scene || scene.type !== "scene")
-        throw new Error("Expected scene node");
-      scene satisfies grida.program.nodes.SceneNode;
-
-      expect(scene.type).toBe("scene");
-      // background_color should be undefined when not set
-      expect(scene.background_color).toBeUndefined();
+      const doc = createSceneDocument(sceneId, baseScene(sceneId));
+      roundtripTest<grida.program.nodes.SceneNode>(
+        doc,
+        sceneId,
+        "scene",
+        (scene) => {
+          expect(scene.type).toBe("scene");
+          expect(scene.background_color).toBeUndefined();
+        }
+      );
     });
 
     it("roundtrips RectangleNode with layout properties", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 45,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          rotation: 45,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      node satisfies grida.program.nodes.RectangleNode;
-
-      expect(node.type).toBe("rectangle");
-      expect(node.name).toBe("Rect");
-      expect(node.active).toBe(true);
-      expect(node.locked).toBe(false);
-      expect(node.layout_inset_left).toBe(10);
-      expect(node.layout_inset_top).toBe(20);
-      expect(node.layout_target_width).toBe(100);
-      expect(node.layout_target_height).toBe(200);
-      expect(node.rotation).toBe(45);
-      // Note: opacity, z_index, stroke properties are not currently decoded from node data
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (node) => {
+          expect(node.type).toBe("rectangle");
+          expect(node.name).toBe("Rect");
+          expect(node.active).toBe(true);
+          expect(node.locked).toBe(false);
+          expect(node.layout_inset_left).toBe(10);
+          expect(node.layout_inset_top).toBe(20);
+          expect(node.layout_target_width).toBe(100);
+          expect(node.layout_target_height).toBe(200);
+          expect(node.rotation).toBe(45);
+        }
+      );
     });
 
     it("roundtrips TextNode with layout properties", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 200,
-            layout_target_height: 50,
-            rotation: 0,
-            text: null,
-            font_size: 14,
-            font_weight: 400,
-            font_kerning: true,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          layout_target_width: 200,
+          layout_target_height: 50,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.type).toBe("tspan");
+          expect(node.name).toBe("Text");
+          expect(node.active).toBe(true);
+          expect(node.locked).toBe(false);
+          expect(node.layout_target_width).toBe(200);
+          expect(node.layout_target_height).toBe(50);
+        }
+      );
+    });
 
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
+    it("roundtrips TextNode with letter_spacing, word_spacing, and line_height", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Test text",
+          layout_target_width: 200,
+          layout_target_height: 50,
+          letter_spacing: 0.1,
+          word_spacing: 0.2,
+          line_height: 1.5,
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.type).toBe("tspan");
+          expect(node.letter_spacing).toBeCloseTo(0.1, 5);
+          expect(node.word_spacing).toBeCloseTo(0.2, 5);
+          expect(node.line_height).toBeCloseTo(1.5, 5);
+        }
+      );
+    });
 
-      expect(node.type).toBe("tspan");
-      expect(node.name).toBe("Text");
-      expect(node.active).toBe(true);
-      expect(node.locked).toBe(false);
-      expect(node.layout_target_width).toBe(200);
-      expect(node.layout_target_height).toBe(50);
-      // Note: text content, font properties, text alignment are not currently decoded from TextSpanNodeProperties
+    it("roundtrips TextNode with undefined letter_spacing, word_spacing, and line_height", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Test text",
+          layout_target_width: 200,
+          layout_target_height: 50,
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.type).toBe("tspan");
+          expect(node.letter_spacing).toBeUndefined();
+          expect(node.word_spacing).toBeUndefined();
+          expect(node.line_height).toBeUndefined();
+        }
+      );
     });
 
     it("roundtrips ContainerNode with flex properties", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "container",
-            id: nodeId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 400,
-            layout_target_height: 300,
-            rotation: 0,
-            layout_mode: "flex",
-            layout_direction: "horizontal",
-            layout_wrap: "wrap",
-            layout_main_axis_alignment: "space-evenly",
-            layout_cross_axis_alignment: "stretch",
-            layout_main_axis_gap: 10,
-            layout_cross_axis_gap: 15,
-            layout_padding_top: 5,
-            layout_padding_right: 10,
-            layout_padding_bottom: 15,
-            layout_padding_left: 20,
-            stroke_width: 1,
-            stroke_cap: "square",
-            stroke_join: "round",
-          } satisfies grida.program.nodes.ContainerNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          layout_target_width: 400,
+          layout_target_height: 300,
+          layout_mode: "flex",
+          layout_wrap: "wrap",
+          layout_main_axis_alignment: "space-evenly",
+          layout_cross_axis_alignment: "stretch",
+          layout_main_axis_gap: 10,
+          layout_cross_axis_gap: 15,
+          layout_padding_top: 5,
+          layout_padding_right: 10,
+          layout_padding_bottom: 15,
+          layout_padding_left: 20,
+          stroke_width: 1,
+          stroke_cap: "square",
+          stroke_join: "round",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      node satisfies grida.program.nodes.ContainerNode;
-
-      expect(node.type).toBe("container");
-      expect(node.layout_mode).toBe("flex");
-      expect(node.layout_direction).toBe("horizontal");
-      expect(node.layout_wrap).toBe("wrap");
-      expect(node.layout_main_axis_alignment).toBe("space-evenly");
-      expect(node.layout_cross_axis_alignment).toBe("stretch");
-      expect(node.layout_main_axis_gap).toBe(10);
-      expect(node.layout_cross_axis_gap).toBe(15);
-      expect(node.layout_padding_top).toBe(5);
-      expect(node.layout_padding_right).toBe(10);
-      expect(node.layout_padding_bottom).toBe(15);
-      expect(node.layout_padding_left).toBe(20);
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (node) => {
+          expect(node.type).toBe("container");
+          expect(node.layout_mode).toBe("flex");
+          expect(node.layout_direction).toBe("horizontal");
+          expect(node.layout_wrap).toBe("wrap");
+          expect(node.layout_main_axis_alignment).toBe("space-evenly");
+          expect(node.layout_cross_axis_alignment).toBe("stretch");
+          expect(node.layout_main_axis_gap).toBe(10);
+          expect(node.layout_cross_axis_gap).toBe(15);
+          expect(node.layout_padding_top).toBe(5);
+          expect(node.layout_padding_right).toBe(10);
+          expect(node.layout_padding_bottom).toBe(15);
+          expect(node.layout_padding_left).toBe(20);
+        }
+      );
     });
 
     it("roundtrips GroupNode with layout properties", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "group",
-            id: nodeId,
-            name: "Group",
-            active: true,
-            locked: false,
-            opacity: 1,
-
-            layout_positioning: "relative",
-            layout_inset_left: 5,
-            layout_inset_top: 10,
-          } satisfies grida.program.nodes.GroupNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseGroup(nodeId),
+          layout_positioning: "relative",
+          layout_inset_left: 5,
+          layout_inset_top: 10,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "group")
-        throw new Error("Expected group node");
-      node satisfies grida.program.nodes.GroupNode;
-
-      expect(node.type).toBe("group");
-      expect(node.name).toBe("Group");
-      expect(node.active).toBe(true);
-      expect(node.locked).toBe(false);
-      expect(node.layout_positioning).toBe("relative");
-      // Note: left, top, width, height, rotation, opacity, expanded are not currently decoded from GroupNodeProperties
+      });
+      roundtripTest<grida.program.nodes.GroupNode>(
+        doc,
+        nodeId,
+        "group",
+        (node) => {
+          expect(node.type).toBe("group");
+          expect(node.name).toBe("Group");
+          expect(node.active).toBe(true);
+          expect(node.locked).toBe(false);
+          expect(node.layout_positioning).toBe("relative");
+        }
+      );
     });
   });
 
@@ -975,55 +893,20 @@ describe("format roundtrip", () => {
     it("roundtrips rotation values", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 45.5,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          rotation: 45.5,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      node satisfies grida.program.nodes.RectangleNode;
-
-      // Floating point precision: rotation is converted from degrees to radians and back
-      expect(node.rotation).toBeCloseTo(45.5, 5);
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (node) => {
+          expect(node.rotation).toBeCloseTo(45.5, 5);
+        }
+      );
     });
   });
 
@@ -1035,67 +918,21 @@ describe("format roundtrip", () => {
     ] as const)("roundtrips layout_wrap: %s", (wrap, expected) => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "container",
-            id: nodeId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            layout_mode: "flex" as const,
-            layout_direction: "horizontal" as const,
-            layout_wrap: wrap satisfies "wrap" | "nowrap" | undefined,
-            layout_main_axis_alignment: "start" as const,
-            layout_cross_axis_alignment: "start" as const,
-            layout_main_axis_gap: 0,
-            layout_cross_axis_gap: 0,
-            layout_padding_top: 0,
-            layout_padding_right: 0,
-            layout_padding_bottom: 0,
-            layout_padding_left: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.ContainerNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          layout_mode: "flex",
+          layout_wrap: wrap satisfies "wrap" | "nowrap" | undefined,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      node satisfies grida.program.nodes.ContainerNode;
-
-      expect(node.layout_wrap).toBe(expected);
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (node) => {
+          expect(node.layout_wrap).toBe(expected);
+        }
+      );
     });
   });
 
@@ -1107,120 +944,59 @@ describe("format roundtrip", () => {
       const containerId = "0-4";
       const groupId = "0-5";
 
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [rectId]: {
-            type: "rectangle",
-            id: rectId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 30,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RectangleNode,
-          [textId]: {
-            type: "tspan",
-            id: textId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_right: 12,
-            layout_inset_bottom: 34,
-            layout_target_width: "auto",
-            layout_target_height: "auto",
-            rotation: 5,
-            text: null,
-            font_size: 14,
-            font_weight: 400,
-            font_kerning: true,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextSpanNode,
-          [containerId]: {
-            type: "container",
-            id: containerId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 1,
-            layout_inset_top: 2,
-            layout_target_width: { type: "percentage" as const, value: 50 },
-            layout_target_height: 100,
-            rotation: 0,
-            layout_mode: "flex" as const,
-            layout_direction: "vertical" as const,
-            layout_wrap: "nowrap" as const,
-            layout_main_axis_alignment: "space-between" as const,
-            layout_cross_axis_alignment: "center" as const,
-            layout_main_axis_gap: 11,
-            layout_cross_axis_gap: 22,
-            layout_padding_top: 3,
-            layout_padding_right: 4,
-            layout_padding_bottom: 5,
-            layout_padding_left: 6,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.ContainerNode,
-          [groupId]: {
-            type: "group",
-            id: groupId,
-            name: "Group",
-            active: true,
-            locked: false,
-            opacity: 0.9,
-            layout_positioning: "relative",
-            layout_inset_left: 5,
-            layout_inset_top: 10,
-          } satisfies grida.program.nodes.GroupNode,
+      const doc = createDocument(sceneId, {
+        [rectId]: {
+          ...baseRectangle(rectId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          rotation: 30,
         },
-        links: {
-          [sceneId]: [rectId, textId, containerId, groupId],
+        [textId]: {
+          ...baseTextSpan(textId),
+          layout_positioning: "absolute",
+          layout_inset_right: 12,
+          layout_inset_bottom: 34,
+          layout_target_width: "auto",
+          layout_target_height: "auto",
+          rotation: 5,
+          text: null,
         },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
+        [containerId]: {
+          ...baseContainer(containerId),
+          layout_inset_left: 1,
+          layout_inset_top: 2,
+          layout_target_width: { type: "percentage" as const, value: 50 },
+          layout_target_height: 100,
+          layout_mode: "flex",
+          layout_direction: "vertical",
+          layout_wrap: "nowrap",
+          layout_main_axis_alignment: "space-between",
+          layout_cross_axis_alignment: "center",
+          layout_main_axis_gap: 11,
+          layout_cross_axis_gap: 22,
+          layout_padding_top: 3,
+          layout_padding_right: 4,
+          layout_padding_bottom: 5,
+          layout_padding_left: 6,
+        },
+        [groupId]: {
+          ...baseGroup(groupId),
+          opacity: 0.9,
+          layout_positioning: "relative",
+          layout_inset_left: 5,
+          layout_inset_top: 10,
+        },
+      });
 
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
 
-      // Verify all nodes roundtrip correctly
       expect(decoded.nodes[rectId]?.type).toBe("rectangle");
       expect(decoded.nodes[textId]?.type).toBe("tspan");
       expect(decoded.nodes[containerId]?.type).toBe("container");
       expect(decoded.nodes[groupId]?.type).toBe("group");
-
-      // Verify hierarchy
       expect(decoded.links[sceneId]).toEqual([
         rectId,
         textId,
@@ -1228,7 +1004,6 @@ describe("format roundtrip", () => {
         groupId,
       ]);
       expect(decoded.scenes_ref).toEqual([sceneId]);
-      // entry_scene_id is not stored in the archive model
       expect(decoded.entry_scene_id).toBeUndefined();
     });
   });
@@ -1242,226 +1017,79 @@ describe("format roundtrip", () => {
     ] as const)("roundtrips opacity: %s", (opacity, expected) => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          opacity,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      node satisfies grida.program.nodes.RectangleNode;
-
-      expect(node.opacity).toBeCloseTo(expected, 5);
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (node) => {
+          expect(node.opacity).toBeCloseTo(expected, 5);
+        }
+      );
     });
 
     it("roundtrips opacity for TextNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 0.8,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 50,
-            rotation: 0,
-            text: "Test",
-            font_size: 14,
-            font_weight: 400,
-            font_kerning: true,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          opacity: 0.8,
+          text: "Test",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
-
-      expect(node.opacity).toBeCloseTo(0.8, 5);
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.opacity).toBeCloseTo(0.8, 5);
+        }
+      );
     });
 
     it("roundtrips max_lines for TextSpanNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 50,
-            rotation: 0,
-            text: "This is a long text that should be truncated",
-            font_size: 14,
-            font_weight: 400,
-            font_kerning: true,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-            max_lines: 3,
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "This is a long text that should be truncated",
+          max_lines: 3,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
-
-      // max_lines should be preserved correctly after roundtrip
-      expect(node.max_lines).toBe(3);
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.max_lines).toBe(3);
+        }
+      );
     });
 
     it("roundtrips TextSpanNode without max_lines (undefined)", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 50,
-            rotation: 0,
-            text: "This is a long text",
-            font_size: 14,
-            font_weight: 400,
-            font_kerning: true,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-            // max_lines is intentionally not set
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "This is a long text",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
-
-      // max_lines should remain undefined when not set
-      expect(node.max_lines).toBeUndefined();
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.max_lines).toBeUndefined();
+        }
+      );
     });
   });
 
@@ -1469,227 +1097,85 @@ describe("format roundtrip", () => {
     it("roundtrips font_size", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 50,
-            rotation: 0,
-            text: "Test",
-            font_size: 24,
-            font_weight: 400,
-            font_kerning: true,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Test",
+          font_size: 24,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
-
-      expect(node.font_size).toBe(24);
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_size).toBe(24);
+        }
+      );
     });
 
     it("roundtrips font_weight", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 50,
-            rotation: 0,
-            text: "Test",
-            font_size: 14,
-            font_weight: 700,
-            font_kerning: true,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Test",
+          font_weight: 700,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
-
-      expect(node.font_weight).toBe(700);
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_weight).toBe(700);
+        }
+      );
     });
 
     it("roundtrips font_kerning", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 50,
-            rotation: 0,
-            text: "Test",
-            font_size: 14,
-            font_weight: 400,
-            font_kerning: false,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Test",
+          font_kerning: false,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
-
-      expect(node.font_kerning).toBe(false);
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_kerning).toBe(false);
+        }
+      );
     });
 
     it("roundtrips all font properties together", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "tspan",
-            id: nodeId,
-            name: "Text",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 50,
-            rotation: 0,
-            text: "Test",
-            font_size: 18,
-            font_weight: 600,
-            font_kerning: false,
-            text_decoration_line: "none",
-            text_align: "left",
-            text_align_vertical: "top",
-          } satisfies grida.program.nodes.TextSpanNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Test",
+          font_size: 18,
+          font_weight: 600,
+          font_kerning: false,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "tspan") throw new Error("Expected text node");
-      node satisfies grida.program.nodes.TextSpanNode;
-
-      expect(node.font_size).toBe(18);
-      expect(node.font_weight).toBe(600);
-      expect(node.font_kerning).toBe(false);
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_size).toBe(18);
+          expect(node.font_weight).toBe(600);
+          expect(node.font_kerning).toBe(false);
+        }
+      );
     });
   });
 
@@ -1697,526 +1183,279 @@ describe("format roundtrip", () => {
     it("roundtrips EllipseNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "ellipse",
-            id: nodeId,
-            name: "Ellipse",
-            active: true,
-            locked: false,
-            opacity: 1,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 80,
-            rotation: 0,
-            angle_offset: 0,
-            angle: 360,
-            inner_radius: 0,
-            stroke_width: 2,
-            stroke_cap: "round",
-            stroke_join: "round",
-          } satisfies grida.program.nodes.EllipseNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseEllipse(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 80,
+          stroke_width: 2,
+          stroke_cap: "round",
+          stroke_join: "round",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "ellipse")
-        throw new Error("Expected ellipse node");
-      node satisfies grida.program.nodes.EllipseNode;
-
-      expect(node.type).toBe("ellipse");
-      expect(node.name).toBe("Ellipse");
-      expect(node.layout_target_width).toBe(100);
-      expect(node.layout_target_height).toBe(80);
-      expect(node.angle_offset).toBe(0);
-      expect(node.angle).toBe(360);
-      expect(node.inner_radius).toBe(0);
-      expect(node.stroke_width).toBe(2);
-      expect(node.stroke_cap).toBe("round");
-      expect(node.stroke_join).toBe("round");
+      });
+      roundtripTest<grida.program.nodes.EllipseNode>(
+        doc,
+        nodeId,
+        "ellipse",
+        (node) => {
+          expect(node.type).toBe("ellipse");
+          expect(node.name).toBe("Ellipse");
+          expect(node.layout_target_width).toBe(100);
+          expect(node.layout_target_height).toBe(80);
+          expect(node.angle_offset).toBe(0);
+          expect(node.angle).toBe(360);
+          expect(node.inner_radius).toBe(0);
+          expect(node.stroke_width).toBe(2);
+          expect(node.stroke_cap).toBe("round");
+          expect(node.stroke_join).toBe("round");
+        }
+      );
     });
 
     it("roundtrips EllipseNode with arc data (non-default values)", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "ellipse",
-            id: nodeId,
-            name: "Ellipse Arc",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 80,
-            rotation: 0,
-            angle_offset: 45, // Non-default: 45 degrees
-            angle: 180, // Non-default: half circle
-            inner_radius: 0.5, // Non-default: donut shape
-            stroke_width: 2,
-            stroke_cap: "round",
-            stroke_join: "round",
-          } satisfies grida.program.nodes.EllipseNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseEllipse(nodeId),
+          name: "Ellipse Arc",
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 80,
+          angle_offset: 45,
+          angle: 180,
+          inner_radius: 0.5,
+          stroke_width: 2,
+          stroke_cap: "round",
+          stroke_join: "round",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "ellipse")
-        throw new Error("Expected ellipse node");
-      node satisfies grida.program.nodes.EllipseNode;
-
-      expect(node.type).toBe("ellipse");
-      expect(node.name).toBe("Ellipse Arc");
-      expect(node.layout_target_width).toBe(100);
-      expect(node.layout_target_height).toBe(80);
-      // Verify arc data is preserved
-      expect(node.angle_offset).toBe(45);
-      expect(node.angle).toBe(180);
-      expect(node.inner_radius).toBe(0.5);
-      expect(node.stroke_width).toBe(2);
-      expect(node.stroke_cap).toBe("round");
-      expect(node.stroke_join).toBe("round");
+      });
+      roundtripTest<grida.program.nodes.EllipseNode>(
+        doc,
+        nodeId,
+        "ellipse",
+        (node) => {
+          expect(node.type).toBe("ellipse");
+          expect(node.name).toBe("Ellipse Arc");
+          expect(node.layout_target_width).toBe(100);
+          expect(node.layout_target_height).toBe(80);
+          expect(node.angle_offset).toBe(45);
+          expect(node.angle).toBe(180);
+          expect(node.inner_radius).toBe(0.5);
+          expect(node.stroke_width).toBe(2);
+          expect(node.stroke_cap).toBe("round");
+          expect(node.stroke_join).toBe("round");
+        }
+      );
     });
 
     it("roundtrips EllipseNode with angle=0 (explicit zero)", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "ellipse",
-            id: nodeId,
-            name: "Ellipse Zero",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 80,
-            rotation: 0,
-            angle_offset: 0,
-            angle: 0, // Explicit zero (should be preserved)
-            inner_radius: 0,
-            stroke_width: 2,
-            stroke_cap: "round",
-            stroke_join: "round",
-          } satisfies grida.program.nodes.EllipseNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseEllipse(nodeId),
+          name: "Ellipse Zero",
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 80,
+          angle: 0,
+          stroke_width: 2,
+          stroke_cap: "round",
+          stroke_join: "round",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "ellipse")
-        throw new Error("Expected ellipse node");
-      node satisfies grida.program.nodes.EllipseNode;
-
-      expect(node.type).toBe("ellipse");
-      expect(node.name).toBe("Ellipse Zero");
-      // Verify angle=0 is preserved (not defaulted to 360)
-      expect(node.angle).toBe(0);
-      expect(node.angle_offset).toBe(0);
-      expect(node.inner_radius).toBe(0);
+      });
+      roundtripTest<grida.program.nodes.EllipseNode>(
+        doc,
+        nodeId,
+        "ellipse",
+        (node) => {
+          expect(node.type).toBe("ellipse");
+          expect(node.name).toBe("Ellipse Zero");
+          expect(node.angle).toBe(0);
+          expect(node.angle_offset).toBe(0);
+          expect(node.inner_radius).toBe(0);
+        }
+      );
     });
 
     it("roundtrips LineNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "line",
-            id: nodeId,
-            name: "Line",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 200,
-            layout_target_height: 0,
-            rotation: 45,
-            stroke_width: 3,
-            stroke_cap: "square",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.LineNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseLine(nodeId),
+          layout_target_width: 200,
+          rotation: 45,
+          stroke_width: 3,
+          stroke_cap: "square",
+          stroke_join: "miter",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "line") throw new Error("Expected line node");
-      node satisfies grida.program.nodes.LineNode;
-
-      expect(node.type).toBe("line");
-      expect(node.name).toBe("Line");
-      expect(node.layout_target_width).toBe(200);
-      expect(node.layout_target_height).toBe(0);
-      expect(node.rotation).toBe(45);
-      expect(node.stroke_width).toBe(3);
-      expect(node.stroke_cap).toBe("square");
-      expect(node.stroke_join).toBe("miter");
+      });
+      roundtripTest<grida.program.nodes.LineNode>(
+        doc,
+        nodeId,
+        "line",
+        (node) => {
+          expect(node.type).toBe("line");
+          expect(node.name).toBe("Line");
+          expect(node.layout_target_width).toBe(200);
+          expect(node.layout_target_height).toBe(0);
+          expect(node.rotation).toBe(45);
+          expect(node.stroke_width).toBe(3);
+          expect(node.stroke_cap).toBe("square");
+          expect(node.stroke_join).toBe("miter");
+        }
+      );
     });
 
     it("roundtrips VectorNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseVector(nodeId),
+          layout_target_width: 150,
+          layout_target_height: 150,
+          corner_radius: 5,
+          stroke_width: 1,
+          vector_network: {
+            vertices: [
+              [0, 0],
+              [100, 0],
+              [100, 100],
+              [0, 100],
+            ],
+            segments: [
+              { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
+              { a: 1, b: 2, ta: [0, 0], tb: [0, 0] },
+              { a: 2, b: 3, ta: [0, 0], tb: [0, 0] },
+              { a: 3, b: 0, ta: [0, 0], tb: [0, 0] },
+            ],
           },
-          [nodeId]: {
-            type: "vector",
-            id: nodeId,
-            name: "Vector",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 150,
-            layout_target_height: 150,
-            rotation: 0,
-            corner_radius: 5,
-            stroke_width: 1,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            vector_network: {
-              vertices: [
-                [0, 0],
-                [100, 0],
-                [100, 100],
-                [0, 100],
-              ],
-              segments: [
-                { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
-                { a: 1, b: 2, ta: [0, 0], tb: [0, 0] },
-                { a: 2, b: 3, ta: [0, 0], tb: [0, 0] },
-                { a: 3, b: 0, ta: [0, 0], tb: [0, 0] },
-              ],
-            },
-          } satisfies grida.program.nodes.VectorNode,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "vector")
-        throw new Error("Expected vector node");
-      node satisfies grida.program.nodes.VectorNode;
-
-      expect(node.type).toBe("vector");
-      expect(node.name).toBe("Vector");
-      expect(node.layout_target_width).toBe(150);
-      expect(node.layout_target_height).toBe(150);
-      expect(node.corner_radius).toBe(5);
-      expect(node.stroke_width).toBe(1);
-      // Verify vector_network roundtrip
-      expect(node.vector_network.vertices).toHaveLength(4);
-      expect(node.vector_network.vertices[0]).toEqual([0, 0]);
-      expect(node.vector_network.vertices[1]).toEqual([100, 0]);
-      expect(node.vector_network.vertices[2]).toEqual([100, 100]);
-      expect(node.vector_network.vertices[3]).toEqual([0, 100]);
-      expect(node.vector_network.segments).toHaveLength(4);
-      expect(node.vector_network.segments[0]).toEqual({
-        a: 0,
-        b: 1,
-        ta: [0, 0],
-        tb: [0, 0],
       });
-      expect(node.vector_network.segments[1]).toEqual({
-        a: 1,
-        b: 2,
-        ta: [0, 0],
-        tb: [0, 0],
-      });
+      roundtripTest<grida.program.nodes.VectorNode>(
+        doc,
+        nodeId,
+        "vector",
+        (node) => {
+          expect(node.type).toBe("vector");
+          expect(node.name).toBe("Vector");
+          expect(node.layout_target_width).toBe(150);
+          expect(node.layout_target_height).toBe(150);
+          expect(node.corner_radius).toBe(5);
+          expect(node.stroke_width).toBe(1);
+          expect(node.vector_network.vertices).toHaveLength(4);
+          expect(node.vector_network.vertices[0]).toEqual([0, 0]);
+          expect(node.vector_network.vertices[1]).toEqual([100, 0]);
+          expect(node.vector_network.vertices[2]).toEqual([100, 100]);
+          expect(node.vector_network.vertices[3]).toEqual([0, 100]);
+          expect(node.vector_network.segments).toHaveLength(4);
+          expect(node.vector_network.segments[0]).toEqual({
+            a: 0,
+            b: 1,
+            ta: [0, 0],
+            tb: [0, 0],
+          });
+          expect(node.vector_network.segments[1]).toEqual({
+            a: 1,
+            b: 2,
+            ta: [0, 0],
+            tb: [0, 0],
+          });
+        }
+      );
     });
 
     it("roundtrips BooleanPathOperationNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "boolean",
-            id: nodeId,
-            name: "Boolean",
-            active: true,
-            locked: false,
-            opacity: 1,
-
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            op: "difference",
-            corner_radius: 0,
-            stroke_width: 2,
-            stroke_cap: "round",
-            stroke_join: "bevel",
-          } satisfies grida.program.nodes.BooleanPathOperationNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseBoolean(nodeId),
+          op: "difference",
+          stroke_width: 2,
+          stroke_cap: "round",
+          stroke_join: "bevel",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "boolean")
-        throw new Error("Expected boolean node");
-      node satisfies grida.program.nodes.BooleanPathOperationNode;
-
-      expect(node.type).toBe("boolean");
-      expect(node.name).toBe("Boolean");
-      expect(node.op).toBe("difference");
-      expect(node.stroke_width).toBe(2);
-      expect(node.stroke_cap).toBe("round");
-      expect(node.stroke_join).toBe("bevel");
+      });
+      roundtripTest<grida.program.nodes.BooleanPathOperationNode>(
+        doc,
+        nodeId,
+        "boolean",
+        (node) => {
+          expect(node.type).toBe("boolean");
+          expect(node.name).toBe("Boolean");
+          expect(node.op).toBe("difference");
+          expect(node.stroke_width).toBe(2);
+          expect(node.stroke_cap).toBe("round");
+          expect(node.stroke_join).toBe("bevel");
+        }
+      );
     });
 
     it("roundtrips RegularPolygonNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "polygon",
-            id: nodeId,
-            name: "Polygon",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            point_count: 6,
-            corner_radius: 2,
-            stroke_width: 1,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.RegularPolygonNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePolygon(nodeId),
+          point_count: 6,
+          corner_radius: 2,
+          stroke_width: 1,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "polygon")
-        throw new Error("Expected polygon node");
-      node satisfies grida.program.nodes.RegularPolygonNode;
-
-      expect(node.type).toBe("polygon");
-      expect(node.name).toBe("Polygon");
-      expect(node.layout_target_width).toBe(100);
-      expect(node.layout_target_height).toBe(100);
-      expect(node.point_count).toBe(6);
-      expect(node.corner_radius).toBe(2);
-      expect(node.stroke_width).toBe(1);
+      });
+      roundtripTest<grida.program.nodes.RegularPolygonNode>(
+        doc,
+        nodeId,
+        "polygon",
+        (node) => {
+          expect(node.type).toBe("polygon");
+          expect(node.name).toBe("Polygon");
+          expect(node.layout_target_width).toBe(100);
+          expect(node.layout_target_height).toBe(100);
+          expect(node.point_count).toBe(6);
+          expect(node.corner_radius).toBe(2);
+          expect(node.stroke_width).toBe(1);
+        }
+      );
     });
 
     it("roundtrips RegularStarPolygonNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "star",
-            id: nodeId,
-            name: "Star",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 120,
-            layout_target_height: 120,
-            rotation: 0,
-            point_count: 5,
-            inner_radius: 0.4,
-            corner_radius: 1,
-            stroke_width: 2,
-            stroke_cap: "round",
-            stroke_join: "round",
-          } satisfies grida.program.nodes.RegularStarPolygonNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseStar(nodeId),
+          layout_target_width: 120,
+          layout_target_height: 120,
+          inner_radius: 0.4,
+          corner_radius: 1,
+          stroke_width: 2,
+          stroke_cap: "round",
+          stroke_join: "round",
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "star") throw new Error("Expected star node");
-      node satisfies grida.program.nodes.RegularStarPolygonNode;
-
-      expect(node.type).toBe("star");
-      expect(node.name).toBe("Star");
-      expect(node.layout_target_width).toBe(120);
-      expect(node.layout_target_height).toBe(120);
-      expect(node.point_count).toBe(5);
-      expect(node.inner_radius).toBeCloseTo(0.4, 5);
-      expect(node.corner_radius).toBe(1);
-      expect(node.stroke_width).toBe(2);
+      });
+      roundtripTest<grida.program.nodes.RegularStarPolygonNode>(
+        doc,
+        nodeId,
+        "star",
+        (node) => {
+          expect(node.type).toBe("star");
+          expect(node.name).toBe("Star");
+          expect(node.layout_target_width).toBe(120);
+          expect(node.layout_target_height).toBe(120);
+          expect(node.point_count).toBe(5);
+          expect(node.inner_radius).toBeCloseTo(0.4, 5);
+          expect(node.corner_radius).toBe(1);
+          expect(node.stroke_width).toBe(2);
+        }
+      );
     });
   });
 
@@ -2224,499 +1463,378 @@ describe("format roundtrip", () => {
     it("roundtrips SolidPaint fill_paints on RectangleNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fill_paints: [
-              {
-                type: "solid",
-                color: { r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F,
-                blend_mode: "normal",
-                active: true,
-              } satisfies cg.SolidPaint,
-            ],
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          fill_paints: [
+            {
+              type: "solid",
+              color: { r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F,
+              blend_mode: "normal",
+              active: true,
+            } satisfies cg.SolidPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectNode.type).toBe("rectangle");
-      expect(rectNode.fill_paints).toBeDefined();
-      expect(rectNode.fill_paints?.length).toBe(1);
-      const paint = rectNode.fill_paints?.[0];
-      expect(paint?.type).toBe("solid");
-      if (paint && paint.type === "solid") {
-        expect(paint.color.r).toBe(0);
-        expect(paint.color.g).toBe(0);
-        expect(paint.color.b).toBe(0);
-        expect(paint.color.a).toBe(1);
-        expect(paint.blend_mode).toBe("normal");
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.fill_paints).toBeDefined();
+          expect(rectNode.fill_paints?.length).toBe(1);
+          const paint = rectNode.fill_paints?.[0];
+          expect(paint?.type).toBe("solid");
+          if (paint && paint.type === "solid") {
+            expect(paint.color.r).toBe(0);
+            expect(paint.color.g).toBe(0);
+            expect(paint.color.b).toBe(0);
+            expect(paint.color.a).toBe(1);
+            expect(paint.blend_mode).toBe("normal");
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips LinearGradientPaint fill_paints on RectangleNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fill_paints: [
-              {
-                type: "linear_gradient",
-                transform: [
-                  [1, 0, 0],
-                  [0, 1, 0],
-                ],
-                stops: [
-                  {
-                    offset: 0,
-                    color: { r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 1,
-                    color: { r: 1, g: 1, b: 1, a: 1 } as cg.RGBA32F,
-                  },
-                ],
-                blend_mode: "normal",
-                opacity: 1,
-                active: true,
-              },
-            ],
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          fill_paints: [
+            {
+              type: "linear_gradient",
+              transform: [
+                [1, 0, 0],
+                [0, 1, 0],
+              ],
+              stops: [
+                { offset: 0, color: { r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F },
+                { offset: 1, color: { r: 1, g: 1, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "normal",
+              opacity: 1,
+              active: true,
+            },
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectNode.type).toBe("rectangle");
-      expect(rectNode.fill_paints).toBeDefined();
-      expect(rectNode.fill_paints?.length).toBe(1);
-      const paint = rectNode.fill_paints?.[0];
-      expect(paint?.type).toBe("linear_gradient");
-      if (paint && paint.type === "linear_gradient") {
-        expect(paint.stops.length).toBe(2);
-        expect(paint.stops[0]?.offset).toBe(0);
-        expect(paint.stops[1]?.offset).toBe(1);
-        expect(paint.blend_mode).toBe("normal");
-        expect(paint.opacity).toBe(1);
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.fill_paints).toBeDefined();
+          expect(rectNode.fill_paints?.length).toBe(1);
+          const paint = rectNode.fill_paints?.[0];
+          expect(paint?.type).toBe("linear_gradient");
+          if (paint && paint.type === "linear_gradient") {
+            expect(paint.stops.length).toBe(2);
+            expect(paint.stops[0]?.offset).toBe(0);
+            expect(paint.stops[1]?.offset).toBe(1);
+            expect(paint.blend_mode).toBe("normal");
+            expect(paint.opacity).toBe(1);
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips RadialGradientPaint fill_paints on RectangleNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fill_paints: [
-              {
-                type: "radial_gradient",
-                transform: [
-                  [1, 0, 0],
-                  [0, 1, 0],
-                ],
-                stops: [
-                  {
-                    offset: 0,
-                    color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 0.5,
-                    color: { r: 0, g: 1, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 1,
-                    color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F,
-                  },
-                ],
-                blend_mode: "multiply",
-                opacity: 0.8,
-                active: true,
-              } satisfies cg.RadialGradientPaint,
-            ],
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          fill_paints: [
+            {
+              type: "radial_gradient",
+              transform: [
+                [1, 0, 0],
+                [0, 1, 0],
+              ],
+              stops: [
+                { offset: 0, color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F },
+                {
+                  offset: 0.5,
+                  color: { r: 0, g: 1, b: 0, a: 1 } as cg.RGBA32F,
+                },
+                { offset: 1, color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "multiply",
+              opacity: 0.8,
+              active: true,
+            } satisfies cg.RadialGradientPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectNode.type).toBe("rectangle");
-      expect(rectNode.fill_paints).toBeDefined();
-      expect(rectNode.fill_paints?.length).toBe(1);
-      const paint = rectNode.fill_paints?.[0];
-      expect(paint?.type).toBe("radial_gradient");
-      if (paint && paint.type === "radial_gradient") {
-        expect(paint.stops.length).toBe(3);
-        expect(paint.stops[0]?.offset).toBe(0);
-        expect(paint.stops[1]?.offset).toBe(0.5);
-        expect(paint.stops[2]?.offset).toBe(1);
-        expect(paint.stops[0]?.color.r).toBe(1);
-        expect(paint.stops[1]?.color.g).toBe(1);
-        expect(paint.stops[2]?.color.b).toBe(1);
-        expect(paint.blend_mode).toBe("multiply");
-        expect(paint.opacity).toBeCloseTo(0.8);
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.fill_paints).toBeDefined();
+          expect(rectNode.fill_paints?.length).toBe(1);
+          const paint = rectNode.fill_paints?.[0];
+          expect(paint?.type).toBe("radial_gradient");
+          if (paint && paint.type === "radial_gradient") {
+            expect(paint.stops.length).toBe(3);
+            expect(paint.stops[0]?.offset).toBe(0);
+            expect(paint.stops[1]?.offset).toBe(0.5);
+            expect(paint.stops[2]?.offset).toBe(1);
+            expect(paint.stops[0]?.color.r).toBe(1);
+            expect(paint.stops[1]?.color.g).toBe(1);
+            expect(paint.stops[2]?.color.b).toBe(1);
+            expect(paint.blend_mode).toBe("multiply");
+            expect(paint.opacity).toBeCloseTo(0.8);
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips SweepGradientPaint fill_paints on RectangleNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fill_paints: [
-              {
-                type: "sweep_gradient",
-                transform: [
-                  [0.5, 0, 50],
-                  [0, 0.5, 50],
-                ],
-                stops: [
-                  {
-                    offset: 0,
-                    color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 1,
-                    color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F,
-                  },
-                ],
-                blend_mode: "screen",
-                opacity: 0.9,
-                active: true,
-              } satisfies cg.SweepGradientPaint,
-            ],
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          fill_paints: [
+            {
+              type: "sweep_gradient",
+              transform: [
+                [0.5, 0, 50],
+                [0, 0.5, 50],
+              ],
+              stops: [
+                { offset: 0, color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F },
+                { offset: 1, color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "screen",
+              opacity: 0.9,
+              active: true,
+            } satisfies cg.SweepGradientPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectNode.type).toBe("rectangle");
-      expect(rectNode.fill_paints).toBeDefined();
-      expect(rectNode.fill_paints?.length).toBe(1);
-      const paint = rectNode.fill_paints?.[0];
-      expect(paint?.type).toBe("sweep_gradient");
-      if (paint && paint.type === "sweep_gradient") {
-        expect(paint.stops.length).toBe(2);
-        expect(paint.stops[0]?.offset).toBe(0);
-        expect(paint.stops[1]?.offset).toBe(1);
-        expect(paint.stops[0]?.color.r).toBe(1);
-        expect(paint.stops[1]?.color.b).toBe(1);
-        expect(paint.blend_mode).toBe("screen");
-        expect(paint.opacity).toBeCloseTo(0.9);
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.fill_paints).toBeDefined();
+          expect(rectNode.fill_paints?.length).toBe(1);
+          const paint = rectNode.fill_paints?.[0];
+          expect(paint?.type).toBe("sweep_gradient");
+          if (paint && paint.type === "sweep_gradient") {
+            expect(paint.stops.length).toBe(2);
+            expect(paint.stops[0]?.offset).toBe(0);
+            expect(paint.stops[1]?.offset).toBe(1);
+            expect(paint.stops[0]?.color.r).toBe(1);
+            expect(paint.stops[1]?.color.b).toBe(1);
+            expect(paint.blend_mode).toBe("screen");
+            expect(paint.opacity).toBeCloseTo(0.9);
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips DiamondGradientPaint fill_paints on RectangleNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fill_paints: [
-              {
-                type: "diamond_gradient",
-                transform: [
-                  [1, 0.5, 0],
-                  [0.5, 1, 0],
-                ],
-                stops: [
-                  {
-                    offset: 0,
-                    color: { r: 1, g: 1, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 0.5,
-                    color: { r: 0, g: 1, b: 1, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 1,
-                    color: { r: 1, g: 0, b: 1, a: 1 } as cg.RGBA32F,
-                  },
-                ],
-                blend_mode: "overlay",
-                opacity: 0.75,
-                active: true,
-              } satisfies cg.DiamondGradientPaint,
-            ],
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          fill_paints: [
+            {
+              type: "diamond_gradient",
+              transform: [
+                [1, 0.5, 0],
+                [0.5, 1, 0],
+              ],
+              stops: [
+                { offset: 0, color: { r: 1, g: 1, b: 0, a: 1 } as cg.RGBA32F },
+                {
+                  offset: 0.5,
+                  color: { r: 0, g: 1, b: 1, a: 1 } as cg.RGBA32F,
+                },
+                { offset: 1, color: { r: 1, g: 0, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "overlay",
+              opacity: 0.75,
+              active: true,
+            } satisfies cg.DiamondGradientPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectNode.type).toBe("rectangle");
-      expect(rectNode.fill_paints).toBeDefined();
-      expect(rectNode.fill_paints?.length).toBe(1);
-      const paint = rectNode.fill_paints?.[0];
-      expect(paint?.type).toBe("diamond_gradient");
-      if (paint && paint.type === "diamond_gradient") {
-        expect(paint.stops.length).toBe(3);
-        expect(paint.stops[0]?.offset).toBe(0);
-        expect(paint.stops[1]?.offset).toBe(0.5);
-        expect(paint.stops[2]?.offset).toBe(1);
-        expect(paint.stops[0]?.color.r).toBe(1);
-        expect(paint.stops[0]?.color.g).toBe(1);
-        expect(paint.stops[1]?.color.g).toBe(1);
-        expect(paint.stops[1]?.color.b).toBe(1);
-        expect(paint.stops[2]?.color.r).toBe(1);
-        expect(paint.stops[2]?.color.b).toBe(1);
-        expect(paint.blend_mode).toBe("overlay");
-        expect(paint.opacity).toBeCloseTo(0.75);
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.fill_paints).toBeDefined();
+          expect(rectNode.fill_paints?.length).toBe(1);
+          const paint = rectNode.fill_paints?.[0];
+          expect(paint?.type).toBe("diamond_gradient");
+          if (paint && paint.type === "diamond_gradient") {
+            expect(paint.stops.length).toBe(3);
+            expect(paint.stops[0]?.offset).toBe(0);
+            expect(paint.stops[1]?.offset).toBe(0.5);
+            expect(paint.stops[2]?.offset).toBe(1);
+            expect(paint.stops[0]?.color.r).toBe(1);
+            expect(paint.stops[0]?.color.g).toBe(1);
+            expect(paint.stops[1]?.color.g).toBe(1);
+            expect(paint.stops[1]?.color.b).toBe(1);
+            expect(paint.stops[2]?.color.r).toBe(1);
+            expect(paint.stops[2]?.color.b).toBe(1);
+            expect(paint.blend_mode).toBe("overlay");
+            expect(paint.opacity).toBeCloseTo(0.75);
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips empty fill_paints (undefined) on RectangleNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            // fill_paints is undefined
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.fill_paints).toBeUndefined();
+        }
+      );
+    });
+  });
 
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectNode = node satisfies grida.program.nodes.RectangleNode;
+  describe("rectangular stroke width", () => {
+    it("roundtrips RectangleNode with rectangular_stroke_width fields", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_target_width: 100,
+          layout_target_height: 200,
+          stroke_width: 2,
+          rectangular_stroke_width_top: 4,
+          rectangular_stroke_width_right: 6,
+          rectangular_stroke_width_bottom: 8,
+          rectangular_stroke_width_left: 10,
+          stroke_cap: "round",
+          stroke_join: "round",
+        },
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.rectangular_stroke_width_top).toBe(4);
+          expect(rectNode.rectangular_stroke_width_right).toBe(6);
+          expect(rectNode.rectangular_stroke_width_bottom).toBe(8);
+          expect(rectNode.rectangular_stroke_width_left).toBe(10);
+        }
+      );
+    });
 
-      expect(rectNode.type).toBe("rectangle");
-      // fill_paints should be undefined when not set
-      expect(rectNode.fill_paints).toBeUndefined();
+    it("roundtrips RectangleNode with only stroke_width (fallback to rectangular)", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_target_width: 100,
+          layout_target_height: 200,
+          stroke_width: 5,
+          stroke_cap: "round",
+          stroke_join: "round",
+        },
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.rectangular_stroke_width_top).toBe(5);
+          expect(rectNode.rectangular_stroke_width_right).toBe(5);
+          expect(rectNode.rectangular_stroke_width_bottom).toBe(5);
+          expect(rectNode.rectangular_stroke_width_left).toBe(5);
+        }
+      );
+    });
+
+    it("roundtrips ContainerNode with rectangular_stroke_width fields", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          layout_target_width: 100,
+          layout_target_height: 200,
+          stroke_width: 3,
+          rectangular_stroke_width_top: 5,
+          rectangular_stroke_width_right: 7,
+          rectangular_stroke_width_bottom: 9,
+          rectangular_stroke_width_left: 11,
+          stroke_cap: "round",
+          stroke_join: "round",
+        },
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (containerNode) => {
+          expect(containerNode.type).toBe("container");
+          expect(containerNode.rectangular_stroke_width_top).toBe(5);
+          expect(containerNode.rectangular_stroke_width_right).toBe(7);
+          expect(containerNode.rectangular_stroke_width_bottom).toBe(9);
+          expect(containerNode.rectangular_stroke_width_left).toBe(11);
+        }
+      );
     });
   });
 
@@ -2724,103 +1842,53 @@ describe("format roundtrip", () => {
     it("roundtrips ImagePaint fill_paints on ContainerNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "container",
-            id: nodeId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            layout_mode: "flow",
-            layout_direction: "horizontal",
-            layout_main_axis_alignment: "start",
-            layout_cross_axis_alignment: "start",
-            layout_main_axis_gap: 0,
-            layout_cross_axis_gap: 0,
-            layout_padding_top: 0,
-            layout_padding_right: 0,
-            layout_padding_bottom: 0,
-            layout_padding_left: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fill_paints: [
-              {
-                type: "image",
-                src: "https://example.com/image.png",
-                fit: "cover",
-                blend_mode: "normal",
-                opacity: 1,
-                active: true,
-                filters: {
-                  exposure: 0.5,
-                  contrast: 0.3,
-                  saturation: 0.2,
-                  temperature: 0.1,
-                  tint: 0.0,
-                  highlights: 0.0,
-                  shadows: 0.0,
-                },
-              } satisfies cg.ImagePaint,
-            ],
-          } satisfies grida.program.nodes.ContainerNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          fill_paints: [
+            {
+              type: "image",
+              src: "https://example.com/image.png",
+              fit: "cover",
+              blend_mode: "normal",
+              opacity: 1,
+              active: true,
+              filters: {
+                exposure: 0.5,
+                contrast: 0.3,
+                saturation: 0.2,
+                temperature: 0.1,
+                tint: 0.0,
+                highlights: 0.0,
+                shadows: 0.0,
+              },
+            } satisfies cg.ImagePaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      const containerNode = node satisfies grida.program.nodes.ContainerNode;
-
-      expect(containerNode.type).toBe("container");
-      expect(containerNode.fill_paints).toBeDefined();
-      expect(containerNode.fill_paints?.length).toBe(1);
-      const paint = containerNode.fill_paints?.[0];
-      expect(paint?.type).toBe("image");
-      if (paint && paint.type === "image") {
-        // TODO: ImagePaint decoding is not fully implemented (src decoding from ResourceRef)
-        // For now, verify that the paint structure is preserved
-        expect(paint.fit).toBe("cover");
-        expect(paint.blend_mode).toBe("normal");
-        expect(paint.opacity).toBe(1);
-        expect(paint.active).toBe(true);
-        // Verify filters are decoded (use toBeCloseTo for float precision)
-        expect(paint.filters).toBeDefined();
-        expect(paint.filters?.exposure).toBeCloseTo(0.5);
-        expect(paint.filters?.contrast).toBeCloseTo(0.3);
-        expect(paint.filters?.saturation).toBeCloseTo(0.2);
-        expect(paint.filters?.temperature).toBeCloseTo(0.1);
-      }
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (containerNode) => {
+          expect(containerNode.type).toBe("container");
+          expect(containerNode.fill_paints).toBeDefined();
+          expect(containerNode.fill_paints?.length).toBe(1);
+          const paint = containerNode.fill_paints?.[0];
+          expect(paint?.type).toBe("image");
+          if (paint && paint.type === "image") {
+            expect(paint.fit).toBe("cover");
+            expect(paint.blend_mode).toBe("normal");
+            expect(paint.opacity).toBe(1);
+            expect(paint.active).toBe(true);
+            expect(paint.filters).toBeDefined();
+            expect(paint.filters?.exposure).toBeCloseTo(0.5);
+            expect(paint.filters?.contrast).toBeCloseTo(0.3);
+            expect(paint.filters?.saturation).toBeCloseTo(0.2);
+            expect(paint.filters?.temperature).toBeCloseTo(0.1);
+          }
+        }
+      );
     });
   });
 
@@ -2828,552 +1896,320 @@ describe("format roundtrip", () => {
     it("roundtrips SolidPaint stroke_paints on RectangleNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 2,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            stroke_paints: [
-              {
-                type: "solid",
-                color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
-                blend_mode: "normal",
-                active: true,
-              } satisfies cg.SolidPaint,
-            ],
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          stroke_width: 2,
+          stroke_paints: [
+            {
+              type: "solid",
+              color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
+              blend_mode: "normal",
+              active: true,
+            } satisfies cg.SolidPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectNode.type).toBe("rectangle");
-      expect(rectNode.stroke_paints).toBeDefined();
-      expect(rectNode.stroke_paints?.length).toBe(1);
-      const paint = rectNode.stroke_paints?.[0];
-      expect(paint?.type).toBe("solid");
-      if (paint && paint.type === "solid") {
-        expect(paint.color.r).toBe(1);
-        expect(paint.color.g).toBe(0);
-        expect(paint.color.b).toBe(0);
-        expect(paint.color.a).toBe(1);
-        expect(paint.blend_mode).toBe("normal");
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.stroke_paints).toBeDefined();
+          expect(rectNode.stroke_paints?.length).toBe(1);
+          const paint = rectNode.stroke_paints?.[0];
+          expect(paint?.type).toBe("solid");
+          if (paint && paint.type === "solid") {
+            expect(paint.color.r).toBe(1);
+            expect(paint.color.g).toBe(0);
+            expect(paint.color.b).toBe(0);
+            expect(paint.color.a).toBe(1);
+            expect(paint.blend_mode).toBe("normal");
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips LinearGradientPaint stroke_paints on RectangleNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 10,
-            layout_inset_top: 20,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 3,
-            stroke_cap: "round",
-            stroke_join: "round",
-            stroke_paints: [
-              {
-                type: "linear_gradient",
-                transform: [
-                  [1, 0, 0],
-                  [0, 1, 0],
-                ],
-                stops: [
-                  {
-                    offset: 0,
-                    color: { r: 0, g: 1, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 1,
-                    color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F,
-                  },
-                ],
-                blend_mode: "normal",
-                opacity: 1,
-                active: true,
-              } satisfies cg.LinearGradientPaint,
-            ],
-          } satisfies grida.program.nodes.RectangleNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          stroke_width: 3,
+          stroke_cap: "round",
+          stroke_join: "round",
+          stroke_paints: [
+            {
+              type: "linear_gradient",
+              transform: [
+                [1, 0, 0],
+                [0, 1, 0],
+              ],
+              stops: [
+                { offset: 0, color: { r: 0, g: 1, b: 0, a: 1 } as cg.RGBA32F },
+                { offset: 1, color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "normal",
+              opacity: 1,
+              active: true,
+            } satisfies cg.LinearGradientPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectNode.type).toBe("rectangle");
-      expect(rectNode.stroke_paints).toBeDefined();
-      expect(rectNode.stroke_paints?.length).toBe(1);
-      const paint = rectNode.stroke_paints?.[0];
-      expect(paint?.type).toBe("linear_gradient");
-      if (paint && paint.type === "linear_gradient") {
-        expect(paint.stops.length).toBe(2);
-        expect(paint.stops[0]?.offset).toBe(0);
-        expect(paint.stops[1]?.offset).toBe(1);
-        expect(paint.stops[0]?.color.g).toBe(1);
-        expect(paint.stops[1]?.color.b).toBe(1);
-        expect(paint.blend_mode).toBe("normal");
-        expect(paint.opacity).toBe(1);
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.stroke_paints).toBeDefined();
+          expect(rectNode.stroke_paints?.length).toBe(1);
+          const paint = rectNode.stroke_paints?.[0];
+          expect(paint?.type).toBe("linear_gradient");
+          if (paint && paint.type === "linear_gradient") {
+            expect(paint.stops.length).toBe(2);
+            expect(paint.stops[0]?.offset).toBe(0);
+            expect(paint.stops[1]?.offset).toBe(1);
+            expect(paint.stops[0]?.color.g).toBe(1);
+            expect(paint.stops[1]?.color.b).toBe(1);
+            expect(paint.blend_mode).toBe("normal");
+            expect(paint.opacity).toBe(1);
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips RadialGradientPaint stroke_paints on EllipseNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "ellipse",
-            id: nodeId,
-            name: "Ellipse",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            angle_offset: 0,
-            angle: 0,
-            inner_radius: 0,
-            stroke_width: 4,
-            stroke_cap: "round",
-            stroke_join: "round",
-            stroke_paints: [
-              {
-                type: "radial_gradient",
-                transform: [
-                  [1, 0, 0],
-                  [0, 1, 0],
-                ],
-                stops: [
-                  {
-                    offset: 0,
-                    color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 1,
-                    color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F,
-                  },
-                ],
-                blend_mode: "multiply",
-                opacity: 0.8,
-                active: true,
-              } satisfies cg.RadialGradientPaint,
-            ],
-          } satisfies grida.program.nodes.EllipseNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseEllipse(nodeId),
+          layout_target_width: 100,
+          layout_target_height: 100,
+          angle: 0,
+          stroke_width: 4,
+          stroke_cap: "round",
+          stroke_join: "round",
+          stroke_paints: [
+            {
+              type: "radial_gradient",
+              transform: [
+                [1, 0, 0],
+                [0, 1, 0],
+              ],
+              stops: [
+                { offset: 0, color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F },
+                { offset: 1, color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "multiply",
+              opacity: 0.8,
+              active: true,
+            } satisfies cg.RadialGradientPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "ellipse")
-        throw new Error("Expected ellipse node");
-      const ellipseNode = node satisfies grida.program.nodes.EllipseNode;
-
-      expect(ellipseNode.type).toBe("ellipse");
-      expect(ellipseNode.stroke_paints).toBeDefined();
-      expect(ellipseNode.stroke_paints?.length).toBe(1);
-      const paint = ellipseNode.stroke_paints?.[0];
-      expect(paint?.type).toBe("radial_gradient");
-      if (paint && paint.type === "radial_gradient") {
-        expect(paint.stops.length).toBe(2);
-        expect(paint.stops[0]?.offset).toBe(0);
-        expect(paint.stops[1]?.offset).toBe(1);
-        expect(paint.stops[0]?.color.r).toBe(1);
-        expect(paint.stops[1]?.color.b).toBe(1);
-        expect(paint.blend_mode).toBe("multiply");
-        expect(paint.opacity).toBeCloseTo(0.8);
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.EllipseNode>(
+        doc,
+        nodeId,
+        "ellipse",
+        (ellipseNode) => {
+          expect(ellipseNode.type).toBe("ellipse");
+          expect(ellipseNode.stroke_paints).toBeDefined();
+          expect(ellipseNode.stroke_paints?.length).toBe(1);
+          const paint = ellipseNode.stroke_paints?.[0];
+          expect(paint?.type).toBe("radial_gradient");
+          if (paint && paint.type === "radial_gradient") {
+            expect(paint.stops.length).toBe(2);
+            expect(paint.stops[0]?.offset).toBe(0);
+            expect(paint.stops[1]?.offset).toBe(1);
+            expect(paint.stops[0]?.color.r).toBe(1);
+            expect(paint.stops[1]?.color.b).toBe(1);
+            expect(paint.blend_mode).toBe("multiply");
+            expect(paint.opacity).toBeCloseTo(0.8);
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips SweepGradientPaint stroke_paints on VectorNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "vector",
-            id: nodeId,
-            name: "Vector",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            corner_radius: 0,
-            stroke_width: 2,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            vector_network: {
-              vertices: [
-                [0, 0],
-                [100, 0],
-                [100, 100],
-                [0, 100],
-              ],
-              segments: [
-                { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
-                { a: 1, b: 2, ta: [0, 0], tb: [0, 0] },
-                { a: 2, b: 3, ta: [0, 0], tb: [0, 0] },
-                { a: 3, b: 0, ta: [0, 0], tb: [0, 0] },
-              ],
-            },
-            stroke_paints: [
-              {
-                type: "sweep_gradient",
-                transform: [
-                  [0.5, 0, 50],
-                  [0, 0.5, 50],
-                ],
-                stops: [
-                  {
-                    offset: 0,
-                    color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 1,
-                    color: { r: 0, g: 1, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                ],
-                blend_mode: "screen",
-                opacity: 0.9,
-                active: true,
-              } satisfies cg.SweepGradientPaint,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseVector(nodeId),
+          stroke_width: 2,
+          vector_network: {
+            vertices: [
+              [0, 0],
+              [100, 0],
+              [100, 100],
+              [0, 100],
             ],
-          } satisfies grida.program.nodes.VectorNode,
+            segments: [
+              { a: 0, b: 1, ta: [0, 0], tb: [0, 0] },
+              { a: 1, b: 2, ta: [0, 0], tb: [0, 0] },
+              { a: 2, b: 3, ta: [0, 0], tb: [0, 0] },
+              { a: 3, b: 0, ta: [0, 0], tb: [0, 0] },
+            ],
+          },
+          stroke_paints: [
+            {
+              type: "sweep_gradient",
+              transform: [
+                [0.5, 0, 50],
+                [0, 0.5, 50],
+              ],
+              stops: [
+                { offset: 0, color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F },
+                { offset: 1, color: { r: 0, g: 1, b: 0, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "screen",
+              opacity: 0.9,
+              active: true,
+            } satisfies cg.SweepGradientPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "vector")
-        throw new Error("Expected vector node");
-      const vectorNode = node satisfies grida.program.nodes.VectorNode;
-
-      expect(vectorNode.type).toBe("vector");
-      expect(vectorNode.stroke_paints).toBeDefined();
-      expect(vectorNode.stroke_paints?.length).toBe(1);
-      const paint = vectorNode.stroke_paints?.[0];
-      expect(paint?.type).toBe("sweep_gradient");
-      if (paint && paint.type === "sweep_gradient") {
-        expect(paint.stops.length).toBe(2);
-        expect(paint.stops[0]?.offset).toBe(0);
-        expect(paint.stops[1]?.offset).toBe(1);
-        expect(paint.stops[0]?.color.r).toBe(1);
-        expect(paint.stops[1]?.color.g).toBe(1);
-        expect(paint.blend_mode).toBe("screen");
-        expect(paint.opacity).toBeCloseTo(0.9);
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.VectorNode>(
+        doc,
+        nodeId,
+        "vector",
+        (vectorNode) => {
+          expect(vectorNode.type).toBe("vector");
+          expect(vectorNode.stroke_paints).toBeDefined();
+          expect(vectorNode.stroke_paints?.length).toBe(1);
+          const paint = vectorNode.stroke_paints?.[0];
+          expect(paint?.type).toBe("sweep_gradient");
+          if (paint && paint.type === "sweep_gradient") {
+            expect(paint.stops.length).toBe(2);
+            expect(paint.stops[0]?.offset).toBe(0);
+            expect(paint.stops[1]?.offset).toBe(1);
+            expect(paint.stops[0]?.color.r).toBe(1);
+            expect(paint.stops[1]?.color.g).toBe(1);
+            expect(paint.blend_mode).toBe("screen");
+            expect(paint.opacity).toBeCloseTo(0.9);
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips DiamondGradientPaint stroke_paints on BooleanOperationNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "boolean",
-            id: nodeId,
-            name: "Boolean",
-            active: true,
-            locked: false,
-            opacity: 1,
-
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            op: "union",
-            corner_radius: 0,
-            stroke_width: 3,
-            stroke_cap: "square",
-            stroke_join: "bevel",
-            stroke_paints: [
-              {
-                type: "diamond_gradient",
-                transform: [
-                  [1, 0.5, 0],
-                  [0.5, 1, 0],
-                ],
-                stops: [
-                  {
-                    offset: 0,
-                    color: { r: 1, g: 1, b: 0, a: 1 } as cg.RGBA32F,
-                  },
-                  {
-                    offset: 1,
-                    color: { r: 1, g: 0, b: 1, a: 1 } as cg.RGBA32F,
-                  },
-                ],
-                blend_mode: "overlay",
-                opacity: 0.75,
-                active: true,
-              } satisfies cg.DiamondGradientPaint,
-            ],
-          } satisfies grida.program.nodes.BooleanPathOperationNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseBoolean(nodeId),
+          stroke_width: 3,
+          stroke_cap: "square",
+          stroke_join: "bevel",
+          stroke_paints: [
+            {
+              type: "diamond_gradient",
+              transform: [
+                [1, 0.5, 0],
+                [0.5, 1, 0],
+              ],
+              stops: [
+                { offset: 0, color: { r: 1, g: 1, b: 0, a: 1 } as cg.RGBA32F },
+                { offset: 1, color: { r: 1, g: 0, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "overlay",
+              opacity: 0.75,
+              active: true,
+            } satisfies cg.DiamondGradientPaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "boolean")
-        throw new Error("Expected boolean node");
-      const boolNode =
-        node satisfies grida.program.nodes.BooleanPathOperationNode;
-
-      expect(boolNode.type).toBe("boolean");
-      expect(boolNode.stroke_paints).toBeDefined();
-      expect(boolNode.stroke_paints?.length).toBe(1);
-      const paint = boolNode.stroke_paints?.[0];
-      expect(paint?.type).toBe("diamond_gradient");
-      if (paint && paint.type === "diamond_gradient") {
-        expect(paint.stops.length).toBe(2);
-        expect(paint.stops[0]?.offset).toBe(0);
-        expect(paint.stops[1]?.offset).toBe(1);
-        expect(paint.stops[0]?.color.r).toBe(1);
-        expect(paint.stops[0]?.color.g).toBe(1);
-        expect(paint.stops[1]?.color.r).toBe(1);
-        expect(paint.stops[1]?.color.b).toBe(1);
-        expect(paint.blend_mode).toBe("overlay");
-        expect(paint.opacity).toBeCloseTo(0.75);
-        expect(paint.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.BooleanPathOperationNode>(
+        doc,
+        nodeId,
+        "boolean",
+        (boolNode) => {
+          expect(boolNode.type).toBe("boolean");
+          expect(boolNode.stroke_paints).toBeDefined();
+          expect(boolNode.stroke_paints?.length).toBe(1);
+          const paint = boolNode.stroke_paints?.[0];
+          expect(paint?.type).toBe("diamond_gradient");
+          if (paint && paint.type === "diamond_gradient") {
+            expect(paint.stops.length).toBe(2);
+            expect(paint.stops[0]?.offset).toBe(0);
+            expect(paint.stops[1]?.offset).toBe(1);
+            expect(paint.stops[0]?.color.r).toBe(1);
+            expect(paint.stops[0]?.color.g).toBe(1);
+            expect(paint.stops[1]?.color.r).toBe(1);
+            expect(paint.stops[1]?.color.b).toBe(1);
+            expect(paint.blend_mode).toBe("overlay");
+            expect(paint.opacity).toBeCloseTo(0.75);
+            expect(paint.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips ImagePaint stroke_paints on ContainerNode", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "container",
-            id: nodeId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            layout_mode: "flow",
-            layout_direction: "horizontal",
-            layout_main_axis_alignment: "start",
-            layout_cross_axis_alignment: "start",
-            layout_main_axis_gap: 0,
-            layout_cross_axis_gap: 0,
-            layout_padding_top: 0,
-            layout_padding_right: 0,
-            layout_padding_bottom: 0,
-            layout_padding_left: 0,
-            stroke_width: 2,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            stroke_paints: [
-              {
-                type: "image",
-                src: "https://example.com/stroke.png",
-                fit: "fill",
-                blend_mode: "normal",
-                opacity: 1,
-                active: true,
-                filters: {
-                  exposure: 0.2,
-                  contrast: 0.1,
-                  saturation: 0.0,
-                  temperature: 0.0,
-                  tint: 0.0,
-                  highlights: 0.0,
-                  shadows: 0.0,
-                },
-              } satisfies cg.ImagePaint,
-            ],
-          } satisfies grida.program.nodes.ContainerNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          stroke_width: 2,
+          stroke_paints: [
+            {
+              type: "image",
+              src: "https://example.com/stroke.png",
+              fit: "fill",
+              blend_mode: "normal",
+              opacity: 1,
+              active: true,
+              filters: {
+                exposure: 0.2,
+                contrast: 0.1,
+                saturation: 0.0,
+                temperature: 0.0,
+                tint: 0.0,
+                highlights: 0.0,
+                shadows: 0.0,
+              },
+            } satisfies cg.ImagePaint,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      const containerNode = node satisfies grida.program.nodes.ContainerNode;
-
-      expect(containerNode.type).toBe("container");
-      expect(containerNode.stroke_paints).toBeDefined();
-      expect(containerNode.stroke_paints?.length).toBe(1);
-      const paint = containerNode.stroke_paints?.[0];
-      expect(paint?.type).toBe("image");
-      if (paint && paint.type === "image") {
-        // TODO: ImagePaint decoding is not fully implemented (src decoding from ResourceRef)
-        // Currently hardcoded to "cover" in decode function
-        expect(paint.fit).toBe("cover");
-        expect(paint.blend_mode).toBe("normal");
-        expect(paint.opacity).toBe(1);
-        expect(paint.active).toBe(true);
-        // Verify filters are decoded
-        expect(paint.filters).toBeDefined();
-        expect(paint.filters?.exposure).toBeCloseTo(0.2);
-        expect(paint.filters?.contrast).toBeCloseTo(0.1);
-      }
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (containerNode) => {
+          expect(containerNode.type).toBe("container");
+          expect(containerNode.stroke_paints).toBeDefined();
+          expect(containerNode.stroke_paints?.length).toBe(1);
+          const paint = containerNode.stroke_paints?.[0];
+          expect(paint?.type).toBe("image");
+          if (paint && paint.type === "image") {
+            expect(paint.fit).toBe("cover");
+            expect(paint.blend_mode).toBe("normal");
+            expect(paint.opacity).toBe(1);
+            expect(paint.active).toBe(true);
+            expect(paint.filters).toBeDefined();
+            expect(paint.filters?.exposure).toBeCloseTo(0.2);
+            expect(paint.filters?.contrast).toBeCloseTo(0.1);
+          }
+        }
+      );
     });
   });
 
@@ -3381,454 +2217,173 @@ describe("format roundtrip", () => {
     it("roundtrips ContainerNode with fe_blur effect", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          fe_blur: {
+            type: "filter-blur",
+            blur: { type: "blur", radius: 10 },
             active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "container",
-            id: nodeId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            layout_mode: "flow",
-            layout_direction: "horizontal",
-            layout_main_axis_alignment: "start",
-            layout_cross_axis_alignment: "start",
-            layout_main_axis_gap: 0,
-            layout_cross_axis_gap: 0,
-            layout_padding_top: 0,
-            layout_padding_right: 0,
-            layout_padding_bottom: 0,
-            layout_padding_left: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fe_blur: {
-              type: "filter-blur",
-              blur: {
-                type: "blur",
-                radius: 10,
-              },
-              active: true,
-            } satisfies cg.FeLayerBlur,
-          } satisfies grida.program.nodes.ContainerNode,
+          } satisfies cg.FeLayerBlur,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      const containerNode = node satisfies grida.program.nodes.ContainerNode;
-
-      expect(containerNode.type).toBe("container");
-      // TODO: Effects decoding is not fully implemented yet
-      // Currently effects are encoded but not decoded
-      // This test verifies that encoding doesn't fail when effects are present
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (containerNode) => {
+          expect(containerNode.type).toBe("container");
+        }
+      );
     });
 
     it("roundtrips RectangleNode with fe_backdrop_blur effect", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_target_width: 100,
+          layout_target_height: 200,
+          fe_backdrop_blur: {
+            type: "backdrop-filter-blur",
+            blur: { type: "blur", radius: 5 },
             active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fe_backdrop_blur: {
-              type: "backdrop-filter-blur",
-              blur: {
-                type: "blur",
-                radius: 5,
-              },
-              active: true,
-            } satisfies cg.FeBackdropBlur,
-          } satisfies grida.program.nodes.RectangleNode,
+          } satisfies cg.FeBackdropBlur,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectangleNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectangleNode.type).toBe("rectangle");
-      // TODO: Effects decoding is not fully implemented yet
-      // Currently effects are encoded but not decoded
-      // This test verifies that encoding doesn't fail when effects are present
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectangleNode) => {
+          expect(rectangleNode.type).toBe("rectangle");
+        }
+      );
     });
 
     it("roundtrips ContainerNode with fe_shadows effect", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "container",
-            id: nodeId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            layout_mode: "flow",
-            layout_direction: "horizontal",
-            layout_main_axis_alignment: "start",
-            layout_cross_axis_alignment: "start",
-            layout_main_axis_gap: 0,
-            layout_cross_axis_gap: 0,
-            layout_padding_top: 0,
-            layout_padding_right: 0,
-            layout_padding_bottom: 0,
-            layout_padding_left: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fe_shadows: [
-              {
-                type: "shadow",
-                dx: 2,
-                dy: 4,
-                blur: 8,
-                spread: 0,
-                color: {
-                  r: 0,
-                  g: 0,
-                  b: 0,
-                  a: 0.5,
-                } as cg.RGBA32F,
-                active: true,
-              } satisfies cg.FeShadow,
-            ],
-          } satisfies grida.program.nodes.ContainerNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          fe_shadows: [
+            {
+              type: "shadow",
+              dx: 2,
+              dy: 4,
+              blur: 8,
+              spread: 0,
+              color: { r: 0, g: 0, b: 0, a: 0.5 } as cg.RGBA32F,
+              active: true,
+            } satisfies cg.FeShadow,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      const containerNode = node satisfies grida.program.nodes.ContainerNode;
-
-      expect(containerNode.type).toBe("container");
-      expect(containerNode.fe_shadows).toBeDefined();
-      expect(containerNode.fe_shadows?.length).toBe(1);
-      const shadow = containerNode.fe_shadows?.[0];
-      if (shadow) {
-        expect(shadow.type).toBe("shadow");
-        expect(shadow.dx).toBeCloseTo(2);
-        expect(shadow.dy).toBeCloseTo(4);
-        expect(shadow.blur).toBeCloseTo(8);
-        expect(shadow.spread).toBeCloseTo(0);
-        expect(shadow.color.r).toBeCloseTo(0);
-        expect(shadow.color.g).toBeCloseTo(0);
-        expect(shadow.color.b).toBeCloseTo(0);
-        expect(shadow.color.a).toBeCloseTo(0.5);
-        expect(shadow.active).toBe(true);
-      }
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (containerNode) => {
+          expect(containerNode.type).toBe("container");
+          expect(containerNode.fe_shadows).toBeDefined();
+          expect(containerNode.fe_shadows?.length).toBe(1);
+          const shadow = containerNode.fe_shadows?.[0];
+          if (shadow) {
+            expect(shadow.type).toBe("shadow");
+            expect(shadow.dx).toBeCloseTo(2);
+            expect(shadow.dy).toBeCloseTo(4);
+            expect(shadow.blur).toBeCloseTo(8);
+            expect(shadow.spread).toBeCloseTo(0);
+            expect(shadow.color.r).toBeCloseTo(0);
+            expect(shadow.color.g).toBeCloseTo(0);
+            expect(shadow.color.b).toBeCloseTo(0);
+            expect(shadow.color.a).toBeCloseTo(0.5);
+            expect(shadow.active).toBe(true);
+          }
+        }
+      );
     });
 
     it("roundtrips RectangleNode with fe_liquid_glass effect", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_target_width: 100,
+          layout_target_height: 200,
+          fe_liquid_glass: {
+            type: "glass",
+            light_intensity: 0.9,
+            light_angle: 45,
+            refraction: 0.8,
+            depth: 20,
+            dispersion: 0.5,
+            radius: 4,
             active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "rectangle",
-            id: nodeId,
-            name: "Rect",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 200,
-            rotation: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fe_liquid_glass: {
-              type: "glass",
-              light_intensity: 0.9,
-              light_angle: 45,
-              refraction: 0.8,
-              depth: 20,
-              dispersion: 0.5,
-              radius: 4,
-              active: true,
-            } satisfies cg.FeLiquidGlass,
-          } satisfies grida.program.nodes.RectangleNode,
+          } satisfies cg.FeLiquidGlass,
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "rectangle")
-        throw new Error("Expected rectangle node");
-      const rectangleNode = node satisfies grida.program.nodes.RectangleNode;
-
-      expect(rectangleNode.type).toBe("rectangle");
-      // TODO: Effects decoding is not fully implemented yet
-      // Currently effects are encoded but not decoded
-      // This test verifies that encoding doesn't fail when effects are present
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectangleNode) => {
+          expect(rectangleNode.type).toBe("rectangle");
+        }
+      );
     });
 
     it("roundtrips ContainerNode with fe_noises effect", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "container",
-            id: nodeId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            layout_mode: "flow",
-            layout_direction: "horizontal",
-            layout_main_axis_alignment: "start",
-            layout_cross_axis_alignment: "start",
-            layout_main_axis_gap: 0,
-            layout_cross_axis_gap: 0,
-            layout_padding_top: 0,
-            layout_padding_right: 0,
-            layout_padding_bottom: 0,
-            layout_padding_left: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-            fe_noises: [
-              {
-                type: "noise",
-                mode: "mono",
-                noise_size: 0.3,
-                density: 0.8,
-                num_octaves: 6,
-                seed: 42,
-                color: {
-                  r: 0,
-                  g: 0,
-                  b: 0,
-                  a: 0.15,
-                } as cg.RGBA32F,
-              } satisfies cg.FeNoise,
-            ],
-          } satisfies grida.program.nodes.ContainerNode,
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          fe_noises: [
+            {
+              type: "noise",
+              mode: "mono",
+              noise_size: 0.3,
+              density: 0.8,
+              num_octaves: 6,
+              seed: 42,
+              color: { r: 0, g: 0, b: 0, a: 0.15 } as cg.RGBA32F,
+            } satisfies cg.FeNoise,
+          ],
         },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      const containerNode = node satisfies grida.program.nodes.ContainerNode;
-
-      expect(containerNode.type).toBe("container");
-      // TODO: Effects decoding is not fully implemented yet
-      // Currently effects are encoded but not decoded
-      // This test verifies that encoding doesn't fail when effects are present
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (containerNode) => {
+          expect(containerNode.type).toBe("container");
+        }
+      );
     });
 
     it("roundtrips ContainerNode without effects", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";
-
-      const doc = {
-        nodes: {
-          [sceneId]: {
-            type: "scene",
-            id: sceneId,
-            name: "Scene",
-            active: true,
-            locked: false,
-            guides: [],
-            edges: [],
-            constraints: { children: "multiple" },
-          },
-          [nodeId]: {
-            type: "container",
-            id: nodeId,
-            name: "Container",
-            active: true,
-            locked: false,
-            clips_content: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            layout_mode: "flow",
-            layout_direction: "horizontal",
-            layout_main_axis_alignment: "start",
-            layout_cross_axis_alignment: "start",
-            layout_main_axis_gap: 0,
-            layout_cross_axis_gap: 0,
-            layout_padding_top: 0,
-            layout_padding_right: 0,
-            layout_padding_bottom: 0,
-            layout_padding_left: 0,
-            stroke_width: 0,
-            stroke_cap: "butt",
-            stroke_join: "miter",
-          } satisfies grida.program.nodes.ContainerNode,
-        },
-        links: { [sceneId]: [nodeId] },
-        scenes_ref: [sceneId],
-        entry_scene_id: sceneId,
-        images: {},
-        bitmaps: {},
-        properties: {},
-      } satisfies grida.program.document.Document;
-
-      const bytes = format.document.encode.toFlatbuffer(doc);
-      const decoded = format.document.decode.fromFlatbuffer(bytes);
-      const node = decoded.nodes[nodeId]!;
-      if (!node || node.type !== "container")
-        throw new Error("Expected container node");
-      const containerNode = node satisfies grida.program.nodes.ContainerNode;
-
-      expect(containerNode.type).toBe("container");
-      // Effects should be undefined when not set
-      expect(containerNode.fe_blur).toBeUndefined();
-      expect(containerNode.fe_backdrop_blur).toBeUndefined();
-      expect(containerNode.fe_shadows).toBeUndefined();
-      expect(containerNode.fe_liquid_glass).toBeUndefined();
-      expect(containerNode.fe_noises).toBeUndefined();
+      const doc = createDocument(sceneId, {
+        [nodeId]: baseContainer(nodeId),
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (containerNode) => {
+          expect(containerNode.type).toBe("container");
+          expect(containerNode.fe_blur).toBeUndefined();
+          expect(containerNode.fe_backdrop_blur).toBeUndefined();
+          expect(containerNode.fe_shadows).toBeUndefined();
+          expect(containerNode.fe_liquid_glass).toBeUndefined();
+          expect(containerNode.fe_noises).toBeUndefined();
+        }
+      );
     });
   });
 });
