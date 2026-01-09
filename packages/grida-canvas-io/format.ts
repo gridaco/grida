@@ -39,6 +39,38 @@ function isPaint(
   return true;
 }
 
+/**
+ * Normalizes paint arrays from legacy singular or plural properties.
+ * Uses the same logic as editor.resolvePaints: checks fill_paints/stroke_paints first,
+ * then falls back to fill/stroke (singular). Also handles fill_paint/stroke_paint for compatibility.
+ *
+ * @param node - The node containing paint properties (supports all node types)
+ * @param target - Whether to target "fill" or "stroke" paints
+ * @returns Array of valid paints, or undefined if none found
+ */
+function paints(
+  node: grida.program.nodes.Node,
+  target: "fill" | "stroke"
+): cg.Paint[] | undefined {
+  const pluralKey = target === "stroke" ? "stroke_paints" : "fill_paints";
+  const singularKey = target === "stroke" ? "stroke" : "fill";
+
+  // Check plural first (new format) - same logic as editor.resolvePaints
+  // Use type assertion to access properties that may exist on the node
+  const nodedyn = node as grida.program.nodes.UnknownNode;
+  if (Array.isArray(nodedyn[pluralKey])) {
+    const filtered = (nodedyn[pluralKey] as cg.Paint[]).filter(isPaint);
+    return filtered.length > 0 ? filtered : undefined;
+  }
+
+  // Fall back to singular (legacy format) - check both fill/stroke and fill_paint/stroke_paint
+  if (nodedyn[singularKey] && isPaint(nodedyn[singularKey])) {
+    return [nodedyn[singularKey]];
+  }
+
+  return undefined;
+}
+
 export namespace format {
   /**
    * Enum lookup maps for encoding/decoding between TS and FlatBuffers enums.
@@ -822,13 +854,13 @@ export namespace format {
           );
 
           // Encode fill_paints and stroke_paints BEFORE starting TextSpanNodeProperties
-          const fillPaintsFiltered = node.fill_paints?.filter(isPaint);
+          const fillPaintsFiltered = paints(node, "fill");
           const fillPaintsOffset = format.paint.encode.fillPaints(
             builder,
             fillPaintsFiltered,
             fbs.TextSpanNodeProperties.createFillPaintsVector
           );
-          const strokePaintsFiltered = node.stroke_paints?.filter(isPaint);
+          const strokePaintsFiltered = paints(node, "stroke");
           const strokePaintsOffset = format.paint.encode.strokePaints(
             builder,
             strokePaintsFiltered,
@@ -1275,13 +1307,13 @@ export namespace format {
           const strokeStyleOffset = fbs.StrokeStyle.endStrokeStyle(builder);
 
           // Encode paints as PaintStackItem arrays
-          const fillPaintsFiltered = shapeNode.fill_paints?.filter(isPaint);
+          const fillPaintsFiltered = paints(shapeNode, "fill");
           const fillPaintsOffset = format.paint.encode.fillPaints(
             builder,
             fillPaintsFiltered,
             fbs.BasicShapeNode.createFillPaintsVector
           );
-          const strokePaintsFiltered = shapeNode.stroke_paints?.filter(isPaint);
+          const strokePaintsFiltered = paints(shapeNode, "stroke");
           const strokePaintsOffset = format.paint.encode.strokePaints(
             builder,
             strokePaintsFiltered,
@@ -1431,15 +1463,13 @@ export namespace format {
                   containerNode.rectangular_corner_radius_bottom_right,
                 corner_smoothing: containerNode.corner_smoothing,
               });
-            const fillPaintsFiltered =
-              containerNode.fill_paints?.filter(isPaint);
+            const fillPaintsFiltered = paints(containerNode, "fill");
             const fillPaintsOffset = format.paint.encode.fillPaints(
               builder,
               fillPaintsFiltered,
               fbs.ContainerNode.createFillPaintsVector
             );
-            const strokePaintsFiltered =
-              containerNode.stroke_paints?.filter(isPaint);
+            const strokePaintsFiltered = paints(containerNode, "stroke");
             const strokePaintsOffset = format.paint.encode.strokePaints(
               builder,
               strokePaintsFiltered,
@@ -1474,8 +1504,7 @@ export namespace format {
                 stroke_cap: lineNode.stroke_cap,
                 stroke_join: lineNode.stroke_join,
               });
-            const strokePaintsFiltered =
-              lineNode.stroke_paints?.filter(isPaint);
+            const strokePaintsFiltered = paints(lineNode, "stroke");
             const strokePaintsOffset = format.paint.encode.strokePaints(
               builder,
               strokePaintsFiltered,
@@ -1529,14 +1558,13 @@ export namespace format {
                     : undefined,
               }
             );
-            const fillPaintsFiltered = vectorNode.fill_paints?.filter(isPaint);
+            const fillPaintsFiltered = paints(vectorNode, "fill");
             const fillPaintsOffset = format.paint.encode.fillPaints(
               builder,
               fillPaintsFiltered,
               fbs.VectorNode.createFillPaintsVector
             );
-            const strokePaintsFiltered =
-              vectorNode.stroke_paints?.filter(isPaint);
+            const strokePaintsFiltered = paints(vectorNode, "stroke");
             const strokePaintsOffset = format.paint.encode.strokePaints(
               builder,
               strokePaintsFiltered,
@@ -1583,14 +1611,13 @@ export namespace format {
                     : undefined,
               }
             );
-            const fillPaintsFiltered = booleanNode.fill_paints?.filter(isPaint);
+            const fillPaintsFiltered = paints(booleanNode, "fill");
             const fillPaintsOffset = format.paint.encode.fillPaints(
               builder,
               fillPaintsFiltered,
               fbs.BooleanOperationNode.createFillPaintsVector
             );
-            const strokePaintsFiltered =
-              booleanNode.stroke_paints?.filter(isPaint);
+            const strokePaintsFiltered = paints(booleanNode, "stroke");
             const strokePaintsOffset = format.paint.encode.strokePaints(
               builder,
               strokePaintsFiltered,
