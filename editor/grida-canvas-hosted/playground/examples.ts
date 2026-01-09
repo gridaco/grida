@@ -2,37 +2,37 @@ export const canvas_examples = [
   {
     id: "blank",
     name: "Blank",
-    url: `/examples/canvas/blank.grida`,
+    url: `/examples/canvas/blank.grida1`,
   },
   {
     id: "helloworld",
     name: "Helloworld",
-    url: `/examples/canvas/helloworld.grida`,
+    url: `/examples/canvas/helloworld.grida1`,
   },
   {
     id: "component-01",
     name: "Component 01",
-    url: `/examples/canvas/component-01.grida`,
+    url: `/examples/canvas/component-01.grida1`,
   },
   {
     id: "layout-01",
     name: "Layout 01",
-    url: `/examples/canvas/layout-01.grida`,
+    url: `/examples/canvas/layout-01.grida1`,
   },
   {
     id: "globals-01",
     name: "Globals 01",
-    url: `/examples/canvas/globals-01.grida`,
+    url: `/examples/canvas/globals-01.grida1`,
   },
   {
     id: "hero-main-demo",
     name: "Hero demo",
-    url: `/examples/canvas/hero-main-demo.grida`,
+    url: `/examples/canvas/hero-main-demo.grida1`,
   },
   {
     id: "poster-happy-new-year-2026",
     name: "Happy New Year 2026",
-    url: `/examples/canvas/poster-happy-new-year-2026.grida`,
+    url: `/examples/canvas/poster-happy-new-year-2026.grida1`,
   },
   {
     id: "with-templates/002",

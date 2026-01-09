@@ -435,6 +435,14 @@ export default function CanvasPlayground({
             try {
               const bytes = io.GRID.encode(file.document);
               await opfs.get("document.grida").write(bytes);
+              // Also write document.grida1 for migration purposes
+              const snapshotJson = io.snapshot.stringify({
+                version: file.version,
+                document: file.document,
+              });
+              await opfs
+                .get("document.grida1")
+                .write(new TextEncoder().encode(snapshotJson));
             } catch (error) {
               console.error("Failed to persist src to OPFS:", error);
             }
@@ -618,9 +626,18 @@ function Consumer({
     async () => {
       if (opfs) {
         try {
-          const document = instance.getSnapshot().document;
+          const snapshot = instance.getSnapshot();
+          const document = snapshot.document;
           const bytes = io.GRID.encode(document);
           await opfs.get("document.grida").write(bytes);
+          // Also write document.grida1 for migration purposes
+          const snapshotJson = io.snapshot.stringify({
+            version: undefined, // Version is optional in snapshot format
+            document: document,
+          });
+          await opfs
+            .get("document.grida1")
+            .write(new TextEncoder().encode(snapshotJson));
           onSaved();
           toast.success("Saved", {
             position: "bottom-left",

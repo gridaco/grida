@@ -583,7 +583,7 @@ class EditorDocumentStore
    * @example
    * ```ts
    * // Load a document from file
-   * const fileData = await fetch('/example.grida').then(r => r.json());
+   * const fileData = await fetch('/example.grida1').then(r => r.json());
    * editor.commands.reset(
    *   editor.state.init({
    *     editable: true,

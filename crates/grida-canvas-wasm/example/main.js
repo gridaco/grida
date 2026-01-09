@@ -41,7 +41,7 @@ init({
   grida.devtools_rendering_set_show_ruler(true);
 
   // Load the demo scene from JSON
-  fetch("./demo.grida")
+  fetch("./demo.grida1")
     .then((r) => r.text())
     .then((txt) => {
       grida.loadScene(txt);

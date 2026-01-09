@@ -873,6 +873,7 @@ export namespace io {
      * - ZIP archive containing:
      *   - `manifest.json`
      *   - `document.grida`
+     *   - `document.grida1` (legacy JSON snapshot for migration purposes)
      *   - optional `images/*`
      */
     export interface Manifest {
@@ -885,48 +886,49 @@ export namespace io {
       version?: string;
     }
 
-    export function pack(
-      document: grida.program.document.Document,
-      images?: Record<string, Uint8Array>,
-      schemaVersion?: string,
-      bitmaps?: Record<string, io.Bitmap>
-    ): Uint8Array;
-    export function pack(
-      fbBytes: Uint8Array,
-      images?: Record<string, Uint8Array>,
-      schemaVersion?: string,
-      bitmaps?: Record<string, io.Bitmap>
-    ): Uint8Array;
-
     /**
-     * Packs a `.grida` ZIP archive.
+     * Packs a `.grida` ZIP archive from a Grida document.
      *
-     * Accepts either:
-     * - a Grida document model (will be encoded to FlatBuffers)
-     * - raw FlatBuffers bytes (document.grida payload)
+     * The function:
+     * 1. Encodes the document to FlatBuffers binary format (`document.grida`)
+     * 2. Generates a JSON snapshot (`document.grida1`) for migration purposes
+     * 3. Packages everything into a ZIP archive with optional images and bitmaps
+     *
+     * @param document - The Grida document to pack
+     * @param images - Optional image assets to include in the archive
+     * @param schemaVersion - Optional schema version (defaults to current)
+     * @param bitmaps - Optional bitmap assets to include in the archive
+     * @returns Uint8Array containing the ZIP archive
      */
     export function pack(
-      documentOrFbBytes: grida.program.document.Document | Uint8Array,
+      document: grida.program.document.Document,
       images?: Record<string, Uint8Array>,
       schemaVersion: string = grida.program.document.SCHEMA_VERSION,
       bitmaps?: Record<string, io.Bitmap>
     ): Uint8Array {
+      // Extract bitmaps from document if not provided
       const inferredBitmaps: Record<string, io.Bitmap> | undefined =
-        bitmaps ??
-        (documentOrFbBytes instanceof Uint8Array
-          ? undefined
-          : ((documentOrFbBytes as any).bitmaps as Record<string, io.Bitmap>));
+        bitmaps ?? ((document as any).bitmaps as Record<string, io.Bitmap>);
 
-      const fbBytes =
-        documentOrFbBytes instanceof Uint8Array
-          ? documentOrFbBytes
-          : format.document.encode.toFlatbuffer(
-              {
-                ...(documentOrFbBytes as any),
-                bitmaps: {},
-              } as grida.program.document.Document,
-              schemaVersion
-            );
+      // Encode document to FlatBuffers binary
+      const fbBytes = format.document.encode.toFlatbuffer(
+        {
+          ...(document as any),
+          bitmaps: {},
+        } as grida.program.document.Document,
+        schemaVersion
+      );
+
+      // Generate document.grida1 (JSON snapshot) from document (for migration purposes)
+      const {
+        images: _images,
+        bitmaps: _bitmaps,
+        ...persistedDocument
+      } = document as any;
+      const snapshotJson = io.snapshot.stringify({
+        version: schemaVersion,
+        document: persistedDocument as grida.program.document.Document,
+      });
 
       const manifest: Manifest = {
         document_file: "document.grida",
@@ -936,6 +938,7 @@ export namespace io {
       const files: Record<string, Uint8Array> = {
         "manifest.json": strToU8(JSON.stringify(manifest)),
         "document.grida": fbBytes,
+        "document.grida1": strToU8(snapshotJson),
         ...(images &&
           Object.keys(images).length > 0 && { "images/": new Uint8Array() }), // Ensure folder exists
       };
@@ -1112,6 +1115,7 @@ export namespace io {
      *
      * Fixed structure within the directory:
      * - document.grida (raw FlatBuffers bytes)
+     * - document.grida1 (legacy JSON snapshot for migration purposes)
      * - thumbnail.png (reserved for future)
      * - images/ (reserved for future)
      */
@@ -1126,7 +1130,10 @@ export namespace io {
     /**
      * Strongly-typed file keys for Grida OPFS structure.
      */
-    export type FileKey = "document.grida" | "thumbnail.png";
+    export type FileKey =
+      | "document.grida"
+      | "document.grida1"
+      | "thumbnail.png";
 
     /**
      * File handle interface for OPFS file operations.

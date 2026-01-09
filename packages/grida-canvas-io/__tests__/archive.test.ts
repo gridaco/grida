@@ -1,4 +1,6 @@
 import { io } from "../index";
+import grida from "@grida/schema";
+import { unzipSync, strFromU8 } from "fflate";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -21,9 +23,26 @@ function createFile(filename: string, content: Uint8Array): File {
 
 describe("archive (.grida zip)", () => {
   const schemaVersion = "0.0.0-test+00000000";
-  // We don't validate FlatBuffers schema here; archive IO guarantees container structure
-  // and preserves payload bytes (document.grida + images).
-  const fbBytes = new Uint8Array([0, 1, 2, 3, 4, 5]);
+
+  // Helper to create a minimal test document
+  function createTestDocument(): grida.program.document.Document {
+    return {
+      nodes: {},
+      links: {},
+      scenes_ref: [],
+      entry_scene_id: undefined,
+      images: {},
+      bitmaps: {},
+      properties: {},
+    };
+  }
+
+  // Helper to get FlatBuffers bytes from a document for comparison
+  function getDocumentBytes(
+    document: grida.program.document.Document
+  ): Uint8Array {
+    return io.GRID.encode(document, schemaVersion);
+  }
 
   const fixtureDir = path.join(__dirname, "../../../fixtures/images");
   const fixtureImages: Record<string, Uint8Array> = {
@@ -47,7 +66,8 @@ describe("archive (.grida zip)", () => {
   }
 
   it("should pack/unpack archive without images", () => {
-    const packed = io.archive.pack(fbBytes, undefined, schemaVersion);
+    const document = createTestDocument();
+    const packed = io.archive.pack(document, undefined, schemaVersion);
     saveArtifact("archive-no-images", packed);
 
     // ZIP magic number
@@ -56,11 +76,13 @@ describe("archive (.grida zip)", () => {
 
     const unpacked = io.archive.unpack(packed);
     expect(unpacked.manifest.version).toBe(schemaVersion);
-    expect(bytesEqual(unpacked.document, fbBytes)).toBe(true);
+    const expectedBytes = getDocumentBytes(document);
+    expect(bytesEqual(unpacked.document, expectedBytes)).toBe(true);
     expect(unpacked.images).toEqual({});
   });
 
   it("should pack/unpack archive with mock images", () => {
+    const document = createTestDocument();
     const images: Record<string, Uint8Array> = {
       "photo.jpg": new Uint8Array([1, 2, 3, 4, 5]),
       "logo.png": new Uint8Array([6, 7, 8, 9, 10]),
@@ -68,7 +90,7 @@ describe("archive (.grida zip)", () => {
         60, 115, 118, 103, 62, 60, 47, 115, 118, 103, 62,
       ]),
     };
-    const packed = io.archive.pack(fbBytes, images, schemaVersion);
+    const packed = io.archive.pack(document, images, schemaVersion);
     saveArtifact("archive-mock-images", packed);
 
     const unpacked = io.archive.unpack(packed);
@@ -79,6 +101,7 @@ describe("archive (.grida zip)", () => {
   });
 
   it("should pack/unpack archive with bitmaps (png)", () => {
+    const document = createTestDocument();
     const bitmap: io.Bitmap = {
       version: 0,
       width: 2,
@@ -89,7 +112,7 @@ describe("archive (.grida zip)", () => {
       ]),
     };
 
-    const packed = io.archive.pack(fbBytes, undefined, schemaVersion, {
+    const packed = io.archive.pack(document, undefined, schemaVersion, {
       preview: bitmap,
     });
 
@@ -101,13 +124,14 @@ describe("archive (.grida zip)", () => {
   });
 
   it("should pack/unpack archive with real fixture images", () => {
+    const document = createTestDocument();
     const images = {
       "checker.png": fixtureImages["checker.png"],
       "stripes.png": fixtureImages["stripes.png"],
       "1024.jpg": fixtureImages["1024.jpg"],
       "512.jpg": fixtureImages["512.jpg"],
     };
-    const packed = io.archive.pack(fbBytes, images, schemaVersion);
+    const packed = io.archive.pack(document, images, schemaVersion);
     saveArtifact("archive-real-images", packed);
 
     const unpacked = io.archive.unpack(packed);
@@ -120,27 +144,31 @@ describe("archive (.grida zip)", () => {
   });
 
   it("should maintain data integrity through multiple pack/unpack cycles", () => {
+    const document = createTestDocument();
     const images = {
       "checker.png": fixtureImages["checker.png"],
       "stripes.png": fixtureImages["stripes.png"],
       "1024.jpg": fixtureImages["1024.jpg"],
     };
 
-    let currentDocBytes = fbBytes;
+    let currentDocument = document;
     let currentImages: Record<string, Uint8Array> = images;
 
     for (let i = 0; i < 3; i++) {
       const packed = io.archive.pack(
-        currentDocBytes,
+        currentDocument,
         currentImages,
         schemaVersion
       );
       const unpacked = io.archive.unpack(packed);
-      currentDocBytes = new Uint8Array(unpacked.document);
+      // Decode the document from FlatBuffers bytes
+      currentDocument = io.GRID.decode(unpacked.document);
       currentImages = unpacked.images;
     }
 
-    expect(bytesEqual(currentDocBytes, fbBytes)).toBe(true);
+    const expectedBytes = getDocumentBytes(document);
+    const finalBytes = getDocumentBytes(currentDocument);
+    expect(bytesEqual(finalBytes, expectedBytes)).toBe(true);
     expect(Object.keys(currentImages).sort()).toEqual(
       Object.keys(images).sort()
     );
@@ -150,19 +178,21 @@ describe("archive (.grida zip)", () => {
   });
 
   it("should handle empty images object", () => {
-    const packed = io.archive.pack(fbBytes, {}, schemaVersion);
+    const document = createTestDocument();
+    const packed = io.archive.pack(document, {}, schemaVersion);
     const unpacked = io.archive.unpack(packed);
     expect(unpacked.images).toEqual({});
   });
 
   it("should handle special characters in image filenames", () => {
+    const document = createTestDocument();
     const specialImages: Record<string, Uint8Array> = {
       "image with spaces.png": new Uint8Array([1, 2, 3, 4, 5]),
       "image-with-dashes.jpg": new Uint8Array([6, 7, 8, 9, 10]),
       "image_with_underscores.svg": new Uint8Array([11, 12, 13, 14, 15]),
       "image.with.dots.gif": new Uint8Array([16, 17, 18, 19, 20]),
     };
-    const packed = io.archive.pack(fbBytes, specialImages, schemaVersion);
+    const packed = io.archive.pack(document, specialImages, schemaVersion);
     const unpacked = io.archive.unpack(packed);
     expect(Object.keys(unpacked.images).sort()).toEqual(
       Object.keys(specialImages).sort()
@@ -173,12 +203,14 @@ describe("archive (.grida zip)", () => {
   });
 
   it("io.is_zip should detect .grida archives", async () => {
-    const packed = io.archive.pack(fbBytes, fixtureImages, schemaVersion);
+    const document = createTestDocument();
+    const packed = io.archive.pack(document, fixtureImages, schemaVersion);
     const file = createFile("test.grida", packed);
     await expect(io.is_zip(file)).resolves.toBe(true);
   });
 
   it("performance: should pack/unpack mixed real files efficiently", () => {
+    const document = createTestDocument();
     const mixedImages = {
       "checker.png": fixtureImages["checker.png"],
       "stripes.png": fixtureImages["stripes.png"],
@@ -187,7 +219,7 @@ describe("archive (.grida zip)", () => {
     };
 
     const start = Date.now();
-    const packed = io.archive.pack(fbBytes, mixedImages, schemaVersion);
+    const packed = io.archive.pack(document, mixedImages, schemaVersion);
     const unpacked = io.archive.unpack(packed);
     const end = Date.now();
 
@@ -196,6 +228,7 @@ describe("archive (.grida zip)", () => {
   });
 
   it("file size analysis: should produce non-empty archives", () => {
+    const document = createTestDocument();
     const pngFiles = {
       "checker.png": fixtureImages["checker.png"],
       "stripes.png": fixtureImages["stripes.png"],
@@ -209,12 +242,26 @@ describe("archive (.grida zip)", () => {
       "8k.jpg": fixtureImages["8k.jpg"],
     };
 
-    const pngPacked = io.archive.pack(fbBytes, pngFiles, schemaVersion);
-    const jpgPacked = io.archive.pack(fbBytes, jpgFiles, schemaVersion);
-    const largePacked = io.archive.pack(fbBytes, largeFiles, schemaVersion);
+    const pngPacked = io.archive.pack(document, pngFiles, schemaVersion);
+    const jpgPacked = io.archive.pack(document, jpgFiles, schemaVersion);
+    const largePacked = io.archive.pack(document, largeFiles, schemaVersion);
 
     expect(pngPacked.length).toBeGreaterThan(0);
     expect(jpgPacked.length).toBeGreaterThan(0);
     expect(largePacked.length).toBeGreaterThan(0);
+  });
+
+  it("should include document.grida1 in archive", () => {
+    const document = createTestDocument();
+    const packed = io.archive.pack(document, undefined, schemaVersion);
+    const files = unzipSync(packed);
+
+    expect(files["document.grida1"]).toBeDefined();
+    const snapshotJson = strFromU8(files["document.grida1"]);
+    const snapshot = JSON.parse(snapshotJson);
+    expect(snapshot.version).toBe(schemaVersion);
+    expect(snapshot.document).toBeDefined();
+    expect(snapshot.document.nodes).toEqual({});
+    expect(snapshot.document.links).toEqual({});
   });
 });

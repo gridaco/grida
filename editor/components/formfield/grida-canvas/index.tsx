@@ -48,7 +48,7 @@ export function GridaCanvasFormField() {
   //
 
   useEffect(() => {
-    fetch("/examples/canvas/blank.grida").then((res) => {
+    fetch("/examples/canvas/blank.grida1").then((res) => {
       res.json().then((file) => {
         instance.commands.reset(
           editor.state.init({
