@@ -2379,7 +2379,7 @@ describe("format roundtrip", () => {
             {
               type: "image",
               src: "https://example.com/stroke.png",
-              fit: "fill",
+              fit: "cover",
               blend_mode: "normal",
               opacity: 1,
               active: true,

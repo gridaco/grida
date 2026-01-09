@@ -2223,10 +2223,42 @@ export namespace format {
           // ImagePaint decoding is complex - for now return a placeholder
           // TODO: Implement full ImagePaint decoding (ResourceRef, ImagePaintFit, filters)
           const imagePaint = paintValue as fbs.ImagePaint;
+
+          // Decode src from ResourceRef
+          let src = "";
+          const imageType = imagePaint.imageType();
+          if (imageType === fbs.ResourceRef.ResourceRefRID) {
+            const resourceRef = imagePaint.image(
+              new fbs.ResourceRefRID()
+            ) as fbs.ResourceRefRID | null;
+            if (resourceRef) {
+              src = resourceRef.rid() ?? "";
+            }
+          }
+
+          // Decode fit from ImagePaintFit union
+          let fit: cg.BoxFit | "transform" | "tile" = "cover";
+          const fitType = imagePaint.fitType();
+          if (fitType === fbs.ImagePaintFit.ImagePaintFitFit) {
+            const fitFit = imagePaint.fit(
+              new fbs.ImagePaintFitFit()
+            ) as fbs.ImagePaintFitFit | null;
+            if (fitFit) {
+              const boxFit = fitFit.boxFit();
+              fit = enums.BOX_FIT_DECODE.get(boxFit) ?? "cover";
+            }
+          } else if (fitType === fbs.ImagePaintFit.ImagePaintFitTransform) {
+            fit = "transform";
+            // TODO: decode transform if needed
+          } else if (fitType === fbs.ImagePaintFit.ImagePaintFitTile) {
+            fit = "tile";
+            // TODO: decode tile scale if needed
+          }
+
           return {
             type: "image",
-            src: "", // TODO: decode from ResourceRef
-            fit: "cover",
+            src,
+            fit,
             blend_mode: styling.decode.blendMode(imagePaint.blendMode()),
             opacity: imagePaint.opacity(),
             active: imagePaint.active(),
