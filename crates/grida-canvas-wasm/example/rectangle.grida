@@ -15,7 +15,6 @@
         "rotation": 0,
         "layout_target_width": 100,
         "layout_target_height": 100,
-        "style": {},
         "type": "rectangle",
         "corner_radius": 0,
         "effects": [],
