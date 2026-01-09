@@ -254,7 +254,7 @@ struct RectangularStrokeWidth {
 // -----------------------------------------------------------------------------
 
 /// node type
-enum NodeType : byte {
+enum NodeType : ubyte {
   Exception,
   Scene,
 
@@ -280,7 +280,7 @@ enum NodeType : byte {
 
 // TODO: remove this
 /// shape node type (flag within BasicShapeNode)
-enum BasicShapeNodeType : byte {
+enum BasicShapeNodeType : ubyte {
   Rectangle = 0,
   Ellipse = 1,
   Polygon = 2,
@@ -290,7 +290,7 @@ enum BasicShapeNodeType : byte {
 }
 
 /// Rust: `BlendMode` (does not include pass-through)
-enum BlendMode : byte {
+enum BlendMode : ubyte {
   Normal = 0,
   Multiply = 1,
   Screen = 2,
@@ -312,7 +312,7 @@ enum BlendMode : byte {
 /// Archive model: flattened blend mode with pass-through included.
 ///
 /// This duplicates `BlendMode` variants and adds `pass_through`, avoiding a union/table wrapper.
-enum LayerBlendMode : byte {
+enum LayerBlendMode : ubyte {
   Normal = 0,
   Multiply = 1,
   Screen = 2,
@@ -336,13 +336,13 @@ enum LayerBlendMode : byte {
 }
 
 /// Rust: `Axis`
-enum Axis : byte {
+enum Axis : ubyte {
   Horizontal = 0,
   Vertical = 1
 }
 
 /// Rust: `TileMode`
-enum TileMode : byte {
+enum TileMode : ubyte {
   Clamp = 0,
   Repeated = 1,
   Mirror = 2,
@@ -350,7 +350,7 @@ enum TileMode : byte {
 }
 
 /// Rust: `math2::box_fit::BoxFit`
-enum BoxFit : byte {
+enum BoxFit : ubyte {
   Contain = 0,
   Cover = 1,
   Fill = 2,
@@ -358,34 +358,29 @@ enum BoxFit : byte {
 }
 
 /// Rust: `ImageRepeat`
-enum ImageRepeat : byte {
+enum ImageRepeat : ubyte {
   RepeatX = 0,
   RepeatY = 1,
   Repeat = 2
 }
 
-enum LayoutMode : byte {
+enum LayoutMode : ubyte {
   Normal = 0,
   Flex = 1
 }
 
-enum LayoutWrap : byte {
+enum LayoutWrap : ubyte {
   None = 0,
   Wrap = 1,
   NoWrap = 2
 }
 
-enum LayoutPositionBasis : byte {
-  Cartesian = 0,
-  Inset = 1
-}
-
-enum LayoutPositioning : byte {
+enum LayoutPositioning : ubyte {
   Auto = 0,
   Absolute = 1
 }
 
-enum MainAxisAlignment : byte {
+enum MainAxisAlignment : ubyte {
   None = 0,
   Start = 1,
   End = 2,
@@ -396,7 +391,7 @@ enum MainAxisAlignment : byte {
   Stretch = 7
 }
 
-enum CrossAxisAlignment : byte {
+enum CrossAxisAlignment : ubyte {
   None = 0,
   Start = 1,
   End = 2,
@@ -404,57 +399,57 @@ enum CrossAxisAlignment : byte {
   Stretch = 4
 }
 
-enum StrokeAlign : byte {
+enum StrokeAlign : ubyte {
   Inside = 0,
   Center = 1,
   Outside = 2
 }
 
-enum StrokeCap : byte {
+enum StrokeCap : ubyte {
   Butt = 0,
   Round = 1,
   Square = 2
 }
 
-enum StrokeJoin : byte {
+enum StrokeJoin : ubyte {
   Miter = 0,
   Round = 1,
   Bevel = 2
 }
 
-enum TextAlign : byte {
+enum TextAlign : ubyte {
   Left = 0,
   Right = 1,
   Center = 2,
   Justify = 3
 }
 
-enum TextAlignVertical : byte {
+enum TextAlignVertical : ubyte {
   Top = 0,
   Center = 1,
   Bottom = 2
 }
 
-enum BooleanPathOperation : byte {
+enum BooleanPathOperation : ubyte {
   Union = 0,
   Intersection = 1,
   Difference = 2,
   Xor = 3
 }
 
-enum SceneConstraintsChildren : byte {
+enum SceneConstraintsChildren : ubyte {
   Single = 0,
   Multiple = 1
 }
 
 /// Rust: `FillRule`
-enum FillRule : byte {
+enum FillRule : ubyte {
   NonZero = 0,
   EvenOdd = 1
 }
 
 /// Rust: `ImageMaskType`
-enum ImageMaskType : byte {
+enum ImageMaskType : ubyte {
   Alpha = 0,
   Luminance = 1
 }
@@ -478,7 +473,7 @@ union LayerMaskType {
 // -----------------------------------------------------------------------------
 
 /// Rust: `TextTransform`
-enum TextTransform : byte {
+enum TextTransform : ubyte {
   None = 0,
   Uppercase = 1,
   Lowercase = 2,
@@ -486,7 +481,7 @@ enum TextTransform : byte {
 }
 
 /// Rust: `TextDecorationLine`
-enum TextDecorationLine : byte {
+enum TextDecorationLine : ubyte {
   None = 0,
   Underline = 1,
   Overline = 2,
@@ -494,7 +489,7 @@ enum TextDecorationLine : byte {
 }
 
 /// Rust: `TextDecorationStyle`
-enum TextDecorationStyle : byte {
+enum TextDecorationStyle : ubyte {
   Solid = 0,
   Double = 1,
   Dotted = 2,
@@ -528,15 +523,15 @@ struct FontWeight {
 }
 
 /// Rust: `FontOpticalSizing` (Auto | None | Fixed(f32))
-enum FontOpticalSizingKind : byte {
+enum FontOpticalSizingKind : ubyte {
   Auto = 0,
   None = 1,
   Fixed = 2
 }
 
 struct FontOpticalSizing {
-  kind:FontOpticalSizingKind;
-  fixed_value:float;
+  kind:FontOpticalSizingKind = Auto;
+  value:float;
 }
 
 
@@ -547,7 +542,7 @@ struct FontOpticalSizing {
 /// `TextLineHeight` (Normal | Fixed(f32) | Factor(f32))
 /// `TextLetterSpacing` (Normal | Fixed(f32) | Factor(f32))
 /// `TextWordSpacing` (Normal | Fixed(f32) | Factor(f32))
-enum TextDimensionKind : byte {
+enum TextDimensionKind : ubyte {
   Normal = 0, // default fallback (=auto|normal)
   Fixed = 1,
   Factor = 2
@@ -555,7 +550,7 @@ enum TextDimensionKind : byte {
 
 table TextDimension {
   kind:TextDimensionKind;
-  value:float;
+  value:float = null;
 }
 
 
@@ -625,12 +620,10 @@ table SolidPaint {
 
 table LinearGradientPaint {
   active:bool = true (id: 0);
-  /// Rust: `xy1: Alignment`
   xy1:Alignment (id: 1);
-  /// Rust: `xy2: Alignment`
   xy2:Alignment (id: 2);
   tile_mode:TileMode = Clamp (id: 3);
-  /// Rust: `transform: AffineTransform`
+  /// transform of the gradient, if empty(unset) canonical is identity
   transform:CGTransform2D (id: 4);
   stops:[GradientStop] (id: 5);
   opacity:float = 1.0 (id: 6);
@@ -639,7 +632,7 @@ table LinearGradientPaint {
 
 table RadialGradientPaint {
   active:bool = true (id: 0);
-  /// Rust: `transform: AffineTransform`
+  /// transform of the gradient, if empty(unset) canonical is identity
   transform:CGTransform2D (id: 1);
   stops:[GradientStop] (id: 2);
   opacity:float = 1.0 (id: 3);
@@ -649,6 +642,7 @@ table RadialGradientPaint {
 
 table DiamondGradientPaint {
   active:bool = true (id: 0);
+  /// transform of the gradient, if empty(unset) canonical is identity
   transform:CGTransform2D (id: 1);
   stops:[GradientStop] (id: 2);
   opacity:float = 1.0 (id: 3);
@@ -657,6 +651,7 @@ table DiamondGradientPaint {
 
 table SweepGradientPaint {
   active:bool = true (id: 0);
+  /// transform of the gradient, if empty(unset) canonical is identity
   transform:CGTransform2D (id: 1);
   stops:[GradientStop] (id: 2);
   opacity:float = 1.0 (id: 3);
@@ -679,7 +674,7 @@ union ResourceRef {
   ResourceRefRID = 2
 }
 
-/// Rust: `ImageFilters`
+/// `ImageFilters` normalized to -0+ (center|default 0)
 struct ImageFilters {
   exposure:float;
   contrast:float;
@@ -690,6 +685,7 @@ struct ImageFilters {
   shadows:float;
 }
 
+// TODO: review me
 /// Rust: `ImageTile`
 struct ImageTile {
   scale:float;
@@ -720,15 +716,15 @@ union ImagePaintFit {
 
 /// Rust: `ImagePaint`
 table ImagePaint {
-  active:bool = true (id: 0);
-  image:ResourceRef (id: 2);
-  quarter_turns:ubyte = 0 (id: 3);
+  active:bool = true;
+  image:ResourceRef;
+  quarter_turns:ubyte = 0;
   /// NOTE: Rust field name is `alignement` (typo preserved for 1:1)
-  alignement:Alignment (id: 4);
-  fit:ImagePaintFit (id: 6);
-  opacity:float = 1.0 (id: 7);
-  blend_mode:BlendMode = Normal (id: 8);
-  filters:ImageFilters (id: 9);
+  alignement:Alignment;
+  fit:ImagePaintFit;
+  opacity:float = 1.0;
+  blend_mode:BlendMode = Normal;
+  filters:ImageFilters;
 }
 
 union Paint {
@@ -848,28 +844,28 @@ union FeBlur {
 
 /// Rust: `FeLayerBlur { blur: FeBlur, active: bool }`
 table FeLayerBlur {
+  active:bool = true;
   blur:FeBlur;
-  active:bool;
 }
 
 /// Rust: `FeBackdropBlur { blur: FeBlur, active: bool }`
 table FeBackdropBlur {
+  active:bool = true;
   blur:FeBlur;
-  active:bool;
 }
 
 /// Rust: `FeShadow { dx, dy, blur, spread, color, active }`
 table FeShadow {
+  active:bool = true;
   dx:float;
   dy:float;
   blur:float;
   spread:float;
   color:RGBA32F;
-  active:bool;
 }
 
 /// Rust: `FilterShadowEffect` (enum)
-enum FilterShadowEffectKind : byte {
+enum FilterShadowEffectKind : ubyte {
   DropShadow = 0,
   InnerShadow = 1
 }
@@ -881,7 +877,7 @@ table FilterShadowEffect {
 }
 
 /// Rust: `NoiseEffectColors` (enum)
-enum NoiseEffectColorsKind : byte {
+enum NoiseEffectColorsKind : ubyte {
   Mono = 0,
   Duo = 1,
   Multi = 2
@@ -898,24 +894,24 @@ table NoiseEffectColors {
 
 /// Rust: `FeNoiseEffect`
 table FeNoiseEffect {
+  active:bool = true;
   noise_size:float;
   density:float;
   num_octaves:int;
   seed:float;
   coloring:NoiseEffectColors;
-  active:bool;
   blend_mode:BlendMode;
 }
 
 /// Rust: `FeLiquidGlass`
 table FeLiquidGlass {
+  active:bool = true;
   light_intensity:float;
   light_angle:float;
   refraction:float;
   depth:float;
   dispersion:float;
   blur_radius:float;
-  active:bool;
 }
 
 
@@ -1095,30 +1091,28 @@ union CanonicalLayerShape {
 // Layout model (aligned to Rust `UniformNodeLayout`)
 // -----------------------------------------------------------------------------
 
-table Px {
-  value:float = 0.0 (id: 0);
+
+enum LayoutDimensionUnit:ubyte{
+  LengthPx = 0, // represents <length/px>
+  Percentage = 1 // represents <percentage>
 }
 
-table Percent {
-  /// 0..100 domain (matching TS `css.Percentage.value`)
-  value:float = 0.0 (id: 0);
-}
-
-/// Length input union.
+/// Dimension value. (width/height)
 ///
 /// Canonical mapping:
-/// - TS `"auto"` -> `Auto`
 /// - TS `number` or `{type:"length", unit:"px"}` -> `Px`
 /// - TS `{type:"percentage"}` -> `Percent`
-union Length {
-  Auto = 1,
-  Px = 2,
-  Percent = 3
+table LayoutDimensionValue {
+  unit:LayoutDimensionUnit;
+  value:float = null;
 }
 
-table LayoutDimensions {
-  layout_target_width:Length (id: 1);
-  layout_target_height:Length (id: 3);
+/// `LayoutDimensionStyle {}`
+table LayoutDimensionStyle {
+  /// unset = auto
+  layout_target_width:LayoutDimensionValue;
+  /// unset = auto
+  layout_target_height:LayoutDimensionValue;
   
   /// Preferred layout aspect ratio.
   ///
@@ -1138,7 +1132,7 @@ table LayoutDimensions {
   ///
   /// Encoding:
   /// - Stored as a tuple (width, height) for parity with TS `layout_target_aspect_ratio?: [number, number]`.
-  layout_target_aspect_ratio:CGSize (id: 4);
+  layout_target_aspect_ratio:CGSize;
 
   // TODO: support min/max size
   // FIXME: Scalar defaults cannot represent "unset"; if "no constraint" differs from 0, use Length/nullable wrapper.
@@ -1149,6 +1143,35 @@ table LayoutDimensions {
   // layout_min_height:float;
   // FIXME: Scalar defaults cannot represent "unset"; if "no constraint" differs from 0, use Length/nullable wrapper.
   // layout_max_height:float;
+}
+
+/// x,y static positioning model
+table LayoutPositioningCartesian {
+  x:float;
+  y:float;
+}
+
+enum PositioningSideOffsetKind : ubyte {
+  Px = 0,
+  Percent = 1
+}
+
+table PositioningSideOffsetValue {
+  kind:PositioningSideOffsetKind;
+  value:float = null;
+}
+
+/// left, top, right, bottom positioning model (css standard)
+table LayoutPositioningInset {
+  top:PositioningSideOffsetValue;
+  right:PositioningSideOffsetValue;
+  bottom:PositioningSideOffsetValue;
+  left:PositioningSideOffsetValue;
+}
+
+union LayoutPositioningBasis {
+  LayoutPositioningCartesian,
+  LayoutPositioningInset,
 }
 
 table LayoutContainerStyle {
@@ -1167,15 +1190,11 @@ table LayoutChildStyle {
   layout_grow:float (id: 1);
 }
 
-table Layout {
-  layout_position_basis:LayoutPositionBasis = Cartesian (id: 0);
-  layout_position:CGPoint (id: 1);
-  // FIXME: EdgeInsets is a struct (non-null). (0,0,0,0) cannot represent "unset".
-  // FIXME: If inset positioning is optional, model it structurally (nullable table/union), not via zero sentinels.
-  layout_inset:EdgeInsets (id: 2);
-  layout_dimensions:LayoutDimensions (id: 3);
-  layout_container:LayoutContainerStyle (id: 4);
-  layout_child:LayoutChildStyle (id: 5);
+table LayoutStyle {
+  layout_position:LayoutPositioningBasis (id: 1);
+  layout_dimensions:LayoutDimensionStyle (id: 2);
+  layout_container:LayoutContainerStyle (id: 3);
+  layout_child:LayoutChildStyle (id: 4);
 }
 
 // -----------------------------------------------------------------------------
@@ -1204,12 +1223,12 @@ table TextSpanNodeProperties {
 table SystemNodeTrait {
   /// unique identifier for the node. (required)
   id:NodeIdentifier (required);
+  /// whether the node is active. (visible, active)
+  active:bool = true;
   /// name of the node. (optional)
   name:string;
-  /// whether the node is active. (visible, active)
-  active:bool;
   /// whether the node is locked. (locked, editor)
-  locked:bool;
+  locked:bool = false;
 }
 
 
@@ -1247,7 +1266,7 @@ table LayerTrait {
   // relative_transform_snapshot:CGTransform2D;
 
   /// Layout (optional, depending on node type / usage).
-  layout:Layout;
+  layout:LayoutStyle;
 
   /// post-layout transform, this reflects how css transform is applied after the layout is resolved. this is currently how grida handles rotation. in the future, this might change.
   post_layout_transform:CGTransform2D;

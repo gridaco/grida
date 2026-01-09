@@ -429,6 +429,71 @@ describe("format roundtrip", () => {
         }
       );
     });
+
+    it("explicitly verifies null/unset values remain unset after roundtrip", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          // All positioning values explicitly undefined (should encode as null)
+          layout_inset_left: undefined,
+          layout_inset_top: undefined,
+          layout_inset_right: undefined,
+          layout_inset_bottom: undefined,
+          // Dimensions explicitly auto (should encode as null)
+          layout_target_width: "auto",
+          layout_target_height: "auto",
+        },
+      });
+
+      // Encode to FlatBuffers
+      const bytes = format.document.encode.toFlatbuffer(doc);
+      const decoded = format.document.decode.fromFlatbuffer(bytes);
+
+      const node = decoded.nodes[nodeId] as grida.program.nodes.TextSpanNode;
+      expect(node).toBeDefined();
+      expect(node.type).toBe("tspan");
+
+      // Verify all positioning values remain undefined (null in FlatBuffers -> undefined in TS)
+      expect(node.layout_inset_left).toBeUndefined();
+      expect(node.layout_inset_top).toBeUndefined();
+      expect(node.layout_inset_right).toBeUndefined();
+      expect(node.layout_inset_bottom).toBeUndefined();
+
+      // Verify dimensions remain auto (null in FlatBuffers -> "auto" in TS)
+      expect(node.layout_target_width).toBe("auto");
+      expect(node.layout_target_height).toBe("auto");
+    });
+
+    it("explicitly verifies mixed set/unset positioning values", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          // Mix of set and unset values
+          layout_inset_left: 10,
+          layout_inset_top: undefined,
+          layout_inset_right: undefined,
+          layout_inset_bottom: 20,
+        },
+      });
+
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (node) => {
+          // Set values should remain set
+          expect(node.layout_inset_left).toBe(10);
+          expect(node.layout_inset_bottom).toBe(20);
+          // Unset values should remain undefined
+          expect(node.layout_inset_top).toBeUndefined();
+          expect(node.layout_inset_right).toBeUndefined();
+        }
+      );
+    });
   });
 
   describe("node types", () => {

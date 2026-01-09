@@ -2,12 +2,7 @@ import grida from "@grida/schema";
 import cg from "@grida/cg";
 import type cmath from "@grida/cmath";
 import * as fbs from "@grida/format";
-import {
-  unionToLength,
-  unionToPaint,
-  unionListToNode,
-  unionToFeBlur,
-} from "@grida/format";
+import { unionToPaint, unionListToNode, unionToFeBlur } from "@grida/format";
 import type { vn } from "@grida/schema";
 import * as flatbuffers from "flatbuffers";
 import { generateNKeysBetween } from "@grida/sequence";
@@ -3711,70 +3706,125 @@ export namespace format {
       };
 
       /**
-       * Encodes a TS `css.LengthPercentage | "auto"` into FlatBuffers `Length` union.
+       * Encodes a TS `number | undefined` into FlatBuffers `PositioningSideOffsetValue` table.
        *
        * Canonical mapping:
-       * - `"auto"` -> `Auto`
-       * - `number` or `{type:"length", unit:"px"}` -> `Px`
-       * - `{type:"percentage"}` -> `Percent`
+       * - `undefined` -> `value = null` (unset/auto)
+       * - `number` -> `kind = Px, value = number`
        */
-      export function length(
+      export function positioningSideOffsetValue(
+        builder: Builder,
+        value: number | undefined
+      ): flatbuffers.Offset {
+        if (value === undefined) {
+          // Unset/auto: value is null
+          fbs.PositioningSideOffsetValue.startPositioningSideOffsetValue(
+            builder
+          );
+          fbs.PositioningSideOffsetValue.addKind(
+            builder,
+            fbs.PositioningSideOffsetKind.Px
+          );
+          // value defaults to null for unset
+          return fbs.PositioningSideOffsetValue.endPositioningSideOffsetValue(
+            builder
+          );
+        }
+
+        // Set value: use Px kind
+        fbs.PositioningSideOffsetValue.startPositioningSideOffsetValue(builder);
+        fbs.PositioningSideOffsetValue.addKind(
+          builder,
+          fbs.PositioningSideOffsetKind.Px
+        );
+        fbs.PositioningSideOffsetValue.addValue(builder, value);
+        return fbs.PositioningSideOffsetValue.endPositioningSideOffsetValue(
+          builder
+        );
+      }
+
+      /**
+       * Encodes a TS `css.LengthPercentage | "auto"` into FlatBuffers `LayoutDimensionValue` table.
+       *
+       * Canonical mapping:
+       * - `"auto"` -> `value = null` (unset/auto)
+       * - `number` or `{type:"length", unit:"px"}` -> `unit = LengthPx, value = number`
+       * - `{type:"percentage"}` -> `unit = Percentage, value = number`
+       */
+      export function layoutDimensionValue(
         builder: Builder,
         value: grida.program.css.LengthPercentage | "auto"
-      ): { type: fbs.Length; offset: number } {
+      ): flatbuffers.Offset {
         if (value === "auto") {
-          const offset = fbs.Auto.createAuto(builder);
-          return { type: fbs.Length.Auto, offset };
+          // Unset/auto: value is null
+          fbs.LayoutDimensionValue.startLayoutDimensionValue(builder);
+          fbs.LayoutDimensionValue.addUnit(
+            builder,
+            fbs.LayoutDimensionUnit.LengthPx
+          );
+          // value defaults to null for unset
+          return fbs.LayoutDimensionValue.endLayoutDimensionValue(builder);
         }
 
         if (typeof value === "number") {
-          const offset = fbs.Px.createPx(builder, value);
-          return { type: fbs.Length.Px, offset };
+          // Px value
+          fbs.LayoutDimensionValue.startLayoutDimensionValue(builder);
+          fbs.LayoutDimensionValue.addUnit(
+            builder,
+            fbs.LayoutDimensionUnit.LengthPx
+          );
+          fbs.LayoutDimensionValue.addValue(builder, value);
+          return fbs.LayoutDimensionValue.endLayoutDimensionValue(builder);
         }
 
         if (isPercentage(value)) {
-          const offset = fbs.Percent.createPercent(builder, value.value);
-          return { type: fbs.Length.Percent, offset };
+          // Percentage value
+          fbs.LayoutDimensionValue.startLayoutDimensionValue(builder);
+          fbs.LayoutDimensionValue.addUnit(
+            builder,
+            fbs.LayoutDimensionUnit.Percentage
+          );
+          fbs.LayoutDimensionValue.addValue(builder, value.value);
+          return fbs.LayoutDimensionValue.endLayoutDimensionValue(builder);
         }
 
         if (isLengthObject(value)) {
           // TS supports multiple CSS units, but for the canonical archive model we only persist px.
           // If it's not px, preserve the numeric magnitude (lossy) rather than throwing.
-          const offset = fbs.Px.createPx(builder, value.value);
-          return { type: fbs.Length.Px, offset };
+          fbs.LayoutDimensionValue.startLayoutDimensionValue(builder);
+          fbs.LayoutDimensionValue.addUnit(
+            builder,
+            fbs.LayoutDimensionUnit.LengthPx
+          );
+          fbs.LayoutDimensionValue.addValue(builder, value.value);
+          return fbs.LayoutDimensionValue.endLayoutDimensionValue(builder);
         }
 
         // Fallback: treat unknown object as px=0.
-        const offset = fbs.Px.createPx(builder, 0);
-        return { type: fbs.Length.Px, offset };
+        fbs.LayoutDimensionValue.startLayoutDimensionValue(builder);
+        fbs.LayoutDimensionValue.addUnit(
+          builder,
+          fbs.LayoutDimensionUnit.LengthPx
+        );
+        fbs.LayoutDimensionValue.addValue(builder, 0);
+        return fbs.LayoutDimensionValue.endLayoutDimensionValue(builder);
       }
 
       /**
-       * Encodes LayoutDimensions table with Length unions for target width/height.
+       * Encodes LayoutDimensionStyle table with LayoutDimensionValue tables for target width/height.
        */
       export function dimensions(
         builder: Builder,
         width: grida.program.css.LengthPercentage | "auto",
         height: grida.program.css.LengthPercentage | "auto"
       ): flatbuffers.Offset {
-        const targetWidth = length(builder, width);
-        const targetHeight = length(builder, height);
+        const targetWidth = layoutDimensionValue(builder, width);
+        const targetHeight = layoutDimensionValue(builder, height);
 
-        fbs.LayoutDimensions.startLayoutDimensions(builder);
-        fbs.LayoutDimensions.addLayoutTargetWidthType(
-          builder,
-          targetWidth.type
-        );
-        fbs.LayoutDimensions.addLayoutTargetWidth(builder, targetWidth.offset);
-        fbs.LayoutDimensions.addLayoutTargetHeightType(
-          builder,
-          targetHeight.type
-        );
-        fbs.LayoutDimensions.addLayoutTargetHeight(
-          builder,
-          targetHeight.offset
-        );
-        return fbs.LayoutDimensions.endLayoutDimensions(builder);
+        fbs.LayoutDimensionStyle.startLayoutDimensionStyle(builder);
+        fbs.LayoutDimensionStyle.addLayoutTargetWidth(builder, targetWidth);
+        fbs.LayoutDimensionStyle.addLayoutTargetHeight(builder, targetHeight);
+        return fbs.LayoutDimensionStyle.endLayoutDimensionStyle(builder);
       }
 
       /**
@@ -3858,9 +3908,9 @@ export namespace format {
       }
 
       /**
-       * Encodes a TS node's layout-related inputs into a FlatBuffers `Layout` table.
+       * Encodes a TS node's layout-related inputs into a FlatBuffers `LayoutStyle` table.
        *
-       * Uses canonical fields: layout_position_basis, layout_position, layout_inset,
+       * Uses canonical fields: layout_position (LayoutPositioningBasis union),
        * layout_dimensions (with Length unions for target width/height).
        */
       export function nodeLayout(
@@ -3900,13 +3950,67 @@ export namespace format {
           bottom: node.layout_inset_bottom,
         };
 
-        // Determine position basis: use Inset if right/bottom are set, otherwise Cartesian
+        // Determine position basis:
+        // - Use Inset if right/bottom are set, OR if any values are undefined (to preserve unset state)
+        // - Use Cartesian only when all values are set and we only have left/top
         const hasRightOrBottom =
           typeof positioning.right === "number" ||
           typeof positioning.bottom === "number";
-        const positionBasis = hasRightOrBottom
-          ? fbs.LayoutPositionBasis.Inset
-          : fbs.LayoutPositionBasis.Cartesian;
+        const hasUndefinedValues =
+          positioning.left === undefined ||
+          positioning.top === undefined ||
+          positioning.right === undefined ||
+          positioning.bottom === undefined;
+
+        // Encode position using LayoutPositioningBasis union
+        let positionType: fbs.LayoutPositioningBasis;
+        let positionOffset: flatbuffers.Offset;
+        if (hasRightOrBottom || hasUndefinedValues) {
+          // Create LayoutPositioningInset table with PositioningSideOffsetValue tables
+          const topOffset = positioningSideOffsetValue(
+            builder,
+            positioning.top
+          );
+          const rightOffset = positioningSideOffsetValue(
+            builder,
+            positioning.right
+          );
+          const bottomOffset = positioningSideOffsetValue(
+            builder,
+            positioning.bottom
+          );
+          const leftOffset = positioningSideOffsetValue(
+            builder,
+            positioning.left
+          );
+
+          fbs.LayoutPositioningInset.startLayoutPositioningInset(builder);
+          fbs.LayoutPositioningInset.addTop(builder, topOffset);
+          fbs.LayoutPositioningInset.addRight(builder, rightOffset);
+          fbs.LayoutPositioningInset.addBottom(builder, bottomOffset);
+          fbs.LayoutPositioningInset.addLeft(builder, leftOffset);
+          positionOffset =
+            fbs.LayoutPositioningInset.endLayoutPositioningInset(builder);
+          positionType = fbs.LayoutPositioningBasis.LayoutPositioningInset;
+        } else {
+          // Create LayoutPositioningCartesian table
+          fbs.LayoutPositioningCartesian.startLayoutPositioningCartesian(
+            builder
+          );
+          fbs.LayoutPositioningCartesian.addX(
+            builder,
+            typeof positioning.left === "number" ? positioning.left : 0
+          );
+          fbs.LayoutPositioningCartesian.addY(
+            builder,
+            typeof positioning.top === "number" ? positioning.top : 0
+          );
+          positionOffset =
+            fbs.LayoutPositioningCartesian.endLayoutPositioningCartesian(
+              builder
+            );
+          positionType = fbs.LayoutPositioningBasis.LayoutPositioningCartesian;
+        }
 
         // Encode dimensions
         const dimensionsOffset = dimensions(
@@ -3925,34 +4029,16 @@ export namespace format {
         // Encode child style
         const childOffset = childStyle(builder, positioning.position);
 
-        // Build Layout table
-        fbs.Layout.startLayout(builder);
-        fbs.Layout.addLayoutPositionBasis(builder, positionBasis);
-        if (positionBasis === fbs.LayoutPositionBasis.Cartesian) {
-          // Create CGPoint struct inline using generated method
-          const pointOffset = fbs.CGPoint.createCGPoint(
-            builder,
-            typeof positioning.left === "number" ? positioning.left : 0,
-            typeof positioning.top === "number" ? positioning.top : 0
-          );
-          fbs.Layout.addLayoutPosition(builder, pointOffset);
-        } else {
-          // Create EdgeInsets struct inline using generated method
-          const insetOffset = fbs.EdgeInsets.createEdgeInsets(
-            builder,
-            positioning.top ?? 0,
-            positioning.right ?? 0,
-            positioning.bottom ?? 0,
-            positioning.left ?? 0
-          );
-          fbs.Layout.addLayoutInset(builder, insetOffset);
-        }
-        fbs.Layout.addLayoutDimensions(builder, dimensionsOffset);
+        // Build LayoutStyle table
+        fbs.LayoutStyle.startLayoutStyle(builder);
+        fbs.LayoutStyle.addLayoutPositionType(builder, positionType);
+        fbs.LayoutStyle.addLayoutPosition(builder, positionOffset);
+        fbs.LayoutStyle.addLayoutDimensions(builder, dimensionsOffset);
         if (containerOffset) {
-          fbs.Layout.addLayoutContainer(builder, containerOffset);
+          fbs.LayoutStyle.addLayoutContainer(builder, containerOffset);
         }
-        fbs.Layout.addLayoutChild(builder, childOffset);
-        return fbs.Layout.endLayout(builder);
+        fbs.LayoutStyle.addLayoutChild(builder, childOffset);
+        return fbs.LayoutStyle.endLayoutStyle(builder);
       }
     }
 
@@ -3974,30 +4060,67 @@ export namespace format {
         v: fbs.LayoutWrap
       ): "wrap" | "nowrap" | undefined => enums.LAYOUT_WRAP_DECODE.get(v);
 
-      export function length(
-        type: fbs.Length,
-        value: unknown
+      /**
+       * Decodes a FlatBuffers `LayoutDimensionValue` table into TS `css.LengthPercentage | "auto"`.
+       *
+       * Canonical mapping:
+       * - `value = null` -> `"auto"` (unset)
+       * - `unit = LengthPx, value = number` -> `number`
+       * - `unit = Percentage, value = number` -> `{type:"percentage", value:number}`
+       */
+      export function layoutDimensionValue(
+        value: fbs.LayoutDimensionValue | null
       ): grida.program.css.LengthPercentage | "auto" {
-        switch (type) {
-          case fbs.Length.Auto:
-            return "auto";
-          case fbs.Length.Percent: {
-            const v = value as fbs.Percent;
-            return { type: "percentage", value: v.value() };
-          }
-          case fbs.Length.Px: {
-            const v = value as fbs.Px;
-            return v.value();
-          }
-          case fbs.Length.NONE:
+        if (!value) {
+          return "auto";
+        }
+
+        const unit = value.unit();
+        const val = value.value();
+
+        // If value is null, it's unset/auto
+        if (val === null) {
+          return "auto";
+        }
+
+        switch (unit) {
+          case fbs.LayoutDimensionUnit.Percentage:
+            return { type: "percentage", value: val };
+          case fbs.LayoutDimensionUnit.LengthPx:
           default:
-            // Default for missing values in TS varies by node; keep it explicit.
-            return "auto";
+            return val;
         }
       }
 
+      /**
+       * Decodes a FlatBuffers `PositioningSideOffsetValue` table into TS `number | undefined`.
+       *
+       * Canonical mapping:
+       * - `value = null` -> `undefined` (unset/auto)
+       * - `kind = Px, value = number` -> `number`
+       * - `kind = Percent, value = number` -> `number` (treating percentage as a number for now)
+       */
+      export function positioningSideOffsetValue(
+        value: fbs.PositioningSideOffsetValue | null
+      ): number | undefined {
+        if (!value) {
+          return undefined;
+        }
+
+        const val = value.value();
+
+        // If value is null, it's unset/auto
+        if (val === null) {
+          return undefined;
+        }
+
+        // For now, return the value as a number regardless of kind (Px or Percent).
+        // Future: could return a percentage object if TS type is extended.
+        return val;
+      }
+
       export function nodeLayout(
-        layout: fbs.Layout
+        layout: fbs.LayoutStyle
       ): grida.program.nodes.i.ILayoutTrait &
         Partial<
           Pick<
@@ -4025,65 +4148,47 @@ export namespace format {
             ? "absolute"
             : "relative";
 
-        const positionBasis = layout.layoutPositionBasis();
+        // Decode layout_position union (LayoutPositioningBasis)
+        const positionType = layout.layoutPositionType();
         let left: number | undefined;
         let top: number | undefined;
         let right: number | undefined;
         let bottom: number | undefined;
 
-        if (positionBasis === fbs.LayoutPositionBasis.Inset) {
-          const inset = layout.layoutInset();
+        if (
+          positionType === fbs.LayoutPositioningBasis.LayoutPositioningInset
+        ) {
+          const inset = layout.layoutPosition(
+            new fbs.LayoutPositioningInset()
+          ) as fbs.LayoutPositioningInset | null;
           if (inset) {
-            // For inset positioning, treat 0 as potentially undefined
-            // since FlatBuffers structs can't represent undefined values
-            // Only set values if they're non-zero or if other inset values are also zero
-            const topVal = inset.top();
-            const rightVal = inset.right();
-            const bottomVal = inset.bottom();
-            const leftVal = inset.left();
-
-            // If we have non-zero values, treat 0 as undefined
-            const hasNonZero =
-              topVal !== 0 ||
-              rightVal !== 0 ||
-              bottomVal !== 0 ||
-              leftVal !== 0;
-
-            top = hasNonZero && topVal === 0 ? undefined : topVal;
-            right = hasNonZero && rightVal === 0 ? undefined : rightVal;
-            bottom = hasNonZero && bottomVal === 0 ? undefined : bottomVal;
-            left = hasNonZero && leftVal === 0 ? undefined : leftVal;
+            // Decode PositioningSideOffsetValue tables for each inset value
+            top = decode.positioningSideOffsetValue(inset.top());
+            right = decode.positioningSideOffsetValue(inset.right());
+            bottom = decode.positioningSideOffsetValue(inset.bottom());
+            left = decode.positioningSideOffsetValue(inset.left());
           }
-        } else {
+        } else if (
+          positionType === fbs.LayoutPositioningBasis.LayoutPositioningCartesian
+        ) {
           // Cartesian
-          const pos = layout.layoutPosition();
-          if (pos) {
-            left = pos.x();
-            top = pos.y();
+          const cartesian = layout.layoutPosition(
+            new fbs.LayoutPositioningCartesian()
+          ) as fbs.LayoutPositioningCartesian | null;
+          if (cartesian) {
+            left = cartesian.x();
+            top = cartesian.y();
           }
         }
 
-        // Decode dimensions from canonical fields (Length unions)
+        // Decode dimensions from canonical fields (LayoutDimensionValue tables)
         const dimensions = layout.layoutDimensions();
         let width: grida.program.css.LengthPercentage | "auto" = "auto";
         let height: grida.program.css.LengthPercentage | "auto" = "auto";
 
         if (dimensions) {
-          const widthType = dimensions.layoutTargetWidthType();
-          const widthValue = unionToLength(
-            widthType,
-            (obj: fbs.Auto | fbs.Px | fbs.Percent) =>
-              dimensions.layoutTargetWidth(obj)
-          );
-          width = decode.length(widthType, widthValue);
-
-          const heightType = dimensions.layoutTargetHeightType();
-          const heightValue = unionToLength(
-            heightType,
-            (obj: fbs.Auto | fbs.Px | fbs.Percent) =>
-              dimensions.layoutTargetHeight(obj)
-          );
-          height = decode.length(heightType, heightValue);
+          width = decode.layoutDimensionValue(dimensions.layoutTargetWidth());
+          height = decode.layoutDimensionValue(dimensions.layoutTargetHeight());
         }
 
         const container = layout.layoutContainer();
@@ -4818,7 +4923,7 @@ export namespace format {
                 // Only set if kind is Factor (em-based value)
                 // Fixed or Normal with value 0 means unset/default
                 if (letterSpacingKind === fbs.TextDimensionKind.Factor) {
-                  letterSpacing = letterSpacingValue;
+                  letterSpacing = letterSpacingValue ?? undefined;
                 }
               }
 
@@ -4832,7 +4937,7 @@ export namespace format {
                 // Only set if kind is Factor (em-based value)
                 // Fixed or Normal with value 0 means unset/default
                 if (wordSpacingKind === fbs.TextDimensionKind.Factor) {
-                  wordSpacing = wordSpacingValue;
+                  wordSpacing = wordSpacingValue ?? undefined;
                 }
               }
 
@@ -4846,7 +4951,7 @@ export namespace format {
                 } else if (lineHeightKind === fbs.TextDimensionKind.Factor) {
                   // Factor (em-based) value
                   const lineHeightValue = lineHeightStruct.value();
-                  lineHeight = lineHeightValue;
+                  lineHeight = lineHeightValue ?? undefined;
                 }
                 // TODO: Support TextDimensionKind.Percent (when added to enum)
                 // Fixed kind is not used for line_height in TS model
