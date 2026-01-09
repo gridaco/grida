@@ -121,6 +121,7 @@ import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 /**
  * Generates a filesystem-safe key from a URL path.
  * Used to create deterministic OPFS keys for examples/embedded canvases.
+ * Never returns an empty string - falls back to "root" or a hash of src.
  */
 function generateFileKeyFromSrc(src: string): string {
   try {
@@ -128,19 +129,25 @@ function generateFileKeyFromSrc(src: string): string {
     // Use pathname + search params to create a unique key
     const path = url.pathname + url.search;
     // Sanitize: replace slashes and special chars with hyphens, remove leading/trailing
-    return path
+    const sanitized = path
       .replace(/^\/+|\/+$/g, "") // Remove leading/trailing slashes
       .replace(/[^a-zA-Z0-9._-]/g, "-") // Replace non-safe chars with hyphens
       .replace(/-+/g, "-") // Collapse multiple hyphens
       .toLowerCase()
       .slice(0, 100); // Limit length for filesystem safety
+
+    // If sanitized result is empty, fall back to hash of src
+    return sanitized || `root-${editor.fnv1a32(src)}`;
   } catch {
     // Fallback: simple sanitization if URL parsing fails
-    return src
+    const sanitized = src
       .replace(/[^a-zA-Z0-9._-]/g, "-")
       .replace(/-+/g, "-")
       .toLowerCase()
       .slice(0, 100);
+
+    // If sanitized result is empty, fall back to hash of src
+    return sanitized || `root-${editor.fnv1a32(src)}`;
   }
 }
 
@@ -154,8 +161,10 @@ function usePlaygroundOPFS(filekey: string): io.opfs.Handle | null {
       return null;
     }
     try {
+      // Defensive check: ensure filekey is never empty
+      const safeFilekey = filekey || "root";
       return new io.opfs.Handle({
-        directory: ["playground", filekey],
+        directory: ["playground", safeFilekey],
       });
     } catch (error) {
       console.error("Failed to create OPFS handle:", error);

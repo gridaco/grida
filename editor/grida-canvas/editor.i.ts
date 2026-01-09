@@ -69,6 +69,20 @@ export namespace editor {
   }
 
   /**
+   * FNV-1a 32-bit hash function.
+   * Returns an 8-character hex string that's deterministic.
+   * Used as a fallback when generating file keys from empty sanitized paths.
+   */
+  export function fnv1a32(str: string): string {
+    let hash = 0x811c9dc5; // FNV offset basis
+    for (let i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193); // FNV prime
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+  }
+
+  /**
    * Mutual exclusion (reentrancy guard) for JavaScript.
    *
    * Ensures that only one callback is executed at a time within the same call stack.
