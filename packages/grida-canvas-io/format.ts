@@ -2571,7 +2571,7 @@ export namespace format {
       }
 
       /**
-       * Encodes CorerRadiusTrait table.
+       * Encodes CornerRadiusTrait table.
        */
       export function cornerRadiusTrait(
         builder: Builder,
@@ -2588,14 +2588,14 @@ export namespace format {
           cornerRadius
         );
 
-        // Create CorerRadiusTrait table
-        fbs.CorerRadiusTrait.startCorerRadiusTrait(builder);
-        fbs.CorerRadiusTrait.addCornerRadius(builder, cornerRadiusStruct);
-        fbs.CorerRadiusTrait.addCornerSmoothing(
+        // Create CornerRadiusTrait table
+        fbs.CornerRadiusTrait.startCornerRadiusTrait(builder);
+        fbs.CornerRadiusTrait.addCornerRadius(builder, cornerRadiusStruct);
+        fbs.CornerRadiusTrait.addCornerSmoothing(
           builder,
           node.corner_smoothing ?? 0
         );
-        return fbs.CorerRadiusTrait.endCorerRadiusTrait(builder);
+        return fbs.CornerRadiusTrait.endCornerRadiusTrait(builder);
       }
 
       /**
@@ -2913,9 +2913,9 @@ export namespace format {
       }
 
       /**
-       * Decodes CorerRadiusTrait table.
+       * Decodes CornerRadiusTrait table.
        */
-      export function cornerRadiusTrait(trait: fbs.CorerRadiusTrait | null): {
+      export function cornerRadiusTrait(trait: fbs.CornerRadiusTrait | null): {
         corner_radius: number;
         corner_smoothing: number;
       } {

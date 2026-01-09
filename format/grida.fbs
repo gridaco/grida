@@ -987,7 +987,7 @@ table RectangularStrokeGeometryTrait {
   stroke_width_profile:VariableWidthProfile;
 }
 
-table CorerRadiusTrait {
+table CornerRadiusTrait {
   corner_radius:CGRadius;
   corner_smoothing:float;
 }
@@ -1332,7 +1332,7 @@ table BooleanOperationNode {
   node: SystemNodeTrait (required);
   layer: LayerTrait (required);
   op:BooleanPathOperation = Union;
-  corner_radius:CorerRadiusTrait;
+  corner_radius:CornerRadiusTrait;
   fill_paints:[PaintStackItem];
   stroke_geometry:StrokeGeometryTrait;
   stroke_paints:[PaintStackItem];
@@ -1374,7 +1374,7 @@ table VectorNode {
   layer:LayerTrait (required);
   stroke_geometry:StrokeGeometryTrait;
   stroke_paints:[PaintStackItem];
-  corner_radius:CorerRadiusTrait;
+  corner_radius:CornerRadiusTrait;
   fill_paints:[PaintStackItem];
   vector_network_data:VectorNetworkData;
 }
