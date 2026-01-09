@@ -63,7 +63,7 @@ export function useInsertFile() {
 
       // Create rectangle node with image paint instead of image node
       const node = instance.commands.createRectangleNode();
-      node.$.position = "absolute";
+      node.$.layout_positioning = "absolute";
       node.$.name = name;
       node.$.layout_inset_left = x;
       node.$.layout_inset_top = y;
@@ -559,7 +559,7 @@ export function useDataTransferEventTarget() {
                 event.clientY,
               ]);
               const node = instance.commands.createRectangleNode();
-              node.$.position = "absolute";
+              node.$.layout_positioning = "absolute";
               node.$.name = name || "Photo";
               node.$.layout_inset_left = x;
               node.$.layout_inset_top = y;

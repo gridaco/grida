@@ -27,7 +27,7 @@ describe("clipboard", () => {
         locked: false,
         name: "tspan",
         opacity: 1,
-        position: "absolute",
+        layout_positioning: "absolute",
         text: "Text",
         type: "tspan",
         layout_target_width: "auto",
@@ -104,38 +104,46 @@ describe("clipboard", () => {
       name: "Root",
       active: true,
       locked: false,
-      position: "absolute",
+      layout_positioning: "absolute",
       layout_target_width: 1000,
       layout_target_height: 1000,
-      children: Array.from({ length: 100 }, (_, i) => ({
-        type: "container" as const,
-        name: `Child ${i}`,
-        active: true,
-        locked: false,
-        position: "absolute" as const,
-        layout_target_width: 100,
-        height: 100,
-        children: Array.from({ length: 50 }, (_, j) => ({
-          type: "tspan" as const,
-          name: `Text ${i}-${j}`,
-          active: true,
-          locked: false,
-          position: "absolute" as const,
-          text: `This is text node ${i}-${j} with some content to make it larger`,
-          font_family: "Inter",
-          font_size: 14,
-          font_weight: 400,
-          width: "auto" as const,
-          height: "auto" as const,
-          fill: {
-            type: "solid" as const,
-            color: { r: 0, g: 0, b: 0, a: 1 },
+      children: Array.from(
+        { length: 100 },
+        (_, i) =>
+          ({
+            type: "container" as const,
+            name: `Child ${i}`,
             active: true,
-          },
-          opacity: 1,
-          z_index: 0,
-        })),
-      })),
+            locked: false,
+            layout_positioning: "absolute" as const,
+            layout_target_width: 100,
+            layout_target_height: 100,
+            children: Array.from(
+              { length: 50 },
+              (_, j) =>
+                ({
+                  type: "tspan" as const,
+                  name: `Text ${i}-${j}`,
+                  active: true,
+                  locked: false,
+                  layout_positioning: "absolute" as const,
+                  text: `This is text node ${i}-${j} with some content to make it larger`,
+                  font_family: "Inter",
+                  font_size: 14,
+                  font_weight: 400,
+                  layout_target_width: "auto" as const,
+                  layout_target_height: "auto" as const,
+                  fill: {
+                    type: "solid" as const,
+                    color: { r: 0, g: 0, b: 0, a: 1 },
+                    active: true,
+                  },
+                  opacity: 1,
+                  z_index: 0,
+                }) satisfies grida.program.nodes.NodePrototype
+            ),
+          }) satisfies grida.program.nodes.NodePrototype
+      ),
     };
 
     const largePayload: io.clipboard.ClipboardPayload = {

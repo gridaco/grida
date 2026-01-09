@@ -85,7 +85,7 @@ _003.definition = {
       rotation: 0,
       layout_target_width: "auto",
       layout_target_height: "auto",
-      position: "relative",
+      layout_positioning: "relative",
     },
     "003.subtitle": {
       id: "003.subtitle",
@@ -105,7 +105,7 @@ _003.definition = {
       rotation: 0,
       layout_target_width: "auto",
       layout_target_height: "auto",
-      position: "relative",
+      layout_positioning: "relative",
     },
     "003.background": {
       id: "003.background",
@@ -121,7 +121,7 @@ _003.definition = {
       layout_target_width: "auto",
       layout_target_height: "auto",
       corner_radius: 0,
-      position: "absolute",
+      layout_positioning: "absolute",
       layout_inset_top: 0,
       layout_inset_left: 0,
       layout_inset_bottom: 0,

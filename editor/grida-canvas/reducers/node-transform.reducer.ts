@@ -92,7 +92,11 @@ export default function updateNodeTransform(
   switch (action.type) {
     case "position": {
       const { x, y } = action;
-      if ("position" in draft && draft.position == "absolute") {
+      if (
+        ("layout_positioning" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+          draft &&
+        draft.layout_positioning == "absolute"
+      ) {
         // TODO: with resolve box model
         // TODO: also need to update right, bottom, width, height
 
@@ -114,7 +118,10 @@ export default function updateNodeTransform(
     }
     case "translate": {
       const { dx, dy } = action;
-      if ("position" in draft) {
+      if (
+        ("layout_positioning" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+        draft
+      ) {
         moveNode(draft as grida.program.nodes.i.IPositioning, dx, dy);
       }
       break;
@@ -180,7 +187,7 @@ export default function updateNodeTransform(
 
       const heightWasNumber = typeof _draft.layout_target_height === "number";
 
-      if (_draft.position === "absolute") {
+      if (_draft.layout_positioning === "absolute") {
         _draft.layout_inset_left = cmath.quantize(scaled.x, 1);
         _draft.layout_inset_top = cmath.quantize(scaled.y, 1);
       }
@@ -269,7 +276,7 @@ function moveNode(
   dx: number,
   dy: number
 ) {
-  if (draft.position == "absolute") {
+  if (draft.layout_positioning == "absolute") {
     if (dx) {
       if (
         draft.layout_inset_left !== undefined ||

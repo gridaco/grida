@@ -41,7 +41,7 @@ export function prepare_bitmap_node(
       id: new_node_id,
       active: true,
       locked: false,
-      position: "absolute",
+      layout_positioning: "absolute",
       opacity: 1,
       rotation: 0,
       z_index: 0,

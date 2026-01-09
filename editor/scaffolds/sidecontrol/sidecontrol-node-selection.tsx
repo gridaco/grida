@@ -843,7 +843,7 @@ function SectionPosition({ node_id }: { node_id: string }) {
   const { position, rotation, top, left, right, bottom } = useNodeState(
     node_id,
     (node) => ({
-      position: node.position,
+      position: node.layout_positioning,
       rotation: node.rotation,
       top: node.layout_inset_top,
       left: node.layout_inset_left,
@@ -864,7 +864,7 @@ function SectionPosition({ node_id }: { node_id: string }) {
         <div className="py-4 px-4">
           <PositioningConstraintsControl
             value={{
-              position: position!,
+              layout_positioning: position!,
               layout_inset_top: top,
               layout_inset_left: left,
               layout_inset_right: right,
@@ -903,7 +903,7 @@ function SectionMixedPosition({ ids }: { ids: string[] }) {
   const instance = useCurrentEditor();
   const mp = useMixedProperties(ids, (node) => {
     return {
-      position: node.position,
+      position: node.layout_positioning,
       top: node.layout_inset_top,
       left: node.layout_inset_left,
       right: node.layout_inset_right,
@@ -918,7 +918,7 @@ function SectionMixedPosition({ ids }: { ids: string[] }) {
       : mp.position.value;
 
   const constraints_value: grida.program.nodes.i.IPositioning = {
-    position,
+    layout_positioning: position,
     layout_inset_top:
       typeof mp.top?.value === "number" ? mp.top.value : undefined,
     layout_inset_left:

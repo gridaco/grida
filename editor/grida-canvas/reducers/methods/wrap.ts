@@ -113,7 +113,7 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
       layout_inset_top: cmath.quantize(union.y, 1),
       layout_inset_left: cmath.quantize(union.x, 1),
       children: [],
-      position: "absolute",
+      layout_positioning: "absolute",
     } satisfies grida.program.nodes.NodePrototype;
 
     if (prototype.type === "container") {
@@ -316,7 +316,7 @@ export function self_wrapNodesAsBooleanOperation<
       layout_inset_top: cmath.quantize(union.y, 1),
       layout_inset_left: cmath.quantize(union.x, 1),
       children: [],
-      position: "absolute",
+      layout_positioning: "absolute",
       op: op,
       corner_radius: modeProperties.cornerRadius(...nodes),
       fill: modeProperties.fill(...nodes),

@@ -1,4 +1,6 @@
 import documentReducer from "../document.reducer";
+import type grida from "@grida/schema";
+import type { editor } from "@/grida-canvas";
 
 jest.mock("../surface.reducer", () => ({
   __esModule: true,
@@ -14,11 +16,11 @@ describe("document reducer - vector cut", () => {
       name: "Vector",
       active: true,
       locked: false,
-      position: "absolute",
-      left: 0,
-      top: 0,
-      width: 10,
-      height: 0,
+      layout_positioning: "absolute",
+      layout_inset_left: 0,
+      layout_inset_top: 0,
+      layout_target_width: 10,
+      layout_target_height: 0,
       opacity: 1,
       rotation: 0,
       z_index: 0,
@@ -29,7 +31,7 @@ describe("document reducer - vector cut", () => {
         ],
         segments: [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }],
       },
-    } as any;
+    } satisfies Partial<grida.program.nodes.VectorNode>;
 
     const doc = {
       nodes: { [node_id]: vectorNode },
@@ -47,7 +49,7 @@ describe("document reducer - vector cut", () => {
     const state = {
       editable: true,
       document: doc,
-      document_ctx: {},
+      document_ctx: {} as any,
       scene_id: "scene",
       selection: [node_id],
       hovered_node_id: null,
@@ -61,8 +63,8 @@ describe("document reducer - vector cut", () => {
           selected_segments: [0],
           selected_tangents: [],
         },
-      },
-    } as any;
+      } satisfies Partial<editor.state.VectorContentEditMode> as any as editor.state.VectorContentEditMode,
+    } satisfies Partial<editor.state.IEditorState> as any as editor.state.IEditorState;
 
     const next = documentReducer(
       state,
@@ -78,7 +80,10 @@ describe("document reducer - vector cut", () => {
       ],
       segments: [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }],
     });
-    expect(next.document.nodes[node_id].vector_network).toEqual({
+    expect(
+      (next.document.nodes[node_id] as grida.program.nodes.VectorNode)
+        .vector_network
+    ).toEqual({
       vertices: [],
       segments: [],
     });

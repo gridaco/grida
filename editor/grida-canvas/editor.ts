@@ -1459,7 +1459,7 @@ class EditorDocumentStore
           const relativeTop = rect.y - parentRect.y;
 
           this.changeNodePropertyPositioning(id, {
-            position: "absolute",
+            layout_positioning: "absolute",
             layout_inset_left: cmath.quantize(relativeLeft, 1),
             layout_inset_top: cmath.quantize(relativeTop, 1),
             layout_inset_right: undefined,
@@ -1688,12 +1688,12 @@ class EditorDocumentStore
 
   changeNodePropertyPositioningMode(
     node_id: string,
-    position: grida.program.nodes.i.IPositioning["position"]
+    position: grida.program.nodes.i.IPositioning["layout_positioning"]
   ) {
     this.dispatch({
       type: "node/change/positioning-mode",
       node_id: node_id,
-      position,
+      layout_positioning: position,
     });
   }
 

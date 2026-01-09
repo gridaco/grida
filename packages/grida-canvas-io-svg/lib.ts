@@ -206,7 +206,7 @@ export namespace iosvg {
         return {
           type: "group",
           name: name,
-          position: "absolute",
+          layout_positioning: "absolute",
           layout_inset_left: position.left,
           layout_inset_top: position.top,
           opacity: opacity,
@@ -294,7 +294,7 @@ export namespace iosvg {
     return {
       type: "container",
       name: name,
-      position: "absolute",
+      layout_positioning: "absolute",
       layout_inset_left: 0,
       layout_inset_top: 0,
       layout_target_width: width,

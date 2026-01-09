@@ -385,7 +385,7 @@ export namespace iofigma {
             }
       ): Pick<
         grida.program.nodes.ContainerNode,
-        | "position"
+        | "layout_positioning"
         | "layout_inset_left"
         | "layout_inset_top"
         | "layout_target_width"
@@ -407,7 +407,7 @@ export namespace iofigma {
           : undefined;
 
         return {
-          position: "absolute" as const,
+          layout_positioning: "absolute" as const,
           layout_inset_left: node.relativeTransform?.[0][2] ?? 0,
           layout_inset_top: node.relativeTransform?.[1][2] ?? 0,
           layout_target_width: szx,
@@ -940,7 +940,7 @@ export namespace iofigma {
 
         const rootNode = processNode(node) as grida.program.nodes.ContainerNode;
         // Keep absolute positioning from Figma (all Figma nodes are absolute by default)
-        // rootNode.position = "relative";
+        // rootNode.layout_positioning = "relative";
         // rootNode.layout_inset_left = 0;
         // rootNode.layout_inset_top = 0;
 
@@ -1087,7 +1087,7 @@ export namespace iofigma {
               ...effects_trait(node.effects),
               type: "tspan",
               text: node.characters,
-              position: "absolute",
+              layout_positioning: "absolute",
               layout_inset_left: constraints.left,
               layout_inset_top: constraints.top,
               layout_inset_right: constraints.right,
@@ -1164,7 +1164,7 @@ export namespace iofigma {
               ...stroke_trait(node),
               ...effects_trait(node.effects),
               type: "line",
-              position: "absolute",
+              layout_positioning: "absolute",
               layout_inset_left: node.relativeTransform![0][2],
               layout_inset_top: node.relativeTransform![1][2],
               layout_target_width: node.size!.x,

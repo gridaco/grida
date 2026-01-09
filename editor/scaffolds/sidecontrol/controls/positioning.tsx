@@ -5,7 +5,7 @@ import { cn } from "@/components/lib/utils";
 import { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
 
-type PositioningMode = grida.program.nodes.i.IPositioning["position"];
+type PositioningMode = grida.program.nodes.i.IPositioning["layout_positioning"];
 
 export function PositioningModeControl({
   value,

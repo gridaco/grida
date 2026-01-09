@@ -1884,7 +1884,7 @@ export namespace grida.program.nodes {
      * by default, use position: relative, layout_inset_left: 0, layout_inset_top: 0 - to avoid unexpected layout issues
      */
     export interface IPositioning {
-      position: "absolute" | "relative";
+      layout_positioning: "absolute" | "relative";
       layout_inset_left?: number | undefined;
       layout_inset_top?: number | undefined;
       layout_inset_right?: number | undefined;
@@ -2580,7 +2580,7 @@ export namespace grida.program.nodes {
         type: "template_instance",
         active: true,
         locked: false,
-        position: "relative",
+        layout_positioning: "relative",
         properties,
         props: {},
         overrides: cloneWithUndefinedValues(nodes),
@@ -2630,7 +2630,7 @@ export namespace grida.program.nodes {
             rotation: 0,
             layout_target_width: 0,
             layout_target_height: 0,
-            position: "absolute",
+            layout_positioning: "absolute",
             layout_inset_top: 0,
             layout_inset_left: 0,
             corner_radius: 0,
@@ -2705,7 +2705,7 @@ export namespace grida.program.nodes {
             rotation: 0,
             layout_target_width: 100,
             layout_target_height: 100,
-            position: "absolute",
+            layout_positioning: "absolute",
             ...prototype,
             id: id,
           } as UnknownNode;
@@ -2861,7 +2861,7 @@ export namespace grida.program.nodes {
         z_index: 0,
         opacity: 1,
         blend_mode: cg.def.LAYER_BLENDMODE,
-        position: "absolute",
+        layout_positioning: "absolute",
         layout: "flow",
         direction: "horizontal",
         main_axis_alignment: "start",

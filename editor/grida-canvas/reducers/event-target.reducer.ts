@@ -173,7 +173,7 @@ function __self_evt_on_click(
           1
         );
 
-        _nnode.position = "absolute";
+        _nnode.layout_positioning = "absolute";
         _nnode.layout_inset_left! = nnode_relative_position[0];
         _nnode.layout_inset_top! = nnode_relative_position[1];
       } catch (e) {

@@ -138,7 +138,7 @@ export function NodeElement<P extends Record<string, any>>({
     vector_network: node.vector_network,
     opacity: node.opacity,
     z_index: DEFAULT_ZINDEX ?? node.z_index,
-    position: DEFAULT_POSITION ?? node.position,
+    layout_positioning: DEFAULT_POSITION ?? node.layout_positioning,
     layout_inset_left: DEFAULT_LEFT ?? node.layout_inset_left,
     layout_inset_top: DEFAULT_TOP ?? node.layout_inset_top,
     layout_target_width: DEFAULT_WIDTH ?? node.layout_target_width,

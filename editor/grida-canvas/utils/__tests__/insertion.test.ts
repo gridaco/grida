@@ -37,7 +37,7 @@ describe("getPackedSubtreeBoundingRect", () => {
           layout_inset_top: 10,
           layout_target_width: 20,
           layout_target_height: 20,
-          position: "absolute",
+          layout_positioning: "absolute",
         } as grida.program.nodes.RectangleNode,
         b: {
           id: "b",
@@ -46,7 +46,7 @@ describe("getPackedSubtreeBoundingRect", () => {
           layout_inset_top: 40,
           layout_target_width: 20,
           layout_target_height: 20,
-          position: "absolute",
+          layout_positioning: "absolute",
         } as grida.program.nodes.RectangleNode,
       },
       images: {},

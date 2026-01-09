@@ -176,9 +176,9 @@ const safe_properties: Partial<
       (draft as UN).name = value;
     },
   }),
-  position: defineNodeProperty<"position">({
+  layout_positioning: defineNodeProperty<"layout_positioning">({
     apply: (draft, value, prev) => {
-      (draft as UN).position = value;
+      (draft as UN).layout_positioning = value;
     },
   }),
   layout_inset_left: defineNodeProperty<"layout_inset_left">({
@@ -914,8 +914,11 @@ export default function nodeReducer<
       // keep
       case "node/change/positioning": {
         const pos = draft as grida.program.nodes.i.IPositioning;
-        if (("position" satisfies UNPK) in action && action.position) {
-          pos.position = action.position;
+        if (
+          ("layout_positioning" satisfies UNPK) in action &&
+          action.layout_positioning
+        ) {
+          pos.layout_positioning = action.layout_positioning;
         }
         if (("layout_inset_left" satisfies UNPK) in action)
           pos.layout_inset_left = action.layout_inset_left;
@@ -929,8 +932,9 @@ export default function nodeReducer<
       }
       // keep
       case "node/change/positioning-mode": {
-        const { position } = action;
-        (draft as grida.program.nodes.i.IPositioning).position = position;
+        const { layout_positioning: position } = action;
+        (draft as grida.program.nodes.i.IPositioning).layout_positioning =
+          position;
         switch (position) {
           case "absolute": {
             break;

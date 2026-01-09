@@ -64,7 +64,7 @@ export namespace css {
     }
   ): React.CSSProperties {
     const {
-      position,
+      layout_positioning: position,
       layout_inset_top: top,
       layout_inset_left: left,
       layout_inset_bottom: bottom,
@@ -271,7 +271,7 @@ export namespace css {
    * For percentage values, returns the percentage value (0-100).
    */
   export function toPxNumber(
-    value: grida.program.css.LengthPercentage | "auto",
+    value?: grida.program.css.LengthPercentage | "auto",
     fallback = 0
   ): number {
     if (!value || value === "auto") return fallback;

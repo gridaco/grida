@@ -492,7 +492,7 @@ function collectAutoSpaceRootsFromGesture(args: {
 
     const o = toRecord(initial_node);
     if (!o) continue;
-    if (o["position"] !== "absolute") continue;
+    if (o["layout_positioning"] !== "absolute") continue;
     if (
       !grida.program.nodes.hasLayoutWidth(initial_node) ||
       !grida.program.nodes.hasLayoutHeight(initial_node) ||
@@ -533,7 +533,7 @@ function collectAutoSpaceRootsForCommand(args: {
 
     const o = toRecord(node);
     if (!o) continue;
-    if (o["position"] !== "absolute") continue;
+    if (o["layout_positioning"] !== "absolute") continue;
     if (
       !grida.program.nodes.hasLayoutWidth(node) ||
       !grida.program.nodes.hasLayoutHeight(node) ||

@@ -969,7 +969,7 @@ type INodeChangePositioningAction = INodeID &
   Partial<grida.program.nodes.i.IPositioning>;
 
 type INodeChangePositioningModeAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknownNode, "position">>;
+  Required<Pick<grida.program.nodes.UnknownNode, "layout_positioning">>;
 
 type INodeChangeComponentAction = INodeID &
   Required<Pick<grida.program.nodes.UnknownNode, "component_id">>;

@@ -3833,7 +3833,7 @@ export namespace format {
         builder: Builder,
         node: Pick<
           grida.program.nodes.UnknownNode,
-          | "position"
+          | "layout_positioning"
           | "layout_inset_left"
           | "layout_inset_top"
           | "layout_inset_right"
@@ -3859,7 +3859,7 @@ export namespace format {
           >
       ): number {
         const positioning = {
-          position: node.position ?? "relative",
+          position: node.layout_positioning ?? "relative",
           left: node.layout_inset_left,
           top: node.layout_inset_top,
           right: node.layout_inset_right,
@@ -4091,7 +4091,7 @@ export namespace format {
         }
 
         return {
-          position,
+          layout_positioning: position,
           layout_inset_left: left,
           layout_inset_top: top,
           layout_inset_right: right,
@@ -4172,10 +4172,10 @@ export namespace format {
           // Layout: only for nodes that have the expected TS fields (position/size).
           let layoutOffset: number | undefined = undefined;
           if (
-            "position" in node &&
+            "layout_positioning" in node &&
             "layout_target_width" in node &&
             "layout_target_height" in node &&
-            node.position &&
+            node.layout_positioning &&
             node.layout_target_width !== undefined &&
             node.layout_target_height !== undefined
           ) {
@@ -4183,7 +4183,7 @@ export namespace format {
               builder,
               node as Pick<
                 grida.program.nodes.UnknownNode,
-                | "position"
+                | "layout_positioning"
                 | "layout_inset_left"
                 | "layout_inset_top"
                 | "layout_inset_right"
@@ -4552,7 +4552,7 @@ export namespace format {
             z_index: 0,
             layout_target_width,
             layout_target_height,
-            position: layoutFields.position ?? "absolute",
+            layout_positioning: layoutFields.layout_positioning ?? "absolute",
             layout_inset_left: layoutFields.layout_inset_left,
             layout_inset_top: layoutFields.layout_inset_top,
             layout_inset_right: layoutFields.layout_inset_right,
@@ -4887,7 +4887,7 @@ export namespace format {
             // stroke_paints from LineNode
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             // geometry via layout (height is always 0 for lines)
-            position: layoutFields.position ?? "absolute",
+            layout_positioning: layoutFields.layout_positioning ?? "absolute",
             layout_inset_left: layoutFields.layout_inset_left,
             layout_inset_top: layoutFields.layout_inset_top,
             layout_inset_right: layoutFields.layout_inset_right,
@@ -4956,7 +4956,7 @@ export namespace format {
             ...(fillPaints ? { fill_paints: fillPaints } : {}),
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             // geometry via layout (fixed dimensions)
-            position: layoutFields.position ?? "absolute",
+            layout_positioning: layoutFields.layout_positioning ?? "absolute",
             layout_inset_left: layoutFields.layout_inset_left,
             layout_inset_top: layoutFields.layout_inset_top,
             layout_inset_right: layoutFields.layout_inset_right,
@@ -5014,7 +5014,7 @@ export namespace format {
             ...(fillPaints ? { fill_paints: fillPaints } : {}),
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             // geometry via layout (IPositioning, IRotation, ILayoutTrait)
-            position: layoutFields.position ?? "absolute",
+            layout_positioning: layoutFields.layout_positioning ?? "absolute",
             layout_inset_left: layoutFields.layout_inset_left,
             layout_inset_top: layoutFields.layout_inset_top,
             layout_inset_right: layoutFields.layout_inset_right,
@@ -5053,7 +5053,7 @@ export namespace format {
             locked: systemNode.locked(),
             opacity,
             ...layoutFields,
-            position: layoutFields.position ?? "relative",
+            layout_positioning: layoutFields.layout_positioning ?? "relative",
             ...(effects || {}),
           } satisfies grida.program.nodes.GroupNode;
         }

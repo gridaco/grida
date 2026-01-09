@@ -75,7 +75,7 @@ export default function initialNode(
   };
 
   const position: grida.program.nodes.i.IPositioning = {
-    position: "absolute",
+    layout_positioning: "absolute",
     layout_inset_top: 0,
     layout_inset_left: 0,
   };
@@ -87,7 +87,7 @@ export default function initialNode(
   };
 
   const layout_child: grida.program.nodes.i.ILayoutChildTrait = {
-    position: "absolute",
+    layout_positioning: "absolute",
     rotation: 0,
     layout_target_width: 100,
     layout_target_height: 100,
@@ -102,7 +102,7 @@ export default function initialNode(
     fill_paints: constraints.fill === "fill_paints" ? [gray] : undefined,
     layout_target_width: 100,
     layout_target_height: 100,
-    position: "absolute",
+    layout_positioning: "absolute",
     border: undefined,
     style: {},
   };

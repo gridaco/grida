@@ -125,10 +125,10 @@ function createGeometryStub(
   }
 
   function getLocalRect(
-    node: grida.program.nodes.Node
+    node: grida.program.nodes.UnknownNode
   ): { x: number; y: number; width: number; height: number } | null {
     if (!node) return null;
-    if (node.position !== "absolute") return null;
+    if (node.layout_positioning !== "absolute") return null;
     if (
       "layout_inset_left" in node &&
       typeof node.layout_inset_left !== "number"
@@ -170,8 +170,8 @@ function createGeometryStub(
     }
 
     if (
-      !grida.program.nodes.hasLayoutWidth(node) ||
-      !grida.program.nodes.hasLayoutHeight(node)
+      !grida.program.nodes.hasLayoutWidth(node as grida.program.nodes.Node) ||
+      !grida.program.nodes.hasLayoutHeight(node as grida.program.nodes.Node)
     ) {
       return null;
     }
@@ -208,7 +208,7 @@ function createGeometryStub(
 
     while (p && p !== state.scene_id) {
       const pn = state.document.nodes[p];
-      const pl = getLocalRect(pn);
+      const pl = getLocalRect(pn as grida.program.nodes.UnknownNode);
       if (pl) {
         x += pl.x;
         y += pl.y;
@@ -299,7 +299,7 @@ function initEditorStateFromFixture(args: {
 
 function hasNumericAbsoluteBox(node: grida.program.nodes.UnknownNode): boolean {
   return (
-    node?.position === "absolute" &&
+    node?.layout_positioning === "absolute" &&
     typeof node.layout_inset_left === "number" &&
     typeof node.layout_inset_top === "number" &&
     typeof node.layout_target_width === "number" &&
@@ -347,7 +347,7 @@ function pickTextAndVectorTargetsFromFixture(
     entries.find(
       ([, n]) =>
         n.type === "tspan" &&
-        n.position === "absolute" &&
+        n.layout_positioning === "absolute" &&
         typeof n.layout_inset_left === "number" &&
         typeof n.layout_inset_top === "number" &&
         typeof n.font_size === "number"
@@ -367,7 +367,7 @@ function isScaleTrackableNode(
   if (!node) return false;
   if (node.type === "tspan") {
     return (
-      node.position === "absolute" &&
+      node.layout_positioning === "absolute" &&
       typeof node.layout_inset_left === "number" &&
       typeof node.layout_inset_top === "number" &&
       typeof node.font_size === "number"
@@ -582,7 +582,7 @@ it("origin semantics: auto overrides root left/top but global does not", () => {
         name: "Rect",
         active: true,
         locked: false,
-        position: "absolute",
+        layout_positioning: "absolute",
         layout_inset_left: 10,
         layout_inset_top: 20,
         layout_target_width: 100,

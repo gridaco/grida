@@ -715,8 +715,8 @@ pub struct JSONUnknownNodeProperties {
     // #[serde(rename = "z_index", alias = "zIndex", default = "default_z_index")]
     // pub z_index: i32,
     // css
-    #[serde(rename = "position")]
-    pub position: Option<CSSPosition>,
+    #[serde(rename = "layout_positioning", alias = "position")]
+    pub layout_positioning: Option<CSSPosition>,
     #[serde(rename = "layout_inset_left", alias = "left")]
     pub layout_inset_left: Option<f32>,
     #[serde(rename = "layout_inset_top", alias = "top")]
@@ -1346,7 +1346,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1381,7 +1381,7 @@ impl From<JSONTextSpanNode> for TextSpanNodeRec {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1495,7 +1495,7 @@ impl From<JSONEllipseNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1552,7 +1552,7 @@ impl From<JSONRectangleNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1661,7 +1661,7 @@ impl From<JSONImageNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1719,7 +1719,7 @@ impl From<JSONRegularPolygonNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1778,7 +1778,7 @@ impl From<JSONRegularStarPolygonNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1823,7 +1823,7 @@ impl From<JSONLineNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1879,7 +1879,7 @@ impl From<JSONVectorNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -2110,7 +2110,7 @@ mod corner_radius_tests {
             "opacity": 1.0,
             "blend_mode": "normal",
             "z_index": 0,
-            "position": "absolute",
+            "layout_positioning": "absolute",
             "layout_inset_left": 0,
             "layout_inset_top": 0,
             "rotation": 0,
@@ -2152,7 +2152,7 @@ mod padding_tests {
             "opacity": 1.0,
             "blend_mode": "normal",
             "z_index": 0,
-            "position": "absolute",
+            "layout_positioning": "absolute",
             "layout_inset_left": 0,
             "layout_inset_top": 0,
             "rotation": 0,
@@ -2187,7 +2187,7 @@ mod padding_tests {
             "opacity": 1.0,
             "blend_mode": "normal",
             "z_index": 0,
-            "position": "absolute",
+            "layout_positioning": "absolute",
             "layout_inset_left": 0,
             "layout_inset_top": 0,
             "rotation": 0,
@@ -2219,7 +2219,7 @@ mod padding_tests {
             "opacity": 1.0,
             "blend_mode": "normal",
             "z_index": 0,
-            "position": "absolute",
+            "layout_positioning": "absolute",
             "layout_inset_left": 0,
             "layout_inset_top": 0,
             "rotation": 0,

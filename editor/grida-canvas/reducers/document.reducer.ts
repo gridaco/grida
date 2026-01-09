@@ -610,8 +610,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               sub.scene.children_refs.forEach((node_id) => {
                 const node = sub.nodes[node_id];
                 if (
-                  "position" in node &&
-                  node.position === "absolute" &&
+                  "layout_positioning" in node &&
+                  node.layout_positioning === "absolute" &&
                   "layout_inset_left" in node &&
                   "layout_inset_top" in node
                 ) {
@@ -634,8 +634,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 sub.scene.children_refs.forEach((node_id) => {
                   const node = sub.nodes[node_id];
                   if (
-                    "position" in node &&
-                    node.position === "absolute" &&
+                    "layout_positioning" in node &&
+                    node.layout_positioning === "absolute" &&
                     "layout_inset_left" in node &&
                     "layout_inset_top" in node
                   ) {
@@ -724,7 +724,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           id,
           active: true,
           locked: false,
-          position: "absolute",
+          layout_positioning: "absolute",
           layout_inset_left: 0,
           layout_inset_top: 0,
           opacity: 1,
@@ -852,8 +852,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       sub.scene.children_refs.forEach((node_id) => {
         const node = sub.nodes[node_id];
         if (
-          "position" in node &&
-          node.position === "absolute" &&
+          "layout_positioning" in node &&
+          node.layout_positioning === "absolute" &&
           "layout_inset_left" in node &&
           "layout_inset_top" in node
         ) {
@@ -871,8 +871,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           sub.scene.children_refs.forEach((node_id) => {
             const node = sub.nodes[node_id];
             if (
-              "position" in node &&
-              node.position === "absolute" &&
+              "layout_positioning" in node &&
+              node.layout_positioning === "absolute" &&
               "layout_inset_left" in node &&
               "layout_inset_top" in node
             ) {
@@ -1084,10 +1084,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
         const in_flow_node_ids = nodes
           .filter((node) => {
-            if ("position" in node) {
+            if ("layout_positioning" in node) {
               return (
-                "position" in node &&
-                node.position === "relative" &&
+                node.layout_positioning === "relative" &&
                 "layout_inset_top" in node &&
                 "layout_inset_right" in node &&
                 "layout_inset_bottom" in node &&
@@ -1346,7 +1345,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               child_id
             ] as grida.program.nodes.i.IPositioning) = {
               ...child,
-              position: "relative",
+              layout_positioning: "relative",
               layout_inset_top: undefined,
               layout_inset_right: undefined,
               layout_inset_bottom: undefined,
@@ -1431,7 +1430,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               // children (empty when init)
               children: [],
               // position
-              position: "absolute",
+              layout_positioning: "absolute",
             };
 
             const container_id = self_insertSubDocument(
@@ -1456,7 +1455,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 child_id
               ] as grida.program.nodes.i.IPositioning) = {
                 ...child,
-                position: "relative",
+                layout_positioning: "relative",
                 layout_inset_top: undefined,
                 layout_inset_right: undefined,
                 layout_inset_bottom: undefined,
