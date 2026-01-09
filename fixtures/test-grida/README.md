@@ -22,6 +22,33 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 
 ### Changelog
 
-- **2026-01-03**: Migrated from legacy `.grida` (JSON/ZIP) format to new `.grida` (ZIP/FlatBuffer) binary format. Legacy snapshot files are now stored as `.grida1.zip` for test fixtures.
+- **0.90.0-beta+20260108**: Migrated from legacy `.grida` (JSON/ZIP) format to new `.grida` (ZIP/FlatBuffer) binary format. Legacy snapshot files are now stored as `.grida1.zip` for test fixtures.
+
+<details>
+<summary>`grida1` `0.89.0` -> `0.90.0`</summary>
+
+| `0.89.0`               | `0.90.0`                      |
+| ---------------------- | ----------------------------- |
+| `position`             | `layout_positioning`          |
+| `left`                 | `layout_inset_left`           |
+| `top`                  | `layout_inset_top`            |
+| `right`                | `layout_inset_right`          |
+| `bottom`               | `layout_inset_bottom`         |
+| `width`                | `layout_target_width`         |
+| `height`               | `layout_target_height`        |
+| `layout`               | `layout_mode`                 |
+| `padding_top`          | `layout_padding_top`          |
+| `padding_right`        | `layout_padding_right`        |
+| `padding_bottom`       | `layout_padding_bottom`       |
+| `padding_left`         | `layout_padding_left`         |
+| `direction`            | `layout_direction`            |
+| `main_axis_alignment`  | `layout_main_axis_alignment`  |
+| `cross_axis_alignment` | `layout_cross_axis_alignment` |
+| `main_axis_gap`        | `layout_main_axis_gap`        |
+| `cross_axis_gap`       | `layout_cross_axis_gap`       |
+
+</details>
+
+---
 
 > Current Version: `0.90.0-beta+20260108` (last updated: 2026-01-08)
