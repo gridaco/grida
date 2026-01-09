@@ -999,7 +999,7 @@ function SectionLayout({
   } = useNodeState(node_id, (node) => ({
     type: node.type,
     layout: node.layout_mode,
-    direction: node.direction,
+    direction: node.layout_direction,
     main_axis_alignment: node.main_axis_alignment,
     cross_axis_alignment: node.cross_axis_alignment,
     main_axis_gap: node.main_axis_gap,
@@ -1107,7 +1107,7 @@ function SectionLayoutMixed({
     width: node.layout_target_width,
     height: node.layout_target_height,
     layout: node.layout_mode,
-    direction: node.direction,
+    direction: node.layout_direction,
     main_axis_alignment: node.main_axis_alignment,
     cross_axis_alignment: node.cross_axis_alignment,
     main_axis_gap: node.main_axis_gap,

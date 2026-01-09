@@ -1611,7 +1611,7 @@ export namespace grida.program.nodes {
        *
        * @default "horizontal"
        */
-      direction: cg.Axis;
+      layout_direction: cg.Axis;
 
       /**
        *
@@ -2863,7 +2863,7 @@ export namespace grida.program.nodes {
         blend_mode: cg.def.LAYER_BLENDMODE,
         layout_positioning: "absolute",
         layout_mode: "flow",
-        direction: "horizontal",
+        layout_direction: "horizontal",
         main_axis_alignment: "start",
         main_axis_gap: 0,
         cross_axis_alignment: "start",

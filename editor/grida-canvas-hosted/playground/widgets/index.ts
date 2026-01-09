@@ -14,7 +14,7 @@ export namespace prototypes {
     rotation: 0,
     corner_radius: 0,
     layout_mode: "flex",
-    direction: "horizontal",
+    layout_direction: "horizontal",
     main_axis_alignment: "start",
     cross_axis_alignment: "start",
     main_axis_gap: 16,
@@ -83,7 +83,7 @@ export namespace prototypes {
 
   export const column = {
     ...row,
-    direction: "vertical",
+    layout_direction: "vertical",
   } satisfies grida.program.nodes.NodePrototype;
 
   export const text = {
@@ -142,7 +142,7 @@ export namespace prototypes {
     rotation: 0,
     corner_radius: 16,
     layout_mode: "flex",
-    direction: "horizontal",
+    layout_direction: "horizontal",
     main_axis_alignment: "center",
     cross_axis_alignment: "center",
     main_axis_gap: 8,
@@ -193,7 +193,7 @@ export namespace prototypes {
     rotation: 0,
     corner_radius: 24,
     layout_mode: "flex",
-    direction: "horizontal",
+    layout_direction: "horizontal",
     main_axis_alignment: "center",
     cross_axis_alignment: "center",
     main_axis_gap: 8,

@@ -370,7 +370,11 @@ export function useSingleSelection(
       };
 
       const container = node as grida.program.nodes.ContainerNode;
-      const { direction, main_axis_gap, cross_axis_gap } = container;
+      const {
+        layout_direction: direction,
+        main_axis_gap,
+        cross_axis_gap,
+      } = container;
       const axis = direction === "horizontal" ? "x" : "y";
       const children = dq.getChildren(document_ctx, node_id);
       const children_rects = children

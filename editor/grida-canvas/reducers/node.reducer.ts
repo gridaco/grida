@@ -689,12 +689,13 @@ const safe_properties: Partial<
   }),
   layout_mode: defineNodeProperty<"layout_mode">({
     assert: (node) => node.type === "container" || node.type === "component",
-    apply: (draft, value, prev) => {
-      (draft as UN).layout_mode = value;
+    apply: (_draft, value, prev) => {
+      const draft = _draft as UN;
+      draft.layout_mode = value;
       if (prev !== "flex" && value === "flex") {
         // initialize flex layout
         // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
-        if (!draft.direction) draft.direction = "horizontal";
+        if (!draft.layout_direction) draft.layout_direction = "horizontal";
         if (!draft.main_axis_alignment) draft.main_axis_alignment = "start";
         if (!draft.cross_axis_alignment) draft.cross_axis_alignment = "start";
         if (!draft.main_axis_gap) draft.main_axis_gap = 0;
@@ -702,10 +703,10 @@ const safe_properties: Partial<
       }
     },
   }),
-  direction: defineNodeProperty<"direction">({
+  layout_direction: defineNodeProperty<"layout_direction">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).direction = value;
+      (draft as UN).layout_direction = value;
     },
   }),
   main_axis_alignment: defineNodeProperty<"main_axis_alignment">({

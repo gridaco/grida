@@ -952,8 +952,8 @@ pub struct JSONContainerNode {
     pub padding_bottom: f32,
     #[serde(rename = "padding_left", alias = "paddingLeft", default)]
     pub padding_left: f32,
-    #[serde(rename = "direction", default)]
-    pub direction: JSONAxis,
+    #[serde(rename = "layout_direction", alias = "direction", default)]
+    pub layout_direction: JSONAxis,
     #[serde(rename = "layout_wrap", alias = "layoutWrap")]
     pub layout_wrap: Option<LayoutWrap>,
     #[serde(rename = "main_axis_alignment", alias = "mainAxisAlignment")]
@@ -1308,7 +1308,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             mask: node.base.mask.map(|m| m.into()),
             layout_container: LayoutContainerStyle {
                 layout_mode: node.layout_mode.into(),
-                layout_direction: node.direction.into(),
+                layout_direction: node.layout_direction.into(),
                 layout_wrap: node.layout_wrap,
                 layout_main_axis_alignment: node.main_axis_alignment,
                 layout_cross_axis_alignment: node.cross_axis_alignment,
@@ -3723,7 +3723,7 @@ mod tests {
             "layout_target_width": 400.0,
             "layout_target_height": 300.0,
             "layout_mode": "flex",
-            "direction": "vertical"
+            "layout_direction": "vertical"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3733,7 +3733,7 @@ mod tests {
             JSONNode::Container(container) => {
                 // Verify typed enums
                 assert!(matches!(container.layout_mode, JSONLayoutMode::Flex));
-                assert!(matches!(container.direction, JSONAxis::Vertical));
+                assert!(matches!(container.layout_direction, JSONAxis::Vertical));
 
                 // Verify conversion
                 let converted: ContainerNodeRec = container.into();
@@ -3762,7 +3762,7 @@ mod tests {
             "layout_target_width": 600.0,
             "layout_target_height": 400.0,
             "layout_mode": "flex",
-            "direction": "horizontal",
+            "layout_direction": "horizontal",
             "main_axis_alignment": "space-between",
             "cross_axis_alignment": "center"
         }"#;
@@ -3852,7 +3852,7 @@ mod tests {
             "layout_target_width": 500.0,
             "layout_target_height": 400.0,
             "layout_mode": "flex",
-            "direction": "vertical",
+            "layout_direction": "vertical",
             "padding_top": 15.0,
             "padding_right": 15.0,
             "padding_bottom": 15.0,
@@ -3868,7 +3868,7 @@ mod tests {
             JSONNode::Container(container) => {
                 // Verify all properties
                 assert!(matches!(container.layout_mode, JSONLayoutMode::Flex));
-                assert!(matches!(container.direction, JSONAxis::Vertical));
+                assert!(matches!(container.layout_direction, JSONAxis::Vertical));
                 assert_eq!(container.padding_top, 15.0);
                 assert_eq!(container.padding_right, 15.0);
                 assert_eq!(container.padding_bottom, 15.0);
@@ -4107,7 +4107,7 @@ mod tests {
             "layout_target_width": 600.0,
             "layout_target_height": 500.0,
             "layout_mode": "flex",
-            "direction": "horizontal",
+            "layout_direction": "horizontal",
             "layout_wrap": "wrap",
             "padding_top": 20.0,
             "padding_right": 20.0,
@@ -4126,7 +4126,7 @@ mod tests {
             JSONNode::Container(container) => {
                 // Verify all properties
                 assert!(matches!(container.layout_mode, JSONLayoutMode::Flex));
-                assert!(matches!(container.direction, JSONAxis::Horizontal));
+                assert!(matches!(container.layout_direction, JSONAxis::Horizontal));
                 assert!(matches!(container.layout_wrap, Some(LayoutWrap::Wrap)));
                 assert_eq!(container.padding_top, 20.0);
                 assert_eq!(container.padding_right, 20.0);

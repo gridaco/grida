@@ -3754,7 +3754,7 @@ export namespace format {
           Pick<
             grida.program.nodes.ContainerNode,
             | "layout_mode"
-            | "direction"
+            | "layout_direction"
             | "layout_wrap"
             | "main_axis_alignment"
             | "cross_axis_alignment"
@@ -3776,7 +3776,7 @@ export namespace format {
         );
         fbs.LayoutContainerStyle.addLayoutDirection(
           builder,
-          axis(node.direction)
+          axis(node.layout_direction)
         );
         fbs.LayoutContainerStyle.addLayoutWrap(
           builder,
@@ -3847,7 +3847,7 @@ export namespace format {
             Pick<
               grida.program.nodes.ContainerNode,
               | "layout_mode"
-              | "direction"
+              | "layout_direction"
               | "layout_wrap"
               | "main_axis_alignment"
               | "cross_axis_alignment"
@@ -3971,7 +3971,7 @@ export namespace format {
           Pick<
             grida.program.nodes.ContainerNode,
             | "layout_mode"
-            | "direction"
+            | "layout_direction"
             | "layout_wrap"
             | "main_axis_alignment"
             | "cross_axis_alignment"
@@ -4059,7 +4059,9 @@ export namespace format {
         if (container) {
           containerFields.layout_mode =
             container.layoutMode() === fbs.LayoutMode.Flex ? "flex" : "flow";
-          containerFields.direction = decode.axis(container.layoutDirection());
+          containerFields.layout_direction = decode.axis(
+            container.layoutDirection()
+          );
 
           const wrap = decode.layoutWrap(container.layoutWrap());
           if (wrap !== undefined) {
@@ -4197,7 +4199,7 @@ export namespace format {
                   Pick<
                     grida.program.nodes.ContainerNode,
                     | "layout_mode"
-                    | "direction"
+                    | "layout_direction"
                     | "layout_wrap"
                     | "main_axis_alignment"
                     | "cross_axis_alignment"
@@ -4681,7 +4683,7 @@ export namespace format {
             ...(fillPaints ? { fill_paints: fillPaints } : {}),
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             layout_mode: "flow",
-            direction: "horizontal" as cg.Axis,
+            layout_direction: "horizontal" as cg.Axis,
             main_axis_alignment: "start" as cg.MainAxisAlignment,
             cross_axis_alignment: "start" as cg.CrossAxisAlignment,
             main_axis_gap: 0,

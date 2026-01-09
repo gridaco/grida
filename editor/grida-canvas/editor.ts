@@ -1381,7 +1381,7 @@ class EditorDocumentStore
     const currentLayout = (node as grida.program.nodes.ContainerNode)
       .layout_mode;
     const currentDirection = (node as grida.program.nodes.ContainerNode)
-      .direction;
+      .layout_direction;
 
     // Compute the action type
     const action: RelayoutAction = (() => {
@@ -1444,7 +1444,7 @@ class EditorDocumentStore
             type: "node/change/*",
             node_id: node_id,
             layout_mode: "flow",
-            direction: undefined,
+            layout_direction: undefined,
             main_axis_gap: undefined,
             cross_axis_gap: undefined,
             main_axis_alignment: undefined,
@@ -2500,7 +2500,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      direction,
+      layout_direction: direction,
     });
   }
 

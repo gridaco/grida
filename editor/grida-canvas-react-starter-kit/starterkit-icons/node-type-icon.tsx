@@ -41,7 +41,7 @@ export function NodeTypeIcon({
       return <MixIcon className={className} />;
     case "container":
       if (node.layout_mode === "flex") {
-        switch (node.direction) {
+        switch (node.layout_direction) {
           case "horizontal":
             return <ViewVerticalIcon className={className} />;
           case "vertical":
