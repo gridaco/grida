@@ -607,7 +607,7 @@ export namespace iofigma {
           expanded,
           padding,
           layout_mode: "flow" as const,
-          direction: "horizontal" as const,
+          layout_direction: "horizontal" as const,
           main_axis_alignment: "start" as const,
           cross_axis_alignment: "start" as const,
           main_axis_gap: node.itemSpacing ?? 0,

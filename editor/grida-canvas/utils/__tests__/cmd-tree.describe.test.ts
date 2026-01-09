@@ -29,7 +29,7 @@ describe("describeDocumentTree", () => {
         z_index: 0,
         layout_positioning: "absolute",
         layout_mode: "flow",
-        direction: "horizontal",
+        layout_direction: "horizontal",
         main_axis_alignment: "start",
         cross_axis_alignment: "start",
         main_axis_gap: 0,

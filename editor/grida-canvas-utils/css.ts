@@ -93,7 +93,7 @@ export namespace css {
       fe_shadows,
       //
       layout_mode: layout,
-      direction,
+      layout_direction: direction,
       main_axis_alignment,
       cross_axis_alignment,
       main_axis_gap,

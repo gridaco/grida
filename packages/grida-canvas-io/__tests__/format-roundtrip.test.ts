@@ -306,7 +306,7 @@ describe("format roundtrip", () => {
         layout_target_height: { type: "percentage" as const, value: 75 },
         rotation: 0,
         layout_mode: "flow" as const,
-        direction: "horizontal" as const,
+        layout_direction: "horizontal" as const,
         main_axis_alignment: "start" as const,
         cross_axis_alignment: "start" as const,
         main_axis_gap: 0,
@@ -681,7 +681,7 @@ describe("format roundtrip", () => {
             layout_target_height: 300,
             rotation: 0,
             layout_mode: "flex",
-            direction: "horizontal",
+            layout_direction: "horizontal",
             layout_wrap: "wrap",
             main_axis_alignment: "space-evenly",
             cross_axis_alignment: "stretch",
@@ -713,7 +713,7 @@ describe("format roundtrip", () => {
 
       expect(node.type).toBe("container");
       expect(node.layout_mode).toBe("flex");
-      expect(node.direction).toBe("horizontal");
+      expect(node.layout_direction).toBe("horizontal");
       expect(node.layout_wrap).toBe("wrap");
       expect(node.main_axis_alignment).toBe("space-evenly");
       expect(node.cross_axis_alignment).toBe("stretch");
@@ -1062,7 +1062,7 @@ describe("format roundtrip", () => {
             layout_target_height: 100,
             rotation: 0,
             layout_mode: "flex" as const,
-            direction: "horizontal" as const,
+            layout_direction: "horizontal" as const,
             layout_wrap: wrap satisfies "wrap" | "nowrap" | undefined,
             main_axis_alignment: "start" as const,
             cross_axis_alignment: "start" as const,
@@ -1172,7 +1172,7 @@ describe("format roundtrip", () => {
             layout_target_height: 100,
             rotation: 0,
             layout_mode: "flex" as const,
-            direction: "vertical" as const,
+            layout_direction: "vertical" as const,
             layout_wrap: "nowrap" as const,
             main_axis_alignment: "space-between" as const,
             cross_axis_alignment: "center" as const,
@@ -2751,7 +2751,7 @@ describe("format roundtrip", () => {
             layout_target_height: 100,
             rotation: 0,
             layout_mode: "flow",
-            direction: "horizontal",
+            layout_direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
             main_axis_gap: 0,
@@ -3306,7 +3306,7 @@ describe("format roundtrip", () => {
             layout_target_height: 100,
             rotation: 0,
             layout_mode: "flow",
-            direction: "horizontal",
+            layout_direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
             main_axis_gap: 0,
@@ -3407,7 +3407,7 @@ describe("format roundtrip", () => {
             layout_target_height: 100,
             rotation: 0,
             layout_mode: "flow",
-            direction: "horizontal",
+            layout_direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
             main_axis_gap: 0,
@@ -3546,7 +3546,7 @@ describe("format roundtrip", () => {
             layout_target_height: 100,
             rotation: 0,
             layout_mode: "flow",
-            direction: "horizontal",
+            layout_direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
             main_axis_gap: 0,
@@ -3707,7 +3707,7 @@ describe("format roundtrip", () => {
             layout_target_height: 100,
             rotation: 0,
             layout_mode: "flow",
-            direction: "horizontal",
+            layout_direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
             main_axis_gap: 0,
@@ -3790,7 +3790,7 @@ describe("format roundtrip", () => {
             layout_target_height: 100,
             rotation: 0,
             layout_mode: "flow",
-            direction: "horizontal",
+            layout_direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
             main_axis_gap: 0,

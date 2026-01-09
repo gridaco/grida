@@ -1326,7 +1326,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           // Apply flex layout properties to the existing container
           container.layout_mode = "flex";
-          container.direction = lay.direction;
+          container.layout_direction = lay.direction;
           container.main_axis_gap = cmath.quantize(lay.spacing, 1);
           container.cross_axis_gap = cmath.quantize(lay.spacing, 1);
           container.main_axis_alignment = lay.mainAxisAlignment;
@@ -1412,7 +1412,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               layout_target_height: "auto",
               layout_inset_top: cmath.quantize(layout.union.y, 1),
               layout_inset_left: cmath.quantize(layout.union.x, 1),
-              direction: layout.direction,
+              layout_direction: layout.direction,
               main_axis_gap: cmath.quantize(layout.spacing, 1),
               cross_axis_gap: cmath.quantize(layout.spacing, 1),
               main_axis_alignment: layout.mainAxisAlignment,

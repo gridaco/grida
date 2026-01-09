@@ -797,7 +797,7 @@ function __self_start_gesture(
           "the selection is not a flex container"
         );
         // (we only support main axis gap for now) - ignoring the input axis.
-        const { direction, main_axis_gap } = node;
+        const { layout_direction: direction, main_axis_gap } = node;
 
         const children = dq.getChildren(draft.document_ctx, selection);
 
