@@ -2042,7 +2042,7 @@ export namespace format {
           stackItemOffsets.push(fbs.PaintStackItem.endPaintStackItem(builder));
         }
 
-        return createVector(builder, stackItemOffsets.reverse());
+        return createVector(builder, stackItemOffsets);
       }
 
       /**

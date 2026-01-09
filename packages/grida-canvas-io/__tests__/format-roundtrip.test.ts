@@ -1810,6 +1810,148 @@ describe("format roundtrip", () => {
         }
       );
     });
+
+    it("roundtrips multiple fill_paints preserving order on RectangleNode", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          fill_paints: [
+            {
+              type: "solid",
+              color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
+              blend_mode: "normal",
+              active: true,
+            } satisfies cg.SolidPaint,
+            {
+              type: "linear_gradient",
+              transform: [
+                [1, 0, 0],
+                [0, 1, 0],
+              ],
+              stops: [
+                { offset: 0, color: { r: 0, g: 1, b: 0, a: 1 } as cg.RGBA32F },
+                { offset: 1, color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "normal",
+              opacity: 1,
+              active: true,
+            } satisfies cg.LinearGradientPaint,
+            {
+              type: "solid",
+              color: { r: 1, g: 1, b: 0, a: 0.5 } as cg.RGBA32F,
+              blend_mode: "multiply",
+              active: true,
+            } satisfies cg.SolidPaint,
+          ],
+        },
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.fill_paints).toBeDefined();
+          expect(rectNode.fill_paints?.length).toBe(3);
+
+          // Verify order is preserved
+          const paint0 = rectNode.fill_paints?.[0];
+          expect(paint0?.type).toBe("solid");
+          if (paint0 && paint0.type === "solid") {
+            expect(paint0.color.r).toBe(1);
+            expect(paint0.color.g).toBe(0);
+            expect(paint0.color.b).toBe(0);
+          }
+
+          const paint1 = rectNode.fill_paints?.[1];
+          expect(paint1?.type).toBe("linear_gradient");
+          if (paint1 && paint1.type === "linear_gradient") {
+            expect(paint1.stops[0]?.color.g).toBe(1);
+            expect(paint1.stops[1]?.color.b).toBe(1);
+          }
+
+          const paint2 = rectNode.fill_paints?.[2];
+          expect(paint2?.type).toBe("solid");
+          if (paint2 && paint2.type === "solid") {
+            expect(paint2.color.r).toBe(1);
+            expect(paint2.color.g).toBe(1);
+            expect(paint2.color.b).toBe(0);
+            expect(paint2.color.a).toBe(0.5);
+            expect(paint2.blend_mode).toBe("multiply");
+          }
+        }
+      );
+    });
+
+    it("roundtrips multiple stroke_paints preserving order on RectangleNode", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseRectangle(nodeId),
+          layout_inset_left: 10,
+          layout_inset_top: 20,
+          layout_target_width: 100,
+          layout_target_height: 200,
+          stroke_width: 2,
+          stroke_paints: [
+            {
+              type: "solid",
+              color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
+              blend_mode: "normal",
+              active: true,
+            } satisfies cg.SolidPaint,
+            {
+              type: "radial_gradient",
+              transform: [
+                [1, 0, 0],
+                [0, 1, 0],
+              ],
+              stops: [
+                { offset: 0, color: { r: 0, g: 1, b: 0, a: 1 } as cg.RGBA32F },
+                { offset: 1, color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F },
+              ],
+              blend_mode: "multiply",
+              opacity: 0.8,
+              active: true,
+            } satisfies cg.RadialGradientPaint,
+          ],
+        },
+      });
+      roundtripTest<grida.program.nodes.RectangleNode>(
+        doc,
+        nodeId,
+        "rectangle",
+        (rectNode) => {
+          expect(rectNode.type).toBe("rectangle");
+          expect(rectNode.stroke_paints).toBeDefined();
+          expect(rectNode.stroke_paints?.length).toBe(2);
+
+          // Verify order is preserved
+          const paint0 = rectNode.stroke_paints?.[0];
+          expect(paint0?.type).toBe("solid");
+          if (paint0 && paint0.type === "solid") {
+            expect(paint0.color.r).toBe(1);
+            expect(paint0.color.g).toBe(0);
+            expect(paint0.color.b).toBe(0);
+          }
+
+          const paint1 = rectNode.stroke_paints?.[1];
+          expect(paint1?.type).toBe("radial_gradient");
+          if (paint1 && paint1.type === "radial_gradient") {
+            expect(paint1.stops[0]?.color.g).toBe(1);
+            expect(paint1.stops[1]?.color.b).toBe(1);
+            expect(paint1.blend_mode).toBe("multiply");
+          }
+        }
+      );
+    });
   });
 
   describe("rectangular stroke width", () => {
