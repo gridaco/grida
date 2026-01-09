@@ -7,7 +7,7 @@
         "name": "rectangle",
         "locked": false,
         "active": true,
-        "position": "absolute",
+        "layout_positioning": "absolute",
         "layout_inset_top": 0,
         "layout_inset_left": 0,
         "opacity": 1,
