@@ -253,7 +253,7 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodeFeBackdropBlur(node_id, value),
 
       // layout
-      layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
+      layout: (value: grida.program.nodes.i.IFlexContainer["layout_mode"]) =>
         instance.commands.changeContainerNodeLayout(node_id, value),
       direction: (value: cg.Axis) =>
         instance.commands.changeFlexContainerNodeDirection(node_id, value),
@@ -812,7 +812,8 @@ export function useNode(node_id: string): NodeWithMeta {
     ) as grida.program.nodes.UnknownNode;
   }, [node_definition, node_change]);
 
-  const is_flex_parent = node.type === "container" && node.layout === "flex";
+  const is_flex_parent =
+    node.type === "container" && node.layout_mode === "flex";
 
   // TODO: also check the ancestor nodes
   const is_component_consumer = is_direct_component_consumer(node.type);

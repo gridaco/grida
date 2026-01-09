@@ -54,7 +54,7 @@ function createLayoutSnapshot(
   );
 
   const is_group_flex_container =
-    parent && parent.type === "container" && parent.layout === "flex";
+    parent && parent.type === "container" && parent.layout_mode === "flex";
 
   if (is_group_flex_container) {
     return {
@@ -793,7 +793,7 @@ function __self_start_gesture(
         // assert the selection to be a flex container
         const node = dq.__getNodeById(draft, selection);
         assert(
-          node.type === "container" && node.layout === "flex",
+          node.type === "container" && node.layout_mode === "flex",
           "the selection is not a flex container"
         );
         // (we only support main axis gap for now) - ignoring the input axis.

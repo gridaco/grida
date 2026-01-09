@@ -687,10 +687,10 @@ const safe_properties: Partial<
       (draft as UN).clips_content = value;
     },
   }),
-  layout: defineNodeProperty<"layout">({
+  layout_mode: defineNodeProperty<"layout_mode">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).layout = value;
+      (draft as UN).layout_mode = value;
       if (prev !== "flex" && value === "flex") {
         // initialize flex layout
         // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)

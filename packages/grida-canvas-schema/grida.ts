@@ -1603,7 +1603,7 @@ export namespace grida.program.nodes {
       /**
        * the flex container only takes effect when layout is set to `flex`
        */
-      layout: "flex" | "flow";
+      layout_mode: "flex" | "flow";
 
       /**
        *
@@ -2862,7 +2862,7 @@ export namespace grida.program.nodes {
         opacity: 1,
         blend_mode: cg.def.LAYER_BLENDMODE,
         layout_positioning: "absolute",
-        layout: "flow",
+        layout_mode: "flow",
         direction: "horizontal",
         main_axis_alignment: "start",
         main_axis_gap: 0,

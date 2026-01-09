@@ -360,7 +360,8 @@ export function useSingleSelection(
     };
 
     let distribution: ObjectsDistributionAnalysis | undefined = undefined;
-    const is_flex_parent = node.type === "container" && node.layout === "flex";
+    const is_flex_parent =
+      node.type === "container" && node.layout_mode === "flex";
     if (is_flex_parent) {
       distribution = {
         rects: [],

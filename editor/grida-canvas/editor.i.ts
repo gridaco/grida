@@ -3643,7 +3643,7 @@ export namespace editor.api {
     ): void;
     changeContainerNodeLayout(
       node_id: NodeID,
-      layout: grida.program.nodes.i.IFlexContainer["layout"]
+      layout: grida.program.nodes.i.IFlexContainer["layout_mode"]
     ): void;
     changeContainerNodeClipsContent(
       node_id: NodeID,

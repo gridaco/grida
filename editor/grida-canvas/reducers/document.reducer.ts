@@ -1325,7 +1325,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           ) as grida.program.nodes.ContainerNode;
 
           // Apply flex layout properties to the existing container
-          container.layout = "flex";
+          container.layout_mode = "flex";
           container.direction = lay.direction;
           container.main_axis_gap = cmath.quantize(lay.spacing, 1);
           container.cross_axis_gap = cmath.quantize(lay.spacing, 1);
@@ -1407,7 +1407,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             const container_prototype: grida.program.nodes.NodePrototype = {
               type: "container",
               // layout
-              layout: "flex",
+              layout_mode: "flex",
               layout_target_width: "auto",
               layout_target_height: "auto",
               layout_inset_top: cmath.quantize(layout.union.y, 1),

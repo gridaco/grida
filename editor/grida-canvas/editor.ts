@@ -1338,7 +1338,7 @@ class EditorDocumentStore
       // to infer the optimal flex direction, spacing, and alignment (same as wrapping)
       if (
         node.type === "container" &&
-        (node as grida.program.nodes.ContainerNode).layout !== "flex"
+        (node as grida.program.nodes.ContainerNode).layout_mode !== "flex"
       ) {
         this.dispatch({
           type: "autolayout",
@@ -1378,7 +1378,8 @@ class EditorDocumentStore
       | { type: "flex"; direction: "horizontal" | "vertical" }
       | { type: "flex-direction-switch"; direction: "horizontal" | "vertical" };
 
-    const currentLayout = (node as grida.program.nodes.ContainerNode).layout;
+    const currentLayout = (node as grida.program.nodes.ContainerNode)
+      .layout_mode;
     const currentDirection = (node as grida.program.nodes.ContainerNode)
       .direction;
 
@@ -1442,7 +1443,7 @@ class EditorDocumentStore
           {
             type: "node/change/*",
             node_id: node_id,
-            layout: "flow",
+            layout_mode: "flow",
             direction: undefined,
             main_axis_gap: undefined,
             cross_axis_gap: undefined,
@@ -2478,12 +2479,12 @@ class EditorDocumentStore
 
   changeContainerNodeLayout(
     node_id: string,
-    layout: grida.program.nodes.i.IFlexContainer["layout"]
+    layout: grida.program.nodes.i.IFlexContainer["layout_mode"]
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      layout,
+      layout_mode: layout,
     });
   }
 

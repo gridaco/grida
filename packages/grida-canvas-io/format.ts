@@ -3753,7 +3753,7 @@ export namespace format {
         node: Partial<
           Pick<
             grida.program.nodes.ContainerNode,
-            | "layout"
+            | "layout_mode"
             | "direction"
             | "layout_wrap"
             | "main_axis_alignment"
@@ -3770,7 +3770,9 @@ export namespace format {
         fbs.LayoutContainerStyle.startLayoutContainerStyle(builder);
         fbs.LayoutContainerStyle.addLayoutMode(
           builder,
-          node.layout === "flex" ? fbs.LayoutMode.Flex : fbs.LayoutMode.Normal
+          node.layout_mode === "flex"
+            ? fbs.LayoutMode.Flex
+            : fbs.LayoutMode.Normal
         );
         fbs.LayoutContainerStyle.addLayoutDirection(
           builder,
@@ -3844,7 +3846,7 @@ export namespace format {
           Partial<
             Pick<
               grida.program.nodes.ContainerNode,
-              | "layout"
+              | "layout_mode"
               | "direction"
               | "layout_wrap"
               | "main_axis_alignment"
@@ -3883,7 +3885,7 @@ export namespace format {
 
         // Encode container style (optional)
         let containerOffset = 0;
-        const hasContainerStyle = node.layout !== undefined;
+        const hasContainerStyle = node.layout_mode !== undefined;
         if (hasContainerStyle) {
           containerOffset = containerStyle(builder, node);
         }
@@ -3968,7 +3970,7 @@ export namespace format {
         Partial<
           Pick<
             grida.program.nodes.ContainerNode,
-            | "layout"
+            | "layout_mode"
             | "direction"
             | "layout_wrap"
             | "main_axis_alignment"
@@ -4055,7 +4057,7 @@ export namespace format {
         const container = layout.layoutContainer();
         const containerFields: Partial<grida.program.nodes.ContainerNode> = {};
         if (container) {
-          containerFields.layout =
+          containerFields.layout_mode =
             container.layoutMode() === fbs.LayoutMode.Flex ? "flex" : "flow";
           containerFields.direction = decode.axis(container.layoutDirection());
 
@@ -4194,7 +4196,7 @@ export namespace format {
                 Partial<
                   Pick<
                     grida.program.nodes.ContainerNode,
-                    | "layout"
+                    | "layout_mode"
                     | "direction"
                     | "layout_wrap"
                     | "main_axis_alignment"
@@ -4678,7 +4680,7 @@ export namespace format {
             cursor: undefined,
             ...(fillPaints ? { fill_paints: fillPaints } : {}),
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
-            layout: "flow",
+            layout_mode: "flow",
             direction: "horizontal" as cg.Axis,
             main_axis_alignment: "start" as cg.MainAxisAlignment,
             cross_axis_alignment: "start" as cg.CrossAxisAlignment,

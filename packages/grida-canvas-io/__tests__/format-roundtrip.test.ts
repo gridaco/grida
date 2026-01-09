@@ -305,7 +305,7 @@ describe("format roundtrip", () => {
         layout_target_width: { type: "percentage" as const, value: 50 },
         layout_target_height: { type: "percentage" as const, value: 75 },
         rotation: 0,
-        layout: "flow" as const,
+        layout_mode: "flow" as const,
         direction: "horizontal" as const,
         main_axis_alignment: "start" as const,
         cross_axis_alignment: "start" as const,
@@ -680,7 +680,7 @@ describe("format roundtrip", () => {
             layout_target_width: 400,
             layout_target_height: 300,
             rotation: 0,
-            layout: "flex",
+            layout_mode: "flex",
             direction: "horizontal",
             layout_wrap: "wrap",
             main_axis_alignment: "space-evenly",
@@ -712,7 +712,7 @@ describe("format roundtrip", () => {
       node satisfies grida.program.nodes.ContainerNode;
 
       expect(node.type).toBe("container");
-      expect(node.layout).toBe("flex");
+      expect(node.layout_mode).toBe("flex");
       expect(node.direction).toBe("horizontal");
       expect(node.layout_wrap).toBe("wrap");
       expect(node.main_axis_alignment).toBe("space-evenly");
@@ -1061,7 +1061,7 @@ describe("format roundtrip", () => {
             layout_target_width: 100,
             layout_target_height: 100,
             rotation: 0,
-            layout: "flex" as const,
+            layout_mode: "flex" as const,
             direction: "horizontal" as const,
             layout_wrap: wrap satisfies "wrap" | "nowrap" | undefined,
             main_axis_alignment: "start" as const,
@@ -1171,7 +1171,7 @@ describe("format roundtrip", () => {
             layout_target_width: { type: "percentage" as const, value: 50 },
             layout_target_height: 100,
             rotation: 0,
-            layout: "flex" as const,
+            layout_mode: "flex" as const,
             direction: "vertical" as const,
             layout_wrap: "nowrap" as const,
             main_axis_alignment: "space-between" as const,
@@ -2750,7 +2750,7 @@ describe("format roundtrip", () => {
             layout_target_width: 100,
             layout_target_height: 100,
             rotation: 0,
-            layout: "flow",
+            layout_mode: "flow",
             direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
@@ -3305,7 +3305,7 @@ describe("format roundtrip", () => {
             layout_target_width: 100,
             layout_target_height: 100,
             rotation: 0,
-            layout: "flow",
+            layout_mode: "flow",
             direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
@@ -3406,7 +3406,7 @@ describe("format roundtrip", () => {
             layout_target_width: 100,
             layout_target_height: 100,
             rotation: 0,
-            layout: "flow",
+            layout_mode: "flow",
             direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
@@ -3545,7 +3545,7 @@ describe("format roundtrip", () => {
             layout_target_width: 100,
             layout_target_height: 100,
             rotation: 0,
-            layout: "flow",
+            layout_mode: "flow",
             direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
@@ -3706,7 +3706,7 @@ describe("format roundtrip", () => {
             layout_target_width: 100,
             layout_target_height: 100,
             rotation: 0,
-            layout: "flow",
+            layout_mode: "flow",
             direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",
@@ -3789,7 +3789,7 @@ describe("format roundtrip", () => {
             layout_target_width: 100,
             layout_target_height: 100,
             rotation: 0,
-            layout: "flow",
+            layout_mode: "flow",
             direction: "horizontal",
             main_axis_alignment: "start",
             cross_axis_alignment: "start",

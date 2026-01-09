@@ -145,7 +145,7 @@ export default function initialNode(
         padding_right: 0,
         padding_bottom: 0,
         padding_left: 0,
-        layout: "flow",
+        layout_mode: "flow",
         direction: "horizontal",
         main_axis_alignment: "start",
         cross_axis_alignment: "start",

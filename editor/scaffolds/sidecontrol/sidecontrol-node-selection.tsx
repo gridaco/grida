@@ -998,7 +998,7 @@ function SectionLayout({
     clips_content,
   } = useNodeState(node_id, (node) => ({
     type: node.type,
-    layout: node.layout,
+    layout: node.layout_mode,
     direction: node.direction,
     main_axis_alignment: node.main_axis_alignment,
     cross_axis_alignment: node.cross_axis_alignment,
@@ -1106,7 +1106,7 @@ function SectionLayoutMixed({
     type: node.type,
     width: node.layout_target_width,
     height: node.layout_target_height,
-    layout: node.layout,
+    layout: node.layout_mode,
     direction: node.direction,
     main_axis_alignment: node.main_axis_alignment,
     cross_axis_alignment: node.cross_axis_alignment,
@@ -1790,7 +1790,7 @@ function PropertyPaddingRow({ node_id }: { node_id: string }) {
     padding_bottom: node.padding_bottom ?? 0,
     padding_left: node.padding_left ?? 0,
     type: node.type,
-    layout: node.layout,
+    layout: node.layout_mode,
   }));
 
   const is_flex_container = type === "container" && layout === "flex";
