@@ -1573,22 +1573,22 @@ export namespace grida.program.nodes {
        * Padding on the top edge.
        * @default 0
        */
-      padding_top: number;
+      layout_padding_top: number;
       /**
        * Padding on the right edge.
        * @default 0
        */
-      padding_right: number;
+      layout_padding_right: number;
       /**
        * Padding on the bottom edge.
        * @default 0
        */
-      padding_bottom: number;
+      layout_padding_bottom: number;
       /**
        * Padding on the left edge.
        * @default 0
        */
-      padding_left: number;
+      layout_padding_left: number;
     }
 
     /**
@@ -2868,10 +2868,10 @@ export namespace grida.program.nodes {
         layout_cross_axis_alignment: "start",
         layout_main_axis_gap: 0,
         layout_cross_axis_gap: 0,
-        padding_top: 0,
-        padding_right: 0,
-        padding_bottom: 0,
-        padding_left: 0,
+        layout_padding_top: 0,
+        layout_padding_right: 0,
+        layout_padding_bottom: 0,
+        layout_padding_left: 0,
         layout_target_width: 100,
         layout_target_height: 100,
         corner_radius: 0,

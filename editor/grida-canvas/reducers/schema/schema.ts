@@ -245,10 +245,10 @@ export namespace schema.parametric_scale {
     scale_number_in_place(n, "rectangular_corner_radius_bottom_right", s);
 
     // Padding (flat properties)
-    scale_number_in_place(n, "padding_top", s);
-    scale_number_in_place(n, "padding_right", s);
-    scale_number_in_place(n, "padding_bottom", s);
-    scale_number_in_place(n, "padding_left", s);
+    scale_number_in_place(n, "layout_padding_top", s);
+    scale_number_in_place(n, "layout_padding_right", s);
+    scale_number_in_place(n, "layout_padding_bottom", s);
+    scale_number_in_place(n, "layout_padding_left", s);
 
     scale_number_in_place(n, "layout_main_axis_gap", s);
     scale_number_in_place(n, "layout_cross_axis_gap", s);

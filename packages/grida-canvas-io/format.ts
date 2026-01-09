@@ -3760,10 +3760,10 @@ export namespace format {
             | "layout_cross_axis_alignment"
             | "layout_main_axis_gap"
             | "layout_cross_axis_gap"
-            | "padding_top"
-            | "padding_right"
-            | "padding_bottom"
-            | "padding_left"
+            | "layout_padding_top"
+            | "layout_padding_right"
+            | "layout_padding_bottom"
+            | "layout_padding_left"
           >
         >
       ): flatbuffers.Offset {
@@ -3793,10 +3793,10 @@ export namespace format {
         // Create EdgeInsets struct inline for padding using generated method
         const paddingOffset = fbs.EdgeInsets.createEdgeInsets(
           builder,
-          node.padding_top ?? 0,
-          node.padding_right ?? 0,
-          node.padding_bottom ?? 0,
-          node.padding_left ?? 0
+          node.layout_padding_top ?? 0,
+          node.layout_padding_right ?? 0,
+          node.layout_padding_bottom ?? 0,
+          node.layout_padding_left ?? 0
         );
         fbs.LayoutContainerStyle.addLayoutPadding(builder, paddingOffset);
         fbs.LayoutContainerStyle.addLayoutMainAxisGap(
@@ -3853,10 +3853,10 @@ export namespace format {
               | "layout_cross_axis_alignment"
               | "layout_main_axis_gap"
               | "layout_cross_axis_gap"
-              | "padding_top"
-              | "padding_right"
-              | "padding_bottom"
-              | "padding_left"
+              | "layout_padding_top"
+              | "layout_padding_right"
+              | "layout_padding_bottom"
+              | "layout_padding_left"
             >
           >
       ): number {
@@ -3977,10 +3977,10 @@ export namespace format {
             | "layout_cross_axis_alignment"
             | "layout_main_axis_gap"
             | "layout_cross_axis_gap"
-            | "padding_top"
-            | "padding_right"
-            | "padding_bottom"
-            | "padding_left"
+            | "layout_padding_top"
+            | "layout_padding_right"
+            | "layout_padding_bottom"
+            | "layout_padding_left"
           >
         > {
         // Decode positioning from canonical fields
@@ -4088,10 +4088,10 @@ export namespace format {
 
           const padding = container.layoutPadding();
           if (padding) {
-            containerFields.padding_top = padding.top();
-            containerFields.padding_right = padding.right();
-            containerFields.padding_bottom = padding.bottom();
-            containerFields.padding_left = padding.left();
+            containerFields.layout_padding_top = padding.top();
+            containerFields.layout_padding_right = padding.right();
+            containerFields.layout_padding_bottom = padding.bottom();
+            containerFields.layout_padding_left = padding.left();
           }
         }
 
@@ -4206,10 +4206,10 @@ export namespace format {
                     | "layout_cross_axis_alignment"
                     | "layout_main_axis_gap"
                     | "layout_cross_axis_gap"
-                    | "padding_top"
-                    | "padding_right"
-                    | "padding_bottom"
-                    | "padding_left"
+                    | "layout_padding_top"
+                    | "layout_padding_right"
+                    | "layout_padding_bottom"
+                    | "layout_padding_left"
                   >
                 >
             );
@@ -4689,10 +4689,10 @@ export namespace format {
             layout_cross_axis_alignment: "start" as cg.CrossAxisAlignment,
             layout_main_axis_gap: 0,
             layout_cross_axis_gap: 0,
-            padding_top: 0,
-            padding_right: 0,
-            padding_bottom: 0,
-            padding_left: 0,
+            layout_padding_top: 0,
+            layout_padding_right: 0,
+            layout_padding_bottom: 0,
+            layout_padding_left: 0,
             stroke_width:
               format.shape.decode.deriveStrokeWidth(strokeGeometryProps),
             stroke_cap: strokeGeometryProps.stroke_cap,

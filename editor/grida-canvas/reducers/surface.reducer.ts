@@ -838,16 +838,16 @@ function __self_start_gesture(
 
       switch (side) {
         case "top":
-          currentValue = container.padding_top ?? 0;
+          currentValue = container.layout_padding_top ?? 0;
           break;
         case "right":
-          currentValue = container.padding_right ?? 0;
+          currentValue = container.layout_padding_right ?? 0;
           break;
         case "bottom":
-          currentValue = container.padding_bottom ?? 0;
+          currentValue = container.layout_padding_bottom ?? 0;
           break;
         case "left":
-          currentValue = container.padding_left ?? 0;
+          currentValue = container.layout_padding_left ?? 0;
           break;
       }
 

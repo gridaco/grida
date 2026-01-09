@@ -944,14 +944,14 @@ pub struct JSONContainerNode {
     #[serde(rename = "layout_mode", alias = "layout", default)]
     pub layout_mode: JSONLayoutMode,
     // Flat padding properties
-    #[serde(rename = "padding_top", alias = "paddingTop", default)]
-    pub padding_top: f32,
-    #[serde(rename = "padding_right", alias = "paddingRight", default)]
-    pub padding_right: f32,
-    #[serde(rename = "padding_bottom", alias = "paddingBottom", default)]
-    pub padding_bottom: f32,
-    #[serde(rename = "padding_left", alias = "paddingLeft", default)]
-    pub padding_left: f32,
+    #[serde(rename = "layout_padding_top", alias = "paddingTop", default)]
+    pub layout_padding_top: f32,
+    #[serde(rename = "layout_padding_right", alias = "paddingRight", default)]
+    pub layout_padding_right: f32,
+    #[serde(rename = "layout_padding_bottom", alias = "paddingBottom", default)]
+    pub layout_padding_bottom: f32,
+    #[serde(rename = "layout_padding_left", alias = "paddingLeft", default)]
+    pub layout_padding_left: f32,
     #[serde(rename = "layout_direction", alias = "direction", default)]
     pub layout_direction: JSONAxis,
     #[serde(rename = "layout_wrap", alias = "layoutWrap")]
@@ -1314,10 +1314,10 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 layout_cross_axis_alignment: node.layout_cross_axis_alignment,
                 layout_padding: {
                     let padding = EdgeInsets {
-                        top: node.padding_top,
-                        right: node.padding_right,
-                        bottom: node.padding_bottom,
-                        left: node.padding_left,
+                        top: node.layout_padding_top,
+                        right: node.layout_padding_right,
+                        bottom: node.layout_padding_bottom,
+                        left: node.layout_padding_left,
                     };
                     if padding.is_zero() {
                         None
@@ -2158,10 +2158,10 @@ mod padding_tests {
             "rotation": 0,
             "layout_target_width": 200,
             "layout_target_height": 200,
-            "padding_top": 10.0,
-            "padding_right": 15.0,
-            "padding_bottom": 20.0,
-            "padding_left": 25.0,
+            "layout_padding_top": 10.0,
+            "layout_padding_right": 15.0,
+            "layout_padding_bottom": 20.0,
+            "layout_padding_left": 25.0,
             "layout_mode": "flex"
         });
 
@@ -2193,8 +2193,8 @@ mod padding_tests {
             "rotation": 0,
             "layout_target_width": 200,
             "layout_target_height": 200,
-            "padding_top": 10.0,
-            "padding_left": 20.0,
+            "layout_padding_top": 10.0,
+            "layout_padding_left": 20.0,
             "layout_mode": "flex"
         });
 
@@ -3809,10 +3809,10 @@ mod tests {
             "layout_target_width": 400.0,
             "layout_target_height": 300.0,
             "layout_mode": "flex",
-            "padding_top": 20.0,
-            "padding_right": 20.0,
-            "padding_bottom": 20.0,
-            "padding_left": 20.0
+            "layout_padding_top": 20.0,
+            "layout_padding_right": 20.0,
+            "layout_padding_bottom": 20.0,
+            "layout_padding_left": 20.0
         }"#;
 
         let node: JSONNode =
@@ -3821,10 +3821,10 @@ mod tests {
         match node {
             JSONNode::Container(container) => {
                 // Verify padding fields
-                assert_eq!(container.padding_top, 20.0);
-                assert_eq!(container.padding_right, 20.0);
-                assert_eq!(container.padding_bottom, 20.0);
-                assert_eq!(container.padding_left, 20.0);
+                assert_eq!(container.layout_padding_top, 20.0);
+                assert_eq!(container.layout_padding_right, 20.0);
+                assert_eq!(container.layout_padding_bottom, 20.0);
+                assert_eq!(container.layout_padding_left, 20.0);
 
                 // Verify conversion to EdgeInsets
                 let converted: ContainerNodeRec = container.into();
@@ -3853,10 +3853,10 @@ mod tests {
             "layout_target_height": 400.0,
             "layout_mode": "flex",
             "layout_direction": "vertical",
-            "padding_top": 15.0,
-            "padding_right": 15.0,
-            "padding_bottom": 15.0,
-            "padding_left": 15.0,
+            "layout_padding_top": 15.0,
+            "layout_padding_right": 15.0,
+            "layout_padding_bottom": 15.0,
+            "layout_padding_left": 15.0,
             "layout_main_axis_alignment": "center",
             "layout_cross_axis_alignment": "stretch"
         }"#;
@@ -3869,10 +3869,10 @@ mod tests {
                 // Verify all properties
                 assert!(matches!(container.layout_mode, JSONLayoutMode::Flex));
                 assert!(matches!(container.layout_direction, JSONAxis::Vertical));
-                assert_eq!(container.padding_top, 15.0);
-                assert_eq!(container.padding_right, 15.0);
-                assert_eq!(container.padding_bottom, 15.0);
-                assert_eq!(container.padding_left, 15.0);
+                assert_eq!(container.layout_padding_top, 15.0);
+                assert_eq!(container.layout_padding_right, 15.0);
+                assert_eq!(container.layout_padding_bottom, 15.0);
+                assert_eq!(container.layout_padding_left, 15.0);
                 assert!(matches!(
                     container.layout_main_axis_alignment,
                     Some(MainAxisAlignment::Center)
@@ -4109,10 +4109,10 @@ mod tests {
             "layout_mode": "flex",
             "layout_direction": "horizontal",
             "layout_wrap": "wrap",
-            "padding_top": 20.0,
-            "padding_right": 20.0,
-            "padding_bottom": 20.0,
-            "padding_left": 20.0,
+            "layout_padding_top": 20.0,
+            "layout_padding_right": 20.0,
+            "layout_padding_bottom": 20.0,
+            "layout_padding_left": 20.0,
             "layout_main_axis_gap": 30.0,
             "layout_cross_axis_gap": 15.0,
             "layout_main_axis_alignment": "space-between",
@@ -4128,10 +4128,10 @@ mod tests {
                 assert!(matches!(container.layout_mode, JSONLayoutMode::Flex));
                 assert!(matches!(container.layout_direction, JSONAxis::Horizontal));
                 assert!(matches!(container.layout_wrap, Some(LayoutWrap::Wrap)));
-                assert_eq!(container.padding_top, 20.0);
-                assert_eq!(container.padding_right, 20.0);
-                assert_eq!(container.padding_bottom, 20.0);
-                assert_eq!(container.padding_left, 20.0);
+                assert_eq!(container.layout_padding_top, 20.0);
+                assert_eq!(container.layout_padding_right, 20.0);
+                assert_eq!(container.layout_padding_bottom, 20.0);
+                assert_eq!(container.layout_padding_left, 20.0);
                 assert_eq!(container.layout_main_axis_gap, 30.0);
                 assert_eq!(container.layout_cross_axis_gap, 15.0);
                 assert!(matches!(

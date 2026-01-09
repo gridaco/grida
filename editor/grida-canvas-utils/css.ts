@@ -85,10 +85,10 @@ export namespace css {
       //
       border,
       //
-      padding_top,
-      padding_right,
-      padding_bottom,
-      padding_left,
+      layout_padding_top,
+      layout_padding_right,
+      layout_padding_bottom,
+      layout_padding_left,
       //
       fe_shadows,
       //
@@ -139,10 +139,10 @@ export namespace css {
       }),
       //
       padding: paddingToPaddingCSS({
-        padding_top: padding_top ?? 0,
-        padding_right: padding_right ?? 0,
-        padding_bottom: padding_bottom ?? 0,
-        padding_left: padding_left ?? 0,
+        layout_padding_top: layout_padding_top ?? 0,
+        layout_padding_right: layout_padding_right ?? 0,
+        layout_padding_bottom: layout_padding_bottom ?? 0,
+        layout_padding_left: layout_padding_left ?? 0,
       }),
       //
       boxShadow: _fb_first_boxShadow
@@ -459,19 +459,19 @@ export namespace css {
   export function paddingToPaddingCSS(
     padding:
       | {
-          padding_top?: number;
-          padding_right?: number;
-          padding_bottom?: number;
-          padding_left?: number;
+          layout_padding_top?: number;
+          layout_padding_right?: number;
+          layout_padding_bottom?: number;
+          layout_padding_left?: number;
         }
       | null
       | undefined
   ): string {
     if (!padding) return "0";
-    const top = padding.padding_top ?? 0;
-    const right = padding.padding_right ?? 0;
-    const bottom = padding.padding_bottom ?? 0;
-    const left = padding.padding_left ?? 0;
+    const top = padding.layout_padding_top ?? 0;
+    const right = padding.layout_padding_right ?? 0;
+    const bottom = padding.layout_padding_bottom ?? 0;
+    const left = padding.layout_padding_left ?? 0;
 
     // If all sides are equal, return single value
     if (top === right && right === bottom && bottom === left) {

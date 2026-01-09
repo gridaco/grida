@@ -597,10 +597,10 @@ export namespace iofigma {
           paddingTop === paddingLeft
             ? (paddingTop ?? 0)
             : {
-                padding_top: paddingTop ?? 0,
-                padding_right: paddingRight ?? 0,
-                padding_bottom: paddingBottom ?? 0,
-                padding_left: paddingLeft ?? 0,
+                layout_padding_top: paddingTop ?? 0,
+                layout_padding_right: paddingRight ?? 0,
+                layout_padding_bottom: paddingBottom ?? 0,
+                layout_padding_left: paddingLeft ?? 0,
               };
 
         return {

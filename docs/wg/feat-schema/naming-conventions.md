@@ -92,10 +92,10 @@ line_height
 ### Layout
 
 ```
-padding_top
-padding_right
-padding_bottom
-padding_left
+layout_padding_top
+layout_padding_right
+layout_padding_bottom
+layout_padding_left
 layout_main_axis_alignment
 layout_cross_axis_alignment
 layout_main_axis_gap

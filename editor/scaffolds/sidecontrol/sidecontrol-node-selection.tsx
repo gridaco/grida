@@ -1780,17 +1780,17 @@ function PropertyCornerRadiusRowMixed({
 function PropertyPaddingRow({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const {
-    padding_top,
-    padding_right,
-    padding_bottom,
-    padding_left,
+    layout_padding_top,
+    layout_padding_right,
+    layout_padding_bottom,
+    layout_padding_left,
     type,
     layout_mode,
   } = useNodeState(node_id, (node) => ({
-    padding_top: node.padding_top ?? 0,
-    padding_right: node.padding_right ?? 0,
-    padding_bottom: node.padding_bottom ?? 0,
-    padding_left: node.padding_left ?? 0,
+    layout_padding_top: node.layout_padding_top ?? 0,
+    layout_padding_right: node.layout_padding_right ?? 0,
+    layout_padding_bottom: node.layout_padding_bottom ?? 0,
+    layout_padding_left: node.layout_padding_left ?? 0,
     type: node.type,
     layout_mode: node.layout_mode,
   }));
@@ -1802,10 +1802,10 @@ function PropertyPaddingRow({ node_id }: { node_id: string }) {
       <PropertyLineLabel>Padding</PropertyLineLabel>
       <PaddingControl
         value={{
-          padding_top,
-          padding_right,
-          padding_bottom,
-          padding_left,
+          layout_padding_top,
+          layout_padding_right,
+          layout_padding_bottom,
+          layout_padding_left,
         }}
         onValueCommit={actions.padding}
       />
@@ -1818,10 +1818,10 @@ function PropertyPaddingRowMixed({ ids }: { ids: string[] }) {
   const mp = useMixedProperties(ids, (node) => {
     return {
       type: node.type,
-      padding_top: node.padding_top,
-      padding_right: node.padding_right,
-      padding_bottom: node.padding_bottom,
-      padding_left: node.padding_left,
+      layout_padding_top: node.layout_padding_top,
+      layout_padding_right: node.layout_padding_right,
+      layout_padding_bottom: node.layout_padding_bottom,
+      layout_padding_left: node.layout_padding_left,
     };
   });
 
@@ -1834,22 +1834,26 @@ function PropertyPaddingRowMixed({ ids }: { ids: string[] }) {
       <PropertyLineLabel>Padding</PropertyLineLabel>
       <PaddingControl
         value={{
-          padding_top:
-            mp.padding_top?.mixed || mp.padding_top?.value === undefined
+          layout_padding_top:
+            mp.layout_padding_top?.mixed ||
+            mp.layout_padding_top?.value === undefined
               ? grida.mixed
-              : (mp.padding_top.value ?? 0),
-          padding_right:
-            mp.padding_right?.mixed || mp.padding_right?.value === undefined
+              : (mp.layout_padding_top.value ?? 0),
+          layout_padding_right:
+            mp.layout_padding_right?.mixed ||
+            mp.layout_padding_right?.value === undefined
               ? grida.mixed
-              : (mp.padding_right.value ?? 0),
-          padding_bottom:
-            mp.padding_bottom?.mixed || mp.padding_bottom?.value === undefined
+              : (mp.layout_padding_right.value ?? 0),
+          layout_padding_bottom:
+            mp.layout_padding_bottom?.mixed ||
+            mp.layout_padding_bottom?.value === undefined
               ? grida.mixed
-              : (mp.padding_bottom.value ?? 0),
-          padding_left:
-            mp.padding_left?.mixed || mp.padding_left?.value === undefined
+              : (mp.layout_padding_bottom.value ?? 0),
+          layout_padding_left:
+            mp.layout_padding_left?.mixed ||
+            mp.layout_padding_left?.value === undefined
               ? grida.mixed
-              : (mp.padding_left.value ?? 0),
+              : (mp.layout_padding_left.value ?? 0),
         }}
         onValueCommit={(value) => {
           containerIds.forEach((id) => {

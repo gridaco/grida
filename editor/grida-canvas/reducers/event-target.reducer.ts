@@ -932,27 +932,27 @@ function __self_evt_on_drag(
 
           switch (side) {
             case "top":
-              updates.padding_top = padding;
+              updates.layout_padding_top = padding;
               if (mirroringEnabled) {
-                updates.padding_bottom = padding;
+                updates.layout_padding_bottom = padding;
               }
               break;
             case "right":
-              updates.padding_right = padding;
+              updates.layout_padding_right = padding;
               if (mirroringEnabled) {
-                updates.padding_left = padding;
+                updates.layout_padding_left = padding;
               }
               break;
             case "bottom":
-              updates.padding_bottom = padding;
+              updates.layout_padding_bottom = padding;
               if (mirroringEnabled) {
-                updates.padding_top = padding;
+                updates.layout_padding_top = padding;
               }
               break;
             case "left":
-              updates.padding_left = padding;
+              updates.layout_padding_left = padding;
               if (mirroringEnabled) {
-                updates.padding_right = padding;
+                updates.layout_padding_right = padding;
               }
               break;
           }

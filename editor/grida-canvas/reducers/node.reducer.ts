@@ -657,28 +657,28 @@ const safe_properties: Partial<
       (draft as UN).fit = value;
     },
   }),
-  padding_top: defineNodeProperty<"padding_top">({
+  layout_padding_top: defineNodeProperty<"layout_padding_top">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding_top = value;
+      (draft as UN).layout_padding_top = value;
     },
   }),
-  padding_right: defineNodeProperty<"padding_right">({
+  layout_padding_right: defineNodeProperty<"layout_padding_right">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding_right = value;
+      (draft as UN).layout_padding_right = value;
     },
   }),
-  padding_bottom: defineNodeProperty<"padding_bottom">({
+  layout_padding_bottom: defineNodeProperty<"layout_padding_bottom">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding_bottom = value;
+      (draft as UN).layout_padding_bottom = value;
     },
   }),
-  padding_left: defineNodeProperty<"padding_left">({
+  layout_padding_left: defineNodeProperty<"layout_padding_left">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding_left = value;
+      (draft as UN).layout_padding_left = value;
     },
   }),
   clips_content: defineNodeProperty<"clips_content">({
