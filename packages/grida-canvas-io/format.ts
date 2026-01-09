@@ -3756,8 +3756,8 @@ export namespace format {
             | "layout_mode"
             | "layout_direction"
             | "layout_wrap"
-            | "main_axis_alignment"
-            | "cross_axis_alignment"
+            | "layout_main_axis_alignment"
+            | "layout_cross_axis_alignment"
             | "main_axis_gap"
             | "cross_axis_gap"
             | "padding_top"
@@ -3784,11 +3784,11 @@ export namespace format {
         );
         fbs.LayoutContainerStyle.addLayoutMainAxisAlignment(
           builder,
-          mainAxisAlignment(node.main_axis_alignment)
+          mainAxisAlignment(node.layout_main_axis_alignment)
         );
         fbs.LayoutContainerStyle.addLayoutCrossAxisAlignment(
           builder,
-          crossAxisAlignment(node.cross_axis_alignment)
+          crossAxisAlignment(node.layout_cross_axis_alignment)
         );
         // Create EdgeInsets struct inline for padding using generated method
         const paddingOffset = fbs.EdgeInsets.createEdgeInsets(
@@ -3849,8 +3849,8 @@ export namespace format {
               | "layout_mode"
               | "layout_direction"
               | "layout_wrap"
-              | "main_axis_alignment"
-              | "cross_axis_alignment"
+              | "layout_main_axis_alignment"
+              | "layout_cross_axis_alignment"
               | "main_axis_gap"
               | "cross_axis_gap"
               | "padding_top"
@@ -3973,8 +3973,8 @@ export namespace format {
             | "layout_mode"
             | "layout_direction"
             | "layout_wrap"
-            | "main_axis_alignment"
-            | "cross_axis_alignment"
+            | "layout_main_axis_alignment"
+            | "layout_cross_axis_alignment"
             | "main_axis_gap"
             | "cross_axis_gap"
             | "padding_top"
@@ -4072,14 +4072,14 @@ export namespace format {
             container.layoutMainAxisAlignment()
           );
           if (mainAxis !== undefined) {
-            containerFields.main_axis_alignment = mainAxis;
+            containerFields.layout_main_axis_alignment = mainAxis;
           }
 
           const crossAxis = decode.crossAxisAlignment(
             container.layoutCrossAxisAlignment()
           );
           if (crossAxis !== undefined) {
-            containerFields.cross_axis_alignment = crossAxis;
+            containerFields.layout_cross_axis_alignment = crossAxis;
           }
 
           containerFields.main_axis_gap = container.layoutMainAxisGap();
@@ -4201,8 +4201,8 @@ export namespace format {
                     | "layout_mode"
                     | "layout_direction"
                     | "layout_wrap"
-                    | "main_axis_alignment"
-                    | "cross_axis_alignment"
+                    | "layout_main_axis_alignment"
+                    | "layout_cross_axis_alignment"
                     | "main_axis_gap"
                     | "cross_axis_gap"
                     | "padding_top"
@@ -4684,8 +4684,8 @@ export namespace format {
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             layout_mode: "flow",
             layout_direction: "horizontal" as cg.Axis,
-            main_axis_alignment: "start" as cg.MainAxisAlignment,
-            cross_axis_alignment: "start" as cg.CrossAxisAlignment,
+            layout_main_axis_alignment: "start" as cg.MainAxisAlignment,
+            layout_cross_axis_alignment: "start" as cg.CrossAxisAlignment,
             main_axis_gap: 0,
             cross_axis_gap: 0,
             padding_top: 0,

@@ -1627,7 +1627,7 @@ export namespace grida.program.nodes {
        *
        * @default "start"
        */
-      main_axis_alignment: cg.MainAxisAlignment;
+      layout_main_axis_alignment: cg.MainAxisAlignment;
 
       /**
        *
@@ -1635,7 +1635,7 @@ export namespace grida.program.nodes {
        *
        * @default "start"
        */
-      cross_axis_alignment: cg.CrossAxisAlignment;
+      layout_cross_axis_alignment: cg.CrossAxisAlignment;
 
       /**
        * the gap between the children in main axis - takes effect when layout is set to `flex`
@@ -2864,9 +2864,9 @@ export namespace grida.program.nodes {
         layout_positioning: "absolute",
         layout_mode: "flow",
         layout_direction: "horizontal",
-        main_axis_alignment: "start",
+        layout_main_axis_alignment: "start",
+        layout_cross_axis_alignment: "start",
         main_axis_gap: 0,
-        cross_axis_alignment: "start",
         cross_axis_gap: 0,
         padding_top: 0,
         padding_right: 0,

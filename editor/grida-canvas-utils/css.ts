@@ -94,8 +94,8 @@ export namespace css {
       //
       layout_mode: layout,
       layout_direction: direction,
-      main_axis_alignment,
-      cross_axis_alignment,
+      layout_main_axis_alignment,
+      layout_cross_axis_alignment,
       main_axis_gap,
       cross_axis_gap,
       //
@@ -164,8 +164,8 @@ export namespace css {
     if (layout === "flex") {
       result["display"] = "flex";
       result["flexDirection"] = axisToFlexDirection(direction!);
-      result["justifyContent"] = main_axis_alignment;
-      result["alignItems"] = cross_axis_alignment;
+      result["justifyContent"] = layout_main_axis_alignment;
+      result["alignItems"] = layout_cross_axis_alignment;
       result["gap"] =
         direction === "horizontal"
           ? `${main_axis_gap}px ${cross_axis_gap}px`

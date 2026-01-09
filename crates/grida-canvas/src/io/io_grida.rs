@@ -956,10 +956,10 @@ pub struct JSONContainerNode {
     pub layout_direction: JSONAxis,
     #[serde(rename = "layout_wrap", alias = "layoutWrap")]
     pub layout_wrap: Option<LayoutWrap>,
-    #[serde(rename = "main_axis_alignment", alias = "mainAxisAlignment")]
-    pub main_axis_alignment: Option<MainAxisAlignment>,
-    #[serde(rename = "cross_axis_alignment", alias = "crossAxisAlignment")]
-    pub cross_axis_alignment: Option<CrossAxisAlignment>,
+    #[serde(rename = "layout_main_axis_alignment", alias = "mainAxisAlignment")]
+    pub layout_main_axis_alignment: Option<MainAxisAlignment>,
+    #[serde(rename = "layout_cross_axis_alignment", alias = "crossAxisAlignment")]
+    pub layout_cross_axis_alignment: Option<CrossAxisAlignment>,
     #[serde(rename = "main_axis_gap", alias = "mainAxisGap", default)]
     pub main_axis_gap: f32,
     #[serde(rename = "cross_axis_gap", alias = "crossAxisGap", default)]
@@ -1310,8 +1310,8 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 layout_mode: node.layout_mode.into(),
                 layout_direction: node.layout_direction.into(),
                 layout_wrap: node.layout_wrap,
-                layout_main_axis_alignment: node.main_axis_alignment,
-                layout_cross_axis_alignment: node.cross_axis_alignment,
+                layout_main_axis_alignment: node.layout_main_axis_alignment,
+                layout_cross_axis_alignment: node.layout_cross_axis_alignment,
                 layout_padding: {
                     let padding = EdgeInsets {
                         top: node.padding_top,
@@ -3763,8 +3763,8 @@ mod tests {
             "layout_target_height": 400.0,
             "layout_mode": "flex",
             "layout_direction": "horizontal",
-            "main_axis_alignment": "space-between",
-            "cross_axis_alignment": "center"
+            "layout_main_axis_alignment": "space-between",
+            "layout_cross_axis_alignment": "center"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3774,11 +3774,11 @@ mod tests {
             JSONNode::Container(container) => {
                 // Verify typed enums
                 assert!(matches!(
-                    container.main_axis_alignment,
+                    container.layout_main_axis_alignment,
                     Some(MainAxisAlignment::SpaceBetween)
                 ));
                 assert!(matches!(
-                    container.cross_axis_alignment,
+                    container.layout_cross_axis_alignment,
                     Some(CrossAxisAlignment::Center)
                 ));
 
@@ -3857,8 +3857,8 @@ mod tests {
             "padding_right": 15.0,
             "padding_bottom": 15.0,
             "padding_left": 15.0,
-            "main_axis_alignment": "center",
-            "cross_axis_alignment": "stretch"
+            "layout_main_axis_alignment": "center",
+            "layout_cross_axis_alignment": "stretch"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3874,11 +3874,11 @@ mod tests {
                 assert_eq!(container.padding_bottom, 15.0);
                 assert_eq!(container.padding_left, 15.0);
                 assert!(matches!(
-                    container.main_axis_alignment,
+                    container.layout_main_axis_alignment,
                     Some(MainAxisAlignment::Center)
                 ));
                 assert!(matches!(
-                    container.cross_axis_alignment,
+                    container.layout_cross_axis_alignment,
                     Some(CrossAxisAlignment::Stretch)
                 ));
 
@@ -4115,8 +4115,8 @@ mod tests {
             "padding_left": 20.0,
             "main_axis_gap": 30.0,
             "cross_axis_gap": 15.0,
-            "main_axis_alignment": "space-between",
-            "cross_axis_alignment": "center"
+            "layout_main_axis_alignment": "space-between",
+            "layout_cross_axis_alignment": "center"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -4135,11 +4135,11 @@ mod tests {
                 assert_eq!(container.main_axis_gap, 30.0);
                 assert_eq!(container.cross_axis_gap, 15.0);
                 assert!(matches!(
-                    container.main_axis_alignment,
+                    container.layout_main_axis_alignment,
                     Some(MainAxisAlignment::SpaceBetween)
                 ));
                 assert!(matches!(
-                    container.cross_axis_alignment,
+                    container.layout_cross_axis_alignment,
                     Some(CrossAxisAlignment::Center)
                 ));
 

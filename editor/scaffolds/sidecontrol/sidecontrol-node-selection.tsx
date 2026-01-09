@@ -990,8 +990,8 @@ function SectionLayout({
     type,
     layout_mode,
     layout_direction,
-    main_axis_alignment,
-    cross_axis_alignment,
+    layout_main_axis_alignment,
+    layout_cross_axis_alignment,
     main_axis_gap,
     cross_axis_gap,
     layout_wrap,
@@ -1000,8 +1000,8 @@ function SectionLayout({
     type: node.type,
     layout_mode: node.layout_mode,
     layout_direction: node.layout_direction,
-    main_axis_alignment: node.main_axis_alignment,
-    cross_axis_alignment: node.cross_axis_alignment,
+    layout_main_axis_alignment: node.layout_main_axis_alignment,
+    layout_cross_axis_alignment: node.layout_cross_axis_alignment,
     main_axis_gap: node.main_axis_gap,
     cross_axis_gap: node.cross_axis_gap,
     layout_wrap: node.layout_wrap,
@@ -1039,11 +1039,11 @@ function SectionLayout({
             className="w-full"
             direction={layout_direction ?? "horizontal"}
             value={
-              main_axis_alignment !== undefined &&
-              cross_axis_alignment !== undefined
+              layout_main_axis_alignment !== undefined &&
+              layout_cross_axis_alignment !== undefined
                 ? {
-                    mainAxisAlignment: main_axis_alignment,
-                    crossAxisAlignment: cross_axis_alignment,
+                    mainAxisAlignment: layout_main_axis_alignment,
+                    crossAxisAlignment: layout_cross_axis_alignment,
                   }
                 : undefined
             }
@@ -1109,8 +1109,8 @@ function SectionLayoutMixed({
     layout_target_height: node.layout_target_height,
     layout_mode: node.layout_mode,
     layout_direction: node.layout_direction,
-    main_axis_alignment: node.main_axis_alignment,
-    cross_axis_alignment: node.cross_axis_alignment,
+    layout_main_axis_alignment: node.layout_main_axis_alignment,
+    layout_cross_axis_alignment: node.layout_cross_axis_alignment,
     main_axis_gap: node.main_axis_gap,
     cross_axis_gap: node.cross_axis_gap,
     layout_wrap: node.layout_wrap,
@@ -1208,14 +1208,14 @@ function SectionLayoutMixed({
                 : (mp.layout_direction?.value ?? "horizontal")
             }
             value={
-              mp.main_axis_alignment?.value === grida.mixed ||
-              mp.cross_axis_alignment?.value === grida.mixed ||
-              mp.main_axis_alignment?.value === undefined ||
-              mp.cross_axis_alignment?.value === undefined
+              mp.layout_main_axis_alignment?.value === grida.mixed ||
+              mp.layout_cross_axis_alignment?.value === grida.mixed ||
+              mp.layout_main_axis_alignment?.value === undefined ||
+              mp.layout_cross_axis_alignment?.value === undefined
                 ? undefined
                 : {
-                    mainAxisAlignment: mp.main_axis_alignment.value,
-                    crossAxisAlignment: mp.cross_axis_alignment.value,
+                    mainAxisAlignment: mp.layout_main_axis_alignment.value,
+                    crossAxisAlignment: mp.layout_cross_axis_alignment.value,
                   }
             }
             onValueChange={(value) => {

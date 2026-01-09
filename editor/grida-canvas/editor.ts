@@ -1447,8 +1447,8 @@ class EditorDocumentStore
             layout_direction: undefined,
             main_axis_gap: undefined,
             cross_axis_gap: undefined,
-            main_axis_alignment: undefined,
-            cross_axis_alignment: undefined,
+            layout_main_axis_alignment: undefined,
+            layout_cross_axis_alignment: undefined,
             layout_wrap: undefined,
           },
         ]);
@@ -2511,7 +2511,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      main_axis_alignment: mainAxisAlignment,
+      layout_main_axis_alignment: mainAxisAlignment,
     });
   }
 
@@ -2522,7 +2522,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      cross_axis_alignment: crossAxisAlignment,
+      layout_cross_axis_alignment: crossAxisAlignment,
     });
   }
   changeFlexContainerNodeGap(

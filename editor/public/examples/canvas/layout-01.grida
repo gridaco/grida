@@ -25,8 +25,8 @@
         "padding_left": 0,
         "layout_mode": "flow",
         "layout_direction": "horizontal",
-        "main_axis_alignment": "start",
-        "cross_axis_alignment": "start",
+        "layout_main_axis_alignment": "start",
+        "layout_cross_axis_alignment": "start",
         "main_axis_gap": 0,
         "cross_axis_gap": 0,
         "fill_paints": [
@@ -64,8 +64,8 @@
         "padding_left": 0,
         "layout_mode": "flex",
         "layout_direction": "vertical",
-        "main_axis_alignment": "start",
-        "cross_axis_alignment": "start",
+        "layout_main_axis_alignment": "start",
+        "layout_cross_axis_alignment": "start",
         "main_axis_gap": 24,
         "cross_axis_gap": 24
       },
@@ -172,8 +172,8 @@
         "padding_left": 0,
         "layout_mode": "flex",
         "layout_direction": "horizontal",
-        "main_axis_alignment": "start",
-        "cross_axis_alignment": "start",
+        "layout_main_axis_alignment": "start",
+        "layout_cross_axis_alignment": "start",
         "main_axis_gap": 24,
         "cross_axis_gap": 24
       },

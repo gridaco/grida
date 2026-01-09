@@ -1329,8 +1329,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           container.layout_direction = lay.direction;
           container.main_axis_gap = cmath.quantize(lay.spacing, 1);
           container.cross_axis_gap = cmath.quantize(lay.spacing, 1);
-          container.main_axis_alignment = lay.mainAxisAlignment;
-          container.cross_axis_alignment = lay.crossAxisAlignment;
+          container.layout_main_axis_alignment = lay.mainAxisAlignment;
+          container.layout_cross_axis_alignment = lay.crossAxisAlignment;
 
           // [reorder children according to guessed layout]
           const ordered = lay.orders.map((i) => children[i]);
@@ -1415,8 +1415,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               layout_direction: layout.direction,
               main_axis_gap: cmath.quantize(layout.spacing, 1),
               cross_axis_gap: cmath.quantize(layout.spacing, 1),
-              main_axis_alignment: layout.mainAxisAlignment,
-              cross_axis_alignment: layout.crossAxisAlignment,
+              layout_main_axis_alignment: layout.mainAxisAlignment,
+              layout_cross_axis_alignment: layout.crossAxisAlignment,
               padding_top: children.length === 1 ? 16 : 0,
               padding_right: children.length === 1 ? 16 : 0,
               padding_bottom: children.length === 1 ? 16 : 0,

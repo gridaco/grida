@@ -96,8 +96,10 @@ padding_top
 padding_right
 padding_bottom
 padding_left
-main_axis_alignment
-cross_axis_gap
+layout_main_axis_alignment
+layout_cross_axis_alignment
+layout_main_axis_gap
+layout_cross_axis_gap
 ```
 
 ### Effects

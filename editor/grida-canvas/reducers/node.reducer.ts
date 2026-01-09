@@ -696,8 +696,10 @@ const safe_properties: Partial<
         // initialize flex layout
         // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
         if (!draft.layout_direction) draft.layout_direction = "horizontal";
-        if (!draft.main_axis_alignment) draft.main_axis_alignment = "start";
-        if (!draft.cross_axis_alignment) draft.cross_axis_alignment = "start";
+        if (!draft.layout_main_axis_alignment)
+          draft.layout_main_axis_alignment = "start";
+        if (!draft.layout_cross_axis_alignment)
+          draft.layout_cross_axis_alignment = "start";
         if (!draft.main_axis_gap) draft.main_axis_gap = 0;
         if (!draft.cross_axis_gap) draft.cross_axis_gap = 0;
       }
@@ -709,18 +711,19 @@ const safe_properties: Partial<
       (draft as UN).layout_direction = value;
     },
   }),
-  main_axis_alignment: defineNodeProperty<"main_axis_alignment">({
+  layout_main_axis_alignment: defineNodeProperty<"layout_main_axis_alignment">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).main_axis_alignment = value;
+      (draft as UN).layout_main_axis_alignment = value;
     },
   }),
-  cross_axis_alignment: defineNodeProperty<"cross_axis_alignment">({
-    assert: (node) => node.type === "container" || node.type === "component",
-    apply: (draft, value, prev) => {
-      (draft as UN).cross_axis_alignment = value;
-    },
-  }),
+  layout_cross_axis_alignment:
+    defineNodeProperty<"layout_cross_axis_alignment">({
+      assert: (node) => node.type === "container" || node.type === "component",
+      apply: (draft, value, prev) => {
+        (draft as UN).layout_cross_axis_alignment = value;
+      },
+    }),
   main_axis_gap: defineNodeProperty<"main_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
