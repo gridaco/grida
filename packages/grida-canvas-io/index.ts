@@ -819,38 +819,38 @@ export namespace io {
     }
 
     /**
-     * Internal snapshot ZIP format (`.snapshot.zip`).
+     * Internal snapshot ZIP format (`.grida1.zip`).
      *
      * This is a test-only format that stores snapshot JSON in a ZIP archive.
      * It's used for fixtures and internal testing purposes only.
      * Not part of the public `.grida` file format specification.
      */
-    export namespace zip {
+    export namespace grida1zip {
       /**
-       * Packs a snapshot document model into a `.snapshot.zip` file.
+       * Packs a snapshot document model into a `.grida1.zip` file.
        *
        * @param model - The snapshot document model to pack
-       * @returns Uint8Array containing the ZIP archive with `snapshot.json` inside
+       * @returns Uint8Array containing the ZIP archive with `document.grida1` inside
        */
       export function pack(model: SnapshotDocumentModel): Uint8Array {
         const json = stringify(model);
         return zipSync({
-          "snapshot.json": strToU8(json),
+          "document.grida1": strToU8(json),
         });
       }
 
       /**
-       * Unpacks a `.snapshot.zip` file into a snapshot document model.
+       * Unpacks a `.grida1.zip` file into a snapshot document model.
        *
        * @param zipData - The ZIP archive bytes
        * @returns The parsed snapshot document model
-       * @throws If the ZIP is invalid or missing `snapshot.json`
+       * @throws If the ZIP is invalid or missing `document.grida1`
        */
       export function unpack(zipData: Uint8Array): SnapshotDocumentModel {
         const files = unzipSync(zipData);
-        const snapshotJson = strFromU8(files["snapshot.json"]);
+        const snapshotJson = strFromU8(files["document.grida1"]);
         if (!snapshotJson) {
-          throw new Error("Missing snapshot.json in zip file");
+          throw new Error("Missing document.grida1 in zip file");
         }
         return parse(snapshotJson) as SnapshotDocumentModel;
       }

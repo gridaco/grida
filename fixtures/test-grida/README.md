@@ -5,7 +5,7 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 ### File formats
 
 - **`.grida` files**: Modern format using ZIP/FlatBuffer binary format. These are the current production format.
-- **`.snapshot.zip` files**: Legacy/test-only format containing JSON snapshots in a ZIP archive. Used for internal testing and fixtures. Not part of the public `.grida` file format specification.
+- **`.grida1.zip` files**: Legacy/test-only format containing JSON snapshots in a ZIP archive. Used for internal testing and fixtures. Not part of the public `.grida` file format specification.
 
 ### Naming convention
 
@@ -22,6 +22,6 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 
 ### Changelog
 
-- **2026-01-03**: Migrated from legacy `.grida` (JSON/ZIP) format to new `.grida` (ZIP/FlatBuffer) binary format. Legacy snapshot files are now stored as `.snapshot.zip` for test fixtures.
+- **2026-01-03**: Migrated from legacy `.grida` (JSON/ZIP) format to new `.grida` (ZIP/FlatBuffer) binary format. Legacy snapshot files are now stored as `.grida1.zip` for test fixtures.
 
 > Current Version: `0.90.0-beta+20260108` (last updated: 2026-01-08)
