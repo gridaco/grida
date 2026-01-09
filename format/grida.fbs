@@ -24,14 +24,20 @@
 //
 // 1) Scalars are always readable — "unset" does NOT exist
 //    -----------------------------------------------------
-//    - Scalar fields (float, int, enum, bool) in FlatBuffers tables always have
-//      a readable value at decode time.
-//    - There is NO way to distinguish:
+//    - Scalar fields (float, int, enum, bool) in FlatBuffers tables always yield
+//      a value at decode time—there is no concept of "unset" or "missing" for scalars.
+//    - It is impossible to distinguish:
 //        "value explicitly set by author"
 //        vs
-//        "value implicitly returned by FlatBuffers default (usually 0)"
+//        "value implicitly returned by FlatBuffers default (usually 0 or the enum's first value)"
+//    - As a result, any semantic intent behind "unset", "inherited", or "auto" is
+//      *lost at decode time* unless it is explicitly modeled.
+//    - This applies equally to all scalar types, including `bool` and enums:
+//        * For enums, the default value (typically the first declared variant) is always returned if unset,
+//          and is thus ambiguous unless it is chosen as a true semantic default.
+//        * For `bool`, there is no way to distinguish "false" from "not specified".
 //    - Therefore:
-//        * If `0` (or the default enum value) has real semantic meaning,
+//        * If `0`, `false`, or the default enum value has real semantic meaning,
 //          it MUST NOT be used to represent "unset".
 //        * Using sentinel values like `0` or `(0,0)` to mean "unset" is fragile
 //          and must be avoided unless the value domain makes it impossible for
@@ -68,6 +74,15 @@
 //
 //    When in doubt: USE A TABLE.
 //
+//    "The Default Semantics Contract"
+//    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//    - Using a `struct` inside a table implicitly commits to: "if the field is absent,
+//      the decoded value is the all-zeros struct".
+//    - Therefore, structs must only be used when the all-zeros value is not just *valid*
+//      but is the *correct semantic default* for that field.
+//    - If a field needs to express "unset" or "unspecified" distinct from the all-zeros default,
+//      the struct must be wrapped in a nullable table or represented via a union.
+//
 //
 // 3) Schema evolution principle
 //    --------------------------
@@ -79,6 +94,18 @@
 //    will make future evolution harder or unsafe.
 //
 //    Prefer explicitness and nullability over compactness.
+//
+//
+// 4) Model intent explicitly; do not rely on "value presence"
+//    ---------------------------------------------------------
+//    Presence and intent are distinct concepts in FlatBuffers.
+//    While `table` and `union` fields can encode intent via presence (null vs set),
+//    scalars and structs cannot: their values are always present and defaulted.
+//    For any concept that requires a meaningful "unspecified", "inherit", or "auto" state,
+//    encode that state structurally—using a nullable table, a union, or an explicit
+//    mode enum plus payload—rather than relying on magic values or defaults.
+//    Choose stable, forward-evolvable shapes over compactness; model the true intent
+//    of the data, not just its storage representation.
 // -----------------------------------------------------------------------------
 // NOTE:
 // - This is a first pass draft.
@@ -88,6 +115,15 @@ namespace grida;
 
 file_extension "grida";
 file_identifier "GRID";
+
+
+/// `None`
+table None {}
+
+/// Explicit length value models (archive input model; CSS-ish).
+///
+/// NOTE: FlatBuffers unions can only include tables, not scalars/structs.
+table Auto {}
 
 // -----------------------------------------------------------------------------
 // Core primitives (Rust `crates/grida-canvas/src/cg/**` aligned)
@@ -466,60 +502,6 @@ enum TextDecorationStyle : byte {
   Wavy = 4
 }
 
-/// Rust: `FontWeight(pub u32)`
-struct FontWeight {
-  value:uint;
-}
-
-/// Rust: `FontOpticalSizing` (Auto | None | Fixed(f32))
-enum FontOpticalSizingKind : byte {
-  Auto = 0,
-  None = 1,
-  Fixed = 2
-}
-
-struct FontOpticalSizing {
-  kind:FontOpticalSizingKind;
-  fixed_value:float;
-}
-
-/// Rust: `TextLineHeight` (Normal | Fixed(f32) | Factor(f32))
-enum TextLineHeightKind : byte {
-  Normal = 0,
-  Fixed = 1,
-  Factor = 2
-}
-
-struct TextLineHeight {
-  kind:TextLineHeightKind;
-  fixed_value:float;
-  factor_value:float;
-}
-
-/// Rust: `TextLetterSpacing` (Fixed(f32) | Factor(f32))
-enum TextLetterSpacingKind : byte {
-  Fixed = 0,
-  Factor = 1
-}
-
-// TODO: review this
-struct TextLetterSpacing {
-  kind:TextLetterSpacingKind;
-  fixed_value:float;
-  factor_value:float;
-}
-
-/// Rust: `TextWordSpacing` (Fixed(f32) | Factor(f32))
-enum TextWordSpacingKind : byte {
-  Fixed = 0,
-  Factor = 1
-}
-
-struct TextWordSpacing {
-  kind:TextWordSpacingKind;
-  fixed_value:float;
-  factor_value:float;
-}
 
 /// OpenType feature tag (4-byte ASCII, standard OpenType format).
 ///
@@ -540,6 +522,43 @@ struct OpenTypeFeatureTag {
   d:ubyte;
 }
 
+/// Rust: `FontWeight(pub u32)`
+struct FontWeight {
+  value:uint;
+}
+
+/// Rust: `FontOpticalSizing` (Auto | None | Fixed(f32))
+enum FontOpticalSizingKind : byte {
+  Auto = 0,
+  None = 1,
+  Fixed = 2
+}
+
+struct FontOpticalSizing {
+  kind:FontOpticalSizingKind;
+  fixed_value:float;
+}
+
+
+// ------------------------------------------------------------
+// Text Dimension
+// ------------------------------------------------------------
+
+/// `TextLineHeight` (Normal | Fixed(f32) | Factor(f32))
+/// `TextLetterSpacing` (Normal | Fixed(f32) | Factor(f32))
+/// `TextWordSpacing` (Normal | Fixed(f32) | Factor(f32))
+enum TextDimensionKind : byte {
+  Normal = 0, // default fallback (=auto|normal)
+  Fixed = 1,
+  Factor = 2
+}
+
+table TextDimension {
+  kind:TextDimensionKind;
+  value:float;
+}
+
+
 /// Rust: `FontFeature { tag: String, value: bool }`
 table FontFeature {
   /// OpenType feature tag (4-byte encoding).
@@ -558,16 +577,17 @@ table FontVariation {
 ///
 /// Archive model notes:
 /// - `decoration_color` uses RGBA32F (float space) to match this schema's color choice.
-/// - When `decoration_color.a == 0`, runtimes may treat it as "unset" if desired.
 table TextDecorationRec {
   text_decoration_line:TextDecorationLine = None (id: 0);
-  text_decoration_color:RGBA32F (id: 1);
-  text_decoration_style:TextDecorationStyle = Solid (id: 2);
-  text_decoration_skip_ink:bool = true (id: 3);
-  text_decoration_thickness:float = 1.0 (id: 4);
+  text_decoration_style:TextDecorationStyle = Solid (id: 1);
+  text_decoration_skip_ink:bool = true (id: 2);
+  text_decoration_thickness:float = 1.0 (id: 3);
+  /// decoration color override, if unset, inherits
+  text_decoration_color:RGBA32F (id: 4);
 }
 
-/// Rust: `TextStyleRec`
+
+/// `TextStyleRec {}`
 table TextStyleRec {
   text_decoration:TextDecorationRec (id: 0);
 
@@ -582,9 +602,9 @@ table TextStyleRec {
   font_features:[FontFeature] (id: 8);
   font_variations:[FontVariation] (id: 9);
 
-  letter_spacing:TextLetterSpacing (id: 10);
-  word_spacing:TextWordSpacing (id: 11);
-  line_height:TextLineHeight (id: 12);
+  letter_spacing:TextDimension (id: 10);
+  word_spacing:TextDimension (id: 11);
+  line_height:TextDimension (id: 12);
   text_transform:TextTransform = None (id: 13);
 }
 
@@ -821,16 +841,9 @@ table FeProgressiveBlur {
 }
 
 /// Rust: `FeBlur` (enum)
-enum FeBlurKind : byte {
-  Gaussian = 0,
-  Progressive = 1
-}
-
-/// Struct-tagged representation of Rust `FeBlur`.
-table FeBlur {
-  kind:FeBlurKind;
-  gaussian:FeGaussianBlur;
-  progressive:FeProgressiveBlur;
+union FeBlur {
+  FeGaussianBlur = 1,
+  FeProgressiveBlur = 2
 }
 
 /// Rust: `FeLayerBlur { blur: FeBlur, active: bool }`
@@ -1082,11 +1095,6 @@ union CanonicalLayerShape {
 // Layout model (aligned to Rust `UniformNodeLayout`)
 // -----------------------------------------------------------------------------
 
-/// Explicit length value models (archive input model; CSS-ish).
-///
-/// NOTE: FlatBuffers unions can only include tables, not scalars/structs.
-table Auto {}
-
 table Px {
   value:float = 0.0 (id: 0);
 }
@@ -1111,14 +1119,13 @@ union Length {
 table LayoutDimensions {
   layout_target_width:Length (id: 1);
   layout_target_height:Length (id: 3);
-  layout_min_width:float = 0.0 (id: 4);
-  layout_max_width:float = 0.0 (id: 5);
-  layout_min_height:float = 0.0 (id: 6);
-  layout_max_height:float = 0.0 (id: 7);
+  
   /// Preferred layout aspect ratio.
   ///
   /// Represents a proportional relationship between width and height expressed
-  /// as a ratio pair (e.g. `[16, 9]`, `[4, 3]`, `[1, 1]`).
+  /// as a ratio pair (e.g. `(16, 9)`, `(4, 3)`, `(1, 1)`).
+  /// 
+  /// (0, 0) represents and is handled as "unset".
   ///
   /// Notes:
   /// - This does not define geometry by itself. It is a sizing preference that
@@ -1131,7 +1138,17 @@ table LayoutDimensions {
   ///
   /// Encoding:
   /// - Stored as a tuple (width, height) for parity with TS `layout_target_aspect_ratio?: [number, number]`.
-  layout_target_aspect_ratio:CGSize (id: 8);
+  layout_target_aspect_ratio:CGSize (id: 4);
+
+  // TODO: support min/max size
+  // FIXME: Scalar defaults cannot represent "unset"; if "no constraint" differs from 0, use Length/nullable wrapper.
+  // layout_min_width:float;
+  // FIXME: Scalar defaults cannot represent "unset"; if "no constraint" differs from 0, use Length/nullable wrapper.
+  // layout_max_width:float;
+  // FIXME: Scalar defaults cannot represent "unset"; if "no constraint" differs from 0, use Length/nullable wrapper.
+  // layout_min_height:float;
+  // FIXME: Scalar defaults cannot represent "unset"; if "no constraint" differs from 0, use Length/nullable wrapper.
+  // layout_max_height:float;
 }
 
 table LayoutContainerStyle {
@@ -1153,6 +1170,8 @@ table LayoutChildStyle {
 table Layout {
   layout_position_basis:LayoutPositionBasis = Cartesian (id: 0);
   layout_position:CGPoint (id: 1);
+  // FIXME: EdgeInsets is a struct (non-null). (0,0,0,0) cannot represent "unset".
+  // FIXME: If inset positioning is optional, model it structurally (nullable table/union), not via zero sentinels.
   layout_inset:EdgeInsets (id: 2);
   layout_dimensions:LayoutDimensions (id: 3);
   layout_container:LayoutContainerStyle (id: 4);

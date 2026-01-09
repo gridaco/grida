@@ -2,7 +2,12 @@ import grida from "@grida/schema";
 import cg from "@grida/cg";
 import type cmath from "@grida/cmath";
 import * as fbs from "@grida/format";
-import { unionToLength, unionToPaint, unionListToNode } from "@grida/format";
+import {
+  unionToLength,
+  unionToPaint,
+  unionListToNode,
+  unionToFeBlur,
+} from "@grida/format";
 import type { vn } from "@grida/schema";
 import * as flatbuffers from "flatbuffers";
 import { generateNKeysBetween } from "@grida/sequence";
@@ -744,6 +749,45 @@ export namespace format {
           // Add required font_family string (must be created before table)
           const fontFamilyOffset = builder.createString(node.font_family ?? "");
 
+          // Create TextDimension tables BEFORE starting TextStyleRec
+          const letterSpacingValue = node.letter_spacing ?? 0;
+          // TODO: Support TextDimensionKind.Normal (when TS model supports "normal" value)
+          // TODO: Support TextDimensionKind.Percent (when added to enum and TS model)
+          const letterSpacingKind =
+            letterSpacingValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Fixed;
+          const letterSpacingOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            letterSpacingKind,
+            letterSpacingValue
+          );
+
+          const wordSpacingValue = node.word_spacing ?? 0;
+          // TODO: Support TextDimensionKind.Normal (when TS model supports "normal" value)
+          // TODO: Support TextDimensionKind.Percent (when added to enum and TS model)
+          const wordSpacingKind =
+            wordSpacingValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Fixed;
+          const wordSpacingOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            wordSpacingKind,
+            wordSpacingValue
+          );
+
+          const lineHeightValue = node.line_height ?? 0;
+          // TODO: Support TextDimensionKind.Percent (when added to enum and TS model)
+          const lineHeightKind =
+            lineHeightValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Normal;
+          const lineHeightOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            lineHeightKind,
+            lineHeightValue
+          );
+
           // Create TextStyleRec (middle layer)
           fbs.TextStyleRec.startTextStyleRec(builder);
           fbs.TextStyleRec.addTextDecoration(builder, decorationOffset);
@@ -765,51 +809,12 @@ export namespace format {
           if (fontFeaturesOffset !== undefined) {
             fbs.TextStyleRec.addFontFeatures(builder, fontFeaturesOffset);
           }
-          // Add required letter_spacing struct (field 10, must be created inline within table context)
-          const letterSpacingValue = node.letter_spacing ?? 0;
-          const letterSpacingKindEnum =
-            letterSpacingValue !== 0
-              ? fbs.TextLetterSpacingKind.Factor
-              : fbs.TextLetterSpacingKind.Fixed;
-          fbs.TextStyleRec.addLetterSpacing(
-            builder,
-            fbs.TextLetterSpacing.createTextLetterSpacing(
-              builder,
-              letterSpacingKindEnum,
-              0, // fixed_value (not used when kind is Factor)
-              letterSpacingValue // factor_value (em-based)
-            )
-          );
-          // Add word_spacing struct (field 11)
-          const wordSpacingValue = node.word_spacing ?? 0;
-          const wordSpacingKindEnum =
-            wordSpacingValue !== 0
-              ? fbs.TextWordSpacingKind.Factor
-              : fbs.TextWordSpacingKind.Fixed;
-          fbs.TextStyleRec.addWordSpacing(
-            builder,
-            fbs.TextWordSpacing.createTextWordSpacing(
-              builder,
-              wordSpacingKindEnum,
-              0, // fixed_value (not used when kind is Factor)
-              wordSpacingValue // factor_value (em-based)
-            )
-          );
-          // Add line_height struct (field 12)
-          const lineHeightValue = node.line_height ?? 0;
-          const lineHeightKindEnum =
-            lineHeightValue !== 0
-              ? fbs.TextLineHeightKind.Factor
-              : fbs.TextLineHeightKind.Normal;
-          fbs.TextStyleRec.addLineHeight(
-            builder,
-            fbs.TextLineHeight.createTextLineHeight(
-              builder,
-              lineHeightKindEnum,
-              0, // fixed_value (not used when kind is Factor or Normal)
-              lineHeightValue // factor_value (em-based)
-            )
-          );
+          // Add required letter_spacing (field 10)
+          fbs.TextStyleRec.addLetterSpacing(builder, letterSpacingOffset);
+          // Add word_spacing (field 11)
+          fbs.TextStyleRec.addWordSpacing(builder, wordSpacingOffset);
+          // Add line_height (field 12)
+          fbs.TextStyleRec.addLineHeight(builder, lineHeightOffset);
           const textStyleOffset = fbs.TextStyleRec.endTextStyleRec(builder);
 
           // Encode StrokeGeometryTrait BEFORE starting TextSpanNodeProperties
@@ -2971,50 +2976,23 @@ export namespace format {
   export namespace effects {
     export namespace encode {
       /**
-       * Encodes FeBlur to FlatBuffers FeBlur table.
+       * Encodes FeBlur to FlatBuffers FeBlur union.
        */
       function encodeFeBlur(
         builder: Builder,
         blur: cg.FeBlur
-      ): flatbuffers.Offset {
+      ): { type: fbs.FeBlur; offset: flatbuffers.Offset } {
         if (blur.type === "blur") {
           // Gaussian blur
           const gaussianRadius = blur.radius;
           // Create FeGaussianBlur table
           fbs.FeGaussianBlur.startFeGaussianBlur(builder);
           fbs.FeGaussianBlur.addRadius(builder, gaussianRadius);
-          const gaussianOffset = fbs.FeGaussianBlur.endFeGaussianBlur(builder);
-
-          // Create FeProgressiveBlur table (empty/default values)
-          // Structs must be created inline within table context
-          fbs.FeProgressiveBlur.startFeProgressiveBlur(builder);
-          fbs.FeProgressiveBlur.addStart(
-            builder,
-            fbs.Alignment.createAlignment(builder, 0, 0)
-          );
-          fbs.FeProgressiveBlur.addEnd(
-            builder,
-            fbs.Alignment.createAlignment(builder, 0, 0)
-          );
-          fbs.FeProgressiveBlur.addRadius(builder, 0);
-          fbs.FeProgressiveBlur.addRadius2(builder, 0);
-          const progressiveOffset =
-            fbs.FeProgressiveBlur.endFeProgressiveBlur(builder);
-
-          // Create FeBlur table
-          fbs.FeBlur.startFeBlur(builder);
-          fbs.FeBlur.addKind(builder, fbs.FeBlurKind.Gaussian);
-          fbs.FeBlur.addGaussian(builder, gaussianOffset);
-          fbs.FeBlur.addProgressive(builder, progressiveOffset);
-          return fbs.FeBlur.endFeBlur(builder);
+          const offset = fbs.FeGaussianBlur.endFeGaussianBlur(builder);
+          return { type: fbs.FeBlur.FeGaussianBlur, offset };
         } else {
           // Progressive blur
           const progressive = blur as cg.FeProgressiveBlur;
-          // Create FeGaussianBlur table (empty/default values)
-          fbs.FeGaussianBlur.startFeGaussianBlur(builder);
-          fbs.FeGaussianBlur.addRadius(builder, 0);
-          const gaussianOffset = fbs.FeGaussianBlur.endFeGaussianBlur(builder);
-
           // Create FeProgressiveBlur table
           // Structs must be created inline within table context
           fbs.FeProgressiveBlur.startFeProgressiveBlur(builder);
@@ -3036,15 +3014,8 @@ export namespace format {
           );
           fbs.FeProgressiveBlur.addRadius(builder, progressive.radius);
           fbs.FeProgressiveBlur.addRadius2(builder, progressive.radius2);
-          const progressiveOffset =
-            fbs.FeProgressiveBlur.endFeProgressiveBlur(builder);
-
-          // Create FeBlur table
-          fbs.FeBlur.startFeBlur(builder);
-          fbs.FeBlur.addKind(builder, fbs.FeBlurKind.Progressive);
-          fbs.FeBlur.addGaussian(builder, gaussianOffset);
-          fbs.FeBlur.addProgressive(builder, progressiveOffset);
-          return fbs.FeBlur.endFeBlur(builder);
+          const offset = fbs.FeProgressiveBlur.endFeProgressiveBlur(builder);
+          return { type: fbs.FeBlur.FeProgressiveBlur, offset };
         }
       }
 
@@ -3055,10 +3026,14 @@ export namespace format {
         builder: Builder,
         feLayerBlur: cg.FeLayerBlur
       ): flatbuffers.Offset {
-        const blurOffset = encodeFeBlur(builder, feLayerBlur.blur);
+        const { type: blurType, offset: blurOffset } = encodeFeBlur(
+          builder,
+          feLayerBlur.blur
+        );
 
         // Create FeLayerBlur table
         fbs.FeLayerBlur.startFeLayerBlur(builder);
+        fbs.FeLayerBlur.addBlurType(builder, blurType);
         fbs.FeLayerBlur.addBlur(builder, blurOffset);
         fbs.FeLayerBlur.addActive(builder, feLayerBlur.active ?? true);
         return fbs.FeLayerBlur.endFeLayerBlur(builder);
@@ -3071,10 +3046,14 @@ export namespace format {
         builder: Builder,
         feBackdropBlur: cg.FeBackdropBlur
       ): flatbuffers.Offset {
-        const blurOffset = encodeFeBlur(builder, feBackdropBlur.blur);
+        const { type: blurType, offset: blurOffset } = encodeFeBlur(
+          builder,
+          feBackdropBlur.blur
+        );
 
         // Create FeBackdropBlur table
         fbs.FeBackdropBlur.startFeBackdropBlur(builder);
+        fbs.FeBackdropBlur.addBlurType(builder, blurType);
         fbs.FeBackdropBlur.addBlur(builder, blurOffset);
         fbs.FeBackdropBlur.addActive(builder, feBackdropBlur.active ?? true);
         return fbs.FeBackdropBlur.endFeBackdropBlur(builder);
@@ -3284,19 +3263,20 @@ export namespace format {
 
     export namespace decode {
       /**
-       * Decodes FeBlur table to TS FeBlur type.
+       * Decodes FeBlur union to TS FeBlur type.
        */
-      function decodeFeBlur(blur: fbs.FeBlur): cg.FeBlur {
-        const kind = blur.kind();
-        if (kind === fbs.FeBlurKind.Gaussian) {
-          const gaussian = blur.gaussian();
+      function decodeFeBlur(
+        blurType: fbs.FeBlur,
+        blurValue: fbs.FeGaussianBlur | fbs.FeProgressiveBlur | null
+      ): cg.FeBlur {
+        if (blurType === fbs.FeBlur.FeGaussianBlur) {
+          const gaussian = blurValue as fbs.FeGaussianBlur | null;
           return {
             type: "blur",
             radius: gaussian ? gaussian.radius() : 0,
           } satisfies cg.FeGaussianBlur;
-        } else {
-          // Progressive blur
-          const progressive = blur.progressive();
+        } else if (blurType === fbs.FeBlur.FeProgressiveBlur) {
+          const progressive = blurValue as fbs.FeProgressiveBlur | null;
           if (progressive) {
             const start = progressive.start();
             const end = progressive.end();
@@ -3309,14 +3289,13 @@ export namespace format {
               radius: progressive.radius(),
               radius2: progressive.radius2(),
             } satisfies cg.FeProgressiveBlur;
-          } else {
-            // Fallback to gaussian blur
-            return {
-              type: "blur",
-              radius: 0,
-            } satisfies cg.FeGaussianBlur;
           }
         }
+        // Fallback to gaussian blur
+        return {
+          type: "blur",
+          radius: 0,
+        } satisfies cg.FeGaussianBlur;
       }
 
       /**
@@ -3326,11 +3305,16 @@ export namespace format {
         feLayerBlur: fbs.FeLayerBlur | null
       ): cg.FeLayerBlur | undefined {
         if (!feLayerBlur) return undefined;
-        const blur = feLayerBlur.blur();
-        if (!blur) return undefined;
+        const blurType = feLayerBlur.blurType();
+        const blurValue = unionToFeBlur(
+          blurType,
+          (obj: fbs.FeGaussianBlur | fbs.FeProgressiveBlur) =>
+            feLayerBlur.blur(obj)
+        );
+        if (blurType === fbs.FeBlur.NONE || !blurValue) return undefined;
         return {
           type: "filter-blur",
-          blur: decodeFeBlur(blur),
+          blur: decodeFeBlur(blurType, blurValue),
           active: feLayerBlur.active(),
         } satisfies cg.FeLayerBlur;
       }
@@ -3342,11 +3326,16 @@ export namespace format {
         feBackdropBlur: fbs.FeBackdropBlur | null
       ): cg.FeBackdropBlur | undefined {
         if (!feBackdropBlur) return undefined;
-        const blur = feBackdropBlur.blur();
-        if (!blur) return undefined;
+        const blurType = feBackdropBlur.blurType();
+        const blurValue = unionToFeBlur(
+          blurType,
+          (obj: fbs.FeGaussianBlur | fbs.FeProgressiveBlur) =>
+            feBackdropBlur.blur(obj)
+        );
+        if (blurType === fbs.FeBlur.NONE || !blurValue) return undefined;
         return {
           type: "backdrop-filter-blur",
-          blur: decodeFeBlur(blur),
+          blur: decodeFeBlur(blurType, blurValue),
           active: feBackdropBlur.active(),
         } satisfies cg.FeBackdropBlur;
       }
@@ -4823,12 +4812,12 @@ export namespace format {
               const letterSpacingStruct = textStyle.letterSpacing();
               if (letterSpacingStruct) {
                 const letterSpacingKind = letterSpacingStruct.kind();
-                const letterSpacingValue =
-                  letterSpacingKind === fbs.TextLetterSpacingKind.Factor
-                    ? letterSpacingStruct.factorValue()
-                    : letterSpacingStruct.fixedValue();
-                // Only set if non-zero (0 means unset/default, encoded when undefined)
-                if (letterSpacingValue !== 0) {
+                const letterSpacingValue = letterSpacingStruct.value();
+                // TODO: Support TextDimensionKind.Normal (means "normal" in CSS)
+                // TODO: Support TextDimensionKind.Percent (when added to enum)
+                // Only set if kind is Factor (em-based value)
+                // Fixed or Normal with value 0 means unset/default
+                if (letterSpacingKind === fbs.TextDimensionKind.Factor) {
                   letterSpacing = letterSpacingValue;
                 }
               }
@@ -4837,12 +4826,12 @@ export namespace format {
               const wordSpacingStruct = textStyle.wordSpacing();
               if (wordSpacingStruct) {
                 const wordSpacingKind = wordSpacingStruct.kind();
-                const wordSpacingValue =
-                  wordSpacingKind === fbs.TextWordSpacingKind.Factor
-                    ? wordSpacingStruct.factorValue()
-                    : wordSpacingStruct.fixedValue();
-                // Only set if non-zero (0 means unset/default, encoded when undefined)
-                if (wordSpacingValue !== 0) {
+                const wordSpacingValue = wordSpacingStruct.value();
+                // TODO: Support TextDimensionKind.Normal (means "normal" in CSS)
+                // TODO: Support TextDimensionKind.Percent (when added to enum)
+                // Only set if kind is Factor (em-based value)
+                // Fixed or Normal with value 0 means unset/default
+                if (wordSpacingKind === fbs.TextDimensionKind.Factor) {
                   wordSpacing = wordSpacingValue;
                 }
               }
@@ -4851,19 +4840,16 @@ export namespace format {
               const lineHeightStruct = textStyle.lineHeight();
               if (lineHeightStruct) {
                 const lineHeightKind = lineHeightStruct.kind();
-                if (lineHeightKind === fbs.TextLineHeightKind.Normal) {
+                if (lineHeightKind === fbs.TextDimensionKind.Normal) {
                   // Normal line height - means undefined/default
                   lineHeight = undefined;
-                } else {
-                  const lineHeightValue =
-                    lineHeightKind === fbs.TextLineHeightKind.Factor
-                      ? lineHeightStruct.factorValue()
-                      : lineHeightStruct.fixedValue();
-                  // Only set if non-zero (0 means unset/default, encoded when undefined)
-                  if (lineHeightValue !== 0) {
-                    lineHeight = lineHeightValue;
-                  }
+                } else if (lineHeightKind === fbs.TextDimensionKind.Factor) {
+                  // Factor (em-based) value
+                  const lineHeightValue = lineHeightStruct.value();
+                  lineHeight = lineHeightValue;
                 }
+                // TODO: Support TextDimensionKind.Percent (when added to enum)
+                // Fixed kind is not used for line_height in TS model
               }
             }
           }
