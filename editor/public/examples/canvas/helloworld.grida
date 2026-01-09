@@ -17,9 +17,7 @@
         "layout_inset_top": 0,
         "layout_target_width": 960,
         "layout_target_height": 540,
-        "style": {
-          "overflow": "clip"
-        },
+        "clips_content": true,
         "corner_radius": 0,
         "fill_paints": [
           {

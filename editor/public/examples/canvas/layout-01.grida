@@ -17,9 +17,7 @@
         "layout_inset_top": 0,
         "layout_target_width": 402,
         "layout_target_height": 874,
-        "style": {
-          "overflow": "clip"
-        },
+        "clips_content": true,
         "corner_radius": 0,
         "padding_top": 0,
         "padding_right": 0,
@@ -59,7 +57,6 @@
         "layout_inset_top": 33,
         "layout_target_width": "auto",
         "layout_target_height": "auto",
-        "style": {},
         "corner_radius": 0,
         "padding_top": 0,
         "padding_right": 0,
@@ -168,7 +165,6 @@
         "layout_inset_top": 33,
         "layout_target_width": "auto",
         "layout_target_height": "auto",
-        "style": {},
         "corner_radius": 0,
         "padding_top": 0,
         "padding_right": 0,
