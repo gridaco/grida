@@ -2978,7 +2978,13 @@ export class Editor
       });
 
       // TODO: cleanup not handled
-      ro.observe(el, { box: "device-pixel-content-box" });
+      // Safari doesn't support the "device-pixel-content-box" box option
+      try {
+        ro.observe(el, { box: "device-pixel-content-box" });
+      } catch (e) {
+        // Fallback for browsers that don't support device-pixel-content-box (e.g., Safari)
+        ro.observe(el);
+      }
 
       if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
         this.log("wasm::factory", factory.module);
