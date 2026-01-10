@@ -63,19 +63,7 @@ ALTER SCHEMA "grida_x_supabase" OWNER TO "postgres";
 CREATE EXTENSION IF NOT EXISTS "pg_net" WITH SCHEMA "extensions";
 
 
-
-
-
-
-CREATE EXTENSION IF NOT EXISTS "pgsodium" WITH SCHEMA "pgsodium";
-
-
-
-
-
-
 COMMENT ON SCHEMA "public" IS 'standard public schema';
-
 
 
 CREATE SCHEMA IF NOT EXISTS "secure";
@@ -85,10 +73,6 @@ ALTER SCHEMA "secure" OWNER TO "postgres";
 
 
 CREATE EXTENSION IF NOT EXISTS "moddatetime" WITH SCHEMA "extensions";
-
-
-
-
 
 
 CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
