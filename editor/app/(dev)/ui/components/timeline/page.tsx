@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Timeline } from "@/grida-react-timeline-wd";
+import { ComponentDemo } from "../component-demo";
 
 export default function TimelinePage() {
   return (
@@ -23,9 +24,11 @@ export default function TimelinePage() {
               The standard timeline component for animation sequences
             </p>
           </div>
-          <div className="p-6 bg-gray-50 rounded-lg">
-            <Timeline />
-          </div>
+          <ComponentDemo>
+            <div className="w-full max-w-4xl">
+              <Timeline />
+            </div>
+          </ComponentDemo>
         </section>
 
         <hr />

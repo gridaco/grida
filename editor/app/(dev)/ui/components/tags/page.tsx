@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { TagInput } from "@/components/tag";
+import { ComponentDemo } from "../component-demo";
 
 export default function TagsPage() {
   const [tags, setTags] = useState<{ id: string; text: string }[]>([
@@ -53,18 +54,21 @@ export default function TagsPage() {
               Create and manage tags with keyboard support
             </p>
           </div>
-          <div className="space-y-4 p-6 bg-gray-50 rounded-lg">
+          <ComponentDemo
+            notes={
+              <>
+                <strong>Tips:</strong> Type and press Enter to add tags. Click
+                on a tag to remove it.
+              </>
+            }
+          >
             <TagInput
               tags={tags}
               setTags={setTags}
               activeTagIndex={null}
               setActiveTagIndex={() => {}}
             />
-            <div className="text-sm text-gray-600">
-              <strong>Tips:</strong> Type and press Enter to add tags. Click on
-              a tag to remove it.
-            </div>
-          </div>
+          </ComponentDemo>
         </section>
 
         <hr />
@@ -76,7 +80,14 @@ export default function TagsPage() {
               Enable autocomplete suggestions for faster input
             </p>
           </div>
-          <div className="space-y-4 p-6 bg-gray-50 rounded-lg">
+          <ComponentDemo
+            notes={
+              <>
+                <strong>Tips:</strong> Start typing to see autocomplete
+                suggestions. Select from the dropdown or create custom tags.
+              </>
+            }
+          >
             <TagInput
               tags={tagsWithAutocomplete}
               setTags={setTagsWithAutocomplete}
@@ -85,11 +96,7 @@ export default function TagsPage() {
               activeTagIndex={null}
               setActiveTagIndex={() => {}}
             />
-            <div className="text-sm text-gray-600">
-              <strong>Tips:</strong> Start typing to see autocomplete
-              suggestions. Select from the dropdown or create custom tags.
-            </div>
-          </div>
+          </ComponentDemo>
         </section>
 
         <hr />
@@ -101,17 +108,14 @@ export default function TagsPage() {
               Tag input without any initial values
             </p>
           </div>
-          <div className="space-y-4 p-6 bg-gray-50 rounded-lg">
+          <ComponentDemo notes="Start typing to add your first tag.">
             <TagInput
               tags={emptyTags}
               setTags={setEmptyTags}
               activeTagIndex={null}
               setActiveTagIndex={() => {}}
             />
-            <div className="text-sm text-gray-600">
-              Start typing to add your first tag.
-            </div>
-          </div>
+          </ComponentDemo>
         </section>
 
         <hr />
