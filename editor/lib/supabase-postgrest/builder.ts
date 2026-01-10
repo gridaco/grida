@@ -234,9 +234,9 @@ export namespace XPostgrestQuery {
 
 export class XSupabaseClientQueryBuilder {
   private builder:
-    | PostgrestQueryBuilder<any, any>
-    | PostgrestTransformBuilder<any, any, any>
-    | PostgrestFilterBuilder<any, any, any>
+    | PostgrestQueryBuilder<any, any, any>
+    | PostgrestTransformBuilder<any, any, any, any>
+    | PostgrestFilterBuilder<any, any, any, any>
     | null = null;
 
   constructor(readonly client: SupabaseClient) {}
@@ -266,32 +266,36 @@ export class XSupabaseClientQueryBuilder {
   delete(
     ...parameters: Parameters<PostgrestQueryBuilder<any, any, any>["delete"]>
   ) {
-    this.builder = (this.builder as PostgrestQueryBuilder<any, any>).delete(
-      ...parameters
-    );
+    this.builder = (
+      this.builder as PostgrestQueryBuilder<any, any, any>
+    ).delete(...parameters);
     return this;
   }
 
   update(
     ...parameters: Parameters<PostgrestQueryBuilder<any, any, any>["update"]>
   ) {
-    this.builder = (this.builder as PostgrestQueryBuilder<any, any>).update(
-      ...parameters
-    );
+    this.builder = (
+      this.builder as PostgrestQueryBuilder<any, any, any>
+    ).update(...parameters);
     return this;
   }
 
-  eq(...parameters: Parameters<PostgrestFilterBuilder<any, any, any>["eq"]>) {
-    this.builder = (this.builder as PostgrestFilterBuilder<any, any, any>).eq(
-      ...parameters
-    );
+  eq(
+    ...parameters: Parameters<PostgrestFilterBuilder<any, any, any, any>["eq"]>
+  ) {
+    this.builder = (
+      this.builder as PostgrestFilterBuilder<any, any, any, any>
+    ).eq(...parameters);
     return this;
   }
 
-  in(...parameters: Parameters<PostgrestFilterBuilder<any, any, any>["in"]>) {
-    this.builder = (this.builder as PostgrestFilterBuilder<any, any, any>).in(
-      ...parameters
-    );
+  in(
+    ...parameters: Parameters<PostgrestFilterBuilder<any, any, any, any>["in"]>
+  ) {
+    this.builder = (
+      this.builder as PostgrestFilterBuilder<any, any, any, any>
+    ).in(...parameters);
     return this;
   }
 
@@ -300,31 +304,35 @@ export class XSupabaseClientQueryBuilder {
       return this;
     }
     this.builder = (
-      this.builder as PostgrestFilterBuilder<any, any, any>
+      this.builder as PostgrestFilterBuilder<any, any, any, any>
     ).limit(limit);
     return this;
   }
 
   order(
-    ...parameters: Parameters<PostgrestFilterBuilder<any, any, any>["order"]>
+    ...parameters: Parameters<
+      PostgrestFilterBuilder<any, any, any, any>["order"]
+    >
   ) {
     this.builder = (
-      this.builder as PostgrestFilterBuilder<any, any, any>
+      this.builder as PostgrestFilterBuilder<any, any, any, any>
     ).order(...parameters);
     return this;
   }
 
   private params<
     T extends XPostgrestQuery.NamedPredicate = XPostgrestQuery.NamedPredicate,
-  >(filter: T): Parameters<PostgrestFilterBuilder<any, any, any>[T["type"]]> {
+  >(
+    filter: T
+  ): Parameters<PostgrestFilterBuilder<any, any, any, any>[T["type"]]> {
     switch (filter.type) {
       case "eq":
         return [filter.column, filter.value] as unknown as Parameters<
-          PostgrestFilterBuilder<any, any, any>[T["type"]]
+          PostgrestFilterBuilder<any, any, any, any>[T["type"]]
         >;
       case "in":
         return [filter.column, filter.values] as unknown as Parameters<
-          PostgrestFilterBuilder<any, any, any>[T["type"]]
+          PostgrestFilterBuilder<any, any, any, any>[T["type"]]
         >;
     }
   }
@@ -361,14 +369,25 @@ export class XSupabaseClientQueryBuilder {
    * @param override
    */
   fromSearchParams(searchParams: URLSearchParams, override: boolean = false) {
-    const prev = (this.builder as PostgrestFilterBuilder<any, any, any>)["url"][
-      "searchParams"
-    ];
+    const builder = this.builder;
+    if (!builder) {
+      throw new Error(
+        "Query builder is not initialized. Call `.from(table)` first."
+      );
+    }
+
+    /**
+     * `@supabase/postgrest-js`'s `PostgrestQueryBuilder` exposes `url: URL`.
+     * Builder instances created from `supabase.from()` also carry this `url`
+     * at runtime, even when the current fluent type is a transform/filter builder.
+     */
+    type BuilderWithUrl = Pick<PostgrestQueryBuilder<any, any, any>, "url">;
+    const prev = (builder as unknown as BuilderWithUrl).url.searchParams;
 
     if (override) {
-      prev.forEach((_, key) => {
+      for (const key of Array.from(prev.keys())) {
         prev.delete(key);
-      });
+      }
     }
 
     searchParams.forEach((value, key) => {

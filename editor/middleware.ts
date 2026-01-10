@@ -1,8 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 import { TanantMiddleware } from "./lib/tenant/middleware";
+import { updateSession } from "./lib/supabase/proxy";
 import { Env } from "./env";
 
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -41,7 +41,27 @@ export async function middleware(req: NextRequest) {
   }
   // #endregion maintenance mode
 
-  const res = await updateSession(req);
+  let res: NextResponse;
+
+  // ------------------------------------------------------------
+  // contributor dx
+  if (
+    process.env.NODE_ENV === "development" &&
+    (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  ) {
+    res = NextResponse.next({
+      request: req,
+    });
+    console.warn(
+      "SUPABASE_URL or SUPABASE_ANON_KEY is not set this will break all db-requests, please set them in the .env.local file",
+      "If you are just testing things around, you can ignore this message",
+      "Learn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
+    );
+  }
+  // ------------------------------------------------------------
+
+  res = await updateSession(req);
 
   // #region tanent matching
 
@@ -88,74 +108,6 @@ export async function middleware(req: NextRequest) {
   // #endregion tanent
 
   return res;
-}
-
-/**
- * @see https://supabase.com/docs/guides/auth/server-side/nextjs
- */
-async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  if (
-    process.env.NODE_ENV === "development" &&
-    (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-  ) {
-    console.warn(
-      "SUPABASE_URL or SUPABASE_ANON_KEY is not set this will break all db-requests, please set them in the .env.local file",
-      "If you are just testing things around, you can ignore this message",
-      "Learn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
-    );
-
-    return supabaseResponse;
-  }
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  // IMPORTANT: DO NOT REMOVE auth.getUser()
-  await supabase.auth.getUser();
-
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
-
-  return supabaseResponse;
 }
 
 // Ensure the middleware is only called for relevant paths.

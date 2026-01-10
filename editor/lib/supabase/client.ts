@@ -10,7 +10,7 @@ const __create_browser_client = <
 ) =>
   _createBrowserClient<Database, SchemaName>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       db: {
         schema: schema,
