@@ -4,9 +4,9 @@ import React from "react";
 import { ScreenRoot } from "@/theme/templates/kit/components";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Platform } from "@/lib/platform";
-import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
-import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
-import { TemplateData } from "@/theme/templates/west-referral/templates";
+import InvitationPageTemplate from "@/theme/templates/enterprise/west-referral/invitation/page";
+import InvitationCouponTemplate from "@/theme/templates/enterprise/west-referral/invitation/coupon";
+import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
 
 interface CampaignPublicData {
   "signup-form-id": string;

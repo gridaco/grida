@@ -4,7 +4,7 @@ import React from "react";
 import { ScratchToReveal } from "@/www/ui/scratch-to-reveal";
 import { Badge } from "@/components/ui/badge";
 import ScratchAnimation from "@/www/ui/scratch-animation";
-import * as Standard from "@/theme/templates/west-referral/standard";
+import * as Standard from "@/theme/templates/enterprise/west-referral/standard";
 
 const dictionary = {
   en: {

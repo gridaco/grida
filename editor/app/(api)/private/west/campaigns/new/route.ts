@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { Platform } from "@/lib/platform";
 import { notFound } from "next/navigation";
 import { nanoid } from "nanoid";
-import { TemplateData } from "@/theme/templates/west-referral/templates";
+import type { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
 
 export async function POST(req: Request) {
   const body = await req.json();

@@ -4,7 +4,7 @@ import React from "react";
 import { editor } from "@/grida-canvas";
 import Editor from "../../../editor";
 import queryattributes from "@/grida-canvas-react-renderer-dom/nodes/utils/attributes";
-import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
+import ReferrerPageTemplate from "@/theme/templates/enterprise/west-referral/referrer/page";
 
 const document: editor.state.IEditorStateInit = {
   editable: true,

@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { TicketCheckIcon } from "lucide-react";
 import { ShineBorder } from "@/www/ui/shine-border";
 import Link from "next/link";
-import * as Standard from "@/theme/templates/west-referral/standard";
+import * as Standard from "@/theme/templates/enterprise/west-referral/standard";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { template } from "@/utils/template";
 import {
