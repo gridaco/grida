@@ -45,11 +45,12 @@ export async function middleware(req: NextRequest) {
 
   // ------------------------------------------------------------
   // contributor dx
-  if (
+  const env_not_set_but_can_skip_on_local_dev =
     process.env.NODE_ENV === "development" &&
     (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
-  ) {
+      !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+
+  if (env_not_set_but_can_skip_on_local_dev) {
     res = NextResponse.next({
       request: req,
     });
@@ -58,10 +59,10 @@ export async function middleware(req: NextRequest) {
       "If you are just testing things around, you can ignore this message",
       "Learn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
     );
+  } else {
+    res = await updateSession(req);
   }
   // ------------------------------------------------------------
-
-  res = await updateSession(req);
 
   // #region tanent matching
 
