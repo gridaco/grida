@@ -126,7 +126,7 @@ export default function InvitationPageTemplate({
   return (
     <ScreenMobileFrame>
       <ScreenScrollable>
-        <div>
+        <div data-testid="west-referral-invitation-page">
           {/* Header */}
           <Standard.Header>
             {design.logo && (
@@ -170,7 +170,10 @@ export default function InvitationPageTemplate({
           )} */}
 
           <Standard.Section>
-            <Card className="relative overflow-hidden rounded-xl border-0">
+            <Card
+              data-testid="west-referral-invitation-card"
+              className="relative overflow-hidden rounded-xl border-0"
+            >
               <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
               <div className="px-4 py-1.5 m-0.5 relative border border-background rounded-t-[10px] overflow-hidden flex items-center z-10">
                 {/* background */}
@@ -227,7 +230,10 @@ export default function InvitationPageTemplate({
             {/* FIXME: use challenges */}
             {is_claimed && (
               <div className="my-4">
-                <Card className="relative overflow-hidden">
+                <Card
+                  data-testid="west-referral-invitation-claimed-card"
+                  className="relative overflow-hidden"
+                >
                   <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -308,7 +314,7 @@ function SignUpForm({
 
   return (
     <FormViewProvider form_id={form_id}>
-      <Drawer {...props}>
+      <Drawer {...props} data-testid="west-referral-invitation-signup-form">
         <DrawerContent>
           <DrawerTitle className="sr-only">Mission Signup Form</DrawerTitle>
           {/*  */}

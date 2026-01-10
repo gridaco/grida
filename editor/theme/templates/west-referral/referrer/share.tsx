@@ -4,6 +4,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
+  DrawerTitle,
   DrawerClose,
   DrawerContent,
   DrawerFooter,
@@ -43,7 +44,8 @@ export default function ShareDialog({
   };
 
   return (
-    <Drawer {...props}>
+    <Drawer {...props} data-testid="west-referral-referrer-share-dialog">
+      <DrawerTitle className="sr-only">Share</DrawerTitle>
       <DrawerContent>
         <div className="mx-auto w-full">
           <article

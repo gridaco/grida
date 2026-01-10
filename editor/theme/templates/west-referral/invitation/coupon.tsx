@@ -46,7 +46,10 @@ export default function InvitationCouponTemplate({
   const t = dictionary[locale];
 
   return (
-    <main className="w-full h-full flex flex-col items-center justify-center">
+    <main
+      data-testid="west-referral-invitation-coupon"
+      className="w-full h-full flex flex-col items-center justify-center"
+    >
       <Standard.Header className="absolute top-0 z-10">
         {design.logo && (
           <Standard.Logo
