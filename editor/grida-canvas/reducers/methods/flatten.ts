@@ -19,7 +19,7 @@ export const FLATTENABLE_NODE_TYPES = new Set<grida.program.nodes.NodeType>([
   "ellipse",
   "line",
   // TODO: only supported by wasm backend, need backend check or seperate api (e.g. vector.textToVectorNetwork())
-  "text",
+  "tspan",
   "vector",
   "boolean",
 ]);
@@ -71,17 +71,19 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   if (!v) return null;
 
   const vectornode: grida.program.nodes.VectorNode = {
-    ...(node as grida.program.nodes.UnknwonNode),
+    ...(node as grida.program.nodes.UnknownNode),
     type: "vector",
     id: node.id,
     active: node.active,
     corner_radius: modeProperties.cornerRadius(node),
-    fill_rule: (node as grida.program.nodes.UnknwonNode).fill_rule ?? "nonzero",
+    fill_rule: (node as grida.program.nodes.UnknownNode).fill_rule ?? "nonzero",
     vector_network: v,
-    width: rect.width,
-    height: rect.height,
-    left: (node as any).left!,
-    top: (node as any).top!,
+    layout_target_width: rect.width,
+    layout_target_height: rect.height,
+    layout_inset_left: (node as grida.program.nodes.UnknownNode)
+      .layout_inset_left!,
+    layout_inset_top: (node as grida.program.nodes.UnknownNode)
+      .layout_inset_top!,
   } as grida.program.nodes.VectorNode;
 
   __dangerously_delete_non_vector_properties(vectornode);

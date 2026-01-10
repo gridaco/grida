@@ -1,9 +1,12 @@
-import type grida from "@grida/schema";
-import type cmath from "@grida/cmath";
+import grida from "@grida/schema";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { encode, decode, type PngDataArray } from "fast-png";
 import { XMLParser } from "fast-xml-parser";
 import { imageSize } from "image-size";
+import { format } from "./format";
+
+// Type alias to avoid namespace shadowing inside io namespace
+type GridaDocument = grida.program.document.Document;
 
 const IMAGE_TYPE_TO_MIME_TYPE: Record<
   string,
@@ -124,7 +127,7 @@ export namespace io {
       }
       let __text_plain = "";
       for (const p of payload.prototypes) {
-        if (p.type === "text") {
+        if (p.type === "tspan") {
           __text_plain += p.text + "\n";
         }
       }
@@ -599,35 +602,14 @@ export namespace io {
   }
 
   /**
-   * Grida Document File model
-   * .grida file is a JSON file that contains the document structure and metadata.
+   * Snapshot model (JSON)
    *
-   * used for web usage
+   * This is NOT a supported `.grida` file format. It's intended for tests and
+   * legacy conversion only.
    */
-  export interface JSONDocumentFileModel {
-    version: typeof grida.program.document.SCHEMA_VERSION;
+  export interface SnapshotDocumentModel {
+    version: string;
     document: grida.program.document.Document;
-  }
-
-  /**
-   * Archive File model
-   * .grida file is a ZIP archive that contains the JSON document file and resources.
-   *
-   * used for archives & desktop usage
-   */
-  export interface ArchiveFileModel {
-    version: typeof grida.program.document.SCHEMA_VERSION;
-    document: JSONDocumentFileModel;
-
-    /**
-     * raw images, uploaded by the user
-     */
-    images: Record<string, Uint8ClampedArray>;
-
-    /**
-     * bitmaps modified by the user
-     */
-    bitmaps: Record<string, cmath.raster.Bitmap>;
   }
 
   /**
@@ -654,58 +636,145 @@ export namespace io {
   }
 
   /**
-   * Checks if a File contains valid JSON.
-   *
-   * This function performs a two-step validation:
-   * 1. Reads a 1KB sample and verifies it starts with "{" or "[".
-   * 2. If the sample passes the heuristic, reads the full file and attempts to parse it with JSON.parse.
-   *
-   * @param file - The File to validate.
-   * @returns A Promise that resolves to the parsed JSON object if the file contains valid JSON,
-   * or `false` if the file is not valid JSON.
+   * Checks if bytes are a raw FlatBuffers .grida buffer by verifying the file
+   * identifier ("GRID") at bytes[4..7].
    */
-  export async function is_json(file: File): Promise<false | any> {
-    try {
-      // Step 1: Heuristic check with a 1KB sample.
-      const sample = await file.slice(0, 1024).text();
-      if (!sample.trim().startsWith("{") && !sample.trim().startsWith("[")) {
-        return false;
+  export function is_grid(bytes: Uint8Array): boolean {
+    return (
+      bytes.length >= 8 &&
+      bytes[4] === 0x47 && // G
+      bytes[5] === 0x52 && // R
+      bytes[6] === 0x49 && // I
+      bytes[7] === 0x44 // D
+    );
+  }
+
+  export namespace fileformat {
+    export type Kind = "grida" | "zip" | "unknown";
+
+    export type Detected =
+      | { kind: "grida"; bytes: Uint8Array }
+      | {
+          kind: "zip";
+          bytes: Uint8Array;
+          archive: {
+            manifest: io.archive.Manifest;
+            document: Uint8Array;
+            images: Record<string, Uint8Array>;
+            bitmaps: Record<string, io.Bitmap>;
+          };
+        }
+      | { kind: "unknown"; bytes?: Uint8Array };
+
+    /**
+     * Detects the .grida file format and returns a processed result so callers
+     * don't repeat expensive work (unzip).
+     */
+    export async function detect(file: File): Promise<Detected> {
+      // ZIP? (cheap: reads 4 bytes)
+      const head4 = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      const isZip =
+        head4.length >= 4 &&
+        head4[0] === 0x50 &&
+        head4[1] === 0x4b &&
+        (head4[2] === 0x03 || head4[2] === 0x05);
+
+      if (isZip) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        try {
+          const files = unzipSync(bytes);
+
+          // FlatBuffers container manifest?
+          if (files["manifest.json"]) {
+            const manifestJson = strFromU8(files["manifest.json"]);
+            const manifest = JSON.parse(manifestJson) as io.archive.Manifest;
+
+            const document = files["document.grida"] ?? null;
+
+            if (manifest.document_file === "document.grida" && document) {
+              if (!document) return { kind: "unknown", bytes };
+
+              const images: Record<string, Uint8Array> = {};
+              const prefix = "images/";
+              for (const [path, data] of Object.entries(files)) {
+                if (path.startsWith(prefix) && path !== prefix) {
+                  images[path.slice(prefix.length)] = data;
+                }
+              }
+
+              const bitmaps: Record<string, io.Bitmap> = {};
+              const bmpPrefix = "bitmaps/";
+              for (const [path, data] of Object.entries(files)) {
+                if (
+                  path.startsWith(bmpPrefix) &&
+                  path.endsWith(".png") &&
+                  path !== bmpPrefix
+                ) {
+                  const key = path.slice(bmpPrefix.length, -4);
+                  try {
+                    const pngd = decode(data);
+                    bitmaps[key] = {
+                      version: 0,
+                      width: pngd.width,
+                      height: pngd.height,
+                      data: __norm_png_data(pngd.data),
+                    };
+                  } catch {
+                    // ignore invalid bitmap
+                  }
+                }
+              }
+
+              return {
+                kind: "zip",
+                bytes,
+                archive: { manifest, document, images, bitmaps },
+              };
+            }
+          }
+        } catch {
+          // Invalid ZIP; fall through
+        }
+
+        return { kind: "unknown", bytes };
       }
 
-      // Step 2: Read the full file and validate JSON structure.
-      const fullText = await file.text();
-      return JSON.parse(fullText);
-    } catch {
-      return false;
+      // Raw FlatBuffers? (cheap: reads 8 bytes)
+      const head8 = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+      if (io.is_grid(head8)) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        return { kind: "grida", bytes };
+      }
+
+      return { kind: "unknown" };
     }
   }
 
   export async function load(file: File): Promise<LoadedDocument> {
-    if (await is_zip(file)) {
-      const buffer = await file.arrayBuffer();
-      const unpacked = archive.unpack(new Uint8Array(buffer));
+    const detected = await fileformat.detect(file);
+
+    // Handle FlatBuffers ZIP container
+    if (detected.kind === "zip") {
       const {
-        version,
-        document: { document },
+        document: fbBytes,
         images: _x_images,
         bitmaps: _x_bitmaps,
-      } = unpacked;
+      } = detected.archive;
 
-      // convert images to blob URLs and create ImageRef objects
+      // Decode FlatBuffers document
+      const document = format.document.decode.fromFlatbuffer(fbBytes);
+
+      // Convert images
       const images: Record<string, grida.program.document.ImageRef> = {};
       for (const [key, imageData] of Object.entries(_x_images)) {
-        // Get image dimensions using image-size package
         const dimensions = imageSize(new Uint8Array(imageData));
         if (!dimensions || !dimensions.width || !dimensions.height) {
           throw new Error(`Failed to get dimensions for image: ${key}`);
         }
-
         const { width, height, type } = dimensions;
-
         const mimeType = IMAGE_TYPE_TO_MIME_TYPE[type || "png"] || "image/png";
         const blob = new Blob([imageData as BlobPart], { type: mimeType });
         const url = URL.createObjectURL(blob);
-
         images[url] = {
           url,
           width,
@@ -715,104 +784,176 @@ export namespace io {
         };
       }
 
-      // load bitmaps
-      const bitmaps: LoadedDocument["document"]["bitmaps"] = {};
-      for (const key in _x_bitmaps) {
-        const bitmap = _x_bitmaps[key];
-        bitmaps[key] = {
-          version: 0,
-          data: bitmap.data,
-          width: bitmap.width,
-          height: bitmap.height,
-        };
-      }
-
       return {
-        version,
-        document: { ...document, bitmaps: bitmaps, images: images },
+        version: grida.program.document.SCHEMA_VERSION,
+        document: { ...document, images, bitmaps: _x_bitmaps },
       } satisfies LoadedDocument;
     }
 
-    const maybe_json = await is_json(file);
-    if (maybe_json) {
-      return json.parse(maybe_json);
+    // Handle raw FlatBuffers binary
+    if (detected.kind === "grida") {
+      const document = format.document.decode.fromFlatbuffer(detected.bytes);
+      return {
+        version: grida.program.document.SCHEMA_VERSION,
+        document: { ...document, images: {}, bitmaps: {} },
+      } satisfies LoadedDocument;
     }
 
     throw new Error(`Unsupported file type: ${file.type}`);
   }
 
-  export namespace json {
-    export function parse(content: string | any): JSONDocumentFileModel {
-      const json: JSONDocumentFileModel =
-        typeof content === "string" ? JSON.parse(content) : content;
-
-      const bitmaps = json.document.bitmaps ?? {};
-
-      // serialize by type
-      // url    | string
-      // bitmap | Array => Uint8ClampedArray
-      for (const key of Object.keys(bitmaps)) {
-        const entry = bitmaps[key];
-        if (Array.isArray(entry.data)) {
-          entry.data = new Uint8ClampedArray(entry.data);
-        }
-      }
-
-      return {
-        version: json.version,
-        document: {
-          nodes: json.document.nodes,
-          links: json.document.links,
-          scenes_ref: json.document.scenes_ref,
-          entry_scene_id: json.document.entry_scene_id,
-          bitmaps: bitmaps,
-          images: json.document.images ?? {},
-          properties: json.document.properties ?? {},
-          metadata: json.document.metadata,
-        },
-      } satisfies JSONDocumentFileModel;
+  /**
+   * Snapshot (JSON) helpers.
+   *
+   * This is intentionally "as-is" JSON:
+   * - no ZIP container
+   * - no normalization/conversion
+   */
+  export namespace snapshot {
+    export function parse(content: string | any): any {
+      return typeof content === "string" ? JSON.parse(content) : content;
     }
 
-    export function stringify(model: JSONDocumentFileModel): string {
-      return JSON.stringify(model, (key, value) => {
-        if (value instanceof Uint8ClampedArray) {
-          return Array.from(value);
+    export function stringify(model: unknown): string {
+      return JSON.stringify(model);
+    }
+
+    /**
+     * Internal snapshot ZIP format (`.grida1.zip`).
+     *
+     * This is a test-only format that stores snapshot JSON in a ZIP archive.
+     * It's used for fixtures and internal testing purposes only.
+     * Not part of the public `.grida` file format specification.
+     */
+    export namespace grida1zip {
+      /**
+       * Packs a snapshot document model into a `.grida1.zip` file.
+       *
+       * @param model - The snapshot document model to pack
+       * @returns Uint8Array containing the ZIP archive with `document.grida1` inside
+       */
+      export function pack(model: SnapshotDocumentModel): Uint8Array {
+        const json = stringify(model);
+        return zipSync({
+          "document.grida1": strToU8(json),
+        });
+      }
+
+      /**
+       * Unpacks a `.grida1.zip` file into a snapshot document model.
+       *
+       * @param zipData - The ZIP archive bytes
+       * @returns The parsed snapshot document model
+       * @throws If the ZIP is invalid or missing `document.grida1`
+       */
+      export function unpack(zipData: Uint8Array): SnapshotDocumentModel {
+        const files = unzipSync(zipData);
+        const snapshotJson = strFromU8(files["document.grida1"]);
+        if (!snapshotJson) {
+          throw new Error("Missing document.grida1 in zip file");
         }
-        return value;
-      });
+        return parse(snapshotJson) as SnapshotDocumentModel;
+      }
     }
   }
 
-  export namespace archive {
-    export function pack(
-      mem: JSONDocumentFileModel,
-      images?: Record<string, Uint8ClampedArray>
-    ): Uint8Array {
-      const archive_targeted_document = {
-        version: mem.version,
-        document: {
-          ...mem.document,
-          // remove bitmaps from document
-          // TODO: in the future, reduce this to zip-local path references
-          bitmaps: {},
-        },
-      } satisfies ArchiveFileModel["document"];
+  export type Bitmap = {
+    version: number;
+    width: number;
+    height: number;
+    data: Uint8ClampedArray;
+  };
 
-      const files: Record<string, Uint8Array> = {
-        "document.json": strToU8(io.json.stringify(archive_targeted_document)),
-        "images/": new Uint8Array(), // ensures images folder exists
-        "bitmaps/": new Uint8Array(), // ensures bitmaps folder exists
+  export namespace archive {
+    /**
+     * Grida `.grida` archive (ZIP) format.
+     *
+     * A `.grida` file can be:
+     * - raw FlatBuffers (starts with file identifier "GRID")
+     * - ZIP archive containing:
+     *   - `manifest.json`
+     *   - `document.grida`
+     *   - `document.grida1` (legacy JSON snapshot for migration purposes)
+     *   - optional `images/*`
+     */
+    export interface Manifest {
+      document_file: "document.grida";
+      /**
+       * Optional schema version string associated with the document.
+       *
+       * This is not used for routing; it's informational/diagnostic only.
+       */
+      version?: string;
+    }
+
+    /**
+     * Packs a `.grida` ZIP archive from a Grida document.
+     *
+     * The function:
+     * 1. Encodes the document to FlatBuffers binary format (`document.grida`)
+     * 2. Generates a JSON snapshot (`document.grida1`) for migration purposes
+     * 3. Packages everything into a ZIP archive with optional images and bitmaps
+     *
+     * @param document - The Grida document to pack
+     * @param images - Optional image assets to include in the archive
+     * @param schemaVersion - Optional schema version (defaults to current)
+     * @param bitmaps - Optional bitmap assets to include in the archive
+     * @returns Uint8Array containing the ZIP archive
+     */
+    export function pack(
+      document: grida.program.document.Document,
+      images?: Record<string, Uint8Array>,
+      schemaVersion: string = grida.program.document.SCHEMA_VERSION,
+      bitmaps?: Record<string, io.Bitmap>
+    ): Uint8Array {
+      // Extract bitmaps from document if not provided
+      const inferredBitmaps: Record<string, io.Bitmap> | undefined =
+        bitmaps ?? ((document as any).bitmaps as Record<string, io.Bitmap>);
+
+      // Encode document to FlatBuffers binary
+      const fbBytes = format.document.encode.toFlatbuffer(
+        {
+          ...(document as any),
+          bitmaps: {},
+        } as grida.program.document.Document,
+        schemaVersion
+      );
+
+      // Generate document.grida1 (JSON snapshot) from document (for migration purposes)
+      const {
+        images: _images,
+        bitmaps: _bitmaps,
+        ...persistedDocument
+      } = document as any;
+      const snapshotJson = io.snapshot.stringify({
+        version: schemaVersion,
+        document: persistedDocument as grida.program.document.Document,
+      });
+
+      const manifest: Manifest = {
+        document_file: "document.grida",
+        version: schemaVersion,
       };
 
-      // Add raw images to archive
-      if (images) {
+      const files: Record<string, Uint8Array> = {
+        "manifest.json": strToU8(JSON.stringify(manifest)),
+        "document.grida": fbBytes,
+        "document.grida1": strToU8(snapshotJson),
+        ...(images &&
+          Object.keys(images).length > 0 && { "images/": new Uint8Array() }), // Ensure folder exists
+      };
+
+      // Add images
+      if (images && Object.keys(images).length > 0) {
         for (const [key, imageData] of Object.entries(images)) {
-          files[`images/${key}`] = new Uint8Array(imageData);
+          files[`images/${key}`] = imageData;
         }
       }
 
-      if (mem.document.bitmaps) {
-        for (const [key, bitmap] of Object.entries(mem.document.bitmaps)) {
+      // Add bitmaps (PNG)
+      if (inferredBitmaps && Object.keys(inferredBitmaps).length > 0) {
+        files["bitmaps/"] = new Uint8Array(); // ensure folder exists
+        for (const [key, bitmap] of Object.entries(inferredBitmaps)) {
           files[`bitmaps/${key}.png`] = new Uint8Array(
             encode({
               data: bitmap.data,
@@ -822,42 +963,368 @@ export namespace io {
           );
         }
       }
+
       return zipSync(files);
     }
 
-    export function unpack(zipData: Uint8Array): io.ArchiveFileModel {
+    /**
+     * Unpacks a ZIP `.grida` archive into its components.
+     */
+    export function unpack(zipData: Uint8Array): {
+      document: Uint8Array;
+      manifest: Manifest;
+      images: Record<string, Uint8Array>;
+      bitmaps: Record<string, io.Bitmap>;
+    } {
       const files = unzipSync(zipData);
-      const documentJson = strFromU8(files["document.json"]);
-      const document = io.json.parse(documentJson);
-      const bitmaps: Record<string, cmath.raster.Bitmap> = {};
-      const images: Record<string, Uint8ClampedArray> = {};
 
-      for (const key in files) {
+      // Parse manifest
+      const manifestJson = strFromU8(files["manifest.json"]);
+      const manifest = JSON.parse(manifestJson) as Manifest;
+
+      // Extract document
+      const document = files["document.grida"];
+      if (!document) {
+        throw new Error("Missing document file: document.grida");
+      }
+
+      // Extract images
+      const images: Record<string, Uint8Array> = {};
+      const prefix = "images/";
+      for (const [path, data] of Object.entries(files)) {
+        if (path.startsWith(prefix) && path !== prefix) {
+          const key = path.slice(prefix.length);
+          images[key] = data;
+        }
+      }
+
+      const bitmaps: Record<string, io.Bitmap> = {};
+      const bmpPrefix = "bitmaps/";
+      for (const [path, data] of Object.entries(files)) {
         if (
-          key.startsWith("bitmaps/") &&
-          key.endsWith(".png") &&
-          key !== "bitmaps/"
+          path.startsWith(bmpPrefix) &&
+          path.endsWith(".png") &&
+          path !== bmpPrefix
         ) {
-          const filename = key.substring("bitmaps/".length); // e.g "bitmaps/ref.png" => "ref.png"
-          const filekey = filename.substring(0, filename.length - 4); // e.g. "ref.png" => "ref"
-          const pngd = decode(files[key]);
-          bitmaps[filekey] = {
+          const key = path.slice(bmpPrefix.length, -4);
+          const pngd = decode(data);
+          bitmaps[key] = {
+            version: 0,
             width: pngd.width,
             height: pngd.height,
             data: __norm_png_data(pngd.data),
           };
-        } else if (key.startsWith("images/") && key !== "images/") {
-          const filename = key.substring("images/".length); // e.g "images/photo.jpg" => "photo.jpg"
-          images[filename] = new Uint8ClampedArray(files[key]);
         }
       }
 
+      return { document, manifest, images, bitmaps };
+    }
+  }
+
+  export namespace GRID {
+    /**
+     * Encodes a Grida document to raw FlatBuffers bytes.
+     *
+     * This is a minimal API for persisting documents without ZIP containers.
+     * Non-persisted fields (images, bitmaps) are stripped before encoding.
+     *
+     * @param document - The Grida document to encode
+     * @param schemaVersion - Optional schema version (defaults to current)
+     * @returns Uint8Array containing raw FlatBuffers bytes
+     *
+     * @example
+     * ```typescript
+     * const bytes = io.grida.encode(document);
+     * await opfs.writeBytes(bytes);
+     * ```
+     */
+    export function encode(
+      document: GridaDocument,
+      schemaVersion: string = grida.program.document.SCHEMA_VERSION
+    ): Uint8Array {
+      // Strip non-persisted fields (images, bitmaps) before encoding
+      const { images, bitmaps, ...persistedDocument } = document;
+      return format.document.encode.toFlatbuffer(
+        persistedDocument as GridaDocument,
+        schemaVersion
+      );
+    }
+
+    /**
+     * Decodes raw FlatBuffers bytes to a Grida document.
+     *
+     * @param bytes - Raw FlatBuffers bytes (must start with "GRID" magic)
+     * @returns Decoded Grida document (with empty images/bitmaps)
+     *
+     * @example
+     * ```typescript
+     * const bytes = await opfs.readBytes();
+     * const document = io.grida.decode(bytes);
+     * ```
+     */
+    export function decode(bytes: Uint8Array): GridaDocument {
+      const document = format.document.decode.fromFlatbuffer(bytes);
+      // Ensure images and bitmaps are empty (they're not persisted)
       return {
-        version: document.version,
-        document: document,
-        images: images,
-        bitmaps: bitmaps,
-      } satisfies io.ArchiveFileModel;
+        ...document,
+        images: {},
+        bitmaps: {},
+      };
+    }
+  }
+
+  /**
+   * Grida-specific OPFS (Origin Private File System) adapter.
+   *
+   * Provides utilities for persisting Grida documents and assets to the browser's
+   * Origin Private File System. This is a Grida-specific adapter that works with
+   * a fixed file structure within a configurable directory path.
+   *
+   * **Fixed Structure:**
+   * - `document.grida` - Raw FlatBuffers bytes of the Grida document
+   * - `thumbnail.png` - Document thumbnail (reserved for future)
+   * - `images/` - Image assets directory (reserved for future)
+   *
+   * **Usage:**
+   * ```typescript
+   * const handle = new io.opfs.Handle({
+   *   directory: ["playground", "current"]
+   * });
+   *
+   * // Read document
+   * const bytes = await handle.get('document.grida').read();
+   * const document = io.GRID.decode(bytes);
+   *
+   * // Write document
+   * const encoded = io.GRID.encode(document);
+   * await handle.get('document.grida').write(encoded);
+   *
+   * // Delete document
+   * await handle.get('document.grida').delete();
+   * ```
+   *
+   * @remarks
+   * - All methods throw errors on failure (no silent failures)
+   * - OPFS is only available in secure contexts (HTTPS or localhost)
+   * - Directory path segments are created automatically if they don't exist
+   */
+  export namespace opfs {
+    /**
+     * Configuration for Grida OPFS storage.
+     * Defines the directory path where Grida files are stored.
+     *
+     * Fixed structure within the directory:
+     * - document.grida (raw FlatBuffers bytes)
+     * - document.grida1 (legacy JSON snapshot for migration purposes)
+     * - thumbnail.png (reserved for future)
+     * - images/ (reserved for future)
+     */
+    export interface Config {
+      /**
+       * Directory path segments (e.g., ["playground", "current"])
+       * Will be created if they don't exist.
+       */
+      directory: string[];
+    }
+
+    /**
+     * Strongly-typed file keys for Grida OPFS structure.
+     */
+    export type FileKey =
+      | "document.grida"
+      | "document.grida1"
+      | "thumbnail.png";
+
+    /**
+     * File handle interface for OPFS file operations.
+     */
+    export interface FileHandle {
+      /**
+       * Reads the file from OPFS.
+       * @returns Raw bytes
+       * @throws If file not found or read fails
+       */
+      read(): Promise<Uint8Array>;
+
+      /**
+       * Writes bytes to the file in OPFS.
+       * @param bytes - Raw bytes to write
+       * @throws If write fails
+       */
+      write(bytes: Uint8Array): Promise<void>;
+
+      /**
+       * Deletes the file from OPFS.
+       * @throws If delete fails (except if file doesn't exist)
+       */
+      delete(): Promise<void>;
+    }
+
+    /**
+     * OPFS handle for accessing Grida files.
+     *
+     * Provides strongly-typed access to files in the Grida OPFS structure.
+     * Directory is created automatically on first access.
+     *
+     * @example
+     * ```typescript
+     * const handle = new io.opfs.Handle({
+     *   directory: ["playground", "current"]
+     * });
+     *
+     * // Read document
+     * const bytes = await handle.get('document.grida').read();
+     * const document = io.GRID.decode(bytes);
+     *
+     * // Write document
+     * const encoded = io.GRID.encode(document);
+     * await handle.get('document.grida').write(encoded);
+     *
+     * // Delete document
+     * await handle.get('document.grida').delete();
+     * ```
+     */
+    export class Handle {
+      private _dirHandle: FileSystemDirectoryHandle | null = null;
+      private _dirHandlePromise: Promise<FileSystemDirectoryHandle> | null =
+        null;
+      private _fileHandles = new Map<FileKey, FileHandle>();
+
+      constructor(private readonly config: Config) {
+        if (!Handle.isSupported()) {
+          throw new Error("OPFS is not supported in this environment");
+        }
+      }
+
+      /**
+       * Checks if OPFS is supported in the current environment.
+       */
+      static isSupported(): boolean {
+        return (
+          typeof window !== "undefined" &&
+          "storage" in navigator &&
+          "getDirectory" in navigator.storage &&
+          window.isSecureContext
+        );
+      }
+
+      /**
+       * Gets or creates the directory handle (cached).
+       */
+      private async getDirectoryHandle(): Promise<FileSystemDirectoryHandle> {
+        if (this._dirHandle) {
+          return this._dirHandle;
+        }
+
+        if (this._dirHandlePromise) {
+          return this._dirHandlePromise;
+        }
+
+        this._dirHandlePromise = (async () => {
+          try {
+            const root = await navigator.storage.getDirectory();
+            let currentDir = root;
+
+            for (const segment of this.config.directory) {
+              currentDir = await currentDir.getDirectoryHandle(segment, {
+                create: true,
+              });
+            }
+
+            this._dirHandle = currentDir;
+            return currentDir;
+          } catch (error) {
+            this._dirHandlePromise = null;
+            throw new Error(
+              `Failed to get OPFS directory: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        })();
+
+        return this._dirHandlePromise;
+      }
+
+      /**
+       * Creates a file handle for the given filename.
+       */
+      private createFileHandle(filename: FileKey): FileHandle {
+        return {
+          read: async (): Promise<Uint8Array> => {
+            const dir = await this.getDirectoryHandle();
+
+            try {
+              const fileHandle = await dir.getFileHandle(filename);
+              const file = await fileHandle.getFile();
+              const bytes = new Uint8Array(await file.arrayBuffer());
+              return bytes;
+            } catch (error) {
+              if (
+                error instanceof DOMException &&
+                (error.name === "NotFoundError" ||
+                  error.name === "TypeMismatchError")
+              ) {
+                throw new Error(`${filename} not found in OPFS`);
+              }
+              throw new Error(
+                `Failed to read OPFS ${filename}: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+          },
+
+          write: async (bytes: Uint8Array): Promise<void> => {
+            const dir = await this.getDirectoryHandle();
+
+            try {
+              const fileHandle = await dir.getFileHandle(filename, {
+                create: true,
+              });
+              const writable = await fileHandle.createWritable();
+              await writable.write(
+                bytes as unknown as FileSystemWriteChunkType
+              );
+              await writable.close();
+            } catch (error) {
+              throw new Error(
+                `Failed to write OPFS ${filename}: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+          },
+
+          delete: async (): Promise<void> => {
+            const dir = await this.getDirectoryHandle();
+
+            try {
+              await dir.removeEntry(filename);
+            } catch (error) {
+              // File doesn't exist - this is not an error
+              if (
+                error instanceof DOMException &&
+                error.name === "NotFoundError"
+              ) {
+                return;
+              }
+              throw new Error(
+                `Failed to delete OPFS ${filename}: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+          },
+        };
+      }
+
+      /**
+       * Strongly-typed file accessor.
+       * @example
+       * ```typescript
+       * const bytes = await handle.get('document.grida').read();
+       * await handle.get('document.grida').write(bytes);
+       * ```
+       */
+      get(key: FileKey): FileHandle {
+        if (!this._fileHandles.has(key)) {
+          this._fileHandles.set(key, this.createFileHandle(key));
+        }
+        return this._fileHandles.get(key)!;
+      }
     }
   }
 

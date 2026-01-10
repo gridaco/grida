@@ -969,10 +969,10 @@ type INodeChangePositioningAction = INodeID &
   Partial<grida.program.nodes.i.IPositioning>;
 
 type INodeChangePositioningModeAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "position">>;
+  Required<Pick<grida.program.nodes.UnknownNode, "layout_positioning">>;
 
 type INodeChangeComponentAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "component_id">>;
+  Required<Pick<grida.program.nodes.UnknownNode, "component_id">>;
 
 interface ITextNodeChangeFontFamilyAction extends INodeID {
   fontFamily: string | undefined;
@@ -990,7 +990,7 @@ export type NodeChangeAction =
   | ({
       type: "node/change/*";
       node_id: string;
-    } & Partial<Omit<grida.program.nodes.UnknwonNode, "type">>)
+    } & Partial<Omit<grida.program.nodes.UnknownNode, "type">>)
   | ({ type: "node/change/positioning" } & INodeChangePositioningAction)
   | ({
       type: "node/change/positioning-mode";

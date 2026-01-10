@@ -530,7 +530,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.89.0-beta+20251219";
+  export const SCHEMA_VERSION = "0.90.0-beta+20260108";
 
   /**
    * JSON-serializable value type
@@ -890,6 +890,8 @@ export namespace grida.program.document {
    * @deprecated This interface is being migrated to {@link nodes.SceneNode} which is stored in the nodes repository.
    * The Scene interface is kept for backward compatibility during the migration period.
    * New code should use SceneNode stored in document.nodes instead of document.scenes.
+   *
+   * TODO: safely remove this
    */
   export interface Scene
     extends document.ISceneBackground,
@@ -916,10 +918,7 @@ export namespace grida.program.document {
       children: "single" | "multiple";
     };
 
-    /**
-     * optional order of the scene
-     */
-    order?: number;
+    position?: string;
   }
 
   /**
@@ -1182,11 +1181,12 @@ export namespace grida.program.nodes {
   export type NodeID = id.NodeIdentifier;
   export type NodeType = Node["type"];
 
-  export type Node =
-    | SceneNode
+  export type Node = SceneNode | LayerNode;
+
+  export type LayerNode =
     | BooleanPathOperationNode
     | GroupNode
-    | TextNode
+    | TextSpanNode
     | ImageNode
     | VideoNode
     | ContainerNode
@@ -1204,7 +1204,7 @@ export namespace grida.program.nodes {
     | TemplateInstanceNode;
 
   export type ComputedNode =
-    | ComputedTextNode
+    | ComputedTextSpanNode
     | ComputedBitmapNode
     | ComputedImageNode
     | ComputedVideoNode
@@ -1220,10 +1220,10 @@ export namespace grida.program.nodes {
     | ComputedTemplateInstanceNode;
 
   /**
-   * Unknwon node utility type - use within the correct context
+   * Unknown node utility type - use within the correct context
    */
-  export type UnknwonComputedNode = Omit<
-    Partial<ComputedTextNode> &
+  export type UnknownComputedNode = Omit<
+    Partial<ComputedTextSpanNode> &
       Partial<ComputedImageNode> &
       Partial<ComputedBitmapNode> &
       Partial<ComputedVideoNode> &
@@ -1244,12 +1244,12 @@ export namespace grida.program.nodes {
     i.ISceneNode;
 
   /**
-   * Unknwon node utility type - use within the correct context
+   * Unknown node utility type - use within the correct context
    */
-  export type UnknwonNode = Omit<
+  export type UnknownNode = Omit<
     Partial<BooleanPathOperationNode> &
       Partial<GroupNode> &
-      Partial<TextNode> &
+      Partial<TextSpanNode> &
       Partial<BitmapNode> &
       Partial<ImageNode> &
       Partial<VideoNode> &
@@ -1271,7 +1271,8 @@ export namespace grida.program.nodes {
   } & i.IBaseNode &
     i.ISceneNode;
 
-  export type UnknownNodeProperties<T = unknown> = Record<keyof UnknwonNode, T>;
+  export type UnknownNodeProperties<T = unknown> = Record<keyof UnknownNode, T>;
+  export type UnknownNodePropertiesKey = keyof UnknownNodeProperties;
 
   // #region node prototypes
 
@@ -1288,7 +1289,7 @@ export namespace grida.program.nodes {
       __IPrototypeNodeChildren
   >;
   export type TextNodePrototype = __TPrototypeNode<
-    Omit<Partial<TextNode>, __base_scene_node_properties>
+    Omit<Partial<TextSpanNode>, __base_scene_node_properties>
   >;
   export type ImageNodePrototype = __TPrototypeNode<
     Omit<Partial<ImageNode>, __base_scene_node_properties>
@@ -1387,6 +1388,18 @@ export namespace grida.program.nodes {
     return "children" in prototype && Array.isArray(prototype.children);
   }
 
+  export function hasLayoutWidth(node: Node): node is Node & {
+    layout_target_width: UnknownNode["layout_target_width"];
+  } {
+    return "layout_target_width" in node;
+  }
+
+  export function hasLayoutHeight(node: Node): node is Node & {
+    layout_target_height: UnknownNode["layout_target_height"];
+  } {
+    return "layout_target_height" in node;
+  }
+
   // #endregion node prototypes
 
   /**
@@ -1481,6 +1494,7 @@ export namespace grida.program.nodes {
       /**
        * @default undefined
        */
+      // TODO: rename to mask_type
       mask?: cg.LayerMaskType | null | undefined;
     }
 
@@ -1502,7 +1516,7 @@ export namespace grida.program.nodes {
        * @default 0
        * @type {number} integer
        */
-      z_index: number;
+      z_index?: number;
     }
 
     /**
@@ -1559,22 +1573,22 @@ export namespace grida.program.nodes {
        * Padding on the top edge.
        * @default 0
        */
-      padding_top: number;
+      layout_padding_top: number;
       /**
        * Padding on the right edge.
        * @default 0
        */
-      padding_right: number;
+      layout_padding_right: number;
       /**
        * Padding on the bottom edge.
        * @default 0
        */
-      padding_bottom: number;
+      layout_padding_bottom: number;
       /**
        * Padding on the left edge.
        * @default 0
        */
-      padding_left: number;
+      layout_padding_left: number;
     }
 
     /**
@@ -1589,7 +1603,7 @@ export namespace grida.program.nodes {
       /**
        * the flex container only takes effect when layout is set to `flex`
        */
-      layout: "flex" | "flow";
+      layout_mode: "flex" | "flow";
 
       /**
        *
@@ -1597,7 +1611,7 @@ export namespace grida.program.nodes {
        *
        * @default "horizontal"
        */
-      direction: cg.Axis;
+      layout_direction: cg.Axis;
 
       /**
        *
@@ -1613,7 +1627,7 @@ export namespace grida.program.nodes {
        *
        * @default "start"
        */
-      main_axis_alignment: cg.MainAxisAlignment;
+      layout_main_axis_alignment: cg.MainAxisAlignment;
 
       /**
        *
@@ -1621,7 +1635,7 @@ export namespace grida.program.nodes {
        *
        * @default "start"
        */
-      cross_axis_alignment: cg.CrossAxisAlignment;
+      layout_cross_axis_alignment: cg.CrossAxisAlignment;
 
       /**
        * the gap between the children in main axis - takes effect when layout is set to `flex`
@@ -1630,7 +1644,7 @@ export namespace grida.program.nodes {
        *
        * @default 0
        */
-      main_axis_gap: number;
+      layout_main_axis_gap: number;
 
       /**
        * the gap between the children in cross axis - takes effect when layout is set to `flex`
@@ -1639,7 +1653,7 @@ export namespace grida.program.nodes {
        *
        * @default 0
        */
-      cross_axis_gap: number;
+      layout_cross_axis_gap: number;
     }
 
     /**
@@ -1859,30 +1873,22 @@ export namespace grida.program.nodes {
       target?: "_self" | "_blank" | undefined;
     }
 
-    /**
-     * does not represent any specific rule or logic, just a data structure, depends on the context
-     */
-    export interface IFixedDimension {
-      width: number;
-      height: number;
-    }
-
     export interface ICSSDimension {
-      width: css.LengthPercentage | "auto";
-      height: css.LengthPercentage | "auto";
+      layout_target_width: css.LengthPercentage | "auto";
+      layout_target_height: css.LengthPercentage | "auto";
     }
 
     /**
      * Relative DOM Positioning model
      *
-     * by default, use position: relative, left: 0, top: 0 - to avoid unexpected layout issues
+     * by default, use position: relative, layout_inset_left: 0, layout_inset_top: 0 - to avoid unexpected layout issues
      */
     export interface IPositioning {
-      position: "absolute" | "relative";
-      left?: number | undefined;
-      top?: number | undefined;
-      right?: number | undefined;
-      bottom?: number | undefined;
+      layout_positioning: "absolute" | "relative";
+      layout_inset_left?: number | undefined;
+      layout_inset_top?: number | undefined;
+      layout_inset_right?: number | undefined;
+      layout_inset_bottom?: number | undefined;
       // x: number;
       // y: number;
     }
@@ -2089,6 +2095,36 @@ export namespace grida.program.nodes {
        */
       props: Record<string, schema.Value>;
     }
+
+    export interface ILayerTrait extends IBlend, ILayerMaskType, IEffects {
+      z_index?: number;
+    }
+
+    export interface IBasicShapeTrait
+      extends i.ICornerRadius,
+        i.IFill<cg.Paint>,
+        i.IStroke {}
+
+    export interface IRectangularShapeTrait
+      extends IRectangularCornerRadius,
+        IRectangularStrokeWidth {}
+
+    export interface ILayoutTrait
+      extends ILayoutTargetAspectRatio,
+        IPositioning {
+      rotation: number;
+      layout_target_width: css.LengthPercentage | "auto";
+      layout_target_height: css.LengthPercentage | "auto";
+    }
+
+    export interface ILayoutChildTrait extends ILayoutTrait {}
+
+    export interface ILayoutContainerTrait
+      extends ILayoutTrait,
+        Partial<i.IPadding>,
+        IFlexContainer {}
+
+    export interface IHotspotTrait extends IHrefable, IMouseCursor {}
   }
 
   type __ReplaceSubset<T, TSubset extends Partial<T>, TNew> = Omit<
@@ -2126,7 +2162,10 @@ export namespace grida.program.nodes {
     constraints: {
       children: "single" | "multiple";
     };
-    order?: number;
+    /// Fractional index position string for ordering among siblings.
+    /// Empty string means "unsorted" or "default position".
+    /// Children are sorted by lexicographic comparison of position strings.
+    position?: string;
   }
 
   /**
@@ -2138,7 +2177,6 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.IBlend,
-      i.IExpandable,
       i.IPositioning {
     type: "group";
     //
@@ -2152,54 +2190,54 @@ export namespace grida.program.nodes {
   export interface BooleanPathOperationNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IBlend,
-      i.IExpandable,
-      i.IRotation,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IFill<cg.Paint>,
       i.IStroke,
-      i.IPositioning,
       i.ICornerRadius {
     type: "boolean";
     op: cg.BooleanOperation;
   }
 
-  export interface TextNode
+  export interface TextSpanNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.ICSSStylable,
-      i.IEffects,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IHotspotTrait,
       i.ITextNodeStyle,
       i.ITextValue,
       i.ITextStroke {
-    readonly type: "text";
+    readonly type: "tspan";
 
+    /**
+     * tspan cannot have max lines. this will be removed in the future.
+     * current interpretation: tspan was previously text node, we keep max lines for legacy reasons.
+     * when cleaned, tspan shall not be a root text node.
+     */
     max_lines?: number | null;
     // text_auto_resize: "none" | "width" | "height" | "auto";
   }
 
-  export interface ComputedTextNode
+  export interface ComputedTextSpanNode
     extends __ReplaceSubset<
-      TextNode,
+      TextSpanNode,
       i.ITextValue & i.ITextStyle,
       i.IComputedTextValue & i.IComputedTextNodeStyle
     > {
-    readonly type: "text";
+    readonly type: "tspan";
     max_lines?: number | null;
   }
 
   export interface ImageNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.ICSSStylable,
-      i.IEffects,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IHotspotTrait,
       i.IBoxFit,
-      i.IHrefable,
-      i.IMouseCursor,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
-      i.IRectangularStrokeWidth,
+      i.IRectangularShapeTrait,
       i.ISourceValue {
     readonly type: "image";
     alt?: string;
@@ -2215,13 +2253,14 @@ export namespace grida.program.nodes {
    *
    * Note:
    * - Limited to HTML environment
-   * - {@link TextNode} also supports rich styling, but only limited to text spans.
+   * - {@link TextSpanNode} also supports rich styling, but only limited to text spans.
    *
    * RichText can hold any html-like text content, including text spans, links, images, etc.
    */
   export interface HTMLRichTextNode
     extends i.IBaseNode,
       i.ISceneNode,
+      i.IBlend,
       i.ICSSStylable,
       i.IHrefable,
       i.IMouseCursor,
@@ -2241,13 +2280,12 @@ export namespace grida.program.nodes {
   export interface VideoNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.ICSSStylable,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IHotspotTrait,
       i.IBoxFit,
-      i.IHrefable,
-      i.IMouseCursor,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
-      i.IRectangularStrokeWidth,
+      i.IRectangularShapeTrait,
       i.ISourceValue {
     readonly type: "video";
 
@@ -2268,18 +2306,15 @@ export namespace grida.program.nodes {
   export interface ContainerNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.ICSSStylable,
-      i.IEffects,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IExpandable,
+      i.ILayerTrait,
+      i.ILayoutContainerTrait,
+      i.IHotspotTrait,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
+      i.IRectangularShapeTrait,
       i.IStroke,
-      i.IRectangularStrokeWidth,
-      Partial<i.IPadding>,
-      i.IFlexContainer {
+      i.IFill<cg.Paint> {
     readonly type: "container";
+    clips_content: boolean;
     //
   }
 
@@ -2299,7 +2334,7 @@ export namespace grida.program.nodes {
       i.ISceneNode,
       i.ICSSStylable,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
+      i.IRectangularShapeTrait,
       i.ISourceValue {
     readonly type: "iframe";
   }
@@ -2323,12 +2358,8 @@ export namespace grida.program.nodes {
   export interface BitmapNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.IZIndex,
-      i.IRotation,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
       i.IFill<cg.Paint> {
     readonly type: "bitmap";
     readonly imageRef: string;
@@ -2339,18 +2370,10 @@ export namespace grida.program.nodes {
   export interface RegularPolygonNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.ILayerMaskType,
-      i.IZIndex,
-      i.IRotation,
-      i.ICornerRadius,
-      i.IFill<cg.Paint>,
-      i.IStroke {
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IBasicShapeTrait,
+      i.IHotspotTrait {
     readonly type: "polygon";
     point_count: number;
   }
@@ -2358,17 +2381,10 @@ export namespace grida.program.nodes {
   export interface RegularStarPolygonNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.IZIndex,
-      i.IRotation,
-      i.ICornerRadius,
-      i.IFill<cg.Paint>,
-      i.IStroke {
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IBasicShapeTrait,
+      i.IHotspotTrait {
     readonly type: "star";
     point_count: number;
     inner_radius: number;
@@ -2377,17 +2393,10 @@ export namespace grida.program.nodes {
   export interface VectorNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IPositioning,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.IZIndex,
-      i.IRotation,
-      i.ICornerRadius,
-      i.IFill<cg.Paint>,
-      i.IStroke {
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IBasicShapeTrait,
+      i.IHotspotTrait {
     readonly type: "vector";
 
     /**
@@ -2420,18 +2429,11 @@ export namespace grida.program.nodes {
   export interface LineNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IPositioning,
-      i.IStroke,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.ILayerMaskType,
-      i.IZIndex,
-      i.IRotation {
+      i.ILayerTrait,
+      i.IHotspotTrait,
+      i.ILayoutChildTrait,
+      i.IStroke {
     readonly type: "line";
-    height: 0;
   }
 
   export interface ComputedLineNode extends LineNode {
@@ -2453,21 +2455,11 @@ export namespace grida.program.nodes {
   export interface RectangleNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IPositioning,
-      // i.ICSSDimension,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IBlend,
-      i.IZIndex,
-      i.IRotation,
-      i.IFill<cg.Paint>,
-      i.IStroke,
-      i.IRectangularStrokeWidth,
-      i.IEffects,
-      i.ICornerRadius,
-      i.IRectangularCornerRadius {
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IBasicShapeTrait,
+      i.IRectangularShapeTrait,
+      i.IHotspotTrait {
     readonly type: "rectangle";
   }
 
@@ -2492,20 +2484,11 @@ export namespace grida.program.nodes {
   export interface EllipseNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IPositioning,
-      // i.ICSSDimension,
-      i.IFixedDimension,
-      i.ILayoutTargetAspectRatio,
-      i.IEllipseArcData,
-      i.IBlend,
-      i.ILayerMaskType,
-      i.IZIndex,
-      i.IRotation,
-      i.IFill<cg.Paint>,
-      i.IStroke,
-      i.IEffects {
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IHotspotTrait,
+      i.IBasicShapeTrait,
+      i.IEllipseArcData {
     type: "ellipse";
   }
 
@@ -2521,12 +2504,11 @@ export namespace grida.program.nodes {
   export interface ComponentNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.ICSSStylable,
-      i.IHrefable,
-      i.IMouseCursor,
-      i.IExpandable,
+      i.ILayerTrait,
+      i.ILayoutContainerTrait,
+      i.IHotspotTrait,
       i.ICornerRadius,
-      i.IRectangularCornerRadius,
+      i.IRectangularShapeTrait,
       Partial<i.IPadding>,
       i.IFlexContainer,
       i.IProperties {
@@ -2538,11 +2520,9 @@ export namespace grida.program.nodes {
   export interface InstanceNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IBlend,
-      i.IPositioning,
-      // i.ICSSStylable,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.ILayerTrait,
+      i.ILayoutContainerTrait,
+      i.IHotspotTrait,
       i.IProperties,
       i.IProps {
     readonly type: "instance";
@@ -2566,8 +2546,7 @@ export namespace grida.program.nodes {
   export interface TemplateInstanceNode
     extends i.IBaseNode,
       i.ISceneNode,
-      i.IHrefable,
-      i.IMouseCursor,
+      i.IHotspotTrait,
       i.IPositioning,
       i.ICSSDimension,
       i.IProperties,
@@ -2601,13 +2580,13 @@ export namespace grida.program.nodes {
         type: "template_instance",
         active: true,
         locked: false,
-        position: "relative",
+        layout_positioning: "relative",
         properties,
         props: {},
         overrides: cloneWithUndefinedValues(nodes),
         template_id: def.name,
-        width: "auto",
-        height: "auto",
+        layout_target_width: "auto",
+        layout_target_height: "auto",
         ...seed,
       };
       //
@@ -2649,11 +2628,11 @@ export namespace grida.program.nodes {
             blend_mode: cg.def.LAYER_BLENDMODE,
             z_index: 0,
             rotation: 0,
-            width: 0,
-            height: 0,
-            position: "absolute",
-            top: 0,
-            left: 0,
+            layout_target_width: 0,
+            layout_target_height: 0,
+            layout_positioning: "absolute",
+            layout_inset_top: 0,
+            layout_inset_left: 0,
             corner_radius: 0,
             ...factory_default_traits.DEFAULT_RECTANGULAR_CORNER_RADIUS,
             stroke_width: 0,
@@ -2675,6 +2654,7 @@ export namespace grida.program.nodes {
             z_index: 0,
             rotation: 0,
             corner_radius: 0,
+            clips_content: true,
             ...factory_default_traits.DEFAULT_RECTANGULAR_CORNER_RADIUS,
             ...prototypeWithoutChildren,
             id: id,
@@ -2699,7 +2679,7 @@ export namespace grida.program.nodes {
             rotation: 0,
             ...prototypeWithoutChildren,
             id: id,
-          } as UnknwonNode;
+          } as UnknownNode;
         }
         // TODO:
         case "bitmap":
@@ -2708,11 +2688,12 @@ export namespace grida.program.nodes {
         case "image":
         case "line":
         case "richtext":
-        case "text":
+        case "tspan":
         case "vector":
         case "polygon":
         case "star":
         case "video": {
+          // FIXME: no expect error
           // @ts-expect-error
           return {
             name: prototype.type,
@@ -2722,12 +2703,12 @@ export namespace grida.program.nodes {
             opacity: 1,
             z_index: 0,
             rotation: 0,
-            width: 100,
-            height: 100,
-            position: "absolute",
+            layout_target_width: 100,
+            layout_target_height: 100,
+            layout_positioning: "absolute",
             ...prototype,
             id: id,
-          } as UnknwonNode;
+          } as UnknownNode;
         }
         default:
           throw new Error(
@@ -2810,7 +2791,6 @@ export namespace grida.program.nodes {
         active: true,
         locked: false,
         constraints: scene.constraints,
-        order: scene.order,
         guides: scene.guides,
         edges: scene.edges,
         background_color: scene.background_color,
@@ -2877,35 +2857,34 @@ export namespace grida.program.nodes {
         name: "container",
         active: true,
         locked: false,
-        expanded: false,
         rotation: 0,
         z_index: 0,
         opacity: 1,
         blend_mode: cg.def.LAYER_BLENDMODE,
-        position: "absolute",
-        layout: "flow",
-        direction: "horizontal",
-        main_axis_alignment: "start",
-        main_axis_gap: 0,
-        cross_axis_alignment: "start",
-        cross_axis_gap: 0,
-        padding_top: 0,
-        padding_right: 0,
-        padding_bottom: 0,
-        padding_left: 0,
-        width: 100,
-        height: 100,
+        layout_positioning: "absolute",
+        layout_mode: "flow",
+        layout_direction: "horizontal",
+        layout_main_axis_alignment: "start",
+        layout_cross_axis_alignment: "start",
+        layout_main_axis_gap: 0,
+        layout_cross_axis_gap: 0,
+        layout_padding_top: 0,
+        layout_padding_right: 0,
+        layout_padding_bottom: 0,
+        layout_padding_left: 0,
+        layout_target_width: 100,
+        layout_target_height: 100,
         corner_radius: 0,
         rectangular_corner_radius_top_left: 0,
         rectangular_corner_radius_top_right: 0,
         rectangular_corner_radius_bottom_left: 0,
         rectangular_corner_radius_bottom_right: 0,
-        style: {},
         stroke_width: 1,
         stroke_align: "inside",
         stroke_cap: "butt",
         stroke_join: "miter",
         stroke_miter_limit: 4,
+        clips_content: true,
         // children_refs: [],
         ...partial,
       };

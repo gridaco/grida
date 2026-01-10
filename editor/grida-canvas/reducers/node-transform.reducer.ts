@@ -1,5 +1,7 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
+import { editor } from "@/grida-canvas";
+import assert from "assert";
 
 type NodeTransformAction =
   | {
@@ -73,10 +75,14 @@ type NodeTransformAction =
  * @mutates draft
  * @param draft node
  * @param action scale, translate, resize, position
+ * @param geometry Geometry query interface for resolving node dimensions
+ * @param nodeId Node ID for geometry queries
  */
 export default function updateNodeTransform(
   draft: grida.program.nodes.Node,
-  action: NodeTransformAction
+  action: NodeTransformAction,
+  geometry: editor.api.IDocumentGeometryQuery,
+  nodeId: string
 ) {
   // Scene nodes cannot be transformed
   if (draft.type === "scene") {
@@ -86,12 +92,24 @@ export default function updateNodeTransform(
   switch (action.type) {
     case "position": {
       const { x, y } = action;
-      if ("position" in draft && draft.position == "absolute") {
+      if (
+        ("layout_positioning" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+          draft &&
+        draft.layout_positioning == "absolute"
+      ) {
         // TODO: with resolve box model
         // TODO: also need to update right, bottom, width, height
 
-        if ("left" in draft) draft.left = cmath.quantize(x, 1);
-        if ("top" in draft) draft.top = cmath.quantize(y, 1);
+        if (
+          ("layout_inset_left" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+          draft
+        )
+          draft.layout_inset_left = cmath.quantize(x, 1);
+        if (
+          ("layout_inset_top" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+          draft
+        )
+          draft.layout_inset_top = cmath.quantize(y, 1);
       } else {
         // ignore
         reportError("node is not draggable");
@@ -100,7 +118,10 @@ export default function updateNodeTransform(
     }
     case "translate": {
       const { dx, dy } = action;
-      if ("position" in draft) {
+      if (
+        ("layout_positioning" satisfies grida.program.nodes.UnknownNodePropertiesKey) in
+        draft
+      ) {
         moveNode(draft as grida.program.nodes.i.IPositioning, dx, dy);
       }
       break;
@@ -164,31 +185,37 @@ export default function updateNodeTransform(
       const _draft = draft as grida.program.nodes.i.ICSSDimension &
         grida.program.nodes.i.IPositioning;
 
-      const heightWasNumber = typeof _draft.height === "number";
+      const heightWasNumber = typeof _draft.layout_target_height === "number";
 
-      if (_draft.position === "absolute") {
-        _draft.left = cmath.quantize(scaled.x, 1);
-        _draft.top = cmath.quantize(scaled.y, 1);
+      if (_draft.layout_positioning === "absolute") {
+        _draft.layout_inset_left = cmath.quantize(scaled.x, 1);
+        _draft.layout_inset_top = cmath.quantize(scaled.y, 1);
       }
 
       // For text nodes, use ceil to ensure we don't cut off content
-      if (draft.type === "text") {
-        _draft.width = Math.ceil(Math.max(scaled.width, 0));
+      if (draft.type === "tspan") {
+        _draft.layout_target_width = Math.ceil(Math.max(scaled.width, 0));
       } else {
-        _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
+        _draft.layout_target_width = cmath.quantize(
+          Math.max(scaled.width, 0),
+          1
+        );
       }
 
       if (draft.type === "line") {
-        _draft.height = 0;
+        _draft.layout_target_height = 0;
       } else {
         const preserveAutoHeight =
-          draft.type === "text" && !heightWasNumber && movement[1] === 0;
+          draft.type === "tspan" && !heightWasNumber && movement[1] === 0;
         if (!preserveAutoHeight) {
           // For text nodes, use ceil to ensure we don't cut off content
-          if (draft.type === "text") {
-            _draft.height = Math.ceil(Math.max(scaled.height, 0));
+          if (draft.type === "tspan") {
+            _draft.layout_target_height = Math.ceil(Math.max(scaled.height, 0));
           } else {
-            _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
+            _draft.layout_target_height = cmath.quantize(
+              Math.max(scaled.height, 0),
+              1
+            );
           }
         }
       }
@@ -199,29 +226,44 @@ export default function updateNodeTransform(
       const { delta } = action;
       const [dx, dy] = delta;
 
-      const _draft = draft as grida.program.nodes.i.IFixedDimension &
-        grida.program.nodes.i.IPositioning;
+      const _draft = draft as grida.program.nodes.i.ILayoutTrait;
+
+      // Get resolved dimensions from geometry cache
+      // This is necessary when width/height are relative (e.g., percentages, viewport units)
+      const rect = geometry.getNodeAbsoluteBoundingRect(nodeId);
+      assert(rect, `Bounding rect for node ${nodeId} must be defined`);
+
+      const currentWidth = rect.width;
+      const currentHeight = rect.height;
 
       // right, bottom
-      if (_draft.right) _draft.right -= dx;
-      if (_draft.bottom) _draft.bottom -= dy;
+      if (_draft.layout_inset_right) _draft.layout_inset_right -= dx;
+      if (_draft.layout_inset_bottom) _draft.layout_inset_bottom -= dy;
 
       // size
       // For text nodes, use ceil to ensure we don't cut off content
-      if (draft.type === "text") {
-        _draft.width = Math.ceil(Math.max(_draft.width + dx, 0));
+      if (draft.type === "tspan") {
+        _draft.layout_target_width = Math.ceil(Math.max(currentWidth + dx, 0));
       } else {
-        _draft.width = cmath.quantize(Math.max(_draft.width + dx, 0), 1);
+        _draft.layout_target_width = cmath.quantize(
+          Math.max(currentWidth + dx, 0),
+          1
+        );
       }
 
       if (draft.type === "line") {
-        _draft.height = 0;
+        _draft.layout_target_height = 0;
       } else {
         // For text nodes, use ceil to ensure we don't cut off content
-        if (draft.type === "text") {
-          _draft.height = Math.ceil(Math.max(_draft.height + dy, 0));
+        if (draft.type === "tspan") {
+          _draft.layout_target_height = Math.ceil(
+            Math.max(currentHeight + dy, 0)
+          );
         } else {
-          _draft.height = cmath.quantize(Math.max(_draft.height + dy, 0), 1);
+          _draft.layout_target_height = cmath.quantize(
+            Math.max(currentHeight + dy, 0),
+            1
+          );
         }
       }
       break;
@@ -234,33 +276,39 @@ function moveNode(
   dx: number,
   dy: number
 ) {
-  if (draft.position == "absolute") {
+  if (draft.layout_positioning == "absolute") {
     if (dx) {
-      if (draft.left !== undefined || draft.right !== undefined) {
-        if (draft.left !== undefined) {
-          const new_l = draft.left + dx;
-          draft.left = cmath.quantize(new_l, 1);
+      if (
+        draft.layout_inset_left !== undefined ||
+        draft.layout_inset_right !== undefined
+      ) {
+        if (draft.layout_inset_left !== undefined) {
+          const new_l = draft.layout_inset_left + dx;
+          draft.layout_inset_left = cmath.quantize(new_l, 1);
         }
-        if (draft.right !== undefined) {
-          const new_r = draft.right - dx;
-          draft.right = cmath.quantize(new_r, 1);
+        if (draft.layout_inset_right !== undefined) {
+          const new_r = draft.layout_inset_right - dx;
+          draft.layout_inset_right = cmath.quantize(new_r, 1);
         }
       } else {
-        draft.left = cmath.quantize(dx, 1);
+        draft.layout_inset_left = cmath.quantize(dx, 1);
       }
     }
     if (dy) {
-      if (draft.top !== undefined || draft.bottom !== undefined) {
-        if (draft.top !== undefined) {
-          const new_t = draft.top + dy;
-          draft.top = cmath.quantize(new_t, 1);
+      if (
+        draft.layout_inset_top !== undefined ||
+        draft.layout_inset_bottom !== undefined
+      ) {
+        if (draft.layout_inset_top !== undefined) {
+          const new_t = draft.layout_inset_top + dy;
+          draft.layout_inset_top = cmath.quantize(new_t, 1);
         }
-        if (draft.bottom !== undefined) {
-          const new_b = draft.bottom - dy;
-          draft.bottom = cmath.quantize(new_b, 1);
+        if (draft.layout_inset_bottom !== undefined) {
+          const new_b = draft.layout_inset_bottom - dy;
+          draft.layout_inset_bottom = cmath.quantize(new_b, 1);
         }
       } else {
-        draft.top = cmath.quantize(dy, 1);
+        draft.layout_inset_top = cmath.quantize(dy, 1);
       }
     }
   } else {

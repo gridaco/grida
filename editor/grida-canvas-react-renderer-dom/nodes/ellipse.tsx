@@ -1,13 +1,14 @@
 import grida from "@grida/schema";
 import { svg } from "@/grida-canvas-utils/svg";
+import { css } from "@/grida-canvas-utils/css";
 import queryattributes from "./utils/attributes";
 
 export function EllipseWidget({
   // x,
   // y,
   style,
-  width,
-  height,
+  layout_target_width: width,
+  layout_target_height: height,
   fill,
   stroke,
   stroke_width,
@@ -30,8 +31,8 @@ export function EllipseWidget({
   return (
     <svg
       {...queryattributes(props)}
-      width={width}
-      height={height}
+      width={css.toDimension(width)}
+      height={css.toDimension(height)}
       style={{
         ...style,
         overflow: "visible", // shall be visible since the polyline has a stroke width
@@ -42,10 +43,10 @@ export function EllipseWidget({
       {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
       {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}
       <ellipse
-        cx={width / 2}
-        cy={height / 2}
-        rx={width / 2}
-        ry={height / 2}
+        cx="50%"
+        cy="50%"
+        rx="50%"
+        ry="50%"
         fill={fillDef}
         strokeWidth={stroke_width}
         stroke={strokeDef}

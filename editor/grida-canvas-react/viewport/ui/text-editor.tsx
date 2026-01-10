@@ -26,7 +26,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
 
   const styles = {
     ...css.toReactTextStyle(
-      node as grida.program.nodes.TextNode as any as grida.program.nodes.ComputedTextNode
+      node as grida.program.nodes.TextSpanNode as any as grida.program.nodes.ComputedTextSpanNode
     ),
     ...(backend === "canvas"
       ? {

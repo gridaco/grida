@@ -10,6 +10,7 @@ import schema from "../schema";
 import updateNodeTransform from "../node-transform.reducer";
 import { getSnapTargets, threshold } from "../tools/snap";
 import { snapObjectsResize } from "../tools/snap-resize";
+import { css } from "@/grida-canvas-utils/css";
 
 /**
  * Scale gesture orchestration.
@@ -133,9 +134,9 @@ export function self_start_gesture_scale(
       direction === "nw" ||
       direction === "sw"
     ) {
-      if (typeof n.width !== "number") {
-        n.width =
-          node.type === "text"
+      if (typeof n.layout_target_width !== "number") {
+        n.layout_target_width =
+          node.type === "tspan"
             ? Math.ceil(rect.width)
             : cmath.quantize(rect.width, 1);
       }
@@ -150,12 +151,12 @@ export function self_start_gesture_scale(
       direction === "se" ||
       direction === "sw"
     ) {
-      if (typeof n.height !== "number") {
+      if (typeof n.layout_target_height !== "number") {
         if (node.type === "line") {
-          n.height = 0;
+          n.layout_target_height = 0;
         } else {
-          n.height =
-            node.type === "text"
+          n.layout_target_height =
+            node.type === "tspan"
               ? Math.ceil(rect.height)
               : cmath.quantize(rect.height, 1);
         }
@@ -327,14 +328,19 @@ function self_update_gesture_resize_scale(
       targetAspectRatio !== undefined;
 
     if (!parent_id || is_scene_parent) {
-      updateNodeTransform(node as any, {
-        type: "scale",
-        rect: initial_rect,
-        origin: origin,
-        movement,
-        preserveAspectRatio: should_preserve_aspect_ratio,
-        targetAspectRatio: targetAspectRatio,
-      });
+      updateNodeTransform(
+        node,
+        {
+          type: "scale",
+          rect: initial_rect,
+          origin: origin,
+          movement,
+          preserveAspectRatio: should_preserve_aspect_ratio,
+          targetAspectRatio: targetAspectRatio,
+        },
+        context.geometry,
+        node_id
+      );
     } else {
       const parent_rect =
         context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
@@ -360,18 +366,22 @@ function self_update_gesture_resize_scale(
         parent_rect.y,
       ]);
 
-      updateNodeTransform(node as any, {
-        type: "scale",
-        rect: relative_rect,
-        origin: relative_origin,
-        movement,
-        preserveAspectRatio: should_preserve_aspect_ratio,
-        targetAspectRatio: targetAspectRatio,
-      });
+      updateNodeTransform(
+        node,
+        {
+          type: "scale",
+          rect: relative_rect,
+          origin: relative_origin,
+          movement,
+          preserveAspectRatio: should_preserve_aspect_ratio,
+          targetAspectRatio: targetAspectRatio,
+        },
+        context.geometry,
+        node_id
+      );
     }
 
     if (initial_node.type === "vector") {
-      const vector_node = node as grida.program.nodes.VectorNode;
       const initial_dimensions: cmath.Rectangle = {
         x: 0,
         y: 0,
@@ -379,11 +389,17 @@ function self_update_gesture_resize_scale(
         height: initial_rect.height,
       };
 
+      // Use geometry query to get resolved dimensions instead of fallback
+      const final_rect = context.geometry.getNodeAbsoluteBoundingRect(node_id);
+      assert(
+        final_rect,
+        `Node ${node_id} does not have a bounding rect after transform`
+      );
       const final_dimensions: cmath.Rectangle = {
         x: 0,
         y: 0,
-        width: vector_node.width ?? 0,
-        height: vector_node.height ?? 0,
+        width: final_rect.width,
+        height: final_rect.height,
       };
 
       let scale: cmath.Vector2;
@@ -440,9 +456,14 @@ function resolveScaleOriginPoint(
     : cmath.rect.getCardinalPoint(bounds, origin);
 }
 
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (value && typeof value === "object")
-    return value as Record<string, unknown>;
+function toRecord(
+  node: grida.program.nodes.Node
+): Record<grida.program.nodes.UnknownNodePropertiesKey, unknown> | null {
+  if (node && typeof node === "object")
+    return node as Record<
+      grida.program.nodes.UnknownNodePropertiesKey,
+      unknown
+    >;
   return null;
 }
 
@@ -471,8 +492,13 @@ function collectAutoSpaceRootsFromGesture(args: {
 
     const o = toRecord(initial_node);
     if (!o) continue;
-    if (o["position"] !== "absolute") continue;
-    if (typeof o["width"] !== "number" || typeof o["height"] !== "number")
+    if (o["layout_positioning"] !== "absolute") continue;
+    if (
+      !grida.program.nodes.hasLayoutWidth(initial_node) ||
+      !grida.program.nodes.hasLayoutHeight(initial_node) ||
+      initial_node.layout_target_width === "auto" ||
+      initial_node.layout_target_height === "auto"
+    )
       continue;
 
     const initialRect = initial_rect_by_root_id[root_id];
@@ -481,8 +507,8 @@ function collectAutoSpaceRootsFromGesture(args: {
     roots.push({
       id: root_id,
       initialRect,
-      hasLeft: typeof o["left"] === "number",
-      hasTop: typeof o["top"] === "number",
+      hasLeft: typeof o["layout_inset_left"] === "number",
+      hasTop: typeof o["layout_inset_top"] === "number",
     });
   }
 
@@ -507,18 +533,24 @@ function collectAutoSpaceRootsForCommand(args: {
 
     const o = toRecord(node);
     if (!o) continue;
-    if (o["position"] !== "absolute") continue;
-    if (typeof o["width"] !== "number" || typeof o["height"] !== "number")
+    if (o["layout_positioning"] !== "absolute") continue;
+    if (
+      !grida.program.nodes.hasLayoutWidth(node) ||
+      !grida.program.nodes.hasLayoutHeight(node) ||
+      node.layout_target_width === "auto" ||
+      node.layout_target_height === "auto"
+    )
       continue;
 
     const rect =
       args.context.geometry.getNodeAbsoluteBoundingRect(root_id) ??
-      (typeof o["left"] === "number" && typeof o["top"] === "number"
+      (typeof o["layout_inset_left"] === "number" &&
+      typeof o["layout_inset_top"] === "number"
         ? {
-            x: o["left"],
-            y: o["top"],
-            width: o["width"],
-            height: o["height"],
+            x: o["layout_inset_left"] as number,
+            y: o["layout_inset_top"] as number,
+            width: css.toPxNumber(node.layout_target_width),
+            height: css.toPxNumber(node.layout_target_height),
           }
         : null);
 
@@ -527,8 +559,8 @@ function collectAutoSpaceRootsForCommand(args: {
     roots.push({
       id: root_id,
       initialRect: rect,
-      hasLeft: typeof o["left"] === "number",
-      hasTop: typeof o["top"] === "number",
+      hasLeft: typeof o["layout_inset_left"] === "number",
+      hasTop: typeof o["layout_inset_top"] === "number",
     });
   }
 
@@ -560,11 +592,11 @@ function applyAutoSpaceRootLeftTopOverride(args: {
 
     if (root.hasLeft) {
       // selection-root override (only if authored as numeric)
-      o["left"] = scaled.x;
+      o["layout_inset_left"] = scaled.x;
     }
     if (root.hasTop) {
       // selection-root override (only if authored as numeric)
-      o["top"] = scaled.y;
+      o["layout_inset_top"] = scaled.y;
     }
   }
 }

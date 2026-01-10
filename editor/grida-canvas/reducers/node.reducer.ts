@@ -6,8 +6,10 @@ import assert from "assert";
 import cmath from "@grida/cmath";
 import { editor } from "@/grida-canvas";
 
-type UN = grida.program.nodes.UnknwonNode;
-type DYN_TODO = grida.program.nodes.UnknwonNode | any; // TODO: remove casting of this usage.
+type UN = grida.program.nodes.UnknownNode;
+// UnknownNodeProperties Keys
+type UNPK = grida.program.nodes.UnknownNodePropertiesKey;
+type DYN_TODO = grida.program.nodes.UnknownNode | any; // TODO: remove casting of this usage.
 
 type PaintValue = grida.program.nodes.i.props.PropsPaintValue;
 
@@ -128,13 +130,13 @@ function insertPaintAtIndex(
 }
 
 function defineNodeProperty<
-  K extends keyof grida.program.nodes.UnknwonNode,
+  K extends keyof grida.program.nodes.UnknownNode,
 >(handlers: {
-  assert?: (node: grida.program.nodes.UnknwonNode) => boolean;
+  assert?: (node: grida.program.nodes.UnknownNode) => boolean;
   apply: (
     draft: grida.program.nodes.UnknownNodeProperties,
-    value: NonNullable<grida.program.nodes.UnknwonNode[K]>,
-    prev?: grida.program.nodes.UnknwonNode[K]
+    value: NonNullable<grida.program.nodes.UnknownNode[K]>,
+    prev?: grida.program.nodes.UnknownNode[K]
   ) => void;
 }) {
   return handlers;
@@ -146,7 +148,7 @@ function defineNodeProperty<
 const safe_properties: Partial<
   Omit<
     grida.program.nodes.UnknownNodeProperties<{
-      assert?: (node: grida.program.nodes.UnknwonNode) => boolean;
+      assert?: (node: grida.program.nodes.UnknownNode) => boolean;
       apply: (
         draft: grida.program.nodes.UnknownNodeProperties,
         value: any,
@@ -174,46 +176,46 @@ const safe_properties: Partial<
       (draft as UN).name = value;
     },
   }),
-  position: defineNodeProperty<"position">({
+  layout_positioning: defineNodeProperty<"layout_positioning">({
     apply: (draft, value, prev) => {
-      (draft as UN).position = value;
+      (draft as UN).layout_positioning = value;
     },
   }),
-  left: defineNodeProperty<"left">({
+  layout_inset_left: defineNodeProperty<"layout_inset_left">({
     apply: (draft, value, prev) => {
-      (draft as UN).left = value;
+      (draft as UN).layout_inset_left = value;
     },
   }),
-  top: defineNodeProperty<"top">({
+  layout_inset_top: defineNodeProperty<"layout_inset_top">({
     apply: (draft, value, prev) => {
-      (draft as UN).top = value;
+      (draft as UN).layout_inset_top = value;
     },
   }),
-  right: defineNodeProperty<"right">({
+  layout_inset_right: defineNodeProperty<"layout_inset_right">({
     apply: (draft, value, prev) => {
-      (draft as UN).right = value;
+      (draft as UN).layout_inset_right = value;
     },
   }),
-  bottom: defineNodeProperty<"bottom">({
+  layout_inset_bottom: defineNodeProperty<"layout_inset_bottom">({
     apply: (draft, value, prev) => {
-      (draft as UN).bottom = value;
+      (draft as UN).layout_inset_bottom = value;
     },
   }),
-  width: defineNodeProperty<"width">({
+  layout_target_width: defineNodeProperty<"layout_target_width">({
     apply: (draft, value, prev) => {
       if (typeof value === "number") {
-        draft.width = ranged(0, value);
+        draft.layout_target_width = ranged(0, value);
       } else {
-        (draft as UN).width = value;
+        (draft as UN).layout_target_width = value;
       }
     },
   }),
-  height: defineNodeProperty<"height">({
+  layout_target_height: defineNodeProperty<"layout_target_height">({
     apply: (draft, value, prev) => {
       if (typeof value === "number") {
-        draft.height = ranged(0, value);
+        draft.layout_target_height = ranged(0, value);
       } else {
-        (draft as UN).height = value;
+        (draft as UN).layout_target_height = value;
       }
     },
   }),
@@ -276,7 +278,7 @@ const safe_properties: Partial<
       node.type === "image" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
-      node.type === "text" ||
+      node.type === "tspan" ||
       node.type === "richtext" ||
       node.type === "container" ||
       node.type === "component",
@@ -383,7 +385,7 @@ const safe_properties: Partial<
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
-      node.type === "text",
+      node.type === "tspan",
     apply: (draft, value, prev) => {
       const target = draft as grida.program.nodes.UnknownNodeProperties;
       const next = value as unknown as PaintValue | null;
@@ -417,7 +419,7 @@ const safe_properties: Partial<
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
-      node.type === "text",
+      node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).stroke_width = ranged(
         0,
@@ -476,7 +478,7 @@ const safe_properties: Partial<
       node.type === "line" ||
       node.type === "rectangle" ||
       node.type === "ellipse" ||
-      node.type === "text",
+      node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).stroke_align = value;
     },
@@ -655,73 +657,83 @@ const safe_properties: Partial<
       (draft as UN).fit = value;
     },
   }),
-  padding_top: defineNodeProperty<"padding_top">({
+  layout_padding_top: defineNodeProperty<"layout_padding_top">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding_top = value;
+      (draft as UN).layout_padding_top = value;
     },
   }),
-  padding_right: defineNodeProperty<"padding_right">({
+  layout_padding_right: defineNodeProperty<"layout_padding_right">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding_right = value;
+      (draft as UN).layout_padding_right = value;
     },
   }),
-  padding_bottom: defineNodeProperty<"padding_bottom">({
+  layout_padding_bottom: defineNodeProperty<"layout_padding_bottom">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding_bottom = value;
+      (draft as UN).layout_padding_bottom = value;
     },
   }),
-  padding_left: defineNodeProperty<"padding_left">({
+  layout_padding_left: defineNodeProperty<"layout_padding_left">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).padding_left = value;
+      (draft as UN).layout_padding_left = value;
     },
   }),
-  layout: defineNodeProperty<"layout">({
-    assert: (node) => node.type === "container" || node.type === "component",
+  clips_content: defineNodeProperty<"clips_content">({
+    assert: (node) => node.type === "container",
     apply: (draft, value, prev) => {
-      (draft as UN).layout = value;
+      (draft as UN).clips_content = value;
+    },
+  }),
+  layout_mode: defineNodeProperty<"layout_mode">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (_draft, value, prev) => {
+      const draft = _draft as UN;
+      draft.layout_mode = value;
       if (prev !== "flex" && value === "flex") {
         // initialize flex layout
         // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
-        if (!draft.direction) draft.direction = "horizontal";
-        if (!draft.main_axis_alignment) draft.main_axis_alignment = "start";
-        if (!draft.cross_axis_alignment) draft.cross_axis_alignment = "start";
-        if (!draft.main_axis_gap) draft.main_axis_gap = 0;
-        if (!draft.cross_axis_gap) draft.cross_axis_gap = 0;
+        if (!draft.layout_direction) draft.layout_direction = "horizontal";
+        if (!draft.layout_main_axis_alignment)
+          draft.layout_main_axis_alignment = "start";
+        if (!draft.layout_cross_axis_alignment)
+          draft.layout_cross_axis_alignment = "start";
+        if (!draft.layout_main_axis_gap) draft.layout_main_axis_gap = 0;
+        if (!draft.layout_cross_axis_gap) draft.layout_cross_axis_gap = 0;
       }
     },
   }),
-  direction: defineNodeProperty<"direction">({
+  layout_direction: defineNodeProperty<"layout_direction">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).direction = value;
+      (draft as UN).layout_direction = value;
     },
   }),
-  main_axis_alignment: defineNodeProperty<"main_axis_alignment">({
+  layout_main_axis_alignment: defineNodeProperty<"layout_main_axis_alignment">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).main_axis_alignment = value;
+      (draft as UN).layout_main_axis_alignment = value;
     },
   }),
-  cross_axis_alignment: defineNodeProperty<"cross_axis_alignment">({
+  layout_cross_axis_alignment:
+    defineNodeProperty<"layout_cross_axis_alignment">({
+      assert: (node) => node.type === "container" || node.type === "component",
+      apply: (draft, value, prev) => {
+        (draft as UN).layout_cross_axis_alignment = value;
+      },
+    }),
+  layout_main_axis_gap: defineNodeProperty<"layout_main_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).cross_axis_alignment = value;
+      (draft as UN).layout_main_axis_gap = value;
     },
   }),
-  main_axis_gap: defineNodeProperty<"main_axis_gap">({
+  layout_cross_axis_gap: defineNodeProperty<"layout_cross_axis_gap">({
     assert: (node) => node.type === "container" || node.type === "component",
     apply: (draft, value, prev) => {
-      (draft as UN).main_axis_gap = value;
-    },
-  }),
-  cross_axis_gap: defineNodeProperty<"cross_axis_gap">({
-    assert: (node) => node.type === "container" || node.type === "component",
-    apply: (draft, value, prev) => {
-      (draft as UN).cross_axis_gap = value;
+      (draft as UN).layout_cross_axis_gap = value;
     },
   }),
   layout_wrap: defineNodeProperty<"layout_wrap">({
@@ -731,149 +743,149 @@ const safe_properties: Partial<
     },
   }),
   text_align: defineNodeProperty<"text_align">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_align = value;
     },
   }),
   text_align_vertical: defineNodeProperty<"text_align_vertical">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_align_vertical = value;
     },
   }),
   text_decoration_line: defineNodeProperty<"text_decoration_line">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_line = value;
     },
   }),
   text_decoration_style: defineNodeProperty<"text_decoration_style">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_style = value;
     },
   }),
   text_decoration_color: defineNodeProperty<"text_decoration_color">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_color = value;
     },
   }),
   text_decoration_skip_ink: defineNodeProperty<"text_decoration_skip_ink">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_skip_ink = value;
     },
   }),
   text_decoration_thickness: defineNodeProperty<"text_decoration_thickness">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_decoration_thickness = value;
     },
   }),
   text_transform: defineNodeProperty<"text_transform">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text_transform = value;
     },
   }),
   font_style_italic: defineNodeProperty<"font_style_italic">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_style_italic = value;
     },
   }),
   font_postscript_name: defineNodeProperty<"font_postscript_name">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_postscript_name = value;
     },
   }),
   font_weight: defineNodeProperty<"font_weight">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_weight = value;
     },
   }),
   font_kerning: defineNodeProperty<"font_kerning">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_kerning = value;
     },
   }),
   font_width: defineNodeProperty<"font_width">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_width = value;
     },
   }),
   font_features: defineNodeProperty<"font_features">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_features = value;
     },
   }),
   font_variations: defineNodeProperty<"font_variations">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_variations = value;
     },
   }),
   font_optical_sizing: defineNodeProperty<"font_optical_sizing">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_optical_sizing = value;
     },
   }),
   font_size: defineNodeProperty<"font_size">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).font_size = ranged(1, value);
     },
   }),
   line_height: defineNodeProperty<"line_height">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).line_height = ranged(0, value);
     },
   }),
   letter_spacing: defineNodeProperty<"letter_spacing">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).letter_spacing = value;
     },
   }),
   word_spacing: defineNodeProperty<"word_spacing">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).word_spacing = value;
     },
   }),
   max_length: defineNodeProperty<"max_length">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).max_length = value;
     },
   }),
   max_lines: defineNodeProperty<"max_lines">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).max_lines = value ? ranged(1, value) : null;
     },
   }),
   text: defineNodeProperty<"text">({
-    assert: (node) => node.type === "text",
+    assert: (node) => node.type === "tspan",
     apply: (draft, value, prev) => {
       (draft as UN).text = value ?? null;
     },
   }),
 };
 
-function applyNodeProperty<K extends keyof grida.program.nodes.UnknwonNode>(
+function applyNodeProperty<K extends keyof grida.program.nodes.UnknownNode>(
   draft: grida.program.nodes.UnknownNodeProperties,
   key: K,
-  value: grida.program.nodes.UnknwonNode[K]
+  value: grida.program.nodes.UnknownNode[K]
 ) {
   if (!(key in safe_properties)) {
     throw new Error(`property handler not found: "${key}"`);
@@ -897,7 +909,7 @@ export default function nodeReducer<
         for (const [key, value] of Object.entries(values)) {
           applyNodeProperty(
             draft as grida.program.nodes.UnknownNodeProperties,
-            key as keyof grida.program.nodes.UnknwonNode,
+            key as keyof grida.program.nodes.UnknownNode,
             value
           );
         }
@@ -906,30 +918,40 @@ export default function nodeReducer<
       // keep
       case "node/change/positioning": {
         const pos = draft as grida.program.nodes.i.IPositioning;
-        if ("position" in action) {
-          if (action.position) {
-            pos.position = action.position;
-          }
+        if (
+          ("layout_positioning" satisfies UNPK) in action &&
+          action.layout_positioning
+        ) {
+          pos.layout_positioning = action.layout_positioning;
         }
-        if ("left" in action) pos.left = action.left;
-        if ("top" in action) pos.top = action.top;
-        if ("right" in action) pos.right = action.right;
-        if ("bottom" in action) pos.bottom = action.bottom;
+        if (("layout_inset_left" satisfies UNPK) in action)
+          pos.layout_inset_left = action.layout_inset_left;
+        if (("layout_inset_top" satisfies UNPK) in action)
+          pos.layout_inset_top = action.layout_inset_top;
+        if (("layout_inset_right" satisfies UNPK) in action)
+          pos.layout_inset_right = action.layout_inset_right;
+        if (("layout_inset_bottom" satisfies UNPK) in action)
+          pos.layout_inset_bottom = action.layout_inset_bottom;
         break;
       }
       // keep
       case "node/change/positioning-mode": {
-        const { position } = action;
-        (draft as grida.program.nodes.i.IPositioning).position = position;
+        const { layout_positioning: position } = action;
+        (draft as grida.program.nodes.i.IPositioning).layout_positioning =
+          position;
         switch (position) {
           case "absolute": {
             break;
           }
           case "relative": {
-            (draft as grida.program.nodes.i.IPositioning).left = undefined;
-            (draft as grida.program.nodes.i.IPositioning).top = undefined;
-            (draft as grida.program.nodes.i.IPositioning).right = undefined;
-            (draft as grida.program.nodes.i.IPositioning).bottom = undefined;
+            (draft as grida.program.nodes.i.IPositioning).layout_inset_left =
+              undefined;
+            (draft as grida.program.nodes.i.IPositioning).layout_inset_top =
+              undefined;
+            (draft as grida.program.nodes.i.IPositioning).layout_inset_right =
+              undefined;
+            (draft as grida.program.nodes.i.IPositioning).layout_inset_bottom =
+              undefined;
           }
         }
         break;
@@ -955,7 +977,7 @@ export default function nodeReducer<
         break;
       }
       case "node/change/fontFamily": {
-        assert(draft.type === "text");
+        assert(draft.type === "tspan");
         draft.font_family = action.fontFamily;
         break;
       }

@@ -71,11 +71,16 @@ export function self_nudge_transform<S extends editor.state.IEditorState>(
 
   for (const node_id of targets) {
     const node = dq.__getNodeById(draft, node_id);
-    updateNodeTransform(node, {
-      type: "translate",
-      dx: dx,
-      dy: dy,
-    });
+    updateNodeTransform(
+      node,
+      {
+        type: "translate",
+        dx: dx,
+        dy: dy,
+      },
+      context.geometry,
+      node_id
+    );
   }
 }
 
@@ -393,11 +398,16 @@ function __self_update_gesture_transform_translate(
         relative_position = r.position;
       }
 
-      updateNodeTransform(node, {
-        type: "position",
-        x: relative_position[0],
-        y: relative_position[1],
-      });
+      updateNodeTransform(
+        node,
+        {
+          type: "position",
+          x: relative_position[0],
+          y: relative_position[1],
+        },
+        context.geometry,
+        node_id
+      );
     }
   } catch (e) {
     // FIXME: thre is a problem with the hierarchy change logic.
@@ -422,8 +432,8 @@ function __self_update_gesture_transform_translate_sort(
     draft,
     node_id
   ) as grida.program.nodes.i.IPositioning;
-  moving_node.left = moving_rect.x;
-  moving_node.top = moving_rect.y;
+  moving_node.layout_inset_left = moving_rect.x;
+  moving_node.layout_inset_top = moving_rect.y;
 
   // [dnd testing]
   const { index: dnd_target_index } = dnd.test(moving_rect, layout.objects);
@@ -477,8 +487,8 @@ function __self_update_gesture_transform_translate_sort(
       draft,
       obj.id
     ) as grida.program.nodes.i.IPositioning;
-    node.left = obj.x;
-    node.top = obj.y;
+    node.layout_inset_left = obj.x;
+    node.layout_inset_top = obj.y;
   });
 }
 

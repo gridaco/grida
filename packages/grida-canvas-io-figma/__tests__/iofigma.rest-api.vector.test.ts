@@ -127,8 +127,14 @@ describe("iofigma.restful.factory.document", () => {
 
       // Verify parent group positioning matches original vector node
       expect(vectorGroupNode).toBeDefined();
-      expect(vectorGroupNode!.left).toBeCloseTo(originalTransform![0][2], 1);
-      expect(vectorGroupNode!.top).toBeCloseTo(originalTransform![1][2], 1);
+      expect(vectorGroupNode!.layout_inset_left).toBeCloseTo(
+        originalTransform![0][2],
+        1
+      );
+      expect(vectorGroupNode!.layout_inset_top).toBeCloseTo(
+        originalTransform![1][2],
+        1
+      );
 
       // Get child nodes
       const childIds = gridaDocument.links[vectorGroupNode!.id];
@@ -152,10 +158,10 @@ describe("iofigma.restful.factory.document", () => {
         expect(child.type).toBe("vector");
         // Child nodes should be positioned at their bbox origin relative to parent
         // (not at 0,0, which would cause misalignment)
-        expect(child.left).toBeDefined();
-        expect(child.top).toBeDefined();
-        expect(typeof child.left).toBe("number");
-        expect(typeof child.top).toBe("number");
+        expect(child.layout_inset_left).toBeDefined();
+        expect(child.layout_inset_top).toBeDefined();
+        expect(typeof child.layout_inset_left).toBe("number");
+        expect(typeof child.layout_inset_top).toBe("number");
 
         // The positioning should use bbox.x and bbox.y, not 0,0
         // This ensures fill and stroke geometries align correctly

@@ -360,7 +360,8 @@ export function useSingleSelection(
     };
 
     let distribution: ObjectsDistributionAnalysis | undefined = undefined;
-    const is_flex_parent = node.type === "container" && node.layout === "flex";
+    const is_flex_parent =
+      node.type === "container" && node.layout_mode === "flex";
     if (is_flex_parent) {
       distribution = {
         rects: [],
@@ -369,7 +370,11 @@ export function useSingleSelection(
       };
 
       const container = node as grida.program.nodes.ContainerNode;
-      const { direction, main_axis_gap, cross_axis_gap } = container;
+      const {
+        layout_direction: direction,
+        layout_main_axis_gap,
+        layout_cross_axis_gap,
+      } = container;
       const axis = direction === "horizontal" ? "x" : "y";
       const children = dq.getChildren(document_ctx, node_id);
       const children_rects = children
@@ -378,11 +383,11 @@ export function useSingleSelection(
 
       distribution.rects = children_rects;
       distribution[axis] = {
-        gap: main_axis_gap,
+        gap: layout_main_axis_gap,
         tolerance: 0,
         gaps: Array.from(
           { length: children_rects.length - 1 },
-          () => main_axis_gap
+          () => layout_main_axis_gap
         ),
       };
     }
@@ -399,7 +404,7 @@ export function useSingleSelection(
       boundingSurfaceRect: boundingSurfaceRect,
       distribution: distribution,
       node: {
-        ...(node as grida.program.nodes.UnknwonNode),
+        ...(node as grida.program.nodes.UnknownNode),
         meta: {
           is_flex_parent,
           is_component_consumer,

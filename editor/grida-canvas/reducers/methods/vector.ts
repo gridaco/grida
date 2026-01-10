@@ -117,12 +117,15 @@ export function self_updateVectorNodeVectorNetwork<R>(
   const bb_b = vne.getBBox();
   const delta: cmath.Vector2 = [bb_b.x - bb_a.x, bb_b.y - bb_a.y];
   vne.translate(cmath.vector2.invert(delta));
-  const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+  const new_pos = cmath.vector2.add(
+    [node.layout_inset_left!, node.layout_inset_top!],
+    delta
+  );
 
-  node.left = new_pos[0];
-  node.top = new_pos[1];
-  node.width = bb_b.width;
-  node.height = bb_b.height;
+  node.layout_inset_left = new_pos[0];
+  node.layout_inset_top = new_pos[1];
+  node.layout_target_width = bb_b.width;
+  node.layout_target_height = bb_b.height;
 
   node.vector_network = vne.value;
 
@@ -134,7 +137,7 @@ export function self_updateVectorNodeVectorNetwork<R>(
  * (0,0) and the node's position reflects the network's real bounding box.
  *
  * The network is translated by the negative offset of its bounding box and the
- * node's `left` and `top` are increased by the same amount. The node's size is
+ * node's `layout_inset_left` and `layout_inset_top` are increased by the same amount. The node's size is
  * updated to match the bounding box dimensions.
  *
  * @param node - Vector node to normalize.
@@ -148,10 +151,10 @@ export function normalizeVectorNodeBBox(
   const delta: cmath.Vector2 = [bb.x, bb.y];
   vne.translate(cmath.vector2.invert(delta));
 
-  node.left = (node.left ?? 0) + delta[0];
-  node.top = (node.top ?? 0) + delta[1];
-  node.width = bb.width;
-  node.height = bb.height;
+  node.layout_inset_left = (node.layout_inset_left ?? 0) + delta[0];
+  node.layout_inset_top = (node.layout_inset_top ?? 0) + delta[1];
+  node.layout_target_width = bb.width;
+  node.layout_target_height = bb.height;
   node.vector_network = vne.value;
 
   return delta;

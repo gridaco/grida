@@ -95,7 +95,7 @@ export default function useVectorContentEditMode(): VectorContentEditor {
   const absolute = instance.getNodeAbsoluteBoundingRect(node_id);
   const offset: cmath.Vector2 = absolute
     ? [absolute.x, absolute.y]
-    : [node.left!, node.top!];
+    : [node.layout_inset_left!, node.layout_inset_top!];
 
   const vne = useMemo(
     () => new vn.VectorNetworkEditor(node.vector_network),

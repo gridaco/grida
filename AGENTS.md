@@ -15,6 +15,7 @@ Currently, we have below features / modules.
 ## Project Structure
 
 - [docs](./docs) - the docs directory
+- [format](./format) - grida file formats & schemas
 - [editor](./editor) - the editor directory
 - [crates](./crates) - the rust crates directory
 - [packages](./packages) - shared packages

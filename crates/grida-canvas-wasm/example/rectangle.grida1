@@ -1,5 +1,5 @@
 {
-  "version": "0.89.0-beta+20251219",
+  "version": "0.90.0-beta+20260108",
   "document": {
     "nodes": {
       "rectangle": {
@@ -7,15 +7,14 @@
         "name": "rectangle",
         "locked": false,
         "active": true,
-        "position": "absolute",
-        "top": 0,
-        "left": 0,
+        "layout_positioning": "absolute",
+        "layout_inset_top": 0,
+        "layout_inset_left": 0,
         "opacity": 1,
         "z_index": 0,
         "rotation": 0,
-        "width": 100,
-        "height": 100,
-        "style": {},
+        "layout_target_width": 100,
+        "layout_target_height": 100,
         "type": "rectangle",
         "corner_radius": 0,
         "effects": [],

@@ -1,3 +1,6 @@
+import surfaceReducer from "../surface.reducer";
+import type grida from "@grida/schema";
+
 jest.mock("../methods", () => ({
   self_optimizeVectorNetwork: jest.fn(),
   self_try_remove_node: jest.fn((draft: any, id: string) => {
@@ -5,8 +8,6 @@ jest.mock("../methods", () => ({
   }),
   self_revert_tool: jest.fn(),
 }));
-
-import surfaceReducer from "../surface.reducer";
 
 describe("surface reducer - vector self remove", () => {
   test("removes vector node when exiting edit mode with empty network", () => {
@@ -19,16 +20,16 @@ describe("surface reducer - vector self remove", () => {
           name: "Vector",
           active: true,
           locked: false,
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: 0,
-          height: 0,
+          layout_positioning: "absolute",
+          layout_inset_left: 0,
+          layout_inset_top: 0,
+          layout_target_width: 0,
+          layout_target_height: 0,
           opacity: 1,
           rotation: 0,
           z_index: 0,
           vector_network: { vertices: [], segments: [] },
-        },
+        } satisfies Partial<grida.program.nodes.VectorNode> as any,
       },
       scenes: {
         scene: {
@@ -39,11 +40,11 @@ describe("surface reducer - vector self remove", () => {
         },
       },
       entry_scene_id: "scene",
-    } as any;
+    } as any as grida.program.document.Document;
 
     const state = {
       document: doc,
-      document_ctx: {},
+      document_ctx: {} as any,
       scene_id: "scene",
       selection: [],
       hovered_node_id: null,

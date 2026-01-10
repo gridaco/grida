@@ -69,6 +69,20 @@ export namespace editor {
   }
 
   /**
+   * FNV-1a 32-bit hash function.
+   * Returns an 8-character hex string that's deterministic.
+   * Used as a fallback when generating file keys from empty sanitized paths.
+   */
+  export function fnv1a32(str: string): string {
+    let hash = 0x811c9dc5; // FNV offset basis
+    for (let i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193); // FNV prime
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+  }
+
+  /**
    * Mutual exclusion (reentrancy guard) for JavaScript.
    *
    * Ensures that only one callback is executed at a time within the same call stack.
@@ -144,7 +158,7 @@ export namespace editor {
    * @returns Object containing resolved paints array and valid index
    */
   export function resolvePaints(
-    node: grida.program.nodes.UnknwonNode,
+    node: grida.program.nodes.UnknownNode,
     target: "fill" | "stroke",
     paintIndex: number = 0
   ): { paints: cg.Paint[]; resolvedIndex: number } {
@@ -1290,7 +1304,7 @@ export namespace editor.state {
      * Snapshot of the node before entering vector edit mode. Used to revert the node
      * when no edits were performed.
      */
-    original: grida.program.nodes.UnknwonNode | null;
+    original: grida.program.nodes.UnknownNode | null;
 
     /**
      * clipboard data for vector content copy/paste
@@ -1598,7 +1612,7 @@ export namespace editor.state {
             active: true,
             locked: false,
             constraints: scene.constraints,
-            order: scene.order,
+            position: scene.position,
             guides: scene.guides,
             edges: scene.edges,
             background_color: scene.background_color,
@@ -3110,7 +3124,7 @@ export namespace editor.api {
     createImageNode(
       image: grida.program.document.ImageRef
     ): NodeProxy<grida.program.nodes.ImageNode>;
-    createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
+    createTextNode(text: string): NodeProxy<grida.program.nodes.TextSpanNode>;
     createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
 
     /**
@@ -3643,7 +3657,11 @@ export namespace editor.api {
     ): void;
     changeContainerNodeLayout(
       node_id: NodeID,
-      layout: grida.program.nodes.i.IFlexContainer["layout"]
+      layout: grida.program.nodes.i.IFlexContainer["layout_mode"]
+    ): void;
+    changeContainerNodeClipsContent(
+      node_id: NodeID,
+      clips_content: boolean
     ): void;
 
     changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis): void;
@@ -3657,7 +3675,9 @@ export namespace editor.api {
     ): void;
     changeFlexContainerNodeGap(
       node_id: string,
-      gap: number | { main_axis_gap: number; cross_axis_gap: number }
+      gap:
+        | number
+        | { layout_main_axis_gap: number; layout_cross_axis_gap: number }
     ): void;
     changeFlexContainerNodeWrap(node_id: string, wrap: "wrap" | "nowrap"): void;
 
@@ -3724,15 +3744,15 @@ export namespace editor.api {
     ): void;
     changeTextNodeLineHeight(
       node_id: NodeID,
-      lineHeight: TChange<grida.program.nodes.TextNode["line_height"]>
+      lineHeight: TChange<grida.program.nodes.TextSpanNode["line_height"]>
     ): void;
     changeTextNodeLetterSpacing(
       node_id: NodeID,
-      letterSpacing: TChange<grida.program.nodes.TextNode["letter_spacing"]>
+      letterSpacing: TChange<grida.program.nodes.TextSpanNode["letter_spacing"]>
     ): void;
     changeTextNodeWordSpacing(
       node_id: NodeID,
-      wordSpacing: TChange<grida.program.nodes.TextNode["word_spacing"]>
+      wordSpacing: TChange<grida.program.nodes.TextSpanNode["word_spacing"]>
     ): void;
     changeTextNodeMaxlength(
       node_id: NodeID,
@@ -3819,7 +3839,7 @@ export namespace editor.api {
      * Change text alignment for text nodes.
      *
      * Applies the specified text alignment to text nodes in the selection.
-     * Only affects nodes with type "text".
+     * Only affects nodes with type "tspan".
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
      * @param textAlign - The text alignment to apply: "left", "right", "center", or "justify"
@@ -3838,7 +3858,7 @@ export namespace editor.api {
      * Change vertical text alignment for text nodes.
      *
      * Applies the specified vertical text alignment to text nodes in the selection.
-     * Only affects nodes with type "text".
+     * Only affects nodes with type "tspan".
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
      * @param textAlignVertical - The vertical text alignment to apply: "top", "center", or "bottom"
@@ -3862,7 +3882,7 @@ export namespace editor.api {
      * Change font size for text nodes.
      *
      * Applies a delta change to the font size of text nodes in the selection.
-     * Only affects nodes with type "text". Positive delta increases font size,
+     * Only affects nodes with type "tspan". Positive delta increases font size,
      * negative delta decreases it.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
@@ -3884,7 +3904,7 @@ export namespace editor.api {
      * Change line height for text nodes.
      *
      * Applies a delta change to the line height of text nodes in the selection.
-     * Only affects nodes with type "text". Positive delta increases line height,
+     * Only affects nodes with type "tspan". Positive delta increases line height,
      * negative delta decreases it.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
@@ -3904,7 +3924,7 @@ export namespace editor.api {
      * Change letter spacing for text nodes.
      *
      * Applies a delta change to the letter spacing of text nodes in the selection.
-     * Only affects nodes with type "text". Positive delta increases letter spacing,
+     * Only affects nodes with type "tspan". Positive delta increases letter spacing,
      * negative delta decreases it.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID
@@ -3927,7 +3947,7 @@ export namespace editor.api {
      * Change font weight for text nodes.
      *
      * Changes the font weight to the next or previous available weight for the font family.
-     * Only affects nodes with type "text". Queries the font family to get available weights
+     * Only affects nodes with type "tspan". Queries the font family to get available weights
      * and selects the next/previous valid weight.
      *
      * @param target - Either "selection" to affect all selected nodes, or a specific NodeID

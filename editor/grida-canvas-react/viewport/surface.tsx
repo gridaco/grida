@@ -949,10 +949,10 @@ function SingleSelectionOverlay({
   const padding =
     node.type === "container" || node.type === "component"
       ? {
-          padding_top: node.padding_top ?? 0,
-          padding_right: node.padding_right ?? 0,
-          padding_bottom: node.padding_bottom ?? 0,
-          padding_left: node.padding_left ?? 0,
+          layout_padding_top: node.layout_padding_top ?? 0,
+          layout_padding_right: node.layout_padding_right ?? 0,
+          layout_padding_bottom: node.layout_padding_bottom ?? 0,
+          layout_padding_left: node.layout_padding_left ?? 0,
         }
       : undefined;
 
@@ -995,10 +995,10 @@ function SingleSelectionOverlay({
                       offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
                       containerRect={object.boundingRect}
                       padding={{
-                        top: padding.padding_top ?? 0,
-                        right: padding.padding_right ?? 0,
-                        bottom: padding.padding_bottom ?? 0,
-                        left: padding.padding_left ?? 0,
+                        top: padding.layout_padding_top ?? 0,
+                        right: padding.layout_padding_right ?? 0,
+                        bottom: padding.layout_padding_bottom ?? 0,
+                        left: padding.layout_padding_left ?? 0,
                       }}
                       onPaddingGestureStart={(side) => {
                         editor.surface.surfaceStartPaddingGesture(
@@ -1311,14 +1311,14 @@ function NodeOverlay({
   // Helper functions for side double-click handlers
   const handleSideDoubleClickVertical = () => {
     // feat: text-node-auto-size
-    if (node.type === "text") {
+    if (node.type === "tspan") {
       editor.surface.autoSizeTextNode(node_id, "height");
     }
   };
 
   const handleSideDoubleClickHorizontal = () => {
     // feat: text-node-auto-size
-    if (node.type === "text") {
+    if (node.type === "tspan") {
       editor.surface.autoSizeTextNode(node_id, "width");
     }
   };
@@ -1326,7 +1326,7 @@ function NodeOverlay({
   // NW (northwest) handle is intentionally omitted - only NE, SE, SW handles support double-click resize-to-fit
   const handleDiagonalDoubleClick_NE_SE_SW = () => {
     // feat: text-node-auto-size
-    if (node.type === "text") {
+    if (node.type === "tspan") {
       editor.surface.autoSizeTextNode(node_id, "width");
       editor.surface.autoSizeTextNode(node_id, "height");
     }
@@ -1705,10 +1705,15 @@ function Edge({
       case "position":
         return cmath.vector2.transform([p.x, p.y], transform);
       case "anchor":
+        // TODO: unstable with layout properties, use geometry query instead
         try {
-          const n = editor.commands.getNodeSnapshotById(p.target);
-          const cx = (n as any).left + (n as any).width / 2;
-          const cy = (n as any).top + (n as any).height / 2;
+          const n = editor.commands.getNodeSnapshotById(
+            p.target
+          ) as grida.program.nodes.UnknownNode;
+          const cx =
+            n.layout_inset_left! + (n.layout_target_width as number) / 2;
+          const cy =
+            n.layout_inset_top! + (n.layout_target_height as number) / 2;
           return cmath.vector2.transform([cx, cy], transform);
         } catch (e) {}
     }

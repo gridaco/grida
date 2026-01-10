@@ -61,7 +61,7 @@ fn main() {
                         cg::io::io_grida::JSONNode::RegularPolygon(_) => "polygon",
                         cg::io::io_grida::JSONNode::RegularStarPolygon(_) => "star",
                         cg::io::io_grida::JSONNode::Line(_) => "line",
-                        cg::io::io_grida::JSONNode::Text(_) => "text",
+                        cg::io::io_grida::JSONNode::TextSpan(_) => "tspan",
                         cg::io::io_grida::JSONNode::BooleanOperation(_) => "boolean",
                         cg::io::io_grida::JSONNode::Image(_) => "image",
                         cg::io::io_grida::JSONNode::Scene(_) => "scene",

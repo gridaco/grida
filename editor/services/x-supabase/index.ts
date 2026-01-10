@@ -209,7 +209,7 @@ export namespace XSupabase {
         };
 
     /**
-     * A bucket info with bucket name required, but other data missing or unknwon
+     * A bucket info with bucket name required, but other data missing or unknown
      *
      * This type is required because in Grida XSB Storage can be saved only with the name but without other metadata, e.g. `public`
      * This is because the configuration can change and lead to unidentifiable outcomes.
@@ -221,7 +221,7 @@ export namespace XSupabase {
     type BucketWithUnknownProperties = {
       bucket: string;
       public: boolean | "unknown";
-      file_size_limit?: number | "unknwon";
+      file_size_limit?: number | "unknown";
       allowed_mime_types?: string[] | "unknown";
     };
 

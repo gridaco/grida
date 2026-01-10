@@ -206,9 +206,9 @@ export namespace iosvg {
         return {
           type: "group",
           name: name,
-          position: "absolute",
-          left: position.left,
-          top: position.top,
+          layout_positioning: "absolute",
+          layout_inset_left: position.left,
+          layout_inset_top: position.top,
           opacity: opacity,
           children: convertedChildren,
         } satisfies grida.program.nodes.GroupNodePrototype;
@@ -247,10 +247,10 @@ export namespace iosvg {
           stroke_join,
           stroke_miter_limit,
           stroke_dash_array,
-          width: bbox.width,
-          height: bbox.height,
-          left: position.left,
-          top: position.top,
+          layout_target_width: bbox.width,
+          layout_target_height: bbox.height,
+          layout_inset_left: position.left,
+          layout_inset_top: position.top,
           fill_rule: fill_rule,
           opacity: fillOpacity,
         } satisfies grida.program.nodes.PathNodePrototype;
@@ -294,11 +294,11 @@ export namespace iosvg {
     return {
       type: "container",
       name: name,
-      position: "absolute",
-      left: 0,
-      top: 0,
-      width: width,
-      height: height,
+      layout_positioning: "absolute",
+      layout_inset_left: 0,
+      layout_inset_top: 0,
+      layout_target_width: width,
+      layout_target_height: height,
       children: convertedChildren,
     } satisfies grida.program.nodes.ContainerNodePrototype;
   }

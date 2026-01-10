@@ -58,7 +58,7 @@ export default function initialNode(
     | "star"
     | "line",
   idfac: () => string,
-  seed: Partial<Omit<grida.program.nodes.UnknwonNode, "type">> = {},
+  seed: Partial<Omit<grida.program.nodes.UnknownNode, "type">> = {},
   constraints: {
     fill?: "fill" | "fill_paints";
     stroke?: "stroke" | "stroke_paints";
@@ -75,9 +75,22 @@ export default function initialNode(
   };
 
   const position: grida.program.nodes.i.IPositioning = {
-    position: "absolute",
-    top: 0,
-    left: 0,
+    layout_positioning: "absolute",
+    layout_inset_top: 0,
+    layout_inset_left: 0,
+  };
+
+  const layer: grida.program.nodes.i.ILayerTrait = {
+    opacity: 1,
+    blend_mode: cg.def.LAYER_BLENDMODE,
+    z_index: 0,
+  };
+
+  const layout_child: grida.program.nodes.i.ILayoutChildTrait = {
+    layout_positioning: "absolute",
+    rotation: 0,
+    layout_target_width: 100,
+    layout_target_height: 100,
   };
 
   const styles: grida.program.nodes.i.ICSSStylable = {
@@ -87,9 +100,9 @@ export default function initialNode(
     rotation: 0,
     fill: constraints.fill === "fill_paints" ? undefined : gray,
     fill_paints: constraints.fill === "fill_paints" ? [gray] : undefined,
-    width: 100,
-    height: 100,
-    position: "absolute",
+    layout_target_width: 100,
+    layout_target_height: 100,
+    layout_positioning: "absolute",
     border: undefined,
     style: {},
   };
@@ -98,16 +111,16 @@ export default function initialNode(
     case "text": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         ...editor.config.fonts.DEFAULT_TEXT_STYLE_INTER,
-        type: "text",
+        type: "tspan",
         text_align: "left",
         text_align_vertical: "top",
         fill: constraints.fill === "fill_paints" ? undefined : black,
         fill_paints: constraints.fill === "fill_paints" ? [black] : undefined,
-        width: "auto",
-        height: "auto",
+        layout_target_width: "auto",
+        layout_target_height: "auto",
         text: "Text",
         stroke: constraints.stroke === "stroke_paints" ? undefined : undefined,
         stroke_paints: constraints.stroke === "stroke_paints" ? [] : undefined,
@@ -117,35 +130,32 @@ export default function initialNode(
         stroke_align: "outside",
         word_spacing: 0,
         ...seed,
-      } satisfies grida.program.nodes.TextNode;
+      } satisfies grida.program.nodes.TextSpanNode;
     }
     case "container": {
       return {
         ...base,
-        ...position,
-        ...styles,
-        style: {
-          overflow: "clip",
-        },
+        ...layer,
+        ...layout_child,
         fill: constraints.fill === "fill_paints" ? undefined : white,
         fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
         type: "container",
-        expanded: false,
         corner_radius: 0,
-        padding_top: 0,
-        padding_right: 0,
-        padding_bottom: 0,
-        padding_left: 0,
-        layout: "flow",
-        direction: "horizontal",
-        main_axis_alignment: "start",
-        cross_axis_alignment: "start",
+        layout_padding_top: 0,
+        layout_padding_right: 0,
+        layout_padding_bottom: 0,
+        layout_padding_left: 0,
+        layout_mode: "flow",
+        layout_direction: "horizontal",
+        layout_main_axis_alignment: "start",
+        layout_cross_axis_alignment: "start",
         stroke_width: 1,
         stroke_align: "inside",
         stroke_cap: "butt",
         stroke_join: "miter",
-        main_axis_gap: 0,
-        cross_axis_gap: 0,
+        layout_main_axis_gap: 0,
+        layout_cross_axis_gap: 0,
+        clips_content: true,
         ...seed,
       } satisfies grida.program.nodes.ContainerNode;
     }
@@ -169,8 +179,8 @@ export default function initialNode(
         fill: constraints.fill === "fill_paints" ? undefined : white,
         fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
         type: "richtext",
-        width: "auto",
-        height: "auto",
+        layout_target_width: "auto",
+        layout_target_height: "auto",
         html: __richtext_html,
         ...seed,
       } satisfies grida.program.nodes.HTMLRichTextNode;
@@ -182,8 +192,8 @@ export default function initialNode(
         ...styles,
         type: "image",
         corner_radius: 0,
-        width: 100,
-        height: 100,
+        layout_target_width: 100,
+        layout_target_height: 100,
         fit: "cover",
         fill: constraints.fill === "fill_paints" ? undefined : undefined,
         fill_paints: constraints.fill === "fill_paints" ? [] : undefined,
@@ -199,8 +209,8 @@ export default function initialNode(
         ...styles,
         type: "video",
         corner_radius: 0,
-        width: 100,
-        height: 100,
+        layout_target_width: 100,
+        layout_target_height: 100,
         fill: constraints.fill === "fill_paints" ? undefined : undefined,
         fill_paints: constraints.fill === "fill_paints" ? [] : undefined,
         fit: "cover",
@@ -215,11 +225,11 @@ export default function initialNode(
     case "ellipse": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "ellipse",
-        width: 100,
-        height: 100,
+        layout_target_width: 100,
+        layout_target_height: 100,
         stroke_width: 0,
         stroke_align: "inside",
         stroke_cap: "butt",
@@ -235,16 +245,16 @@ export default function initialNode(
     case "rectangle": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "rectangle",
         corner_radius: 0,
         rectangular_corner_radius_top_left: 0,
         rectangular_corner_radius_top_right: 0,
         rectangular_corner_radius_bottom_right: 0,
         rectangular_corner_radius_bottom_left: 0,
-        width: 100,
-        height: 100,
+        layout_target_width: 100,
+        layout_target_height: 100,
         stroke_width: 0,
         stroke_align: "inside",
         stroke_cap: "butt",
@@ -257,13 +267,13 @@ export default function initialNode(
     case "polygon": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "polygon",
         point_count: 3,
         corner_radius: 0,
-        width: 100,
-        height: 100,
+        layout_target_width: 100,
+        layout_target_height: 100,
         stroke_width: 0,
         stroke_align: "inside",
         stroke_cap: "butt",
@@ -276,14 +286,14 @@ export default function initialNode(
     case "star": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "star",
         point_count: 5,
         inner_radius: 0.5,
         corner_radius: 0,
-        width: 100,
-        height: 100,
+        layout_target_width: 100,
+        layout_target_height: 100,
         stroke_width: 0,
         stroke_align: "inside",
         stroke_cap: "butt",
@@ -296,8 +306,8 @@ export default function initialNode(
     case "line": {
       return {
         ...base,
-        ...position,
-        ...styles,
+        ...layer,
+        ...layout_child,
         type: "line",
         stroke: constraints.stroke === "stroke_paints" ? undefined : black,
         stroke_paints:
@@ -305,8 +315,8 @@ export default function initialNode(
         stroke_width: 1,
         stroke_cap: "butt",
         stroke_join: "miter",
-        width: 100,
-        height: 0,
+        layout_target_width: 100,
+        layout_target_height: 0,
         ...seed,
       } satisfies grida.program.nodes.LineNode;
     }

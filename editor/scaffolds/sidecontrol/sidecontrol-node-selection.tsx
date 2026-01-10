@@ -62,12 +62,7 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { supports } from "@/grida-canvas/utils/supports";
-import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
-import { StrokeCapControl } from "./controls/stroke-cap";
-import { StrokeAlignControl } from "./controls/stroke-align";
-import { StrokeJoinControl } from "./controls/stroke-join";
-import { StrokeMiterLimitControl } from "./controls/stroke-miter-limit";
 import {
   useCurrentSceneState,
   useEditorFlagsState,
@@ -78,7 +73,7 @@ import {
   useContentEditModeMinimalState,
   useToolState,
 } from "@/grida-canvas-react/provider";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@/components/ui-editor/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
 import { Button } from "@/components/ui-editor/button";
@@ -434,7 +429,7 @@ function ModeMixedNodeProperties({
             </PropertySectionContent>
           )}
         </PropertySection> */}
-      {config.text !== "off" && types.has("text") && (
+      {config.text !== "off" && types.has("tspan") && (
         <SectionMixedText ids={ids} />
       )}
       <PropertySection
@@ -579,7 +574,7 @@ function ModeNodeProperties({
 
   // const istemplate = type?.startsWith("templates/");
   const is_templateinstance = type === "template_instance";
-  const is_text = type === "text";
+  const is_text = type === "tspan";
   const is_image = type === "image";
   const is_container = type === "container";
   const is_stylable = type !== "template_instance";
@@ -848,12 +843,12 @@ function SectionPosition({ node_id }: { node_id: string }) {
   const { position, rotation, top, left, right, bottom } = useNodeState(
     node_id,
     (node) => ({
-      position: node.position,
+      position: node.layout_positioning,
       rotation: node.rotation,
-      top: node.top,
-      left: node.left,
-      right: node.right,
-      bottom: node.bottom,
+      top: node.layout_inset_top,
+      left: node.layout_inset_left,
+      right: node.layout_inset_right,
+      bottom: node.layout_inset_bottom,
     })
   );
 
@@ -869,11 +864,11 @@ function SectionPosition({ node_id }: { node_id: string }) {
         <div className="py-4 px-4">
           <PositioningConstraintsControl
             value={{
-              position: position!,
-              top,
-              left,
-              right,
-              bottom,
+              layout_positioning: position!,
+              layout_inset_top: top,
+              layout_inset_left: left,
+              layout_inset_right: right,
+              layout_inset_bottom: bottom,
             }}
             disabled={{
               right: is_root,
@@ -908,11 +903,11 @@ function SectionMixedPosition({ ids }: { ids: string[] }) {
   const instance = useCurrentEditor();
   const mp = useMixedProperties(ids, (node) => {
     return {
-      position: node.position,
-      top: node.top,
-      left: node.left,
-      right: node.right,
-      bottom: node.bottom,
+      position: node.layout_positioning,
+      top: node.layout_inset_top,
+      left: node.layout_inset_left,
+      right: node.layout_inset_right,
+      bottom: node.layout_inset_bottom,
       rotation: node.rotation,
     };
   });
@@ -923,11 +918,15 @@ function SectionMixedPosition({ ids }: { ids: string[] }) {
       : mp.position.value;
 
   const constraints_value: grida.program.nodes.i.IPositioning = {
-    position,
-    top: typeof mp.top?.value === "number" ? mp.top.value : undefined,
-    left: typeof mp.left?.value === "number" ? mp.left.value : undefined,
-    right: typeof mp.right?.value === "number" ? mp.right.value : undefined,
-    bottom: typeof mp.bottom?.value === "number" ? mp.bottom.value : undefined,
+    layout_positioning: position,
+    layout_inset_top:
+      typeof mp.top?.value === "number" ? mp.top.value : undefined,
+    layout_inset_left:
+      typeof mp.left?.value === "number" ? mp.left.value : undefined,
+    layout_inset_right:
+      typeof mp.right?.value === "number" ? mp.right.value : undefined,
+    layout_inset_bottom:
+      typeof mp.bottom?.value === "number" ? mp.bottom.value : undefined,
   };
 
   return (
@@ -989,26 +988,28 @@ function SectionLayout({
   const actions = useNodeActions(node_id)!;
   const {
     type,
-    layout,
-    direction,
-    main_axis_alignment,
-    cross_axis_alignment,
-    main_axis_gap,
-    cross_axis_gap,
+    layout_mode,
+    layout_direction,
+    layout_main_axis_alignment,
+    layout_cross_axis_alignment,
+    layout_main_axis_gap,
+    layout_cross_axis_gap,
     layout_wrap,
+    clips_content,
   } = useNodeState(node_id, (node) => ({
     type: node.type,
-    layout: node.layout,
-    direction: node.direction,
-    main_axis_alignment: node.main_axis_alignment,
-    cross_axis_alignment: node.cross_axis_alignment,
-    main_axis_gap: node.main_axis_gap,
-    cross_axis_gap: node.cross_axis_gap,
+    layout_mode: node.layout_mode,
+    layout_direction: node.layout_direction,
+    layout_main_axis_alignment: node.layout_main_axis_alignment,
+    layout_cross_axis_alignment: node.layout_cross_axis_alignment,
+    layout_main_axis_gap: node.layout_main_axis_gap,
+    layout_cross_axis_gap: node.layout_cross_axis_gap,
     layout_wrap: node.layout_wrap,
+    clips_content: (node as grida.program.nodes.ContainerNode).clips_content,
   }));
 
   const is_container = type === "container";
-  const is_flex_container = is_container && layout === "flex";
+  const is_flex_container = is_container && layout_mode === "flex";
 
   return (
     <PropertySection hidden={config.layout === "off"} className="border-b">
@@ -1021,8 +1022,9 @@ function SectionLayout({
             <PropertyLineLabel>Flow</PropertyLineLabel>
             <LayoutControl
               value={{
-                layoutMode: layout ?? "flow",
-                direction: layout === "flex" ? direction : undefined,
+                layoutMode: layout_mode ?? "flow",
+                direction:
+                  layout_mode === "flex" ? layout_direction : undefined,
               }}
               onValueChange={(value) => {
                 instance.commands.reLayout(node_id, value.key);
@@ -1035,13 +1037,13 @@ function SectionLayout({
           <PropertyLineLabel>Alignment</PropertyLineLabel>
           <FlexAlignControl
             className="w-full"
-            direction={direction ?? "horizontal"}
+            direction={layout_direction ?? "horizontal"}
             value={
-              main_axis_alignment !== undefined &&
-              cross_axis_alignment !== undefined
+              layout_main_axis_alignment !== undefined &&
+              layout_cross_axis_alignment !== undefined
                 ? {
-                    mainAxisAlignment: main_axis_alignment,
-                    crossAxisAlignment: cross_axis_alignment,
+                    mainAxisAlignment: layout_main_axis_alignment,
+                    crossAxisAlignment: layout_cross_axis_alignment,
                   }
                 : undefined
             }
@@ -1063,13 +1065,30 @@ function SectionLayout({
           <GapControl
             mode={layout_wrap === "wrap" ? "multiple" : "single"}
             value={{
-              main_axis_gap: main_axis_gap!,
-              cross_axis_gap: cross_axis_gap,
+              layout_main_axis_gap: layout_main_axis_gap!,
+              layout_cross_axis_gap: layout_cross_axis_gap,
             }}
             onValueCommit={actions.gap}
           />
         </PropertyRow>
         <PropertyPaddingRow node_id={node_id} />
+        {is_container && (
+          <PropertyRow className="items-center justify-start gap-2">
+            <Checkbox
+              id="control-clips_content"
+              checked={clips_content ?? false}
+              onCheckedChange={(checked) => {
+                actions.clipsContent(Boolean(checked));
+              }}
+            />
+            <PropertyLineLabel
+              htmlFor="control-clips-content"
+              className="w-auto min-w-auto text-foreground"
+            >
+              Clip content
+            </PropertyLineLabel>
+          </PropertyRow>
+        )}
       </PropertySectionContent>
     </PropertySection>
   );
@@ -1086,15 +1105,19 @@ function SectionLayoutMixed({
 
   const mp = useMixedProperties(ids, (node) => ({
     type: node.type,
-    width: node.width,
-    height: node.height,
-    layout: node.layout,
-    direction: node.direction,
-    main_axis_alignment: node.main_axis_alignment,
-    cross_axis_alignment: node.cross_axis_alignment,
-    main_axis_gap: node.main_axis_gap,
-    cross_axis_gap: node.cross_axis_gap,
+    layout_target_width: node.layout_target_width,
+    layout_target_height: node.layout_target_height,
+    layout_mode: node.layout_mode,
+    layout_direction: node.layout_direction,
+    layout_main_axis_alignment: node.layout_main_axis_alignment,
+    layout_cross_axis_alignment: node.layout_cross_axis_alignment,
+    layout_main_axis_gap: node.layout_main_axis_gap,
+    layout_cross_axis_gap: node.layout_cross_axis_gap,
     layout_wrap: node.layout_wrap,
+    clips_content:
+      node.type === "container"
+        ? (node as grida.program.nodes.ContainerNode).clips_content
+        : undefined,
   }));
 
   const containerIds =
@@ -1102,7 +1125,7 @@ function SectionLayoutMixed({
   const has_container = containerIds.length > 0;
 
   const flexIds = new Set(
-    mp.layout?.values?.find((v) => v.value === "flex")?.ids ?? []
+    mp.layout_mode?.values?.find((v) => v.value === "flex")?.ids ?? []
   );
   const containerFlexIds = containerIds.filter((id) => flexIds.has(id));
   const has_flex_container = containerFlexIds.length > 0;
@@ -1116,9 +1139,9 @@ function SectionLayoutMixed({
         <PropertyRow hidden={config.size === "off"}>
           <PropertyLineLabel>Width</PropertyLineLabel>
           <LengthPercentageControl
-            value={mp.width?.value}
+            value={mp.layout_target_width?.value}
             onValueCommit={(value) => {
-              const target = mp.width?.ids ?? ids;
+              const target = mp.layout_target_width?.ids ?? ids;
               target.forEach((id) => {
                 instance.commands.changeNodeSize(id, "width", value);
               });
@@ -1128,9 +1151,9 @@ function SectionLayoutMixed({
         <PropertyRow hidden={config.size === "off"}>
           <PropertyLineLabel>Height</PropertyLineLabel>
           <LengthPercentageControl
-            value={mp.height?.value}
+            value={mp.layout_target_height?.value}
             onValueCommit={(value) => {
-              const target = mp.height?.ids ?? ids;
+              const target = mp.layout_target_height?.ids ?? ids;
               target.forEach((id) => {
                 instance.commands.changeNodeSize(id, "height", value);
               });
@@ -1143,17 +1166,17 @@ function SectionLayoutMixed({
             <PropertyLineLabel>Flow</PropertyLineLabel>
             <LayoutControl
               value={
-                mp.layout?.value === grida.mixed ||
-                mp.direction?.value === grida.mixed ||
-                mp.layout?.value === undefined ||
-                (mp.layout?.value === "flex" &&
-                  mp.direction?.value === undefined)
+                mp.layout_mode?.value === grida.mixed ||
+                mp.layout_direction?.value === grida.mixed ||
+                mp.layout_mode?.value === undefined ||
+                (mp.layout_mode?.value === "flex" &&
+                  mp.layout_direction?.value === undefined)
                   ? undefined
                   : {
-                      layoutMode: mp.layout?.value ?? "flow",
+                      layoutMode: mp.layout_mode?.value ?? "flow",
                       direction:
-                        mp.layout?.value === "flex"
-                          ? mp.direction?.value
+                        mp.layout_mode?.value === "flex"
+                          ? mp.layout_direction?.value
                           : undefined,
                     }
               }
@@ -1180,19 +1203,19 @@ function SectionLayoutMixed({
           <FlexAlignControl
             className="w-full"
             direction={
-              mp.direction?.value === grida.mixed
+              mp.layout_direction?.value === grida.mixed
                 ? "horizontal"
-                : (mp.direction?.value ?? "horizontal")
+                : (mp.layout_direction?.value ?? "horizontal")
             }
             value={
-              mp.main_axis_alignment?.value === grida.mixed ||
-              mp.cross_axis_alignment?.value === grida.mixed ||
-              mp.main_axis_alignment?.value === undefined ||
-              mp.cross_axis_alignment?.value === undefined
+              mp.layout_main_axis_alignment?.value === grida.mixed ||
+              mp.layout_cross_axis_alignment?.value === grida.mixed ||
+              mp.layout_main_axis_alignment?.value === undefined ||
+              mp.layout_cross_axis_alignment?.value === undefined
                 ? undefined
                 : {
-                    mainAxisAlignment: mp.main_axis_alignment.value,
-                    crossAxisAlignment: mp.cross_axis_alignment.value,
+                    mainAxisAlignment: mp.layout_main_axis_alignment.value,
+                    crossAxisAlignment: mp.layout_cross_axis_alignment.value,
                   }
             }
             onValueChange={(value) => {
@@ -1215,13 +1238,14 @@ function SectionLayoutMixed({
           <GapControl
             mode={mp.layout_wrap?.value === "wrap" ? "multiple" : "single"}
             value={{
-              main_axis_gap:
-                mp.main_axis_gap?.mixed || mp.main_axis_gap?.value === undefined
+              layout_main_axis_gap:
+                mp.layout_main_axis_gap?.mixed ||
+                mp.layout_main_axis_gap?.value === undefined
                   ? grida.mixed
-                  : (mp.main_axis_gap.value ?? 0),
-              cross_axis_gap: mp.cross_axis_gap?.mixed
+                  : (mp.layout_main_axis_gap.value ?? 0),
+              layout_cross_axis_gap: mp.layout_cross_axis_gap?.mixed
                 ? grida.mixed
-                : mp.cross_axis_gap?.value,
+                : mp.layout_cross_axis_gap?.value,
             }}
             onValueCommit={(value) => {
               containerFlexIds.forEach((id) => {
@@ -1232,6 +1256,33 @@ function SectionLayoutMixed({
         </PropertyRow>
 
         <PropertyPaddingRowMixed ids={ids} />
+
+        {has_container && (
+          <PropertyRow className="items-center justify-start gap-2">
+            <Checkbox
+              id="control-clips_content"
+              checked={
+                mp.clips_content?.mixed
+                  ? "indeterminate"
+                  : (mp.clips_content?.value ?? false)
+              }
+              onCheckedChange={(checked) => {
+                containerIds.forEach((id) => {
+                  instance.commands.changeContainerNodeClipsContent(
+                    id,
+                    Boolean(checked)
+                  );
+                });
+              }}
+            />
+            <PropertyLineLabel
+              htmlFor="control-clips_content"
+              className="w-auto min-w-auto text-foreground"
+            >
+              Clip content
+            </PropertyLineLabel>
+          </PropertyRow>
+        )}
       </PropertySectionContent>
     </PropertySection>
   );
@@ -1265,7 +1316,7 @@ function SectionText({ node_id }: { node_id: string }) {
     font_kerning,
     font_width,
   } = useNodeState(node_id, (_node) => {
-    const node = _node as grida.program.nodes.TextNode;
+    const node = _node as grida.program.nodes.TextSpanNode;
     return {
       text: node.text,
       font_family: node.font_family,
@@ -1434,7 +1485,7 @@ function SectionText({ node_id }: { node_id: string }) {
 function SectionMixedText({ ids }: { ids: string[] }) {
   const instance = useCurrentEditor();
   const mp = useMixedProperties(ids, (node) => {
-    const t = node as grida.program.nodes.TextNode;
+    const t = node as grida.program.nodes.TextSpanNode;
     return {
       font_family: t.font_family,
       font_postscript_name: t.font_postscript_name,
@@ -1729,32 +1780,32 @@ function PropertyCornerRadiusRowMixed({
 function PropertyPaddingRow({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const {
-    padding_top,
-    padding_right,
-    padding_bottom,
-    padding_left,
+    layout_padding_top,
+    layout_padding_right,
+    layout_padding_bottom,
+    layout_padding_left,
     type,
-    layout,
+    layout_mode,
   } = useNodeState(node_id, (node) => ({
-    padding_top: node.padding_top ?? 0,
-    padding_right: node.padding_right ?? 0,
-    padding_bottom: node.padding_bottom ?? 0,
-    padding_left: node.padding_left ?? 0,
+    layout_padding_top: node.layout_padding_top ?? 0,
+    layout_padding_right: node.layout_padding_right ?? 0,
+    layout_padding_bottom: node.layout_padding_bottom ?? 0,
+    layout_padding_left: node.layout_padding_left ?? 0,
     type: node.type,
-    layout: node.layout,
+    layout_mode: node.layout_mode,
   }));
 
-  const is_flex_container = type === "container" && layout === "flex";
+  const is_flex_container = type === "container" && layout_mode === "flex";
 
   return (
     <PropertyRow hidden={!is_flex_container}>
       <PropertyLineLabel>Padding</PropertyLineLabel>
       <PaddingControl
         value={{
-          padding_top,
-          padding_right,
-          padding_bottom,
-          padding_left,
+          layout_padding_top,
+          layout_padding_right,
+          layout_padding_bottom,
+          layout_padding_left,
         }}
         onValueCommit={actions.padding}
       />
@@ -1767,10 +1818,10 @@ function PropertyPaddingRowMixed({ ids }: { ids: string[] }) {
   const mp = useMixedProperties(ids, (node) => {
     return {
       type: node.type,
-      padding_top: node.padding_top,
-      padding_right: node.padding_right,
-      padding_bottom: node.padding_bottom,
-      padding_left: node.padding_left,
+      layout_padding_top: node.layout_padding_top,
+      layout_padding_right: node.layout_padding_right,
+      layout_padding_bottom: node.layout_padding_bottom,
+      layout_padding_left: node.layout_padding_left,
     };
   });
 
@@ -1783,22 +1834,26 @@ function PropertyPaddingRowMixed({ ids }: { ids: string[] }) {
       <PropertyLineLabel>Padding</PropertyLineLabel>
       <PaddingControl
         value={{
-          padding_top:
-            mp.padding_top?.mixed || mp.padding_top?.value === undefined
+          layout_padding_top:
+            mp.layout_padding_top?.mixed ||
+            mp.layout_padding_top?.value === undefined
               ? grida.mixed
-              : (mp.padding_top.value ?? 0),
-          padding_right:
-            mp.padding_right?.mixed || mp.padding_right?.value === undefined
+              : (mp.layout_padding_top.value ?? 0),
+          layout_padding_right:
+            mp.layout_padding_right?.mixed ||
+            mp.layout_padding_right?.value === undefined
               ? grida.mixed
-              : (mp.padding_right.value ?? 0),
-          padding_bottom:
-            mp.padding_bottom?.mixed || mp.padding_bottom?.value === undefined
+              : (mp.layout_padding_right.value ?? 0),
+          layout_padding_bottom:
+            mp.layout_padding_bottom?.mixed ||
+            mp.layout_padding_bottom?.value === undefined
               ? grida.mixed
-              : (mp.padding_bottom.value ?? 0),
-          padding_left:
-            mp.padding_left?.mixed || mp.padding_left?.value === undefined
+              : (mp.layout_padding_bottom.value ?? 0),
+          layout_padding_left:
+            mp.layout_padding_left?.mixed ||
+            mp.layout_padding_left?.value === undefined
               ? grida.mixed
-              : (mp.padding_left.value ?? 0),
+              : (mp.layout_padding_left.value ?? 0),
         }}
         onValueCommit={(value) => {
           containerIds.forEach((id) => {
@@ -1812,22 +1867,23 @@ function PropertyPaddingRowMixed({ ids }: { ids: string[] }) {
 
 function SectionDimension({ node_id }: { node_id: string }) {
   const instance = useCurrentEditor();
-  const { width, height, layout_target_aspect_ratio } = useNodeState(
-    node_id,
-    (node) => ({
-      width: node.width,
-      height: node.height,
-      layout_target_aspect_ratio: node.layout_target_aspect_ratio,
-    })
-  );
+  const {
+    layout_target_width,
+    layout_target_height,
+    layout_target_aspect_ratio,
+  } = useNodeState(node_id, (node) => ({
+    layout_target_width: node.layout_target_width,
+    layout_target_height: node.layout_target_height,
+    layout_target_aspect_ratio: node.layout_target_aspect_ratio,
+  }));
 
   const actions = useNodeActions(node_id)!;
   const locked = Boolean(layout_target_aspect_ratio);
 
   return (
     <WidthHeightControl
-      width={width}
-      height={height}
+      width={layout_target_width}
+      height={layout_target_height}
       locked={locked}
       onWidthChange={actions.width}
       onHeightChange={actions.height}

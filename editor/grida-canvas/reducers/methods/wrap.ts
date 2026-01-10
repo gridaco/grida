@@ -110,15 +110,15 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
 
     const prototype: grida.program.nodes.NodePrototype = {
       type: kind,
-      top: cmath.quantize(union.y, 1),
-      left: cmath.quantize(union.x, 1),
+      layout_inset_top: cmath.quantize(union.y, 1),
+      layout_inset_left: cmath.quantize(union.x, 1),
       children: [],
-      position: "absolute",
+      layout_positioning: "absolute",
     } satisfies grida.program.nodes.NodePrototype;
 
     if (prototype.type === "container") {
-      prototype.width = union.width;
-      prototype.height = union.height;
+      prototype.layout_target_width = union.width;
+      prototype.layout_target_height = union.height;
     }
 
     const wrapperId = self_insertSubDocument(
@@ -137,11 +137,17 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
 
     g.forEach((id) => {
       const child = dq.__getNodeById(draft, id);
-      if ("left" in child && typeof child.left === "number") {
-        child.left -= union.x;
+      if (
+        "layout_inset_left" in child &&
+        typeof child.layout_inset_left === "number"
+      ) {
+        child.layout_inset_left -= union.x;
       }
-      if ("top" in child && typeof child.top === "number") {
-        child.top -= union.y;
+      if (
+        "layout_inset_top" in child &&
+        typeof child.layout_inset_top === "number"
+      ) {
+        child.layout_inset_top -= union.y;
       }
     });
 
@@ -213,11 +219,17 @@ export function self_ungroup<S extends editor.state.IEditorState>(
 
     // Adjust the child's position to preserve absolute position
     const child = dq.__getNodeById(draft, child_id);
-    if ("left" in child && typeof child.left === "number") {
-      child.left += offset_x;
+    if (
+      "layout_inset_left" in child &&
+      typeof child.layout_inset_left === "number"
+    ) {
+      child.layout_inset_left += offset_x;
     }
-    if ("top" in child && typeof child.top === "number") {
-      child.top += offset_y;
+    if (
+      "layout_inset_top" in child &&
+      typeof child.layout_inset_top === "number"
+    ) {
+      child.layout_inset_top += offset_y;
     }
 
     // Add to the list of ungrouped children
@@ -301,10 +313,10 @@ export function self_wrapNodesAsBooleanOperation<
 
     const prototype: grida.program.nodes.BooleanPathOperationNodePrototype = {
       type: "boolean",
-      top: cmath.quantize(union.y, 1),
-      left: cmath.quantize(union.x, 1),
+      layout_inset_top: cmath.quantize(union.y, 1),
+      layout_inset_left: cmath.quantize(union.x, 1),
       children: [],
-      position: "absolute",
+      layout_positioning: "absolute",
       op: op,
       corner_radius: modeProperties.cornerRadius(...nodes),
       fill: modeProperties.fill(...nodes),
@@ -328,11 +340,17 @@ export function self_wrapNodesAsBooleanOperation<
 
     g.forEach((id) => {
       const child = dq.__getNodeById(draft, id);
-      if ("left" in child && typeof child.left === "number") {
-        child.left -= union.x;
+      if (
+        "layout_inset_left" in child &&
+        typeof child.layout_inset_left === "number"
+      ) {
+        child.layout_inset_left -= union.x;
       }
-      if ("top" in child && typeof child.top === "number") {
-        child.top -= union.y;
+      if (
+        "layout_inset_top" in child &&
+        typeof child.layout_inset_top === "number"
+      ) {
+        child.layout_inset_top -= union.y;
       }
     });
 

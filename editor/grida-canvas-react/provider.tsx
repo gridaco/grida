@@ -224,11 +224,13 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (
         change: editor.api.TChange<
-          grida.program.nodes.TextNode["letter_spacing"]
+          grida.program.nodes.i.ITextStyle["letter_spacing"]
         >
       ) => instance.commands.changeTextNodeLetterSpacing(node_id, change),
       wordSpacing: (
-        change: editor.api.TChange<grida.program.nodes.TextNode["word_spacing"]>
+        change: editor.api.TChange<
+          grida.program.nodes.i.ITextStyle["word_spacing"]
+        >
       ) => instance.commands.changeTextNodeWordSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         instance.commands.changeTextNodeMaxlength(node_id, value),
@@ -251,7 +253,7 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodeFeBackdropBlur(node_id, value),
 
       // layout
-      layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
+      layout: (value: grida.program.nodes.i.IFlexContainer["layout_mode"]) =>
         instance.commands.changeContainerNodeLayout(node_id, value),
       direction: (value: cg.Axis) =>
         instance.commands.changeFlexContainerNodeDirection(node_id, value),
@@ -268,8 +270,12 @@ export function useNodeActions(node_id: string | undefined) {
           value
         ),
       gap: (
-        value: number | { main_axis_gap: number; cross_axis_gap: number }
+        value:
+          | number
+          | { layout_main_axis_gap: number; layout_cross_axis_gap: number }
       ) => instance.commands.changeFlexContainerNodeGap(node_id, value),
+      clipsContent: (value: boolean) =>
+        instance.commands.changeContainerNodeClipsContent(node_id, value),
 
       // css style
       aspectRatio: (value?: number) =>
@@ -717,7 +723,7 @@ export function useRootTemplateInstanceNode(root_id: string) {
   );
 }
 
-export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
+export type NodeWithMeta = grida.program.nodes.UnknownNode & {
   meta: {
     is_component_consumer: boolean;
     is_flex_parent: boolean;
@@ -726,12 +732,12 @@ export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
 
 export function useNodeState<Selected>(
   node_id: string,
-  selector: (state: grida.program.nodes.UnknwonNode) => Selected
+  selector: (state: grida.program.nodes.UnknownNode) => Selected
 ) {
   const instance = useCurrentEditor();
   return useEditorState(instance, (state) => {
     const node = state.document.nodes[node_id];
-    return selector(node as grida.program.nodes.UnknwonNode);
+    return selector(node as grida.program.nodes.UnknownNode);
   });
 }
 
@@ -800,15 +806,16 @@ export function useNode(node_id: string): NodeWithMeta {
     node_definition = templates[template_id].nodes[node_id];
   }
 
-  const node: grida.program.nodes.UnknwonNode = useMemo(() => {
+  const node: grida.program.nodes.UnknownNode = useMemo(() => {
     return Object.assign(
       {},
       node_definition,
       node_change || {}
-    ) as grida.program.nodes.UnknwonNode;
+    ) as grida.program.nodes.UnknownNode;
   }, [node_definition, node_change]);
 
-  const is_flex_parent = node.type === "container" && node.layout === "flex";
+  const is_flex_parent =
+    node.type === "container" && node.layout_mode === "flex";
 
   // TODO: also check the ancestor nodes
   const is_component_consumer = is_direct_component_consumer(node.type);
@@ -827,7 +834,7 @@ export function useNode(node_id: string): NodeWithMeta {
  */
 export function useComputedNode(
   node_id: string
-): grida.program.nodes.UnknwonComputedNode {
+): grida.program.nodes.UnknownComputedNode {
   const { props, text, html, src, href, fill } = useNodeState(
     node_id,
     (node) => ({
@@ -852,7 +859,7 @@ export function useComputedNode(
     true
   );
 
-  return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknwonComputedNode;
+  return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknownComputedNode;
 }
 
 export function useTemplateDefinition(template_id: string) {

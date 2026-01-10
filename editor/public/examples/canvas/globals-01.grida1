@@ -1,5 +1,5 @@
 {
-  "version": "0.89.0-beta+20251219",
+  "version": "0.90.0-beta+20260108",
   "document": {
     "nodes": {
       "root": {
@@ -12,11 +12,11 @@
         "z_index": 0,
         "type": "container",
         "expanded": false,
-        "position": "relative",
-        "left": 0,
-        "top": 0,
-        "width": 960,
-        "height": 540,
+        "layout_positioning": "relative",
+        "layout_inset_left": 0,
+        "layout_inset_top": 0,
+        "layout_target_width": 960,
+        "layout_target_height": 540,
         "corner_radius": 0,
         "fill_paints": [
           {
@@ -33,20 +33,19 @@
       },
       "text": {
         "id": "text",
-        "name": "text",
+        "name": "tspan",
         "active": true,
         "locked": false,
         "rotation": 0,
         "opacity": 1,
         "z_index": 0,
-        "type": "text",
+        "type": "tspan",
         "text": "Programmable Design",
-        "position": "absolute",
-        "left": 59,
-        "top": 251,
-        "width": "auto",
-        "height": "auto",
-        "style": {},
+        "layout_positioning": "absolute",
+        "layout_inset_left": 59,
+        "layout_inset_top": 251,
+        "layout_target_width": "auto",
+        "layout_target_height": "auto",
         "text_align": "left",
         "text_align_vertical": "top",
         "text_decoration_line": "none",

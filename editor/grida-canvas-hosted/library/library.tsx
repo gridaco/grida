@@ -127,10 +127,10 @@ export function Library() {
           const imageRef = await instance.createImageAsync(imageUrl);
           const node = instance.commands.createRectangleNode();
 
-          node.$.position = "absolute";
+          node.$.layout_positioning = "absolute";
           node.$.name = photo.alt || "Photo";
-          node.$.width = imageRef.width;
-          node.$.height = imageRef.height;
+          node.$.layout_target_width = imageRef.width;
+          node.$.layout_target_height = imageRef.height;
 
           node.$.fill_paints = [
             {

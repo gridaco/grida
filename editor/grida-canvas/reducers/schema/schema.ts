@@ -230,12 +230,12 @@ export namespace schema.parametric_scale {
     const n = node as NodeScaleProps;
 
     // Layout-ish lengths (treat as regular numeric fields; do not bake non-numeric values)
-    scale_number_in_place(n, "left", s);
-    scale_number_in_place(n, "top", s);
-    scale_number_in_place(n, "right", s);
-    scale_number_in_place(n, "bottom", s);
-    scale_number_in_place(n, "width", s);
-    scale_number_in_place(n, "height", s);
+    scale_number_in_place(n, "layout_inset_left", s);
+    scale_number_in_place(n, "layout_inset_top", s);
+    scale_number_in_place(n, "layout_inset_right", s);
+    scale_number_in_place(n, "layout_inset_bottom", s);
+    scale_number_in_place(n, "layout_target_width", s);
+    scale_number_in_place(n, "layout_target_height", s);
 
     // General geometry-ish lengths
     scale_number_in_place(n, "corner_radius", s);
@@ -245,13 +245,13 @@ export namespace schema.parametric_scale {
     scale_number_in_place(n, "rectangular_corner_radius_bottom_right", s);
 
     // Padding (flat properties)
-    scale_number_in_place(n, "padding_top", s);
-    scale_number_in_place(n, "padding_right", s);
-    scale_number_in_place(n, "padding_bottom", s);
-    scale_number_in_place(n, "padding_left", s);
+    scale_number_in_place(n, "layout_padding_top", s);
+    scale_number_in_place(n, "layout_padding_right", s);
+    scale_number_in_place(n, "layout_padding_bottom", s);
+    scale_number_in_place(n, "layout_padding_left", s);
 
-    scale_number_in_place(n, "main_axis_gap", s);
-    scale_number_in_place(n, "cross_axis_gap", s);
+    scale_number_in_place(n, "layout_main_axis_gap", s);
+    scale_number_in_place(n, "layout_cross_axis_gap", s);
 
     // Stroke
     scale_number_in_place(n, "stroke_width", s);
@@ -267,7 +267,7 @@ export namespace schema.parametric_scale {
     }
 
     // Text
-    if (node.type === "text") {
+    if (node.type === "tspan") {
       scale_number_in_place(node, "font_size", s);
     }
 

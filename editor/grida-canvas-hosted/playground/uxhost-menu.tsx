@@ -620,14 +620,14 @@ function TextMenuContent() {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
   const hasTextSelection = selection.some(
-    (node_id) => instance.doc.getNodeSnapshotById(node_id)?.type === "text"
+    (node_id) => instance.doc.getNodeSnapshotById(node_id)?.type === "tspan"
   );
 
   // Helper to apply command to all selected text nodes
   const applyToTextNodes = (fn: (node_id: string) => void) => {
     selection.forEach((node_id) => {
       const node = instance.doc.getNodeSnapshotById(node_id);
-      if (node?.type === "text") {
+      if (node?.type === "tspan") {
         fn(node_id);
       }
     });

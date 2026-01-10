@@ -41,14 +41,14 @@ export function prepare_bitmap_node(
       id: new_node_id,
       active: true,
       locked: false,
-      position: "absolute",
+      layout_positioning: "absolute",
       opacity: 1,
       rotation: 0,
       z_index: 0,
-      left: x,
-      top: y,
-      width: width,
-      height: height,
+      layout_inset_left: x,
+      layout_inset_top: y,
+      layout_target_width: width,
+      layout_target_height: height,
       imageRef: new_bitmap_ref_id,
     };
 
@@ -106,9 +106,16 @@ export function on_brush(
 
   const node = prepare_bitmap_node(draft, node_id, context);
 
-  const nodepos: cmath.Vector2 = [node.left!, node.top!];
+  const nodepos: cmath.Vector2 = [
+    node.layout_inset_left!,
+    node.layout_inset_top!,
+  ];
 
   const image = draft.document.bitmaps[node.imageRef];
+
+  // Get resolved dimensions from geometry cache
+  const rect = context.geometry.getNodeAbsoluteBoundingRect(node.id);
+  assert(rect, `Bounding rect for node ${node.id} must be defined`);
 
   // set up the editor from global.
   let bme: BitmapLayerEditor;
@@ -123,8 +130,8 @@ export function on_brush(
       {
         x: nodepos[0],
         y: nodepos[1],
-        width: node.width,
-        height: node.height,
+        width: rect.width,
+        height: rect.height,
       },
       image.data,
       image.version
@@ -153,10 +160,10 @@ export function on_brush(
   };
 
   // transform node
-  node.left = bme.x;
-  node.top = bme.y;
-  node.width = bme.width;
-  node.height = bme.height;
+  node.layout_inset_left = bme.x;
+  node.layout_inset_top = bme.y;
+  node.layout_target_width = bme.width;
+  node.layout_target_height = bme.height;
 
   if (is_gesture) {
     if (draft.gesture.type === "idle") {

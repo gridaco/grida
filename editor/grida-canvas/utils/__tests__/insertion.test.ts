@@ -28,29 +28,32 @@ describe("getPackedSubtreeBoundingRect", () => {
         id: "s",
         name: "s",
         children_refs: ["a", "b"],
-        order: 0,
-      },
+      } as grida.program.document.Scene,
       nodes: {
         a: {
           id: "a",
           type: "rectangle",
-          left: 10,
-          top: 10,
-          width: 20,
-          height: 20,
-          position: "absolute",
-        },
+          layout_inset_left: 10,
+          layout_inset_top: 10,
+          layout_target_width: 20,
+          layout_target_height: 20,
+          layout_positioning: "absolute",
+        } as grida.program.nodes.RectangleNode,
         b: {
           id: "b",
           type: "rectangle",
-          left: 40,
-          top: 40,
-          width: 20,
-          height: 20,
-          position: "absolute",
-        },
+          layout_inset_left: 40,
+          layout_inset_top: 40,
+          layout_target_width: 20,
+          layout_target_height: 20,
+          layout_positioning: "absolute",
+        } as grida.program.nodes.RectangleNode,
       },
-    } as any;
+      images: {},
+      links: {},
+      bitmaps: {},
+      properties: {},
+    };
     const box = getPackedSubtreeBoundingRect(sub);
     expect(box).toEqual({ x: 10, y: 10, width: 50, height: 50 });
   });

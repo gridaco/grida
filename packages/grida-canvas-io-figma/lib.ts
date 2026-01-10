@@ -383,7 +383,15 @@ export namespace iofigma {
               relativeTransform?: any;
               size?: any;
             }
-      ) {
+      ): Pick<
+        grida.program.nodes.ContainerNode,
+        | "layout_positioning"
+        | "layout_inset_left"
+        | "layout_inset_top"
+        | "layout_target_width"
+        | "layout_target_height"
+        | "layout_target_aspect_ratio"
+      > {
         const szx = node.size?.x ?? 0;
         const szy = node.size?.y ?? 0;
 
@@ -399,11 +407,11 @@ export namespace iofigma {
           : undefined;
 
         return {
-          position: "absolute" as const,
-          left: node.relativeTransform?.[0][2] ?? 0,
-          top: node.relativeTransform?.[1][2] ?? 0,
-          width: szx,
-          height: szy,
+          layout_positioning: "absolute" as const,
+          layout_inset_left: node.relativeTransform?.[0][2] ?? 0,
+          layout_inset_top: node.relativeTransform?.[1][2] ?? 0,
+          layout_target_width: szx,
+          layout_target_height: szy,
           layout_target_aspect_ratio,
         };
       }
@@ -589,21 +597,22 @@ export namespace iofigma {
           paddingTop === paddingLeft
             ? (paddingTop ?? 0)
             : {
-                padding_top: paddingTop ?? 0,
-                padding_right: paddingRight ?? 0,
-                padding_bottom: paddingBottom ?? 0,
-                padding_left: paddingLeft ?? 0,
+                layout_padding_top: paddingTop ?? 0,
+                layout_padding_right: paddingRight ?? 0,
+                layout_padding_bottom: paddingBottom ?? 0,
+                layout_padding_left: paddingLeft ?? 0,
               };
 
         return {
           expanded,
           padding,
-          layout: "flow" as const,
-          direction: "horizontal" as const,
-          main_axis_alignment: "start" as const,
-          cross_axis_alignment: "start" as const,
-          main_axis_gap: node.itemSpacing ?? 0,
-          cross_axis_gap: node.counterAxisSpacing ?? node.itemSpacing ?? 0,
+          layout_mode: "flow" as const,
+          layout_direction: "horizontal" as const,
+          layout_main_axis_alignment: "start" as const,
+          layout_cross_axis_alignment: "start" as const,
+          layout_main_axis_gap: node.itemSpacing ?? 0,
+          layout_cross_axis_gap:
+            node.counterAxisSpacing ?? node.itemSpacing ?? 0,
         };
       }
 
@@ -763,8 +772,8 @@ export namespace iofigma {
                 : effects_trait(undefined)),
               type: "vector",
               vector_network: vectorNetwork,
-              width: bbox.width,
-              height: bbox.height,
+              layout_target_width: bbox.width,
+              layout_target_height: bbox.height,
               fill_rule: map.windingRuleMap[geometry.windingRule] ?? "nonzero",
             };
           } catch (e) {
@@ -932,9 +941,9 @@ export namespace iofigma {
 
         const rootNode = processNode(node) as grida.program.nodes.ContainerNode;
         // Keep absolute positioning from Figma (all Figma nodes are absolute by default)
-        // rootNode.position = "relative";
-        // rootNode.left = 0;
-        // rootNode.top = 0;
+        // rootNode.layout_positioning = "relative";
+        // rootNode.layout_inset_left = 0;
+        // rootNode.layout_inset_top = 0;
 
         if (!rootNode) {
           throw new Error("Failed to process root node");
@@ -1002,6 +1011,7 @@ export namespace iofigma {
               ...corner_radius_trait({ cornerRadius: 0 }),
               ...container_layout_trait({}, false),
               type: "container",
+              clips_content: false,
             } satisfies grida.program.nodes.ContainerNode;
           }
           //
@@ -1021,6 +1031,9 @@ export namespace iofigma {
               ...container_layout_trait(node, true),
               ...effects_trait(node.effects),
               type: "container",
+              // In Figma, FRAME/COMPONENT/INSTANCE clip by default unless explicitly disabled
+              // So undefined means "use default" which is "clipping enabled" (true)
+              clips_content: node.clipsContent !== false,
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -1032,7 +1045,6 @@ export namespace iofigma {
               ...base_node_trait(node),
               ...positioning_trait(node),
               type: "group",
-              expanded: false,
             } satisfies grida.program.nodes.GroupNode;
           }
           case "TEXT": {
@@ -1074,18 +1086,18 @@ export namespace iofigma {
               ...text_stroke_trait(node),
               ...style_trait({}),
               ...effects_trait(node.effects),
-              type: "text",
+              type: "tspan",
               text: node.characters,
-              position: "absolute",
-              left: constraints.left,
-              top: constraints.top,
-              right: constraints.right,
-              bottom: constraints.bottom,
-              width:
+              layout_positioning: "absolute",
+              layout_inset_left: constraints.left,
+              layout_inset_top: constraints.top,
+              layout_inset_right: constraints.right,
+              layout_inset_bottom: constraints.bottom,
+              layout_target_width:
                 figma_text_resizing_model === "WIDTH_AND_HEIGHT"
                   ? "auto"
                   : fixedwidth,
-              height:
+              layout_target_height:
                 figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
                 figma_text_resizing_model === "HEIGHT"
                   ? "auto"
@@ -1144,7 +1156,6 @@ export namespace iofigma {
               ...effects_trait(node.effects),
               type: "boolean",
               op: mapBooleanOperation(node.booleanOperation),
-              expanded: false,
             } satisfies grida.program.nodes.BooleanPathOperationNode;
           }
           case "LINE": {
@@ -1154,11 +1165,11 @@ export namespace iofigma {
               ...stroke_trait(node),
               ...effects_trait(node.effects),
               type: "line",
-              position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: 0,
+              layout_positioning: "absolute",
+              layout_inset_left: node.relativeTransform![0][2],
+              layout_inset_top: node.relativeTransform![1][2],
+              layout_target_width: node.size!.x,
+              layout_target_height: 0,
             } satisfies grida.program.nodes.LineNode;
           }
           case "SLICE": {
@@ -1175,7 +1186,6 @@ export namespace iofigma {
               ...base_node_trait(node),
               ...positioning_trait(node),
               type: "group",
-              expanded: false,
             } satisfies grida.program.nodes.GroupNode;
           }
 
@@ -1679,17 +1689,21 @@ export namespace iofigma {
        * HasFramePropertiesTrait - Clips content
        * Maps frameMaskDisabled to clipsContent.
        *
-       * Mapping:
-       * - frameMaskDisabled: true → clipsContent: true (mask disabled = clipping enabled)
-       * - frameMaskDisabled: false → clipsContent: false (mask enabled = clipping disabled)
-       * - frameMaskDisabled: undefined → clipsContent: false (default, no clipping)
+       * Mapping (CORRECTED based on fixture analysis):
+       * - frameMaskDisabled: true → clipsContent: false (mask disabled = clipping disabled)
+       * - frameMaskDisabled: false → clipsContent: true (mask enabled = clipping enabled)
+       * - frameMaskDisabled: undefined → clipsContent: true (default, clipping enabled - Figma frames clip by default)
        *
        * Note: This is separate from GROUP detection. GROUPs are handled separately
        * in the frame() function and always have clipsContent: false.
        */
       function kiwi_frame_clip_trait(nc: figkiwi.NodeChange) {
-        // Map frameMaskDisabled directly to clipsContent, default to false
-        const clipsContent = nc.frameMaskDisabled ?? false;
+        // Map frameMaskDisabled to clipsContent
+        // In Figma, frames clip by default unless explicitly disabled
+        // frameMaskDisabled: true means clipping is DISABLED
+        // frameMaskDisabled: false means clipping is ENABLED
+        // undefined means "use default" which is "clipping enabled" (true)
+        const clipsContent = nc.frameMaskDisabled !== true;
         return { clipsContent };
       }
 
@@ -1841,9 +1855,9 @@ export namespace iofigma {
        *
        * Figma converts GROUP nodes to FRAME nodes in both clipboard and .fig files.
        * We can detect GROUP-originated FRAMEs using:
-       * - frameMaskDisabled === false (real FRAMEs have true)
-       * - resizeToFit === true (real FRAMEs don't have this property)
-       * - No paints: fillPaints, strokePaints, and backgroundPaints are all empty/undefined
+       * - frameMaskDisabled === false (note: real FRAMEs can have either true or false, so this alone is not sufficient)
+       * - resizeToFit === true (real FRAMEs typically have undefined)
+       * - No paints: fillPaints, strokePaints, and backgroundPaints are all empty/undefined (GROUPs never have paints)
        *   (GROUPs don't have fills or strokes, so this is an additional safety check)
        *
        * See: https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi.md for detailed documentation

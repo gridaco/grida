@@ -207,11 +207,14 @@ export function on_path_pointer_down(
     const bb_b = vne.getBBox();
     const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
     vne.translate(cmath.vector2.invert(delta));
-    const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
-    node.left = new_pos[0];
-    node.top = new_pos[1];
-    node.width = bb_b.width;
-    node.height = bb_b.height;
+    const new_pos = cmath.vector2.add(
+      [node.layout_inset_left!, node.layout_inset_top!],
+      delta
+    );
+    node.layout_inset_left = new_pos[0];
+    node.layout_inset_top = new_pos[1];
+    node.layout_target_width = bb_b.width;
+    node.layout_target_height = bb_b.height;
     node.vector_network = vne.value;
 
     if (typeof a_point !== "number") {
@@ -246,11 +249,14 @@ export function on_path_pointer_down(
       const bb_b2 = vne.getBBox();
       const delta2: cmath.Vector2 = [bb_b2.x, bb_b2.y];
       vne.translate(cmath.vector2.invert(delta2));
-      const new_pos2 = cmath.vector2.add([node.left!, node.top!], delta2);
-      node.left = new_pos2[0];
-      node.top = new_pos2[1];
-      node.width = bb_b2.width;
-      node.height = bb_b2.height;
+      const new_pos2 = cmath.vector2.add(
+        [node.layout_inset_left!, node.layout_inset_top!],
+        delta2
+      );
+      node.layout_inset_left = new_pos2[0];
+      node.layout_inset_top = new_pos2[1];
+      node.layout_target_width = bb_b2.width;
+      node.layout_target_height = bb_b2.height;
       node.vector_network = vne.value;
 
       draft.content_edit_mode.selection.selected_vertices = [new_vertex_idx];
@@ -319,12 +325,15 @@ export function on_path_pointer_down(
   const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
   vne.translate(cmath.vector2.invert(delta));
 
-  const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+  const new_pos = cmath.vector2.add(
+    [node.layout_inset_left!, node.layout_inset_top!],
+    delta
+  );
 
-  node.left = new_pos[0];
-  node.top = new_pos[1];
-  node.width = bb_b.width;
-  node.height = bb_b.height;
+  node.layout_inset_left = new_pos[0];
+  node.layout_inset_top = new_pos[1];
+  node.layout_target_width = bb_b.width;
+  node.layout_target_height = bb_b.height;
 
   node.vector_network = vne.value;
   draft.content_edit_mode.selection.selected_vertices = [new_vertex_idx];
@@ -365,12 +374,12 @@ export function create_new_vector_node(
     id: new_node_id,
     active: true,
     locked: false,
-    position: "absolute",
-    left: 0,
-    top: 0,
+    layout_positioning: "absolute",
+    layout_inset_left: 0,
+    layout_inset_top: 0,
     opacity: 1,
-    width: 0,
-    height: 0,
+    layout_target_width: 0,
+    layout_target_height: 0,
     rotation: 0,
     z_index: 0,
     stroke: {
@@ -397,8 +406,8 @@ export function create_new_vector_node(
     relpos = cmath.vector2.sub(pos, [parent_rect.x, parent_rect.y]);
   }
 
-  vector.left = relpos[0];
-  vector.top = relpos[1];
+  vector.layout_inset_left = relpos[0];
+  vector.layout_inset_top = relpos[1];
 
   self_try_insert_node(draft, parent, vector);
   self_selectNode(draft, "reset", vector.id);
@@ -554,12 +563,15 @@ export function on_drag_gesture_curve(
 
   vne.translate(cmath.vector2.invert(delta));
 
-  const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+  const new_pos = cmath.vector2.add(
+    [node.layout_inset_left!, node.layout_inset_top!],
+    delta
+  );
 
-  node.left = new_pos[0];
-  node.top = new_pos[1];
-  node.width = bb.width;
-  node.height = bb.height;
+  node.layout_inset_left = new_pos[0];
+  node.layout_inset_top = new_pos[1];
+  node.layout_target_width = bb.width;
+  node.layout_target_height = bb.height;
 
   node.vector_network = vne.value;
 }
@@ -669,10 +681,10 @@ export function on_drag_gesture_translate_vector_controls(
   vne.translate(cmath.vector2.invert(delta));
 
   const new_pos = cmath.vector2.add(initial_position, delta);
-  node.left = new_pos[0];
-  node.top = new_pos[1];
-  node.width = bb_b.width;
-  node.height = bb_b.height;
+  node.layout_inset_left = new_pos[0];
+  node.layout_inset_top = new_pos[1];
+  node.layout_target_width = bb_b.width;
+  node.layout_target_height = bb_b.height;
 
   node.vector_network = vne.value;
 }
@@ -694,12 +706,12 @@ export function on_draw_pointer_down(
     id: new_node_id,
     active: true,
     locked: false,
-    position: "absolute",
-    left: 0,
-    top: 0,
+    layout_positioning: "absolute",
+    layout_inset_left: 0,
+    layout_inset_top: 0,
     opacity: 1,
-    width: 0,
-    height: 0,
+    layout_target_width: 0,
+    layout_target_height: 0,
     rotation: 0,
     z_index: 0,
     stroke: {
@@ -708,7 +720,7 @@ export function on_draw_pointer_down(
       active: true,
     },
     stroke_cap: "butt",
-  } as const;
+  } satisfies Partial<grida.program.nodes.UnknownNode>;
 
   switch (tool) {
     case "pencil": {
@@ -755,8 +767,8 @@ export function on_draw_pointer_down(
     ]);
   }
 
-  vector.left = node_relative_pos[0];
-  vector.top = node_relative_pos[1];
+  vector.layout_inset_left = node_relative_pos[0];
+  vector.layout_inset_top = node_relative_pos[1];
 
   draft.gesture = {
     type: "draw",
@@ -836,10 +848,10 @@ export function on_drag_gesture_draw(
   vne.translate(cmath.vector2.invert(snapped_offset));
 
   const new_pos = cmath.vector2.add(origin, snapped_offset);
-  node.left = new_pos[0];
-  node.top = new_pos[1];
-  node.width = bb.width;
-  node.height = bb.height;
+  node.layout_inset_left = new_pos[0];
+  node.layout_inset_top = new_pos[1];
+  node.layout_target_width = bb.width;
+  node.layout_target_height = bb.height;
   node.vector_network = vne.value;
 }
 

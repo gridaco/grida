@@ -10,10 +10,10 @@ import type { TMixed } from "./utils/types";
 type Padding = grida.program.nodes.i.IPadding;
 
 type MixedPadding = {
-  padding_top?: TMixed<number>;
-  padding_right?: TMixed<number>;
-  padding_bottom?: TMixed<number>;
-  padding_left?: TMixed<number>;
+  layout_padding_top?: TMixed<number>;
+  layout_padding_right?: TMixed<number>;
+  layout_padding_bottom?: TMixed<number>;
+  layout_padding_left?: TMixed<number>;
 };
 
 export function PaddingControl({
@@ -26,7 +26,11 @@ export function PaddingControl({
   const [showIndividual, setShowIndividual] = useState(false);
 
   const getPaddingValue = (
-    prop: "padding_top" | "padding_right" | "padding_bottom" | "padding_left",
+    prop:
+      | "layout_padding_top"
+      | "layout_padding_right"
+      | "layout_padding_bottom"
+      | "layout_padding_left",
     defaultValue: number = 0
   ): TMixed<number> => {
     if (!value) return defaultValue;
@@ -37,10 +41,10 @@ export function PaddingControl({
   };
 
   const paddingValues = {
-    top: getPaddingValue("padding_top"),
-    right: getPaddingValue("padding_right"),
-    bottom: getPaddingValue("padding_bottom"),
-    left: getPaddingValue("padding_left"),
+    top: getPaddingValue("layout_padding_top"),
+    right: getPaddingValue("layout_padding_right"),
+    bottom: getPaddingValue("layout_padding_bottom"),
+    left: getPaddingValue("layout_padding_left"),
   };
 
   const { top, right, bottom, left } = paddingValues;
@@ -72,10 +76,10 @@ export function PaddingControl({
   const handleUniformChange = (newValue: number | undefined) => {
     if (newValue === undefined) return;
     onValueCommit?.({
-      padding_top: newValue,
-      padding_right: newValue,
-      padding_bottom: newValue,
-      padding_left: newValue,
+      layout_padding_top: newValue,
+      layout_padding_right: newValue,
+      layout_padding_bottom: newValue,
+      layout_padding_left: newValue,
     });
   };
 
@@ -109,10 +113,10 @@ export function PaddingControl({
           ? paddingValues.left
           : 0;
     onValueCommit?.({
-      padding_top: currentTop,
-      padding_right: currentRight,
-      padding_bottom: currentBottom,
-      padding_left: currentLeft,
+      layout_padding_top: currentTop,
+      layout_padding_right: currentRight,
+      layout_padding_bottom: currentBottom,
+      layout_padding_left: currentLeft,
     });
   };
 

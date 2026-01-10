@@ -1,5 +1,5 @@
 import { ContainerWidget } from "./container";
-import { TextWidget } from "./text";
+import { TextSpanWidget } from "./tspan";
 import { ImageWidget } from "./image";
 import { VideoWidget } from "./video";
 import { RectangleWidget } from "./rectangle";
@@ -24,7 +24,7 @@ export namespace ReactNodeRenderers {
   export const ellipse = EllipseWidget;
   export const polygon = RegularPolygonWidget;
   export const star = RegularStarPolygonWidget;
-  export const text = TextWidget;
+  export const tspan = TextSpanWidget;
   export const image = ImageWidget;
   export const video = VideoWidget;
   export const richtext = RichTextWidget;

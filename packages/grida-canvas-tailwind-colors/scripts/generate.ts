@@ -374,3 +374,4 @@ await Deno.writeTextFile(`${jsonDir}/oklch.json`, oklchJSON);
 console.log(`✅ Generated: json/oklch.json (${colorEntries.length} colors)`);
 
 console.log(`🎉 Done! Generated ${colorEntries.length} color variables.`);
+Deno.exit(0);

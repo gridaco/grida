@@ -2,10 +2,11 @@ import React from "react";
 import type grida from "@grida/schema";
 import queryattributes from "./utils/attributes";
 import { svg } from "@/grida-canvas-utils/svg";
+import { css } from "@/grida-canvas-utils/css";
 
 export function SVGLineWidget({
-  width,
-  height,
+  layout_target_width: width,
+  layout_target_height: height,
   stroke,
   stroke_width,
   stroke_cap,
@@ -28,15 +29,15 @@ export function SVGLineWidget({
     <svg
       {...queryattributes(props)}
       style={style_without_height}
-      width={width}
+      width={css.toDimension(width)}
       height={1}
     >
       {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}
       <line
-        x1={0}
-        y1={0}
-        x2={width}
-        y2={0}
+        x1="0"
+        y1="0"
+        x2={"100%"}
+        y2="0"
         stroke={strokeDef}
         strokeWidth={stroke_width}
         strokeLinecap={stroke_cap}

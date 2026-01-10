@@ -12,7 +12,7 @@ Future support for SVG is planned (HTML + SVG share >90% of style logic).
 
 ### “Isn’t a full CSS engine overkill?”
 
-Not really. Stylo stays surprisingly lean—our builds land around ~1.5 MB when compiled with `wasm-unknwon-unknown` and roughly ~2.5 MB when targeting `wasm32-unknown-emscripten`. More importantly, reproducing the entirety of CSS3 (selectors, cascade rules, media queries, shorthand expansion, inheritance, etc.) is phenomenally difficult; sooner or later any serious renderer ends up needing a browser-grade engine. Stylo already solves that problem with production-ready accuracy, so we embrace it and focus on the rest of the pipeline.
+Not really. Stylo stays surprisingly lean—our builds land around ~1.5 MB when compiled with `wasm-unknown-unknown` and roughly ~2.5 MB when targeting `wasm32-unknown-emscripten`. More importantly, reproducing the entirety of CSS3 (selectors, cascade rules, media queries, shorthand expansion, inheritance, etc.) is phenomenally difficult; sooner or later any serious renderer ends up needing a browser-grade engine. Stylo already solves that problem with production-ready accuracy, so we embrace it and focus on the rest of the pipeline.
 
 ---
 

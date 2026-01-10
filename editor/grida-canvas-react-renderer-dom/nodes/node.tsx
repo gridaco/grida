@@ -32,8 +32,8 @@ interface NodeElementProps<P extends Record<string, any>> {
   position?: "absolute" | "relative";
   left?: number;
   top?: number;
-  width?: grida.program.nodes.i.ICSSDimension["width"];
-  height?: grida.program.nodes.i.ICSSDimension["height"];
+  width?: grida.program.nodes.i.ICSSDimension["layout_target_width"];
+  height?: grida.program.nodes.i.ICSSDimension["layout_target_height"];
   fill?: cg.Paint;
 }
 
@@ -86,7 +86,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "container":
       case "image":
       case "video":
-      case "text":
+      case "tspan":
       case "bitmap":
       case "vector":
       case "line":
@@ -138,11 +138,11 @@ export function NodeElement<P extends Record<string, any>>({
     vector_network: node.vector_network,
     opacity: node.opacity,
     z_index: DEFAULT_ZINDEX ?? node.z_index,
-    position: DEFAULT_POSITION ?? node.position,
-    left: DEFAULT_LEFT ?? node.left,
-    top: DEFAULT_TOP ?? node.top,
-    width: DEFAULT_WIDTH ?? node.width,
-    height: DEFAULT_HEIGHT ?? node.height,
+    layout_positioning: DEFAULT_POSITION ?? node.layout_positioning,
+    layout_inset_left: DEFAULT_LEFT ?? node.layout_inset_left,
+    layout_inset_top: DEFAULT_TOP ?? node.layout_inset_top,
+    layout_target_width: DEFAULT_WIDTH ?? node.layout_target_width,
+    layout_target_height: (DEFAULT_HEIGHT ?? node.layout_target_height) as any,
     fill_rule: node.fill_rule,
     stroke: node.stroke,
     stroke_width: node.stroke_width,
@@ -163,7 +163,7 @@ export function NodeElement<P extends Record<string, any>>({
   } satisfies grida.program.document.IGlobalRenderingContext &
     (
       | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
-      | grida.program.nodes.UnknwonComputedNode
+      | grida.program.nodes.UnknownComputedNode
     );
 
   if (!node.active) return <></>;
@@ -187,7 +187,7 @@ export function NodeElement<P extends Record<string, any>>({
               renderprops as grida.program.nodes.i.IComputedCSSStylable,
               {
                 fill: fillings[node.type],
-                hasTextStyle: node.type === "text",
+                hasTextStyle: node.type === "tspan",
               }
             ),
             // hard override user-select
@@ -211,7 +211,7 @@ const fillings = {
   scene: "background",
   boolean: "none",
   group: "none",
-  text: "color",
+  tspan: "color",
   container: "background",
   component: "background",
   iframe: "background",

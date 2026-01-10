@@ -10,7 +10,7 @@ export default function CanvasPlaygroundPage() {
   return (
     <main className="w-screen h-screen overflow-hidden">
       <PlaygroundCanvas
-        src="/examples/canvas/hero-main-demo.grida"
+        src="/examples/canvas/hero-main-demo.grida1"
         backend="canvas"
       />
     </main>

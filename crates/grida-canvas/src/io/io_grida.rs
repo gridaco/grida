@@ -703,8 +703,8 @@ pub struct JSONUnknownNodeProperties {
     pub name: Option<String>,
     #[serde(rename = "active", default = "default_active")]
     pub active: bool,
-    #[serde(rename = "locked", default = "default_locked")]
-    pub locked: bool,
+    // #[serde(rename = "locked", default = "default_locked")]
+    // pub locked: bool,
     // blend
     #[serde(rename = "opacity", default = "default_opacity")]
     pub opacity: f32,
@@ -712,34 +712,32 @@ pub struct JSONUnknownNodeProperties {
     pub blend_mode: JSONLayerBlendMode,
     #[serde(rename = "mask")]
     pub mask: Option<JSONLayerMaskType>,
-    #[serde(rename = "z_index", alias = "zIndex", default = "default_z_index")]
-    pub z_index: i32,
+    // #[serde(rename = "z_index", alias = "zIndex", default = "default_z_index")]
+    // pub z_index: i32,
     // css
-    #[serde(rename = "position")]
-    pub position: Option<CSSPosition>,
-    #[serde(rename = "left")]
-    pub left: Option<f32>,
-    #[serde(rename = "top")]
-    pub top: Option<f32>,
-    #[serde(rename = "right")]
-    pub right: Option<f32>,
-    #[serde(rename = "bottom")]
-    pub bottom: Option<f32>,
+    #[serde(rename = "layout_positioning", alias = "position")]
+    pub layout_positioning: Option<CSSPosition>,
+    #[serde(rename = "layout_inset_left", alias = "left")]
+    pub layout_inset_left: Option<f32>,
+    #[serde(rename = "layout_inset_top", alias = "top")]
+    pub layout_inset_top: Option<f32>,
+    #[serde(rename = "layout_inset_right", alias = "right")]
+    pub layout_inset_right: Option<f32>,
+    #[serde(rename = "layout_inset_bottom", alias = "bottom")]
+    pub layout_inset_bottom: Option<f32>,
     #[serde(rename = "rotation", default = "default_rotation")]
     pub rotation: f32,
-    #[serde(rename = "border")]
-    pub border: Option<CSSBorder>,
-    #[serde(rename = "style")]
-    pub style: Option<HashMap<String, serde_json::Value>>,
     // geometry - defaults to 0 for non-intrinsic size nodes
     #[serde(
-        rename = "width",
+        rename = "layout_target_width",
+        alias = "width",
         default = "default_width_css",
         deserialize_with = "de_css_dimension"
     )]
     pub width: CSSDimension,
     #[serde(
-        rename = "height",
+        rename = "layout_target_height",
+        alias = "height",
         default = "default_height_css",
         deserialize_with = "de_css_dimension"
     )]
@@ -872,8 +870,8 @@ pub enum JSONNode {
     RegularStarPolygon(JSONRegularStarPolygonNode),
     #[serde(rename = "line")]
     Line(JSONLineNode),
-    #[serde(rename = "text")]
-    Text(JSONTextNode),
+    #[serde(rename = "tspan", alias = "text")]
+    TextSpan(JSONTextSpanNode),
     #[serde(rename = "boolean")]
     BooleanOperation(JSONBooleanOperationNode),
     #[serde(rename = "image")]
@@ -943,29 +941,35 @@ pub struct JSONContainerNode {
     pub expanded: Option<bool>,
 
     // layout
-    #[serde(rename = "layout", default)]
-    pub layout: JSONLayoutMode,
+    #[serde(rename = "layout_mode", alias = "layout", default)]
+    pub layout_mode: JSONLayoutMode,
     // Flat padding properties
-    #[serde(rename = "padding_top", alias = "paddingTop", default)]
-    pub padding_top: f32,
-    #[serde(rename = "padding_right", alias = "paddingRight", default)]
-    pub padding_right: f32,
-    #[serde(rename = "padding_bottom", alias = "paddingBottom", default)]
-    pub padding_bottom: f32,
-    #[serde(rename = "padding_left", alias = "paddingLeft", default)]
-    pub padding_left: f32,
-    #[serde(rename = "direction", default)]
-    pub direction: JSONAxis,
+    #[serde(rename = "layout_padding_top", alias = "paddingTop", default)]
+    pub layout_padding_top: f32,
+    #[serde(rename = "layout_padding_right", alias = "paddingRight", default)]
+    pub layout_padding_right: f32,
+    #[serde(rename = "layout_padding_bottom", alias = "paddingBottom", default)]
+    pub layout_padding_bottom: f32,
+    #[serde(rename = "layout_padding_left", alias = "paddingLeft", default)]
+    pub layout_padding_left: f32,
+    #[serde(rename = "layout_direction", alias = "direction", default)]
+    pub layout_direction: JSONAxis,
     #[serde(rename = "layout_wrap", alias = "layoutWrap")]
     pub layout_wrap: Option<LayoutWrap>,
-    #[serde(rename = "main_axis_alignment", alias = "mainAxisAlignment")]
-    pub main_axis_alignment: Option<MainAxisAlignment>,
-    #[serde(rename = "cross_axis_alignment", alias = "crossAxisAlignment")]
-    pub cross_axis_alignment: Option<CrossAxisAlignment>,
-    #[serde(rename = "main_axis_gap", alias = "mainAxisGap", default)]
-    pub main_axis_gap: f32,
-    #[serde(rename = "cross_axis_gap", alias = "crossAxisGap", default)]
-    pub cross_axis_gap: f32,
+    #[serde(rename = "layout_main_axis_alignment", alias = "mainAxisAlignment")]
+    pub layout_main_axis_alignment: Option<MainAxisAlignment>,
+    #[serde(rename = "layout_cross_axis_alignment", alias = "crossAxisAlignment")]
+    pub layout_cross_axis_alignment: Option<CrossAxisAlignment>,
+    #[serde(rename = "layout_main_axis_gap", alias = "mainAxisGap", default)]
+    pub layout_main_axis_gap: f32,
+    #[serde(rename = "layout_cross_axis_gap", alias = "crossAxisGap", default)]
+    pub layout_cross_axis_gap: f32,
+    #[serde(
+        rename = "clips_content",
+        alias = "clipsContent",
+        default = "default_false"
+    )]
+    pub clips_content: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -978,7 +982,7 @@ pub struct JSONGroupNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JSONTextNode {
+pub struct JSONTextSpanNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
 
@@ -1205,6 +1209,9 @@ fn default_active() -> bool {
 fn default_locked() -> bool {
     false
 }
+fn default_false() -> bool {
+    false
+}
 fn default_opacity() -> f32 {
     1.0
 }
@@ -1226,8 +1233,8 @@ fn default_image_scale() -> f32 {
 impl From<JSONGroupNode> for GroupNodeRec {
     fn from(node: JSONGroupNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1264,10 +1271,10 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             active: node.base.active,
             rotation: node.base.rotation,
             position: json_position_to_layout_basis(
-                node.base.left,
-                node.base.top,
-                node.base.right,
-                node.base.bottom,
+                node.base.layout_inset_left,
+                node.base.layout_inset_top,
+                node.base.layout_inset_right,
+                node.base.layout_inset_bottom,
             ),
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,
@@ -1297,20 +1304,20 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                 node.base.fe_noises,
             ),
             // Children populated from links after conversion
-            clip: true,
+            clip: node.clips_content,
             mask: node.base.mask.map(|m| m.into()),
             layout_container: LayoutContainerStyle {
-                layout_mode: node.layout.into(),
-                layout_direction: node.direction.into(),
+                layout_mode: node.layout_mode.into(),
+                layout_direction: node.layout_direction.into(),
                 layout_wrap: node.layout_wrap,
-                layout_main_axis_alignment: node.main_axis_alignment,
-                layout_cross_axis_alignment: node.cross_axis_alignment,
+                layout_main_axis_alignment: node.layout_main_axis_alignment,
+                layout_cross_axis_alignment: node.layout_cross_axis_alignment,
                 layout_padding: {
                     let padding = EdgeInsets {
-                        top: node.padding_top,
-                        right: node.padding_right,
-                        bottom: node.padding_bottom,
-                        left: node.padding_left,
+                        top: node.layout_padding_top,
+                        right: node.layout_padding_right,
+                        bottom: node.layout_padding_bottom,
+                        left: node.layout_padding_left,
                     };
                     if padding.is_zero() {
                         None
@@ -1318,10 +1325,10 @@ impl From<JSONContainerNode> for ContainerNodeRec {
                         Some(padding)
                     }
                 },
-                layout_gap: if node.main_axis_gap > 0.0 || node.cross_axis_gap > 0.0 {
+                layout_gap: if node.layout_main_axis_gap > 0.0 || node.layout_cross_axis_gap > 0.0 {
                     Some(LayoutGap {
-                        main_axis_gap: node.main_axis_gap,
-                        cross_axis_gap: node.cross_axis_gap,
+                        main_axis_gap: node.layout_main_axis_gap,
+                        cross_axis_gap: node.layout_cross_axis_gap,
                     })
                 } else {
                     None
@@ -1339,7 +1346,7 @@ impl From<JSONContainerNode> for ContainerNodeRec {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1348,8 +1355,8 @@ impl From<JSONContainerNode> for ContainerNodeRec {
     }
 }
 
-impl From<JSONTextNode> for TextSpanNodeRec {
-    fn from(node: JSONTextNode) -> Self {
+impl From<JSONTextSpanNode> for TextSpanNodeRec {
+    fn from(node: JSONTextSpanNode) -> Self {
         // For text nodes, width can be Auto or fixed Length
         let width = match node.base.width {
             CSSDimension::Auto => None,
@@ -1364,8 +1371,8 @@ impl From<JSONTextNode> for TextSpanNodeRec {
         TextSpanNodeRec {
             active: node.base.active,
             transform: AffineTransform::from_box_center(
-                node.base.left.unwrap_or(0.0),
-                node.base.top.unwrap_or(0.0),
+                node.base.layout_inset_left.unwrap_or(0.0),
+                node.base.layout_inset_top.unwrap_or(0.0),
                 node.base.width.length(0.0),
                 node.base.height.length(0.0),
                 node.base.rotation,
@@ -1374,7 +1381,7 @@ impl From<JSONTextNode> for TextSpanNodeRec {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1448,8 +1455,8 @@ impl From<JSONEllipseNode> for Node {
         let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1488,7 +1495,7 @@ impl From<JSONEllipseNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1507,8 +1514,8 @@ impl From<JSONRectangleNode> for Node {
         let stroke_width: StrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1545,7 +1552,7 @@ impl From<JSONRectangleNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1567,8 +1574,8 @@ impl From<JSONImageNode> for Node {
         let stroke_width: StrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1654,7 +1661,7 @@ impl From<JSONImageNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1669,8 +1676,8 @@ impl From<JSONRegularPolygonNode> for Node {
         let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1712,7 +1719,7 @@ impl From<JSONRegularPolygonNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1727,8 +1734,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
         let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
 
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1771,7 +1778,7 @@ impl From<JSONRegularStarPolygonNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1783,8 +1790,8 @@ impl From<JSONRegularStarPolygonNode> for Node {
 impl From<JSONLineNode> for Node {
     fn from(node: JSONLineNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1816,7 +1823,7 @@ impl From<JSONLineNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1828,8 +1835,8 @@ impl From<JSONLineNode> for Node {
 impl From<JSONVectorNode> for Node {
     fn from(node: JSONVectorNode) -> Self {
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1872,7 +1879,7 @@ impl From<JSONVectorNode> for Node {
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
-                    .position
+                    .layout_positioning
                     .map(|position| position.into())
                     .unwrap_or_default(),
                 layout_grow: 0.0,
@@ -1888,8 +1895,8 @@ impl From<JSONBooleanOperationNode> for Node {
 
         // TODO: boolean operation's transform should be handled differently
         let transform = AffineTransform::from_box_center(
-            node.base.left.unwrap_or(0.0),
-            node.base.top.unwrap_or(0.0),
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
             node.base.width.length(0.0),
             node.base.height.length(0.0),
             node.base.rotation,
@@ -1933,7 +1940,7 @@ impl From<JSONNode> for Node {
         match node {
             JSONNode::Group(group) => Node::Group(group.into()),
             JSONNode::Container(container) => Node::Container(container.into()),
-            JSONNode::Text(text) => Node::TextSpan(text.into()),
+            JSONNode::TextSpan(text) => Node::TextSpan(text.into()),
             JSONNode::Vector(vector) => vector.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),
@@ -2103,12 +2110,12 @@ mod corner_radius_tests {
             "opacity": 1.0,
             "blend_mode": "normal",
             "z_index": 0,
-            "position": "absolute",
-            "left": 0,
-            "top": 0,
+            "layout_positioning": "absolute",
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "rotation": 0,
-            "width": 100,
-            "height": 50,
+            "layout_target_width": 100,
+            "layout_target_height": 50,
             "corner_radius": [12, 8, 4, 2]
         });
 
@@ -2145,17 +2152,17 @@ mod padding_tests {
             "opacity": 1.0,
             "blend_mode": "normal",
             "z_index": 0,
-            "position": "absolute",
-            "left": 0,
-            "top": 0,
+            "layout_positioning": "absolute",
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "rotation": 0,
-            "width": 200,
-            "height": 200,
-            "padding_top": 10.0,
-            "padding_right": 15.0,
-            "padding_bottom": 20.0,
-            "padding_left": 25.0,
-            "layout": "flex"
+            "layout_target_width": 200,
+            "layout_target_height": 200,
+            "layout_padding_top": 10.0,
+            "layout_padding_right": 15.0,
+            "layout_padding_bottom": 20.0,
+            "layout_padding_left": 25.0,
+            "layout_mode": "flex"
         });
 
         let container: JSONContainerNode = serde_json::from_value(json).unwrap();
@@ -2180,15 +2187,15 @@ mod padding_tests {
             "opacity": 1.0,
             "blend_mode": "normal",
             "z_index": 0,
-            "position": "absolute",
-            "left": 0,
-            "top": 0,
+            "layout_positioning": "absolute",
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "rotation": 0,
-            "width": 200,
-            "height": 200,
-            "padding_top": 10.0,
-            "padding_left": 20.0,
-            "layout": "flex"
+            "layout_target_width": 200,
+            "layout_target_height": 200,
+            "layout_padding_top": 10.0,
+            "layout_padding_left": 20.0,
+            "layout_mode": "flex"
         });
 
         let container: JSONContainerNode = serde_json::from_value(json).unwrap();
@@ -2212,13 +2219,13 @@ mod padding_tests {
             "opacity": 1.0,
             "blend_mode": "normal",
             "z_index": 0,
-            "position": "absolute",
-            "left": 0,
-            "top": 0,
+            "layout_positioning": "absolute",
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "rotation": 0,
-            "width": 200,
-            "height": 200,
-            "layout": "flex"
+            "layout_target_width": 200,
+            "layout_target_height": 200,
+            "layout_mode": "flex"
         });
 
         let container: JSONContainerNode = serde_json::from_value(json).unwrap();
@@ -2371,10 +2378,10 @@ mod tests {
             "name": "Boolean Operation",
             "type": "boolean",
             "op": "union",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 200.0,
-            "height": 200.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 200.0,
             "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
         }"#;
 
@@ -2389,8 +2396,8 @@ mod tests {
                     Some("Boolean Operation".to_string())
                 );
                 assert_eq!(boolean_node.op, BooleanPathOperation::Union);
-                assert_eq!(boolean_node.base.left, Some(100.0));
-                assert_eq!(boolean_node.base.top, Some(100.0));
+                assert_eq!(boolean_node.base.layout_inset_left, Some(100.0));
+                assert_eq!(boolean_node.base.layout_inset_top, Some(100.0));
                 assert_eq!(boolean_node.base.width, CSSDimension::LengthPX(200.0));
                 assert_eq!(boolean_node.base.height, CSSDimension::LengthPX(200.0));
             }
@@ -2500,19 +2507,19 @@ mod tests {
         let json_text_auto = r#"{
             "id": "text-1",
             "name": "Auto Width Text",
-            "type": "text",
+            "type": "tspan",
             "text": "Hello World",
-            "left": 100.0,
-            "top": 100.0,
-            "width": "auto",
-            "height": "auto"
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": "auto",
+            "layout_target_height": "auto"
         }"#;
 
         let text_node: JSONNode =
             serde_json::from_str(json_text_auto).expect("failed to deserialize text node");
 
         match text_node {
-            JSONNode::Text(text) => {
+            JSONNode::TextSpan(text) => {
                 assert_eq!(text.base.width, CSSDimension::Auto);
                 assert_eq!(text.base.height, CSSDimension::Auto);
             }
@@ -2523,19 +2530,19 @@ mod tests {
         let json_text_fixed = r#"{
             "id": "text-2",
             "name": "Fixed Width Text",
-            "type": "text",
+            "type": "tspan",
             "text": "Hello World",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 200.0,
-            "height": "auto"
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": "auto"
         }"#;
 
         let text_node_fixed: JSONNode = serde_json::from_str(json_text_fixed)
             .expect("failed to deserialize text node with fixed width");
 
         match text_node_fixed {
-            JSONNode::Text(text) => {
+            JSONNode::TextSpan(text) => {
                 assert_eq!(text.base.width, CSSDimension::LengthPX(200.0));
                 assert_eq!(text.base.height, CSSDimension::Auto);
             }
@@ -2547,10 +2554,10 @@ mod tests {
             "id": "rect-1",
             "name": "Auto Width Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
-            "width": "auto",
-            "height": "auto",
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": "auto",
+            "layout_target_height": "auto",
             "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
         }"#;
 
@@ -2572,15 +2579,15 @@ mod tests {
         // Test "auto" case
         let json_auto = r#"{
             "id": "text-1",
-            "type": "text",
+            "type": "tspan",
             "text": "Test",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "font_optical_sizing": "auto"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_auto).expect("Failed to parse 'auto'");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
         } else {
             panic!("Expected Text node");
@@ -2589,15 +2596,15 @@ mod tests {
         // Test "none" case
         let json_none = r#"{
             "id": "text-2",
-            "type": "text",
+            "type": "tspan",
             "text": "Test",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "font_optical_sizing": "none"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_none).expect("Failed to parse 'none'");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::None));
         } else {
             panic!("Expected Text node");
@@ -2606,15 +2613,15 @@ mod tests {
         // Test numeric case
         let json_fixed = r#"{
             "id": "text-3",
-            "type": "text",
+            "type": "tspan",
             "text": "Test",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "font_optical_sizing": 16.5
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_fixed).expect("Failed to parse numeric");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             match text.font_optical_sizing {
                 FontOpticalSizing::Fixed(value) => assert_eq!(value, 16.5),
                 _ => panic!("Expected Fixed variant"),
@@ -2626,15 +2633,15 @@ mod tests {
         // Test invalid string fallback to Auto (via serde default)
         let json_invalid = r#"{
             "id": "text-4",
-            "type": "text",
+            "type": "tspan",
             "text": "Test",
-            "left": 0,
-            "top": 0,
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
             "font_optical_sizing": "invalid_value"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json_invalid).expect("Failed to parse invalid");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
         } else {
             panic!("Expected Text node");
@@ -2647,16 +2654,16 @@ mod tests {
         let json_none = r#"{
             "id": "text-1",
             "name": "text",
-            "type": "text",
+            "type": "tspan",
             "text": "Text",
-            "left": 100,
-            "top": 100,
+            "layout_inset_left": 100,
+            "layout_inset_top": 100,
             "font_optical_sizing": "none"
         }"#;
 
         let node: JSONNode =
             serde_json::from_str(json_none).expect("Failed to parse 'none' variant");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::None));
         } else {
             panic!("Expected Text node");
@@ -2666,16 +2673,16 @@ mod tests {
         let json_fixed = r#"{
             "id": "text-2",
             "name": "text",
-            "type": "text",
+            "type": "tspan",
             "text": "Text",
-            "left": 100,
-            "top": 100,
+            "layout_inset_left": 100,
+            "layout_inset_top": 100,
             "font_optical_sizing": 16.5
         }"#;
 
         let node: JSONNode =
             serde_json::from_str(json_fixed).expect("Failed to parse numeric variant");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             match text.font_optical_sizing {
                 FontOpticalSizing::Fixed(value) => assert_eq!(value, 16.5),
                 _ => panic!("Expected Fixed variant"),
@@ -2688,15 +2695,15 @@ mod tests {
         let json_default = r#"{
             "id": "text-3",
             "name": "text",
-            "type": "text",
+            "type": "tspan",
             "text": "Text",
-            "left": 100,
-            "top": 100
+            "layout_inset_left": 100,
+            "layout_inset_top": 100
         }"#;
 
         let node: JSONNode =
             serde_json::from_str(json_default).expect("Failed to parse default variant");
-        if let JSONNode::Text(text) = node {
+        if let JSONNode::TextSpan(text) = node {
             assert!(matches!(text.font_optical_sizing, FontOpticalSizing::Auto));
         } else {
             panic!("Expected Text node");
@@ -2824,10 +2831,10 @@ mod tests {
             "id": "rect-pt",
             "name": "PassThrough Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "blend_mode": "pass-through"
         }"#;
 
@@ -2850,10 +2857,10 @@ mod tests {
             "id": "rect-normal",
             "name": "Normal Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "blend_mode": "normal"
         }"#;
 
@@ -2890,10 +2897,10 @@ mod tests {
             "id": "rect-multiply",
             "name": "Multiply Blend Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "blend_mode": "multiply"
         }"#;
 
@@ -2935,10 +2942,10 @@ mod tests {
             "id": "rect-geometry-mask",
             "name": "Geometry Mask Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "mask": "geometry"
         }"#;
 
@@ -2958,10 +2965,10 @@ mod tests {
             "id": "rect-alpha-mask",
             "name": "Alpha Mask Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "mask": "alpha"
         }"#;
 
@@ -2981,10 +2988,10 @@ mod tests {
             "id": "rect-luminance-mask",
             "name": "Luminance Mask Rect",
             "type": "rectangle",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 100.0,
-            "height": 100.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
             "mask": "luminance"
         }"#;
 
@@ -3084,7 +3091,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.89.0-beta+20251219",
+            "version": "0.90.0-beta+20260108",
             "document": {
                 "nodes": {
                     "main": {
@@ -3102,10 +3109,10 @@ mod tests {
                         "id": "rect1",
                         "name": "Rectangle",
                         "type": "rectangle",
-                        "left": 100,
-                        "top": 100,
-                        "width": 200,
-                        "height": 150
+                        "layout_inset_left": 100,
+                        "layout_inset_top": 100,
+                        "layout_target_width": 200,
+                        "layout_target_height": 150
                     }
                 },
                 "links": {
@@ -3141,7 +3148,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.89.0-beta+20251219",
+            "version": "0.90.0-beta+20260108",
             "document": {
                 "nodes": {
                     "main": {
@@ -3159,19 +3166,19 @@ mod tests {
                         "id": "container1",
                         "name": "Container",
                         "type": "container",
-                        "left": 0,
-                        "top": 0,
-                        "width": 500,
-                        "height": 500
+                        "layout_inset_left": 0,
+                        "layout_inset_top": 0,
+                        "layout_target_width": 500,
+                        "layout_target_height": 500
                     },
                     "rect1": {
                         "id": "rect1",
                         "name": "Rectangle",
                         "type": "rectangle",
-                        "left": 10,
-                        "top": 10,
-                        "width": 100,
-                        "height": 100
+                        "layout_inset_left": 10,
+                        "layout_inset_top": 10,
+                        "layout_target_width": 100,
+                        "layout_target_height": 100
                     }
                 },
                 "links": {
@@ -3208,7 +3215,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.89.0-beta+20251219",
+            "version": "0.90.0-beta+20260108",
             "document": {
                 "nodes": {
                     "main": {
@@ -3226,28 +3233,28 @@ mod tests {
                         "id": "container1",
                         "name": "Container 1",
                         "type": "container",
-                        "left": 0,
-                        "top": 0,
-                        "width": 500,
-                        "height": 500
+                        "layout_inset_left": 0,
+                        "layout_inset_top": 0,
+                        "layout_target_width": 500,
+                        "layout_target_height": 500
                     },
                     "container2": {
                         "id": "container2",
                         "name": "Container 2",
                         "type": "container",
-                        "left": 10,
-                        "top": 10,
-                        "width": 400,
-                        "height": 400
+                        "layout_inset_left": 10,
+                        "layout_inset_top": 10,
+                        "layout_target_width": 400,
+                        "layout_target_height": 400
                     },
                     "rect1": {
                         "id": "rect1",
                         "name": "Rectangle",
                         "type": "rectangle",
-                        "left": 20,
-                        "top": 20,
-                        "width": 100,
-                        "height": 100
+                        "layout_inset_left": 20,
+                        "layout_inset_top": 20,
+                        "layout_target_width": 100,
+                        "layout_target_height": 100
                     }
                 },
                 "links": {
@@ -3357,10 +3364,10 @@ mod tests {
             "id": "rect-1",
             "name": "Blurred Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 200.0,
-            "height": 200.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 200.0,
             "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
@@ -3398,10 +3405,10 @@ mod tests {
             "id": "rect-2",
             "name": "Progressive Blur Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 200.0,
-            "height": 400.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 400.0,
             "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
@@ -3450,10 +3457,10 @@ mod tests {
             "id": "rect-3",
             "name": "Backdrop Blur Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 200.0,
-            "height": 200.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 200.0,
             "fe_backdrop_blur": {
                 "type": "backdrop-filter-blur",
                 "blur": {
@@ -3491,10 +3498,10 @@ mod tests {
             "id": "rect-4",
             "name": "Progressive Backdrop Blur Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 200.0,
-            "height": 300.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 300.0,
             "fe_backdrop_blur": {
                 "type": "backdrop-filter-blur",
                 "blur": {
@@ -3542,12 +3549,12 @@ mod tests {
         let json = r#"{
             "id": "text-1",
             "name": "Blurred Text",
-            "type": "text",
+            "type": "tspan",
             "text": "Hello World",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 200.0,
-            "height": "auto",
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": "auto",
             "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
@@ -3561,7 +3568,7 @@ mod tests {
             serde_json::from_str(json).expect("failed to deserialize text with blur");
 
         match node {
-            JSONNode::Text(text) => {
+            JSONNode::TextSpan(text) => {
                 let converted: TextSpanNodeRec = text.into();
                 assert!(converted.effects.blur.is_some());
                 match &converted.effects.blur.as_ref().unwrap().blur {
@@ -3646,10 +3653,10 @@ mod tests {
             "id": "container-1",
             "name": "Container with Blurs",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 300.0,
-            "height": 400.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 300.0,
+            "layout_target_height": 400.0,
             "fe_blur": {
                 "type": "filter-blur",
                 "blur": {
@@ -3711,12 +3718,12 @@ mod tests {
             "id": "container-layout",
             "name": "Container with Layout",
             "type": "container",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 400.0,
-            "height": 300.0,
-            "layout": "flex",
-            "direction": "vertical"
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
+            "layout_mode": "flex",
+            "layout_direction": "vertical"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3725,8 +3732,8 @@ mod tests {
         match node {
             JSONNode::Container(container) => {
                 // Verify typed enums
-                assert!(matches!(container.layout, JSONLayoutMode::Flex));
-                assert!(matches!(container.direction, JSONAxis::Vertical));
+                assert!(matches!(container.layout_mode, JSONLayoutMode::Flex));
+                assert!(matches!(container.layout_direction, JSONAxis::Vertical));
 
                 // Verify conversion
                 let converted: ContainerNodeRec = container.into();
@@ -3750,14 +3757,14 @@ mod tests {
             "id": "container-aligned",
             "name": "Container with Alignments",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 600.0,
-            "height": 400.0,
-            "layout": "flex",
-            "direction": "horizontal",
-            "main_axis_alignment": "space-between",
-            "cross_axis_alignment": "center"
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 600.0,
+            "layout_target_height": 400.0,
+            "layout_mode": "flex",
+            "layout_direction": "horizontal",
+            "layout_main_axis_alignment": "space-between",
+            "layout_cross_axis_alignment": "center"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3767,11 +3774,11 @@ mod tests {
             JSONNode::Container(container) => {
                 // Verify typed enums
                 assert!(matches!(
-                    container.main_axis_alignment,
+                    container.layout_main_axis_alignment,
                     Some(MainAxisAlignment::SpaceBetween)
                 ));
                 assert!(matches!(
-                    container.cross_axis_alignment,
+                    container.layout_cross_axis_alignment,
                     Some(CrossAxisAlignment::Center)
                 ));
 
@@ -3797,15 +3804,15 @@ mod tests {
             "id": "container-padded",
             "name": "Container with Padding",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 400.0,
-            "height": 300.0,
-            "layout": "flex",
-            "padding_top": 20.0,
-            "padding_right": 20.0,
-            "padding_bottom": 20.0,
-            "padding_left": 20.0
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
+            "layout_mode": "flex",
+            "layout_padding_top": 20.0,
+            "layout_padding_right": 20.0,
+            "layout_padding_bottom": 20.0,
+            "layout_padding_left": 20.0
         }"#;
 
         let node: JSONNode =
@@ -3814,10 +3821,10 @@ mod tests {
         match node {
             JSONNode::Container(container) => {
                 // Verify padding fields
-                assert_eq!(container.padding_top, 20.0);
-                assert_eq!(container.padding_right, 20.0);
-                assert_eq!(container.padding_bottom, 20.0);
-                assert_eq!(container.padding_left, 20.0);
+                assert_eq!(container.layout_padding_top, 20.0);
+                assert_eq!(container.layout_padding_right, 20.0);
+                assert_eq!(container.layout_padding_bottom, 20.0);
+                assert_eq!(container.layout_padding_left, 20.0);
 
                 // Verify conversion to EdgeInsets
                 let converted: ContainerNodeRec = container.into();
@@ -3840,18 +3847,18 @@ mod tests {
             "id": "container-complete",
             "name": "Complete Layout Container",
             "type": "container",
-            "left": 50.0,
-            "top": 50.0,
-            "width": 500.0,
-            "height": 400.0,
-            "layout": "flex",
-            "direction": "vertical",
-            "padding_top": 15.0,
-            "padding_right": 15.0,
-            "padding_bottom": 15.0,
-            "padding_left": 15.0,
-            "main_axis_alignment": "center",
-            "cross_axis_alignment": "stretch"
+            "layout_inset_left": 50.0,
+            "layout_inset_top": 50.0,
+            "layout_target_width": 500.0,
+            "layout_target_height": 400.0,
+            "layout_mode": "flex",
+            "layout_direction": "vertical",
+            "layout_padding_top": 15.0,
+            "layout_padding_right": 15.0,
+            "layout_padding_bottom": 15.0,
+            "layout_padding_left": 15.0,
+            "layout_main_axis_alignment": "center",
+            "layout_cross_axis_alignment": "stretch"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -3860,18 +3867,18 @@ mod tests {
         match node {
             JSONNode::Container(container) => {
                 // Verify all properties
-                assert!(matches!(container.layout, JSONLayoutMode::Flex));
-                assert!(matches!(container.direction, JSONAxis::Vertical));
-                assert_eq!(container.padding_top, 15.0);
-                assert_eq!(container.padding_right, 15.0);
-                assert_eq!(container.padding_bottom, 15.0);
-                assert_eq!(container.padding_left, 15.0);
+                assert!(matches!(container.layout_mode, JSONLayoutMode::Flex));
+                assert!(matches!(container.layout_direction, JSONAxis::Vertical));
+                assert_eq!(container.layout_padding_top, 15.0);
+                assert_eq!(container.layout_padding_right, 15.0);
+                assert_eq!(container.layout_padding_bottom, 15.0);
+                assert_eq!(container.layout_padding_left, 15.0);
                 assert!(matches!(
-                    container.main_axis_alignment,
+                    container.layout_main_axis_alignment,
                     Some(MainAxisAlignment::Center)
                 ));
                 assert!(matches!(
-                    container.cross_axis_alignment,
+                    container.layout_cross_axis_alignment,
                     Some(CrossAxisAlignment::Stretch)
                 ));
 
@@ -3904,13 +3911,13 @@ mod tests {
             "id": "container-gap",
             "name": "Container with Gap",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 400.0,
-            "height": 300.0,
-            "layout": "flex",
-            "main_axis_gap": 20.0,
-            "cross_axis_gap": 10.0
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
+            "layout_mode": "flex",
+            "layout_main_axis_gap": 20.0,
+            "layout_cross_axis_gap": 10.0
         }"#;
 
         let node: JSONNode =
@@ -3919,8 +3926,8 @@ mod tests {
         match node {
             JSONNode::Container(container) => {
                 // Verify gap fields (non-optional now)
-                assert_eq!(container.main_axis_gap, 20.0);
-                assert_eq!(container.cross_axis_gap, 10.0);
+                assert_eq!(container.layout_main_axis_gap, 20.0);
+                assert_eq!(container.layout_cross_axis_gap, 10.0);
 
                 // Verify conversion to LayoutGap
                 let converted: ContainerNodeRec = container.into();
@@ -3941,11 +3948,11 @@ mod tests {
             "id": "container-wrap",
             "name": "Container with Wrap",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 400.0,
-            "height": 300.0,
-            "layout": "flex",
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
+            "layout_mode": "flex",
             "layout_wrap": "wrap"
         }"#;
 
@@ -3970,11 +3977,11 @@ mod tests {
             "id": "container-nowrap",
             "name": "Container with NoWrap",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 400.0,
-            "height": 300.0,
-            "layout": "flex",
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 400.0,
+            "layout_target_height": 300.0,
+            "layout_mode": "flex",
             "layout_wrap": "nowrap"
         }"#;
 
@@ -4001,10 +4008,10 @@ mod tests {
             "id": "rect-smooth",
             "name": "Smooth Rectangle",
             "type": "rectangle",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 200.0,
-            "height": 200.0,
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 200.0,
+            "layout_target_height": 200.0,
             "corner_radius": 50.0,
             "corner_smoothing": 0.6
         }"#;
@@ -4033,10 +4040,10 @@ mod tests {
             "id": "container-smooth",
             "name": "Smooth Container",
             "type": "container",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 300.0,
-            "height": 300.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 300.0,
+            "layout_target_height": 300.0,
             "corner_radius": 40.0,
             "corner_smoothing": 1.0
         }"#;
@@ -4062,10 +4069,10 @@ mod tests {
             "name": "Smooth Image",
             "type": "image",
             "src": "test.png",
-            "left": 0.0,
-            "top": 0.0,
-            "width": 250.0,
-            "height": 250.0,
+            "layout_inset_left": 0.0,
+            "layout_inset_top": 0.0,
+            "layout_target_width": 250.0,
+            "layout_target_height": 250.0,
             "corner_radius": 30.0,
             "corner_smoothing": 0.8
         }"#;
@@ -4095,21 +4102,21 @@ mod tests {
             "id": "container-all",
             "name": "All Layout Properties",
             "type": "container",
-            "left": 100.0,
-            "top": 100.0,
-            "width": 600.0,
-            "height": 500.0,
-            "layout": "flex",
-            "direction": "horizontal",
+            "layout_inset_left": 100.0,
+            "layout_inset_top": 100.0,
+            "layout_target_width": 600.0,
+            "layout_target_height": 500.0,
+            "layout_mode": "flex",
+            "layout_direction": "horizontal",
             "layout_wrap": "wrap",
-            "padding_top": 20.0,
-            "padding_right": 20.0,
-            "padding_bottom": 20.0,
-            "padding_left": 20.0,
-            "main_axis_gap": 30.0,
-            "cross_axis_gap": 15.0,
-            "main_axis_alignment": "space-between",
-            "cross_axis_alignment": "center"
+            "layout_padding_top": 20.0,
+            "layout_padding_right": 20.0,
+            "layout_padding_bottom": 20.0,
+            "layout_padding_left": 20.0,
+            "layout_main_axis_gap": 30.0,
+            "layout_cross_axis_gap": 15.0,
+            "layout_main_axis_alignment": "space-between",
+            "layout_cross_axis_alignment": "center"
         }"#;
 
         let node: JSONNode = serde_json::from_str(json)
@@ -4118,21 +4125,21 @@ mod tests {
         match node {
             JSONNode::Container(container) => {
                 // Verify all properties
-                assert!(matches!(container.layout, JSONLayoutMode::Flex));
-                assert!(matches!(container.direction, JSONAxis::Horizontal));
+                assert!(matches!(container.layout_mode, JSONLayoutMode::Flex));
+                assert!(matches!(container.layout_direction, JSONAxis::Horizontal));
                 assert!(matches!(container.layout_wrap, Some(LayoutWrap::Wrap)));
-                assert_eq!(container.padding_top, 20.0);
-                assert_eq!(container.padding_right, 20.0);
-                assert_eq!(container.padding_bottom, 20.0);
-                assert_eq!(container.padding_left, 20.0);
-                assert_eq!(container.main_axis_gap, 30.0);
-                assert_eq!(container.cross_axis_gap, 15.0);
+                assert_eq!(container.layout_padding_top, 20.0);
+                assert_eq!(container.layout_padding_right, 20.0);
+                assert_eq!(container.layout_padding_bottom, 20.0);
+                assert_eq!(container.layout_padding_left, 20.0);
+                assert_eq!(container.layout_main_axis_gap, 30.0);
+                assert_eq!(container.layout_cross_axis_gap, 15.0);
                 assert!(matches!(
-                    container.main_axis_alignment,
+                    container.layout_main_axis_alignment,
                     Some(MainAxisAlignment::SpaceBetween)
                 ));
                 assert!(matches!(
-                    container.cross_axis_alignment,
+                    container.layout_cross_axis_alignment,
                     Some(CrossAxisAlignment::Center)
                 ));
 

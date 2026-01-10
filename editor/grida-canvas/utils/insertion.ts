@@ -1,5 +1,6 @@
 import cmath from "@grida/cmath";
-import type grida from "@grida/schema";
+import grida from "@grida/schema";
+import { css } from "@/grida-canvas-utils/css";
 
 /**
  * Computes the axis-aligned bounding rectangle of a packed scene document.
@@ -10,6 +11,9 @@ import type grida from "@grida/schema";
  *
  * @param sub - Packed scene document whose children will be measured.
  * @returns Bounding rectangle covering all top-level children of `sub`.
+ *
+ * TODO: this fails to report accurate bounds if the root size is relative.
+ * instead, we should make the bounds to be included within the packed document (while exporting or copying)
  */
 export function getPackedSubtreeBoundingRect(
   sub: grida.program.document.IPackedSceneDocument
@@ -18,15 +22,17 @@ export function getPackedSubtreeBoundingRect(
   for (const node_id of sub.scene.children_refs) {
     const node = sub.nodes[node_id];
     const r: cmath.Rectangle = {
-      x: "left" in node ? (node.left ?? 0) : 0,
-      y: "top" in node ? (node.top ?? 0) : 0,
+      x: "layout_inset_left" in node ? (node.layout_inset_left ?? 0) : 0,
+      y: "layout_inset_top" in node ? (node.layout_inset_top ?? 0) : 0,
       width:
-        "width" in node ? (typeof node.width === "number" ? node.width : 0) : 0,
+        grida.program.nodes.hasLayoutWidth(node) &&
+        node.layout_target_width !== undefined
+          ? css.toPxNumber(node.layout_target_width)
+          : 0,
       height:
-        "height" in node
-          ? typeof node.height === "number"
-            ? node.height
-            : 0
+        grida.program.nodes.hasLayoutHeight(node) &&
+        node.layout_target_height !== undefined
+          ? css.toPxNumber(node.layout_target_height)
           : 0,
     };
     bb = bb ? cmath.rect.union([bb, r]) : r;

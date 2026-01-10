@@ -60,20 +60,20 @@ The schema defines over 50 node types, including:
 
 Properties we've analyzed and documented from the Kiwi schema:
 
-| Property                        | Type                              | Location                                   | Purpose                                | Usage                                                                                 |
-| ------------------------------- | --------------------------------- | ------------------------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------- |
-| `parentIndex`                   | `ParentIndex`                     | `NodeChange.parentIndex`                   | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering)     |
-| `parentIndex.position`          | `string`                          | `ParentIndex.position`                     | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                     |
-| `sortPosition`                  | `string?`                         | `NodeChange.sortPosition`                  | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types              |
-| `frameMaskDisabled`             | `boolean?`                        | `NodeChange.frameMaskDisabled`             | Frame clipping mask setting            | `false` for GROUP-originated FRAMEs, `true` for real FRAMEs                           |
-| `resizeToFit`                   | `boolean?`                        | `NodeChange.resizeToFit`                   | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                       |
-| `fillPaints`                    | `Paint[]?`                        | `NodeChange.fillPaints`                    | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)            |
-| `strokePaints`                  | `Paint[]?`                        | `NodeChange.strokePaints`                  | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)            |
-| `backgroundPaints`              | `Paint[]?`                        | `NodeChange.backgroundPaints`              | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)            |
-| `isStateGroup`                  | `boolean?`                        | `NodeChange.isStateGroup`                  | Indicates state group/component set    | `true` for component set FRAMEs, `undefined` for regular FRAMEs                       |
-| `componentPropDefs`             | `ComponentPropDef[]?`             | `NodeChange.componentPropDefs`             | Component property definitions         | Present on component set FRAMEs, defines variant properties                           |
-| `stateGroupPropertyValueOrders` | `StateGroupPropertyValueOrder[]?` | `NodeChange.stateGroupPropertyValueOrders` | Variant property value orders          | Present on component set FRAMEs, defines order of variant values                      |
-| `variantPropSpecs`              | `VariantPropSpec[]?`              | `NodeChange.variantPropSpecs`              | Variant property specifications        | Present on SYMBOL nodes that are part of component sets, absent on standalone SYMBOLs |
+| Property                        | Type                              | Location                                   | Purpose                                | Usage                                                                                                                                                                                                   |
+| ------------------------------- | --------------------------------- | ------------------------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parentIndex`                   | `ParentIndex`                     | `NodeChange.parentIndex`                   | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering)                                                                                                                       |
+| `parentIndex.position`          | `string`                          | `ParentIndex.position`                     | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                                                                                                                                       |
+| `sortPosition`                  | `string?`                         | `NodeChange.sortPosition`                  | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types                                                                                                                                |
+| `frameMaskDisabled`             | `boolean?`                        | `NodeChange.frameMaskDisabled`             | Frame clipping mask setting            | `true` = clipping disabled (no clip), `false` = clipping enabled (with clip), `undefined` = default (clipping enabled). `false` for GROUP-originated FRAMEs, `true` for regular FRAMEs without clipping |
+| `resizeToFit`                   | `boolean?`                        | `NodeChange.resizeToFit`                   | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                                                                                                                                         |
+| `fillPaints`                    | `Paint[]?`                        | `NodeChange.fillPaints`                    | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
+| `strokePaints`                  | `Paint[]?`                        | `NodeChange.strokePaints`                  | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
+| `backgroundPaints`              | `Paint[]?`                        | `NodeChange.backgroundPaints`              | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
+| `isStateGroup`                  | `boolean?`                        | `NodeChange.isStateGroup`                  | Indicates state group/component set    | `true` for component set FRAMEs, `undefined` for regular FRAMEs                                                                                                                                         |
+| `componentPropDefs`             | `ComponentPropDef[]?`             | `NodeChange.componentPropDefs`             | Component property definitions         | Present on component set FRAMEs, defines variant properties                                                                                                                                             |
+| `stateGroupPropertyValueOrders` | `StateGroupPropertyValueOrder[]?` | `NodeChange.stateGroupPropertyValueOrders` | Variant property value orders          | Present on component set FRAMEs, defines order of variant values                                                                                                                                        |
+| `variantPropSpecs`              | `VariantPropSpec[]?`              | `NodeChange.variantPropSpecs`              | Variant property specifications        | Present on SYMBOL nodes that are part of component sets, absent on standalone SYMBOLs                                                                                                                   |
 
 ### parentIndex
 
@@ -148,6 +148,21 @@ const sortedChildren = children.sort((a, b) => {
 | `fillPaints`        | May exist   | `undefined` or `[]`    | ✅ Safety check      |
 | `strokePaints`      | May exist   | `undefined` or `[]`    | ✅ Safety check      |
 | `backgroundPaints`  | May exist   | `undefined` or `[]`    | ✅ Safety check      |
+
+**Note on `frameMaskDisabled` semantics:**
+
+- `frameMaskDisabled: true` = clipping is **disabled** (no clip)
+- `frameMaskDisabled: false` = clipping is **enabled** (with clip)
+- `frameMaskDisabled: undefined` = default behavior (clipping **enabled**)
+
+**Observed values:**
+
+- Regular FRAMEs (without clipping) typically have `frameMaskDisabled: true` (clipping disabled)
+- FRAMEs with clipping enabled have `frameMaskDisabled: false` (clipping enabled)
+- GROUP-originated FRAMEs have `frameMaskDisabled: false` (but can be distinguished by `resizeToFit: true` and lack of paints)
+- When `frameMaskDisabled` is `undefined`, the default behavior is clipping **enabled** (maps to `clipsContent: true`)
+
+**Note:** The property name is counterintuitive - `frameMaskDisabled: true` means the mask (clipping) is disabled, not that the frame is disabled.
 
 **Detection Logic:**
 

@@ -54,7 +54,7 @@ function createLayoutSnapshot(
   );
 
   const is_group_flex_container =
-    parent && parent.type === "container" && parent.layout === "flex";
+    parent && parent.type === "container" && parent.layout_mode === "flex";
 
   if (is_group_flex_container) {
     return {
@@ -128,7 +128,7 @@ export function __self_try_enter_content_edit_mode_vector(
   context: ReducerContext
 ) {
   const node = dq.__getNodeById(draft, node_id);
-  const nodeSnapshot: grida.program.nodes.UnknwonNode = JSON.parse(
+  const nodeSnapshot: grida.program.nodes.UnknownNode = JSON.parse(
     JSON.stringify(node)
   );
 
@@ -199,7 +199,7 @@ function __has_image_paint(
   paintTarget: "fill" | "stroke";
   paintIndex: number;
 } | null {
-  if (node.type === "text") return null;
+  if (node.type === "tspan") return null;
 
   switch (paint_target) {
     case "fill": {
@@ -260,7 +260,7 @@ function __self_try_enter_content_edit_mode_auto(
   const node = dq.__getNodeById(draft, node_id);
 
   switch (node.type) {
-    case "text": {
+    case "tspan": {
       // the text node should have a string literal value assigned (we don't support props editing via surface)
       if (typeof node.text !== "string") return;
 
@@ -332,8 +332,8 @@ function __try_restore_vector_mode_original_node(
     // TODO: need to implement this by having the initial xy position and comparing that diff.
     // // while the vector data itself is not changed, the position of the node may have been changed. - keep that.
     // // this happens when translating the node, by dragging the region. - when even the data is translated, it's 0,0 relative, so the data itself may be identical.
-    // left: current.left,
-    // top: current.top,
+    // layout_inset_left: current.layout_inset_left,
+    // layout_inset_top: current.layout_inset_top,
   } as grida.program.nodes.Node;
   //
 }
@@ -375,7 +375,7 @@ function __self_before_exit_content_edit_mode(
       const current = dq.__getNodeById(
         draft,
         mode.node_id
-      ) as grida.program.nodes.TextNode;
+      ) as grida.program.nodes.TextSpanNode;
       // when text is empty, remove that. - (when perfectly empty)
       if (typeof current.text === "string" && current.text === "") {
         self_try_remove_node(draft, mode.node_id);
@@ -601,7 +601,7 @@ function __self_start_gesture(
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
-        initial_position: [node.left!, node.top!],
+        initial_position: [node.layout_inset_left!, node.layout_inset_top!],
         initial_absolute_position: absolute_position,
       };
       break;
@@ -630,7 +630,7 @@ function __self_start_gesture(
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
-        initial_position: [node.left!, node.top!],
+        initial_position: [node.layout_inset_left!, node.layout_inset_top!],
         initial_absolute_position: absolute_position,
       };
       break;
@@ -668,8 +668,8 @@ function __self_start_gesture(
         // Get absolute vertices (similar to useVariableWithEditor)
         const vne = new vn.VectorNetworkEditor(node.vector_network);
         const absolute_vertices = vne.getVerticesAbsolute([
-          node.left!,
-          node.top!,
+          node.layout_inset_left!,
+          node.layout_inset_top!,
         ]);
 
         const a = absolute_vertices[segment.a];
@@ -692,7 +692,7 @@ function __self_start_gesture(
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
-        initial_position: [node.left!, node.top!],
+        initial_position: [node.layout_inset_left!, node.layout_inset_top!],
         initial_absolute_position: absolute_position,
         initial_angle: initial_angle,
         initial_curve_position: curve_position,
@@ -793,11 +793,11 @@ function __self_start_gesture(
         // assert the selection to be a flex container
         const node = dq.__getNodeById(draft, selection);
         assert(
-          node.type === "container" && node.layout === "flex",
+          node.type === "container" && node.layout_mode === "flex",
           "the selection is not a flex container"
         );
         // (we only support main axis gap for now) - ignoring the input axis.
-        const { direction, main_axis_gap } = node;
+        const { layout_direction: direction, layout_main_axis_gap } = node;
 
         const children = dq.getChildren(draft.document_ctx, selection);
 
@@ -813,8 +813,8 @@ function __self_start_gesture(
           axis: direction === "horizontal" ? "x" : "y",
           layout,
           min_gap: 0,
-          initial_gap: main_axis_gap,
-          gap: main_axis_gap,
+          initial_gap: layout_main_axis_gap,
+          gap: layout_main_axis_gap,
           movement: cmath.vector2.zero,
           first: cmath.vector2.zero,
           last: cmath.vector2.zero,
@@ -838,16 +838,16 @@ function __self_start_gesture(
 
       switch (side) {
         case "top":
-          currentValue = container.padding_top ?? 0;
+          currentValue = container.layout_padding_top ?? 0;
           break;
         case "right":
-          currentValue = container.padding_right ?? 0;
+          currentValue = container.layout_padding_right ?? 0;
           break;
         case "bottom":
-          currentValue = container.padding_bottom ?? 0;
+          currentValue = container.layout_padding_bottom ?? 0;
           break;
         case "left":
-          currentValue = container.padding_left ?? 0;
+          currentValue = container.layout_padding_left ?? 0;
           break;
       }
 
@@ -880,10 +880,11 @@ function __self_start_gesture_rotate(
     offset: cmath.Vector2;
   }
 ) {
-  const { rotation } = dq.__getNodeById(
+  const node = dq.__getNodeById(
     draft,
     selection
-  ) as grida.program.nodes.i.IRotation;
+  ) as grida.program.nodes.UnknownNodeProperties;
+  const rotation = node.rotation as number;
 
   draft.gesture = {
     type: "rotate",

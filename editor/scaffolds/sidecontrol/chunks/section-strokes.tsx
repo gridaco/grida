@@ -96,7 +96,7 @@ export function SectionStrokes({
     type: node.type,
   }));
 
-  const is_text_node = type === "text";
+  const is_text_node = type === "tspan";
   const isCanvasBackend = backend === "canvas";
   const supportsStrokeWidth4 = supports.strokeWidth4(type, { backend });
 
@@ -128,12 +128,10 @@ export function SectionStrokes({
     rectangular_stroke_width_left,
   ]);
 
-  const paints = isCanvasBackend
-    ? Array.isArray(stroke_paints) && stroke_paints.length > 0
-      ? stroke_paints
-      : stroke
-        ? [stroke]
-        : []
+  // Resolve paints using the same logic as editor.resolvePaints
+  // If stroke_paints is an array (even if empty), use it. Otherwise, fall back to legacy stroke property.
+  const paints = Array.isArray(stroke_paints)
+    ? stroke_paints
     : stroke
       ? [stroke]
       : [];

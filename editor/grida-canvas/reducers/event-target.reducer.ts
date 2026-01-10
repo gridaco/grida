@@ -158,13 +158,14 @@ function __self_evt_on_click(
       }
 
       try {
-        const _nnode = nnode as grida.program.nodes.UnknwonNode;
+        const _nnode = nnode as grida.program.nodes.UnknownNode;
 
         // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
         const center_translate_delta: cmath.Vector2 =
           // (if width and height is fixed number) - can be 'auto' for text node
-          typeof _nnode.width === "number" && typeof _nnode.height === "number"
-            ? [_nnode.width / 2, _nnode.height / 2]
+          typeof _nnode.layout_target_width === "number" &&
+          typeof _nnode.layout_target_height === "number"
+            ? [_nnode.layout_target_width / 2, _nnode.layout_target_height / 2]
             : [0, 0];
 
         const nnode_relative_position = cmath.vector2.quantize(
@@ -172,9 +173,9 @@ function __self_evt_on_click(
           1
         );
 
-        _nnode.position = "absolute";
-        _nnode.left! = nnode_relative_position[0];
-        _nnode.top! = nnode_relative_position[1];
+        _nnode.layout_positioning = "absolute";
+        _nnode.layout_inset_left! = nnode_relative_position[0];
+        _nnode.layout_inset_top! = nnode_relative_position[1];
       } catch (e) {
         reportError(e);
       }
@@ -184,7 +185,7 @@ function __self_evt_on_click(
       self_selectNode(draft, "reset", nnode.id);
 
       // if the node is text, enter content edit mode
-      if (nnode.type === "text") {
+      if (nnode.type === "tspan") {
         draft.content_edit_mode = { type: "text", node_id: nnode.id };
       }
       break;
@@ -469,10 +470,10 @@ function __self_evt_on_drag_start(
         draft.tool.node,
         () => context.idgen.next(),
         {
-          left: initial_rect.x,
-          top: initial_rect.y,
-          width: initial_rect.width,
-          height: initial_rect.height as 0, // casting for line node
+          layout_inset_left: initial_rect.x,
+          layout_inset_top: initial_rect.y,
+          layout_target_width: initial_rect.width,
+          layout_target_height: initial_rect.height as 0, // casting for line node
         },
         context.paint_constraints
       );
@@ -743,9 +744,12 @@ function __self_evt_on_drag(
         let fixed_width: number | undefined;
         let fixed_height: number | undefined;
 
-        if ("width" in node && "height" in node) {
-          const width = node.width;
-          const height = node.height;
+        if (
+          grida.program.nodes.hasLayoutWidth(node) &&
+          grida.program.nodes.hasLayoutHeight(node)
+        ) {
+          const width = node.layout_target_width;
+          const height = node.layout_target_height;
           if (typeof width === "number" && typeof height === "number") {
             fixed_width = width;
             fixed_height = height;
@@ -841,7 +845,8 @@ function __self_evt_on_drag(
       case "gap": {
         const { layout, axis, initial_gap, min_gap } = draft.gesture;
         const delta = movement[axis === "x" ? 0 : 1];
-        const side: "left" | "top" = axis === "x" ? "left" : "top";
+        const side: "layout_inset_left" | "layout_inset_top" =
+          axis === "x" ? "layout_inset_left" : "layout_inset_top";
 
         switch (layout.type) {
           case "group": {
@@ -891,8 +896,8 @@ function __self_evt_on_drag(
             draft.document.nodes[layout.group] = nodeReducer(container, {
               type: "node/change/*",
               node_id: container.id,
-              main_axis_gap: gap,
-              cross_axis_gap: gap,
+              layout_main_axis_gap: gap,
+              layout_cross_axis_gap: gap,
             });
 
             draft.gesture.gap = gap;
@@ -927,27 +932,27 @@ function __self_evt_on_drag(
 
           switch (side) {
             case "top":
-              updates.padding_top = padding;
+              updates.layout_padding_top = padding;
               if (mirroringEnabled) {
-                updates.padding_bottom = padding;
+                updates.layout_padding_bottom = padding;
               }
               break;
             case "right":
-              updates.padding_right = padding;
+              updates.layout_padding_right = padding;
               if (mirroringEnabled) {
-                updates.padding_left = padding;
+                updates.layout_padding_left = padding;
               }
               break;
             case "bottom":
-              updates.padding_bottom = padding;
+              updates.layout_padding_bottom = padding;
               if (mirroringEnabled) {
-                updates.padding_top = padding;
+                updates.layout_padding_top = padding;
               }
               break;
             case "left":
-              updates.padding_left = padding;
+              updates.layout_padding_left = padding;
               if (mirroringEnabled) {
-                updates.padding_right = padding;
+                updates.layout_padding_right = padding;
               }
               break;
           }
@@ -1091,9 +1096,10 @@ function __before_end_insert_and_resize(
         draft,
         id
       ) as grida.program.nodes.i.IPositioning;
-      if (typeof child.left === "number")
-        child.left = rect.x - container_rect.x;
-      if (typeof child.top === "number") child.top = rect.y - container_rect.y;
+      if (typeof child.layout_inset_left === "number")
+        child.layout_inset_left = rect.x - container_rect.x;
+      if (typeof child.layout_inset_top === "number")
+        child.layout_inset_top = rect.y - container_rect.y;
     }
   });
 }
@@ -1131,8 +1137,8 @@ function __self_maybe_end_gesture(
       const node = draft.document.nodes[
         draft.gesture.node_id
       ] as grida.program.nodes.i.IPositioning;
-      node.left = placement.rect.x;
-      node.top = placement.rect.y;
+      node.layout_inset_left = placement.rect.x;
+      node.layout_inset_top = placement.rect.y;
 
       break;
     }

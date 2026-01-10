@@ -2,12 +2,12 @@ import React from "react";
 import type grida from "@grida/schema";
 import queryattributes from "./utils/attributes";
 
-export const TextWidget = ({
+export const TextSpanWidget = ({
   text,
   style,
   max_lines,
   ...props
-}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.TextNode>) => {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.TextSpanNode>) => {
   const children = text?.toString();
 
   return (
@@ -17,4 +17,4 @@ export const TextWidget = ({
   );
 };
 
-TextWidget.type = "text";
+TextSpanWidget.type = "tspan";

@@ -57,20 +57,20 @@ export namespace css {
       Partial<grida.program.nodes.i.IPadding> &
       Partial<grida.program.nodes.i.IEffects> &
       Partial<grida.program.nodes.i.IFlexContainer> &
-      Partial<Pick<grida.program.nodes.TextNode, "max_lines">>,
+      Partial<Pick<grida.program.nodes.TextSpanNode, "max_lines">>,
     config: {
       hasTextStyle: boolean;
       fill: "color" | "background" | "fill" | "none";
     }
   ): React.CSSProperties {
     const {
-      position,
-      top,
-      left,
-      bottom,
-      right,
-      width,
-      height,
+      layout_positioning: position,
+      layout_inset_top: top,
+      layout_inset_left: left,
+      layout_inset_bottom: bottom,
+      layout_inset_right: right,
+      layout_target_width: width,
+      layout_target_height: height,
       z_index,
       opacity,
       blend_mode,
@@ -85,19 +85,19 @@ export namespace css {
       //
       border,
       //
-      padding_top,
-      padding_right,
-      padding_bottom,
-      padding_left,
+      layout_padding_top,
+      layout_padding_right,
+      layout_padding_bottom,
+      layout_padding_left,
       //
       fe_shadows,
       //
-      layout,
-      direction,
-      main_axis_alignment,
-      cross_axis_alignment,
-      main_axis_gap,
-      cross_axis_gap,
+      layout_mode: layout,
+      layout_direction: direction,
+      layout_main_axis_alignment,
+      layout_cross_axis_alignment,
+      layout_main_axis_gap,
+      layout_cross_axis_gap,
       //
       max_lines,
       //
@@ -139,10 +139,10 @@ export namespace css {
       }),
       //
       padding: paddingToPaddingCSS({
-        padding_top: padding_top ?? 0,
-        padding_right: padding_right ?? 0,
-        padding_bottom: padding_bottom ?? 0,
-        padding_left: padding_left ?? 0,
+        layout_padding_top: layout_padding_top ?? 0,
+        layout_padding_right: layout_padding_right ?? 0,
+        layout_padding_bottom: layout_padding_bottom ?? 0,
+        layout_padding_left: layout_padding_left ?? 0,
       }),
       //
       boxShadow: _fb_first_boxShadow
@@ -164,12 +164,12 @@ export namespace css {
     if (layout === "flex") {
       result["display"] = "flex";
       result["flexDirection"] = axisToFlexDirection(direction!);
-      result["justifyContent"] = main_axis_alignment;
-      result["alignItems"] = cross_axis_alignment;
+      result["justifyContent"] = layout_main_axis_alignment;
+      result["alignItems"] = layout_cross_axis_alignment;
       result["gap"] =
         direction === "horizontal"
-          ? `${main_axis_gap}px ${cross_axis_gap}px`
-          : `${cross_axis_gap}px ${main_axis_gap}px`;
+          ? `${layout_main_axis_gap}px ${layout_cross_axis_gap}px`
+          : `${layout_cross_axis_gap}px ${layout_main_axis_gap}px`;
     }
 
     switch (config.fill) {
@@ -263,6 +263,26 @@ export namespace css {
         }
       }
     }
+  }
+
+  /**
+   * Converts LengthPercentage | "auto" to a numeric pixel value.
+   * Returns 0 for "auto" or non-px units (as a fallback).
+   * For percentage values, returns the percentage value (0-100).
+   */
+  export function toPxNumber(
+    value?: grida.program.css.LengthPercentage | "auto",
+    fallback = 0
+  ): number {
+    if (!value || value === "auto") return fallback;
+    if (typeof value === "number") {
+      return value;
+    }
+    if (value.type === "length") {
+      // Only convert px units to numbers; other units default to 0
+      return value.unit === "px" ? value.value : fallback;
+    }
+    return fallback;
   }
 
   export function toReactCSSBorder(
@@ -439,19 +459,19 @@ export namespace css {
   export function paddingToPaddingCSS(
     padding:
       | {
-          padding_top?: number;
-          padding_right?: number;
-          padding_bottom?: number;
-          padding_left?: number;
+          layout_padding_top?: number;
+          layout_padding_right?: number;
+          layout_padding_bottom?: number;
+          layout_padding_left?: number;
         }
       | null
       | undefined
   ): string {
     if (!padding) return "0";
-    const top = padding.padding_top ?? 0;
-    const right = padding.padding_right ?? 0;
-    const bottom = padding.padding_bottom ?? 0;
-    const left = padding.padding_left ?? 0;
+    const top = padding.layout_padding_top ?? 0;
+    const right = padding.layout_padding_right ?? 0;
+    const bottom = padding.layout_padding_bottom ?? 0;
+    const left = padding.layout_padding_left ?? 0;
 
     // If all sides are equal, return single value
     if (top === right && right === bottom && bottom === left) {

@@ -9,7 +9,7 @@ import {
   ViewGridIcon,
 } from "@radix-ui/react-icons";
 
-type LayoutMode = grida.program.nodes.i.IFlexContainer["layout"];
+type LayoutMode = grida.program.nodes.i.IFlexContainer["layout_mode"];
 
 type PartialLayoutProperties = {
   layoutMode: LayoutMode;

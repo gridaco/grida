@@ -39,8 +39,8 @@ import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 
 function resolveNumberChangeValue(
-  node: grida.program.nodes.UnknwonNode,
-  key: keyof grida.program.nodes.UnknwonNode,
+  node: grida.program.nodes.UnknownNode,
+  key: keyof grida.program.nodes.UnknownNode,
   change: editor.api.NumberChange
 ): number {
   switch (change.type) {
@@ -583,7 +583,7 @@ class EditorDocumentStore
    * @example
    * ```ts
    * // Load a document from file
-   * const fileData = await fetch('/example.grida').then(r => r.json());
+   * const fileData = await fetch('/example.grida1').then(r => r.json());
    * editor.commands.reset(
    *   editor.state.init({
    *     editable: true,
@@ -716,8 +716,7 @@ class EditorDocumentStore
       currentColor: kolor.colorformats.RGBA32F.BLACK,
     });
     if (result) {
-      result = result as grida.program.nodes.i.IPositioning &
-        grida.program.nodes.i.IFixedDimension;
+      result = result as grida.program.nodes.i.ILayoutTrait;
 
       // Use explicit scene-level target for programmatic SVG node creation
       this.insert(
@@ -746,8 +745,8 @@ class EditorDocumentStore
           type: "image",
           _$id: id,
           src: image.url,
-          width: image.width,
-          height: image.height,
+          layout_target_width: image.width,
+          layout_target_height: image.height,
         },
       },
       this.mstate.scene_id ?? null
@@ -756,18 +755,21 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
-  public createTextNode(text = ""): NodeProxy<grida.program.nodes.TextNode> {
+  // TODO: rename to createTextSpanNode
+  public createTextNode(
+    text = ""
+  ): NodeProxy<grida.program.nodes.TextSpanNode> {
     const id = this.idgen.next();
     // Use explicit scene-level target for programmatic text node creation
     this.insert(
       {
         id: id,
         prototype: {
-          type: "text",
+          type: "tspan",
           _$id: id,
           text: text,
-          width: "auto",
-          height: "auto",
+          layout_target_width: "auto",
+          layout_target_height: "auto",
           fill: {
             type: "solid",
             color: kolor.colorformats.RGBA32F.BLACK,
@@ -790,8 +792,8 @@ class EditorDocumentStore
         prototype: {
           type: "rectangle",
           _$id: id,
-          width: 100,
-          height: 100,
+          layout_target_width: 100,
+          layout_target_height: 100,
           fill: {
             type: "solid",
             color: kolor.colorformats.RGBA32F.BLACK,
@@ -1336,7 +1338,7 @@ class EditorDocumentStore
       // to infer the optimal flex direction, spacing, and alignment (same as wrapping)
       if (
         node.type === "container" &&
-        (node as grida.program.nodes.ContainerNode).layout !== "flex"
+        (node as grida.program.nodes.ContainerNode).layout_mode !== "flex"
       ) {
         this.dispatch({
           type: "autolayout",
@@ -1376,9 +1378,10 @@ class EditorDocumentStore
       | { type: "flex"; direction: "horizontal" | "vertical" }
       | { type: "flex-direction-switch"; direction: "horizontal" | "vertical" };
 
-    const currentLayout = (node as grida.program.nodes.ContainerNode).layout;
+    const currentLayout = (node as grida.program.nodes.ContainerNode)
+      .layout_mode;
     const currentDirection = (node as grida.program.nodes.ContainerNode)
-      .direction;
+      .layout_direction;
 
     // Compute the action type
     const action: RelayoutAction = (() => {
@@ -1440,12 +1443,12 @@ class EditorDocumentStore
           {
             type: "node/change/*",
             node_id: node_id,
-            layout: "flow",
-            direction: undefined,
-            main_axis_gap: undefined,
-            cross_axis_gap: undefined,
-            main_axis_alignment: undefined,
-            cross_axis_alignment: undefined,
+            layout_mode: "flow",
+            layout_direction: undefined,
+            layout_main_axis_gap: undefined,
+            layout_cross_axis_gap: undefined,
+            layout_main_axis_alignment: undefined,
+            layout_cross_axis_alignment: undefined,
             layout_wrap: undefined,
           },
         ]);
@@ -1457,11 +1460,11 @@ class EditorDocumentStore
           const relativeTop = rect.y - parentRect.y;
 
           this.changeNodePropertyPositioning(id, {
-            position: "absolute",
-            left: cmath.quantize(relativeLeft, 1),
-            top: cmath.quantize(relativeTop, 1),
-            right: undefined,
-            bottom: undefined,
+            layout_positioning: "absolute",
+            layout_inset_left: cmath.quantize(relativeLeft, 1),
+            layout_inset_top: cmath.quantize(relativeTop, 1),
+            layout_inset_right: undefined,
+            layout_inset_bottom: undefined,
           });
         });
         break;
@@ -1686,12 +1689,12 @@ class EditorDocumentStore
 
   changeNodePropertyPositioningMode(
     node_id: string,
-    position: grida.program.nodes.i.IPositioning["position"]
+    position: grida.program.nodes.i.IPositioning["layout_positioning"]
   ) {
     this.dispatch({
       type: "node/change/positioning-mode",
       node_id: node_id,
-      position,
+      layout_positioning: position,
     });
   }
 
@@ -1730,10 +1733,17 @@ class EditorDocumentStore
     axis: "width" | "height",
     value: grida.program.css.LengthPercentage | "auto"
   ) {
+    const axis_property_map: Record<
+      "width" | "height",
+      keyof grida.program.nodes.UnknownNode
+    > = {
+      width: "layout_target_width",
+      height: "layout_target_height",
+    };
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      [axis]: value,
+      [axis_property_map[axis]]: value,
     });
   }
 
@@ -1790,12 +1800,12 @@ class EditorDocumentStore
       // Note: resolvePaints returns the full paints array regardless of paintIndex
       // The paintIndex parameter (0) is only used for resolvedIndex calculation, which we ignore
       const { paints: currentFills } = editor.resolvePaints(
-        node as grida.program.nodes.UnknwonNode,
+        node as grida.program.nodes.UnknownNode,
         "fill",
         0
       );
       const { paints: currentStrokes } = editor.resolvePaints(
-        node as grida.program.nodes.UnknwonNode,
+        node as grida.program.nodes.UnknownNode,
         "stroke",
         0
       );
@@ -1867,7 +1877,7 @@ class EditorDocumentStore
   ) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
         "stroke_width",
         strokeWidth
       );
@@ -2030,7 +2040,7 @@ class EditorDocumentStore
   ): void {
     const node = this.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.UnknwonNode;
+    ) as grida.program.nodes.UnknownNode;
 
     const applyDelta = (
       currentValue: number | undefined,
@@ -2134,7 +2144,7 @@ class EditorDocumentStore
   ): void {
     const node = this.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
     const features = Object.assign({}, node.font_features ?? {});
     features[feature] = value;
 
@@ -2151,7 +2161,7 @@ class EditorDocumentStore
   ): void {
     const node = this.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
     const variations = Object.assign({}, node.font_variations ?? {});
     variations[key] = value;
 
@@ -2176,7 +2186,7 @@ class EditorDocumentStore
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
         "font_size",
         fontSize
       );
@@ -2285,7 +2295,7 @@ class EditorDocumentStore
   ) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
         "line_height",
         lineHeight
       );
@@ -2303,7 +2313,7 @@ class EditorDocumentStore
   changeTextNodeLetterSpacing(
     node_id: string,
     letterSpacing: editor.api.TChange<
-      grida.program.nodes.TextNode["letter_spacing"]
+      grida.program.nodes.TextSpanNode["letter_spacing"]
     >
   ) {
     try {
@@ -2312,7 +2322,7 @@ class EditorDocumentStore
         value = undefined;
       } else {
         value = resolveNumberChangeValue(
-          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
           "letter_spacing",
           letterSpacing as editor.api.NumberChange
         );
@@ -2332,7 +2342,7 @@ class EditorDocumentStore
   changeTextNodeWordSpacing(
     node_id: string,
     wordSpacing: editor.api.TChange<
-      grida.program.nodes.TextNode["word_spacing"]
+      grida.program.nodes.TextSpanNode["word_spacing"]
     >
   ) {
     try {
@@ -2341,7 +2351,7 @@ class EditorDocumentStore
         value = undefined;
       } else {
         value = resolveNumberChangeValue(
-          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknownNode,
           "word_spacing",
           wordSpacing as editor.api.NumberChange
         );
@@ -2469,12 +2479,20 @@ class EditorDocumentStore
 
   changeContainerNodeLayout(
     node_id: string,
-    layout: grida.program.nodes.i.IFlexContainer["layout"]
+    layout: grida.program.nodes.i.IFlexContainer["layout_mode"]
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      layout,
+      layout_mode: layout,
+    });
+  }
+
+  changeContainerNodeClipsContent(node_id: string, clips_content: boolean) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      clips_content,
     });
   }
 
@@ -2482,7 +2500,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      direction,
+      layout_direction: direction,
     });
   }
 
@@ -2493,7 +2511,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      main_axis_alignment: mainAxisAlignment,
+      layout_main_axis_alignment: mainAxisAlignment,
     });
   }
 
@@ -2504,18 +2522,22 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      cross_axis_alignment: crossAxisAlignment,
+      layout_cross_axis_alignment: crossAxisAlignment,
     });
   }
   changeFlexContainerNodeGap(
     node_id: string,
-    gap: number | { main_axis_gap: number; cross_axis_gap: number }
+    gap:
+      | number
+      | { layout_main_axis_gap: number; layout_cross_axis_gap: number }
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      main_axis_gap: typeof gap === "number" ? gap : gap.main_axis_gap,
-      cross_axis_gap: typeof gap === "number" ? gap : gap.cross_axis_gap,
+      layout_main_axis_gap:
+        typeof gap === "number" ? gap : gap.layout_main_axis_gap,
+      layout_cross_axis_gap:
+        typeof gap === "number" ? gap : gap.layout_cross_axis_gap,
     });
   }
   changeFlexContainerNodeWrap(node_id: string, layoutWrap: "wrap" | "nowrap") {
@@ -2817,14 +2839,12 @@ export class Editor
   }
 
   public archive(): Blob {
-    const documentData = {
-      version: "0.89.0-beta+20251219",
-      document: this.getSnapshot().document,
-    } satisfies io.JSONDocumentFileModel;
-
-    const blob = new Blob([io.archive.pack(documentData) as BlobPart], {
-      type: "application/zip",
-    });
+    const blob = new Blob(
+      [io.archive.pack(this.getSnapshot().document) as BlobPart],
+      {
+        type: "application/zip",
+      }
+    );
 
     return blob;
   }
@@ -2958,7 +2978,13 @@ export class Editor
       });
 
       // TODO: cleanup not handled
-      ro.observe(el, { box: "device-pixel-content-box" });
+      // Safari doesn't support the "device-pixel-content-box" box option
+      try {
+        ro.observe(el, { box: "device-pixel-content-box" });
+      } catch (e) {
+        // Fallback for browsers that don't support device-pixel-content-box (e.g., Safari)
+        ro.observe(el);
+      }
 
       if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
         this.log("wasm::factory", factory.module);
@@ -2978,7 +3004,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.89.0-beta+20251219",
+          version: "0.90.0-beta+20260108",
           document: payloadDocument,
         });
         surface.loadScene(p);
@@ -3333,8 +3359,8 @@ export class Editor
   toggleTextNodeBold(node_id: string) {
     const node = this.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
-    if (node.type !== "text") return false;
+    ) as grida.program.nodes.TextSpanNode;
+    if (node.type !== "tspan") return false;
 
     const isBold = node.font_weight === 700;
     const next_weight = isBold ? 400 : 700;
@@ -3364,8 +3390,8 @@ export class Editor
   toggleTextNodeItalic(node_id: string) {
     const node = this.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
-    if (node.type !== "text") return false;
+    ) as grida.program.nodes.TextSpanNode;
+    if (node.type !== "tspan") return false;
 
     const next_italic = !node.font_style_italic;
     const fontFamily = node.font_family;
@@ -3400,7 +3426,7 @@ export class Editor
 
     const node = this.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
 
     const prev: grida.program.nodes.i.IFontStyle = {
       font_postscript_name: node.font_postscript_name,
@@ -3485,9 +3511,9 @@ export class Editor
   ) {
     const node = this.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.TextNode;
+    ) as grida.program.nodes.TextSpanNode;
     assert(node, "node is not found");
-    assert(node.type === "text", "node is not a text node");
+    assert(node.type === "tspan", "node is not a text node");
 
     // load the font family & prepare
     await this.loadFontSync({ family: fontFamily });
@@ -4925,7 +4951,7 @@ export class EditorSurface
       if (node) {
         const paintTarget = paint_target ?? "fill";
         const { paints, resolvedIndex } = editor.resolvePaints(
-          node as grida.program.nodes.UnknwonNode,
+          node as grida.program.nodes.UnknownNode,
           paintTarget,
           paint_index ?? 0
         );
@@ -5086,7 +5112,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeTextAlign(node_id, textAlign);
       }
     }
@@ -5099,7 +5125,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeTextAlignVertical(
           node_id,
           textAlignVertical
@@ -5115,7 +5141,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeFontSize(node_id, {
           type: "delta",
           value: delta,
@@ -5131,7 +5157,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeLineHeight(node_id, {
           type: "delta",
           value: delta,
@@ -5147,7 +5173,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         this._editor.doc.changeTextNodeLetterSpacing(node_id, {
           type: "delta",
           value: delta,
@@ -5163,7 +5189,7 @@ export class EditorSurface
     const target_ids = target === "selection" ? this.state.selection : [target];
     for (const node_id of target_ids) {
       const node = this._editor.doc.getNodeSnapshotById(node_id);
-      if (node && node.type === "text") {
+      if (node && node.type === "tspan") {
         const fontFamily = node.font_family;
         if (!fontFamily) continue;
 
@@ -5378,9 +5404,16 @@ export class EditorSurface
   autoSizeTextNode(node_id: string, axis: "width" | "height") {
     const node = this._editor.doc.getNodeSnapshotById(
       node_id
-    ) as grida.program.nodes.UnknwonNode;
-    if (node.type !== "text") return;
+    ) as grida.program.nodes.UnknownNode;
+    if (node.type !== "tspan") return;
 
+    const axis_property_map: Record<
+      "width" | "height",
+      keyof grida.program.nodes.UnknownNode
+    > = {
+      width: "layout_target_width",
+      height: "layout_target_height",
+    };
     const prev =
       this._editor.geometryProvider.getNodeAbsoluteBoundingRect(node_id);
     if (!prev) return;
@@ -5398,7 +5431,7 @@ export class EditorSurface
       this._editor.doc.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        [axis]: "auto",
+        [axis_property_map[axis]]: "auto",
       });
 
       requestAnimationFrame(() => {
@@ -5421,7 +5454,7 @@ export class EditorSurface
               return;
           }
           this._editor.doc.changeNodePropertyPositioning(node_id, {
-            left: cmath.quantize(left, 1),
+            layout_inset_left: cmath.quantize(left, 1),
           });
         } else {
           const diff = prev.height - next.height;
@@ -5438,7 +5471,7 @@ export class EditorSurface
               return;
           }
           this._editor.doc.changeNodePropertyPositioning(node_id, {
-            top: cmath.quantize(top, 1),
+            layout_inset_top: cmath.quantize(top, 1),
           });
         }
       });
@@ -5604,7 +5637,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#name}
+   * {@link grida.program.nodes.UnknownNode#name}
    */
   set name(name: string) {
     this.doc.dispatch({
@@ -5615,14 +5648,14 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#name}
+   * {@link grida.program.nodes.UnknownNode#name}
    */
   get name() {
     return this.$.name;
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#active}
+   * {@link grida.program.nodes.UnknownNode#active}
    */
   set active(active: boolean) {
     this.doc.dispatch({
@@ -5633,14 +5666,14 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#active}
+   * {@link grida.program.nodes.UnknownNode#active}
    */
   get active() {
     return this.$.active;
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#locked}
+   * {@link grida.program.nodes.UnknownNode#locked}
    */
   set locked(locked: boolean) {
     this.doc.dispatch({
@@ -5651,14 +5684,14 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#locked}
+   * {@link grida.program.nodes.UnknownNode#locked}
    */
   get locked() {
     return this.$.locked;
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#rotation}
+   * {@link grida.program.nodes.UnknownNode#rotation}
    */
   set rotation(rotation: number) {
     this.doc.dispatch({
@@ -5672,7 +5705,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
     const value = resolveNumberChangeValue(
       this.doc.getNodeSnapshotById(
         this.node_id
-      ) as grida.program.nodes.UnknwonNode,
+      ) as grida.program.nodes.UnknownNode,
       "rotation",
       change
     );
@@ -5684,7 +5717,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   };
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#opacity}
+   * {@link grida.program.nodes.UnknownNode#opacity}
    */
   set opacity(opacity: number) {
     this.doc.dispatch({
@@ -5698,7 +5731,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
     const value = resolveNumberChangeValue(
       this.doc.getNodeSnapshotById(
         this.node_id
-      ) as grida.program.nodes.UnknwonNode,
+      ) as grida.program.nodes.UnknownNode,
       "opacity",
       change
     );
@@ -5711,7 +5744,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#blend_mode}
+   * {@link grida.program.nodes.UnknownNode#blend_mode}
    */
   set blend_mode(blend_mode: cg.LayerBlendMode) {
     this.doc.dispatch({
@@ -5722,7 +5755,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
   }
 
   /**
-   * {@link grida.program.nodes.UnknwonNode#mask}
+   * {@link grida.program.nodes.UnknownNode#mask}
    */
   set mask(mask: cg.LayerMaskType | null | undefined) {
     this.doc.dispatch({

@@ -30,7 +30,7 @@
     "**/node_modules": true
   },
   "files.associations": {
-    ".grida": "json",
+    ".grida1": "json",
     ".babelrc": "jsonc",
     ".eslintrc": "jsonc",
     ".prettierrc": "jsonc",

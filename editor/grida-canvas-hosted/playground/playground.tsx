@@ -115,6 +115,98 @@ import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { PlaygroundMenuContent } from "./uxhost-menu";
 import { Library } from "../library/library";
+import { io } from "@grida/io";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
+
+/**
+ * Generates a filesystem-safe key from a URL path.
+ * Used to create deterministic OPFS keys for examples/embedded canvases.
+ * Never returns an empty string - falls back to "root" or a hash of src.
+ */
+function generateFileKeyFromSrc(src: string): string {
+  try {
+    const url = new URL(src, window.location.origin);
+    // Use pathname + search params to create a unique key
+    const path = url.pathname + url.search;
+    // Sanitize: replace slashes and special chars with hyphens, remove leading/trailing
+    const sanitized = path
+      .replace(/^\/+|\/+$/g, "") // Remove leading/trailing slashes
+      .replace(/[^a-zA-Z0-9._-]/g, "-") // Replace non-safe chars with hyphens
+      .replace(/-+/g, "-") // Collapse multiple hyphens
+      .toLowerCase()
+      .slice(0, 100); // Limit length for filesystem safety
+
+    // If sanitized result is empty, fall back to hash of src
+    return sanitized || `root-${editor.fnv1a32(src)}`;
+  } catch {
+    // Fallback: simple sanitization if URL parsing fails
+    const sanitized = src
+      .replace(/[^a-zA-Z0-9._-]/g, "-")
+      .replace(/-+/g, "-")
+      .toLowerCase()
+      .slice(0, 100);
+
+    // If sanitized result is empty, fall back to hash of src
+    return sanitized || `root-${editor.fnv1a32(src)}`;
+  }
+}
+
+/**
+ * Hook for accessing the playground OPFS handle.
+ * Returns null if OPFS is not supported or handle creation fails.
+ */
+function usePlaygroundOPFS(filekey: string): io.opfs.Handle | null {
+  return useMemo(() => {
+    if (!io.opfs.Handle.isSupported()) {
+      return null;
+    }
+    try {
+      // Defensive check: ensure filekey is never empty
+      const safeFilekey = filekey || "root";
+      return new io.opfs.Handle({
+        directory: ["playground", safeFilekey],
+      });
+    } catch (error) {
+      console.error("Failed to create OPFS handle:", error);
+      return null;
+    }
+  }, [filekey]);
+}
+
+function usePlaygroundDirtyFlag(instance: Editor, enabled: boolean) {
+  const [dirty, setDirty] = useState(false);
+
+  const markSaved = useCallback(() => {
+    setDirty(false);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) {
+      // Avoid extra subscriptions/overhead in demo contexts (e.g. /home embed).
+      setDirty(false);
+      return;
+    }
+
+    // Start clean for the current session.
+    setDirty(false);
+
+    const unsubscribe = instance.doc.subscribeWithSelector(
+      (state) => state.document,
+      (_store, _next, _prev, action) => {
+        // Reset means "loaded/initialized", not a user edit.
+        if (action?.type === "document/reset") {
+          setDirty(false);
+          return;
+        }
+        setDirty(true);
+      }
+    );
+
+    return unsubscribe;
+  }, [enabled, instance]);
+
+  return { dirty, markSaved };
+}
 
 // Custom hook for managing UI layout state
 function useUILayout() {
@@ -211,6 +303,25 @@ export type CanvasPlaygroundProps = {
   document?: editor.state.IEditorStateInit;
   room_id?: string;
   backend?: "dom" | "canvas";
+  /**
+   * OPFS file key. Determines which OPFS directory to use for persistence.
+   * - Defaults to "current" for the main editor
+   * - Examples/embeds should provide a unique key (or it will be auto-generated from `src`)
+   *
+   * @example
+   * ```tsx
+   * <PlaygroundCanvas filekey="my-project" />
+   * <PlaygroundCanvas src="/examples/demo.grida" /> // auto-generates key from src
+   * ```
+   */
+  filekey?: string;
+  /**
+   * Opt-in. When enabled, warn on navigation/close if there are unsaved changes.
+   *
+   * IMPORTANT: `playground` is also used in demo contexts (e.g. /home embed),
+   * so this is intentionally off by default.
+   */
+  warnOnUnsavedChanges?: boolean;
 } & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
@@ -219,11 +330,25 @@ export default function CanvasPlayground({
   templates,
   src,
   room_id,
+  filekey,
+  warnOnUnsavedChanges = false,
 }: CanvasPlaygroundProps) {
+  // Determine filekey: explicit prop > auto-generated from src > default "current"
+  const resolvedFilekey = useMemo(() => {
+    if (filekey) return filekey;
+    if (src) return generateFileKeyFromSrc(src);
+    return "current";
+  }, [filekey, src]);
+
   const instance = useEditor(document, backend);
   useDisableSwipeBack();
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
+  const opfs = usePlaygroundOPFS(resolvedFilekey);
+  const { dirty, markSaved } = usePlaygroundDirtyFlag(
+    instance,
+    warnOnUnsavedChanges
+  );
   const [documentReady, setDocumentReady] = useState(() => !src);
   const [canvasReady, setCanvasReady] = useState(false);
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(
@@ -234,6 +359,13 @@ export default function CanvasPlayground({
   const handleCanvasRef = useCallback((node: HTMLCanvasElement | null) => {
     setCanvasElement(node);
   }, []);
+
+  useUnsavedChangesWarning(() => {
+    if (!warnOnUnsavedChanges) return false;
+    // Keep local dev convenient (previous behavior).
+    // if (process.env.NODE_ENV === "development") return false;
+    return dirty;
+  });
 
   useEffect(() => {
     if (backend !== "canvas") {
@@ -273,44 +405,90 @@ export default function CanvasPlayground({
   useEffect(() => {
     let cancelled = false;
 
-    if (!src) {
-      setDocumentReady(!!document);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const controller = new AbortController();
-    setDocumentReady(false);
-
     const load = async () => {
-      try {
-        const res = await fetch(src, { signal: controller.signal });
-        if (!res.ok) {
-          throw new Error(
-            `Failed to fetch document: ${res.status} ${res.statusText}`
+      if (src) {
+        // If src is provided, load it and persist to OPFS
+        const controller = new AbortController();
+        setDocumentReady(false);
+
+        try {
+          const res = await fetch(src, { signal: controller.signal });
+          if (!res.ok) {
+            throw new Error(
+              `Failed to fetch document: ${res.status} ${res.statusText}`
+            );
+          }
+          const file = await res.json();
+          if (cancelled) {
+            return;
+          }
+          instance.commands.reset(
+            editor.state.init({
+              editable: true,
+              document: file.document,
+            }),
+            src
           );
+
+          // Persist loaded document to OPFS
+          if (opfs) {
+            try {
+              const bytes = io.GRID.encode(file.document);
+              await opfs.get("document.grida").write(bytes);
+              // Also write document.grida1 for migration purposes
+              const snapshotJson = io.snapshot.stringify({
+                version: file.version,
+                document: file.document,
+              });
+              await opfs
+                .get("document.grida1")
+                .write(new TextEncoder().encode(snapshotJson));
+            } catch (error) {
+              console.error("Failed to persist src to OPFS:", error);
+            }
+          }
+        } catch (error) {
+          if (controller.signal.aborted) {
+            return;
+          }
+          console.error("Failed to load playground document", error);
+        } finally {
+          if (!cancelled) {
+            setDocumentReady(true);
+          }
         }
-        const file = await res.json();
-        if (cancelled) {
-          return;
+      } else {
+        // No src: try to load from OPFS, otherwise use provided document or empty
+        setDocumentReady(false);
+
+        try {
+          if (opfs) {
+            const bytes = await opfs.get("document.grida").read();
+            if (bytes && !cancelled) {
+              const loadedDocument = io.GRID.decode(bytes);
+              instance.commands.reset(
+                editor.state.init({
+                  editable: true,
+                  document: loadedDocument,
+                }),
+                "opfs"
+              );
+              setDocumentReady(true);
+              return;
+            }
+          }
+        } catch (error) {
+          // File not found or other error - continue to fallback
+          if (error instanceof Error && error.message.includes("not found")) {
+            // File doesn't exist yet - this is fine, continue to fallback
+          } else {
+            console.error("Failed to load from OPFS:", error);
+          }
         }
-        console.log("file.document", file.document);
-        instance.commands.reset(
-          editor.state.init({
-            editable: true,
-            document: file.document,
-          }),
-          src
-        );
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-        console.error("Failed to load playground document", error);
-      } finally {
+
+        // Fallback to provided document or empty
         if (!cancelled) {
-          setDocumentReady(true);
+          setDocumentReady(!!document);
         }
       }
     };
@@ -319,9 +497,8 @@ export default function CanvasPlayground({
 
     return () => {
       cancelled = true;
-      controller.abort();
     };
-  }, [document, instance, src]);
+  }, [document, instance, src, opfs]);
 
   const ready = documentReady && canvasReady;
 
@@ -345,7 +522,12 @@ export default function CanvasPlayground({
                   <main className="w-full h-full select-none relative">
                     <WindowGlobalCurrentEditorProvider />
                     <UserCustomTemplatesProvider templates={templates}>
-                      <Consumer backend={backend} canvasRef={handleCanvasRef} />
+                      <Consumer
+                        backend={backend}
+                        canvasRef={handleCanvasRef}
+                        onSaved={markSaved}
+                        filekey={resolvedFilekey}
+                      />
                     </UserCustomTemplatesProvider>
                   </main>
                 </SidebarProvider>
@@ -361,9 +543,13 @@ export default function CanvasPlayground({
 function Consumer({
   backend,
   canvasRef,
+  onSaved,
+  filekey,
 }: {
   backend: "dom" | "canvas";
   canvasRef?: (canvas: HTMLCanvasElement | null) => void;
+  onSaved: () => void;
+  filekey: string;
 }) {
   const {
     ui,
@@ -373,6 +559,7 @@ function Consumer({
     setRightSidebarTab,
   } = useUILayout();
   const instance = useCurrentEditor();
+  const opfs = usePlaygroundOPFS(filekey);
   const debug = useEditorState(instance, (state) => state.debug);
   const libraryWindowControls = useFloatingWindowControls({
     defaultOpen: false,
@@ -433,10 +620,35 @@ function Consumer({
     });
   });
 
+  // Cmd/Ctrl+S: save to OPFS
   useHotkeys(
     "meta+s, ctrl+s",
-    () => {
-      onExport();
+    async () => {
+      if (opfs) {
+        try {
+          const snapshot = instance.getSnapshot();
+          const document = snapshot.document;
+          const bytes = io.GRID.encode(document);
+          await opfs.get("document.grida").write(bytes);
+          // Also write document.grida1 for migration purposes
+          const snapshotJson = io.snapshot.stringify({
+            version: undefined, // Version is optional in snapshot format
+            document: document,
+          });
+          await opfs
+            .get("document.grida1")
+            .write(new TextEncoder().encode(snapshotJson));
+          onSaved();
+          toast.success("Saved", {
+            position: "bottom-left",
+          });
+        } catch (error) {
+          console.error("Failed to save to OPFS:", error);
+          toast.error("Failed to save", {
+            position: "bottom-left",
+          });
+        }
+      }
     },
     {
       preventDefault: true,

@@ -40,8 +40,8 @@ export function NodeTypeIcon({
     case "template_instance":
       return <MixIcon className={className} />;
     case "container":
-      if (node.layout === "flex") {
-        switch (node.direction) {
+      if (node.layout_mode === "flex") {
+        switch (node.layout_direction) {
           case "horizontal":
             return <ViewVerticalIcon className={className} />;
           case "vertical":
@@ -53,7 +53,7 @@ export function NodeTypeIcon({
       return <Component1Icon className={className} />;
     case "image":
       return <ImageIcon className={className} />;
-    case "text":
+    case "tspan":
       return <TextIcon className={className} />;
     case "instance":
       return <ComponentInstanceIcon className={className} />;

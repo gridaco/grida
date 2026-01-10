@@ -112,8 +112,8 @@ function CanvasConsumer() {
     const id = editor.commands.insertNode({
       type: "image",
       name: value.text,
-      width: model.width,
-      height: model.height,
+      layout_target_width: model.width,
+      layout_target_height: model.height,
       fit: "cover",
     });
     setPrompt(value.text);

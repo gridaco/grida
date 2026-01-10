@@ -65,6 +65,7 @@ import cg from "@grida/cg";
 import vn from "@grida/vn";
 import tree from "@grida/tree";
 import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
+import { generateKeyBetween } from "@grida/sequence";
 import "core-js/features/object/group-by";
 
 /**
@@ -115,6 +116,23 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         return state;
       }
 
+      // Calculate auto-incremented position
+      // Get all existing scenes sorted by position
+      const existingScenes = state.document.scenes_ref
+        .map((id) => state.document.nodes[id] as grida.program.nodes.SceneNode)
+        .filter(
+          (node): node is grida.program.nodes.SceneNode =>
+            node?.type === "scene"
+        )
+        .sort((a, b) => (a.position ?? "").localeCompare(b.position ?? ""));
+
+      // Generate position after the last scene (or "a0" if no scenes exist)
+      const lastPosition =
+        existingScenes.length > 0
+          ? (existingScenes[existingScenes.length - 1]?.position ?? null)
+          : null;
+      const newPosition = generateKeyBetween(lastPosition, null);
+
       // Create scene as a SceneNode
       const new_scene_node: grida.program.nodes.SceneNode = {
         type: "scene",
@@ -125,7 +143,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         constraints: {
           children: scene?.constraints?.children ?? "multiple",
         },
-        order: scene?.order ?? scene_count,
+        position: scene?.position ?? newPosition,
         guides: scene?.guides ?? [],
         edges: scene?.edges ?? [],
         background_color: scene?.background_color,
@@ -194,12 +212,31 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const origin_children = state.document.links[scene_id] || [];
       const new_scene_id = context.idgen.next();
 
+      // Calculate auto-incremented position after the original scene
+      const existingScenes = state.document.scenes_ref
+        .map((id) => state.document.nodes[id] as grida.program.nodes.SceneNode)
+        .filter(
+          (node): node is grida.program.nodes.SceneNode =>
+            node?.type === "scene"
+        )
+        .sort((a, b) => (a.position ?? "").localeCompare(b.position ?? ""));
+
+      // Find the original scene's position and generate next position
+      const originPosition = origin_node.position ?? null;
+      const originIndex = existingScenes.findIndex((s) => s.id === scene_id);
+      const nextScene =
+        originIndex >= 0 && originIndex < existingScenes.length - 1
+          ? existingScenes[originIndex + 1]
+          : null;
+      const nextPosition = nextScene?.position ?? null;
+      const newPosition = generateKeyBetween(originPosition, nextPosition);
+
       // Create duplicated SceneNode
       const new_scene_node: grida.program.nodes.SceneNode = {
         ...origin_node,
         id: new_scene_id,
         name: origin_node.name + " copy",
-        order: origin_node.order ? origin_node.order + 1 : undefined,
+        position: newPosition,
       };
 
       return updateState(state, (draft) => {
@@ -335,7 +372,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const node = dq.__getNodeById(state, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         const { paints, resolvedIndex } = editor.resolvePaints(
-          node as grida.program.nodes.UnknwonNode,
+          node as grida.program.nodes.UnknownNode,
           paint_target,
           paint_index
         );
@@ -383,7 +420,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           const mode =
             draft.content_edit_mode as editor.state.VectorContentEditMode;
           mode.clipboard = copied;
-          mode.clipboard_node_position = [node.left ?? 0, node.top ?? 0];
+          mode.clipboard_node_position = [
+            node.layout_inset_left ?? 0,
+            node.layout_inset_top ?? 0,
+          ];
           draft.user_clipboard = undefined;
           if (action.type === "cut") {
             __self_delete_vector_network_selection(draft, mode);
@@ -494,8 +534,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           let net_to_union = net;
           if (mode.clipboard_node_position) {
             const delta: [number, number] = [
-              mode.clipboard_node_position[0] - (node.left ?? 0),
-              mode.clipboard_node_position[1] - (node.top ?? 0),
+              mode.clipboard_node_position[0] - (node.layout_inset_left ?? 0),
+              mode.clipboard_node_position[1] - (node.layout_inset_top ?? 0),
             ];
             net_to_union = vn.VectorNetworkEditor.translate(net, delta);
           }
@@ -569,9 +609,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             if (delta) {
               sub.scene.children_refs.forEach((node_id) => {
                 const node = sub.nodes[node_id];
-                if ("position" in node && node.position === "absolute") {
-                  node.left = (node.left ?? 0) + delta[0];
-                  node.top = (node.top ?? 0) + delta[1];
+                if (
+                  "layout_positioning" in node &&
+                  node.layout_positioning === "absolute" &&
+                  "layout_inset_left" in node &&
+                  "layout_inset_top" in node
+                ) {
+                  node.layout_inset_left =
+                    (node.layout_inset_left ?? 0) + delta[0];
+                  node.layout_inset_top =
+                    (node.layout_inset_top ?? 0) + delta[1];
                 }
               });
               box.x += delta[0];
@@ -586,9 +633,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               if (parent_rect) {
                 sub.scene.children_refs.forEach((node_id) => {
                   const node = sub.nodes[node_id];
-                  if ("position" in node && node.position === "absolute") {
-                    node.left = (node.left ?? 0) - parent_rect.x;
-                    node.top = (node.top ?? 0) - parent_rect.y;
+                  if (
+                    "layout_positioning" in node &&
+                    node.layout_positioning === "absolute" &&
+                    "layout_inset_left" in node &&
+                    "layout_inset_top" in node
+                  ) {
+                    node.layout_inset_left =
+                      (node.layout_inset_left ?? 0) - parent_rect.x;
+                    node.layout_inset_top =
+                      (node.layout_inset_top ?? 0) - parent_rect.y;
                   }
                 });
               }
@@ -617,8 +671,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           let net_to_union = net;
           if (mode.clipboard && mode.clipboard_node_position) {
             const delta: [number, number] = [
-              mode.clipboard_node_position[0] - (node.left ?? 0),
-              mode.clipboard_node_position[1] - (node.top ?? 0),
+              mode.clipboard_node_position[0] - (node.layout_inset_left ?? 0),
+              mode.clipboard_node_position[1] - (node.layout_inset_top ?? 0),
             ];
             if (JSON.stringify(mode.clipboard) === JSON.stringify(net)) {
               net_to_union = vn.VectorNetworkEditor.translate(net, delta);
@@ -670,12 +724,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           id,
           active: true,
           locked: false,
-          position: "absolute",
-          left: 0,
-          top: 0,
+          layout_positioning: "absolute",
+          layout_inset_left: 0,
+          layout_inset_top: 0,
           opacity: 1,
-          width: 0,
-          height: 0,
+          layout_target_width: 0,
+          layout_target_height: 0,
           rotation: 0,
           z_index: 0,
           stroke: { type: "solid", color: black, active: true },
@@ -797,9 +851,14 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       sub.scene.children_refs.forEach((node_id) => {
         const node = sub.nodes[node_id];
-        if ("position" in node && node.position === "absolute") {
-          node.left = (node.left ?? 0) + placement.x;
-          node.top = (node.top ?? 0) + placement.y;
+        if (
+          "layout_positioning" in node &&
+          node.layout_positioning === "absolute" &&
+          "layout_inset_left" in node &&
+          "layout_inset_top" in node
+        ) {
+          node.layout_inset_left = (node.layout_inset_left ?? 0) + placement.x;
+          node.layout_inset_top = (node.layout_inset_top ?? 0) + placement.y;
         }
       });
 
@@ -811,9 +870,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         if (parent_rect) {
           sub.scene.children_refs.forEach((node_id) => {
             const node = sub.nodes[node_id];
-            if ("position" in node && node.position === "absolute") {
-              node.left = (node.left ?? 0) - parent_rect.x;
-              node.top = (node.top ?? 0) - parent_rect.y;
+            if (
+              "layout_positioning" in node &&
+              node.layout_positioning === "absolute" &&
+              "layout_inset_left" in node &&
+              "layout_inset_top" in node
+            ) {
+              node.layout_inset_left =
+                (node.layout_inset_left ?? 0) - parent_rect.x;
+              node.layout_inset_top =
+                (node.layout_inset_top ?? 0) - parent_rect.y;
             }
           });
         }
@@ -863,10 +929,15 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
           const node = draft.document.nodes[node_id];
-          updateNodeTransform(node, {
-            type: "resize",
-            delta: [dx, dy],
-          });
+          updateNodeTransform(
+            node,
+            {
+              type: "resize",
+              delta: [dx, dy],
+            },
+            context.geometry,
+            node_id
+          );
         }
       });
     }
@@ -902,7 +973,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             return updateState(state, (draft) => {
               const node = dq.__getNodeById(draft, node_id);
               const { paints, resolvedIndex } = editor.resolvePaints(
-                node as grida.program.nodes.UnknwonNode,
+                node as grida.program.nodes.UnknownNode,
                 paint_target,
                 paint_index
               );
@@ -954,14 +1025,19 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               const scene = getScene(draft.document, draft.scene_id!);
               const agent_points = vertices.map((i) =>
                 cmath.vector2.add(node.vector_network.vertices[i], [
-                  node.left!,
-                  node.top!,
+                  node.layout_inset_left!,
+                  node.layout_inset_top!,
                 ])
               );
               const anchor_points = node.vector_network.vertices
                 .map((v, i) => ({ p: v, i }))
                 .filter(({ i }) => !vertices.includes(i))
-                .map(({ p }) => cmath.vector2.add(p, [node.left!, node.top!]));
+                .map(({ p }) =>
+                  cmath.vector2.add(p, [
+                    node.layout_inset_left!,
+                    node.layout_inset_top!,
+                  ])
+                );
 
               const should_snap =
                 draft.gesture_modifiers.translate_with_force_disable_snap !==
@@ -1008,13 +1084,17 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
         const in_flow_node_ids = nodes
           .filter((node) => {
-            if ("position" in node) {
+            if ("layout_positioning" in node) {
               return (
-                node.position === "relative" &&
-                node.top === undefined &&
-                node.right === undefined &&
-                node.bottom === undefined &&
-                node.left === undefined
+                node.layout_positioning === "relative" &&
+                "layout_inset_top" in node &&
+                "layout_inset_right" in node &&
+                "layout_inset_bottom" in node &&
+                "layout_inset_left" in node &&
+                node.layout_inset_top === undefined &&
+                node.layout_inset_right === undefined &&
+                node.layout_inset_bottom === undefined &&
+                node.layout_inset_left === undefined
               );
             }
           })
@@ -1115,11 +1195,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           return updateState(state, (draft) => {
             const node = dq.__getNodeById(draft, node_id);
-            updateNodeTransform(node, {
-              type: "translate",
-              dx,
-              dy,
-            });
+            updateNodeTransform(
+              node,
+              {
+                type: "translate",
+                dx,
+                dy,
+              },
+              context.geometry,
+              node_id
+            );
           });
         }
 
@@ -1143,11 +1228,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         let i = 0;
         for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(draft, node_id);
-          updateNodeTransform(node, {
-            type: "translate",
-            dx: deltas[i].dx,
-            dy: deltas[i].dy,
-          });
+          updateNodeTransform(
+            node,
+            {
+              type: "translate",
+              dx: deltas[i].dx,
+              dy: deltas[i].dy,
+            },
+            context.geometry,
+            node_id
+          );
           i++;
         }
       });
@@ -1180,11 +1270,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         let i = 0;
         for (const node_id of target_node_ids) {
           const node = dq.__getNodeById(draft, node_id);
-          updateNodeTransform(node, {
-            type: "translate",
-            dx: deltas[i].dx,
-            dy: deltas[i].dy,
-          });
+          updateNodeTransform(
+            node,
+            {
+              type: "translate",
+              dx: deltas[i].dx,
+              dy: deltas[i].dy,
+            },
+            context.geometry,
+            node_id
+          );
           i++;
         }
       });
@@ -1230,12 +1325,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           ) as grida.program.nodes.ContainerNode;
 
           // Apply flex layout properties to the existing container
-          container.layout = "flex";
-          container.direction = lay.direction;
-          container.main_axis_gap = cmath.quantize(lay.spacing, 1);
-          container.cross_axis_gap = cmath.quantize(lay.spacing, 1);
-          container.main_axis_alignment = lay.mainAxisAlignment;
-          container.cross_axis_alignment = lay.crossAxisAlignment;
+          container.layout_mode = "flex";
+          container.layout_direction = lay.direction;
+          container.layout_main_axis_gap = cmath.quantize(lay.spacing, 1);
+          container.layout_cross_axis_gap = cmath.quantize(lay.spacing, 1);
+          container.layout_main_axis_alignment = lay.mainAxisAlignment;
+          container.layout_cross_axis_alignment = lay.crossAxisAlignment;
 
           // [reorder children according to guessed layout]
           const ordered = lay.orders.map((i) => children[i]);
@@ -1250,11 +1345,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               child_id
             ] as grida.program.nodes.i.IPositioning) = {
               ...child,
-              position: "relative",
-              top: undefined,
-              right: undefined,
-              bottom: undefined,
-              left: undefined,
+              layout_positioning: "relative",
+              layout_inset_top: undefined,
+              layout_inset_right: undefined,
+              layout_inset_bottom: undefined,
+              layout_inset_left: undefined,
             };
           });
 
@@ -1312,20 +1407,20 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             const container_prototype: grida.program.nodes.NodePrototype = {
               type: "container",
               // layout
-              layout: "flex",
-              width: "auto",
-              height: "auto",
-              top: cmath.quantize(layout.union.y, 1),
-              left: cmath.quantize(layout.union.x, 1),
-              direction: layout.direction,
-              main_axis_gap: cmath.quantize(layout.spacing, 1),
-              cross_axis_gap: cmath.quantize(layout.spacing, 1),
-              main_axis_alignment: layout.mainAxisAlignment,
-              cross_axis_alignment: layout.crossAxisAlignment,
-              padding_top: children.length === 1 ? 16 : 0,
-              padding_right: children.length === 1 ? 16 : 0,
-              padding_bottom: children.length === 1 ? 16 : 0,
-              padding_left: children.length === 1 ? 16 : 0,
+              layout_mode: "flex",
+              layout_target_width: "auto",
+              layout_target_height: "auto",
+              layout_inset_top: cmath.quantize(layout.union.y, 1),
+              layout_inset_left: cmath.quantize(layout.union.x, 1),
+              layout_direction: layout.direction,
+              layout_main_axis_gap: cmath.quantize(layout.spacing, 1),
+              layout_cross_axis_gap: cmath.quantize(layout.spacing, 1),
+              layout_main_axis_alignment: layout.mainAxisAlignment,
+              layout_cross_axis_alignment: layout.crossAxisAlignment,
+              layout_padding_top: children.length === 1 ? 16 : 0,
+              layout_padding_right: children.length === 1 ? 16 : 0,
+              layout_padding_bottom: children.length === 1 ? 16 : 0,
+              layout_padding_left: children.length === 1 ? 16 : 0,
               // corner radius
               corner_radius: 0,
               rectangular_corner_radius_top_left: 0,
@@ -1335,7 +1430,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               // children (empty when init)
               children: [],
               // position
-              position: "absolute",
+              layout_positioning: "absolute",
             };
 
             const container_id = self_insertSubDocument(
@@ -1360,11 +1455,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 child_id
               ] as grida.program.nodes.i.IPositioning) = {
                 ...child,
-                position: "relative",
-                top: undefined,
-                right: undefined,
-                bottom: undefined,
-                left: undefined,
+                layout_positioning: "relative",
+                layout_inset_top: undefined,
+                layout_inset_right: undefined,
+                layout_inset_bottom: undefined,
+                layout_inset_left: undefined,
               };
             });
 
@@ -1794,7 +1889,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const node = dq.__getNodeById(draft, node_id)!;
         const paintTarget = paint_target ?? "fill";
         const { paints, resolvedIndex } = editor.resolvePaints(
-          node as grida.program.nodes.UnknwonNode,
+          node as grida.program.nodes.UnknownNode,
           paintTarget,
           paint_index ?? 0
         );
@@ -1971,7 +2066,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const { node_id } = <NodeToggleUnderlineAction>action;
         const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
-        if (node.type !== "text") return;
+        if (node.type !== "tspan") return;
 
         const isUnderline = node.text_decoration_line === "underline";
         node.text_decoration_line = isUnderline ? "none" : "underline";
@@ -1983,7 +2078,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const { node_id } = <NodeToggleLineThroughAction>action;
         const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
-        if (node.type !== "text") return;
+        if (node.type !== "tspan") return;
 
         const isLineThrough = node.text_decoration_line === "line-through";
         node.text_decoration_line = isLineThrough ? "none" : "line-through";
@@ -2141,15 +2236,15 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
     ...base,
     id,
     vector_network: union_net,
-    left: 0,
-    top: 0,
-    width: 0,
-    height: 0,
+    layout_inset_left: 0,
+    layout_inset_top: 0,
+    layout_target_width: 0,
+    layout_target_height: 0,
   };
 
   normalizeVectorNodeBBox(node);
-  node.left! -= parent_rect.x;
-  node.top! -= parent_rect.y;
+  node.layout_inset_left! -= parent_rect.x;
+  node.layout_inset_top! -= parent_rect.y;
 
   self_try_insert_node(draft, parent_id, node);
   __self_delete_nodes(draft, group, "on");

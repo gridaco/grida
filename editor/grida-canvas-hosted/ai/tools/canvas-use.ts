@@ -326,10 +326,10 @@ export namespace canvas_use {
           const image_ref = await editor.createImageAsync(params.image_url);
 
           const node = editor.commands.createRectangleNode();
-          node.$.position = "absolute";
+          node.$.layout_positioning = "absolute";
           node.$.name = params.name || "image";
-          node.$.width = params.width || image_ref.width;
-          node.$.height = params.height || image_ref.height;
+          node.$.layout_target_width = params.width || image_ref.width;
+          node.$.layout_target_height = params.height || image_ref.height;
           node.$.fill_paints = [
             {
               type: "image",
@@ -350,7 +350,7 @@ export namespace canvas_use {
           };
         } else {
           const node = editor.commands.createRectangleNode();
-          node.$.position = "absolute";
+          node.$.layout_positioning = "absolute";
           node.$.fill_paints = [
             {
               type: "image",

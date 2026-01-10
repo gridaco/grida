@@ -98,7 +98,7 @@ interface ChartViewState {
   grid: DataChartCartesianGridState;
   mainAxis: Chart.MainAxisDataQuery;
   crossAxis: CrossAxisDataQuery;
-  semantic: "continuous" | "discrete" | "unknwon";
+  semantic: "continuous" | "discrete" | "unknown";
 }
 
 type ChartViewAction =
@@ -191,7 +191,7 @@ export function DataChartview() {
     },
     mainAxis: { key: "", sort: "none", aggregate: "datetime-week" },
     crossAxis: { fn: "count" },
-    semantic: "unknwon",
+    semantic: "unknown",
   });
 
   const { mainAxis, renderer, curve, areaFill, palette } = state;

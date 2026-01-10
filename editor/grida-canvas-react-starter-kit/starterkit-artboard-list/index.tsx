@@ -32,10 +32,10 @@ const ArtboardList = () => {
   const onClickItem = (item: ArtboardData) => {
     const inserted = editor.commands.insertNode({
       type: "container",
-      position: "absolute",
+      layout_positioning: "absolute",
       name: item.name,
-      width: item.width,
-      height: item.height,
+      layout_target_width: item.width,
+      layout_target_height: item.height,
       fill: {
         type: "solid",
         color: kolor.colorformats.RGBA32F.WHITE,

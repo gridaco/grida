@@ -1,5 +1,7 @@
 import { describeDocumentTree } from "../cmd-tree";
 import { editor } from "../../editor.i";
+import type grida from "@grida/schema";
+import kolor from "@grida/color";
 
 const chars = editor.ascii.chars;
 
@@ -15,7 +17,6 @@ describe("describeDocumentTree", () => {
         constraints: { children: "multiple" },
         guides: [],
         edges: [],
-        opacity: 1,
       },
       frame: {
         id: "frame",
@@ -23,37 +24,67 @@ describe("describeDocumentTree", () => {
         name: "HeroSection",
         active: true,
         locked: false,
-        layout: "flow",
-        direction: "horizontal",
-        mainAxisAlignment: "start",
-        crossAxisAlignment: "start",
-        mainAxisGap: 0,
-        crossAxisGap: 0,
-        padding: 0,
-        width: 1280,
-        height: 720,
+        clips_content: false,
+        rotation: 0,
+        z_index: 0,
+        layout_positioning: "absolute",
+        layout_mode: "flow",
+        layout_direction: "horizontal",
+        layout_main_axis_alignment: "start",
+        layout_cross_axis_alignment: "start",
+        layout_main_axis_gap: 0,
+        layout_cross_axis_gap: 0,
+        layout_padding_top: 0,
+        layout_padding_right: 0,
+        layout_padding_bottom: 0,
+        layout_padding_left: 0,
+        layout_target_width: 1280,
+        layout_target_height: 720,
+        corner_radius: 0,
+        rectangular_corner_radius_top_left: 0,
+        rectangular_corner_radius_top_right: 0,
+        rectangular_corner_radius_bottom_left: 0,
+        rectangular_corner_radius_bottom_right: 0,
+        stroke_width: 0,
+        stroke_align: "inside",
+        stroke_cap: "butt",
+        stroke_join: "miter",
+        stroke_miter_limit: 4,
         opacity: 0.9,
-        fill: {
-          type: "solid",
-          color: {
-            r: 17 / 255,
-            g: 17 / 255,
-            b: 17 / 255,
-            a: 1,
+        blend_mode: "normal",
+        fill_paints: [
+          {
+            type: "solid",
+            color: kolor.colorformats.RGBA32F.fromHEX("#111111"),
+            active: true,
           },
-        },
+        ],
+        stroke_paints: [],
       },
       text: {
         id: "text",
-        type: "text",
+        type: "tspan",
         name: "Title",
         active: true,
         locked: false,
-        text: "Welcome to Grida",
-        fontFamily: "Inter",
-        fontSize: 32,
-        fontWeight: 700,
+        rotation: 0,
+        z_index: 0,
+        layout_positioning: "absolute",
+        layout_target_width: "auto",
+        layout_target_height: "auto",
         opacity: 1,
+        blend_mode: "normal",
+        text: "Welcome to Grida",
+        font_family: "Inter",
+        font_size: 32,
+        font_weight: 700,
+        font_kerning: true,
+        text_align: "left",
+        text_align_vertical: "top",
+        text_decoration_line: "none",
+        stroke_width: 0,
+        stroke_align: "inside",
+        fill_paints: [],
       },
       button: {
         id: "button",
@@ -61,19 +92,31 @@ describe("describeDocumentTree", () => {
         name: "Button",
         active: true,
         locked: false,
-        width: 160,
-        height: 48,
-        cornerRadius: 8,
+        rotation: 0,
+        z_index: 0,
+        layout_positioning: "absolute",
+        layout_target_width: 160,
+        layout_target_height: 48,
+        corner_radius: 8,
+        rectangular_corner_radius_top_left: 0,
+        rectangular_corner_radius_top_right: 0,
+        rectangular_corner_radius_bottom_left: 0,
+        rectangular_corner_radius_bottom_right: 0,
+        stroke_width: 0,
+        stroke_align: "inside",
+        stroke_cap: "butt",
+        stroke_join: "miter",
+        stroke_miter_limit: 4,
         opacity: 1,
-        fill: {
-          type: "solid",
-          color: {
-            r: 59 / 255,
-            g: 130 / 255,
-            b: 246 / 255,
-            a: 1,
+        blend_mode: "normal",
+        fill_paints: [
+          {
+            type: "solid",
+            color: kolor.colorformats.RGBA32F.fromHEX("#3B82F6"),
+            active: true,
           },
-        },
+        ],
+        stroke_paints: [],
       },
     },
     links: {
@@ -85,7 +128,7 @@ describe("describeDocumentTree", () => {
     images: {},
     bitmaps: {},
     properties: {},
-  } as const;
+  } satisfies grida.program.document.Document;
 
   const context = {
     lu_keys: Object.keys(document.nodes),
@@ -111,7 +154,7 @@ describe("describeDocumentTree", () => {
     const expected = [
       "└─ ⛶  Document (nodes=4, scenes=1, entry=scene)",
       "   └─ ⛶  Frame HeroSection  (type=container, id=frame)  [1280×720]  fill=#111111  opacity=0.9",
-      '      ├─ ✎  Text Title  (type=text, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700',
+      '      ├─ ✎  TextSpan Title  (type=tspan, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700',
       "      └─ ◼  Rect Button  (type=rectangle, id=button)  [160×48]  fill=#3B82F6  radius=8",
     ].join("\n");
 
@@ -126,7 +169,7 @@ describe("describeDocumentTree", () => {
 
     const expected = [
       "└─ ⛶  Frame HeroSection  (type=container, id=frame)  [1280×720]  fill=#111111  opacity=0.9",
-      '   ├─ ✎  Text Title  (type=text, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700',
+      '   ├─ ✎  TextSpan Title  (type=tspan, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700',
       "   └─ ◼  Rect Button  (type=rectangle, id=button)  [160×48]  fill=#3B82F6  radius=8",
     ].join("\n");
 

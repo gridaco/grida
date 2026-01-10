@@ -1,6 +1,9 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
+    "generate": {
+      "outputs": []
+    },
     "test": {
       "dependsOn": ["^test"]
     },
