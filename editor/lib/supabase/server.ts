@@ -1,5 +1,8 @@
 import type { Database } from "@app/database";
-import { createClient as _createClient } from "@supabase/supabase-js";
+import {
+  createClient as _createClient,
+  SupabaseClientOptions,
+} from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -13,7 +16,7 @@ const __create_server_client = async <
   const cookieStore = await cookies();
   return createServerClient<Database, SchemaName>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       db: {
         schema: schema,
@@ -79,10 +82,10 @@ const __create_service_role_client = <
 ) => {
   return _createClient<Database, SchemaName>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
+    process.env.SUPABASE_SECRET_KEY!,
     {
       db: {
-        schema: schema,
+        schema: schema as any,
       },
     }
   );
