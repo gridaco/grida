@@ -2,6 +2,7 @@
 
 import React from "react";
 import OriginComp569 from "../../comp/comp-569";
+import { ComponentDemo } from "../component-demo";
 
 export default function TreePage() {
   return (
@@ -25,9 +26,11 @@ export default function TreePage() {
               reorder
             </p>
           </div>
-          <div className="p-6 bg-gray-50 rounded-lg min-h-[400px]">
-            <OriginComp569 />
-          </div>
+          <ComponentDemo className="min-h-[400px]">
+            <div className="w-full max-w-2xl">
+              <OriginComp569 />
+            </div>
+          </ComponentDemo>
         </section>
 
         <hr />

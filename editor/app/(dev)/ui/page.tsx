@@ -26,16 +26,6 @@ export default function UIComponentsIndexPage() {
       description: "Progress bars for task completion and loading states",
     },
     {
-      name: "Tag Input",
-      href: "/ui/components/tags",
-      description: "Tag input with autocomplete for managing multiple values",
-    },
-    {
-      name: "Phone Input",
-      href: "/ui/components/phone-input",
-      description: "International phone number input with country selection",
-    },
-    {
       name: "Rich Text Editor",
       href: "/ui/components/rich-text-editor",
       description: "Powerful WYSIWYG editor for creating rich content",
@@ -49,6 +39,25 @@ export default function UIComponentsIndexPage() {
       name: "Tree",
       href: "/ui/components/tree",
       description: "Hierarchical tree view with drag-and-drop and multi-select",
+    },
+  ];
+
+  const forms = [
+    {
+      name: "Email Challenge",
+      href: "/ui/components/email-challenge",
+      description:
+        "Email input with embedded challenge UI (send code + verify OTP)",
+    },
+    {
+      name: "Tag Input",
+      href: "/ui/components/tags",
+      description: "Tag input with autocomplete for managing multiple values",
+    },
+    {
+      name: "Phone Input",
+      href: "/ui/components/phone-input",
+      description: "International phone number input with country selection",
     },
   ];
 
@@ -108,6 +117,26 @@ export default function UIComponentsIndexPage() {
                   {component.name}
                 </h3>
                 <p className="text-sm text-gray-600">{component.description}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <hr />
+
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold">Forms</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {forms.map((form) => (
+              <Link
+                key={form.href}
+                href={form.href}
+                className="p-6 border rounded-lg hover:border-green-500 hover:shadow-md transition-all group"
+              >
+                <h3 className="font-semibold text-lg mb-2 group-hover:text-green-500 transition-colors">
+                  {form.name}
+                </h3>
+                <p className="text-sm text-gray-600">{form.description}</p>
               </Link>
             ))}
           </div>

@@ -1,9 +1,9 @@
 import React, { useEffect, useReducer } from "react";
 import queryattributes from "@/grida-canvas-react-renderer-dom/nodes/utils/attributes";
-import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
-import ShareDialog from "@/theme/templates/west-referral/referrer/share";
-import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
-import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
+import ReferrerPageTemplate from "@/theme/templates/enterprise/west-referral/referrer/page";
+import ShareDialog from "@/theme/templates/enterprise/west-referral/referrer/share";
+import InvitationCouponTemplate from "@/theme/templates/enterprise/west-referral/invitation/coupon";
+import InvitationPageTemplate from "@/theme/templates/enterprise/west-referral/invitation/page";
 import {
   StandaloneDocumentEditor,
   ViewportRoot,
@@ -19,7 +19,7 @@ import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { Platform } from "@/lib/platform";
-import { TemplateData } from "@/theme/templates/west-referral/templates";
+import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
 import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
 import MessageAppFrame from "@/components/frames/message-app-frame";
 import { editor } from "@/grida-canvas";

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { ComponentDemo } from "../component-demo";
 
 export default function SpinnerPage() {
   return (
@@ -23,9 +24,9 @@ export default function SpinnerPage() {
               The standard spinner component
             </p>
           </div>
-          <div className="flex items-center justify-center p-12 bg-gray-50 rounded-lg">
+          <ComponentDemo>
             <Spinner />
-          </div>
+          </ComponentDemo>
         </section>
 
         <hr />

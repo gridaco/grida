@@ -9,7 +9,7 @@ import InvitationPage from "./_components/invitation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCampaignAgent } from "../../store";
 import { useLayout } from "@/scaffolds/tenant";
-import { TemplateData } from "@/theme/templates/west-referral/templates";
+import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
 import { Env } from "@/env";
 
 type Params = {
