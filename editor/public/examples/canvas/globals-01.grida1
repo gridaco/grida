@@ -32,7 +32,7 @@
         ]
       },
       "text": {
-        "id": "tspan",
+        "id": "text",
         "name": "tspan",
         "active": true,
         "locked": false,
