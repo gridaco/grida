@@ -14,11 +14,15 @@ type RealtimeTableChangeData = {
 
 type TableSubscriptionFilter = RealtimePostgresChangesFilter<"*">;
 
+type SupabaseSchemaName<_Database> = string &
+  Exclude<keyof _Database, "__InternalSupabase">;
+
 export function subscribeTable<
   _Database = Database,
-  SchemaName extends string & keyof _Database = "public" extends keyof _Database
-    ? "public"
-    : string & keyof _Database,
+  SchemaName extends SupabaseSchemaName<_Database> =
+    "public" extends SupabaseSchemaName<_Database>
+      ? "public"
+      : SupabaseSchemaName<_Database>,
 >(
   client: SupabaseClient<_Database, SchemaName>,
   channel: string,
@@ -61,9 +65,10 @@ export function subscribeTable<
 
 export const useTableSubscription = <
   _Database = Database,
-  SchemaName extends string & keyof _Database = "public" extends keyof _Database
-    ? "public"
-    : string & keyof _Database,
+  SchemaName extends SupabaseSchemaName<_Database> =
+    "public" extends SupabaseSchemaName<_Database>
+      ? "public"
+      : SupabaseSchemaName<_Database>,
 >({
   channel,
   client,
