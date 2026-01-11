@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
+import { ComponentDemo } from "../component-demo";
 
 export default function RichTextEditorPage() {
   const [content1, setContent1] = useState("");
@@ -29,21 +30,23 @@ export default function RichTextEditorPage() {
               Start with an empty editor and create content
             </p>
           </div>
-          <div className="p-6 bg-gray-50 rounded-lg">
-            <MinimalTiptapEditor
-              value={content1}
-              onChange={(value) =>
-                setContent1(
-                  typeof value === "string"
-                    ? value
-                    : value
-                      ? JSON.stringify(value)
-                      : ""
-                )
-              }
-              className="min-h-[200px]"
-            />
-          </div>
+          <ComponentDemo>
+            <div className="w-full max-w-2xl">
+              <MinimalTiptapEditor
+                value={content1}
+                onChange={(value) =>
+                  setContent1(
+                    typeof value === "string"
+                      ? value
+                      : value
+                        ? JSON.stringify(value)
+                        : ""
+                  )
+                }
+                className="min-h-[200px]"
+              />
+            </div>
+          </ComponentDemo>
         </section>
 
         <hr />
@@ -57,21 +60,23 @@ export default function RichTextEditorPage() {
               Editor pre-populated with formatted content
             </p>
           </div>
-          <div className="p-6 bg-gray-50 rounded-lg">
-            <MinimalTiptapEditor
-              value={content2}
-              onChange={(value) =>
-                setContent2(
-                  typeof value === "string"
-                    ? value
-                    : value
-                      ? JSON.stringify(value)
-                      : ""
-                )
-              }
-              className="min-h-[300px]"
-            />
-          </div>
+          <ComponentDemo>
+            <div className="w-full max-w-2xl">
+              <MinimalTiptapEditor
+                value={content2}
+                onChange={(value) =>
+                  setContent2(
+                    typeof value === "string"
+                      ? value
+                      : value
+                        ? JSON.stringify(value)
+                        : ""
+                  )
+                }
+                className="min-h-[300px]"
+              />
+            </div>
+          </ComponentDemo>
         </section>
 
         <hr />

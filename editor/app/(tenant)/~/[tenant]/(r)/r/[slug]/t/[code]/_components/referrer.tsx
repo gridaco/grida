@@ -2,8 +2,8 @@
 
 import React from "react";
 import { Platform } from "@/lib/platform";
-import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
-import { TemplateData } from "@/theme/templates/west-referral/templates";
+import ReferrerPageTemplate from "@/theme/templates/enterprise/west-referral/referrer/page";
+import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
 
 export default function ReferrerPage({
   context,

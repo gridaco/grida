@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { PhoneInput } from "@/components/extension/phone-input";
+import { ComponentDemo } from "../component-demo";
 
 export default function PhoneInputPage() {
   const [phone1, setPhone1] = useState("");
@@ -27,15 +28,12 @@ export default function PhoneInputPage() {
               Basic phone input with country selector
             </p>
           </div>
-          <div className="space-y-4 p-6 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
+          <ComponentDemo notes={`Current value: ${phone1 || "(empty)"}`}>
+            <div className="space-y-2 w-full max-w-md">
               <label className="text-sm font-medium">Phone Number</label>
               <PhoneInput value={phone1} onChange={setPhone1} />
-              <p className="text-xs text-gray-500">
-                Current value: {phone1 || "(empty)"}
-              </p>
             </div>
-          </div>
+          </ComponentDemo>
         </section>
 
         <hr />
@@ -49,15 +47,12 @@ export default function PhoneInputPage() {
               Phone input with pre-selected country
             </p>
           </div>
-          <div className="space-y-4 p-6 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
+          <ComponentDemo notes={`Current value: ${phone2 || "(empty)"}`}>
+            <div className="space-y-2 w-full max-w-md">
               <label className="text-sm font-medium">Phone Number (US)</label>
               <PhoneInput value={phone2} onChange={setPhone2} />
-              <p className="text-xs text-gray-500">
-                Current value: {phone2 || "(empty)"}
-              </p>
             </div>
-          </div>
+          </ComponentDemo>
         </section>
 
         <hr />
@@ -69,17 +64,14 @@ export default function PhoneInputPage() {
               Phone input with a pre-filled number
             </p>
           </div>
-          <div className="space-y-4 p-6 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
+          <ComponentDemo notes={`Current value: ${phone3 || "(empty)"}`}>
+            <div className="space-y-2 w-full max-w-md">
               <label className="text-sm font-medium">
                 Phone Number (Korea)
               </label>
               <PhoneInput value={phone3} onChange={setPhone3} />
-              <p className="text-xs text-gray-500">
-                Current value: {phone3 || "(empty)"}
-              </p>
             </div>
-          </div>
+          </ComponentDemo>
         </section>
 
         <hr />
@@ -91,7 +83,7 @@ export default function PhoneInputPage() {
               Using phone input in a form context
             </p>
           </div>
-          <div className="p-6 bg-gray-50 rounded-lg">
+          <ComponentDemo>
             <form className="space-y-4 max-w-md">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Name</label>
@@ -121,7 +113,7 @@ export default function PhoneInputPage() {
                 Submit
               </button>
             </form>
-          </div>
+          </ComponentDemo>
         </section>
       </div>
     </main>

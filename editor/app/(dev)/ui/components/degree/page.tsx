@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import DegreeControl from "@/scaffolds/sidecontrol/controls/degree";
+import { ComponentDemo } from "../component-demo";
 
 export default function DegreeControlPage() {
   const [rotation, setRotation] = useState(0);
@@ -31,51 +32,50 @@ export default function DegreeControlPage() {
                 Available in five sizes: icon, sm, md, lg, and xl
               </p>
             </div>
-            <div className="flex gap-8 items-center flex-wrap p-6 bg-gray-50 rounded-lg">
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl
-                  value={rotation}
-                  onChange={setRotation}
-                  size="icon"
-                />
-                <span className="text-xs text-gray-500">icon (24px)</span>
+            <ComponentDemo notes={`Current rotation: ${rotation}°`}>
+              <div className="flex gap-8 items-center flex-wrap">
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl
+                    value={rotation}
+                    onChange={setRotation}
+                    size="icon"
+                  />
+                  <span className="text-xs text-gray-500">icon (24px)</span>
+                </div>
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl
+                    value={rotation}
+                    onChange={setRotation}
+                    size="sm"
+                  />
+                  <span className="text-xs text-gray-500">sm (32px)</span>
+                </div>
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl
+                    value={rotation}
+                    onChange={setRotation}
+                    size="md"
+                  />
+                  <span className="text-xs text-gray-500">md (48px)</span>
+                </div>
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl
+                    value={rotation}
+                    onChange={setRotation}
+                    size="lg"
+                  />
+                  <span className="text-xs text-gray-500">lg (64px)</span>
+                </div>
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl
+                    value={rotation}
+                    onChange={setRotation}
+                    size="xl"
+                  />
+                  <span className="text-xs text-gray-500">xl (80px)</span>
+                </div>
               </div>
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl
-                  value={rotation}
-                  onChange={setRotation}
-                  size="sm"
-                />
-                <span className="text-xs text-gray-500">sm (32px)</span>
-              </div>
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl
-                  value={rotation}
-                  onChange={setRotation}
-                  size="md"
-                />
-                <span className="text-xs text-gray-500">md (48px)</span>
-              </div>
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl
-                  value={rotation}
-                  onChange={setRotation}
-                  size="lg"
-                />
-                <span className="text-xs text-gray-500">lg (64px)</span>
-              </div>
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl
-                  value={rotation}
-                  onChange={setRotation}
-                  size="xl"
-                />
-                <span className="text-xs text-gray-500">xl (80px)</span>
-              </div>
-            </div>
-            <div className="text-sm text-gray-600">
-              Current rotation: <span className="font-mono">{rotation}°</span>
-            </div>
+            </ComponentDemo>
           </section>
 
           <hr />
@@ -88,45 +88,45 @@ export default function DegreeControlPage() {
                 Limit the rotation range with min and max values
               </p>
             </div>
-            <div className="flex gap-8 items-center flex-wrap p-6 bg-gray-50 rounded-lg">
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl
-                  value={constrainedRotation}
-                  onChange={setConstrainedRotation}
-                  size="lg"
-                  loop={false}
-                  min={0}
-                  max={180}
-                />
-                <span className="text-xs text-gray-500">0-180° range</span>
+            <ComponentDemo
+              notes={`Constrained rotation: ${constrainedRotation}°`}
+            >
+              <div className="flex gap-8 items-center flex-wrap">
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl
+                    value={constrainedRotation}
+                    onChange={setConstrainedRotation}
+                    size="lg"
+                    loop={false}
+                    min={0}
+                    max={180}
+                  />
+                  <span className="text-xs text-gray-500">0-180° range</span>
+                </div>
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl
+                    value={constrainedRotation}
+                    onChange={setConstrainedRotation}
+                    size="lg"
+                    loop={false}
+                    min={-45}
+                    max={45}
+                  />
+                  <span className="text-xs text-gray-500">-45° to 45°</span>
+                </div>
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl
+                    value={constrainedRotation}
+                    onChange={setConstrainedRotation}
+                    size="lg"
+                    loop={false}
+                    min={90}
+                    max={270}
+                  />
+                  <span className="text-xs text-gray-500">90° to 270°</span>
+                </div>
               </div>
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl
-                  value={constrainedRotation}
-                  onChange={setConstrainedRotation}
-                  size="lg"
-                  loop={false}
-                  min={-45}
-                  max={45}
-                />
-                <span className="text-xs text-gray-500">-45° to 45°</span>
-              </div>
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl
-                  value={constrainedRotation}
-                  onChange={setConstrainedRotation}
-                  size="lg"
-                  loop={false}
-                  min={90}
-                  max={270}
-                />
-                <span className="text-xs text-gray-500">90° to 270°</span>
-              </div>
-            </div>
-            <div className="text-sm text-gray-600">
-              Constrained rotation:{" "}
-              <span className="font-mono">{constrainedRotation}°</span>
-            </div>
+            </ComponentDemo>
           </section>
 
           <hr />
@@ -139,16 +139,18 @@ export default function DegreeControlPage() {
                 Non-interactive state for read-only display
               </p>
             </div>
-            <div className="flex gap-8 items-center flex-wrap p-6 bg-gray-50 rounded-lg">
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl value={disabledRotation} size="md" disabled />
-                <span className="text-xs text-gray-500">Disabled</span>
+            <ComponentDemo>
+              <div className="flex gap-8 items-center flex-wrap">
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl value={disabledRotation} size="md" disabled />
+                  <span className="text-xs text-gray-500">Disabled</span>
+                </div>
+                <div className="flex flex-col gap-2 items-center">
+                  <DegreeControl value={disabledRotation} size="lg" disabled />
+                  <span className="text-xs text-gray-500">Disabled (lg)</span>
+                </div>
               </div>
-              <div className="flex flex-col gap-2 items-center">
-                <DegreeControl value={disabledRotation} size="lg" disabled />
-                <span className="text-xs text-gray-500">Disabled (lg)</span>
-              </div>
-            </div>
+            </ComponentDemo>
           </section>
 
           <hr />
@@ -216,13 +218,13 @@ export default function DegreeControlPage() {
                 keyboard shortcuts
               </p>
             </div>
-            <div className="flex items-center justify-center p-12 bg-gray-50 rounded-lg">
+            <ComponentDemo>
               <DegreeControl
                 value={rotation}
                 onChange={setRotation}
                 size="xl"
               />
-            </div>
+            </ComponentDemo>
           </section>
         </div>
       </main>
