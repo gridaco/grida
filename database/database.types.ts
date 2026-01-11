@@ -14,9 +14,16 @@ type DBDocType = DatabaseGenerated["public"]["Enums"]["doctype"];
 export type Database = MergeDeep<
   DatabaseGenerated,
   {
-    public: {
+    public: {};
+    // [private]
+    grida_ciam: never;
+    grida_ciam_public: {
       Views: {
+        customer_auth_policy: {
+          Row: DatabaseGenerated["grida_ciam"]["Tables"]["customer_auth_policy"]["Row"];
+        };
         customer_with_tags: {
+          // customer_with_tags + customer + tags (view makes field optional)
           Row: DatabaseGenerated["public"]["Tables"]["customer"]["Row"] & {
             tags: string[];
           };

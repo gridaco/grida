@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { createBrowserCIAMClient } from "@/lib/supabase/client";
 import { Data } from "@/lib/data";
 import { Platform } from "@/lib/platform";
 import type { PostgrestError } from "@supabase/postgrest-js";
@@ -40,7 +40,7 @@ export async function deleteCustomers(
 }
 
 export async function fetchCustomers(
-  client: SupabaseClient<Database, "public">,
+  client: SupabaseClient<Database, "grida_ciam_public">,
   project_id: number,
   query: Data.Relation.QueryState
 ) {
@@ -86,7 +86,7 @@ export function useCustomers(
   project_id: number,
   query: Data.Relation.QueryState
 ) {
-  const client = useMemo(() => createBrowserClient(), []);
+  const client = useMemo(() => createBrowserCIAMClient(), []);
   const [customers, setCustomers] = useState<
     Platform.Customer.CustomerWithTags[]
   >([]);
@@ -121,7 +121,7 @@ export function useCustomerFeed(
     onError?: (error: PostgrestError) => void;
   }
 ) {
-  const client = useMemo(() => createBrowserClient(), []);
+  const client = useMemo(() => createBrowserCIAMClient(), []);
 
   useEffect(() => {
     if (!enabled) return;

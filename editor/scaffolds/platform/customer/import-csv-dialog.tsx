@@ -24,6 +24,7 @@ import { useProject } from "@/scaffolds/workspace";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Platform } from "@/lib/platform";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
 
@@ -162,16 +163,23 @@ export function ImportCSVDialog({
                 Please review the data before importing. This action cannot be
                 undone.
               </AlertDescription>
-              <label className="flex items-center space-x-2 cursor-pointer mt-2">
-                <Checkbox
-                  checked={datachecked}
-                  onCheckedChange={(s) => setDataChecked(s === true)}
-                />
-                <span>
-                  I&apos;ve reviewed the data and want to import these customers
-                </span>
-              </label>
             </Alert>
+            <Field orientation="horizontal">
+              <Checkbox
+                id="import-csv-dialog-data-checked"
+                checked={datachecked}
+                onCheckedChange={(s) => setDataChecked(s === true)}
+              />
+              <FieldLabel
+                htmlFor="import-csv-dialog-data-checked"
+                className="font-normal"
+              >
+                I&apos;ve reviewed the data and want to import these customers
+              </FieldLabel>
+            </Field>
+            <label className="flex items-center space-x-2 cursor-pointer mt-2 w-full">
+              <span></span>
+            </label>
           </div>
         )}
 

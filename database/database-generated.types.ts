@@ -44,6 +44,185 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_ciam: {
+    Tables: {
+      customer_auth_policy: {
+        Row: {
+          challenges: Json[]
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          name: string
+          project_id: number
+          scopes: string[]
+        }
+        Insert: {
+          challenges: Json[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          name: string
+          project_id: number
+          scopes: string[]
+        }
+        Update: {
+          challenges?: Json[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          name?: string
+          project_id?: number
+          scopes?: string[]
+        }
+        Relationships: []
+      }
+      customer_tag: {
+        Row: {
+          created_at: string
+          customer_uid: string
+          project_id: number
+          tag_name: string
+        }
+        Insert: {
+          created_at?: string
+          customer_uid: string
+          project_id: number
+          tag_name: string
+        }
+        Update: {
+          created_at?: string
+          customer_uid?: string
+          project_id?: number
+          tag_name?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  grida_ciam_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      customer_auth_policy: {
+        Row: {
+          challenges: Json[] | null
+          created_at: string | null
+          description: string | null
+          enabled: boolean | null
+          id: string | null
+          name: string | null
+          project_id: number | null
+          scopes: string[] | null
+        }
+        Insert: {
+          challenges?: Json[] | null
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string | null
+          name?: string | null
+          project_id?: number | null
+          scopes?: string[] | null
+        }
+        Update: {
+          challenges?: Json[] | null
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string | null
+          name?: string | null
+          project_id?: number | null
+          scopes?: string[] | null
+        }
+        Relationships: []
+      }
+      customer_tag: {
+        Row: {
+          created_at: string | null
+          customer_uid: string | null
+          project_id: number | null
+          tag_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_uid?: string | null
+          project_id?: number | null
+          tag_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_uid?: string | null
+          project_id?: number | null
+          tag_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_tag_customer_uid_fkey"
+            columns: ["customer_uid"]
+            isOneToOne: false
+            referencedRelation: "customer_with_tags"
+            referencedColumns: ["uid"]
+          },
+        ]
+      }
+      customer_with_tags: {
+        Row: {
+          _fp_fingerprintjs_visitorid: string | null
+          created_at: string | null
+          description: string | null
+          email: string | null
+          email_provisional: string[] | null
+          is_email_verified: boolean | null
+          is_marketing_email_subscribed: boolean | null
+          is_marketing_sms_subscribed: boolean | null
+          is_phone_verified: boolean | null
+          last_seen_at: string | null
+          metadata: Json | null
+          name: string | null
+          name_provisional: string[] | null
+          phone: string | null
+          phone_provisional: string[] | null
+          project_id: number | null
+          search_text: string | null
+          search_tsv: unknown
+          tags: string[] | null
+          uid: string | null
+          user_id: string | null
+          uuid: string | null
+          visitor_id: string | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      update_customer_tags: {
+        Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
+        Returns: undefined
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_commerce: {
     Tables: {
       inventory_item: {
@@ -3832,90 +4011,6 @@ export type Database = {
           },
         ]
       }
-      customer_auth_policy: {
-        Row: {
-          challenges: Json[]
-          created_at: string
-          description: string | null
-          enabled: boolean
-          id: string
-          name: string
-          project_id: number
-          scopes: string[]
-        }
-        Insert: {
-          challenges: Json[]
-          created_at?: string
-          description?: string | null
-          enabled?: boolean
-          id?: string
-          name: string
-          project_id: number
-          scopes: string[]
-        }
-        Update: {
-          challenges?: Json[]
-          created_at?: string
-          description?: string | null
-          enabled?: boolean
-          id?: string
-          name?: string
-          project_id?: number
-          scopes?: string[]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_auth_policy_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      customer_tag: {
-        Row: {
-          created_at: string
-          customer_uid: string
-          project_id: number
-          tag_name: string
-        }
-        Insert: {
-          created_at?: string
-          customer_uid: string
-          project_id: number
-          tag_name: string
-        }
-        Update: {
-          created_at?: string
-          customer_uid?: string
-          project_id?: number
-          tag_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_tag_customer_uid_fkey"
-            columns: ["customer_uid"]
-            isOneToOne: false
-            referencedRelation: "customer"
-            referencedColumns: ["uid"]
-          },
-          {
-            foreignKeyName: "customer_tag_customer_uid_fkey"
-            columns: ["customer_uid"]
-            isOneToOne: false
-            referencedRelation: "customer_with_tags"
-            referencedColumns: ["uid"]
-          },
-          {
-            foreignKeyName: "customer_tag_project_id_tag_name_fkey"
-            columns: ["project_id", "tag_name"]
-            isOneToOne: false
-            referencedRelation: "tag"
-            referencedColumns: ["project_id", "name"]
-          },
-        ]
-      }
       document: {
         Row: {
           created_at: string
@@ -4244,49 +4339,7 @@ export type Database = {
       }
     }
     Views: {
-      customer_with_tags: {
-        Row: {
-          _fp_fingerprintjs_visitorid: string | null
-          created_at: string | null
-          description: string | null
-          email: string | null
-          email_provisional: string[] | null
-          is_email_verified: boolean | null
-          is_marketing_email_subscribed: boolean | null
-          is_marketing_sms_subscribed: boolean | null
-          is_phone_verified: boolean | null
-          last_seen_at: string | null
-          metadata: Json | null
-          name: string | null
-          name_provisional: string[] | null
-          phone: string | null
-          phone_provisional: string[] | null
-          project_id: number | null
-          search_text: string | null
-          search_tsv: unknown
-          tags: string[] | null
-          uid: string | null
-          user_id: string | null
-          uuid: string | null
-          visitor_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_visitor_id_fkey"
-            columns: ["visitor_id"]
-            isOneToOne: true
-            referencedRelation: "visitor"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "public_customer_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       find_project: {
@@ -4335,10 +4388,6 @@ export type Database = {
       }
       rls_project: { Args: { project_id: number }; Returns: boolean }
       rls_via_customer: { Args: { p_customer_id: string }; Returns: boolean }
-      update_customer_tags: {
-        Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
-        Returns: undefined
-      }
       workspace_documents: {
         Args: { p_organization_id: number }
         Returns: {
@@ -4514,6 +4563,12 @@ export type CompositeTypes<
 
 export const Constants = {
   grida_canvas: {
+    Enums: {},
+  },
+  grida_ciam: {
+    Enums: {},
+  },
+  grida_ciam_public: {
     Enums: {},
   },
   grida_commerce: {

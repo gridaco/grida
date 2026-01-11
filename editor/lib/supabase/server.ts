@@ -45,6 +45,10 @@ export async function createClient() {
   return __create_server_client<"public">("public");
 }
 
+export async function createCIAMClient() {
+  return __create_server_client<"grida_ciam_public">("grida_ciam_public");
+}
+
 export async function createLibraryClient() {
   return __create_server_client<"grida_library">("grida_library");
 }
@@ -96,6 +100,8 @@ const __create_service_role_client = <
  */
 export namespace service_role {
   export const workspace = __create_service_role_client<"public">("public");
+  export const ciam =
+    __create_service_role_client<"grida_ciam_public">("grida_ciam_public");
   export const library =
     __create_service_role_client<"grida_library">("grida_library");
   export const forms =
