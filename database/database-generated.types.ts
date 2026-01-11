@@ -502,35 +502,35 @@ export type Database = {
     }
     Functions: {
       generate_combinations: {
-        Args: { options: Json; index: number; current: Json }
+        Args: { current: Json; index: number; options: Json }
         Returns: Json
       }
       get_inventory_items_with_committed: {
         Args: { p_store_id: number }
         Returns: {
-          id: number
-          created_at: string
-          sku: string
-          store_id: number
-          product_id: number
-          variant_id: number
-          cost: number
           available: number
           committed: number
+          cost: number
+          created_at: string
+          id: number
+          product_id: number
+          sku: string
+          store_id: number
+          variant_id: number
         }[]
       }
       get_inventory_with_committed: {
-        Args: { p_store_id: number; p_sku: string }
+        Args: { p_sku: string; p_store_id: number }
         Returns: {
-          id: number
-          created_at: string
-          sku: string
-          store_id: number
-          product_id: number
-          variant_id: number
-          cost: number
           available: number
           committed: number
+          cost: number
+          created_at: string
+          id: number
+          product_id: number
+          sku: string
+          store_id: number
+          variant_id: number
         }[]
       }
     }
@@ -1559,16 +1559,10 @@ export type Database = {
         Args: { p_form_id: string }
         Returns: undefined
       }
-      rls_form: {
-        Args: { p_form_id: string }
-        Returns: boolean
-      }
-      rpc_check_max_responses: {
-        Args: { form_id: string }
-        Returns: undefined
-      }
+      rls_form: { Args: { p_form_id: string }; Returns: boolean }
+      rpc_check_max_responses: { Args: { form_id: string }; Returns: undefined }
       set_response_session_field_value: {
-        Args: { session_id: string; key: string; value: Json }
+        Args: { key: string; session_id: string; value: Json }
         Returns: undefined
       }
     }
@@ -1700,7 +1694,7 @@ export type Database = {
     }
     Functions: {
       create_secret_connection_supabase_service_key: {
-        Args: { p_supabase_project_id: number; p_secret: string }
+        Args: { p_secret: string; p_supabase_project_id: number }
         Returns: string
       }
       reveal_secret_connection_supabase_service_key: {
@@ -2050,7 +2044,7 @@ export type Database = {
           prompt: string | null
           public_domain: boolean
           score: number | null
-          search_tsv: unknown | null
+          search_tsv: unknown
           sys_annotations: string[]
           title: string | null
           transparency: boolean
@@ -2089,7 +2083,7 @@ export type Database = {
           prompt?: string | null
           public_domain?: boolean
           score?: number | null
-          search_tsv?: unknown | null
+          search_tsv?: unknown
           sys_annotations?: string[]
           title?: string | null
           transparency: boolean
@@ -2128,7 +2122,7 @@ export type Database = {
           prompt?: string | null
           public_domain?: boolean
           score?: number | null
-          search_tsv?: unknown | null
+          search_tsv?: unknown
           sys_annotations?: string[]
           title?: string | null
           transparency?: boolean
@@ -2217,7 +2211,7 @@ export type Database = {
           prompt: string | null
           public_domain: boolean
           score: number | null
-          search_tsv: unknown | null
+          search_tsv: unknown
           sys_annotations: string[]
           title: string | null
           transparency: boolean
@@ -2226,6 +2220,12 @@ export type Database = {
           width: number
           year: number | null
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "object"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       similar: {
         Args: { ref_id: string }
@@ -2259,7 +2259,7 @@ export type Database = {
           prompt: string | null
           public_domain: boolean
           score: number | null
-          search_tsv: unknown | null
+          search_tsv: unknown
           sys_annotations: string[]
           title: string | null
           transparency: boolean
@@ -2268,6 +2268,12 @@ export type Database = {
           width: number
           year: number | null
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "object"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
     }
     Enums: {
@@ -3206,15 +3212,15 @@ export type Database = {
       analyze: {
         Args: {
           p_campaign_id: string
+          p_interval?: unknown
           p_names?: string[]
           p_time_from?: string
           p_time_to?: string
-          p_interval?: unknown
         }
         Returns: {
           bucket: string
-          name: string
           count: number
+          name: string
         }[]
       }
       claim: {
@@ -3229,20 +3235,23 @@ export type Database = {
           metadata: Json | null
           referrer_id: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "invitation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       flag: {
         Args: {
           p_campaign_id: string
-          p_invitation_id: string
-          p_event_name: string
           p_event_data?: Json
+          p_event_name: string
+          p_invitation_id: string
         }
         Returns: undefined
       }
-      gen_random_short_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      gen_random_short_code: { Args: never; Returns: string }
       invite: {
         Args: {
           p_campaign_id: string
@@ -3258,6 +3267,12 @@ export type Database = {
           is_claimed: boolean
           metadata: Json | null
           referrer_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invitation"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       lookup: {
@@ -3284,17 +3299,20 @@ export type Database = {
           metadata: Json | null
           referrer_id: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "invitation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      rls_campaign: {
-        Args: { p_campaign_id: string }
-        Returns: boolean
-      }
+      rls_campaign: { Args: { p_campaign_id: string }; Returns: boolean }
       track: {
         Args: {
           p_campaign_id: string
           p_code: string
-          p_name: string
           p_data?: Json
+          p_name: string
         }
         Returns: undefined
       }
@@ -3565,21 +3583,12 @@ export type Database = {
     }
     Functions: {
       change_www_name: {
-        Args: { p_www_id: string; p_name: string }
+        Args: { p_name: string; p_www_id: string }
         Returns: undefined
       }
-      check_www_name_available: {
-        Args: { p_name: string }
-        Returns: boolean
-      }
-      gen_random_www_name: {
-        Args: { p_project_id: number }
-        Returns: string
-      }
-      rls_www: {
-        Args: { p_www_id: string }
-        Returns: boolean
-      }
+      check_www_name_available: { Args: { p_name: string }; Returns: boolean }
+      gen_random_www_name: { Args: { p_project_id: number }; Returns: string }
+      rls_www: { Args: { p_www_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -3752,7 +3761,7 @@ export type Database = {
           phone_provisional: string[]
           project_id: number
           search_text: string | null
-          search_tsv: unknown | null
+          search_tsv: unknown
           uid: string
           user_id: string | null
           uuid: string | null
@@ -3776,7 +3785,7 @@ export type Database = {
           phone_provisional?: string[]
           project_id: number
           search_text?: string | null
-          search_tsv?: unknown | null
+          search_tsv?: unknown
           uid?: string
           user_id?: string | null
           uuid?: string | null
@@ -3800,7 +3809,7 @@ export type Database = {
           phone_provisional?: string[]
           project_id?: number
           search_text?: string | null
-          search_tsv?: unknown | null
+          search_tsv?: unknown
           uid?: string
           user_id?: string | null
           uuid?: string | null
@@ -4203,7 +4212,7 @@ export type Database = {
           created_at: string
           fingerprint_visitor_id: string | null
           id: string
-          ip: unknown | null
+          ip: unknown
           project_id: number
           user_agent: string | null
         }
@@ -4211,7 +4220,7 @@ export type Database = {
           created_at?: string
           fingerprint_visitor_id?: string | null
           id?: string
-          ip?: unknown | null
+          ip?: unknown
           project_id: number
           user_agent?: string | null
         }
@@ -4219,7 +4228,7 @@ export type Database = {
           created_at?: string
           fingerprint_visitor_id?: string | null
           id?: string
-          ip?: unknown | null
+          ip?: unknown
           project_id?: number
           user_agent?: string | null
         }
@@ -4254,7 +4263,7 @@ export type Database = {
           phone_provisional: string[] | null
           project_id: number | null
           search_text: string | null
-          search_tsv: unknown | null
+          search_tsv: unknown
           tags: string[] | null
           uid: string | null
           user_id: string | null
@@ -4280,30 +4289,6 @@ export type Database = {
       }
     }
     Functions: {
-      citext: {
-        Args: { "": string } | { "": boolean } | { "": unknown }
-        Returns: string
-      }
-      citext_hash: {
-        Args: { "": string }
-        Returns: number
-      }
-      citextin: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      citextout: {
-        Args: { "": string }
-        Returns: unknown
-      }
-      citextrecv: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      citextsend: {
-        Args: { "": string }
-        Returns: string
-      }
       find_project: {
         Args: { p_org_ref: string; p_proj_ref: string }
         Returns: {
@@ -4313,45 +4298,33 @@ export type Database = {
           organization_id: number
           ref_id: string | null
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "project"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
-      flatten_jsonb_object_values: {
-        Args: { obj: Json }
-        Returns: string
-      }
-      gen_random_slug: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_combinations: {
-        Args:
-          | { product_id: number; option_value_combinations: number[] }
-          | { option_ids: number[]; product_id: number; store_id: number }
-        Returns: undefined
-      }
+      flatten_jsonb_object_values: { Args: { obj: Json }; Returns: string }
+      gen_random_slug: { Args: never; Returns: string }
+      generate_combinations:
+        | {
+            Args: { option_ids: number[]; product_id: number; store_id: number }
+            Returns: undefined
+          }
+        | {
+            Args: { option_value_combinations: number[]; product_id: number }
+            Returns: undefined
+          }
       get_organizations_for_user: {
         Args: { user_id: string }
         Returns: number[]
       }
-      get_projects_for_user: {
-        Args: { user_id: string }
-        Returns: number[]
-      }
-      jsonb_array_objects_only: {
-        Args: { arr: Json[] }
-        Returns: boolean
-      }
-      rls_asset: {
-        Args: { p_asset_id: string }
-        Returns: boolean
-      }
-      rls_document: {
-        Args: { p_document_id: string }
-        Returns: boolean
-      }
-      rls_manifest: {
-        Args: { p_manifest_id: number }
-        Returns: boolean
-      }
+      get_projects_for_user: { Args: { user_id: string }; Returns: number[] }
+      jsonb_array_objects_only: { Args: { arr: Json[] }; Returns: boolean }
+      rls_asset: { Args: { p_asset_id: string }; Returns: boolean }
+      rls_document: { Args: { p_document_id: string }; Returns: boolean }
+      rls_manifest: { Args: { p_manifest_id: number }; Returns: boolean }
       rls_organization: {
         Args: { p_organization_id: number }
         Returns: boolean
@@ -4360,14 +4333,8 @@ export type Database = {
         Args: { p_organization_id: number }
         Returns: boolean
       }
-      rls_project: {
-        Args: { project_id: number }
-        Returns: boolean
-      }
-      rls_via_customer: {
-        Args: { p_customer_id: string }
-        Returns: boolean
-      }
+      rls_project: { Args: { project_id: number }; Returns: boolean }
+      rls_via_customer: { Args: { p_customer_id: string }; Returns: boolean }
       update_customer_tags: {
         Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
         Returns: undefined
@@ -4375,25 +4342,25 @@ export type Database = {
       workspace_documents: {
         Args: { p_organization_id: number }
         Returns: {
-          id: string
           created_at: string
-          updated_at: string
           doctype: Database["public"]["Enums"]["doctype"]
-          project_id: number
-          title: string
           form_id: string
-          organization_id: number
           has_connection_supabase: boolean
-          responses: number
-          max_responses: number
+          id: string
           is_public: boolean
+          max_responses: number
+          organization_id: number
+          project_id: number
+          responses: number
+          title: string
+          updated_at: string
         }[]
       }
       workspace_mark_access: {
         Args: {
+          p_document_id?: string
           p_organization_name: string
           p_project_name: string
-          p_document_id?: string
         }
         Returns: undefined
       }
@@ -4428,21 +4395,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -4460,14 +4431,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -4483,14 +4456,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -4506,14 +4481,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -4521,14 +4498,16 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
