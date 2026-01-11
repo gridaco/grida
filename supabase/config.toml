@@ -1,5 +1,7 @@
 # For detailed configuration reference documentation, visit:
 # https://supabase.com/docs/guides/local-development/cli/config
+# https://github.com/supabase/cli/blob/develop/pkg/config/templates/config.toml
+
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
 project_id = "sb"
@@ -10,7 +12,7 @@ enabled = true
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` and `graphql_public` schemas are included by default.
-schemas = ["public", "graphql_public", "pgmq_public", "grida_library", "grida_www", "grida_g11n", "grida_x_supabase", "grida_sites", "grida_canvas", "grida_commerce", "grida_forms_secure", "grida_forms", "grida_storage", "grida_west", "grida_west_referral"]
+schemas = ["public", "graphql_public", "pgmq_public", "grida_library", "grida_www", "grida_g11n", "grida_x_supabase", "grida_sites", "grida_canvas", "grida_commerce", "grida_forms_secure", "grida_forms", "grida_storage", "grida_west_referral"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
@@ -133,6 +135,8 @@ site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = ["https://127.0.0.1:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
+# Path to JWT signing key. DO NOT commit your signing keys file to git.
+signing_keys_path = "./signing_keys.json"
 # If disabled, the refresh token will never expire.
 enable_refresh_token_rotation = true
 # Allows refresh tokens to be reused after expiry, up to the specified interval in seconds.
