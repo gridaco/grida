@@ -182,3 +182,41 @@ END;
 $function$;
 
 GRANT EXECUTE ON FUNCTION grida_ciam_public.update_customer_tags(uuid, bigint, text[]) TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.customer_auth_policy]
+-- Public-facing view exposing customer_auth_policy table
+---------------------------------------------------------------------
+
+CREATE VIEW grida_ciam_public.customer_auth_policy
+WITH (security_invoker = true)
+AS
+SELECT
+  id,
+  created_at,
+  project_id,
+  challenges,
+  description,
+  name,
+  enabled,
+  scopes
+FROM grida_ciam.customer_auth_policy;
+
+GRANT ALL ON TABLE grida_ciam_public.customer_auth_policy TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.customer_tag]
+-- Public-facing view exposing customer_tag table (for FK relationships)
+---------------------------------------------------------------------
+
+CREATE VIEW grida_ciam_public.customer_tag
+WITH (security_invoker = true)
+AS
+SELECT
+  customer_uid,
+  project_id,
+  tag_name,
+  created_at
+FROM grida_ciam.customer_tag;
+
+GRANT ALL ON TABLE grida_ciam_public.customer_tag TO anon, authenticated, service_role;

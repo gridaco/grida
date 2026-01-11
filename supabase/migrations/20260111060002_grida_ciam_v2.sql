@@ -110,3 +110,37 @@ CREATE TRIGGER insert_customer_with_tags_instead
 INSTEAD OF INSERT ON grida_ciam_public.customer_with_tags
 FOR EACH ROW
 EXECUTE FUNCTION grida_ciam.insert_customer_with_tags();
+
+---------------------------------------------------------------------
+-- Public-facing views in grida_ciam_public
+---------------------------------------------------------------------
+
+-- View to expose customer_auth_policy from grida_ciam
+CREATE OR REPLACE VIEW grida_ciam_public.customer_auth_policy
+WITH (security_invoker = true)
+AS
+SELECT
+  id,
+  created_at,
+  project_id,
+  challenges,
+  description,
+  name,
+  enabled,
+  scopes
+FROM grida_ciam.customer_auth_policy;
+
+GRANT ALL ON TABLE grida_ciam_public.customer_auth_policy TO anon, authenticated, service_role;
+
+-- View to expose customer_tag from grida_ciam (for FK relationships)
+CREATE OR REPLACE VIEW grida_ciam_public.customer_tag
+WITH (security_invoker = true)
+AS
+SELECT
+  customer_uid,
+  project_id,
+  tag_name,
+  created_at
+FROM grida_ciam.customer_tag;
+
+GRANT ALL ON TABLE grida_ciam_public.customer_tag TO anon, authenticated, service_role;
