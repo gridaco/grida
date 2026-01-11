@@ -97,6 +97,7 @@ supabase migration up
 
 supabase gen types typescript --local \
   --schema public \
+  --schema grida_ciam_public \
   --schema grida_library \
   --schema grida_www \
   --schema grida_g11n \
