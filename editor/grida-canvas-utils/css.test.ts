@@ -1,11 +1,6 @@
 import type grida from "@grida/schema";
 import kolor from "@grida/color";
 
-jest.mock("@grida/cmath", () => ({ __esModule: true, default: {} }), {
-  virtual: true,
-});
-jest.mock("color-name", () => ({}), { virtual: true });
-
 import { css } from "./css";
 
 describe("toReactTextStyle", () => {

@@ -1,11 +1,6 @@
 import documentReducer from "../document.reducer";
 import grida from "@grida/schema";
 
-jest.mock("../surface.reducer", () => ({
-  __esModule: true,
-  default: jest.fn(),
-}));
-
 function createImagePaint(overrides: Record<string, any> = {}) {
   return {
     type: "image",
