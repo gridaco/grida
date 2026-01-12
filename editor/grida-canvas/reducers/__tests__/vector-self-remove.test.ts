@@ -1,19 +1,25 @@
 import surfaceReducer from "../surface.reducer";
-import type grida from "@grida/schema";
-
-jest.mock("../methods", () => ({
-  self_optimizeVectorNetwork: jest.fn(),
-  self_try_remove_node: jest.fn((draft: any, id: string) => {
-    delete draft.document.nodes[id];
-  }),
-  self_revert_tool: jest.fn(),
-}));
+import grida from "@grida/schema";
+import { editor } from "@/grida-canvas";
 
 describe("surface reducer - vector self remove", () => {
   test("removes vector node when exiting edit mode with empty network", () => {
     const node_id = "vector1";
-    const doc = {
+    const doc: grida.program.document.Document = {
+      scenes_ref: ["scene"],
+      links: { scene: [node_id] },
       nodes: {
+        scene: {
+          type: "scene",
+          id: "scene",
+          name: "Scene",
+          active: true,
+          locked: false,
+          constraints: { children: "multiple" },
+          guides: [],
+          edges: [],
+          background_color: null,
+        },
         [node_id]: {
           id: node_id,
           type: "vector",
@@ -31,26 +37,24 @@ describe("surface reducer - vector self remove", () => {
           vector_network: { vertices: [], segments: [] },
         } satisfies Partial<grida.program.nodes.VectorNode> as any,
       },
-      scenes: {
-        scene: {
-          id: "scene",
-          name: "Scene",
-          constraints: { children: "many" },
-          children: [node_id],
-        },
-      },
       entry_scene_id: "scene",
-    } as any as grida.program.document.Document;
+      bitmaps: {},
+      images: {},
+      properties: {},
+    };
+
+    const base = editor.state.init({
+      editable: true,
+      debug: false,
+      document: doc,
+      templates: {},
+    });
 
     const state = {
-      document: doc,
-      document_ctx: {} as any,
-      scene_id: "scene",
-      selection: [],
-      hovered_node_id: null,
+      ...base,
       when_not_removable: "deactivate",
-      gesture: { type: "idle" },
       tool: { type: "cursor" },
+      gesture: { type: "idle" },
       content_edit_mode: {
         type: "vector",
         node_id,

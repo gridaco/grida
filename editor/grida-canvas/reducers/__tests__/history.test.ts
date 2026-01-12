@@ -4,6 +4,7 @@ import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import color from "@grida/color";
 import type { Action } from "../../action";
+import { vi } from "vitest";
 
 // Mock geometry interface
 const geometryStub: editor.api.IDocumentGeometryQuery = {
@@ -230,7 +231,7 @@ describe("History Management", () => {
     test("merges rapid selection updates", () => {
       const history = new DocumentHistoryManager();
       let state = createState();
-      const nowSpy = jest.spyOn(Date, "now");
+      const nowSpy = vi.spyOn(Date, "now");
 
       // First selection
       nowSpy.mockReturnValueOnce(1000);
@@ -264,7 +265,7 @@ describe("History Management", () => {
     test("does not merge actions after merge window", () => {
       const history = new DocumentHistoryManager();
       let state = createState();
-      const nowSpy = jest.spyOn(Date, "now");
+      const nowSpy = vi.spyOn(Date, "now");
 
       // First selection
       nowSpy.mockReturnValueOnce(1000);
@@ -274,16 +275,16 @@ describe("History Management", () => {
       });
       expect(history.snapshot.past).toHaveLength(1);
 
-      // Second selection after merge window (200ms)
-      nowSpy.mockReturnValueOnce(1200);
-      nowSpy.mockReturnValueOnce(1200);
+      // Second selection after merge window (> 300ms)
+      nowSpy.mockReturnValueOnce(1401);
+      nowSpy.mockReturnValueOnce(1401);
       state = dispatchWithHistory(history, state, {
         type: "select",
         selection: ["rect2"],
       });
 
-      // Should create separate entries (200ms is outside merge window)
-      expect(history.snapshot.past).toHaveLength(1); // Still merged due to rapid execution
+      // Should create separate entries (outside merge window)
+      expect(history.snapshot.past).toHaveLength(2);
       expect(state.selection).toEqual(["rect2"]);
 
       nowSpy.mockRestore();
