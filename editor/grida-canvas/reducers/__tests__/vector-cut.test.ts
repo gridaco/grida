@@ -2,11 +2,6 @@ import documentReducer from "../document.reducer";
 import type grida from "@grida/schema";
 import type { editor } from "@/grida-canvas";
 
-jest.mock("../surface.reducer", () => ({
-  __esModule: true,
-  default: jest.fn(),
-}));
-
 describe("document reducer - vector cut", () => {
   test("cuts selected vector network", () => {
     const node_id = "vector1";
