@@ -67,7 +67,7 @@ export default function InvitationPage({
         locale={template.locale}
         data={{
           ...context,
-          // FIXME:
+          // FIXME: type strong or dynamic schema needed.
           signup_form_id:
             (context.campaign.public as CampaignPublicData | null)?.[
               "signup-form-id"

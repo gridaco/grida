@@ -845,7 +845,7 @@ importers:
         specifier: ^1.6.5
         version: 1.6.5(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       react-hook-form:
-        specifier: ^7.56.3
+        specifier: ^7.56.4
         version: 7.56.4(react@19.2.1)
       react-hotkeys-hook:
         specifier: ^4.6.1
