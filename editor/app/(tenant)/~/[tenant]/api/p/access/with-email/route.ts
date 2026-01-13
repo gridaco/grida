@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { service_role } from "@/lib/supabase/server";
 import { resend } from "@/clients/resend";
-import EmailTemplateCIAMVerification from "@/theme/templates-email/ciam-verifiaction/default";
+import TenantCustomerPortalAccessEmailVerification, {
+  subject,
+  supported_languages,
+  type CustomerPortalVerificationEmailLang,
+} from "@/theme/templates-email/customer-portal-verification/default";
 import { otp6 } from "@/lib/crypto/otp";
+import { select_lang } from "@/i18n/utils";
 // TODO: add rate limiting
 export async function POST(
   req: NextRequest,
@@ -10,8 +15,6 @@ export async function POST(
 ) {
   const jsonbody = await req.json();
   const { email } = jsonbody;
-
-  const brand_name = "Grida";
 
   const emailNormalized = String(email ?? "")
     .trim()
@@ -23,7 +26,7 @@ export async function POST(
   const { tenant } = await params;
   const { data: www, error: wwwErr } = await service_role.www
     .from("www")
-    .select("project_id")
+    .select("project_id, title, publisher, lang")
     .eq("name", tenant)
     .single();
 
@@ -36,10 +39,15 @@ export async function POST(
     return NextResponse.json({ data: null, error: null, message: "ok" });
   }
 
-  const projectId = Number((www as any).project_id);
+  const projectId = Number(www.project_id);
   if (!Number.isFinite(projectId)) {
     return NextResponse.json({ data: null, error: null, message: "ok" });
   }
+
+  const brand_name =
+    typeof www.title === "string" && www.title
+      ? String(www.title)
+      : "(Untitled)";
 
   // Customer portal access: existing customers only.
   const { data: customer_list, error: customer_list_err } =
@@ -104,22 +112,38 @@ export async function POST(
     return NextResponse.json({ data: null, error: null, message: "ok" });
   }
 
-  const acceptLanguage = req.headers.get("accept-language") ?? "";
-  const emailLang = acceptLanguage.toLowerCase().includes("ko") ? "ko" : "en";
+  // Tenant support info (optional). `www.publisher` isn't strictly "support",
+  // but can be used as a tenant-provided contact/URL when available.
+  const publisher =
+    typeof www.publisher === "string" && www.publisher
+      ? String(www.publisher)
+      : "";
+  const brand_support_url =
+    publisher.startsWith("http://") || publisher.startsWith("https://")
+      ? publisher
+      : undefined;
+  const brand_support_contact = publisher.includes("@") ? publisher : undefined;
+
+  const emailLang: CustomerPortalVerificationEmailLang = select_lang(
+    www.lang,
+    supported_languages,
+    "en"
+  );
 
   const { error: resend_err } = await resend.emails.send({
     from: `${brand_name} <no-reply@accounts.grida.co>`,
     to: emailNormalized,
-    subject:
-      emailLang === "ko"
-        ? `${otp} - ${brand_name} 인증 코드`
-        : `${otp} - ${brand_name} Verification`,
-    react: EmailTemplateCIAMVerification({
-      email_otp: otp,
+    subject: subject(emailLang, {
       brand_name,
-      expires_in_minutes,
+      email_otp: otp,
+    }),
+    react: TenantCustomerPortalAccessEmailVerification({
+      email_otp: otp,
+      customer_name: customer.name ?? undefined,
+      brand_name: brand_name,
+      brand_support_url,
+      brand_support_contact,
       lang: emailLang,
-      userName: customer.name ?? undefined,
     }),
   });
 

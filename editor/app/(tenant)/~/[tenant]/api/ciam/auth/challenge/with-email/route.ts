@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { service_role } from "@/lib/supabase/server";
 import { resend } from "@/clients/resend";
-import EmailTemplateCIAMVerification from "@/theme/templates-email/ciam-verifiaction/default";
+import TenantCIAMEmailVerification, {
+  subject,
+  supported_languages,
+  type CIAMVerificationEmailLang,
+} from "@/theme/templates-email/ciam-verifiaction/default";
 import { otp6 } from "@/lib/crypto/otp";
+import { select_lang } from "@/i18n/utils";
 
 /**
  * POST /api/ciam/auth/challenge/with-email
@@ -34,7 +39,7 @@ export async function POST(
     // Tenant in this router corresponds to `grida_www.www.name`.
     const { data: www, error: wwwErr } = await service_role.www
       .from("www")
-      .select("project_id")
+      .select("project_id, title, publisher, lang")
       .eq("name", tenant)
       .single();
     if (wwwErr || !www) {
@@ -42,7 +47,7 @@ export async function POST(
       return NextResponse.json({ error: "tenant not found" }, { status: 404 });
     }
 
-    const projectId = Number((www as any).project_id);
+    const projectId = Number(www.project_id);
     if (!Number.isFinite(projectId)) {
       return NextResponse.json({ error: "tenant not found" }, { status: 404 });
     }
@@ -102,21 +107,33 @@ export async function POST(
     }
 
     // Send email with OTP
-    const brand_name = "Grida";
-    const acceptLanguage = req.headers.get("accept-language") ?? "";
-    const emailLang = acceptLanguage.toLowerCase().includes("ko") ? "ko" : "en";
+    const brand_name = www.title ? String(www.title) : "(Untitled)";
+
+    const publisher = www.publisher ? String(www.publisher) : "";
+    const brand_support_url =
+      publisher.startsWith("http://") || publisher.startsWith("https://")
+        ? publisher
+        : undefined;
+    const brand_support_contact = publisher.includes("@")
+      ? publisher
+      : undefined;
+
+    const emailLang: CIAMVerificationEmailLang = select_lang(
+      www.lang,
+      supported_languages,
+      "en"
+    );
     const { error: resend_err } = await resend.emails.send({
       from: `${brand_name} <no-reply@accounts.grida.co>`,
       to: emailNormalized,
-      subject:
-        emailLang === "ko"
-          ? `${otp} - ${brand_name} 인증 코드`
-          : `${otp} - ${brand_name} Verification`,
-      react: EmailTemplateCIAMVerification({
+      subject: subject(emailLang, { brand_name, email_otp: otp }),
+      react: TenantCIAMEmailVerification({
         email_otp: otp,
         brand_name,
         expires_in_minutes,
         lang: emailLang,
+        brand_support_url,
+        brand_support_contact,
       }),
     });
 
