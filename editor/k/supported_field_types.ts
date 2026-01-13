@@ -101,6 +101,12 @@ export const annotations: Record<FormInputType, FieldTypeAnnotation> = {
     keywords: ["mail", "contact", "address", "communication"],
     description: "Input field for email addresses with validation",
   },
+  challenge_email: {
+    label: "Email Challenge",
+    keywords: ["email", "verification", "otp", "challenge", "2fa"],
+    description:
+      "Email field with an embedded challenge UI (e.g. send code + verify)",
+  },
   file: {
     label: "File Upload",
     keywords: ["document", "upload", "attachment", "file-picker"],
@@ -192,6 +198,7 @@ export const supported_field_types: FormInputType[] = [
   "radio",
   "toggle-group",
   "email",
+  "challenge_email",
   "tel",
   "url",
   "password",

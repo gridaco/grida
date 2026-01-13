@@ -1,5 +1,5 @@
 import type { Platform } from "@/lib/platform";
-import { createClient, createFormsClient } from "@/lib/supabase/server";
+import { createFormsClient, createCIAMClient } from "@/lib/supabase/server";
 import type { Form, FormResponse } from "@/grida-forms-hosted/types";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -19,10 +19,10 @@ export async function GET(
   }
 ) {
   const { uid } = await context.params;
-  const client = await createClient();
+  const ciamClient = await createCIAMClient();
   const formsClient = await createFormsClient();
 
-  const { data: customer } = await client
+  const { data: customer } = await ciamClient
     .from("customer_with_tags")
     .select("*")
     .eq("uid", uid)

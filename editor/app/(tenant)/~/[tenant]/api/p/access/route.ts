@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, context: Context) {
   const formdata = await reqformdata(req, contenttype);
   const { policy: policyid } = await context.params;
 
-  const { data: policy, error: policy_fetch_err } = await service_role.workspace
+  const { data: policy, error: policy_fetch_err } = await service_role.ciam
     .from("customer_auth_policy")
     .select("*")
     .eq("id", policyid)

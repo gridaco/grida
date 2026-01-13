@@ -70,7 +70,7 @@ function Form({ searchParams }: { searchParams: SerachParams }) {
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="insiders@grida.co"
+                    placeholder="insider@grida.co"
                     required
                   />
                 </div>

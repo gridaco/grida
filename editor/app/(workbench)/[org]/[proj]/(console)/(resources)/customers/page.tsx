@@ -21,7 +21,7 @@ import {
   insertCustomer,
 } from "@/scaffolds/platform/customer/use-customer-feed";
 import { useTableSpaceInstance } from "@/scaffolds/data-table";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { createBrowserClient, createBrowserCIAMClient } from "@/lib/supabase/client";
 import {
   DataPlatformProvider,
   SchemaNameProvider,
@@ -88,11 +88,12 @@ function Body() {
   };
 
   // TODO: remove the realtime - or at least disable when importing from csv (swr will be enough)
+  const ciamClient = useMemo(() => createBrowserCIAMClient(), []);
   const tablespace = useTableSpaceInstance<Platform.Customer.CustomerWithTags>({
     identifier: "uid",
     readonly: false,
     realtime: true,
-    fetcher: (q) => fetchCustomers(client, project_id, q),
+    fetcher: (q) => fetchCustomers(ciamClient, project_id, q),
     subscriber: (callbacks) => {
       const subscription = subscribeTable(
         client,

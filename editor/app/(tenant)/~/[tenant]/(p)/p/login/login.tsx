@@ -17,7 +17,6 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { createBrowserClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/ui/spinner";
 import { template } from "@/utils/template";
 import { useRouter } from "next/navigation";
@@ -61,11 +60,11 @@ export default function PortalLogin({
   locale = "en",
 }: CustomerPropsMinimalCustomizationProps) {
   const router = useRouter();
-  const supabase = useMemo(() => createBrowserClient(), []);
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
 
   const sendEmail = async (email: string) => {
     const res = await fetch(`/api/p/access/with-email`, {
@@ -74,7 +73,13 @@ export default function PortalLogin({
         email: email,
       }),
     });
-    return res.ok;
+    const json = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok,
+      // Note: endpoint returns ok even when the email isn't registered.
+      // We store challenge_id if present, but do not depend on it for the email step UI.
+      challenge_id: (json as any)?.challenge_id as string | undefined,
+    };
   };
 
   const handleEmail = (e: React.FormEvent) => {
@@ -88,8 +93,9 @@ export default function PortalLogin({
 
     setIsLoading(true);
     sendEmail?.(email)
-      .then((ok) => {
+      .then(({ ok, challenge_id }) => {
         if (ok) {
+          setChallengeId(challenge_id ?? null);
           setStep("otp");
         } else {
           toast.error("Something went wrong");
@@ -103,22 +109,41 @@ export default function PortalLogin({
 
   const handleOtp = async (otp: string) => {
     setIsLoading(true);
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: "email",
-    });
-    setIsLoading(false);
+    setError("");
 
-    if (error) {
-      setError(error.message);
+    // CIAM flow:
+    // Customer portal access is verified via CIAM OTP challenge verification.
+    // This intentionally does NOT use Supabase Auth.
+    if (!challengeId) {
+      setIsLoading(false);
+      setError("Invalid or expired OTP");
       return;
     }
 
-    router.replace(`./session`);
+    const res = await fetch(
+      `/api/ciam/auth/challenge/${encodeURIComponent(challengeId)}/verify`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ otp }),
+      }
+    );
+
+    const json = await res.json().catch(() => ({}));
+    setIsLoading(false);
+
+    if (!res.ok) {
+      setError((json as any)?.error ?? "Invalid or expired OTP");
+      return;
+    }
+
+    const session_url = (json as any)?.session_url as string | undefined;
+    if (!session_url) {
+      setError("Invalid or expired OTP");
+      return;
+    }
+
+    router.replace(session_url);
   };
 
   const t = dictionary[locale as keyof typeof dictionary];

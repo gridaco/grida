@@ -19,6 +19,14 @@ export namespace TemplateData {
         title?: string;
         cta?: string;
         description?: string;
+        /**
+         * Controls whether the invite list section is visible on the referrer page.
+         */
+        show_invitations?: boolean;
+        invitation_card_content?: {
+          type: "richtext";
+          html: string;
+        };
         article?: {
           type: "richtext";
           html: string;
@@ -49,6 +57,10 @@ export namespace TemplateData {
         cta?: string;
         title?: string;
         description?: string;
+        invitation_card_content?: {
+          type: "richtext";
+          html: string;
+        };
         article?: {
           type: "richtext";
           html: string;

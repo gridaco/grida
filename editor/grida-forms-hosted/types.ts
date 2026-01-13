@@ -78,6 +78,7 @@ export type FormInputType =
   | "week"
   | "time"
   | "email"
+  | "challenge_email"
   | "file"
   | "image"
   | "audio"

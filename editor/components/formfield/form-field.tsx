@@ -54,6 +54,7 @@ import {
 } from "./reference-search-field";
 import { PhoneField } from "./phone-field";
 import { RichTextEditorField } from "./richtext-field";
+import { ChallengeEmailField, EmailChallengePreview } from "./email-challenge";
 import { FieldProperties } from "@/k/supported_field_types";
 import type { tokens } from "@grida/tokens";
 import { useValue } from "@/lib/spock";
@@ -307,6 +308,31 @@ function MonoFormField({
           // @ts-ignore
           <PhoneField
             {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+      case "challenge_email": {
+        if (preview) {
+          return (
+            <EmailChallengePreview
+              name={name}
+              label={label}
+              placeholder={placeholder}
+              required={required}
+              disabled={disabled}
+            />
+          );
+        }
+        return (
+          <ChallengeEmailField
+            // This renderer may be used outside of a session-based FormView.
+            // When no provider/session is available, ChallengeEmailField falls back to demo behavior.
+            stateKey={id ?? name}
+            name={name}
+            label={label}
+            placeholder={placeholder}
+            required={required}
+            disabled={disabled}
           />
         );
       }

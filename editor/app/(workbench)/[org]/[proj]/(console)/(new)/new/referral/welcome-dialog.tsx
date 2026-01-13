@@ -58,15 +58,13 @@ export default function WelcomeDialog(
               invitee
             </li>
           </ul>
-          <p>
-            All campaigns come with:
-            <ul>
-              <li>✅ Invite &amp; reward tracking</li>
-              <li>✅ Built-in landing &amp; dashboard pages</li>
-              <li>✅ Event analytics</li>
-              <li>✅ Secure-by-default setup</li>
-            </ul>
-          </p>
+          <p>All campaigns come with:</p>
+          <ul>
+            <li>✅ Invite &amp; reward tracking</li>
+            <li>✅ Built-in landing &amp; dashboard pages</li>
+            <li>✅ Event analytics</li>
+            <li>✅ Secure-by-default setup</li>
+          </ul>
           <p>
             No code needed — but devs can go wild later.
             <br />

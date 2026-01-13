@@ -24,6 +24,11 @@ import {
   TossPaymentsPayButton,
 } from "@/components/tosspayments";
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
+import {
+  ChallengeEmailField,
+  EmailChallengeProvider,
+  createHttpEmailChallengeProvider,
+} from "@/components/formfield/email-challenge";
 import { useFingerprint } from "@/components/fingerprint";
 import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
@@ -74,6 +79,19 @@ export interface FormViewTranslation {
   back: string;
   submit: string;
   pay: string;
+  email_challenge: {
+    verify: string;
+    sending: string;
+    verify_code: string;
+    enter_verification_code: string;
+    code_sent: string;
+    didnt_receive_code: string;
+    resend: string;
+    retry: string;
+    code_expired: string;
+    incorrect_code: string;
+    error_occurred: string;
+  };
 }
 
 const default_form_view_translation_en: FormViewTranslation = {
@@ -81,6 +99,19 @@ const default_form_view_translation_en: FormViewTranslation = {
   back: "Back",
   submit: "Submit",
   pay: "Pay",
+  email_challenge: {
+    verify: "Verify",
+    sending: "Sending",
+    verify_code: "Verify",
+    enter_verification_code: "Enter verification code",
+    code_sent: "A verification code has been sent to your inbox.",
+    didnt_receive_code: "Didn't receive a code?",
+    resend: "Resend",
+    retry: "Retry",
+    code_expired: "Verification code has expired.",
+    incorrect_code: "Incorrect verification code. Please try again.",
+    error_occurred: "An error occurred. Please try again later.",
+  },
 };
 
 type FormViewRootProps = {
@@ -149,6 +180,10 @@ function Providers({
 }>) {
   const [checkoutSession, setCheckoutSession] =
     useState<PaymentCheckoutSession | null>(null);
+  const emailChallengeProvider = useMemo(
+    () => createHttpEmailChallengeProvider({}),
+    []
+  );
 
   useEffect(() => {
     request_toss_payments_checkout_session({
@@ -174,9 +209,11 @@ function Providers({
           <FormAgentMessagingInterfaceProvider />
           <MediaLoadPluginProvider />
           <SessionDataSyncProvider session_id={session_id}>
-            <TossPaymentsCheckoutProvider initial={checkoutSession}>
-              {children}
-            </TossPaymentsCheckoutProvider>
+            <EmailChallengeProvider provider={emailChallengeProvider}>
+              <TossPaymentsCheckoutProvider initial={checkoutSession}>
+                {children}
+              </TossPaymentsCheckoutProvider>
+            </EmailChallengeProvider>
           </SessionDataSyncProvider>
         </PhoneFieldDefaultCountryProvider>
       </FormAgentProvider>
@@ -268,6 +305,7 @@ export function FormBody({
               block={b}
               stylesheet={stylesheet}
               getDefaultValue={getDefaultValue}
+              emailChallengeTranslation={translation.email_challenge}
             />
           ))}
         </GroupLayout>
@@ -401,7 +439,7 @@ function FormSubmit({
     >
       {is_submitting && (
         <div className="flex items-center justify-center">
-          <Spinner className="me-2 fill-accent" />
+          <Spinner className="me-2" />
         </div>
       )}
       {children}
@@ -413,6 +451,7 @@ function BlockRenderer({
   block,
   stylesheet,
   getDefaultValue,
+  emailChallengeTranslation,
   // this is the default config because if the form does not have a section, it is considered as a single root section.
   // if there is a section, the section renderer will create a new context.
   context = { is_root: true, is_in_current_section: false },
@@ -421,12 +460,14 @@ function BlockRenderer({
   stylesheet?: any;
   // e.g. (key) => defaultValues?.[key]
   getDefaultValue?: (key: string) => string | undefined;
+  emailChallengeTranslation: FormViewTranslation["email_challenge"];
   context?: {
     is_root: boolean;
     is_in_current_section: boolean;
   };
 }) {
   const [state, dispatch] = useFormAgentState();
+  const { session_id } = useFormAgent();
 
   const onValueChange = useCallback(
     (value: string | boolean | number) => {
@@ -481,6 +522,7 @@ function BlockRenderer({
                 block={b}
                 stylesheet={stylesheet}
                 getDefaultValue={getDefaultValue}
+                emailChallengeTranslation={emailChallengeTranslation}
                 context={{
                   is_root: false, // always false
                   is_in_current_section: is_current_section,
@@ -501,6 +543,21 @@ function BlockRenderer({
       const defaultValue = getDefaultValue?.(field.name);
 
       switch (type) {
+        case "challenge_email": {
+          return (
+            <ChallengeEmailField
+              sessionId={session_id}
+              fieldId={field.id}
+              stateKey={field.name}
+              name={field.name}
+              label={field.label ?? field.name}
+              placeholder={field.placeholder ?? "alice@example.com"}
+              required={field.required}
+              disabled={is_not_in_current_section_nor_root || hidden}
+              i18n={emailChallengeTranslation}
+            />
+          );
+        }
         case "payment": {
           switch ((field.data as PaymentFieldData)?.service_provider) {
             case "tosspayments": {

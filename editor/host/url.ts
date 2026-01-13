@@ -267,5 +267,11 @@ export function formerrorlink(
     case "FORM_OPTION_UNAVAILABLE": {
       return formlink(host, form_id, "formoptionsoldout");
     }
+    case "CHALLENGE_EMAIL_NOT_VERIFIED": {
+      // Keep the user in the form flow; treat as a bad request with a specific error.
+      return formlink(host, form_id, "badrequest", {
+        error: "CHALLENGE_EMAIL_NOT_VERIFIED",
+      } as any);
+    }
   }
 }

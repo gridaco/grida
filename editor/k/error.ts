@@ -1,3 +1,5 @@
+// TODO: move this file to form-specific directory.
+
 export const SERVICE_ERROR = {
   code: "INTERNAL_SERVER_ERROR",
   message: "Internal server error",
@@ -69,4 +71,9 @@ export const FORM_SOLD_OUT = {
 export const FORM_OPTION_UNAVAILABLE = {
   code: "FORM_OPTION_UNAVAILABLE",
   message: "The form option is unavailable",
+} as const;
+
+export const CHALLENGE_EMAIL_NOT_VERIFIED = {
+  code: "CHALLENGE_EMAIL_NOT_VERIFIED",
+  message: "Please verify your email before submitting.",
 } as const;

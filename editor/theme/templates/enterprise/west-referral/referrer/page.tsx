@@ -171,6 +171,8 @@ export interface Props {
     src: string;
     alt?: string;
   };
+  invitation_card_content?: { type: "richtext"; html: string };
+  show_invitations?: boolean;
   cta: string;
   article?: {
     html: string;
@@ -329,11 +331,18 @@ export default function ReferrerPageTemplate({
                   </CardHeader>
                 )}
                 <CardContent className="px-4 py-4">
-                  <p className="text-sm text-muted-foreground">
-                    {template(t.invite_description, {
-                      referrer_name,
-                    })}
-                  </p>
+                  {design.invitation_card_content?.html ? (
+                    <div
+                      className="prose prose-sm dark:prose-invert text-muted-foreground"
+                      dangerouslySetInnerHTML={{
+                        __html: design.invitation_card_content.html,
+                      }}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      (Customize your message in campaign designer)
+                    </p>
+                  )}
                 </CardContent>
                 {is_available && (
                   <CardFooter className="px-4 pb-4">
@@ -350,7 +359,7 @@ export default function ReferrerPageTemplate({
               </Card>
             </Standard.Section>
 
-            {invitations.length > 0 && (
+            {design.show_invitations && invitations.length > 0 && (
               <Standard.Section>
                 <Card className="relative overflow-hidden rounded-xl py-2 border-0">
                   {invitations?.map((inv, index) => (

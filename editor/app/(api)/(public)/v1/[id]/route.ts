@@ -270,7 +270,9 @@ export async function GET(
       {
         id: system_keys.__gf_session ?? undefined,
         form_id: id,
-        customer_id: customer?.uid,
+        // IMPORTANT: never overwrite an existing session.customer_id with null.
+        // customer_id is a sticky binding set by trusted verification flows.
+        customer_id: customer?.uid ?? undefined,
       },
       { onConflict: "id" }
     )

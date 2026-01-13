@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { Control } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { z } from "zod/v3";
 import { CalendarIcon, InfoIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useCampaign } from "../store";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -48,12 +50,29 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from "@/components/ui/field";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { createBrowserWestReferralClient } from "@/lib/supabase/client";
+import {
+  createBrowserFormsClient,
+  createBrowserWestReferralClient,
+} from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
+import type { Database } from "@app/database";
 
 // Timezone options
 const timezones = [
@@ -153,6 +172,7 @@ export default function CampaignSettings() {
   return (
     <Body
       campaign_id={id}
+      project_id={campaign.project_id}
       defaultValues={campaign as Partial<CampaignFormValues>}
       onSubmit={update}
     />
@@ -184,10 +204,12 @@ function ComingSoonCard() {
 
 function Body({
   campaign_id,
+  project_id,
   defaultValues,
   onSubmit,
 }: {
   campaign_id: string;
+  project_id: number;
   defaultValues: Partial<CampaignFormValues>;
   onSubmit: (data: CampaignFormValues) => Promise<boolean>;
 }) {
@@ -256,14 +278,14 @@ function Body({
                   Configure the basic settings for your campaign.
                 </p>
                 <div className="space-y-8">
-                  <FormItem>
-                    <FormLabel>Campaign ID</FormLabel>
+                  {/* NOTE: FormLabel/FormDescription require FormField context. */}
+                  <div className="space-y-2">
+                    <Label>Campaign ID</Label>
                     <Input readOnly disabled value={campaign_id} />
-                    <FormDescription>
+                    <p className="text-sm text-muted-foreground">
                       Your campaign&apos;s unique identifier.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
+                    </p>
+                  </div>
 
                   <FormField
                     control={form.control}
@@ -585,41 +607,16 @@ function Body({
                     )}
                   />
 
-                  <FormField
+                  <CampaignPublicDataFields
                     control={form.control}
-                    name="public"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Public JSON Data</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            className="font-mono h-32 resize-none"
-                            placeholder="{}"
-                            value={JSON.stringify(field.value, null, 2)}
-                            onChange={(e) => {
-                              try {
-                                field.onChange(JSON.parse(e.target.value));
-                              } catch (error) {
-                                // Allow invalid JSON during editing
-                                console.log(
-                                  "Invalid JSON, not updating form value"
-                                );
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Additional JSON data for the campaign. Must be valid
-                          JSON.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    projectId={project_id}
                   />
                 </div>
               </div>
             )}
           </CardContent>
+
+          <Separator className="my-4" />
 
           <CardFooter className="flex justify-end">
             <Button
@@ -640,5 +637,183 @@ function Body({
         </form>
       </Form>
     </Card>
+  );
+}
+
+function CampaignPublicDataFields({
+  control,
+  projectId,
+}: {
+  control: Control<CampaignFormValues>;
+  projectId: number;
+}) {
+  const formsClient = useMemo(() => createBrowserFormsClient(), []);
+  const [publicJsonOpen, setPublicJsonOpen] = useState(false);
+  const [forms, setForms] = useState<
+    Array<
+      Pick<Database["grida_forms"]["Tables"]["form"]["Row"], "id" | "title">
+    >
+  >([]);
+  const [formsLoading, setFormsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setFormsLoading(true);
+    (async () => {
+      try {
+        const { data } = await formsClient
+          .from("form")
+          .select("id,title")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: false });
+
+        if (cancelled) return;
+        setForms(
+          (data ?? []) as Array<
+            Pick<
+              Database["grida_forms"]["Tables"]["form"]["Row"],
+              "id" | "title"
+            >
+          >
+        );
+      } finally {
+        if (cancelled) return;
+        setFormsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formsClient, projectId]);
+
+  return (
+    <FormField
+      control={control}
+      name="public"
+      render={({ field, fieldState }) => (
+        <div>
+          <FieldGroup>
+            <Field>
+              <FieldLabel>Signup Form ID</FieldLabel>
+              <SignupFormIdSelect
+                value={getSignupFormIdFromPublic(field.value)}
+                forms={forms}
+                loading={formsLoading}
+                onChange={(next) => {
+                  field.onChange(setSignupFormIdInPublic(field.value, next));
+                }}
+              />
+              <FieldDescription>
+                Convenience field for{" "}
+                <code className="font-mono text-xs">
+                  public[&quot;signup-form-id&quot;]
+                </code>
+                . Used by the public invitation page.
+              </FieldDescription>
+              <FieldError>{fieldState.error?.message}</FieldError>
+            </Field>
+
+            <FieldSeparator />
+
+            <Field>
+              <Collapsible
+                open={publicJsonOpen}
+                onOpenChange={setPublicJsonOpen}
+              >
+                <div className="flex items-center justify-between">
+                  <FieldLabel>Public JSON Data (read-only)</FieldLabel>
+                  <CollapsibleTrigger asChild>
+                    <Button type="button" variant="ghost" size="sm">
+                      {publicJsonOpen ? "Hide" : "Show"}
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+                <FieldDescription>
+                  Additional JSON data for the campaign (not editable in UI).
+                </FieldDescription>
+                <CollapsibleContent>
+                  <div className="pt-2">
+                    <Textarea
+                      className="font-mono h-32 resize-none"
+                      placeholder="{}"
+                      value={JSON.stringify(field.value, null, 2)}
+                      readOnly
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </Field>
+          </FieldGroup>
+        </div>
+      )}
+    />
+  );
+}
+
+type FormOption = Pick<
+  Database["grida_forms"]["Tables"]["form"]["Row"],
+  "id" | "title"
+>;
+
+function getSignupFormIdFromPublic(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  if (!("signup-form-id" in value)) return undefined;
+  const v = String((value as Record<string, unknown>)["signup-form-id"] ?? "");
+  return v ? v : undefined;
+}
+
+function setSignupFormIdInPublic(
+  value: unknown,
+  signupFormId: string | undefined
+): Record<string, unknown> {
+  const base =
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  if (!signupFormId) {
+    const { ["signup-form-id"]: _, ...rest } = base;
+    return rest;
+  }
+
+  return { ...base, "signup-form-id": signupFormId };
+}
+
+function SignupFormIdSelect({
+  value,
+  forms,
+  loading,
+  onChange,
+}: {
+  value?: string;
+  forms: FormOption[];
+  loading: boolean;
+  onChange: (next?: string) => void;
+}) {
+  // Radix Select forbids empty string item values; use a sentinel.
+  const NONE = "__none__";
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(v) => onChange(v === NONE ? undefined : v)}
+      disabled={loading}
+    >
+      <SelectTrigger className="w-full">
+        {/* TODO(west-referral): Consider a searchable combobox UX */}
+        <SelectValue
+          placeholder={loading ? "Loading forms..." : "Select a form"}
+        />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NONE}>None</SelectItem>
+        {forms.map((f) => (
+          <SelectItem key={f.id} value={f.id}>
+            {f.title}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

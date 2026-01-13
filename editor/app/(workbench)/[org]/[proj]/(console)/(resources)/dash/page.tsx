@@ -14,6 +14,7 @@ import {
   AppWindowMacIcon,
   BarChart2Icon,
   MegaphoneIcon,
+  ShieldCheckIcon,
   TagsIcon,
   User2Icon,
 } from "lucide-react";
@@ -48,6 +49,12 @@ const menus = [
     description: "Launch and manage marketing or referral campaigns.",
     link: "./campaigns",
     icon: MegaphoneIcon,
+  },
+  {
+    title: "CIAM",
+    description: "Customer verification and session tools.",
+    link: "./ciam",
+    icon: ShieldCheckIcon,
   },
 ];
 

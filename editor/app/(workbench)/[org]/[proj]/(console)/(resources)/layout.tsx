@@ -10,9 +10,9 @@ import {
   SidebarProvider,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { ArrowLeftIcon, OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import { ArrowLeftIcon } from "@radix-ui/react-icons";
+import { HomeIcon, ShieldCheckIcon } from "lucide-react";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { previewlink } from "@/lib/internal/url";
 import { DarwinSidebarHeaderDragArea } from "@/host/desktop";
 import Link from "next/link";
 
@@ -47,6 +47,20 @@ export default async function Layout({
             </SidebarHeader>
             <SidebarContent>
               <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <Link href={`/${org}/${proj}/dash`}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton size="sm">
+                          <HomeIcon className="size-4" />
+                          Dashboard
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </Link>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+              <SidebarGroup>
                 <SidebarGroupLabel>Customer</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -66,6 +80,14 @@ export default async function Layout({
                         <SidebarMenuButton size="sm">
                           <ResourceTypeIcon type="tag" className="size-4" />
                           Tags
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </Link>
+                    <Link href={`/${org}/${proj}/ciam`}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton size="sm">
+                          <ShieldCheckIcon className="size-4" />
+                          CIAM
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     </Link>
@@ -127,14 +149,11 @@ export default async function Layout({
                     </Link>
                   </SidebarMenu>
                   <SidebarMenu>
-                    <Link
-                      href={previewlink({ org, proj, path: "/p/login" })}
-                      target="_blank"
-                    >
+                    <Link href={`/${org}/${proj}/ciam`}>
                       <SidebarMenuItem>
                         <SidebarMenuButton size="sm">
-                          <OpenInNewWindowIcon className="size-4" />
-                          Customer Portal
+                          <ShieldCheckIcon className="size-4" />
+                          CIAM
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     </Link>

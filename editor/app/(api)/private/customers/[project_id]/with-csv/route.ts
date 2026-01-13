@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createCIAMClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { Platform } from "@/lib/platform";
 import assert from "assert";
@@ -6,7 +6,7 @@ import { qboolean } from "@/utils/qs";
 import type { Database } from "@app/database";
 
 type PGCustomerInsert =
-  Database["public"]["Views"]["customer_with_tags"]["Row"];
+  Database["grida_ciam_public"]["Views"]["customer_with_tags"]["Row"];
 
 type Params = {
   project_id: number;
@@ -115,7 +115,8 @@ export async function POST(
       length: data?.length,
       summary: data?.slice(0, 5),
     });
-    const { count, error } = await client
+    const ciamClient = await createCIAMClient();
+    const { count, error } = await ciamClient
       .from("customer_with_tags")
       .insert(
         data! satisfies Platform.Customer.CustomerInsertionWithTags[] as any,

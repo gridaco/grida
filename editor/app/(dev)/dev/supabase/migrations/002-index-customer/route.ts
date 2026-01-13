@@ -23,6 +23,7 @@ export async function POST() {
         .eq("customer_id", customer.uid);
 
       const { email_provisional, phone_provisional } =
+        // FIXME: no any
         process_response_provisional_info(responses as any);
 
       // update customer

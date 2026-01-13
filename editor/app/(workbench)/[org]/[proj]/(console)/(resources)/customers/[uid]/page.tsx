@@ -44,7 +44,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { createBrowserClient, createBrowserCIAMClient } from "@/lib/supabase/client";
 import React, { useCallback, useMemo, useState, use } from "react";
 import { toast } from "sonner";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
@@ -172,7 +172,8 @@ function useCustomer(project_id: number, uid: string) {
   };
 
   const _update_tags = async (tags: string[]) => {
-    const { error } = await supabase.rpc("update_customer_tags", {
+    const ciamClient = createBrowserCIAMClient();
+    const { error } = await ciamClient.rpc("update_customer_tags", {
       p_customer_uid: uid,
       p_project_id: project_id,
       p_tags: tags,

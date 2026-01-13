@@ -44,6 +44,330 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_ciam: {
+    Tables: {
+      customer_auth_policy: {
+        Row: {
+          challenges: Json[]
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          name: string
+          project_id: number
+          scopes: string[]
+        }
+        Insert: {
+          challenges: Json[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          name: string
+          project_id: number
+          scopes: string[]
+        }
+        Update: {
+          challenges?: Json[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          name?: string
+          project_id?: number
+          scopes?: string[]
+        }
+        Relationships: []
+      }
+      customer_otp_challenge: {
+        Row: {
+          attempt_count: number
+          consumed_at: string | null
+          created_at: string
+          customer_uid: string | null
+          email: string
+          expires_at: string
+          id: string
+          otp_hash: string
+          otp_salt: string
+          project_id: number
+          token_type: Database["grida_ciam"]["Enums"]["one_time_token_type"]
+        }
+        Insert: {
+          attempt_count?: number
+          consumed_at?: string | null
+          created_at?: string
+          customer_uid?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          otp_hash: string
+          otp_salt: string
+          project_id: number
+          token_type?: Database["grida_ciam"]["Enums"]["one_time_token_type"]
+        }
+        Update: {
+          attempt_count?: number
+          consumed_at?: string | null
+          created_at?: string
+          customer_uid?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          otp_hash?: string
+          otp_salt?: string
+          project_id?: number
+          token_type?: Database["grida_ciam"]["Enums"]["one_time_token_type"]
+        }
+        Relationships: []
+      }
+      customer_portal_session: {
+        Row: {
+          activate_expires_at: string
+          activated_at: string | null
+          activation_ttl_seconds: number
+          created_at: string
+          customer_uid: string
+          id: string
+          idle_ttl_seconds: number
+          last_seen_at: string | null
+          project_id: number
+          revoked_at: string | null
+          scopes: string[]
+          token_hash: string
+        }
+        Insert: {
+          activate_expires_at: string
+          activated_at?: string | null
+          activation_ttl_seconds?: number
+          created_at?: string
+          customer_uid: string
+          id?: string
+          idle_ttl_seconds?: number
+          last_seen_at?: string | null
+          project_id: number
+          revoked_at?: string | null
+          scopes?: string[]
+          token_hash: string
+        }
+        Update: {
+          activate_expires_at?: string
+          activated_at?: string | null
+          activation_ttl_seconds?: number
+          created_at?: string
+          customer_uid?: string
+          id?: string
+          idle_ttl_seconds?: number
+          last_seen_at?: string | null
+          project_id?: number
+          revoked_at?: string | null
+          scopes?: string[]
+          token_hash?: string
+        }
+        Relationships: []
+      }
+      customer_tag: {
+        Row: {
+          created_at: string
+          customer_uid: string
+          project_id: number
+          tag_name: string
+        }
+        Insert: {
+          created_at?: string
+          customer_uid: string
+          project_id: number
+          tag_name: string
+        }
+        Update: {
+          created_at?: string
+          customer_uid?: string
+          project_id?: number
+          tag_name?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      make_url_token: { Args: { n_bytes?: number }; Returns: string }
+    }
+    Enums: {
+      one_time_token_type: "confirmation_token"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  grida_ciam_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      customer_auth_policy: {
+        Row: {
+          challenges: Json[] | null
+          created_at: string | null
+          description: string | null
+          enabled: boolean | null
+          id: string | null
+          name: string | null
+          project_id: number | null
+          scopes: string[] | null
+        }
+        Insert: {
+          challenges?: Json[] | null
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string | null
+          name?: string | null
+          project_id?: number | null
+          scopes?: string[] | null
+        }
+        Update: {
+          challenges?: Json[] | null
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string | null
+          name?: string | null
+          project_id?: number | null
+          scopes?: string[] | null
+        }
+        Relationships: []
+      }
+      customer_tag: {
+        Row: {
+          created_at: string | null
+          customer_uid: string | null
+          project_id: number | null
+          tag_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_uid?: string | null
+          project_id?: number | null
+          tag_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_uid?: string | null
+          project_id?: number | null
+          tag_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_tag_customer_uid_fkey"
+            columns: ["customer_uid"]
+            isOneToOne: false
+            referencedRelation: "customer_with_tags"
+            referencedColumns: ["uid"]
+          },
+        ]
+      }
+      customer_with_tags: {
+        Row: {
+          _fp_fingerprintjs_visitorid: string | null
+          created_at: string | null
+          description: string | null
+          email: string | null
+          email_provisional: string[] | null
+          is_email_verified: boolean | null
+          is_marketing_email_subscribed: boolean | null
+          is_marketing_sms_subscribed: boolean | null
+          is_phone_verified: boolean | null
+          last_seen_at: string | null
+          metadata: Json | null
+          name: string | null
+          name_provisional: string[] | null
+          phone: string | null
+          phone_provisional: string[] | null
+          project_id: number | null
+          search_text: string | null
+          search_tsv: unknown
+          tags: string[] | null
+          uid: string | null
+          uuid: string | null
+          visitor_id: string | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      create_customer_otp_challenge: {
+        Args: {
+          p_email: string
+          p_expires_in_seconds?: number
+          p_otp: string
+          p_project_id: number
+        }
+        Returns: string
+      }
+      create_customer_portal_session: {
+        Args: {
+          p_activation_ttl_seconds?: number
+          p_customer_uid: string
+          p_idle_ttl_seconds?: number
+          p_project_id: number
+          p_scopes?: string[]
+        }
+        Returns: {
+          activate_expires_at: string
+          activation_ttl_seconds: number
+          idle_ttl_seconds: number
+          token: string
+        }[]
+      }
+      redeem_customer_portal_session: {
+        Args: { p_token: string; p_touch?: boolean }
+        Returns: {
+          activated_at: string
+          customer_uid: string
+          idle_expires_at: string
+          last_seen_at: string
+          project_id: number
+          scopes: string[]
+          session_id: string
+        }[]
+      }
+      revoke_customer_portal_sessions: {
+        Args: { p_customer_uid: string; p_project_id: number }
+        Returns: undefined
+      }
+      touch_customer_portal_session: {
+        Args: { p_min_seconds_between_touches?: number; p_token: string }
+        Returns: {
+          idle_expires_at: string
+          last_seen_at: string
+          session_id: string
+        }[]
+      }
+      update_customer_tags: {
+        Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
+        Returns: undefined
+      }
+      verify_customer_otp_and_create_session: {
+        Args: {
+          p_challenge_id: string
+          p_otp: string
+          p_session_ttl_seconds?: number
+        }
+        Returns: {
+          customer_uid: string
+          project_id: number
+        }[]
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_commerce: {
     Tables: {
       inventory_item: {
@@ -1398,6 +1722,7 @@ export type Database = {
       }
       response_field: {
         Row: {
+          challenge_state: Json | null
           created_at: string
           form_field_id: string
           form_field_option_id: string | null
@@ -1411,6 +1736,7 @@ export type Database = {
           value: Json | null
         }
         Insert: {
+          challenge_state?: Json | null
           created_at?: string
           form_field_id: string
           form_field_option_id?: string | null
@@ -1424,6 +1750,7 @@ export type Database = {
           value?: Json | null
         }
         Update: {
+          challenge_state?: Json | null
           created_at?: string
           form_field_id?: string
           form_field_option_id?: string | null
@@ -1612,6 +1939,7 @@ export type Database = {
         | "video"
         | "json"
         | "canvas"
+        | "challenge_email"
       form_method: "post" | "get" | "dialog"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"
@@ -3763,7 +4091,6 @@ export type Database = {
           search_text: string | null
           search_tsv: unknown
           uid: string
-          user_id: string | null
           uuid: string | null
           visitor_id: string | null
         }
@@ -3787,7 +4114,6 @@ export type Database = {
           search_text?: string | null
           search_tsv?: unknown
           uid?: string
-          user_id?: string | null
           uuid?: string | null
           visitor_id?: string | null
         }
@@ -3811,7 +4137,6 @@ export type Database = {
           search_text?: string | null
           search_tsv?: unknown
           uid?: string
-          user_id?: string | null
           uuid?: string | null
           visitor_id?: string | null
         }
@@ -3829,90 +4154,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project"
             referencedColumns: ["id"]
-          },
-        ]
-      }
-      customer_auth_policy: {
-        Row: {
-          challenges: Json[]
-          created_at: string
-          description: string | null
-          enabled: boolean
-          id: string
-          name: string
-          project_id: number
-          scopes: string[]
-        }
-        Insert: {
-          challenges: Json[]
-          created_at?: string
-          description?: string | null
-          enabled?: boolean
-          id?: string
-          name: string
-          project_id: number
-          scopes: string[]
-        }
-        Update: {
-          challenges?: Json[]
-          created_at?: string
-          description?: string | null
-          enabled?: boolean
-          id?: string
-          name?: string
-          project_id?: number
-          scopes?: string[]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_auth_policy_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      customer_tag: {
-        Row: {
-          created_at: string
-          customer_uid: string
-          project_id: number
-          tag_name: string
-        }
-        Insert: {
-          created_at?: string
-          customer_uid: string
-          project_id: number
-          tag_name: string
-        }
-        Update: {
-          created_at?: string
-          customer_uid?: string
-          project_id?: number
-          tag_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_tag_customer_uid_fkey"
-            columns: ["customer_uid"]
-            isOneToOne: false
-            referencedRelation: "customer"
-            referencedColumns: ["uid"]
-          },
-          {
-            foreignKeyName: "customer_tag_customer_uid_fkey"
-            columns: ["customer_uid"]
-            isOneToOne: false
-            referencedRelation: "customer_with_tags"
-            referencedColumns: ["uid"]
-          },
-          {
-            foreignKeyName: "customer_tag_project_id_tag_name_fkey"
-            columns: ["project_id", "tag_name"]
-            isOneToOne: false
-            referencedRelation: "tag"
-            referencedColumns: ["project_id", "name"]
           },
         ]
       }
@@ -4244,49 +4485,7 @@ export type Database = {
       }
     }
     Views: {
-      customer_with_tags: {
-        Row: {
-          _fp_fingerprintjs_visitorid: string | null
-          created_at: string | null
-          description: string | null
-          email: string | null
-          email_provisional: string[] | null
-          is_email_verified: boolean | null
-          is_marketing_email_subscribed: boolean | null
-          is_marketing_sms_subscribed: boolean | null
-          is_phone_verified: boolean | null
-          last_seen_at: string | null
-          metadata: Json | null
-          name: string | null
-          name_provisional: string[] | null
-          phone: string | null
-          phone_provisional: string[] | null
-          project_id: number | null
-          search_text: string | null
-          search_tsv: unknown
-          tags: string[] | null
-          uid: string | null
-          user_id: string | null
-          uuid: string | null
-          visitor_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_visitor_id_fkey"
-            columns: ["visitor_id"]
-            isOneToOne: true
-            referencedRelation: "visitor"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "public_customer_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       find_project: {
@@ -4334,11 +4533,6 @@ export type Database = {
         Returns: boolean
       }
       rls_project: { Args: { project_id: number }; Returns: boolean }
-      rls_via_customer: { Args: { p_customer_id: string }; Returns: boolean }
-      update_customer_tags: {
-        Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
-        Returns: undefined
-      }
       workspace_documents: {
         Args: { p_organization_id: number }
         Returns: {
@@ -4514,6 +4708,14 @@ export type CompositeTypes<
 
 export const Constants = {
   grida_canvas: {
+    Enums: {},
+  },
+  grida_ciam: {
+    Enums: {
+      one_time_token_type: ["confirmation_token"],
+    },
+  },
+  grida_ciam_public: {
     Enums: {},
   },
   grida_commerce: {
@@ -4743,6 +4945,7 @@ export const Constants = {
         "video",
         "json",
         "canvas",
+        "challenge_email",
       ],
       form_method: ["post", "get", "dialog"],
       form_response_unknown_field_handling_strategy_type: [

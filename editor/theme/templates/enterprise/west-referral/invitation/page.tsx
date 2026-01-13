@@ -10,7 +10,6 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import NumberFlow from "@number-flow/react";
 import {
   Drawer,
   DrawerContent,
@@ -38,6 +37,7 @@ import {
   useRequestFormSession,
 } from "@/grida-forms-hosted/e/load";
 import { Skeleton } from "@/components/ui/skeleton";
+import { submitFormToDefaultEndpoint } from "@/grida-forms-hosted/internal-sdk/submit";
 
 const dictionary = {
   ko: {
@@ -45,6 +45,9 @@ const dictionary = {
     about_event: "이벤트 안내",
     event_signup_success: "이벤트 참여신청이 완료되었습니다.",
     event_signup_fail: "이벤트 참여에 실패했습니다.",
+    claimed_title: "참여가 접수되었습니다.",
+    claimed_description:
+      "이벤트 참여 신청이 완료되었습니다. 확인 후 안내드리겠습니다.",
     invitation_name: "{referrer_name} 님의 초대",
     invitation_description:
       "{referrer_name}님으로부터 초대를 받았습니다. 이벤트 참여 시 {referrer_name}님과 이벤트 참여자 모두에게 경품이 지급됩니다.",
@@ -54,6 +57,9 @@ const dictionary = {
     about_event: "Event Information",
     event_signup_success: "Event participation request completed.",
     event_signup_fail: "Event participation failed.",
+    claimed_title: "You're all set.",
+    claimed_description:
+      "Your event participation has been received. We'll contact you with the next steps.",
     invitation_name: "{referrer_name} invited you",
     invitation_description:
       "You have been invited by {referrer_name}. Both the inviter and invitee will receive a reward upon event participation.",
@@ -74,6 +80,7 @@ type Props = {
   brand_name?: string;
   title: string;
   description?: string;
+  invitation_card_content?: { type: "richtext"; html: string };
   favicon?: {
     src: string;
     srcDark?: string;
@@ -110,18 +117,17 @@ export default function InvitationPageTemplate({
   const { code, campaign, referrer_name: _referrer_name, is_claimed } = data;
   const referrer_name = _referrer_name || t.an_anonymous;
   const router = useRouter();
+  const [claimed, setClaimed] = useState(is_claimed);
 
   const signupformDialog = useDialogState("signupform");
+
+  useEffect(() => {
+    setClaimed(is_claimed);
+  }, [is_claimed]);
 
   // if (token.is_burned) {
   //   return <>Already used.</>;
   // }
-
-  // FIXME:
-  const reward_value = 100000;
-  const reward_currency = "KRW";
-  const reward_description = "TMAP EV 충전 포인트";
-  const reward_currency_valid = reward_currency.length === 3;
 
   return (
     <ScreenMobileFrame>
@@ -172,7 +178,7 @@ export default function InvitationPageTemplate({
           <Standard.Section>
             <Card
               data-testid="west-referral-invitation-card"
-              className="relative overflow-hidden rounded-xl border-0"
+              className="relative overflow-hidden rounded-xl border-0 py-0"
             >
               <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
               <div className="px-4 py-1.5 m-0.5 relative border border-background rounded-t-[10px] overflow-hidden flex items-center z-10">
@@ -187,33 +193,21 @@ export default function InvitationPageTemplate({
                   </span>
                 </div>
               </div>
-              <CardHeader className="px-4 py-4">
-                <span>
-                  <span className="text-xl font-bold">
-                    <NumberFlow
-                      value={visible ? reward_value : reward_value * 0.01}
-                      format={{
-                        style: reward_currency_valid ? "currency" : undefined,
-                        currency: reward_currency_valid
-                          ? reward_currency
-                          : undefined,
-                      }}
-                    />
-                    <span className="ms-1 text-xs text-muted-foreground font-normal">
-                      {reward_description}
-                    </span>
-                  </span>
-                </span>
-              </CardHeader>
-              <hr />
               <CardContent className="px-4 py-4">
-                <p className="text-sm text-muted-foreground">
-                  {template(t.invitation_description, {
-                    referrer_name,
-                  })}
-                </p>
+                {design.invitation_card_content?.html ? (
+                  <div
+                    className="prose prose-sm dark:prose-invert text-muted-foreground"
+                    dangerouslySetInnerHTML={{
+                      __html: design.invitation_card_content?.html ?? "",
+                    }}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    (Customize your message in campaign designer)
+                  </p>
+                )}
               </CardContent>
-              {!is_claimed && (
+              {!claimed && (
                 <CardFooter className="px-4 pb-4">
                   {/* CTA Button */}
                   <Button
@@ -228,7 +222,7 @@ export default function InvitationPageTemplate({
             </Card>
 
             {/* FIXME: use challenges */}
-            {is_claimed && (
+            {claimed && (
               <div className="my-4">
                 <Card
                   data-testid="west-referral-invitation-claimed-card"
@@ -238,20 +232,12 @@ export default function InvitationPageTemplate({
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <TicketCheckIcon className="size-5" />
-                      시승 확인중
+                      {t.claimed_title}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">
-                      이벤트 참여가 완료되었습니다. 폴스타에서 시승을 완료해
-                      주세요. 이후 문자를 통해 안내 드리겠습니다.
-                      {/* FIXME: */}
-                      {/* <br />
-                      <br />
-                      시승 신청을 완료하지 못하였나요?{" "}
-                      <Link href={fixme_external_link} className="underline">
-                        다시 신청하기
-                      </Link> */}
+                      {t.claimed_description}
                     </p>
                   </CardContent>
                 </Card>
@@ -262,6 +248,14 @@ export default function InvitationPageTemplate({
           <SignUpForm
             {...signupformDialog.props}
             form_id={data.signup_form_id}
+            invitation_code={code}
+            client={client}
+            copy={t}
+            onClaimed={() => {
+              setClaimed(true);
+              signupformDialog.closeDialog();
+              router.refresh();
+            }}
           />
 
           <Standard.Section>
@@ -295,51 +289,87 @@ export default function InvitationPageTemplate({
 
 function SignUpForm({
   form_id,
-  onSubmit,
+  invitation_code,
+  client,
+  copy,
+  onClaimed,
   ...props
 }: React.ComponentProps<typeof Drawer> & {
   form_id: string;
-  onSubmit?: (data: { name: string; phone: string }) => Promise<void>;
+  invitation_code: string;
+  client?: Platform.WEST.Referral.WestReferralClient;
+  copy: (typeof dictionary)[keyof typeof dictionary];
+  onClaimed?: () => void;
 }) {
-  const onClaim = async () => {
-    // const customer_id = submission.data.customer_id;
-    // const ok = await client?.claim?.(code, customer_id);
-    // if (ok) {
-    //   toast.success(t.event_signup_success);
-    //   router.replace(fixme_external_link);
-    // } else {
-    //   toast.error(t.event_signup_fail);
-    // }
-  };
+  const isOpen = props.open === true;
+  const hasForm = typeof form_id === "string" && form_id.length > 0;
 
   return (
-    <FormViewProvider form_id={form_id}>
-      <Drawer {...props} data-testid="west-referral-invitation-signup-form">
-        <DrawerContent>
-          <DrawerTitle className="sr-only">Mission Signup Form</DrawerTitle>
-          {/*  */}
-          <FormView.Body
-            onSubmit={(e) => {
-              e.preventDefault();
+    <Drawer {...props} data-testid="west-referral-invitation-signup-form">
+      <DrawerContent>
+        <DrawerTitle className="sr-only">Mission Signup Form</DrawerTitle>
 
-              const formdata = new FormData(e.target as HTMLFormElement);
-              // onSubmit?.(formdata);
-            }}
-            className="max-w-full"
-            config={{
-              is_powered_by_branding_enabled: false,
-            }}
-          />
+        {/* Only mount the form session + loading state when the drawer is open.
+            This prevents the loading skeleton from rendering inline on the page. */}
+        {isOpen ? (
+          hasForm ? (
+            <FormViewProvider form_id={form_id}>
+              <FormView.Body
+                onSubmit={async (e) => {
+                  e.preventDefault();
 
-          <DrawerFooter className="pt-2">
-            <FormView.Prev>Previous</FormView.Prev>
-            <FormView.Next>Next</FormView.Next>
-            <FormView.Submit>Save</FormView.Submit>
-            {/*  */}
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-    </FormViewProvider>
+                  const formdata = new FormData(e.target as HTMLFormElement);
+                  const submit_json = await submitFormToDefaultEndpoint<{
+                    customer_id?: string | null;
+                  }>(form_id, formdata);
+
+                  const customer_id =
+                    submit_json?.data?.customer_id &&
+                    typeof submit_json.data.customer_id === "string"
+                      ? submit_json.data.customer_id
+                      : null;
+
+                  if (!customer_id) {
+                    toast.error(copy.event_signup_fail);
+                    return;
+                  }
+
+                  if (!client) {
+                    toast.error(copy.event_signup_fail);
+                    return;
+                  }
+
+                  const ok = await client.claim(invitation_code, customer_id);
+                  if (!ok) {
+                    toast.error(copy.event_signup_fail);
+                    return;
+                  }
+
+                  toast.success(copy.event_signup_success);
+                  onClaimed?.();
+                }}
+                className="max-w-full"
+                config={{
+                  is_powered_by_branding_enabled: false,
+                }}
+              />
+
+              <DrawerFooter className="pt-2">
+                <FormView.Prev>Previous</FormView.Prev>
+                <FormView.Next>Next</FormView.Next>
+                <FormView.Submit>Save</FormView.Submit>
+              </DrawerFooter>
+            </FormViewProvider>
+          ) : (
+            <div className="p-4">
+              <p className="text-sm text-muted-foreground">
+                No signup form configured.
+              </p>
+            </div>
+          )
+        ) : null}
+      </DrawerContent>
+    </Drawer>
   );
 }
 
@@ -349,6 +379,9 @@ function FormViewProvider({
 }: React.PropsWithChildren<{
   form_id: string;
 }>) {
+  // TODO: make FormViewProvider accept a configurable loading/empty state renderer
+  // (or allow callers to fully control loading UX). For now, we keep a simple
+  // built-in skeleton and only mount this provider when the dialog is open.
   const { session, clearSessionStorage } = useRequestFormSession(form_id);
   const {
     data: res,
@@ -371,11 +404,9 @@ function FormViewProvider({
 
   if (isLoading || !session || !data) {
     return (
-      <main className="h-screen min-h-screen">
-        <div className="p-4 overflow-auto flex-1">
-          <Skeleton className="w-full h-96" />
-        </div>
-      </main>
+      <div className="p-4">
+        <Skeleton className="w-full h-24" />
+      </div>
     );
   }
 
