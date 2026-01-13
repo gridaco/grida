@@ -51,6 +51,8 @@ export function FormFieldTypeIcon({
       return <PhoneIcon {...props} />;
     case "email":
       return <EnvelopeClosedIcon {...props} />;
+    case "challenge_email":
+      return <EnvelopeClosedIcon {...props} />;
     case "radio":
     case "toggle":
     case "toggle-group":

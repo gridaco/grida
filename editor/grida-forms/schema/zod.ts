@@ -18,6 +18,7 @@ export const zFormInputType = z.enum([
   "week",
   "time",
   "email",
+  "challenge_email",
   "file",
   "image",
   "select",

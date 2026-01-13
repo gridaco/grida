@@ -1722,6 +1722,7 @@ export type Database = {
       }
       response_field: {
         Row: {
+          challenge_state: Json | null
           created_at: string
           form_field_id: string
           form_field_option_id: string | null
@@ -1735,6 +1736,7 @@ export type Database = {
           value: Json | null
         }
         Insert: {
+          challenge_state?: Json | null
           created_at?: string
           form_field_id: string
           form_field_option_id?: string | null
@@ -1748,6 +1750,7 @@ export type Database = {
           value?: Json | null
         }
         Update: {
+          challenge_state?: Json | null
           created_at?: string
           form_field_id?: string
           form_field_option_id?: string | null
@@ -1936,6 +1939,7 @@ export type Database = {
         | "video"
         | "json"
         | "canvas"
+        | "challenge_email"
       form_method: "post" | "get" | "dialog"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"
@@ -4941,6 +4945,7 @@ export const Constants = {
         "video",
         "json",
         "canvas",
+        "challenge_email",
       ],
       form_method: ["post", "get", "dialog"],
       form_response_unknown_field_handling_strategy_type: [
