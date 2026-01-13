@@ -9,6 +9,7 @@ import { CalendarIcon, InfoIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useCampaign } from "../store";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -52,6 +53,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
@@ -276,14 +278,14 @@ function Body({
                   Configure the basic settings for your campaign.
                 </p>
                 <div className="space-y-8">
-                  <FormItem>
-                    <FormLabel>Campaign ID</FormLabel>
+                  {/* NOTE: FormLabel/FormDescription require FormField context. */}
+                  <div className="space-y-2">
+                    <Label>Campaign ID</Label>
                     <Input readOnly disabled value={campaign_id} />
-                    <FormDescription>
+                    <p className="text-sm text-muted-foreground">
                       Your campaign&apos;s unique identifier.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
+                    </p>
+                  </div>
 
                   <FormField
                     control={form.control}
@@ -614,7 +616,7 @@ function Body({
             )}
           </CardContent>
 
-          <Separator />
+          <Separator className="my-4" />
 
           <CardFooter className="flex justify-end">
             <Button
@@ -648,7 +650,9 @@ function CampaignPublicDataFields({
   const formsClient = useMemo(() => createBrowserFormsClient(), []);
   const [publicJsonOpen, setPublicJsonOpen] = useState(false);
   const [forms, setForms] = useState<
-    Array<Pick<Database["grida_forms"]["Tables"]["form"]["Row"], "id" | "title">>
+    Array<
+      Pick<Database["grida_forms"]["Tables"]["form"]["Row"], "id" | "title">
+    >
   >([]);
   const [formsLoading, setFormsLoading] = useState(false);
 
@@ -687,7 +691,7 @@ function CampaignPublicDataFields({
     <FormField
       control={control}
       name="public"
-      render={({ field }) => (
+      render={({ field, fieldState }) => (
         <div>
           <FieldGroup>
             <Field>
@@ -707,13 +711,16 @@ function CampaignPublicDataFields({
                 </code>
                 . Used by the public invitation page.
               </FieldDescription>
-              <FormMessage />
+              <FieldError>{fieldState.error?.message}</FieldError>
             </Field>
 
             <FieldSeparator />
 
             <Field>
-              <Collapsible open={publicJsonOpen} onOpenChange={setPublicJsonOpen}>
+              <Collapsible
+                open={publicJsonOpen}
+                onOpenChange={setPublicJsonOpen}
+              >
                 <div className="flex items-center justify-between">
                   <FieldLabel>Public JSON Data (read-only)</FieldLabel>
                   <CollapsibleTrigger asChild>
@@ -795,7 +802,9 @@ function SignupFormIdSelect({
     >
       <SelectTrigger className="w-full">
         {/* TODO(west-referral): Consider a searchable combobox UX */}
-        <SelectValue placeholder={loading ? "Loading forms..." : "Select a form"} />
+        <SelectValue
+          placeholder={loading ? "Loading forms..." : "Select a form"}
+        />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>None</SelectItem>
