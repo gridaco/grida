@@ -19,7 +19,8 @@ export type FormSubmitErrorCode =
   | typeof ERR.FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code
   | typeof ERR.FORM_SOLD_OUT.code
   | typeof ERR.FORM_OPTION_UNAVAILABLE.code
-  | typeof ERR.FORM_SCHEDULE_NOT_IN_RANGE.code;
+  | typeof ERR.FORM_SCHEDULE_NOT_IN_RANGE.code
+  | typeof ERR.CHALLENGE_EMAIL_NOT_VERIFIED.code;
 
 export type FormFieldUpsert = IFormField & {
   form_id: string;

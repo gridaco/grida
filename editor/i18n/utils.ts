@@ -12,4 +12,3 @@ export function select_lang<T extends string>(
     ? (v as T)
     : fallback_lang;
 }
-

@@ -24,6 +24,8 @@ export default function ReferrerPage({
         logo: _t?.navbar?.logo,
         title: _r?.title ?? context.campaign.title,
         description: _r?.description ?? context.campaign.description,
+        invitation_card_content: _r?.invitation_card_content,
+        show_invitations: _r?.show_invitations,
         article: _r?.article,
         cta: _r?.cta ?? "Invite",
         image: _r?.image ?? { src: "" },

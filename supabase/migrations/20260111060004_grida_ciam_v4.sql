@@ -55,3 +55,13 @@ EXECUTE FUNCTION grida_ciam.insert_customer_with_tags();
 ALTER TABLE public.customer DROP CONSTRAINT IF EXISTS customer_user_id_fkey;
 ALTER TABLE public.customer DROP COLUMN IF EXISTS user_id;
 
+-- 5) CIAM minimal constraint: unique verified email per project
+-- NOTE:
+-- - We intentionally do NOT enforce uniqueness for unverified emails (to avoid blocking lead capture / legacy duplicates).
+-- - Verified emails are used as identity, so they must be unique per tenant (project).
+CREATE UNIQUE INDEX IF NOT EXISTS customer_unique_verified_email_per_project
+ON public.customer (project_id, (lower(btrim(email))))
+WHERE email IS NOT NULL
+  AND btrim(email) <> ''
+  AND is_email_verified = true;
+

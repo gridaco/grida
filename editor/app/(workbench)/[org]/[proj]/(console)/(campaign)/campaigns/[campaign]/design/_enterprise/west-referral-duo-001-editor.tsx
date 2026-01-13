@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function EnterpriseWestReferralDuo001Editor({
   template,
@@ -228,6 +229,46 @@ function TemplateEditor({
                         }}
                         placeholder="Enter your description"
                       />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Invitation Card Content</Label>
+                      <CMSRichText
+                        value={
+                          values?.components?.referrer?.invitation_card_content
+                            ?.html ?? ""
+                        }
+                        uploader={template.upload}
+                        onValueChange={(value) => {
+                          props.set(
+                            "components.referrer.invitation_card_content",
+                            {
+                              type: "richtext",
+                              html: value,
+                            }
+                          );
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This content appears inside the invitation card on the
+                        referrer page.
+                      </p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Show Invitation List</Label>
+                      <label className="flex items-center gap-2">
+                        <Checkbox
+                          checked={!!values?.components?.referrer?.show_invitations}
+                          onCheckedChange={(checked) => {
+                            props.set(
+                              "components.referrer.show_invitations",
+                              !!checked
+                            );
+                          }}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          Show the invite list section on the referrer page.
+                        </span>
+                      </label>
                     </div>
                     <div className="grid gap-2">
                       <Label>Button Text</Label>
@@ -446,6 +487,29 @@ function TemplateEditor({
                         }}
                         placeholder="Enter your description"
                       />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Invitation Card Content</Label>
+                      <CMSRichText
+                        value={
+                          values?.components?.invitation
+                            ?.invitation_card_content?.html ?? ""
+                        }
+                        uploader={template.upload}
+                        onValueChange={(value) => {
+                          props.set(
+                            "components.invitation.invitation_card_content",
+                            {
+                              type: "richtext",
+                              html: value,
+                            }
+                          );
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This content appears inside the invitation card on the
+                        invitee page.
+                      </p>
                     </div>
                     <div className="grid gap-2">
                       <Label>Button Text</Label>

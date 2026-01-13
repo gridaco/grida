@@ -50,13 +50,20 @@ export async function POST(
       : "(Untitled)";
 
   // Customer portal access: existing customers only.
+  // Prefer verified customer if duplicates exist (legacy data).
+  // TODO(security/identity): once we have an admin UI + policy for managing email verification,
+  // we should filter to `is_email_verified = true` (not just sort), to ensure portal access
+  // is only granted to verified identities. For now we only sort because legacy tenants can
+  // have duplicates and not all projects have a verified-email-only policy yet.
   const { data: customer_list, error: customer_list_err } =
     await service_role.workspace
       .from("customer")
-      .select("uid, name")
+      .select("uid, name, is_email_verified")
       .eq("project_id", projectId)
       .eq("email", emailNormalized)
-      .order("uid");
+      .order("is_email_verified", { ascending: false })
+      .order("uid")
+      .limit(1);
 
   if (customer_list_err) {
     console.error(
@@ -72,7 +79,11 @@ export async function POST(
     });
   }
 
-  let customer: { uid: string; name?: string | null } | null = null;
+  let customer: {
+    uid: string;
+    name?: string | null;
+    is_email_verified?: boolean | null;
+  } | null = null;
   if (customer_list.length === 0) {
     // return ok, cause we don't want to leak if the email is registered or not
     return NextResponse.json({
@@ -80,11 +91,8 @@ export async function POST(
       error: null,
       message: "ok",
     });
-  } else if (customer_list.length === 1) {
-    customer = customer_list[0];
-  } else if (customer_list.length > 1) {
-    // Multiple customers with same email in the same project is a known issue.
-    // Pick the first deterministically.
+  } else {
+    // Deterministic: the query already prefers verified customers.
     customer = customer_list[0];
   }
 

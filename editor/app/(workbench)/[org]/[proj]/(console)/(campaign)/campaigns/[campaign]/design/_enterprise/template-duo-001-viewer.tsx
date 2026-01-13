@@ -312,6 +312,8 @@ function CustomComponent_Viewer__Referrer(componentprops: any) {
           description: props?.components?.referrer?.description,
           image: props?.components?.referrer?.image,
           logo: props.theme?.navbar?.logo,
+          invitation_card_content: props?.components?.referrer?.invitation_card_content,
+          show_invitations: props?.components?.referrer?.show_invitations,
           article: props?.components?.referrer?.article,
           cta: props?.components?.referrer?.cta ?? "Join Now",
         }}
@@ -407,6 +409,8 @@ function CustomComponent_Viewer__Invitation(componentprops: any) {
         design={{
           title: props?.components?.invitation?.title ?? "Enter a Title",
           description: props?.components?.invitation?.description,
+          invitation_card_content:
+            props?.components?.invitation?.invitation_card_content,
           logo: props.theme?.navbar?.logo,
           article: props?.components?.invitation?.article,
           cta: props?.components?.invitation?.cta ?? "Join Now",

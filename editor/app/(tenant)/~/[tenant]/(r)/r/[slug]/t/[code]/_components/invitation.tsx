@@ -60,6 +60,7 @@ export default function InvitationPage({
           logo: _t?.navbar?.logo,
           title: _i?.title ?? context.campaign.title,
           description: _i?.description,
+          invitation_card_content: _i?.invitation_card_content,
           article: _i?.article,
           cta: _i?.cta ?? "Join Now",
           image: _i?.image,

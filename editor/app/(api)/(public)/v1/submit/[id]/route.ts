@@ -61,6 +61,10 @@ import { Env } from "@/env";
 
 type Params = { id: string };
 
+function normalizeEmail(email: string) {
+  return String(email).trim().toLowerCase();
+}
+
 export async function GET(
   req: NextRequest,
   context: {
@@ -318,6 +322,75 @@ async function submit({
     );
   }
 
+  // ==================================================
+  // challenge_email gating (session-scoped verification)
+  // ==================================================
+  const challenge_email_fields = fields.filter(
+    (f) => f.type === "challenge_email"
+  );
+  const required_challenge_email_fields = challenge_email_fields.filter(
+    (f) => f.required
+  );
+
+  // These are also used later for persistence/binding.
+  let session_raw: Record<string, unknown> | null = null;
+  let session_customer_id: string | null = null;
+
+  if (challenge_email_fields.length > 0 && meta.session) {
+    const { data: response_session, error: response_session_err } =
+      await service_role.forms
+        .from("response_session")
+        .select("id, raw, customer_id")
+        .eq("id", meta.session)
+        .eq("form_id", form_id)
+        .single();
+
+    if (response_session_err || !response_session) {
+      console.error("submit/err/session", response_session_err);
+      return error(ERR.SERVICE_ERROR.code, { form_id }, meta);
+    }
+
+    session_raw =
+      (response_session.raw as Record<string, unknown> | null) ?? null;
+    session_customer_id = response_session.customer_id ?? null;
+  }
+
+  if (required_challenge_email_fields.length > 0) {
+    if (!meta.session || !session_raw) {
+      return error(ERR.CHALLENGE_EMAIL_NOT_VERIFIED.code, { form_id }, meta);
+    }
+
+    for (const f of required_challenge_email_fields) {
+      const key = `__challenge_email__${f.id}`;
+      const obj = session_raw?.[key];
+      const state =
+        obj && typeof obj === "object" && "state" in (obj as any)
+          ? String((obj as any).state)
+          : "idle";
+
+      if (state !== "challenge-success") {
+        return error(ERR.CHALLENGE_EMAIL_NOT_VERIFIED.code, { form_id }, meta);
+      }
+
+      // Ensure the verified email matches submitted email for this field.
+      const verified_email =
+        obj && typeof obj === "object" && "email" in (obj as any)
+          ? String((obj as any).email ?? "")
+          : "";
+
+      const submitted = qval(formdata.get(f.name) as string);
+      const submitted_email = submitted ? normalizeEmail(submitted) : "";
+
+      if (!submitted_email || !verified_email) {
+        return error(ERR.CHALLENGE_EMAIL_NOT_VERIFIED.code, { form_id }, meta);
+      }
+
+      if (normalizeEmail(verified_email) !== submitted_email) {
+        return error(ERR.CHALLENGE_EMAIL_NOT_VERIFIED.code, { form_id }, meta);
+      }
+    }
+  }
+
   // endregion
 
   // ==================================================
@@ -433,7 +506,9 @@ async function submit({
         session_id: meta.session,
         browser: meta.browser,
         ip: meta.ip,
-        customer_id: customer?.uid,
+        // Prefer explicit customer from the submit payload; otherwise use session binding
+        // (set only by trusted verification flows).
+        customer_id: customer?.uid ?? session_customer_id,
         x_referer: meta.referer,
         x_useragent: meta.useragent,
         x_ipinfo: ipinfo_data as {},
@@ -693,7 +768,7 @@ async function submit({
           }
         }
 
-        return {
+        const base = {
           type: type,
           response_id: response_reference_obj!.id,
           form_field_id: field.id,
@@ -701,7 +776,19 @@ async function submit({
           value: value,
           form_field_option_id: enum_id,
           form_field_option_ids: enum_ids,
-        } satisfies InsertDto<"grida_forms", "response_field">;
+        };
+
+        if (type === "challenge_email") {
+          const key = `__challenge_email__${field.id}`;
+          const challenge_state =
+            session_raw && key in session_raw ? (session_raw as any)[key] : null;
+          return {
+            ...base,
+            challenge_state,
+          } satisfies InsertDto<"grida_forms", "response_field">;
+        }
+
+        return base satisfies InsertDto<"grida_forms", "response_field">;
       })
     );
 
@@ -1366,9 +1453,15 @@ function error(
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
       case "FORM_SCHEDULE_NOT_IN_RANGE":
       case "FORM_SOLD_OUT":
-      case "FORM_OPTION_UNAVAILABLE": {
-        return NextResponse.redirect(formerrorlink(Env.web.HOST, code, data), {
-          status: 307,
+      case "FORM_OPTION_UNAVAILABLE":
+      case "CHALLENGE_EMAIL_NOT_VERIFIED": {
+        const target =
+          formerrorlink(Env.web.HOST, code, data) ??
+          // safety: never crash on unknown error codes
+          formlink(Env.web.HOST, form_id, "badrequest");
+        return NextResponse.redirect(target, {
+          // 303 ensures POST -> GET, avoiding 405 on GET-only pages (e.g. /d/e/.../badrequest)
+          status: 303,
         });
       }
     }
@@ -1406,6 +1499,7 @@ function error(
       case "FORM_SCHEDULE_NOT_IN_RANGE":
       case "FORM_SOLD_OUT":
       case "FORM_OPTION_UNAVAILABLE":
+      case "CHALLENGE_EMAIL_NOT_VERIFIED":
       default: {
         return NextResponse.json(
           {
