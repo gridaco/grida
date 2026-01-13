@@ -312,7 +312,6 @@ CREATE TABLE grida_west_referral.referrer (
 
 ALTER TABLE grida_west_referral.referrer enable row level security;
 CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.referrer USING (grida_west_referral.rls_campaign(campaign_id));
-CREATE POLICY "access_based_on_via_customer" on grida_west_referral.referrer FOR SELECT USING (public.rls_via_customer(customer_id));  -- allow read for via customer
 
 CREATE TRIGGER trg_insert_token_for_referrer BEFORE INSERT ON grida_west_referral.referrer FOR EACH ROW EXECUTE FUNCTION grida_west_referral.insert_with_code();
 
@@ -380,7 +379,6 @@ CREATE TABLE grida_west_referral.invitation (
 
 ALTER TABLE grida_west_referral.invitation enable row level security;
 CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.invitation USING (grida_west_referral.rls_campaign(campaign_id));
-CREATE POLICY "access_based_on_via_customer" on grida_west_referral.invitation FOR SELECT USING (public.rls_via_customer(customer_id));  -- allow read for via customer
 
 CREATE INDEX idx_invitation_referrer_id ON grida_west_referral.invitation(referrer_id);
 CREATE TRIGGER trg_insert_token_for_invitation BEFORE INSERT ON grida_west_referral.invitation FOR EACH ROW EXECUTE FUNCTION grida_west_referral.insert_with_code();

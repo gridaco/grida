@@ -1,6 +1,9 @@
 -- grida_ciam schema
 -- Physical tables and internal functions
 
+-- Ensure pgcrypto extension is available for hashing functions
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE SCHEMA IF NOT EXISTS grida_ciam;
 ALTER SCHEMA grida_ciam OWNER TO postgres;
 
@@ -118,7 +121,6 @@ AS
 SELECT
   c.created_at,
   c.uid,
-  c.user_id,
   c.email,
   c.project_id,
   c._fp_fingerprintjs_visitorid,
@@ -220,3 +222,476 @@ SELECT
 FROM grida_ciam.customer_tag;
 
 GRANT ALL ON TABLE grida_ciam_public.customer_tag TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam.one_time_token_type]
+-- Enum type for OTP challenge token types
+---------------------------------------------------------------------
+
+CREATE TYPE grida_ciam.one_time_token_type AS ENUM ('confirmation_token');
+
+---------------------------------------------------------------------
+-- [grida_ciam.customer_otp_challenge]
+-- Stores OTP challenges for customer email verification
+---------------------------------------------------------------------
+
+CREATE TABLE grida_ciam.customer_otp_challenge (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    consumed_at timestamptz,
+    
+    project_id bigint NOT NULL,
+    email text NOT NULL,
+    customer_uid uuid NULL REFERENCES public.customer(uid) ON DELETE CASCADE,
+    
+    token_type grida_ciam.one_time_token_type NOT NULL DEFAULT 'confirmation_token',
+    otp_salt bytea NOT NULL,
+    otp_hash bytea NOT NULL,
+    attempt_count int NOT NULL DEFAULT 0,
+    
+    CONSTRAINT customer_otp_challenge_pkey PRIMARY KEY (id)
+);
+
+CREATE INDEX customer_otp_challenge_lookup ON grida_ciam.customer_otp_challenge (project_id, email, created_at DESC);
+
+ALTER TABLE grida_ciam.customer_otp_challenge ENABLE ROW LEVEL SECURITY;
+
+GRANT ALL ON TABLE grida_ciam.customer_otp_challenge TO service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam.make_url_token]
+-- URL-safe base64 token generator (no padding)
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION grida_ciam.make_url_token(n_bytes int DEFAULT 48)
+RETURNS text
+LANGUAGE sql
+VOLATILE
+SET search_path = extensions, pg_temp
+AS $$
+  SELECT regexp_replace(
+           translate(encode(gen_random_bytes(n_bytes), 'base64'), '+/', '-_'),
+           '=+$',
+           ''
+         );
+$$;
+
+REVOKE ALL ON FUNCTION grida_ciam.make_url_token(int) FROM public;
+GRANT EXECUTE ON FUNCTION grida_ciam.make_url_token(int) TO service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam.customer_portal_session]
+-- Stores URL-based bearer sessions for customer portal access
+---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS grida_ciam.customer_portal_session (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+
+  project_id bigint NOT NULL,
+  customer_uid uuid NOT NULL REFERENCES public.customer(uid) ON DELETE CASCADE,
+
+  -- Store only sha256(token); never store the raw token
+  token_hash bytea NOT NULL,
+
+  -- Phase A: must be opened before this time or it expires unused
+  activate_expires_at timestamptz NOT NULL,
+
+  -- Phase B: sliding idle timeout after activation
+  activated_at timestamptz,
+  last_seen_at timestamptz,
+
+  -- TTL knobs stored per-row
+  activation_ttl_seconds int NOT NULL DEFAULT 300,
+  idle_ttl_seconds int NOT NULL DEFAULT 3600,
+
+  revoked_at timestamptz,
+
+  scopes text[] NOT NULL DEFAULT ARRAY['portal']::text[]
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS customer_portal_session_token_hash_uq
+  ON grida_ciam.customer_portal_session (token_hash);
+
+CREATE INDEX IF NOT EXISTS customer_portal_session_customer_idx
+  ON grida_ciam.customer_portal_session (project_id, customer_uid);
+
+ALTER TABLE grida_ciam.customer_portal_session ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON TABLE grida_ciam.customer_portal_session TO service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.create_customer_otp_challenge]
+-- Public-facing RPC to create an OTP challenge
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION grida_ciam_public.create_customer_otp_challenge(
+    p_project_id bigint,
+    p_email text,
+    p_otp text,
+    p_expires_in_seconds int DEFAULT 600
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $function$
+DECLARE
+    v_customer_uid uuid;
+    v_challenge_id uuid;
+    v_salt bytea;
+    v_hash bytea;
+BEGIN
+    -- Look up customer by project_id and email (optional, may be null to prevent enumeration)
+    SELECT uid INTO v_customer_uid
+    FROM public.customer
+    WHERE project_id = p_project_id
+      AND email = p_email
+    ORDER BY uid
+    LIMIT 1;
+
+    -- Generate salt and hash the OTP
+    v_salt := gen_random_bytes(16);
+    v_hash := digest(v_salt || convert_to(p_otp, 'utf8'), 'sha256');
+
+    -- Insert challenge
+    INSERT INTO grida_ciam.customer_otp_challenge (
+        project_id,
+        email,
+        customer_uid,
+        token_type,
+        otp_salt,
+        otp_hash,
+        expires_at
+    )
+    VALUES (
+        p_project_id,
+        p_email,
+        v_customer_uid,
+        'confirmation_token',
+        v_salt,
+        v_hash,
+        now() + make_interval(secs => p_expires_in_seconds)
+    )
+    RETURNING id INTO v_challenge_id;
+
+    RETURN v_challenge_id;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION grida_ciam_public.create_customer_otp_challenge(bigint, text, text, int) TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.verify_customer_otp_and_create_session]
+-- Public-facing RPC to verify OTP (no session creation)
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION grida_ciam_public.verify_customer_otp_and_create_session(
+    p_challenge_id uuid,
+    p_otp text,
+    p_session_ttl_seconds int DEFAULT 2592000
+)
+RETURNS TABLE (
+    customer_uid uuid,
+    project_id bigint
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $function$
+DECLARE
+    c grida_ciam.customer_otp_challenge%ROWTYPE;
+    v_hash bytea;
+    v_customer_uid uuid;
+    v_project_id bigint;
+BEGIN
+    -- Lock and fetch challenge row
+    SELECT * INTO c
+    FROM grida_ciam.customer_otp_challenge
+    WHERE id = p_challenge_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'invalid';
+    END IF;
+
+    -- Validate challenge state
+    IF c.consumed_at IS NOT NULL OR c.expires_at <= now() THEN
+        RAISE EXCEPTION 'invalid';
+    END IF;
+
+    IF c.attempt_count >= 8 THEN
+        RAISE EXCEPTION 'invalid';
+    END IF;
+
+    -- Verify token type
+    IF c.token_type != 'confirmation_token' THEN
+        RAISE EXCEPTION 'invalid';
+    END IF;
+
+    -- Hash OTP with stored salt
+    v_hash := digest(c.otp_salt || convert_to(p_otp, 'utf8'), 'sha256');
+
+    -- Verify hash and customer_uid
+    IF v_hash != c.otp_hash OR c.customer_uid IS NULL THEN
+        UPDATE grida_ciam.customer_otp_challenge
+        SET attempt_count = attempt_count + 1
+        WHERE id = c.id;
+        
+        RAISE EXCEPTION 'invalid';
+    END IF;
+
+    -- Mark challenge as consumed
+    UPDATE grida_ciam.customer_otp_challenge
+    SET consumed_at = now()
+    WHERE id = c.id;
+
+    -- Update customer: set email verified and update email
+    UPDATE public.customer
+    SET is_email_verified = true,
+        email = c.email
+    WHERE public.customer.uid = c.customer_uid
+      AND public.customer.project_id = c.project_id;
+
+    -- Return customer scope for downstream portal session minting
+    v_customer_uid := c.customer_uid;
+    v_project_id := c.project_id;
+
+    RETURN QUERY SELECT v_customer_uid, v_project_id;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION grida_ciam_public.verify_customer_otp_and_create_session(uuid, text, int) TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.create_customer_portal_session]
+-- Service-role RPC to create portal session and return the raw token ONCE
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION grida_ciam_public.create_customer_portal_session(
+  p_project_id bigint,
+  p_customer_uid uuid,
+  p_activation_ttl_seconds int DEFAULT 300,
+  p_idle_ttl_seconds int DEFAULT 3600,
+  p_scopes text[] DEFAULT ARRAY['portal']::text[]
+)
+RETURNS TABLE (
+  token text,
+  activate_expires_at timestamptz,
+  activation_ttl_seconds int,
+  idle_ttl_seconds int
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $function$
+DECLARE
+  v_token text;
+  v_hash bytea;
+  v_activate_expires timestamptz;
+  v_activation_ttl int;
+  v_idle_ttl int;
+BEGIN
+  v_activation_ttl := GREATEST(1, p_activation_ttl_seconds);
+  v_idle_ttl := GREATEST(1, p_idle_ttl_seconds);
+
+  v_token := grida_ciam.make_url_token(48);
+  v_hash := digest(convert_to(v_token, 'utf8'), 'sha256');
+
+  v_activate_expires := now() + make_interval(secs => v_activation_ttl);
+
+  INSERT INTO grida_ciam.customer_portal_session (
+    project_id,
+    customer_uid,
+    token_hash,
+    activate_expires_at,
+    activation_ttl_seconds,
+    idle_ttl_seconds,
+    scopes
+  )
+  VALUES (
+    p_project_id,
+    p_customer_uid,
+    v_hash,
+    v_activate_expires,
+    v_activation_ttl,
+    v_idle_ttl,
+    COALESCE(p_scopes, ARRAY['portal']::text[])
+  );
+
+  RETURN QUERY SELECT v_token, v_activate_expires, v_activation_ttl, v_idle_ttl;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION grida_ciam_public.create_customer_portal_session(
+  bigint, uuid, int, int, text[]
+) TO service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.redeem_customer_portal_session]
+-- Public-facing RPC to redeem (activate) a portal session and optionally touch it
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION grida_ciam_public.redeem_customer_portal_session(
+  p_token text,
+  p_touch boolean DEFAULT true
+)
+RETURNS TABLE (
+  session_id uuid,
+  project_id bigint,
+  customer_uid uuid,
+  scopes text[],
+  activated_at timestamptz,
+  last_seen_at timestamptz,
+  idle_expires_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $function$
+DECLARE
+  v_hash bytea;
+  s grida_ciam.customer_portal_session%ROWTYPE;
+  v_now timestamptz := now();
+  v_idle_expires timestamptz;
+BEGIN
+  v_hash := digest(convert_to(p_token, 'utf8'), 'sha256');
+
+  SELECT * INTO s
+  FROM grida_ciam.customer_portal_session
+  WHERE token_hash = v_hash
+    AND revoked_at IS NULL
+  LIMIT 1
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  IF s.activated_at IS NULL THEN
+    IF s.activate_expires_at <= v_now THEN
+      RETURN;
+    END IF;
+
+    UPDATE grida_ciam.customer_portal_session
+    SET activated_at = v_now,
+        last_seen_at = v_now
+    WHERE id = s.id
+    RETURNING * INTO s;
+  ELSE
+    v_idle_expires := s.last_seen_at + make_interval(secs => s.idle_ttl_seconds);
+    IF v_idle_expires <= v_now THEN
+      RETURN;
+    END IF;
+
+    IF p_touch THEN
+      UPDATE grida_ciam.customer_portal_session
+      SET last_seen_at = v_now
+      WHERE id = s.id
+      RETURNING * INTO s;
+    END IF;
+  END IF;
+
+  v_idle_expires := s.last_seen_at + make_interval(secs => s.idle_ttl_seconds);
+
+  RETURN QUERY
+  SELECT
+    s.id,
+    s.project_id,
+    s.customer_uid,
+    s.scopes,
+    s.activated_at,
+    s.last_seen_at,
+    v_idle_expires;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION grida_ciam_public.redeem_customer_portal_session(text, boolean)
+TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.touch_customer_portal_session]
+-- Public-facing RPC to refresh last_seen_at with debounce
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION grida_ciam_public.touch_customer_portal_session(
+  p_token text,
+  p_min_seconds_between_touches int DEFAULT 60
+)
+RETURNS TABLE (
+  session_id uuid,
+  last_seen_at timestamptz,
+  idle_expires_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $function$
+DECLARE
+  v_hash bytea;
+  s grida_ciam.customer_portal_session%ROWTYPE;
+  v_now timestamptz := now();
+  v_idle_expires timestamptz;
+  v_min int := GREATEST(0, p_min_seconds_between_touches);
+BEGIN
+  v_hash := digest(convert_to(p_token, 'utf8'), 'sha256');
+
+  SELECT * INTO s
+  FROM grida_ciam.customer_portal_session
+  WHERE token_hash = v_hash
+    AND revoked_at IS NULL
+    AND activated_at IS NOT NULL
+  LIMIT 1
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  v_idle_expires := s.last_seen_at + make_interval(secs => s.idle_ttl_seconds);
+  IF v_idle_expires <= v_now THEN
+    RETURN;
+  END IF;
+
+  IF s.last_seen_at + make_interval(secs => v_min) > v_now THEN
+    RETURN QUERY SELECT s.id, s.last_seen_at, v_idle_expires;
+    RETURN;
+  END IF;
+
+  UPDATE grida_ciam.customer_portal_session
+  SET last_seen_at = v_now
+  WHERE id = s.id
+  RETURNING * INTO s;
+
+  v_idle_expires := s.last_seen_at + make_interval(secs => s.idle_ttl_seconds);
+
+  RETURN QUERY SELECT s.id, s.last_seen_at, v_idle_expires;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION grida_ciam_public.touch_customer_portal_session(text, int)
+TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.revoke_customer_portal_sessions]
+-- Service-role RPC to revoke all portal sessions for a customer
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION grida_ciam_public.revoke_customer_portal_sessions(
+  p_project_id bigint,
+  p_customer_uid uuid
+)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+  UPDATE grida_ciam.customer_portal_session
+  SET revoked_at = now()
+  WHERE project_id = p_project_id
+    AND customer_uid = p_customer_uid
+    AND revoked_at IS NULL;
+$$;
+
+GRANT EXECUTE ON FUNCTION grida_ciam_public.revoke_customer_portal_sessions(bigint, uuid)
+TO service_role;

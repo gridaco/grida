@@ -79,6 +79,93 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_otp_challenge: {
+        Row: {
+          attempt_count: number
+          consumed_at: string | null
+          created_at: string
+          customer_uid: string | null
+          email: string
+          expires_at: string
+          id: string
+          otp_hash: string
+          otp_salt: string
+          project_id: number
+          token_type: Database["grida_ciam"]["Enums"]["one_time_token_type"]
+        }
+        Insert: {
+          attempt_count?: number
+          consumed_at?: string | null
+          created_at?: string
+          customer_uid?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          otp_hash: string
+          otp_salt: string
+          project_id: number
+          token_type?: Database["grida_ciam"]["Enums"]["one_time_token_type"]
+        }
+        Update: {
+          attempt_count?: number
+          consumed_at?: string | null
+          created_at?: string
+          customer_uid?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          otp_hash?: string
+          otp_salt?: string
+          project_id?: number
+          token_type?: Database["grida_ciam"]["Enums"]["one_time_token_type"]
+        }
+        Relationships: []
+      }
+      customer_portal_session: {
+        Row: {
+          activate_expires_at: string
+          activated_at: string | null
+          activation_ttl_seconds: number
+          created_at: string
+          customer_uid: string
+          id: string
+          idle_ttl_seconds: number
+          last_seen_at: string | null
+          project_id: number
+          revoked_at: string | null
+          scopes: string[]
+          token_hash: string
+        }
+        Insert: {
+          activate_expires_at: string
+          activated_at?: string | null
+          activation_ttl_seconds?: number
+          created_at?: string
+          customer_uid: string
+          id?: string
+          idle_ttl_seconds?: number
+          last_seen_at?: string | null
+          project_id: number
+          revoked_at?: string | null
+          scopes?: string[]
+          token_hash: string
+        }
+        Update: {
+          activate_expires_at?: string
+          activated_at?: string | null
+          activation_ttl_seconds?: number
+          created_at?: string
+          customer_uid?: string
+          id?: string
+          idle_ttl_seconds?: number
+          last_seen_at?: string | null
+          project_id?: number
+          revoked_at?: string | null
+          scopes?: string[]
+          token_hash?: string
+        }
+        Relationships: []
+      }
       customer_tag: {
         Row: {
           created_at: string
@@ -105,10 +192,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      make_url_token: { Args: { n_bytes?: number }; Returns: string }
     }
     Enums: {
-      [_ in never]: never
+      one_time_token_type: "confirmation_token"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -203,7 +290,6 @@ export type Database = {
           search_tsv: unknown
           tags: string[] | null
           uid: string | null
-          user_id: string | null
           uuid: string | null
           visitor_id: string | null
         }
@@ -211,9 +297,68 @@ export type Database = {
       }
     }
     Functions: {
+      create_customer_otp_challenge: {
+        Args: {
+          p_email: string
+          p_expires_in_seconds?: number
+          p_otp: string
+          p_project_id: number
+        }
+        Returns: string
+      }
+      create_customer_portal_session: {
+        Args: {
+          p_activation_ttl_seconds?: number
+          p_customer_uid: string
+          p_idle_ttl_seconds?: number
+          p_project_id: number
+          p_scopes?: string[]
+        }
+        Returns: {
+          activate_expires_at: string
+          activation_ttl_seconds: number
+          idle_ttl_seconds: number
+          token: string
+        }[]
+      }
+      redeem_customer_portal_session: {
+        Args: { p_token: string; p_touch?: boolean }
+        Returns: {
+          activated_at: string
+          customer_uid: string
+          idle_expires_at: string
+          last_seen_at: string
+          project_id: number
+          scopes: string[]
+          session_id: string
+        }[]
+      }
+      revoke_customer_portal_sessions: {
+        Args: { p_customer_uid: string; p_project_id: number }
+        Returns: undefined
+      }
+      touch_customer_portal_session: {
+        Args: { p_min_seconds_between_touches?: number; p_token: string }
+        Returns: {
+          idle_expires_at: string
+          last_seen_at: string
+          session_id: string
+        }[]
+      }
       update_customer_tags: {
         Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
         Returns: undefined
+      }
+      verify_customer_otp_and_create_session: {
+        Args: {
+          p_challenge_id: string
+          p_otp: string
+          p_session_ttl_seconds?: number
+        }
+        Returns: {
+          customer_uid: string
+          project_id: number
+        }[]
       }
     }
     Enums: {
@@ -3942,7 +4087,6 @@ export type Database = {
           search_text: string | null
           search_tsv: unknown
           uid: string
-          user_id: string | null
           uuid: string | null
           visitor_id: string | null
         }
@@ -3966,7 +4110,6 @@ export type Database = {
           search_text?: string | null
           search_tsv?: unknown
           uid?: string
-          user_id?: string | null
           uuid?: string | null
           visitor_id?: string | null
         }
@@ -3990,7 +4133,6 @@ export type Database = {
           search_text?: string | null
           search_tsv?: unknown
           uid?: string
-          user_id?: string | null
           uuid?: string | null
           visitor_id?: string | null
         }
@@ -4387,7 +4529,6 @@ export type Database = {
         Returns: boolean
       }
       rls_project: { Args: { project_id: number }; Returns: boolean }
-      rls_via_customer: { Args: { p_customer_id: string }; Returns: boolean }
       workspace_documents: {
         Args: { p_organization_id: number }
         Returns: {
@@ -4566,7 +4707,9 @@ export const Constants = {
     Enums: {},
   },
   grida_ciam: {
-    Enums: {},
+    Enums: {
+      one_time_token_type: ["confirmation_token"],
+    },
   },
   grida_ciam_public: {
     Enums: {},

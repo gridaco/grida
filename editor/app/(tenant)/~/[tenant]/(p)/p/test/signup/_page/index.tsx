@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import * as React from "react";
 import { UserCheck2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,109 +17,93 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { Spinner } from "@/components/ui/spinner";
 import { template } from "@/utils/template";
-import { useRouter } from "next/navigation";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 
-type Step = "email" | "otp";
+type Step = "email" | "otp" | "done";
 
 const dictionary = {
   en: {
-    title: "Log in to manage your account",
+    title: "Verify your email (test signup)",
     description:
-      "Enter your email and we will send you a verification code directly to your customer portal.",
+      "Enter your email and we will send you a verification code. This creates a customer record if needed.",
     email: "Email",
-    continue_with_email: "Continue with Email",
+    continue_with_email: "Send verification code",
     sending: "Sending...",
     verification: "Verification",
     verification_description:
-      "If you have an account, We have sent a code to <strong>{email}</strong>. Enter it below.",
+      "We have sent a code to <strong>{email}</strong>. Enter it below.",
     verifying: "Verifying...",
     back: "← Back",
+    success: "Email verified successfully.",
+    go_portal: "Go to customer portal",
   },
   ko: {
-    title: "계속 하려면 로그인하세요",
-    description: "이메일을 입력하시면 고객 포털 인증 코드를 보내드립니다.",
+    title: "이메일 인증 (테스트 가입)",
+    description:
+      "이메일을 입력하시면 인증 코드를 보내드립니다. 필요 시 고객 레코드가 생성됩니다.",
     email: "이메일",
-    continue_with_email: "이메일로 계속하기",
+    continue_with_email: "인증 코드 받기",
     sending: "전송중...",
     verification: "인증하기",
     verification_description:
-      "계정이 있으시다면, <strong>{email}</strong>로 코드를 보냈습니다. 아래에 입력해 주세요.",
+      "<strong>{email}</strong>로 코드를 보냈습니다. 아래에 입력해 주세요.",
     verifying: "인증중...",
     back: "← 뒤로",
+    success: "인증이 완료되었습니다.",
+    go_portal: "고객 포털로 이동",
   },
 };
 
-interface CustomerPropsMinimalCustomizationProps {
-  locale?: string;
-}
-
-export default function PortalLogin({
+export function CustomerSignupTestClient({
   locale = "en",
-}: CustomerPropsMinimalCustomizationProps) {
-  const router = useRouter();
-  const [step, setStep] = useState<Step>("email");
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [challengeId, setChallengeId] = useState<string | null>(null);
+}: {
+  locale?: string;
+}) {
+  const [email, setEmail] = React.useState("");
+  const [step, setStep] = React.useState<Step>("email");
+  const [challengeId, setChallengeId] = React.useState<string>("");
+  const [error, setError] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  const sendEmail = async (email: string) => {
-    const res = await fetch(`/api/p/access/with-email`, {
+  async function requestOtp() {
+    setError("");
+    setIsLoading(true);
+    setChallengeId("");
+
+    const res = await fetch("/api/ciam/auth/challenge/with-email", {
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        email: email,
+        email,
       }),
     });
+
     const json = await res.json().catch(() => ({}));
-    return {
-      ok: res.ok,
-      // Note: endpoint returns ok even when the email isn't registered.
-      // We store challenge_id if present, but do not depend on it for the email step UI.
-      challenge_id: (json as any)?.challenge_id as string | undefined,
-    };
-  };
-
-  const handleEmail = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    if (!email) {
-      toast("Please enter your email address");
-      return;
-    }
-
-    setIsLoading(true);
-    sendEmail?.(email)
-      .then(({ ok, challenge_id }) => {
-        if (ok) {
-          setChallengeId(challenge_id ?? null);
-          setStep("otp");
-        } else {
-          toast.error("Something went wrong");
-          return;
-        }
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  };
-
-  const handleOtp = async (otp: string) => {
-    setIsLoading(true);
-    setError("");
-
-    // CIAM flow:
-    // Customer portal access is verified via CIAM OTP challenge verification.
-    // This intentionally does NOT use Supabase Auth.
-    if (!challengeId) {
+    if (!res.ok) {
+      setError(json?.error ?? res.statusText);
       setIsLoading(false);
-      setError("Invalid or expired OTP");
       return;
     }
 
+    if (!json?.challenge_id) {
+      setError("challenge_id was not returned");
+      setIsLoading(false);
+      return;
+    }
+
+    setChallengeId(String(json.challenge_id));
+    setStep("otp");
+    setIsLoading(false);
+    toast.success(
+      locale === "ko" ? "인증 코드를 보냈습니다." : "Verification code sent."
+    );
+  }
+
+  async function verifyOtp(otp: string) {
+    setError("");
+    setIsLoading(true);
     const res = await fetch(
       `/api/ciam/auth/challenge/${encodeURIComponent(challengeId)}/verify`,
       {
@@ -130,28 +114,29 @@ export default function PortalLogin({
     );
 
     const json = await res.json().catch(() => ({}));
-    setIsLoading(false);
-
     if (!res.ok) {
-      setError((json as any)?.error ?? "Invalid or expired OTP");
+      setError(json?.error ?? res.statusText);
+      setIsLoading(false);
       return;
     }
 
-    const session_url = (json as any)?.session_url as string | undefined;
-    if (!session_url) {
-      setError("Invalid or expired OTP");
-      return;
-    }
+    setIsLoading(false);
+    setStep("done");
+    toast.success(t.success);
+  }
 
-    router.replace(session_url);
-  };
-
-  const t = dictionary[locale as keyof typeof dictionary];
+  const t = dictionary[locale as keyof typeof dictionary] ?? dictionary.en;
 
   return (
     <div className="flex flex-col gap-6">
       {step === "email" && (
-        <form onSubmit={handleEmail}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!email) return;
+            requestOtp();
+          }}
+        >
           <div className="flex flex-col gap-6">
             <div className="flex flex-col items-center gap-2">
               <div className="flex flex-col items-center gap-2 font-medium">
@@ -168,6 +153,7 @@ export default function PortalLogin({
               <div className="grid gap-2">
                 <Label htmlFor="email">{t.email}</Label>
                 <Input
+                  id="email"
                   type="email"
                   placeholder="name@example.com"
                   value={email}
@@ -183,6 +169,7 @@ export default function PortalLogin({
           </div>
         </form>
       )}
+
       {step === "otp" && (
         <Card className="w-full max-w-md border-none bg-transparent shadow-none">
           <CardHeader className="space-y-1">
@@ -200,7 +187,33 @@ export default function PortalLogin({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <OTP disabled={isLoading} onComplete={handleOtp} />
+            <InputOTP
+              maxLength={6}
+              disabled={isLoading}
+              inputMode="numeric"
+              onComplete={(otp) => {
+                verifyOtp(otp);
+              }}
+            >
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+              </InputOTPGroup>
+              <InputOTPGroup>
+                <InputOTPSlot index={1} />
+              </InputOTPGroup>
+              <InputOTPGroup>
+                <InputOTPSlot index={2} />
+              </InputOTPGroup>
+              <InputOTPGroup>
+                <InputOTPSlot index={3} />
+              </InputOTPGroup>
+              <InputOTPGroup>
+                <InputOTPSlot index={4} />
+              </InputOTPGroup>
+              <InputOTPGroup>
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
 
             {error && (
               <div className="mt-4">
@@ -228,44 +241,22 @@ export default function PortalLogin({
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
 
-function OTP({
-  disabled,
-  onComplete,
-}: {
-  disabled?: boolean;
-  onComplete?: (otp: string) => void;
-}) {
-  return (
-    <InputOTP
-      maxLength={6}
-      disabled={disabled}
-      inputMode="numeric"
-      onComplete={(otp) => {
-        onComplete?.(otp);
-      }}
-    >
-      <InputOTPGroup>
-        <InputOTPSlot index={0} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={1} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={2} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={3} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={4} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={5} />
-      </InputOTPGroup>
-    </InputOTP>
+      {step === "done" && (
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold">
+              {t.verification}
+            </CardTitle>
+            <CardDescription>{t.success}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <a href="/p/login">{t.go_portal}</a>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
