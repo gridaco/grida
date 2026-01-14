@@ -2899,6 +2899,7 @@ export namespace editor.api {
     deleteScene(scene_id: string): void;
     duplicateScene(scene_id: string): void;
     renameScene(scene_id: string, name: string): void;
+    reorderScenes(sceneIds: string[]): void;
     changeSceneBackground(
       scene_id: string,
       backgroundColor: grida.program.document.ISceneBackground["background_color"]

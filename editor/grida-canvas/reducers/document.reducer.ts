@@ -292,6 +292,32 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       });
     }
+    case "scenes/reorder": {
+      const { sceneIds } = action;
+      return updateState(state, (draft) => {
+        // Validate that all scene IDs exist and are unique
+        const validSceneIds = sceneIds.filter(
+          (id) =>
+            draft.document.scenes_ref.includes(id) &&
+            draft.document.nodes[id]?.type === "scene"
+        );
+        
+        // Ensure all existing scenes are included
+        const existingSceneIds = new Set(draft.document.scenes_ref);
+        const providedSceneIds = new Set(validSceneIds);
+        
+        // If not all scenes are provided, keep the order of provided ones and append the rest
+        if (existingSceneIds.size !== providedSceneIds.size) {
+          const missingScenes = draft.document.scenes_ref.filter(
+            (id) => !providedSceneIds.has(id)
+          );
+          draft.document.scenes_ref = [...validSceneIds, ...missingScenes];
+        } else {
+          // All scenes are provided, use the new order
+          draft.document.scenes_ref = validSceneIds;
+        }
+      });
+    }
     case "select": {
       return updateState(state, (draft) => {
         const { selection, mode = "reset" } = <EditorSelectAction>action;

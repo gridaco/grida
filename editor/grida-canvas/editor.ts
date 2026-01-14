@@ -682,6 +682,13 @@ class EditorDocumentStore
     });
   }
 
+  public reorderScenes(sceneIds: string[]) {
+    this.dispatch({
+      type: "scenes/reorder",
+      sceneIds,
+    });
+  }
+
   public changeSceneBackground(
     scene_id: string,
     backgroundColor: grida.program.document.ISceneBackground["background_color"]

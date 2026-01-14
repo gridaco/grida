@@ -205,7 +205,8 @@ export type SceneAction =
   | DeleteSceneAction
   | DuplicateSceneAction
   | ChangeSceneNameAction
-  | ChangeSceneBackgroundAction;
+  | ChangeSceneBackgroundAction
+  | ReorderScenesAction;
 
 export interface CreateNewSceneAction {
   type: "scenes/new";
@@ -231,6 +232,11 @@ export interface ChangeSceneBackgroundAction {
   type: "scenes/change/background-color";
   scene: string;
   backgroundColor: grida.program.document.ISceneBackground["background_color"];
+}
+
+export interface ReorderScenesAction {
+  type: "scenes/reorder";
+  sceneIds: string[];
 }
 
 export interface EditorSelectAction {
