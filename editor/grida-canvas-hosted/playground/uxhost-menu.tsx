@@ -1361,6 +1361,9 @@ function ObjectMenuContent() {
               className="text-xs"
             >
               Union
+              <DropdownMenuShortcut>
+                {keyboardShortcutText("workbench.surface.object.boolean-union")}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => instance.commands.subtract(selection)}
@@ -1368,6 +1371,9 @@ function ObjectMenuContent() {
               className="text-xs"
             >
               Subtract
+              <DropdownMenuShortcut>
+                {keyboardShortcutText("workbench.surface.object.boolean-subtract")}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => instance.commands.intersect(selection)}
@@ -1375,6 +1381,9 @@ function ObjectMenuContent() {
               className="text-xs"
             >
               Intersect
+              <DropdownMenuShortcut>
+                {keyboardShortcutText("workbench.surface.object.boolean-intersect")}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => instance.commands.exclude(selection)}
@@ -1382,6 +1391,9 @@ function ObjectMenuContent() {
               className="text-xs"
             >
               Exclude
+              <DropdownMenuShortcut>
+                {keyboardShortcutText("workbench.surface.object.boolean-exclude")}
+              </DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>

@@ -523,6 +523,83 @@ export function useEditorHotKeys() {
     }
   );
 
+  // Boolean operations
+  useHotkeys(
+    "alt+shift+u",
+    () => {
+      if (editor.backend !== "canvas") return;
+      if (selection.length < 2) return;
+      try {
+        editor.commands.op(selection, "union");
+      } catch (e) {
+        console.error(e);
+        toast.error("Boolean union failed");
+      }
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys(
+    "alt+shift+s",
+    () => {
+      if (editor.backend !== "canvas") return;
+      if (selection.length < 2) return;
+      try {
+        editor.commands.op(selection, "difference");
+      } catch (e) {
+        console.error(e);
+        toast.error("Boolean subtract failed");
+      }
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys(
+    "alt+shift+i",
+    () => {
+      if (editor.backend !== "canvas") return;
+      if (selection.length < 2) return;
+      try {
+        editor.commands.op(selection, "intersection");
+      } catch (e) {
+        console.error(e);
+        toast.error("Boolean intersect failed");
+      }
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys(
+    "alt+shift+e",
+    () => {
+      if (editor.backend !== "canvas") return;
+      if (selection.length < 2) return;
+      try {
+        editor.commands.op(selection, "xor");
+      } catch (e) {
+        console.error(e);
+        toast.error("Boolean exclude failed");
+      }
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
   useHotkeys("shift+h", () => {
     // TODO:
     toast.error("[flip horizontal] is not implemented yet");

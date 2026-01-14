@@ -486,6 +486,31 @@ export const actions = {
     ],
   },
 
+  ["workbench.surface.object.boolean-union"]: {
+    name: "boolean union",
+    description: "Combine selection using union operation",
+    command: "editor.surface.action.booleanUnion",
+    keybindings: kb(KeyCode.KeyU, M.Alt | M.Shift),
+  },
+  ["workbench.surface.object.boolean-subtract"]: {
+    name: "boolean subtract",
+    description: "Subtract selection using difference operation",
+    command: "editor.surface.action.booleanSubtract",
+    keybindings: kb(KeyCode.KeyS, M.Alt | M.Shift),
+  },
+  ["workbench.surface.object.boolean-intersect"]: {
+    name: "boolean intersect",
+    description: "Intersect selection using intersection operation",
+    command: "editor.surface.action.booleanIntersect",
+    keybindings: kb(KeyCode.KeyI, M.Alt | M.Shift),
+  },
+  ["workbench.surface.object.boolean-exclude"]: {
+    name: "boolean exclude",
+    description: "Exclude selection using xor operation",
+    command: "editor.surface.action.booleanExclude",
+    keybindings: kb(KeyCode.KeyE, M.Alt | M.Shift),
+  },
+
   // TODO:
   ["workbench.surface.object.outline-stroke"]: {
     name: "outline stroke",

@@ -96,10 +96,10 @@
 | `Object > Rotate 90° right`                                   | Rotate 90° right               | Rotates selection 90 degrees clockwise          | —        | ❌    |
 | `Object > Flatten`                                            | Flatten                        | Converts selection to vector paths              | ⌘E       | ✅    |
 | `Object > Outline stroke`                                     | Outline stroke                 | Converts stroke to filled shape                 | ⌥⌘O      | ❌    |
-| `Object > Boolean groups > Union`                             | Union                          | Combines shapes using union operation           | —        | ✅    |
-| `Object > Boolean groups > Subtract`                          | Subtract                       | Subtracts shapes using subtract operation       | —        | ✅    |
-| `Object > Boolean groups > Intersect`                         | Intersect                      | Creates intersection of shapes                  | —        | ✅    |
-| `Object > Boolean groups > Exclude`                           | Exclude                        | Creates exclusion of shapes                     | —        | ✅    |
+| `Object > Boolean groups > Union`                             | Union                          | Combines shapes using union operation           | ⌥⇧U      | ✅    |
+| `Object > Boolean groups > Subtract`                          | Subtract                       | Subtracts shapes using subtract operation       | ⌥⇧S      | ✅    |
+| `Object > Boolean groups > Intersect`                         | Intersect                      | Creates intersection of shapes                  | ⌥⇧I      | ✅    |
+| `Object > Boolean groups > Exclude`                           | Exclude                        | Creates exclusion of shapes                     | ⌥⇧E      | ✅    |
 | `Object > Rasterize selection`                                | Rasterize selection            | Converts selection to raster image              | —        | ❌    |
 | `Object > Show/Hide selection`                                | Show/Hide selection            | Toggles visibility of selection                 | ⇧⌘H      | ✅    |
 | `Object > Lock/Unlock selection`                              | Lock/Unlock selection          | Toggles lock state of selection                 | ⇧⌘L      | ✅    |
