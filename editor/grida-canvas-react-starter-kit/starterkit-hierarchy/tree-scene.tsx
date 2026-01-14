@@ -199,7 +199,7 @@ export function ScenesList() {
 
   useEffect(() => {
     tree.rebuildTree();
-  }, [scenes]);
+  }, [scenes_ref, tree]);
 
   return (
     <Tree tree={tree} indent={0}>
