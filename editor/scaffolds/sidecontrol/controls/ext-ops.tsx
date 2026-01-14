@@ -4,6 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import cg from "@grida/cg";
@@ -14,6 +15,7 @@ import {
   SquaresIntersectIcon,
   SquaresUniteIcon,
 } from "lucide-react";
+import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
 
 export function OpsControl({
   disabled,
@@ -55,6 +57,9 @@ export function OpsControl({
           >
             <SquaresUniteIcon className="size-4" />
             Union
+            <DropdownMenuShortcut>
+              {keyboardShortcutText("workbench.surface.object.boolean-union")}
+            </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-xs"
@@ -63,6 +68,9 @@ export function OpsControl({
           >
             <SquaresSubtractIcon className="size-4" />
             Subtract
+            <DropdownMenuShortcut>
+              {keyboardShortcutText("workbench.surface.object.boolean-subtract")}
+            </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-xs"
@@ -71,6 +79,9 @@ export function OpsControl({
           >
             <SquaresIntersectIcon className="size-4" />
             Intersect
+            <DropdownMenuShortcut>
+              {keyboardShortcutText("workbench.surface.object.boolean-intersect")}
+            </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-xs"
@@ -79,6 +90,9 @@ export function OpsControl({
           >
             <SquaresExcludeIcon className="size-4" />
             Exclude
+            <DropdownMenuShortcut>
+              {keyboardShortcutText("workbench.surface.object.boolean-exclude")}
+            </DropdownMenuShortcut>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
