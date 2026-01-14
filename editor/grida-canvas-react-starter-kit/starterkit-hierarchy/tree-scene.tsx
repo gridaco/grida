@@ -2,7 +2,7 @@
 
 import React, { useMemo, useEffect } from "react";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
-import { Tree, TreeItem, TreeItemLabel } from "@/components/ui-editor/tree";
+import { Tree, TreeItem, TreeItemLabel, TreeDragLine } from "@/components/ui-editor/tree";
 import {
   dragAndDropFeature,
   selectionFeature,
@@ -127,7 +127,34 @@ export function ScenesList() {
     },
     isItemFolder: (item) => false,
     onDrop(items, target) {
-      //
+      const ids = items.map((item) => item.getId());
+
+      // Only allow reordering scenes within document root
+      if (
+        target.item.getId() !== "<document>" ||
+        ids.some((id) => !scenes_ref.includes(id))
+      ) {
+        return;
+      }
+
+      // Remove dragged scenes from current order
+      const draggedSet = new Set(ids);
+      const remaining = scenes_ref.filter((id) => !draggedSet.has(id));
+
+      // Calculate insertion index
+      const insertionIndex =
+        "insertionIndex" in target && typeof target.insertionIndex === "number"
+          ? Math.max(0, Math.min(target.insertionIndex, remaining.length))
+          : 0;
+
+      // Reorder scenes
+      const newOrder = [
+        ...remaining.slice(0, insertionIndex),
+        ...ids,
+        ...remaining.slice(insertionIndex),
+      ];
+
+      editor.commands.reorderScenes(newOrder);
     },
     dataLoader: {
       getItem(itemId) {
@@ -135,7 +162,8 @@ export function ScenesList() {
       },
       getChildren: (itemId) => {
         if (itemId === "<document>") {
-          return scenes.map((s) => s.id);
+          // Use scenes_ref order directly instead of sorting by position
+          return scenes_ref;
         }
         return [];
       },
@@ -171,7 +199,7 @@ export function ScenesList() {
 
   useEffect(() => {
     tree.rebuildTree();
-  }, [scenes]);
+  }, [scenes_ref, tree]);
 
   return (
     <Tree tree={tree} indent={0}>
@@ -217,6 +245,7 @@ export function ScenesList() {
           </SceneItemContextMenuWrapper>
         );
       })}
+      <TreeDragLine />
     </Tree>
   );
 }
