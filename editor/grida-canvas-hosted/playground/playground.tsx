@@ -101,6 +101,7 @@ import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools
 import { EditorYSyncPlugin } from "@/grida-canvas/plugins/yjs";
 import { Editor } from "@/grida-canvas/editor";
 import { PlayerAvatar } from "@/components/multiplayer/avatar";
+import grida from "@grida/schema";
 import colors, {
   neutral_colors,
   randomcolorname,
@@ -466,6 +467,21 @@ export default function CanvasPlayground({
             const bytes = await opfs.get("document.grida").read();
             if (bytes && !cancelled) {
               const loadedDocument = io.GRID.decode(bytes);
+
+              // Load images from OPFS (images/<hash>.<ext>)
+              const images: Record<string, Uint8Array> = {};
+              const names = await opfs.listImages();
+              for (const name of names) {
+                const base = name.split("/").pop() ?? name;
+                const hash = base.includes(".") ? base.split(".")[0]! : base;
+                try {
+                  const img = await opfs.readImage(name);
+                  images[hash] = img;
+                } catch (e) {
+                  // Ignore per-file errors; we still load the document.
+                }
+              }
+
               instance.commands.reset(
                 editor.state.init({
                   editable: true,
@@ -473,6 +489,14 @@ export default function CanvasPlayground({
                 }),
                 "opfs"
               );
+
+              // Load image assets into the WASM runtime.
+              // This is safe to call before mount; the editor will defer and apply after mount.
+              const imageCount = Object.keys(images).length;
+              if (imageCount > 0) {
+                instance.loadImagesToWasmSurface(images);
+              }
+
               setDocumentReady(true);
               return;
             }
@@ -498,7 +522,7 @@ export default function CanvasPlayground({
     return () => {
       cancelled = true;
     };
-  }, [document, instance, src, opfs]);
+  }, [document, instance, src, opfs, backend]);
 
   const ready = documentReady && canvasReady;
 
@@ -627,13 +651,19 @@ function Consumer({
       if (opfs) {
         try {
           const snapshot = instance.getSnapshot();
-          const document = snapshot.document;
-          const bytes = io.GRID.encode(document);
+          const dir = instance.archivedir();
+
+          // Write images into OPFS (images/<hash>.<ext>)
+          for (const [filename, bytes] of Object.entries(dir.images)) {
+            await opfs.writeImage(filename, bytes);
+          }
+
+          const bytes = io.GRID.encode(dir.document);
           await opfs.get("document.grida").write(bytes);
           // Also write document.grida1 for migration purposes
           const snapshotJson = io.snapshot.stringify({
             version: undefined, // Version is optional in snapshot format
-            document: document,
+            document: dir.document,
           });
           await opfs
             .get("document.grida1")

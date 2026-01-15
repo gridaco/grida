@@ -599,6 +599,14 @@ export namespace io {
   export interface LoadedDocument {
     version: typeof grida.program.document.SCHEMA_VERSION;
     document: grida.program.document.Document;
+    /**
+     * Optional raw assets extracted from an archive.
+     *
+     * Keys are canonical image hash ids (hex16), values are encoded image bytes.
+     */
+    assets?: {
+      images: Record<string, Uint8Array>;
+    };
   }
 
   /**
@@ -764,19 +772,25 @@ export namespace io {
       // Decode FlatBuffers document
       const document = format.document.decode.fromFlatbuffer(fbBytes);
 
-      // Convert images
-      const images: Record<string, grida.program.document.ImageRef> = {};
+      // Convert images into a hash-addressed asset map, and populate a minimal images repository
+      // keyed by hash (persisted identifier). Runtime should resolve/register and rewrite refs.
+      const imagesRepo: Record<string, grida.program.document.ImageRef> = {};
+      const assets: Record<string, Uint8Array> = {};
+
       for (const [key, imageData] of Object.entries(_x_images)) {
+        const base = key.split("/").pop() ?? key;
+        const hashHex = base.includes(".") ? base.split(".")[0]! : base;
+
         const dimensions = imageSize(new Uint8Array(imageData));
         if (!dimensions || !dimensions.width || !dimensions.height) {
           throw new Error(`Failed to get dimensions for image: ${key}`);
         }
         const { width, height, type } = dimensions;
         const mimeType = IMAGE_TYPE_TO_MIME_TYPE[type || "png"] || "image/png";
-        const blob = new Blob([imageData as BlobPart], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        images[url] = {
-          url,
+
+        assets[hashHex] = imageData;
+        imagesRepo[hashHex] = {
+          url: hashHex,
           width,
           height,
           bytes: imageData.byteLength,
@@ -786,7 +800,8 @@ export namespace io {
 
       return {
         version: grida.program.document.SCHEMA_VERSION,
-        document: { ...document, images, bitmaps: _x_bitmaps },
+        document: { ...document, images: imagesRepo, bitmaps: _x_bitmaps },
+        assets: { images: assets },
       } satisfies LoadedDocument;
     }
 
@@ -884,6 +899,23 @@ export namespace io {
        * This is not used for routing; it's informational/diagnostic only.
        */
       version?: string;
+      /**
+       * Optional images index for hash-addressed image assets stored under `images/`.
+       *
+       * Key is the canonical SeaHash hex16 (lowercase, big-endian) used for filenames.
+       * Value includes metadata needed to reconstruct `document.images` and/or to
+       * register resources into WASM.
+       */
+      images?: Record<
+        string,
+        {
+          ext?: string;
+          mime?: string;
+          bytes?: number;
+          width?: number;
+          height?: number;
+        }
+      >;
     }
 
     /**
@@ -908,14 +940,15 @@ export namespace io {
     ): Uint8Array {
       // Extract bitmaps from document if not provided
       const inferredBitmaps: Record<string, io.Bitmap> | undefined =
-        bitmaps ?? ((document as any).bitmaps as Record<string, io.Bitmap>);
+        bitmaps ?? document.bitmaps;
 
       // Encode document to FlatBuffers binary
       const fbBytes = format.document.encode.toFlatbuffer(
         {
-          ...(document as any),
+          ...document,
+          images: {},
           bitmaps: {},
-        } as grida.program.document.Document,
+        },
         schemaVersion
       );
 
@@ -924,16 +957,30 @@ export namespace io {
         images: _images,
         bitmaps: _bitmaps,
         ...persistedDocument
-      } = document as any;
+      } = document;
       const snapshotJson = io.snapshot.stringify({
         version: schemaVersion,
-        document: persistedDocument as grida.program.document.Document,
+        document: persistedDocument,
       });
 
       const manifest: Manifest = {
         document_file: "document.grida",
         version: schemaVersion,
       };
+
+      // Optional image index (best-effort).
+      if (images && Object.keys(images).length > 0) {
+        const index: NonNullable<Manifest["images"]> = {};
+        for (const [key, imageData] of Object.entries(images)) {
+          const name = key.split("/").pop() ?? key;
+          const ext = name.includes(".") ? name.split(".").pop() : undefined;
+          index[name.split(".")[0] ?? name] = {
+            ext,
+            bytes: imageData.byteLength,
+          };
+        }
+        manifest.images = index;
+      }
 
       const files: Record<string, Uint8Array> = {
         "manifest.json": strToU8(JSON.stringify(manifest)),
@@ -945,6 +992,13 @@ export namespace io {
 
       // Add images
       if (images && Object.keys(images).length > 0) {
+        // TODO(resources): stop hardcoding `images/`.
+        //
+        // The long-term contract should treat `res://<dir>/<id>` as the cross-boundary identifier,
+        // and the archive should store files under `<dir>/<id>` (directory-local), not only under
+        // `images/<hash>.<ext>`.
+        //
+        // Today we only persist image assets and only under `images/`.
         for (const [key, imageData] of Object.entries(images)) {
           files[`images/${key}`] = imageData;
         }
@@ -1131,9 +1185,10 @@ export namespace io {
      * Strongly-typed file keys for Grida OPFS structure.
      */
     export type FileKey =
-      | "document.grida"
-      | "document.grida1"
-      | "thumbnail.png";
+      // NOTE: images are stored under a directory and addressed by filename.
+      // We keep these as methods (not union keys) because OPFS directory entries
+      // are not single files.
+      "document.grida" | "document.grida1" | "thumbnail.png";
 
     /**
      * File handle interface for OPFS file operations.
@@ -1324,6 +1379,60 @@ export namespace io {
           this._fileHandles.set(key, this.createFileHandle(key));
         }
         return this._fileHandles.get(key)!;
+      }
+
+      /**
+       * Writes an image blob into `images/<filename>` under this handle directory.
+       */
+      async writeImage(filename: string, bytes: Uint8Array): Promise<void> {
+        // TODO(resources): stop hardcoding the OPFS `images/` directory.
+        // Once `res://<dir>/<id>` is the cross-boundary identifier, OPFS should store
+        // assets under `<dir>/...` accordingly (general-purpose directory-local layout).
+        const dir = await this.getDirectoryHandle();
+        const imagesDir = await dir.getDirectoryHandle("images", {
+          create: true,
+        });
+        const fileHandle = await imagesDir.getFileHandle(filename, {
+          create: true,
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(bytes as unknown as FileSystemWriteChunkType);
+        await writable.close();
+      }
+
+      /**
+       * Lists image filenames under `images/`.
+       */
+      async listImages(): Promise<string[]> {
+        const dir = await this.getDirectoryHandle();
+        try {
+          const imagesDir = await dir.getDirectoryHandle("images");
+          const names: string[] = [];
+          // NOTE: TypeScript's lib.dom typing for the File System Access API varies by TS/lib config.
+          // We avoid `as any`, but still need a narrow typing bridge for `entries()` in some configs.
+          const entries = (
+            imagesDir as unknown as {
+              entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
+            }
+          ).entries();
+          for await (const [name, handle] of entries) {
+            if (handle && handle.kind === "file") names.push(name);
+          }
+          return names;
+        } catch {
+          return [];
+        }
+      }
+
+      /**
+       * Reads `images/<filename>` bytes.
+       */
+      async readImage(filename: string): Promise<Uint8Array> {
+        const dir = await this.getDirectoryHandle();
+        const imagesDir = await dir.getDirectoryHandle("images");
+        const fileHandle = await imagesDir.getFileHandle(filename);
+        const file = await fileHandle.getFile();
+        return new Uint8Array(await file.arrayBuffer());
       }
     }
   }

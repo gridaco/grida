@@ -1655,7 +1655,6 @@ export namespace format {
           }
           case "group":
           case "image": {
-            // ImageNode is not in the union, encode as GroupNode
             fbs.GroupNode.startGroupNode(builder);
             fbs.GroupNode.addNode(builder, systemNodeTraitOffset);
             fbs.GroupNode.addLayer(builder, layerOffset);
@@ -1901,14 +1900,35 @@ export namespace format {
           builder: Builder,
           paint: cg.ImagePaint
         ): { type: fbs.Paint; offset: flatbuffers.Offset } {
-          // ImagePaint is complex - for now, create a placeholder
-          // TODO: Implement full ImagePaint encoding (ResourceRef, ImagePaintFit, filters)
-          // Create ResourceRefRID with src string
-          const srcOffset = builder.createString(paint.src);
-          fbs.ResourceRefRID.startResourceRefRID(builder);
-          fbs.ResourceRefRID.addRid(builder, srcOffset);
+          // Hash-only persistence for image paints.
+          // Accepted src forms:
+          // - "<hex16>" (canonical persisted identifier)
+          // - "res://images/<hex16>" (engine runtime URL)
+          // - "mem://<hex16>" (legacy/alternate runtime URL)
+          //
+          // NOTE: We intentionally do NOT encode RID/external URLs into FlatBuffers here.
+          //
+          // TODO(resources): once `res://` is the only cross-boundary identifier, restrict
+          // accepted runtime forms here to `res://<dir>/<id>` (and drop `mem://` entirely).
+          // Also, `res://` should map to a general-purpose archive directory path, not a
+          // hardcoded `images/` folder.
+          const rawSrc = (paint.src || "").trim().toLowerCase();
+          const src = rawSrc.startsWith("res://images/")
+            ? rawSrc.slice("res://images/".length)
+            : rawSrc.startsWith("mem://")
+              ? rawSrc.slice(6)
+              : rawSrc;
+          if (!/^[0-9a-f]{16}$/.test(src)) {
+            throw new Error(
+              `ImagePaint.src must be hex16 (or res://images/<hex16>, mem://<hex16>) for persistence. Got: "${paint.src}"`
+            );
+          }
+
+          const hashOffset = builder.createString(src);
+          fbs.ResourceRefHASH.startResourceRefHASH(builder);
+          fbs.ResourceRefHASH.addHash(builder, hashOffset);
           const resourceRefOffset =
-            fbs.ResourceRefRID.endResourceRefRID(builder);
+            fbs.ResourceRefHASH.endResourceRefHASH(builder);
 
           // Create ImagePaintFit based on fit type
           let fitType: fbs.ImagePaintFit;
@@ -1949,7 +1969,7 @@ export namespace format {
           // Structs must be created inline within table context
           fbs.ImagePaint.startImagePaint(builder);
           fbs.ImagePaint.addActive(builder, paint.active ?? true);
-          fbs.ImagePaint.addImageType(builder, fbs.ResourceRef.ResourceRefRID);
+          fbs.ImagePaint.addImageType(builder, fbs.ResourceRef.ResourceRefHASH);
           fbs.ImagePaint.addImage(builder, resourceRefOffset);
           fbs.ImagePaint.addQuarterTurns(
             builder,
@@ -2247,19 +2267,23 @@ export namespace format {
          * Decodes ImagePaint.
          */
         export function image(paintValue: unknown): cg.ImagePaint {
-          // ImagePaint decoding is complex - for now return a placeholder
-          // TODO: Implement full ImagePaint decoding (ResourceRef, ImagePaintFit, filters)
+          // NOTE: hash-only decode for image resource reference.
           const imagePaint = paintValue as fbs.ImagePaint;
 
           // Decode src from ResourceRef
           let src = "";
           const imageType = imagePaint.imageType();
-          if (imageType === fbs.ResourceRef.ResourceRefRID) {
+          if (imageType === fbs.ResourceRef.ResourceRefHASH) {
             const resourceRef = imagePaint.image(
-              new fbs.ResourceRefRID()
-            ) as fbs.ResourceRefRID | null;
+              new fbs.ResourceRefHASH()
+            ) as fbs.ResourceRefHASH | null;
             if (resourceRef) {
-              src = resourceRef.rid() ?? "";
+              // NOTE: WASM renderer currently uses `res://images/<hex16>` as the cross-boundary image id.
+              // Persisted form remains plain hex16; decode returns the runtime identifier.
+              //
+              // TODO(resources): once `res://<dir>/<id>` is fully generalized, avoid hardcoding `images/`.
+              const hash = resourceRef.hash() ?? "";
+              src = hash ? `res://images/${hash}` : "";
             }
           }
 

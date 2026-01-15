@@ -1,6 +1,7 @@
-import type { editor } from "..";
+import { editor } from "..";
 import type grida from "@grida/schema";
 import assert from "assert";
+import cg from "@grida/cg";
 
 type NodeID = string & {};
 
@@ -612,5 +613,60 @@ export namespace dq {
         )
       );
     }
+
+    /**
+     * Returns all image paints used across the document (fills + strokes).
+     *
+     * This is the right primitive to build "persist resources" steps on top of.
+     */
+    private image_paints(): Array<{
+      node_id: string;
+      target: "fill" | "stroke";
+      paint: cg.ImagePaint;
+    }> {
+      const out: Array<{
+        node_id: string;
+        target: "fill" | "stroke";
+        paint: cg.ImagePaint;
+      }> = [];
+
+      for (const node_id of this.nodeids) {
+        const node = this.nodes[node_id];
+        if (!node) continue;
+
+        for (const target of ["fill", "stroke"] as const) {
+          const { paints } = editor.resolvePaints(
+            node as grida.program.nodes.UnknownNode,
+            target,
+            0
+          );
+          for (const paint of paints) {
+            if (cg.isImagePaint(paint)) {
+              out.push({ node_id, target, paint });
+            }
+          }
+        }
+      }
+
+      return out;
+    }
+
+    /**
+     * Returns unique image `src` references used by image paints.
+     *
+     * - Persisted: typically `hex16` (content hash id)
+     * - Runtime: typically `blob:` or `mem://...`
+     */
+    image_srcs(): string[] {
+      return Array.from(
+        new Set(
+          this.image_paints()
+            .map((p) => p.paint.src)
+            .filter(Boolean)
+        )
+      );
+    }
   }
+
+  // note: paint extraction uses `editor.resolvePaints` for correctness across all node variants
 }
