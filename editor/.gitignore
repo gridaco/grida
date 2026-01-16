@@ -43,6 +43,7 @@ supabase/.temp
 
 # typescript
 *.tsbuildinfo
+next-env.d.ts
 
 # Playwright
 node_modules/
