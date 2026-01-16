@@ -14,7 +14,7 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   );
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Check if the request path starts with /dev/ and NODE_ENV is not development
   if (req.nextUrl.pathname.startsWith("/dev/") && !IS_DEV) {
     return new NextResponse("Not Found", { status: 404 });

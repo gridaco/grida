@@ -3,20 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "packageManager": "pnpm@10.10.0",
   "dependencies": {
     "@uidotdev/usehooks": "^2.4.1",
     "lucide-react": "^0.511.0",
-    "next": "15.3.8",
+    "next": "16.1.2",
     "pdfjs-dist": "4.8.69",
-    "react": "19.2.1",
-    "react-dom": "19.2.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-pageflip": "^2.0.3",
     "react-pdf": "^9.2.1"
   },
@@ -27,7 +27,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.3.8",
+    "eslint-config-next": "16.1.2",
     "postcss": "^8",
     "tailwindcss": "^4",
     "typescript": "^5"
