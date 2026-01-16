@@ -845,9 +845,7 @@ describe("format roundtrip", () => {
   });
 
   describe("cg.BoxFit", () => {
-    // TODO: Enable when ImageNodeProperties decoding is implemented
-    // Currently fit is hardcoded to "cover" in decode
-    it.skip.each([
+    it.each([
       ["contain", "contain"],
       ["cover", "cover"],
       ["fill", "fill"],
@@ -869,21 +867,27 @@ describe("format roundtrip", () => {
             constraints: { children: "multiple" },
           },
           [nodeId]: {
-            type: "image",
-            id: nodeId,
-            name: "Image",
-            active: true,
-            locked: false,
-            opacity: 1,
-            z_index: 0,
-            layout_positioning: "absolute",
-            layout_inset_left: 0,
-            layout_inset_top: 0,
-            layout_target_width: 100,
-            layout_target_height: 100,
-            rotation: 0,
-            fit,
-          } satisfies grida.program.nodes.ImageNode,
+            ...baseContainer(nodeId),
+            fill_paints: [
+              {
+                type: "image",
+                src: "0123456789abcdef",
+                fit,
+                opacity: 1,
+                blend_mode: "normal",
+                active: true,
+                filters: {
+                  exposure: 0,
+                  contrast: 0,
+                  saturation: 0,
+                  temperature: 0,
+                  tint: 0,
+                  highlights: 0,
+                  shadows: 0,
+                },
+              },
+            ],
+          } satisfies grida.program.nodes.ContainerNode,
         },
         links: { [sceneId]: [nodeId] },
         scenes_ref: [sceneId],
@@ -896,11 +900,15 @@ describe("format roundtrip", () => {
       const bytes = format.document.encode.toFlatbuffer(doc);
       const decoded = format.document.decode.fromFlatbuffer(bytes);
       const node = decoded.nodes[nodeId];
-      if (!node || node.type !== "image")
-        throw new Error("Expected image node");
-      node satisfies grida.program.nodes.ImageNode;
+      if (!node || node.type !== "container")
+        throw new Error("Expected container node");
+      if (!node.fill_paints || node.fill_paints.length === 0)
+        throw new Error("Expected fill_paints");
+      const paint = node.fill_paints[0];
+      if (!paint || paint.type !== "image")
+        throw new Error("Expected image paint");
 
-      expect(node.fit).toBe(expected);
+      expect(paint.fit).toBe(expected);
     });
   });
 
@@ -2055,7 +2063,7 @@ describe("format roundtrip", () => {
           fill_paints: [
             {
               type: "image",
-              src: "https://example.com/image.png",
+              src: "0123456789abcdef",
               fit: "cover",
               blend_mode: "normal",
               opacity: 1,
@@ -2378,7 +2386,7 @@ describe("format roundtrip", () => {
           stroke_paints: [
             {
               type: "image",
-              src: "https://example.com/stroke.png",
+              src: "fedcba9876543210",
               fit: "cover",
               blend_mode: "normal",
               opacity: 1,

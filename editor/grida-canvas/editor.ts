@@ -710,13 +710,7 @@ class EditorDocumentStore
       throw new Error("Failed to pack SVG");
     }
 
-    // Handle both response formats: { success: true, data: { svg } } or direct { svg }
-    const svgData =
-      (packed as any).svg ||
-      ((packed as any).success && (packed as any).data?.svg);
-    if (!svgData) {
-      throw new Error("Failed to extract SVG data from packed result");
-    }
+    const svgData = packed.svg;
 
     let result = await iosvg.convert(svgData, {
       name: "svg",
@@ -1832,12 +1826,14 @@ class EditorDocumentStore
     const node_ids = Array.isArray(node_id) ? node_id : [node_id];
     this.dispatch(
       node_ids.map((node_id) => {
-        const current = this.getNodeSnapshotById(node_id);
-        const currentFills = Array.isArray((current as any).fill_paints)
-          ? ((current as any).fill_paints as cg.Paint[])
-          : (current as any).fill
-            ? [(current as any).fill as cg.Paint]
-            : [];
+        const current = this.getNodeSnapshotById(
+          node_id
+        ) as grida.program.nodes.UnknownNode;
+        const { paints: currentFills } = editor.resolvePaints(
+          current,
+          "fill",
+          0
+        );
 
         const newFills =
           at === "start" ? [fill, ...currentFills] : [...currentFills, fill];
@@ -1862,11 +1858,11 @@ class EditorDocumentStore
       const current = this.getNodeSnapshotById(node_id);
       if (!current) continue;
 
-      const currentStrokes = Array.isArray((current as any).stroke_paints)
-        ? ((current as any).stroke_paints as cg.Paint[])
-        : (current as any).stroke
-          ? [(current as any).stroke as cg.Paint]
-          : [];
+      const { paints: currentStrokes } = editor.resolvePaints(
+        current as grida.program.nodes.UnknownNode,
+        "stroke",
+        0
+      );
 
       const newStrokes =
         at === "start"
@@ -2836,6 +2832,42 @@ export class Editor
     }
   }
 
+  private static __isRecord(v: unknown): v is Record<string, unknown> {
+    return typeof v === "object" && v !== null && !Array.isArray(v);
+  }
+
+  /**
+   * Recursively rewrites `{ type: "image", src: string }` paint values in-place.
+   *
+   * Returns the number of rewritten `src` fields.
+   */
+  private static __rewriteImagePaintSrcDeep(
+    value: unknown,
+    mapSrc: (src: string) => string | undefined
+  ): number {
+    if (Array.isArray(value)) {
+      let sum = 0;
+      for (const item of value)
+        sum += Editor.__rewriteImagePaintSrcDeep(item, mapSrc);
+      return sum;
+    }
+    if (!Editor.__isRecord(value)) return 0;
+
+    let rewrites = 0;
+    if (value["type"] === "image" && typeof value["src"] === "string") {
+      const mapped = mapSrc(value["src"]);
+      if (mapped && mapped !== value["src"]) {
+        value["src"] = mapped;
+        rewrites++;
+      }
+    }
+
+    for (const key of Object.keys(value)) {
+      rewrites += Editor.__rewriteImagePaintSrcDeep(value[key], mapSrc);
+    }
+    return rewrites;
+  }
+
   public subscribe(fn: editor.api.SubscriptionCallbackFn<this>) {
     // TODO: we can have a single subscription to the document and use that.
     // Subscribe to the document store changes
@@ -2845,13 +2877,82 @@ export class Editor
     });
   }
 
-  public archive(): Blob {
-    const blob = new Blob(
-      [io.archive.pack(this.getSnapshot().document) as BlobPart],
-      {
-        type: "application/zip",
+  /**
+   * Prepares a persisted “archive directory” view of the current document state.
+   *
+   * This method is shared by both:
+   * - ZIP archive export (`.grida` via `io.archive.pack`)
+   * - OPFS persistence (playground `Cmd/Ctrl+S`)
+   *
+   * What it does:
+   * - Collects **used** image paint `src` references in the document.
+   * - For the WASM backend, resolves those runtime refs (`mem://...`) to bytes and a
+   *   WASM-provided content hash (hex16), producing `images/<hash>.<ext>` entries.
+   * - Rewrites image paint `src` in the persisted document from runtime URL → hash id.
+   *
+   * Notes / policy:
+   * - We intentionally **do not** compute SeaHash in JS; persisted image IDs come from WASM.
+   * - For DOM backend (hosted HTML flow), we keep external `src` values as-is and do not embed.
+   *
+   * TODO: support `thumbnail.png` generation/persistence alongside the document.
+   */
+  public archivedir(): {
+    document: grida.program.document.Document;
+    /**
+     * Image files to persist under `images/`.
+     *
+     * Keys are filenames (e.g. "<hash>.png"), values are bytes.
+     */
+    images: Record<string, Uint8Array>;
+  } {
+    const snapshot = this.getSnapshot()
+      .document as grida.program.document.Document;
+    const images: Record<string, Uint8Array> = {};
+
+    const usedSrcs = new dq.DocumentStateQuery(snapshot).image_srcs();
+    if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) {
+      throw new Error(
+        "`archivedir()` requires the canvas/WASM backend to be mounted."
+      );
+    }
+
+    // Collect bytes keyed by hash, by reading them back from WASM.
+    for (const src of usedSrcs) {
+      const hashHex = Editor.__try_parse_hex16_from_image_src(src);
+      if (!hashHex) {
+        throw new Error(
+          `Cannot persist image paint src (expected res://images/<hex16>, mem://<hex16>, or <hex16>): "${src}"`
+        );
       }
-    );
+
+      // Rust/WASM normalizes non-RID ids into `res://images/<hex16>`.
+      const bytes = this.__get_image_bytes_for_wasm(hashHex);
+      if (!bytes) {
+        throw new Error(
+          `Cannot persist image bytes (WASM missing resource for "${hashHex}")`
+        );
+      }
+
+      const mime = snapshot.images?.[hashHex]?.type;
+      const ext = (mime && mime.split("/")[1]) || "bin";
+      images[`${hashHex}.${ext}`] = bytes;
+    }
+
+    // Rewrite persisted image paint refs (runtime URL -> hash id) before encoding.
+    const persisted = structuredClone(snapshot);
+    Editor.__rewriteImagePaintSrcDeep(persisted, (src) => {
+      const hex = Editor.__try_parse_hex16_from_image_src(src);
+      return hex ?? undefined;
+    });
+
+    return { document: persisted, images };
+  }
+
+  public archive(): Blob {
+    const { document, images } = this.archivedir();
+    const blob = new Blob([io.archive.pack(document, images) as BlobPart], {
+      type: "application/zip",
+    });
 
     return blob;
   }
@@ -2909,6 +3010,18 @@ export class Editor
     );
 
     this._do_legacy_warmup();
+
+    // If we had pending image assets (e.g. loaded from an archive before mount),
+    // register them into WASM now.
+    if (this._pending_image_assets) {
+      const pending = this._pending_image_assets;
+      this._pending_image_assets = null;
+      try {
+        this.loadImagesToWasmSurface(pending);
+      } catch (e) {
+        this.log("failed to load pending image assets into wasm runtime", e);
+      }
+    }
   }
 
   /**
@@ -3149,6 +3262,79 @@ export class Editor
 
   private readonly images = new Map<string, grida.program.document.ImageRef>();
 
+  /**
+   * TODO(resource-lifecycle): replace `loadImagesToWasmSurface` + `_pending_image_assets`
+   * with a real lifecycle/event hook so hosts can do:
+   * `editor.once("surface:ready", () => loadAssetsToWasm())`
+   * instead of relying on a dedicated API and implicit deferral.
+   *
+   * (Skip details for now; keep current behavior stable.)
+   *
+   * Pending hash-addressed image assets loaded from an archive/OPFS before the WASM
+   * surface is mounted. Once mounted, we'll register and rewrite refs.
+   */
+  private _pending_image_assets: Record<string, Uint8Array> | null = null;
+
+  private static __try_parse_hex16_from_image_src(src: string): string | null {
+    /**
+     * TODO(resources): cross-boundary image ids should be `res://...` only.
+     *
+     * - `res://...` is the engine/host boundary identifier (returned by WASM today).
+     * - `mem://...` should remain a rust-native/internal byte-store pointer only.
+     *
+     * Once the contract is finalized, drop `mem://` acceptance here and prefer
+     * parsing `res://<dir>/<id>` generically (not hardcoded to `res://images/`).
+     */
+    const raw = src.trim().toLowerCase();
+    if (raw.startsWith("res://images/")) {
+      const hex = raw.slice("res://images/".length);
+      return /^[0-9a-f]{16}$/.test(hex) ? hex : null;
+    }
+    if (raw.startsWith("mem://")) {
+      const hex = raw.slice("mem://".length);
+      return /^[0-9a-f]{16}$/.test(hex) ? hex : null;
+    }
+    return /^[0-9a-f]{16}$/.test(raw) ? raw : null;
+  }
+
+  /**
+   * Loads hash-addressed image bytes into the WASM renderer runtime.
+   *
+   * Why this exists:
+   * - DOM rendering can rely on fetchable URLs (`http(s):`, `blob:`).
+   * - WASM cannot fetch URLs directly; bytes must be provided by the host.
+   *   The runtime then exposes a stable cross-boundary identifier (`res://...`).
+   *
+   * This method intentionally does **NOT** mutate the document (no `src` rewriting),
+   * so loading assets does not mark the document as "dirty".
+   *
+   * TODO(resource-lifecycle): evolve into a dynamic "asset server" flow where the renderer
+   * requests missing resources on-demand and the editor provides bytes as needed.
+   */
+  public loadImagesToWasmSurface(images: Record<string, Uint8Array>) {
+    if (!images || Object.keys(images).length === 0) return;
+
+    // If we're on canvas backend but not mounted yet, defer.
+    if (this.backend === "canvas" && !this._m_wasm_canvas_scene) {
+      this._pending_image_assets = images;
+      return;
+    }
+
+    if (this.backend !== "canvas") {
+      // DOM backend does not require pre-loading bytes into a renderer runtime.
+      return;
+    }
+
+    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
+    for (const [_hash, bytes] of Object.entries(images)) {
+      try {
+        this._experimental_createImage_for_wasm(bytes);
+      } catch (e) {
+        this.log("failed to load image asset into wasm runtime", e);
+      }
+    }
+  }
+
   __is_image_registered(ref: string): boolean {
     return this.images.has(ref);
   }
@@ -3191,6 +3377,18 @@ export class Editor
     };
 
     this.images.set(url, ref);
+    this.doc.reduce((state) => {
+      // Persistable image metadata is keyed by canonical content hash (hex16).
+      // Runtime refs use `res://images/<hex16>` (returned by WASM) and are stored in `ImagePaint.src` after registration.
+      state.document.images[hash] = {
+        url: hash,
+        width,
+        height,
+        bytes: data.byteLength,
+        type: type as grida.program.document.ImageType,
+      };
+      return state;
+    });
 
     return ref;
   }
@@ -3261,11 +3459,6 @@ export class Editor
       bytes: data.byteLength,
       type: (type as grida.program.document.ImageType) || "image/png",
     };
-
-    this.doc.reduce((state) => {
-      state.document.images[ref.url] = ref;
-      return state;
-    });
 
     return ref;
   }
