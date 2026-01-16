@@ -253,7 +253,9 @@ describe("Typr font parsing", () => {
     expect(uniqueCoords.size).toBeGreaterThan(1); // Should have at least 2 different coordinate sets
   });
 
-  it("handles AR_One_Sans font without crashing", () => {
+  it(
+    "handles AR_One_Sans font without crashing",
+    () => {
     // This font was causing the "Cannot read properties of undefined (reading '0')" error
     const font = loadFont("AR_One_Sans/AROneSans-VariableFont_ARRR,wght.ttf");
 
@@ -268,9 +270,13 @@ describe("Typr font parsing", () => {
       const __ = font.HVAR;
       const ___ = font.fvar;
     }).not.toThrow();
-  });
+    },
+    20000
+  );
 
-  it("handles various fonts with potential malformed tables gracefully", () => {
+  it(
+    "handles various fonts with potential malformed tables gracefully",
+    () => {
     // Test multiple fonts to ensure our safety fixes work broadly
     const fonts = [
       "AR_One_Sans/AROneSans-VariableFont_ARRR,wght.ttf",
@@ -295,5 +301,7 @@ describe("Typr font parsing", () => {
         const _____ = font.STAT;
       }).not.toThrow(`Font ${fontPath} should parse without errors`);
     });
-  });
+    },
+    20000
+  );
 });

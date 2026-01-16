@@ -18,7 +18,13 @@ const mockResolver = async (batch: Task[]): Promise<Result[]> => {
 };
 
 describe("BatchQueue", () => {
-  jest.useFakeTimers(); // Use fake timers to control time-based events
+  beforeAll(() => {
+    vi.useFakeTimers(); // Use fake timers to control time-based events
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
 
   let queue: BatchQueue<Task, Result, "id">;
 
@@ -31,8 +37,6 @@ describe("BatchQueue", () => {
     });
   });
 
-  jest.setTimeout(10000);
-
   it("should add tasks and resolve when batch size is reached", async () => {
     const promises = [
       queue.addTask({ id: "1", payload: "task1" }),
@@ -40,7 +44,7 @@ describe("BatchQueue", () => {
       queue.addTask({ id: "3", payload: "task3" }), // This should trigger flush
     ];
 
-    jest.runAllTimers();
+    await vi.runAllTimersAsync();
 
     const results = await Promise.all(promises);
 
@@ -57,7 +61,7 @@ describe("BatchQueue", () => {
       queue.addTask({ id: "2", payload: "task2" }),
     ];
 
-    jest.advanceTimersByTime(1000);
+    await vi.advanceTimersByTimeAsync(1000);
 
     const results = await Promise.all(promises);
 
@@ -84,9 +88,12 @@ describe("BatchQueue", () => {
       errorQueue.addTask({ id: "2", payload: "task2" }), // This should trigger flush
     ];
 
-    jest.runAllTimers();
+    // Attach handlers before timers run to avoid unhandled rejection warnings
+    const settled = Promise.allSettled(promises);
 
-    const results = await Promise.allSettled(promises);
+    await vi.runAllTimersAsync();
+
+    const results = await settled;
 
     expect(results).toEqual([
       { status: "rejected", reason: new Error("Resolver failed") },

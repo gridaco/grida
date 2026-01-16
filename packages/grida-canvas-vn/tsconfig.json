@@ -4,6 +4,8 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "target": "ES2020",
+    "types": ["vitest/globals"],
+    "skipLibCheck": true,
     "strict": true
   },
   "exclude": ["dist", "node_modules"]

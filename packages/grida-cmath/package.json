@@ -27,7 +27,7 @@
   "scripts": {
     "dev": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts --watch",
     "build": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts",
-    "test": "jest"
+    "test": "vitest run"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -66,8 +66,5 @@
       "import": "./dist/_snap.mjs",
       "require": "./dist/_snap.js"
     }
-  },
-  "jest": {
-    "preset": "ts-jest"
   }
 }

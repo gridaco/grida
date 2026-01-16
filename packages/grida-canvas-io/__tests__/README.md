@@ -54,15 +54,6 @@ pnpm turbo test --filter='./packages/grida-canvas-io'
 pnpm turbo test --filter='./packages/grida-canvas-io' -- --testNamePattern="archive comprehensive"
 ```
 
-### Using other test runners
-
-The tests are written in standard Jest format and should work with:
-
-- Jest
-- Vitest
-- Node.js built-in test runner
-- Any other Jest-compatible test framework
-
 ## Test Coverage
 
 The tests cover:

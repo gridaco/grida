@@ -1,8 +1,10 @@
+// Shared test setup for this package (Vitest).
+
 // Mock FontFace constructor for testing
-const MockFontFace = jest.fn().mockImplementation(function (
+const MockFontFace: any = vi.fn().mockImplementation(function (
   this: any,
   family: string,
-  src: string,
+  src: string | ArrayBuffer,
   descriptors: any
 ) {
   this.family = family;
@@ -11,27 +13,27 @@ const MockFontFace = jest.fn().mockImplementation(function (
   this.weight = descriptors.weight || "400";
   this.stretch = descriptors.stretch || "normal";
   this.display = descriptors.display || "auto";
-  this.load = jest.fn().mockResolvedValue(this);
+  this.load = vi.fn().mockResolvedValue(this);
   return this;
 });
 
 // Mock global FontFace
-(global as any).FontFace = MockFontFace;
+(globalThis as any).FontFace = MockFontFace;
 
 // Mock document.fonts
-Object.defineProperty(global, "document", {
+Object.defineProperty(globalThis, "document", {
   value: {
     fonts: {
-      add: jest.fn(),
-      check: jest.fn().mockReturnValue(false),
-      delete: jest.fn(),
+      add: vi.fn(),
+      check: vi.fn().mockReturnValue(false),
+      delete: vi.fn(),
     },
   },
   writable: true,
 });
 
 // Mock fetch
-(global as any).fetch = jest.fn().mockImplementation((url: string) => {
+(globalThis as any).fetch = vi.fn().mockImplementation((_url: string) => {
   return Promise.resolve({
     ok: true,
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
@@ -40,11 +42,8 @@ Object.defineProperty(global, "document", {
 });
 
 // Mock window for Typr library
-(global as any).window = {
-  TextDecoder: class TextDecoder {
-    constructor() {}
-    decode(buffer: Uint8Array): string {
-      return new TextDecoder().decode(buffer);
-    }
-  },
+const NativeTextDecoder = (globalThis as any).TextDecoder;
+(globalThis as any).window = {
+  TextDecoder: NativeTextDecoder,
 };
+

@@ -36,7 +36,6 @@ pnpm test api-validation.test.ts
 ## Test Structure
 
 - `api-validation.test.ts` - Main API validation tests
-- `setup.ts` - Jest setup and mocks
 
 ## What the Tests Check
 

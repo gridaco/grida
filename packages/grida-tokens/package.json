@@ -17,7 +17,7 @@
   "scripts": {
     "dev": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts --watch",
     "build": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts",
-    "test": "jest"
+    "test": "vitest run"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -41,8 +41,5 @@
       "import": "./dist/locales.mjs",
       "require": "./dist/locales.js"
     }
-  },
-  "jest": {
-    "preset": "ts-jest"
   }
 }

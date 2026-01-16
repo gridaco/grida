@@ -17,15 +17,12 @@
   "scripts": {
     "dev": "tsup index.ts --format cjs,esm --dts --watch",
     "build": "tsup index.ts --format cjs,esm --dts",
-    "test": "jest"
+    "test": "vitest run"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
-  ],
-  "jest": {
-    "preset": "ts-jest"
-  }
+  ]
 }

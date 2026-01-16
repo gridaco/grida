@@ -14,17 +14,6 @@ import { css } from "@/grida-canvas-utils/css";
  */
 const FIXTURE_VERSION_SPECIFIER = "20251209";
 
-function deepClone<T>(v: T): T {
-  // structuredClone is available in modern runtimes, but keep a fallback for Jest.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return structuredClone(v);
-  } catch {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return JSON.parse(JSON.stringify(v)) as T;
-  }
-}
-
 function approxEqual(a: unknown, b: unknown, eps = 1e-9): boolean {
   if (typeof a === "number" && typeof b === "number") {
     if (Number.isNaN(a) && Number.isNaN(b)) return true;
@@ -446,7 +435,7 @@ describe.skip("apply-scale round-trip (accuracy)", () => {
         () => {
           const tid = text_id!;
           let state = initEditorStateFromFixture({ scene_id, document });
-          const initial = deepClone(state.document.nodes[tid]);
+          const initial = structuredClone(state.document.nodes[tid]);
 
           const ctx = createContext(() => state);
           state = applyScaleOnce(state, ctx, {
@@ -479,7 +468,7 @@ describe.skip("apply-scale round-trip (accuracy)", () => {
         () => {
           const vid = vector_id!;
           let state = initEditorStateFromFixture({ scene_id, document });
-          const initial = deepClone(state.document.nodes[vid]);
+          const initial = structuredClone(state.document.nodes[vid]);
 
           const ctx = createContext(() => state);
           state = applyScaleOnce(state, ctx, {
@@ -525,7 +514,7 @@ describe.skip("apply-scale round-trip (accuracy)", () => {
 
             const initial: Record<string, unknown> = {};
             for (const id of tracked_ids) {
-              initial[id] = deepClone(state.document.nodes[id]);
+              initial[id] = structuredClone(state.document.nodes[id]);
             }
 
             const ctx = createContext(() => state);

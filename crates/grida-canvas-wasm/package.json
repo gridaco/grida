@@ -20,7 +20,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "serve": "serve -p 4020",
-    "test": "jest",
+    "test": "vitest run",
     "prepack": "just build",
     "prepublishOnly": "[ $(du -sk lib 2>/dev/null | cut -f1) -lt 15360 ]"
   },
@@ -29,10 +29,7 @@
   ],
   "devDependencies": {
     "@webgpu/types": "^0.1.61",
-    "@types/jest": "^29.5.12",
-    "jest": "^29.7.0",
     "serve": "^14.2.4",
-    "ts-jest": "^29.1.2",
     "tsup": "^8.5.0",
     "typescript": "^5.3.3"
   }

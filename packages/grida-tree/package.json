@@ -3,9 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "jest"
-  },
-  "jest": {
-    "preset": "ts-jest"
+    "test": "vitest run"
   }
 }

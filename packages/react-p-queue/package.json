@@ -19,7 +19,7 @@
   "scripts": {
     "dev": "tsup index.tsx --format cjs,esm --dts --watch",
     "build": "tsup index.tsx --format cjs,esm --dts",
-    "test": "jest"
+    "test": "vitest run"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -44,8 +44,5 @@
   },
   "dependencies": {
     "p-queue": "^7.4.1"
-  },
-  "jest": {
-    "preset": "ts-jest"
   }
 }
