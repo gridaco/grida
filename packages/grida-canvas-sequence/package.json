@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit",
     "dev": "tsup index.ts --format cjs,esm --dts --watch",
     "build": "tsup index.ts --format cjs,esm --dts",
-    "test": "jest"
+    "test": "vitest run"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -32,8 +32,5 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     }
-  },
-  "jest": {
-    "preset": "ts-jest"
   }
 }

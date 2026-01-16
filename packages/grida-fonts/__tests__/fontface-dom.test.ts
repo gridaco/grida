@@ -2,7 +2,7 @@ import type { GoogleWebFontListItem } from "../google";
 import { FontFaceManager as FontFaceManagerDOM } from "../fontface-dom";
 
 // Mock FontFace constructor for testing
-const MockFontFace = jest.fn().mockImplementation(function (
+const MockFontFace = vi.fn().mockImplementation(function (
   this: any,
   family: string,
   src: string,
@@ -14,7 +14,7 @@ const MockFontFace = jest.fn().mockImplementation(function (
   this.weight = descriptors.weight || "400";
   this.stretch = descriptors.stretch || "normal";
   this.display = descriptors.display || "auto";
-  this.load = jest.fn().mockResolvedValue(this);
+  this.load = vi.fn().mockResolvedValue(this);
   return this;
 });
 
@@ -28,8 +28,8 @@ import mockInter from "./inter.json";
 describe("FontFaceManagerDOM - DOM-specific functionality", () => {
   beforeEach(() => {
     MockFontFace.mockClear();
-    (document.fonts.add as jest.Mock).mockClear();
-    (document.fonts.check as jest.Mock).mockClear();
+    (document.fonts.add as any).mockClear();
+    (document.fonts.check as any).mockClear();
   });
 
   describe("Static Methods", () => {
@@ -53,7 +53,9 @@ describe("FontFaceManagerDOM - DOM-specific functionality", () => {
     });
 
     it("should warn when trying to unload font family", () => {
-      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+      const consoleSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
 
       FontFaceManagerDOM.unloadFontFamily("Roboto Flex");
 

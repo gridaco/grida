@@ -1,5 +1,10 @@
 {
   "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["vitest/globals"],
+    "skipLibCheck": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
     "strict": true

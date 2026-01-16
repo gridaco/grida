@@ -4,7 +4,7 @@ import type grida from "@grida/schema";
 describe("clipboard", () => {
   // Using a simple test payload instead of the full ClipboardPayload type
   // This is just for testing the IO functionality
-  const testPayload: io.clipboard.ClipboardPayload = {
+  const testPayload = {
     type: "prototypes",
     ids: ["<id>"],
     payload_id: "52b698ef-d06a-4f9c-ac4c-c26e744c8567",
@@ -12,13 +12,14 @@ describe("clipboard", () => {
       {
         active: true,
         fill: {
-          color: {
-            a: 1,
-            b: 0,
-            g: 0,
-            r: 0,
-          },
           type: "solid",
+          color: {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 1,
+          },
+          active: true,
         },
         font_family: "Inter",
         font_size: 14,
@@ -34,7 +35,7 @@ describe("clipboard", () => {
         z_index: 0,
       },
     ],
-  } satisfies io.clipboard.ClipboardPayload;
+  } as unknown as io.clipboard.ClipboardPayload;
 
   it("should encode and decode clipboard data correctly", () => {
     // Encode the test payload to HTML
@@ -99,7 +100,7 @@ describe("clipboard", () => {
   it("should encode large clipboard payloads without stack overflow", () => {
     // Create a large payload that would cause stack overflow with spread operator
     // Simulate copying a root container with many nested children
-    const largePrototype: grida.program.nodes.NodePrototype = {
+    const largePrototype = {
       type: "container",
       name: "Root",
       active: true,
@@ -140,11 +141,11 @@ describe("clipboard", () => {
                   },
                   opacity: 1,
                   z_index: 0,
-                }) satisfies grida.program.nodes.NodePrototype
+                })
             ),
-          }) satisfies grida.program.nodes.NodePrototype
+          })
       ),
-    };
+    } as unknown as grida.program.nodes.NodePrototype;
 
     const largePayload: io.clipboard.ClipboardPayload = {
       type: "prototypes",

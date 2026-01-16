@@ -26,7 +26,7 @@
     "typecheck": "tsc --noEmit",
     "dev": "tsup src/index.ts src/react/index.ts --format cjs,esm --dts --watch",
     "build": "tsup src/index.ts src/react/index.ts --format cjs,esm --dts",
-    "test": "jest"
+    "test": "vitest run"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -63,8 +63,5 @@
     "@types/react": "^19",
     "@use-gesture/react": "^10",
     "react": "^19.0.0"
-  },
-  "jest": {
-    "preset": "ts-jest"
   }
 }

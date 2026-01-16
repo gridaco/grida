@@ -18,7 +18,7 @@
   "scripts": {
     "dev": "tsup index.ts --format cjs,esm --dts --watch",
     "build": "tsup index.ts --format cjs,esm --dts",
-    "test": "jest"
+    "test": "vitest run"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -28,9 +28,6 @@
   ],
   "dependencies": {
     "fast-deep-equal": "^3.1.3"
-  },
-  "jest": {
-    "preset": "ts-jest"
   },
   "devDependencies": {}
 }

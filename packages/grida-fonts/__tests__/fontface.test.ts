@@ -3,7 +3,7 @@ import { DomFontAdapter } from "../fontface-dom";
 import type { GoogleWebFontListItem } from "../google";
 
 // Mock FontFace constructor for testing
-const MockFontFace = jest.fn().mockImplementation(function (
+const MockFontFace = vi.fn().mockImplementation(function (
   this: any,
   family: string,
   src: string | ArrayBuffer,
@@ -15,7 +15,7 @@ const MockFontFace = jest.fn().mockImplementation(function (
   this.weight = descriptors.weight || "400";
   this.stretch = descriptors.stretch || "normal";
   this.display = descriptors.display || "auto";
-  this.load = jest.fn().mockResolvedValue(this);
+  this.load = vi.fn().mockResolvedValue(this);
   return this;
 });
 
@@ -34,7 +34,7 @@ const mockInter: GoogleWebFontListItem = interData as GoogleWebFontListItem;
 describe("Unified Font Manager - Core Functionality", () => {
   beforeEach(() => {
     // Reset mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     MockFontFace.mockClear();
   });
 

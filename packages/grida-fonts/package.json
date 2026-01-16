@@ -6,7 +6,7 @@
     "typecheck": "tsc --noEmit",
     "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts --watch",
     "build": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts",
-    "test": "jest"
+    "test": "vitest run"
   },
   "files": [
     "dist"
