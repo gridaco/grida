@@ -45,7 +45,7 @@ Grida heavily relies on Supabase (PostgreSQL).
 **Web**
 
 - React.js 19
-- Next.js 15
+- Next.js 16
 
 **UI**
 
