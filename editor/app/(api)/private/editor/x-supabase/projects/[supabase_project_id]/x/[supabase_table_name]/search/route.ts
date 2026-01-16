@@ -8,7 +8,7 @@ import type { GridaXSupabase } from "@/types";
 import type { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 type Params = {
-  supabase_project_id: number;
+  supabase_project_id: string;
   supabase_table_name: string;
 };
 
@@ -19,7 +19,12 @@ type Context = {
 export async function GET(req: NextRequest, context: Context) {
   const searchParams = omit(req.nextUrl.searchParams, "r"); // not used, only for swr key
   const supabase_schema_name = req.headers.get("Accept-Profile") || "public";
-  const { supabase_project_id, supabase_table_name } = await context.params;
+  const {
+    supabase_project_id: supabase_project_id_param,
+    supabase_table_name,
+  } = await context.params;
+  const supabase_project_id = Number(supabase_project_id_param);
+  if (!Number.isFinite(supabase_project_id)) return notFound();
 
   const xsbClient = await createXSBClient();
 

@@ -4,7 +4,7 @@ import { createXSBClient } from "@/lib/supabase/server";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import assert from "assert";
 
-type Params = { supabase_project_id: number };
+type Params = { supabase_project_id: string };
 
 interface Context {
   params: Promise<Params>;
@@ -12,7 +12,13 @@ interface Context {
 
 export async function POST(req: NextRequest, context: Context) {
   const xsbClient = await createXSBClient();
-  const { supabase_project_id } = await context.params;
+  const { supabase_project_id: supabase_project_id_param } =
+    await context.params;
+  const supabase_project_id = Number(supabase_project_id_param);
+  assert(
+    Number.isFinite(supabase_project_id),
+    "Invalid supabase_project_id (expected a numeric route param)"
+  );
 
   const body: XSupabasePrivateApiTypes.AddSchemaNameRequestData =
     await req.json();

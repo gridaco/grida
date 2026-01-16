@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Platform } from "@/lib/platform";
 
-type Params = { organization_id: number; project_id: number };
+type Params = { organization_id: string; project_id: string };
 
 /**
  * Get tags with usage counts for a project.
@@ -16,7 +16,9 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<Params> }
 ) {
-  const { project_id } = await context.params;
+  const { project_id: project_id_param } = await context.params;
+  const project_id = Number(project_id_param);
+  if (!Number.isFinite(project_id)) return notFound();
 
   const client = await createClient();
   const ciamClient = await createCIAMClient();

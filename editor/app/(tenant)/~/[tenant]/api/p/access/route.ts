@@ -15,14 +15,16 @@ import {
 import { flatten } from "flat";
 import { Platform } from "@/lib/platform";
 
-type Params = {
-  policy: string;
-};
+type Params = { tenant: string };
 
-type Context = {
-  params: Promise<Params>;
-};
-
+/**
+ * NOTE(legacy):
+ * This route is currently not referenced anywhere in the `editor` codebase.
+ * The tenant portal login flow uses `/api/p/access/with-email` + `/api/ciam/auth/...` instead.
+ *
+ * TODO(techdebt): Safe to delete once we confirm no external/legacy clients depend on it.
+ * For now we keep it as a reference implementation, but explicitly reject in production.
+ */
 async function reqformdata(
   req: NextRequest,
   contenttype: HeaderContentType
@@ -44,14 +46,30 @@ async function reqformdata(
 // TODO: add rate limiting
 // TODO: add captcha by polocy
 // TODO: validate the policy
-export async function POST(req: NextRequest, context: Context) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      {
+        error:
+          "Deprecated endpoint. This route is kept as a reference only and is disabled in production.",
+      },
+      { status: 410 }
+    );
+  }
+
   const origin = req.nextUrl.origin;
   const next = req.nextUrl.searchParams.get("next");
+  // NOTE: [tenant] is a dynamic route segment for this handler, even if we don't use it directly yet.
+  const { tenant } = await params;
   const headerslist = await headers();
   const accept = haccept(headerslist.get("accept"));
   const contenttype = hcontenttype(headerslist.get("content-type"));
   const formdata = await reqformdata(req, contenttype);
-  const { policy: policyid } = await context.params;
+  const policyid = req.nextUrl.searchParams.get("policy");
+  assert(policyid, "policy is required");
 
   const { data: policy, error: policy_fetch_err } = await service_role.ciam
     .from("customer_auth_policy")
