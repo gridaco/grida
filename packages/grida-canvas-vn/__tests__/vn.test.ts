@@ -1,20 +1,18 @@
 import { vn } from "../vn";
 
-/*
-// FIXME: the jest config does not work with svg-pathdata
-import { vn } from "../vn";
-
 describe("vector network svg io", () => {
-  it("from path data", () => {
-    it("d", () => {
-      expect(vn.fromSVGPathData("M50 250 Q150 200 250 250 T450 250")).toEqual({
-        verticies: [],
-        segments: [],
-      });
-    });
+  it("from path data (smoke)", () => {
+    const network = vn.fromSVGPathData("M50 250 Q150 200 250 250 T450 250");
+
+    // The exact output structure is complex; this is a basic regression/smoke test
+    // that ensures we can parse ESM-only svg-pathdata inputs in our current toolchain.
+    expect(network).toBeDefined();
+    expect(Array.isArray(network.vertices)).toBe(true);
+    expect(Array.isArray(network.segments)).toBe(true);
+    expect(network.vertices.length).toBeGreaterThan(0);
+    expect(network.segments.length).toBeGreaterThan(0);
   });
 });
-*/
 
 describe("splitSegment", () => {
   it("splits a straight segment at middle", () => {

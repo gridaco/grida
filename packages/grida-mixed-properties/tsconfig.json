@@ -3,7 +3,8 @@
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "noImplicitAny": true,
-    "strict": true
+    "strict": true,
+    "types": ["vitest/globals"]
   },
   "exclude": ["dist"]
 }
