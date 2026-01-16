@@ -28,3 +28,7 @@ Blink uses this file to generate:
 - Style builder code
 
 This means the file embeds the **actual behavior used by Chrome** when resolving CSS cascade and computed style.
+
+## Misc
+
+- **Count (from this repo snapshot)**: `744` CSS properties (unique `data[].name` where `is_property !== false`), `33` descriptors (`is_descriptor === true`).
