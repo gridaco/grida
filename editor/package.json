@@ -10,9 +10,10 @@
     "lint:fix": "eslint --fix",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
   },
-  "packageManager": "pnpm@10.10.0",
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.0",
     "@ai-sdk/openai": "3.0.0",
@@ -275,5 +276,6 @@
     "tailwindcss": "^4",
     "tw-animate-css": "^1.2.9",
     "typescript": "^5"
-  }
+  },
+  "packageManager": "pnpm@10.10.0"
 }
