@@ -5,7 +5,7 @@ import {
   __dangerously_fetch_secure_service_role_key,
 } from "@/services/x-supabase";
 
-type Params = { supabase_project_id: number };
+type Params = { supabase_project_id: string };
 
 interface Context {
   params: Promise<Params>;
@@ -13,7 +13,15 @@ interface Context {
 
 export async function GET(req: NextRequest, context: Context) {
   const xsbClient = await createXSBClient();
-  const { supabase_project_id } = await context.params;
+  const { supabase_project_id: supabase_project_id_param } =
+    await context.params;
+  const supabase_project_id = Number(supabase_project_id_param);
+  if (!Number.isFinite(supabase_project_id)) {
+    return NextResponse.json(
+      { error: "Invalid supabase_project_id" },
+      { status: 400 }
+    );
+  }
 
   // [REQUIRED SECURITY LAYER]
   // Security layer - this is secure (protected by RLS).
@@ -40,7 +48,15 @@ export async function GET(req: NextRequest, context: Context) {
 
 export async function POST(req: NextRequest, context: Context) {
   const xsbClient = await createXSBClient();
-  const { supabase_project_id } = await context.params;
+  const { supabase_project_id: supabase_project_id_param } =
+    await context.params;
+  const supabase_project_id = Number(supabase_project_id_param);
+  if (!Number.isFinite(supabase_project_id)) {
+    return NextResponse.json(
+      { error: "Invalid supabase_project_id" },
+      { status: 400 }
+    );
+  }
 
   // [REQUIRED SECURITY LAYER]
   // Security layer - this is secure (protected by RLS).

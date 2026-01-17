@@ -5,7 +5,7 @@ import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
-type Params = { supabase_project_id: number };
+type Params = { supabase_project_id: string };
 
 interface Context {
   params: Promise<Params>;
@@ -13,7 +13,10 @@ interface Context {
 
 export async function GET(req: NextRequest, context: Context) {
   const xsbClient = await createXSBClient();
-  const { supabase_project_id } = await context.params;
+  const { supabase_project_id: supabase_project_id_param } =
+    await context.params;
+  const supabase_project_id = Number(supabase_project_id_param);
+  if (!Number.isFinite(supabase_project_id)) return notFound();
 
   const { data: supabase_project, error: rls_err } = await xsbClient
     .from("supabase_project")
@@ -41,7 +44,10 @@ export async function GET(req: NextRequest, context: Context) {
 
 export async function PATCH(req: NextRequest, context: Context) {
   const xsbClient = await createXSBClient();
-  const { supabase_project_id } = await context.params;
+  const { supabase_project_id: supabase_project_id_param } =
+    await context.params;
+  const supabase_project_id = Number(supabase_project_id_param);
+  if (!Number.isFinite(supabase_project_id)) return notFound();
 
   const { data: supabase_project, error: rls_err } = await xsbClient
     .from("supabase_project")
@@ -118,7 +124,10 @@ export async function PATCH(req: NextRequest, context: Context) {
 
 export async function DELETE(req: NextRequest, context: Context) {
   const xsbClient = await createXSBClient();
-  const { supabase_project_id } = await context.params;
+  const { supabase_project_id: supabase_project_id_param } =
+    await context.params;
+  const supabase_project_id = Number(supabase_project_id_param);
+  if (!Number.isFinite(supabase_project_id)) return notFound();
 
   const { count, error } = await xsbClient
     .from("supabase_project")

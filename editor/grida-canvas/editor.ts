@@ -2827,9 +2827,11 @@ export class Editor
   }
 
   private log(...args: any[]) {
-    if (this.debug || process.env.NODE_ENV === "development") {
-      this.logger?.(...args);
-    }
+    try {
+      if (this.debug || process.env.NODE_ENV === "development") {
+        this.logger?.(...args);
+      }
+    } catch {}
   }
 
   private static __isRecord(v: unknown): v is Record<string, unknown> {

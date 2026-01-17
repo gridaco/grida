@@ -9,7 +9,7 @@ type PGCustomerInsert =
   Database["grida_ciam_public"]["Views"]["customer_with_tags"]["Row"];
 
 type Params = {
-  project_id: number;
+  project_id: string;
 };
 
 async function parse_customers_csv(
@@ -89,7 +89,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
-  const { project_id } = await params;
+  const { project_id: project_id_param } = await params;
+  const project_id = Number(project_id_param);
+  assert(
+    Number.isFinite(project_id),
+    "Invalid project_id (expected a numeric route param)"
+  );
   const formdata = await request.formData();
   const searchParams = request.nextUrl.searchParams;
   const dryrun = qboolean(searchParams.get("dryrun"));
@@ -150,7 +155,12 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
-  const { project_id } = await params;
+  const { project_id: project_id_param } = await params;
+  const project_id = Number(project_id_param);
+  assert(
+    Number.isFinite(project_id),
+    "Invalid project_id (expected a numeric route param)"
+  );
   const formdata = await request.formData();
   const searchParams = request.nextUrl.searchParams;
   const dryrun = qboolean(searchParams.get("dryrun"));

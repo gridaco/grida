@@ -14,7 +14,7 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   );
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Check if the request path starts with /dev/ and NODE_ENV is not development
   if (req.nextUrl.pathname.startsWith("/dev/") && !IS_DEV) {
     return new NextResponse("Not Found", { status: 404 });
@@ -66,8 +66,20 @@ export async function middleware(req: NextRequest) {
 
   // #region tanent matching
 
-  const host = req.headers.get("host") || "";
-  const url = new URL(`https://${host}`);
+  const host = req.headers.get("host");
+  // Host can be null (or malformed) in some proxy / local contributor setups.
+  // If we can't reliably parse it, skip tenant matching rather than throwing.
+  if (!host) {
+    return res;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(`https://${host}`);
+  } catch {
+    return res;
+  }
+
   const hostname = url.hostname;
 
   // ignore if vercel preview url

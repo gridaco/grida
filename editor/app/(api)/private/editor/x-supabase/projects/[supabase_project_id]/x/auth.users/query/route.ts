@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { GridaXSupabase } from "@/types";
 
-type Params = { supabase_project_id: number };
+type Params = { supabase_project_id: string };
 
 interface Context {
   params: Promise<Params>;
@@ -15,7 +15,10 @@ interface Context {
 // this route is protected via supabase_project access RLS.
 export async function GET(req: NextRequest, context: Context) {
   const xsbClient = await createXSBClient();
-  const { supabase_project_id } = await context.params;
+  const { supabase_project_id: supabase_project_id_param } =
+    await context.params;
+  const supabase_project_id = Number(supabase_project_id_param);
+  if (!Number.isFinite(supabase_project_id)) return notFound();
 
   const _q_page = req.nextUrl.searchParams.get("page");
   const page = _q_page ? parseInt(_q_page) : undefined;

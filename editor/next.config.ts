@@ -241,18 +241,9 @@ const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY
       // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
       // side errors will fail.
       tunnelRoute: "/monitoring",
-
-      // Automatically tree-shake Sentry logger statements to reduce bundle size
-      disableLogger: true,
-
-      // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
-      // See the following for more information:
-      // https://docs.sentry.io/product/crons/
-      // https://vercel.com/docs/cron-jobs
-      automaticVercelMonitors: false,
     } satisfies SentryBuildOptions)
   : null;
 
 export default sentry_build_options
-  ? withSentryConfig(withMDX(nextConfig as any), sentry_build_options)
-  : withMDX(nextConfig as any);
+  ? withSentryConfig(withMDX(nextConfig), sentry_build_options)
+  : withMDX(nextConfig);
