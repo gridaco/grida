@@ -70,7 +70,7 @@ import { tokens } from "@grida/tokens";
 import { TypeSelect } from "@/components/formfield-type-select";
 import type { Data } from "@/lib/data";
 
-// @ts-ignore
+// @ts-expect-error - `FormInputType` includes many variants; this table intentionally defines defaults for a supported subset and treats missing types as `{}` at runtime.
 const default_field_init: {
   [key in FormInputType]: Partial<FormFieldInit>;
 } = {
@@ -1035,6 +1035,6 @@ function xsb_reference_available({
 }
 
 function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
-  let txt = label || fmt_snake_case_to_human_text(name);
+  const txt = label || fmt_snake_case_to_human_text(name);
   return txt;
 }

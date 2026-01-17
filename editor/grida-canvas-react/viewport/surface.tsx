@@ -115,7 +115,7 @@ const SURFACE_TRANSFORM_CONTEXT = React.createContext<cmath.Transform>(
 
 function SurfaceTransformContextProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   const { transform } = useTransform();
   return (
     <SURFACE_TRANSFORM_CONTEXT.Provider value={transform}>
@@ -825,7 +825,7 @@ function NodeTitleBarTitle({
  */
 export function EditorSurfaceClipboardSyncProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   useClipboardSync();
 
   return <>{children}</>;

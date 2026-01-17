@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { UserCheck2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -251,9 +252,9 @@ export function CustomerSignupTestClient({
             <CardDescription>{t.success}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild className="w-full">
-              <a href="/p/login">{t.go_portal}</a>
-            </Button>
+            <Link href="/p/login">
+              <Button className="w-full">{t.go_portal}</Button>
+            </Link>
           </CardContent>
         </Card>
       )}

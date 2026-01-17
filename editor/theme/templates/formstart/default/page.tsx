@@ -118,7 +118,7 @@ export default function _000({ data }: Props) {
   );
 }
 
-function SectionHeader({ children }: React.PropsWithChildren<{}>) {
+function SectionHeader({ children }: React.PropsWithChildren) {
   return (
     <div className="py-4">
       <h4>{children}</h4>

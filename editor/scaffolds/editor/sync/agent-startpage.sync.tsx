@@ -48,7 +48,7 @@ export function useSyncFormAgentStartPage() {
 
 export function FormAgentStartPageSyncProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   useSyncFormAgentStartPage();
   return <>{children}</>;
 }

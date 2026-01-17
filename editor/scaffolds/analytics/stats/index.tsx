@@ -191,7 +191,7 @@ export function Sessions({
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      let { data, error } = await fetchSession(
+      const { data, error } = await fetchSession(
         {
           project_ids,
           from: from,
@@ -263,7 +263,7 @@ export function Customers({
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      let { data, error } = await fetchCustomers(
+      const { data, error } = await fetchCustomers(
         {
           project_ids,
           from: from,
@@ -335,7 +335,7 @@ export function Responses({
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      let { data, error } = await fetchResponses(
+      const { data, error } = await fetchResponses(
         {
           project_ids,
           from: from,

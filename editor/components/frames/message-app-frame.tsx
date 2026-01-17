@@ -98,7 +98,7 @@ export default function MessageAppFrame({
   );
 }
 
-function OutgoingMessage({ children }: React.PropsWithChildren<{}>) {
+function OutgoingMessage({ children }: React.PropsWithChildren) {
   return (
     <div className="flex justify-end">
       <div className="max-w-[75%] rounded-[20px] bg-[#007AFF] px-4 py-2 text-white">
@@ -108,7 +108,7 @@ function OutgoingMessage({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function IncomingMessage({ children }: React.PropsWithChildren<{}>) {
+function IncomingMessage({ children }: React.PropsWithChildren) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[75%] rounded-[20px] bg-[#F2F2F7] dark:bg-[#2C2C2E] px-4 py-2 text-gray-900 dark:text-gray-100">

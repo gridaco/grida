@@ -6,7 +6,7 @@ import { useEditorState } from "../use";
 
 export function AssetsBackgroundsResolver({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   const [, dispatch] = useEditorState();
 
   const { data } = useSWR("https://bg.grida.co/data", async (url: string) => {

@@ -1,4 +1,4 @@
-/* eslint-disable */
+// prettier-ignore
 export const cursors = {
   "alias": { src: "/assets/css-cursors-macos/alias.png", label: "Alias" },
   "cell": { src: "/assets/css-cursors-macos/cell.png", label: "Cell" },

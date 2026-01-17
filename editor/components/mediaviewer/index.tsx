@@ -68,7 +68,7 @@ export function useMediaViewer() {
   return context;
 }
 
-export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
+export function MediaViewerProvider({ children }: React.PropsWithChildren) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPip, setIsPip] = useState(false);
   const [mediaSrc, setMediaSrc] = useState<MediaObject | undefined>(undefined);
@@ -250,7 +250,7 @@ function PipPlayerContent({
   );
 }
 
-function PipPlayerErrorMessage({ children }: React.PropsWithChildren<{}>) {
+function PipPlayerErrorMessage({ children }: React.PropsWithChildren) {
   return <span className="text-sm text-muted-foreground">{children}</span>;
 }
 

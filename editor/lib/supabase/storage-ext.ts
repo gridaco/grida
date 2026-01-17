@@ -50,8 +50,8 @@ export namespace SupabaseStorageExtensions {
     bucket: string,
     path = ""
   ) {
-    let files: Record<string, FileObject> = {};
-    let stack: string[] = [path];
+    const files: Record<string, FileObject> = {};
+    const stack: string[] = [path];
 
     while (stack.length > 0) {
       const currentPath = stack.pop();
@@ -114,7 +114,7 @@ export namespace SupabaseStorageExtensions {
       fullPath: string;
       path: string;
     } | null;
-    error: any;
+    error: unknown;
   }> {
     try {
       const response = await fetch(signed_url, {

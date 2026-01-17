@@ -660,10 +660,7 @@ function BlockRenderer({
       );
     }
     case "image": {
-      return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img {...__shared_root_attr} src={block.src} alt="" />
-      );
+      return <img {...__shared_root_attr} src={block.src} alt="" />;
     }
     case "video": {
       return (
@@ -707,7 +704,7 @@ function BlockRenderer({
   }
 }
 
-function GroupLayout({ children }: React.PropsWithChildren<{}>) {
+function GroupLayout({ children }: React.PropsWithChildren) {
   return <div className="flex flex-col gap-8">{children}</div>;
 }
 

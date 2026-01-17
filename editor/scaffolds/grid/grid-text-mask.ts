@@ -52,7 +52,7 @@ export function mask(value: string, config?: MarkerConfig): string {
     );
   }
 
-  for (let token of tokens) {
+  for (const token of tokens) {
     if (value.includes(token)) {
       const parts = value.split(token);
       // Mask all parts except the first one

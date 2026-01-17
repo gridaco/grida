@@ -58,7 +58,9 @@ export function StandaloneSceneContent({
       id={primary ? domapi.k.EDITOR_CONTENT_ELEMENT_ID : undefined}
       {...props}
     >
-      {children?.map((id) => <NodeElement key={id} node_id={id} />)}
+      {children?.map((id) => (
+        <NodeElement key={id} node_id={id} />
+      ))}
     </div>
   );
 }
@@ -141,7 +143,7 @@ export function StandaloneSceneBackground({
   );
 }
 
-export function Transformer({ children }: React.PropsWithChildren<{}>) {
+export function Transformer({ children }: React.PropsWithChildren) {
   const { style } = useTransformState();
 
   return (
@@ -172,7 +174,7 @@ function useFitInitiallyEffect() {
  */
 export function AutoInitialFitTransformer({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   const { style } = useTransformState();
 
   useFitInitiallyEffect();

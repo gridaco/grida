@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 
-export const DisableSwipeBack = ({ children }: React.PropsWithChildren<{}>) => {
+export const DisableSwipeBack = ({ children }: React.PropsWithChildren) => {
   useEffect(() => {
     document.body.style.overscrollBehaviorX = "none";
 

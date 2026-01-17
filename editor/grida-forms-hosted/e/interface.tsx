@@ -18,7 +18,7 @@ import equal from "deep-equal";
  */
 export function FormAgentGlobalWindowMessagingInterface({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   useEffect(() => {
     const cb_onload_interface_ready = () => {
       console.log("[MESSAGE] | grida.co/forms | onload");

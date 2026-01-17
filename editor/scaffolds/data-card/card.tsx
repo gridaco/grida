@@ -121,10 +121,10 @@ function CardMediaRoot({
   );
 }
 
-function CardPropertyLines({ children }: React.PropsWithChildren<{}>) {
+function CardPropertyLines({ children }: React.PropsWithChildren) {
   return <div className="flex flex-col w-full gap-2">{children}</div>;
 }
 
-function CardPropertyLine({ children }: React.PropsWithChildren<{}>) {
+function CardPropertyLine({ children }: React.PropsWithChildren) {
   return <div className="flex">{children}</div>;
 }

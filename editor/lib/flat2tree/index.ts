@@ -91,7 +91,7 @@ export function flat(items: TreeNode[]): Omit<TreeNode, "children">[] {
  */
 export function tree(items: FlatItem[]): TreeNode[] {
   const roots: TreeNode[] = [];
-  let stack: TreeNode[] = [];
+  const stack: TreeNode[] = [];
 
   for (const it of items) {
     if (it.isFolder) {

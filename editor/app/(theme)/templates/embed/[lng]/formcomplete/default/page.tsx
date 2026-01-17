@@ -29,7 +29,7 @@ export default async function Component({
   return (
     <main className="flex items-center justify-center min-h-screen">
       <FormCompletePageDefault
-        // @ts-ignore
+        // @ts-expect-error - context prop type mismatch with FormCompletePageDefault
         context={{
           form_title: title,
         }}

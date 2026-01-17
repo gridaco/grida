@@ -102,7 +102,6 @@ export default function BrandPage() {
       {/* JSON-LD (structured data). Next.js guide: https://nextjs.org/docs/app/guides/json-ld */}
       <script
         type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
         }}

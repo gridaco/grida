@@ -2,11 +2,11 @@
 import { cn } from "@/components/lib/utils";
 import React from "react";
 
-export function Root({ children }: React.PropsWithChildren<{}>) {
+export function Root({ children }: React.PropsWithChildren) {
   return <div className="flex flex-col h-full w-full">{children}</div>;
 }
 
-export function Header({ children }: React.PropsWithChildren<{}>) {
+export function Header({ children }: React.PropsWithChildren) {
   return <header className="bg-background w-full">{children}</header>;
 }
 
@@ -26,11 +26,11 @@ export function HeaderLine({
   );
 }
 
-export function HeaderMenus({ children }: React.PropsWithChildren<{}>) {
+export function HeaderMenus({ children }: React.PropsWithChildren) {
   return <div className="flex gap-2 items-center">{children}</div>;
 }
 
-export function HeaderMenuItems({ children }: React.PropsWithChildren<{}>) {
+export function HeaderMenuItems({ children }: React.PropsWithChildren) {
   return <div className="flex gap-1 items-center">{children}</div>;
 }
 

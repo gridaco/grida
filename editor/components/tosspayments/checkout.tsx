@@ -17,8 +17,7 @@ import {
 import { cn } from "@/components/lib/utils";
 import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
 
-interface TossPaymentsCheckoutSessionContext
-  extends TossPaymentsCheckoutSessionResponseData {
+interface TossPaymentsCheckoutSessionContext extends TossPaymentsCheckoutSessionResponseData {
   paymentWidgetRef: React.MutableRefObject<PaymentWidgetInstance | null>;
 }
 
@@ -61,9 +60,7 @@ export function useTossPaymentsCheckoutSession() {
   return useContext(TossPaymentsCheckoutSessionContext);
 }
 
-export function TossPaymentsCheckout({
-  children,
-}: React.PropsWithChildren<{}>) {
+export function TossPaymentsCheckout({ children }: React.PropsWithChildren) {
   const session = useTossPaymentsCheckoutSession();
 
   const paymentMethodsWidgetRef = useRef<any>(null);
@@ -126,7 +123,7 @@ export function TossPaymentsCheckout({
  */
 export function TossPaymentsPayButtonContainerFooter({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   return <footer className="px-4 pb-2">{children}</footer>;
 }
 

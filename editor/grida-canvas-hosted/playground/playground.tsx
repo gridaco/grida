@@ -1088,7 +1088,7 @@ function SidebarRight({
   );
 }
 
-function PathToolbarPosition({ children }: React.PropsWithChildren<{}>) {
+function PathToolbarPosition({ children }: React.PropsWithChildren) {
   const cem = useContentEditModeMinimalState();
 
   if (cem?.type !== "vector" && cem?.type !== "width") return null;
@@ -1100,7 +1100,7 @@ function PathToolbarPosition({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function BrushToolbarPosition({ children }: React.PropsWithChildren<{}>) {
+function BrushToolbarPosition({ children }: React.PropsWithChildren) {
   const tool = useToolState();
 
   if (!(tool.type === "brush" || tool.type === "eraser")) return null;

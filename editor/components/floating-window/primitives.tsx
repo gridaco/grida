@@ -192,7 +192,7 @@ export type FloatingWindowRegistry = {
 const FloatingWindowRegistryContext =
   createContext<FloatingWindowRegistry | null>(null);
 
-export function FloatingWindowHost({ children }: React.PropsWithChildren<{}>) {
+export function FloatingWindowHost({ children }: React.PropsWithChildren) {
   const storeRef = useRef(new Map<string, FloatingWindowControls>());
 
   const registry = useMemo<FloatingWindowRegistry>(() => {

@@ -3,7 +3,7 @@
 import FingerprintJS, { Agent, GetResult } from "@fingerprintjs/fingerprintjs";
 import React, { useEffect } from "react";
 
-export function FingerprintProvider({ children }: React.PropsWithChildren<{}>) {
+export function FingerprintProvider({ children }: React.PropsWithChildren) {
   useEffect(() => {
     FingerprintJS.load().then((fp) => {
       window.fingerprint = fp;

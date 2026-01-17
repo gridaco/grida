@@ -29,6 +29,11 @@ export default function CampaignLayoutDesignerPage() {
 function DesignerRouter() {
   const { template_id } = useWWWLayout();
 
+  // NOTE: `template_id` here is the DB `template.id` (UUID), not the template key.
+  const template = useWWWTemplate<TemplateData.West_Referrral__Duo_001>(
+    template_id ?? ""
+  );
+
   // TODO: make this dynamic.
   // This page is currently statically wired to a specific enterprise template editor.
   // In the future, we should dispatch based on `template.data.template_id` (or template metadata)
@@ -43,10 +48,6 @@ function DesignerRouter() {
       </div>
     );
   }
-
-  // NOTE: `template_id` here is the DB `template.id` (UUID), not the template key.
-  const template =
-    useWWWTemplate<TemplateData.West_Referrral__Duo_001>(template_id);
 
   if (template.loading || !template.data) {
     return (

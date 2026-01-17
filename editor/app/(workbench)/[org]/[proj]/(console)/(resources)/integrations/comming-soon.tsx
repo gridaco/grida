@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Building2, MessageSquareText, Puzzle, Rocket } from "lucide-react";
 
 import {
@@ -17,12 +17,8 @@ import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
 
 export function IntegrationsCommingSoonDialog() {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    // Open the dialog when the component mounts
-    setOpen(true);
-  }, []);
+  // Initialize dialog as open on mount
+  const [open, setOpen] = useState(true);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

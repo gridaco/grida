@@ -57,7 +57,7 @@ export function SectionHeader({
   );
 }
 
-export function SectionHeaderBadge({ children }: React.PropsWithChildren<{}>) {
+export function SectionHeaderBadge({ children }: React.PropsWithChildren) {
   return (
     <Badge
       variant="secondary"

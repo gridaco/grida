@@ -192,7 +192,7 @@ export default function _002() {
   );
 }
 
-function ModeratorDrawer({ children }: React.PropsWithChildren<{}>) {
+function ModeratorDrawer({ children }: React.PropsWithChildren) {
   return (
     <Drawer>
       <DrawerTrigger>{children}</DrawerTrigger>

@@ -3,9 +3,7 @@ import { Badge } from "@/components/ui/badge";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
-export function AlphaDisabledFeature({
-  children,
-}: React.PropsWithChildren<{}>) {
+export function AlphaDisabledFeature({ children }: React.PropsWithChildren) {
   if (IS_DEV) {
     return <>{children}</>;
   }

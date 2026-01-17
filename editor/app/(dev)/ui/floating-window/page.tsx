@@ -167,7 +167,7 @@ export default function FloatingWindowDemoPage() {
                           </p>
                           <div className="rounded-md bg-slate-950 text-slate-100 p-3">
                             <div>$ window.moveTo(x, y)</div>
-                            <div className="text-slate-400">// logs</div>
+                            <div className="text-slate-400">{"// logs"}</div>
                             <div>{"Ready >"}</div>
                           </div>
                         </FloatingWindowBody>

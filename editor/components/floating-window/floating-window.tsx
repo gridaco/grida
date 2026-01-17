@@ -65,7 +65,7 @@ function DefaultWindowCrashFallback({
   );
 }
 
-export function FloatingWindowHost(props: React.PropsWithChildren<{}>) {
+export function FloatingWindowHost(props: React.PropsWithChildren) {
   return <PrimitiveHost {...props} />;
 }
 

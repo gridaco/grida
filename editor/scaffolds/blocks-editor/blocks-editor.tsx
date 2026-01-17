@@ -41,15 +41,13 @@ export default function BlocksEditorRoot() {
  * TODO: this is added while developing a v_value feature on form field. once the value computation is moved to the higher level, this can be removed.
  * @returns
  */
-function DummyFormAgentStateProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
+function DummyFormAgentStateProvider({ children }: React.PropsWithChildren) {
   return (
     <FormAgentProvider initial={initdummy()}>{children}</FormAgentProvider>
   );
 }
 
-function DndContextProvider({ children }: React.PropsWithChildren<{}>) {
+function DndContextProvider({ children }: React.PropsWithChildren) {
   const [, dispatch] = useEditorState();
 
   const id = useId();
@@ -207,9 +205,7 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
   }, [blocks, supabase]);
 }
 
-function OptimisticBlocksSyncProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
+function OptimisticBlocksSyncProvider({ children }: React.PropsWithChildren) {
   // sync data to server, when blocks change. (use id as identifier)
   // look for differences in..
   // - type
@@ -360,12 +356,12 @@ function shallowEqual(obj1: any, obj2: any) {
     return false;
   }
 
-  let keys1 = Object.keys(obj1);
-  let keys2 = Object.keys(obj2);
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
 
   if (keys1.length !== keys2.length) return false;
 
-  for (let key of keys1) {
+  for (const key of keys1) {
     if (obj1[key] !== obj2[key]) {
       return false;
     }

@@ -49,7 +49,7 @@ export async function GET(
   assert(field);
 
   if (field.storage) {
-    const { type, bucket } = field.storage as any as FormFieldStorageSchema;
+    const { type, bucket } = field.storage as unknown as FormFieldStorageSchema;
     switch (type) {
       case "x-supabase": {
         assert(supabase_connection);

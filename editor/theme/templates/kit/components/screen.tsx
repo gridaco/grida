@@ -1,6 +1,6 @@
 import React from "react";
 
-export function ScreenWindowRoot({ children }: React.PropsWithChildren<{}>) {
+export function ScreenWindowRoot({ children }: React.PropsWithChildren) {
   return (
     <div className="relative h-dvh w-dvw max-w-screen-2xl mx-auto overflow-hidden">
       {children}
@@ -10,7 +10,7 @@ export function ScreenWindowRoot({ children }: React.PropsWithChildren<{}>) {
 
 export const ScreenRoot = React.forwardRef<
   HTMLDivElement,
-  React.PropsWithChildren<{}>
+  React.PropsWithChildren
 >(({ children }, ref) => {
   return (
     <div className="@container/screen relative w-full h-full" ref={ref}>
@@ -19,7 +19,7 @@ export const ScreenRoot = React.forwardRef<
   );
 });
 
-export function ScreenCenter({ children }: React.PropsWithChildren<{}>) {
+export function ScreenCenter({ children }: React.PropsWithChildren) {
   return (
     <div className="relative flex justify-center items-center h-full w-full md:rounded-md md:shadow-md overflow-hidden">
       {children}
@@ -27,7 +27,7 @@ export function ScreenCenter({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function ScreenMobileFrame({ children }: React.PropsWithChildren<{}>) {
+export function ScreenMobileFrame({ children }: React.PropsWithChildren) {
   return (
     <main className="relative overflow-hidden @lg/screen:container w-full h-full @lg/screen:max-w-md mx-auto @lg/screen:rounded-lg @lg/screen:shadow-lg @lg/screen:border !p-0">
       {children}
@@ -35,7 +35,7 @@ export function ScreenMobileFrame({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function ScreenScrollable({ children }: React.PropsWithChildren<{}>) {
+export function ScreenScrollable({ children }: React.PropsWithChildren) {
   return (
     <div className="relative overflow-y-scroll w-full h-full">{children}</div>
   );
@@ -43,7 +43,7 @@ export function ScreenScrollable({ children }: React.PropsWithChildren<{}>) {
 
 export function ScreenRootBackground({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   return (
     <div className="absolute inset-0 w-full h-full -z-50 pointer-events-none select-none">
       {children}
@@ -144,7 +144,7 @@ export function ScreenGridArea({
   );
 }
 
-export function ScreenDecorations({ children }: React.PropsWithChildren<{}>) {
+export function ScreenDecorations({ children }: React.PropsWithChildren) {
   return (
     <div className="absolute inset-0 w-full h-full z-50 pointer-events-none select-none">
       {children}
