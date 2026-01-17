@@ -66,8 +66,20 @@ export async function proxy(req: NextRequest) {
 
   // #region tanent matching
 
-  const host = req.headers.get("host") || "";
-  const url = new URL(`https://${host}`);
+  const host = req.headers.get("host");
+  // Host can be null (or malformed) in some proxy / local contributor setups.
+  // If we can't reliably parse it, skip tenant matching rather than throwing.
+  if (!host) {
+    return res;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(`https://${host}`);
+  } catch {
+    return res;
+  }
+
   const hostname = url.hostname;
 
   // ignore if vercel preview url
