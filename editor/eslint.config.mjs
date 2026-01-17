@@ -13,6 +13,12 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Custom rules
+  {
+    rules: {
+      "@typescript-eslint/no-namespace": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
