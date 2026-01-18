@@ -16,9 +16,7 @@ describe("computeMixed", () => {
 
   it("ignores undefined points when computing", () => {
     const points: ([number, number] | undefined)[] = [[1, 2], undefined];
-    const safe = points.filter(
-      (p): p is [number, number] => Array.isArray(p)
-    );
+    const safe = points.filter((p): p is [number, number] => Array.isArray(p));
     expect(computeMixed(safe.map((p) => p[0]))).toBe(1);
   });
 });

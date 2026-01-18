@@ -39,8 +39,10 @@ type DataResponse<T> =
 
 type SubscriptionDisposer = () => void;
 
-interface TableSpaceInstanceInit<T>
-  extends Pick<TableSpaceInstance<T>, "identifier" | "readonly" | "realtime"> {
+interface TableSpaceInstanceInit<T> extends Pick<
+  TableSpaceInstance<T>,
+  "identifier" | "readonly" | "realtime"
+> {
   fetcher: (query: Data.Relation.QueryState) => Promise<DataResponse<T>>;
   subscriber?: (callbacks: {
     onInsert?: (data: T) => void;

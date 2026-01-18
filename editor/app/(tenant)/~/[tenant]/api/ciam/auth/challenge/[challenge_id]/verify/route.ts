@@ -42,7 +42,10 @@ export async function POST(
 
     const { customer_uid, project_id } = session_data[0];
     if (!customer_uid || !project_id) {
-      return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid or expired OTP" },
+        { status: 401 }
+      );
     }
 
     const activation_ttl_seconds = 60 * 5;
@@ -59,7 +62,10 @@ export async function POST(
 
     if (portal_session_err || !portal_session || portal_session.length === 0) {
       console.error("[ciam]/error creating portal session", portal_session_err);
-      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      );
     }
 
     const s = portal_session[0];

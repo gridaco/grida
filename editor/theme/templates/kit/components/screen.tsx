@@ -41,9 +41,7 @@ export function ScreenScrollable({ children }: React.PropsWithChildren) {
   );
 }
 
-export function ScreenRootBackground({
-  children,
-}: React.PropsWithChildren) {
+export function ScreenRootBackground({ children }: React.PropsWithChildren) {
   return (
     <div className="absolute inset-0 w-full h-full -z-50 pointer-events-none select-none">
       {children}

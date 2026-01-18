@@ -1479,7 +1479,8 @@ export namespace editor.state {
    * @persistent
    */
   export interface IDocumentState
-    extends editor.state.IMinimalDocumentState,
+    extends
+      editor.state.IMinimalDocumentState,
       editor.state.IScenePersistenceState {
     /**
      * current scene id
@@ -1488,7 +1489,8 @@ export namespace editor.state {
   }
 
   export interface IEditorState
-    extends editor.config.IEditorConfig,
+    extends
+      editor.config.IEditorConfig,
       editor.state.IViewportTransformState,
       editor.state.IEditorUserClipboardState,
       editor.state.IEditorMultiplayerCursorState,
@@ -1547,7 +1549,8 @@ export namespace editor.state {
   };
 
   export interface IEditorStateInit
-    extends Pick<editor.config.IEditorConfig, "editable" | "debug">,
+    extends
+      Pick<editor.config.IEditorConfig, "editable" | "debug">,
       Partial<
         Pick<editor.config.IEditorConfig, "flags" | "rotation_quantize_step">
       >,

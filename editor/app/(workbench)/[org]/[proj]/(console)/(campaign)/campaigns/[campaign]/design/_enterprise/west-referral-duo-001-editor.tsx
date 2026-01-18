@@ -257,7 +257,9 @@ function TemplateEditor({
                       <Label>Show Invitation List</Label>
                       <label className="flex items-center gap-2">
                         <Checkbox
-                          checked={!!values?.components?.referrer?.show_invitations}
+                          checked={
+                            !!values?.components?.referrer?.show_invitations
+                          }
                           onCheckedChange={(checked) => {
                             props.set(
                               "components.referrer.show_invitations",

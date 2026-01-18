@@ -12,15 +12,13 @@ export function Header_001({ logo }: { logo?: string }) {
         color: kolor.colorformats.RGBA32F.TRANSPARENT,
         active: true,
       }}
-      style={
-        {
-          // right: 0,
-          // justifyContent: "center",
-          // alignItems: "center",
-          // padding: 16,
-          // zIndex: 10,
-        }
-      }
+      style={{
+        // right: 0,
+        // justifyContent: "center",
+        // alignItems: "center",
+        // padding: 16,
+        // zIndex: 10,
+      }}
     >
       <NodeElement
         node_id="logo"

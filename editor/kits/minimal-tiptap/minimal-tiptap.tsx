@@ -15,8 +15,10 @@ import { useMinimalTiptapEditor } from "./hooks/use-minimal-tiptap";
 import { MeasuredContainer } from "./components/measured-container";
 import { cn } from "@/components/lib/utils";
 
-export interface MinimalTiptapProps
-  extends Omit<UseMinimalTiptapEditorProps, "onUpdate"> {
+export interface MinimalTiptapProps extends Omit<
+  UseMinimalTiptapEditorProps,
+  "onUpdate"
+> {
   value?: Content;
   onChange?: (value: Content) => void;
   className?: string;

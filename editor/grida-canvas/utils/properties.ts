@@ -38,7 +38,10 @@ function cornerRadius(
 // TODO: LEGACY_PAINT_MODEL
 function fill(...nodes: grida.program.nodes.Node[]): any {
   for (const node of nodes) {
-    if (Array.isArray((node as any).fill_paints) && (node as any).fill_paints.length > 0) {
+    if (
+      Array.isArray((node as any).fill_paints) &&
+      (node as any).fill_paints.length > 0
+    ) {
       return (node as any).fill_paints[0];
     }
     if ("fill" in node && node.fill !== undefined) {

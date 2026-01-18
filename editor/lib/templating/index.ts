@@ -129,8 +129,8 @@ export namespace TemplateVariables {
 
   export interface FormConnectedDatasourcePostgresTransactionCompleteContext<
     R extends Record<string, any> = Record<string, any>,
-  > extends FormResponseContext,
-      XSupabase.PostgresQueryInsertSelectContext<R> {
+  >
+    extends FormResponseContext, XSupabase.PostgresQueryInsertSelectContext<R> {
     NEW: R;
   }
 

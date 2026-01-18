@@ -1,7 +1,7 @@
-import * as React from "react"
-import { ChevronDownIcon } from "lucide-react"
+import * as React from "react";
+import { ChevronDownIcon } from "lucide-react";
 
-import { cn } from "@/components/lib/utils"
+import { cn } from "@/components/lib/utils";
 
 function NativeSelect({ className, ...props }: React.ComponentProps<"select">) {
   return (
@@ -25,11 +25,11 @@ function NativeSelect({ className, ...props }: React.ComponentProps<"select">) {
         data-slot="native-select-icon"
       />
     </div>
-  )
+  );
 }
 
 function NativeSelectOption({ ...props }: React.ComponentProps<"option">) {
-  return <option data-slot="native-select-option" {...props} />
+  return <option data-slot="native-select-option" {...props} />;
 }
 
 function NativeSelectOptGroup({
@@ -42,7 +42,7 @@ function NativeSelectOptGroup({
       className={cn(className)}
       {...props}
     />
-  )
+  );
 }
 
-export { NativeSelect, NativeSelectOptGroup, NativeSelectOption }
+export { NativeSelect, NativeSelectOptGroup, NativeSelectOption };

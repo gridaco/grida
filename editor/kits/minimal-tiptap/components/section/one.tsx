@@ -15,11 +15,10 @@ import {
 import { ToolbarButton } from "../toolbar-button";
 import { ShortcutKey } from "../shortcut-key";
 
-interface TextStyle
-  extends Omit<
-    FormatAction,
-    "value" | "icon" | "action" | "isActive" | "canExecute"
-  > {
+interface TextStyle extends Omit<
+  FormatAction,
+  "value" | "icon" | "action" | "isActive" | "canExecute"
+> {
   element: keyof React.JSX.IntrinsicElements;
   level?: Level;
   className: string;

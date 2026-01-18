@@ -8,7 +8,8 @@ import type cg from "@grida/cg";
  * @deprecated - not ready - do not use in production
  */
 interface PolylineNode
-  extends grida.program.nodes.i.IBaseNode,
+  extends
+    grida.program.nodes.i.IBaseNode,
     grida.program.nodes.i.ISceneNode,
     grida.program.nodes.i.IHrefable,
     grida.program.nodes.i.IPositioning,

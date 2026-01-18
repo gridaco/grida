@@ -50,8 +50,10 @@ const copyStyles = (styles: CSSStyleDeclaration, node: HTMLElement) => {
   node.style.textTransform = styles.textTransform;
 };
 
-export interface AutosizeInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+export interface AutosizeInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "onChange"
+> {
   /** className for the outer element */
   className?: string;
   /** additional width for input element */

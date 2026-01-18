@@ -113,13 +113,29 @@ export default function Toolbar() {
       label: string;
       shortcut?: string;
     }> = [
-      { value: "pencil", label: "Pencil tool", shortcut: keyboardShortcutText("workbench.surface.cursor.pencil") },
-      { value: "path", label: "Path tool", shortcut: keyboardShortcutText("workbench.surface.cursor.path") },
+      {
+        value: "pencil",
+        label: "Pencil tool",
+        shortcut: keyboardShortcutText("workbench.surface.cursor.pencil"),
+      },
+      {
+        value: "path",
+        label: "Path tool",
+        shortcut: keyboardShortcutText("workbench.surface.cursor.path"),
+      },
     ];
 
     if (flags.__unstable_brush_tool === "on") {
-      stable.push({ value: "brush", label: "Brush tool", shortcut: keyboardShortcutText("workbench.surface.cursor.brush") });
-      stable.push({ value: "eraser", label: "Eraser tool", shortcut: keyboardShortcutText("workbench.surface.cursor.eraser") });
+      stable.push({
+        value: "brush",
+        label: "Brush tool",
+        shortcut: keyboardShortcutText("workbench.surface.cursor.brush"),
+      });
+      stable.push({
+        value: "eraser",
+        label: "Eraser tool",
+        shortcut: keyboardShortcutText("workbench.surface.cursor.eraser"),
+      });
     }
 
     return stable;
@@ -146,9 +162,21 @@ export default function Toolbar() {
           open={open === "cursor"}
           onOpenChange={(o) => setOpen(o ? "cursor" : null)}
           options={[
-            { value: "cursor", label: "Cursor", shortcut: keyboardShortcutText("workbench.surface.cursor.cursor") },
-            { value: "hand", label: "Hand tool", shortcut: keyboardShortcutText("workbench.surface.cursor.hand") },
-            { value: "scale", label: "Scale tool", shortcut: keyboardShortcutText("workbench.surface.cursor.scale") },
+            {
+              value: "cursor",
+              label: "Cursor",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.cursor"),
+            },
+            {
+              value: "hand",
+              label: "Hand tool",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.hand"),
+            },
+            {
+              value: "scale",
+              label: "Scale tool",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.scale"),
+            },
           ]}
           onValueChange={(v) => {
             editor.surface.surfaceSetTool(
@@ -178,10 +206,32 @@ export default function Toolbar() {
           open={open === "shape"}
           onOpenChange={(o) => setOpen(o ? "shape" : null)}
           options={[
-            { value: "rectangle", label: "Rectangle", shortcut: keyboardShortcutText("workbench.surface.cursor.rectangle") },
-            { value: "ellipse", label: "Ellipse", shortcut: keyboardShortcutText("workbench.surface.cursor.ellipse") },
-            { value: "line", label: "Line", shortcut: keyboardShortcutText("workbench.surface.cursor.line") },
-            { value: "polygon", label: "Polygon", shortcut: keyboardShortcutText("workbench.surface.cursor.polygon") },
+            {
+              value: "rectangle",
+              label: "Rectangle",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.rectangle"
+              ),
+            },
+            {
+              value: "ellipse",
+              label: "Ellipse",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.ellipse"
+              ),
+            },
+            {
+              value: "line",
+              label: "Line",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.line"),
+            },
+            {
+              value: "polygon",
+              label: "Polygon",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.polygon"
+              ),
+            },
             { value: "star", label: "Star" },
             { value: "image", label: "Image" },
           ]}

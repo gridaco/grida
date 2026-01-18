@@ -8,10 +8,8 @@ export const demo_1_categories = [
 ];
 
 export const imagesDemo1 = {
-  이벤트:
-    "/affiliate/poc/images/demo-1-images/formbuilder-section-event-image.png",
-  스포츠:
-    "/affiliate/poc/images/demo-1-images/formbuilder-section-sports-image.png",
+  이벤트: "/affiliate/poc/images/demo-1-images/formbuilder-section-event-image.png",
+  스포츠: "/affiliate/poc/images/demo-1-images/formbuilder-section-sports-image.png",
   음악: "/affiliate/poc/images/demo-1-images/formbuilder-section-music-image.png",
   패션: "/affiliate/poc/images/demo-1-images/formbuilder-section-fashion-image.png",
   미술: "/affiliate/poc/images/demo-1-images/formbuilder-section-art-image.png",

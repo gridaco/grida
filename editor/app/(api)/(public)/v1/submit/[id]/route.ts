@@ -783,7 +783,9 @@ async function submit({
         if (type === "challenge_email") {
           const key = `__challenge_email__${field.id}`;
           const challenge_state =
-            session_raw && key in session_raw ? (session_raw as any)[key] : null;
+            session_raw && key in session_raw
+              ? (session_raw as any)[key]
+              : null;
           return {
             ...base,
             challenge_state,

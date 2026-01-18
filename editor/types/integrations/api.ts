@@ -71,8 +71,7 @@ export interface TossPaymentsCheckoutSessionRequest {
 }
 
 export interface TossPaymentsCheckoutSessionResponseData
-  extends TossPaymentsBasePaymentInfo,
-    TossPaymentsIntegrationPublicKeys {
+  extends TossPaymentsBasePaymentInfo, TossPaymentsIntegrationPublicKeys {
   successUrl: string;
   failUrl: string;
   price: number;
