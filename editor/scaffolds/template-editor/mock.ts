@@ -17,7 +17,6 @@ export function mockContext({
   title,
 }: Partial<TemplateVariables.FormResponseContext> & { lang?: string }) {
   const faker = new Faker({
-    // @ts-ignore
     locale: lngFallback(lang),
   });
 

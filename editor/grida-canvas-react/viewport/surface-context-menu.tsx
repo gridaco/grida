@@ -32,23 +32,23 @@ export function EditorSurfaceContextMenu({
   );
 }
 
+const ActionItem = ({ action }: { action: ContextMenuAction }) => (
+  <ContextMenuItem
+    onSelect={action.onSelect}
+    disabled={action.disabled}
+    className="text-xs"
+  >
+    {action.label}
+    {action.shortcut && (
+      <ContextMenuShortcut>{action.shortcut}</ContextMenuShortcut>
+    )}
+  </ContextMenuItem>
+);
+
 function ContextMenuContent() {
   const { selection } = useSelectionState();
   const { debug } = useEditorFlagsState();
   const actions = useContextMenuActions(selection);
-
-  const ActionItem = ({ action }: { action: ContextMenuAction }) => (
-    <ContextMenuItem
-      onSelect={action.onSelect}
-      disabled={action.disabled}
-      className="text-xs"
-    >
-      {action.label}
-      {action.shortcut && (
-        <ContextMenuShortcut>{action.shortcut}</ContextMenuShortcut>
-      )}
-    </ContextMenuItem>
-  );
 
   return (
     <_ContextMenuContent className="w-52">

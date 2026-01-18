@@ -34,7 +34,7 @@ async function reqformdata(
       const json = await req.json();
       const formdata = new FormData();
 
-      for (var key in json) {
+      for (const key in json) {
         formdata.append(key, json[key]);
       }
       return formdata;

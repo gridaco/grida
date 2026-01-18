@@ -26,7 +26,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 type Step = "email" | "otp";
 
-export default function _Page() {
+export default function Page() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next");
   const redirect_uri = searchParams.get("redirect_uri");

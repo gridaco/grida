@@ -43,7 +43,7 @@ export function ThemePalette({
         <header className="flex flex-col items-start gap-3">
           <div className="flex flex-wrap gap-2">
             {Object.keys(palettes).map((key) => {
-              // @ts-ignore
+              // @ts-expect-error - Dynamic palette access by key
               const palette = palettes[key];
               const primary = palette[colorscheme]["--primary"];
               return (

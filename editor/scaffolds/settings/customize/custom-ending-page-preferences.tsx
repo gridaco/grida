@@ -259,13 +259,9 @@ function Preview({
   return (
     <>
       {template &&
-        React.createElement(
-          // @ts-ignore
-          getComponent(template),
-          {
-            ...texts,
-          } as any
-        )}
+        React.createElement(getComponent(template), {
+          ...texts,
+        } as any)}
     </>
   );
 }

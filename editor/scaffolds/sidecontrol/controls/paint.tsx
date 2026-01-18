@@ -815,7 +815,7 @@ function PaintTabsContent({
             onValueChange?.({
               ...value,
               type: "solid",
-              // @ts-ignore
+              // @ts-expect-error - Token color type assignment
               color: token,
               active: true,
             });

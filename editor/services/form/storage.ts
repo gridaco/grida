@@ -98,7 +98,10 @@ export class FieldStorageService {
             this.supabase_connection!
           );
 
-          const { sb_table_name, sb_table_schema } = conn?.main_supabase_table!;
+          if (!conn?.main_supabase_table) {
+            throw new Error("Main supabase table connection not available");
+          }
+          const { sb_table_name, sb_table_schema } = conn.main_supabase_table;
           const { pk_col, pk_cols, pk_first_col } =
             SupabasePostgRESTOpenApi.parse_pks(sb_table_schema);
 

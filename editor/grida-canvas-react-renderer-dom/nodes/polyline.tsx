@@ -38,7 +38,7 @@ export function SVGPolyLineWidget({
   style,
   points,
   ...props
-}: // @ts-expect-error
+}: // @ts-expect-error - PolylineNode props type mismatch
 grida.program.document.IComputedNodeReactRenderProps<PolylineNode>) {
   const width = Math.max(_width, 1);
   const height = Math.max(_height, 1);

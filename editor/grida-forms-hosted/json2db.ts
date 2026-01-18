@@ -212,7 +212,7 @@ export class JSONFrom2DB {
 
     // TODO: block mapping is not complete - only works for field blocks and header blocks
 
-    // @ts-ignore
+    // @ts-expect-error - Block mapping type incomplete
     const rows: FormBlockInsertion[] = this.renderer.blocks().map((b, i) => {
       const __shared: Partial<FormBlockInsertion> = {
         // data: b.data

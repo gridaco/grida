@@ -143,7 +143,7 @@ function removeEmpty<T extends Record<string, any>>(obj: T): Partial<T> {
       ([, value]) => value !== undefined && value !== null && value !== ""
     )
     .reduce((acc, [key, value]) => {
-      // @ts-ignore
+      // @ts-expect-error - Dynamic object property assignment
       acc[key] = value;
       return acc;
     }, {} as Partial<T>);

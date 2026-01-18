@@ -18,9 +18,9 @@ function replaceCaret(el: HTMLElement) {
   // do not move caret if element was not focused
   const isTargetFocused = document.activeElement === el;
   if (target !== null && target.nodeValue !== null && isTargetFocused) {
-    var sel = window.getSelection();
+    const sel = window.getSelection();
     if (sel !== null) {
-      var range = document.createRange();
+      const range = document.createRange();
       range.setStart(target, target.nodeValue.length);
       range.collapse(true);
       sel.removeAllRanges();
@@ -148,6 +148,6 @@ export interface Props extends DivProps {
   contentEditable?: boolean | "plaintext-only";
   tagName?: string;
   className?: string;
-  style?: Object;
-  innerRef?: React.Ref<HTMLElement> | Function;
+  style?: object;
+  innerRef?: React.Ref<HTMLElement> | ((instance: HTMLElement | null) => void);
 }

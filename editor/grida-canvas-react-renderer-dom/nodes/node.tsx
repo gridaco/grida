@@ -159,7 +159,6 @@ export function NodeElement<P extends Record<string, any>>({
     // width: node.width,
     // height: node.height,
     corner_radius: node.corner_radius,
-    // @ts-ignore
   } satisfies grida.program.document.IGlobalRenderingContext &
     (
       | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>

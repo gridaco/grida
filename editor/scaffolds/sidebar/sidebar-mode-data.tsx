@@ -572,7 +572,7 @@ function ConnectNewSupabaseTableDialog({
         <div className="my-4">
           <Select
             value={fulltable}
-            // @ts-expect-error
+            // @ts-expect-error - Select onValueChange type mismatch
             onValueChange={setFullTable}
           >
             <SelectTrigger>

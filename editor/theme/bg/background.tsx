@@ -55,7 +55,7 @@ export function PageBackgroundIframe({ src }: { src: string }) {
       }}
       transition={{ delay: 0.1, duration: 0.25 }}
       // onLoad={() => setIsLoaded(true)}
-      // @ts-ignore
+      // @ts-expect-error - HTML iframe allowtransparency attribute
       allowtransparency="true"
       background="transparent"
       className="absolute inset-0 w-screen h-screen -z-10"

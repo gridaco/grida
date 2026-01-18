@@ -287,7 +287,7 @@ function ErrorCodeLink({
     return <>--</>;
   }
 
-  let href = formerrorlink(Env.web.HOST, code, { form_id });
+  const href = formerrorlink(Env.web.HOST, code, { form_id });
 
   return (
     <Link href={href} target="_blank" prefetch={false}>
@@ -462,7 +462,7 @@ function SimulationPlanner({
         </Label>
         <Select
           value={loctype}
-          // @ts-ignore
+          // @ts-expect-error - Select onValueChange type mismatch with strict union type
           onValueChange={setLoctype}
         >
           <SelectTrigger>

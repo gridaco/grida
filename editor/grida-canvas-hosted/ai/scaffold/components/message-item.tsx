@@ -90,7 +90,7 @@ export function AssistantMessage({
     content = directContent;
   }
 
-  let reasoningText = reasoningSegments.join("").trim();
+  const reasoningText = reasoningSegments.join("").trim();
   const reasoningIsStreaming = reasoningStreaming;
 
   const toolItems = Array.from(toolMap.values());
