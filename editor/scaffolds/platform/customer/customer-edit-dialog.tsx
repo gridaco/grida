@@ -12,52 +12,224 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { PhoneInput } from "@/components/extension/phone-input";
 import { Textarea } from "@/components/ui/textarea";
+import { TagInput } from "@/components/tag";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 
-export interface CustomerEditDialogDTO {
+export interface CustomerContactsEditDialogDTO {
   name: string | null;
   email: string | null;
   phone: string | null;
   description: string | null;
 }
 
-const t_operation_action_label = {
-  insert: "create",
-  update: "update",
-} as const;
+export interface CustomerCreateDialogDTO extends CustomerContactsEditDialogDTO {
+  tags: string[];
+}
 
-export default function CustomerEditDialog({
+export function CustomerCreateDialog({
   default: defaultValues = {
     name: "",
     email: "",
     phone: "",
     description: "",
+    tags: [],
   },
-  operation,
   onSubmit,
+  tagOptions,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  operation: "insert" | "update";
-  default?: CustomerEditDialogDTO;
-  onSubmit?: (data: CustomerEditDialogDTO) => Promise<boolean>;
+  default?: CustomerContactsEditDialogDTO & { tags?: string[] };
+  onSubmit?: (data: CustomerCreateDialogDTO) => Promise<boolean>;
+  /**
+   * Autocomplete options (tag names). Freeform tags are still allowed.
+   */
+  tagOptions?: string[];
 }) {
   const {
     control,
     register,
     handleSubmit,
     formState: { isSubmitting },
-  } = useForm<CustomerEditDialogDTO>({
+  } = useForm<CustomerContactsEditDialogDTO>({
+    defaultValues: {
+      name: defaultValues.name ?? "",
+      email: defaultValues.email ?? "",
+      phone: defaultValues.phone ?? "",
+      description: defaultValues.description ?? "",
+    },
+  });
+
+  const [activeTagIndex, setActiveTagIndex] = React.useState<number | null>(
+    null
+  );
+  const [tags, setTags] = React.useState<{ id: string; text: string }[]>(() =>
+    (defaultValues.tags ?? []).map((t) => ({ id: t, text: t }))
+  );
+
+  const onFormSubmit = async (data: CustomerContactsEditDialogDTO) => {
+    // Transform falsy (empty) values to null.
+    const transformedData: CustomerCreateDialogDTO = {
+      name: data.name?.trim() || null,
+      email: data.email?.trim() || null,
+      phone: data.phone?.trim() || null,
+      description: data.description?.trim() || null,
+      tags: tags.map((t) => t.text.trim()).filter((t) => t.length > 0),
+    };
+
+    await onSubmit?.(transformedData).then((success) => {
+      if (success) props.onOpenChange?.(false);
+    });
+  };
+
+  return (
+    <Dialog {...props}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogTitle className="capitalize">create customer</DialogTitle>
+        </DialogHeader>
+        <form
+          id="customer-create-form"
+          onSubmit={handleSubmit(onFormSubmit)}
+          className="w-full"
+        >
+          <FieldGroup>
+            <FieldSet>
+              <FieldLegend>Account information</FieldLegend>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="customer-create-name">Name</FieldLabel>
+                  <Input
+                    id="customer-create-name"
+                    placeholder="John Doe"
+                    {...register("name")}
+                    max={255}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="customer-create-email">
+                    Account email
+                  </FieldLabel>
+                  <Input
+                    id="customer-create-email"
+                    type="email"
+                    placeholder="alice@acme.com"
+                    pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
+                    {...register("email")}
+                    min={5}
+                    max={255}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="customer-create-phone">
+                    Account Phone Number
+                  </FieldLabel>
+                  <Controller
+                    name="phone"
+                    control={control}
+                    render={({ field }) => (
+                      <PhoneInput
+                        id="customer-create-phone"
+                        {...field}
+                        value={field.value as any}
+                      />
+                    )}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="customer-create-description">
+                    Description
+                  </FieldLabel>
+                  <Textarea
+                    id="customer-create-description"
+                    {...register("description")}
+                    maxLength={400}
+                  />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+
+            <FieldSet>
+              <FieldLegend>Tags</FieldLegend>
+              <FieldDescription>
+                Add tags to organize and filter customers later.
+              </FieldDescription>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="customer-create-tags">
+                    Customer tags
+                  </FieldLabel>
+                  <TagInput
+                    id="customer-create-tags"
+                    tags={tags}
+                    setTags={setTags}
+                    activeTagIndex={activeTagIndex}
+                    setActiveTagIndex={setActiveTagIndex}
+                    enableAutocomplete={(tagOptions?.length ?? 0) > 0}
+                    autocompleteOptions={tagOptions?.map((t) => ({
+                      id: t,
+                      text: t,
+                    }))}
+                    placeholder="Add tags"
+                  />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+          </FieldGroup>
+        </form>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" disabled={isSubmitting}>
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button
+            form="customer-create-form"
+            disabled={isSubmitting}
+            className="capitalize"
+          >
+            {isSubmitting ? <Spinner /> : "create customer"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function CustomerContactsEditDialog({
+  default: defaultValues = {
+    name: "",
+    email: "",
+    phone: "",
+    description: "",
+  },
+  onSubmit,
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  default?: CustomerContactsEditDialogDTO;
+  onSubmit?: (data: CustomerContactsEditDialogDTO) => Promise<boolean>;
+}) {
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<CustomerContactsEditDialogDTO>({
     defaultValues: defaultValues,
   });
 
-  const t_action_label = t_operation_action_label[operation];
-
-  const onFormSubmit = async (data: CustomerEditDialogDTO) => {
+  const onFormSubmit = async (data: CustomerContactsEditDialogDTO) => {
     // Transform falsy (empty) values to null.
-    const transformedData: CustomerEditDialogDTO = {
+    const transformedData: CustomerContactsEditDialogDTO = {
       name: data.name?.trim() || null,
       email: data.email?.trim() || null,
       phone: data.phone?.trim() || null,
@@ -74,58 +246,70 @@ export default function CustomerEditDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="capitalize">
-            {t_action_label} customer
+            Edit contact information
           </DialogTitle>
         </DialogHeader>
         <form
-          id="create-customer"
+          id="customer-contacts-edit-form"
           onSubmit={handleSubmit(onFormSubmit)}
-          className="space-y-6"
+          className="w-full"
         >
-          <div>
-            <h3 className="text-lg font-medium">Account information</h3>
-          </div>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                placeholder="John Doe"
-                {...register("name")}
-                max={255}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Account email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="alice@acme.com"
-                pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
-                {...register("email")}
-                min={5}
-                max={255}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Account Phone Number</Label>
-              <Controller
-                name="phone"
-                control={control}
-                render={({ field }) => (
-                  <PhoneInput {...field} value={field.value as any} />
-                )}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                {...register("description")}
-                maxLength={400}
-              />
-            </div>
-          </div>
+          <FieldGroup>
+            <FieldSet>
+              <FieldLegend>Account information</FieldLegend>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="customer-contacts-name">Name</FieldLabel>
+                  <Input
+                    id="customer-contacts-name"
+                    placeholder="John Doe"
+                    {...register("name")}
+                    max={255}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="customer-contacts-email">
+                    Account email
+                  </FieldLabel>
+                  <Input
+                    id="customer-contacts-email"
+                    type="email"
+                    placeholder="alice@acme.com"
+                    pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
+                    {...register("email")}
+                    min={5}
+                    max={255}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="customer-contacts-phone">
+                    Account Phone Number
+                  </FieldLabel>
+                  <Controller
+                    name="phone"
+                    control={control}
+                    render={({ field }) => (
+                      <PhoneInput
+                        id="customer-contacts-phone"
+                        {...field}
+                        value={field.value as any}
+                      />
+                    )}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="customer-contacts-description">
+                    Description
+                  </FieldLabel>
+                  <Textarea
+                    id="customer-contacts-description"
+                    {...register("description")}
+                    maxLength={400}
+                  />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+          </FieldGroup>
         </form>
         <DialogFooter>
           <DialogClose asChild>
@@ -134,14 +318,16 @@ export default function CustomerEditDialog({
             </Button>
           </DialogClose>
           <Button
-            form="create-customer"
+            form="customer-contacts-edit-form"
             disabled={isSubmitting}
             className="capitalize"
           >
-            {isSubmitting ? <Spinner /> : `${t_action_label} customer`}
+            {isSubmitting ? <Spinner /> : "save"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+export default CustomerCreateDialog;

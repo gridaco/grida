@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
 import useSWR, { mutate } from "swr";
 import { Spinner } from "@/components/ui/spinner";
-import { ClockIcon, Cross1Icon, Link2Icon } from "@radix-ui/react-icons";
+import { ClockIcon, Link2Icon } from "@radix-ui/react-icons";
 import {
   ArrowLeft,
   ChevronDown,
@@ -51,8 +51,9 @@ import {
 import React, { useCallback, useMemo, useState, use } from "react";
 import { toast } from "sonner";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import CustomerEditDialog, {
-  CustomerEditDialogDTO,
+import {
+  CustomerContactsEditDialog,
+  CustomerContactsEditDialogDTO,
 } from "@/scaffolds/platform/customer/customer-edit-dialog";
 import {
   Dialog,
@@ -103,7 +104,7 @@ function useCustomer(project_id: number, uid: string) {
   }, [uid, supabase]);
 
   const _update = useCallback(
-    async (data: CustomerEditDialogDTO) => {
+    async (data: CustomerContactsEditDialogDTO) => {
       const { error } = await supabase
         .from("customer")
         .update(data)
@@ -198,7 +199,6 @@ function useCustomer(project_id: number, uid: string) {
       update_tags: _update_tags,
       update_marketing: _update_marketing,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [uid, supabase]
   );
 }
@@ -274,7 +274,7 @@ export default function CustomerDetailPage(props0: {
     }
   };
 
-  const onUpdateCustomer = async (data: CustomerEditDialogDTO) => {
+  const onUpdateCustomer = async (data: CustomerContactsEditDialogDTO) => {
     const success = await actions.update(data);
     mutate(key);
 
@@ -389,10 +389,9 @@ export default function CustomerDetailPage(props0: {
         options={allTags.map((t) => t.name)}
         onSave={onUpdateCustomerTags}
       />
-      <CustomerEditDialog
+      <CustomerContactsEditDialog
         key={editCustomerDialog.refreshkey}
         {...editCustomerDialog.props}
-        operation="update"
         onSubmit={onUpdateCustomer}
         default={customer}
       />
@@ -821,7 +820,7 @@ function MetadataEditDialog({
       await onSave?.(data).then((success) => {
         if (success) props.onOpenChange?.(false);
       });
-    } catch (e) {
+    } catch {
       toast.error("Invalid JSON");
     }
   };

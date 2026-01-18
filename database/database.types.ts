@@ -27,6 +27,13 @@ export type Database = MergeDeep<
           Row: DatabaseGenerated["public"]["Tables"]["customer"]["Row"] & {
             tags: string[];
           };
+          /**
+           * `customer_with_tags` is a view with an INSTEAD OF INSERT trigger.
+           * We model Insert so client code can insert without `any` casts.
+           */
+          Insert: DatabaseGenerated["public"]["Tables"]["customer"]["Insert"] & {
+            tags?: string[] | null;
+          };
         };
       };
     };

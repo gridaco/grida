@@ -36,35 +36,25 @@ import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ChevronDownIcon,
-  Cross2Icon,
-  GearIcon,
-  UploadIcon,
-} from "@radix-ui/react-icons";
+import { ChevronDownIcon, Cross2Icon, UploadIcon } from "@radix-ui/react-icons";
 import { useProject } from "@/scaffolds/workspace";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportCSVDialog } from "@/scaffolds/platform/customer/import-csv-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { subscribeTable } from "@/lib/supabase/realtime";
-import { Badge } from "@/components/ui/badge";
-import { DateFormatRadioGroup } from "@/scaffolds/data-format/ui/date-format";
-import { DateTimeZoneRadioGroup } from "@/scaffolds/data-format/ui/date-timezone";
 import { cn } from "@/components/lib/utils";
-import CustomerEditDialog from "@/scaffolds/platform/customer/customer-edit-dialog";
+import CustomerCreateDialog from "@/scaffolds/platform/customer/customer-edit-dialog";
 import { toast } from "sonner";
 import { Platform } from "@/lib/platform";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TableQueryChips } from "@/scaffolds/grid-editor/components/query/query-chips";
 import { txt_n_plural } from "@/utils/plural";
 import { DeleteSelectionButton } from "@/scaffolds/grid-editor/components/delete";
+import { useTags } from "@/scaffolds/workspace";
 
 export default function Customers() {
   return (
@@ -297,7 +287,8 @@ function Body() {
 function NewButton({ onNewData }: { onNewData?: () => void }) {
   const project = useProject();
   const project_id = project.id;
-  const client = useMemo(() => createBrowserClient(), []);
+  const ciamClient = useMemo(() => createBrowserCIAMClient(), []);
+  const { tags: allTags } = useTags();
   const createCustomerDialog = useDialogState("create-customer", {
     refreshkey: true,
   });
@@ -316,12 +307,15 @@ function NewButton({ onNewData }: { onNewData?: () => void }) {
 
   return (
     <div className="flex items-center gap-1">
-      <CustomerEditDialog
+      <CustomerCreateDialog
         {...createCustomerDialog.props}
         key={createCustomerDialog.refreshkey}
-        operation="insert"
+        tagOptions={allTags.map((t) => t.name)}
         onSubmit={async (data) => {
-          const { error } = await insertCustomer(client, project_id, data);
+          const { error } = await insertCustomer(ciamClient, project_id, {
+            ...data,
+          });
+
           if (error) {
             console.error("Failed to create customer", error);
             toast.error("Failed to create customer");
@@ -370,75 +364,5 @@ function NewButton({ onNewData }: { onNewData?: () => void }) {
         </DropdownMenu>
       </div>
     </div>
-  );
-}
-
-function ViewSettings() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="flex items-center justify-center">
-          <Badge variant="outline" className="cursor-pointer">
-            <GearIcon />
-          </Badge>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel>View Options</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel
-          inset
-          className="text-xs text-muted-foreground font-normal"
-        >
-          Data Consistency & Protection
-        </DropdownMenuLabel>
-        <DropdownMenuCheckboxItem
-        // checked={datagrid_filter.masking_enabled}
-        // onCheckedChange={(checked) => {
-        //   dispatch({
-        //     type: "editor/data-grid/local-filter",
-        //     masking_enabled: checked,
-        //   });
-        // }}
-        >
-          Mask data{" "}
-          <span className="inline ms-2 text-muted-foreground text-xs">
-            Locally
-          </span>
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuSeparator />
-        {/*  */}
-        {/* date format */}
-        <DropdownMenuLabel
-          inset
-          className="text-xs text-muted-foreground font-normal"
-        >
-          Date Format
-        </DropdownMenuLabel>
-        <DateFormatRadioGroup
-          value="datetime"
-          // value={dateformat}
-          onValueChange={(value) => {
-            //
-          }}
-        />
-
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel
-          inset
-          className="text-xs text-muted-foreground font-normal"
-        >
-          Date Timezone
-        </DropdownMenuLabel>
-        {/* tz */}
-        <DateTimeZoneRadioGroup
-          value="UTC"
-          // value={dateformat}
-          onValueChange={(value) => {
-            //
-          }}
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

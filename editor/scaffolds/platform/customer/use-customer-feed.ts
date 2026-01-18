@@ -7,17 +7,19 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@app/database";
 
 export async function insertCustomer(
-  client: SupabaseClient<Database, "public">,
+  client: SupabaseClient<Database, "grida_ciam_public">,
   project_id: number,
-  data: Partial<
-    Pick<Platform.Customer.Customer, "name" | "email" | "phone" | "description">
+  data: Omit<
+    Database["grida_ciam_public"]["Views"]["customer_with_tags"]["Insert"],
+    "project_id"
   >
 ) {
   return await client
-    .from("customer")
+    .from("customer_with_tags")
     .insert({
       project_id,
       ...data,
+      tags: data.tags ?? [],
     })
     .select("*")
     .single();
@@ -92,7 +94,7 @@ export function useCustomers(
   >([]);
 
   useEffect(() => {
-    fetchCustomers(client, project_id, query).then(({ data, error }) => {
+    fetchCustomers(client, project_id, query).then(({ data }) => {
       if (data) {
         setCustomers(data);
       }
