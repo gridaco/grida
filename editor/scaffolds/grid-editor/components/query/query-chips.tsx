@@ -24,7 +24,7 @@ export function TableQueryChips(
       {predicates.map((predicate, i) => (
         <DataQueryPredicateChip key={i} index={i} {...props} />
       ))}
-      <DataQueryPrediateAddMenu {...props}>
+      <DataQueryPrediateAddMenu {...props} asChild>
         <Button variant="ghost" size="xs" className="text-muted-foreground">
           <PlusIcon className="size-3 me-2" />
           Add filter

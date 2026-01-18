@@ -8,6 +8,57 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Data } from "@/lib/data";
 
 export namespace XPostgrestQuery {
+  /**
+   * Helpers for encoding/decoding Postgres literals used in PostgREST filters.
+   */
+  export namespace Literal {
+    /**
+     * Parse a Postgres `text[]` array literal (e.g. `{"a","b"}`) into string[].
+     *
+     * If the value is not an array literal, it is treated as a single item
+     * (e.g. `"rock"` -> `["rock"]`).
+     */
+    export function parsePostgresTextArrayLiteral(value: unknown): string[] {
+      if (typeof value !== "string") return [];
+      const v = value.trim();
+      if (!v.startsWith("{") || !v.endsWith("}")) {
+        return v ? [v] : [];
+      }
+
+      const inner = v.slice(1, -1).trim();
+      if (!inner) return [];
+
+      const quotedMatches = Array.from(
+        inner.matchAll(/"((?:\\.|[^"\\])*)"/g)
+      ).map((m) =>
+        m[1]
+          .replace(/\\(["\\])/g, "$1")
+          .replace(/\\\\/g, "\\")
+          .trim()
+      );
+
+      if (quotedMatches.length > 0) {
+        return quotedMatches.filter(Boolean);
+      }
+
+      return inner
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    /**
+     * Encode string[] into a Postgres `text[]` array literal, e.g.
+     * `["a","b"]` -> `{"a","b"}`.
+     */
+    export function toPostgresTextArrayLiteral(values: string[]): string {
+      const escaped = values.map(
+        (v) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+      );
+      return `{${escaped.join(",")}}`;
+    }
+  }
+
   export namespace PredicateOperator {
     export type PostgRESTSQLPredicateNegateOperatorKeyword =
       `not.${Data.Query.Predicate.PredicateOperatorKeyword}`;

@@ -378,7 +378,9 @@ export namespace Data {
               ""
             ) as PGSupportedColumnType;
             // For array types, the operators "cs" (contains) and "cd" (contained by) are typically used
-            return [..._get_for_non_array(baseFormat), "cs", "cd"];
+            return Array.from(
+              new Set([..._get_for_non_array(baseFormat), "cs", "cd", "ov"])
+            );
           } else {
             return _get_for_non_array(format as PGSupportedColumnType);
           }
@@ -395,6 +397,7 @@ export namespace Data {
           "ilike",
           "is",
           "in",
+          "ov",
         ];
 
         export const supported_extensions: Extension.PrediacteExtensionType[] =
