@@ -829,6 +829,9 @@ function MetadataEditDialog({
   return (
     <AlertDialog {...props}>
       <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Edit customer metadata</AlertDialogTitle>
+        </AlertDialogHeader>
         <ThemedMonacoEditor
           defaultValue={
             defaultValue ? JSON.stringify(defaultValue, null, 2) : ""
