@@ -15,6 +15,7 @@ import {
   DrawerFooter,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { FormView } from "@/grida-forms-hosted/e";
 import {
   ScreenMobileFrame,
@@ -338,7 +339,10 @@ function SignUpForm({
 
   return (
     <Drawer {...props} data-testid="west-referral-invitation-signup-form">
-      <DrawerContent className="overflow-hidden">
+      {/* Ref: shadcn-ui/ui#2167 – scrolling inside Drawer on mobile.
+          Key: give drawer a fixed (d)vh height + overflow-hidden,
+          and make the scroll container fill the remaining height. */}
+      <DrawerContent className="h-[90dvh] max-h-[90dvh] min-h-0 overflow-hidden">
         <DrawerTitle className="sr-only">Mission Signup Form</DrawerTitle>
 
         {/* Only mount the form session + loading state when the drawer is open.
@@ -348,15 +352,17 @@ function SignUpForm({
             <FormViewProvider form_id={form_id}>
               <div className="flex min-h-0 flex-1 flex-col">
                 {/* Scrollable form area (critical for small screens). */}
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                  <FormView.Body
-                    onSubmit={onSubmit}
-                    className="max-w-full"
-                    config={{
-                      is_powered_by_branding_enabled: false,
-                    }}
-                  />
-                </div>
+                <ScrollArea className="min-h-0 flex-1">
+                  <div>
+                    <FormView.Body
+                      onSubmit={onSubmit}
+                      className="max-w-full"
+                      config={{
+                        is_powered_by_branding_enabled: false,
+                      }}
+                    />
+                  </div>
+                </ScrollArea>
 
                 {/* Fixed action area */}
                 {/* TODO: have i18n */}
