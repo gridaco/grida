@@ -28,7 +28,6 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Plus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -98,38 +97,51 @@ export function QuestsTable() {
     );
   };
 
+  const BADGE_PRESETS = {
+    quest_status: {
+      active: {
+        label: "Active",
+        className: "bg-green-50 text-green-700 border-green-200",
+      },
+      completed: {
+        label: "Completed",
+        className: "bg-blue-50 text-blue-700 border-blue-200",
+      },
+      expired: {
+        label: "Expired",
+        className: "bg-amber-50 text-amber-700 border-amber-200",
+      },
+    },
+    claim_status: {
+      claimed: {
+        label: "Claimed",
+        className: "bg-green-50 text-green-700 border-green-200",
+      },
+      not_claimed: {
+        label: "Not claimed",
+        className: "bg-amber-50 text-amber-700 border-amber-200",
+      },
+    },
+  } as const;
+
   const getStatusBadge = (status: "active" | "completed" | "expired") => {
-    switch (status) {
-      case "active":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-green-50 text-green-700 border-green-200"
-          >
-            Active
-          </Badge>
-        );
-      case "completed":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-blue-50 text-blue-700 border-blue-200"
-          >
-            Completed
-          </Badge>
-        );
-      case "expired":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-amber-50 text-amber-700 border-amber-200"
-          >
-            Expired
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+    const preset = BADGE_PRESETS.quest_status[status];
+    return (
+      <Badge variant="outline" className={preset.className}>
+        {preset.label}
+      </Badge>
+    );
+  };
+
+  const getClaimStatusBadge = (is_claimed: boolean) => {
+    const preset = is_claimed
+      ? BADGE_PRESETS.claim_status.claimed
+      : BADGE_PRESETS.claim_status.not_claimed;
+    return (
+      <Badge variant="outline" className={preset.className}>
+        {preset.label}
+      </Badge>
+    );
   };
 
   if (!tokens) {
@@ -301,9 +313,6 @@ export function QuestsTable() {
                                 <TableHead>Onboarding</TableHead>
                                 <TableHead>Step 1: Claim</TableHead>
                                 <TableHead>Step 2: Submit Form</TableHead>
-                                <TableHead>
-                                  Step 3: Complete Test Drive
-                                </TableHead>
                                 <TableHead className="text-right">
                                   Status
                                 </TableHead>
@@ -345,13 +354,8 @@ export function QuestsTable() {
                                       </span>
                                     </div>
                                   </TableCell>
-                                  <TableCell></TableCell>
                                   <TableCell className="text-right">
-                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                                      {challenge.is_claimed
-                                        ? "claimed"
-                                        : "not claimed"}
-                                    </Badge>
+                                    {getClaimStatusBadge(challenge.is_claimed)}
                                     {/* {challenge.steps.every(
                                       (step) => step.completed
                                     ) ? (
