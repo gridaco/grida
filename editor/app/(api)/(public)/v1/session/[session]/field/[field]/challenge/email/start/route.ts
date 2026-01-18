@@ -122,13 +122,44 @@ export async function POST(
     .select("lang")
     .eq("form_id", ctx.form.id)
     .single();
+
+  if (!formDoc) {
+    return NextResponse.json({ error: "form not found" }, { status: 404 });
+  }
+
+  // Resolve brand info for email sender/display.
+  // Prefer published tenant branding (`www.title` / `www.publisher`) when available,
+  // otherwise fall back to a generic placeholder. (Do not expose internal project names.)
+  const { data: www_list, error: www_err } = await service_role.www
+    .from("www")
+    .select("title, publisher, lang")
+    .eq("project_id", ctx.form.project_id)
+    .limit(1);
+
+  const www = !www_err && www_list && www_list.length > 0 ? www_list[0] : null;
+
+  const brand_name =
+    www && typeof www.title === "string" && www.title
+      ? String(www.title)
+      : "(Untitled)";
+
+  const publisher =
+    www && typeof www.publisher === "string" && www.publisher
+      ? String(www.publisher)
+      : "";
+  const brand_support_url =
+    publisher.startsWith("http://") || publisher.startsWith("https://")
+      ? publisher
+      : undefined;
+  const brand_support_contact = publisher.includes("@") ? publisher : undefined;
+
+  const langCandidate =
+    www && typeof www.lang === "string" && www.lang ? www.lang : formDoc.lang;
   const emailLang: CIAMVerificationEmailLang = select_lang(
-    (formDoc as { lang?: unknown } | null)?.lang,
+    langCandidate,
     supported_languages,
     "en"
   );
-
-  const brand_name = "Grida";
   const { error: resend_err } = await resend.emails.send({
     from: `${brand_name} <no-reply@accounts.grida.co>`,
     to: email,
@@ -138,6 +169,8 @@ export async function POST(
       brand_name,
       expires_in_minutes,
       lang: emailLang,
+      brand_support_url,
+      brand_support_contact,
     }),
   });
 
