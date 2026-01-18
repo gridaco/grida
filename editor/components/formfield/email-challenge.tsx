@@ -230,6 +230,7 @@ function _EmailChallenge({
   label,
   placeholder,
   required,
+  requiredAsterisk = true,
   disabled,
   sendPending,
   i18n,
@@ -250,6 +251,7 @@ function _EmailChallenge({
   label?: string;
   placeholder?: string;
   required?: boolean;
+  requiredAsterisk?: boolean;
   disabled?: boolean;
   sendPending?: boolean;
   i18n?: EmailChallengeI18n;
@@ -283,7 +285,12 @@ function _EmailChallenge({
   return (
     <div data-slot="email-challenge" data-state={state} className="space-y-3">
       {label && (
-        <label className="text-sm font-medium leading-none">{label}</label>
+        <label className="text-sm font-medium leading-none">
+          {label}{" "}
+          {required && requiredAsterisk && (
+            <span className="text-red-500/80">*</span>
+          )}
+        </label>
       )}
 
       <InputGroup data-disabled={disabled ? "true" : undefined}>
@@ -509,6 +516,7 @@ export function EmailChallenge({
   label,
   placeholder,
   required,
+  requiredAsterisk = true,
   disabled,
   otpLength,
   otpType,
@@ -520,6 +528,7 @@ export function EmailChallenge({
   label?: string;
   placeholder?: string;
   required?: boolean;
+  requiredAsterisk?: boolean;
   disabled?: boolean;
   otpLength?: number;
   otpType?: "text" | "numeric";
@@ -552,6 +561,7 @@ export function EmailChallenge({
       label={label}
       placeholder={placeholder}
       required={required}
+      requiredAsterisk={requiredAsterisk}
       disabled={disabled}
       sendPending={false}
       i18n={defaultEmailChallengeI18nEn}
@@ -584,6 +594,7 @@ export function ChallengeEmailField({
   label,
   placeholder,
   required,
+  requiredAsterisk = true,
   disabled,
   otpLength = 6,
   otpType = "numeric",
@@ -599,6 +610,7 @@ export function ChallengeEmailField({
   label?: string;
   placeholder?: string;
   required?: boolean;
+  requiredAsterisk?: boolean;
   disabled?: boolean;
   otpLength?: number;
   otpType?: "text" | "numeric";
@@ -641,7 +653,6 @@ export function ChallengeEmailField({
     if (lastAutoVerifyOtpRef.current === otp) return;
     lastAutoVerifyOtpRef.current = otp;
     void onVerifyClick();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otp, otpLength, verifyPending, sessionState.challenge_id, widgetState]);
 
   React.useEffect(() => {
@@ -665,7 +676,6 @@ export function ChallengeEmailField({
       cancelled = true;
     };
     // intentionally omit `email` from deps: we only want to hydrate once
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider, effectiveSessionId, effectiveFieldId]);
 
   const canSend = useMemo(() => {
@@ -732,6 +742,7 @@ export function ChallengeEmailField({
       label={label}
       placeholder={placeholder}
       required={required}
+      requiredAsterisk={requiredAsterisk}
       disabled={disabled}
       sendPending={sendPending}
       verifyPending={verifyPending}
@@ -762,6 +773,7 @@ export function EmailChallengePreview({
   label,
   placeholder,
   required,
+  requiredAsterisk = true,
   disabled,
   otpLength,
   otpType,
@@ -772,6 +784,7 @@ export function EmailChallengePreview({
   label?: string;
   placeholder?: string;
   required?: boolean;
+  requiredAsterisk?: boolean;
   disabled?: boolean;
   otpLength?: number;
   otpType?: "text" | "numeric";
@@ -813,6 +826,7 @@ export function EmailChallengePreview({
       label={label}
       placeholder={placeholder}
       required={required}
+      requiredAsterisk={requiredAsterisk}
       disabled={disabled}
       sendPending={false}
       i18n={defaultEmailChallengeI18nEn}

@@ -317,6 +317,7 @@ function MonoFormField({
               label={label}
               placeholder={placeholder}
               required={required}
+              requiredAsterisk={requiredAsterisk}
               disabled={disabled}
             />
           );
@@ -330,6 +331,7 @@ function MonoFormField({
             label={label}
             placeholder={placeholder}
             required={required}
+            requiredAsterisk={requiredAsterisk}
             disabled={disabled}
           />
         );
