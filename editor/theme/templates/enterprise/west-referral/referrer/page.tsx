@@ -49,7 +49,9 @@ function renderSharable({
   }
 
   return {
-    text: template(template_text, context),
+    // Some mobile share targets are sensitive to trailing newlines/spaces.
+    // Normalize to avoid extra empty lines being introduced.
+    text: template(template_text, context).trimEnd(),
     url: context.url,
   };
 }
@@ -95,14 +97,20 @@ async function reshare({
 async function share_or_copy(
   sharable: WebSharePayload
 ): Promise<{ type: "clipboard" | "share" }> {
+  const normalized: WebSharePayload = {
+    // Some share targets add their own separators; keep our payload clean.
+    title: sharable.title?.trim(),
+    text: sharable.text?.trimEnd(),
+    url: sharable.url?.trim(),
+  };
+
   if (navigator.share) {
-    await navigator.share(sharable);
+    await navigator.share(normalized);
     return { type: "share" };
   } else {
-    const shareUrl = sharable.url;
-    const shareText = sharable.text;
-    const shareTitle = sharable.title;
-    const shareContent = `${shareTitle}\n${shareText}\n${shareUrl}`;
+    const shareContent = [normalized.title, normalized.text, normalized.url]
+      .filter((v): v is string => typeof v === "string" && v.length > 0)
+      .join("\n");
     await navigator.clipboard.writeText(shareContent);
     return { type: "clipboard" };
   }
