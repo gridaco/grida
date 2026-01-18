@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Infinity,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -86,8 +87,7 @@ export function QuestsTable() {
   const { tokens } = useReferrerQuests(campaign.id);
   const project = useProject();
 
-  // FIXME:
-  const max_invitations_per_referrer = 10;
+  const max_invitations_per_referrer = campaign.max_invitations_per_referrer;
 
   const toggleQuestExpand = (questId: string) => {
     setExpandedQuests((prev) =>
@@ -228,35 +228,48 @@ export function QuestsTable() {
                     <Badge variant="outline">{QUESTNAME}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <div className="text-xs text-muted-foreground">
-                        {(quest.invitation_count /
-                          (max_invitations_per_referrer ?? 0)) *
-                          100}
-                        %
+                    {max_invitations_per_referrer !== null ? (
+                      <div className="flex flex-col gap-1">
+                        <div className="text-xs text-muted-foreground">
+                          {Math.round(
+                            (quest.invitation_count /
+                              max_invitations_per_referrer) *
+                              100
+                          )}
+                          %
+                        </div>
+                        <Progress
+                          value={
+                            (quest.invitation_count /
+                              max_invitations_per_referrer) *
+                            100
+                          }
+                          className="h-2"
+                        />
                       </div>
-                      <Progress
-                        value={
-                          (quest.invitation_count /
-                            (max_invitations_per_referrer ?? 0)) *
-                          100
-                        }
-                        className="h-2"
-                      />
-                    </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">
+                        Unlimited
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Users className="size-4 text-muted-foreground" />
-                      <span>
-                        {quest.invitation_count} /{" "}
-                        {max_invitations_per_referrer ?? "∞"}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span>{quest.invitation_count} /</span>
+                        {max_invitations_per_referrer !== null ? (
+                          <span>{max_invitations_per_referrer}</span>
+                        ) : (
+                          <Infinity className="size-4 text-muted-foreground" />
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(
-                      quest.invitation_count === max_invitations_per_referrer
+                      max_invitations_per_referrer !== null &&
+                        quest.invitation_count === max_invitations_per_referrer
                         ? "completed"
                         : "active"
                     )}
