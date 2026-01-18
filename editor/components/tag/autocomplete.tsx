@@ -303,6 +303,12 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
                       onClick={() => toggleTag(option)}
                     >
                       <div className="w-full flex items-center gap-2">
+                        {option.color && (
+                          <span
+                            className="size-2 rounded-full border"
+                            style={{ backgroundColor: option.color }}
+                          />
+                        )}
                         {option.text}
                         {tags.some((tag) => tag.text === option.text) && (
                           <svg

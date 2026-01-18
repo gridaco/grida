@@ -49,7 +49,6 @@ import {
 import { Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
-  useDataGridTextSearch,
   useDataGridQuery,
   useDataGridRefresh,
   useDatagridTableAttributes,
@@ -59,10 +58,7 @@ import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import {
   DataQueryPredicatesMenu,
-  DataQueryPredicateChip,
-  DataQueryPrediateAddMenu,
   DataQueryOrderByMenu,
-  DataQueryOrderbyChip,
 } from "./components/query";
 import {
   DataQueryPredicatesMenuTriggerButton,

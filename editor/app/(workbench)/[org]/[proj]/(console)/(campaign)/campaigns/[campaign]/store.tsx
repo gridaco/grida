@@ -6,6 +6,7 @@ const CampaignContext = createContext<{
   id: string;
   title: string;
   layout_id: string | null;
+  max_invitations_per_referrer: number | null;
 } | null>(null);
 
 export function CampaignProvider({
@@ -17,6 +18,7 @@ export function CampaignProvider({
     id: string;
     title: string;
     layout_id: string | null;
+    max_invitations_per_referrer: number | null;
   };
 }) {
   return (

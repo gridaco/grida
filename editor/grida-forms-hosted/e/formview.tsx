@@ -553,6 +553,7 @@ function BlockRenderer({
               label={field.label ?? field.name}
               placeholder={field.placeholder ?? "alice@example.com"}
               required={field.required}
+              requiredAsterisk
               disabled={is_not_in_current_section_nor_root || hidden}
               i18n={emailChallengeTranslation}
             />

@@ -315,3 +315,12 @@ export function useTags() {
 
   return context;
 }
+
+/**
+ * Like {@link useTags}, but returns null when not within {@link ProjectTagsProvider}.
+ *
+ * Useful for optional tag autocomplete in shared UI components.
+ */
+export function useOptionalTags() {
+  return useContext(ProjectTagsContext);
+}

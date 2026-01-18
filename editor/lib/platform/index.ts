@@ -410,6 +410,19 @@ export namespace Platform.Customer {
         null: false,
         default: "false",
       },
+      tags: {
+        name: "tags",
+        description: "customer tags",
+        type: "array",
+        format: "text[]",
+        scalar_format: "text",
+        enum: undefined,
+        array: true,
+        pk: false,
+        fk: false,
+        null: false,
+        default: undefined,
+      },
     },
   };
 

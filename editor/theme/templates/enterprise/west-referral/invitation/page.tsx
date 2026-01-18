@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -13,11 +12,10 @@ import { Button } from "@/components/ui/button";
 import {
   Drawer,
   DrawerContent,
-  DrawerDescription,
   DrawerFooter,
-  DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { FormView } from "@/grida-forms-hosted/e";
 import {
   ScreenMobileFrame,
@@ -28,7 +26,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { TicketCheckIcon } from "lucide-react";
 import { ShineBorder } from "@/www/ui/shine-border";
-import Link from "next/link";
 import * as Standard from "@/theme/templates/enterprise/west-referral/standard";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { template } from "@/utils/template";
@@ -113,8 +110,10 @@ export default function InvitationPageTemplate({
   };
   client?: Platform.WEST.Referral.WestReferralClient;
 }) {
+  if (!visible) return null;
+
   const t = dictionary[locale];
-  const { code, campaign, referrer_name: _referrer_name, is_claimed } = data;
+  const { code, referrer_name: _referrer_name, is_claimed } = data;
   const referrer_name = _referrer_name || t.an_anonymous;
   const router = useRouter();
   const [claimed, setClaimed] = useState(is_claimed);
@@ -304,9 +303,46 @@ function SignUpForm({
   const isOpen = props.open === true;
   const hasForm = typeof form_id === "string" && form_id.length > 0;
 
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const formdata = new FormData(e.target as HTMLFormElement);
+    const submit_json = await submitFormToDefaultEndpoint<{
+      customer_id?: string | null;
+    }>(form_id, formdata);
+
+    const customer_id =
+      submit_json?.data?.customer_id &&
+      typeof submit_json.data.customer_id === "string"
+        ? submit_json.data.customer_id
+        : null;
+
+    if (!customer_id) {
+      toast.error(copy.event_signup_fail);
+      return;
+    }
+
+    if (!client) {
+      toast.error(copy.event_signup_fail);
+      return;
+    }
+
+    const ok = await client.claim(invitation_code, customer_id);
+    if (!ok) {
+      toast.error(copy.event_signup_fail);
+      return;
+    }
+
+    toast.success(copy.event_signup_success);
+    onClaimed?.();
+  };
+
   return (
     <Drawer {...props} data-testid="west-referral-invitation-signup-form">
-      <DrawerContent>
+      {/* Ref: shadcn-ui/ui#2167 – scrolling inside Drawer on mobile.
+          Key: give drawer a fixed (d)vh height + overflow-hidden,
+          and make the scroll container fill the remaining height. */}
+      <DrawerContent className="h-[90dvh] max-h-[90dvh] min-h-0 overflow-hidden">
         <DrawerTitle className="sr-only">Mission Signup Form</DrawerTitle>
 
         {/* Only mount the form session + loading state when the drawer is open.
@@ -314,51 +350,28 @@ function SignUpForm({
         {isOpen ? (
           hasForm ? (
             <FormViewProvider form_id={form_id}>
-              <FormView.Body
-                onSubmit={async (e) => {
-                  e.preventDefault();
+              <div className="flex min-h-0 flex-1 flex-col">
+                {/* Scrollable form area (critical for small screens). */}
+                <ScrollArea className="min-h-0 flex-1">
+                  <div>
+                    <FormView.Body
+                      onSubmit={onSubmit}
+                      className="max-w-full"
+                      config={{
+                        is_powered_by_branding_enabled: false,
+                      }}
+                    />
+                  </div>
+                </ScrollArea>
 
-                  const formdata = new FormData(e.target as HTMLFormElement);
-                  const submit_json = await submitFormToDefaultEndpoint<{
-                    customer_id?: string | null;
-                  }>(form_id, formdata);
-
-                  const customer_id =
-                    submit_json?.data?.customer_id &&
-                    typeof submit_json.data.customer_id === "string"
-                      ? submit_json.data.customer_id
-                      : null;
-
-                  if (!customer_id) {
-                    toast.error(copy.event_signup_fail);
-                    return;
-                  }
-
-                  if (!client) {
-                    toast.error(copy.event_signup_fail);
-                    return;
-                  }
-
-                  const ok = await client.claim(invitation_code, customer_id);
-                  if (!ok) {
-                    toast.error(copy.event_signup_fail);
-                    return;
-                  }
-
-                  toast.success(copy.event_signup_success);
-                  onClaimed?.();
-                }}
-                className="max-w-full"
-                config={{
-                  is_powered_by_branding_enabled: false,
-                }}
-              />
-
-              <DrawerFooter className="pt-2">
-                <FormView.Prev>Previous</FormView.Prev>
-                <FormView.Next>Next</FormView.Next>
-                <FormView.Submit>Save</FormView.Submit>
-              </DrawerFooter>
+                {/* Fixed action area */}
+                {/* TODO: have i18n */}
+                <DrawerFooter className="pt-2 border-t bg-background pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+                  <FormView.Prev>Previous</FormView.Prev>
+                  <FormView.Next>Next</FormView.Next>
+                  <FormView.Submit>Save</FormView.Submit>
+                </DrawerFooter>
+              </div>
             </FormViewProvider>
           ) : (
             <div className="p-4">
@@ -383,11 +396,7 @@ function FormViewProvider({
   // (or allow callers to fully control loading UX). For now, we keep a simple
   // built-in skeleton and only mount this provider when the dialog is open.
   const { session, clearSessionStorage } = useRequestFormSession(form_id);
-  const {
-    data: res,
-    error: servererror,
-    isLoading,
-  } = useFormSession(form_id, {
+  const { data: res, isLoading } = useFormSession(form_id, {
     mode: "signed",
     session_id: session,
     // TODO: not implemented
@@ -400,7 +409,7 @@ function FormViewProvider({
     };
   }, []);
 
-  const { data, error } = res || {};
+  const { data } = res || {};
 
   if (isLoading || !session || !data) {
     return (

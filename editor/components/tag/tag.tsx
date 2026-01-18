@@ -109,6 +109,19 @@ export const Tag: React.FC<TagProps> = ({
   tagClasses,
   disabled,
 }) => {
+  const style: React.CSSProperties | undefined = tagObj.color
+    ? ({
+        /**
+         * We keep the styling simple and avoid manual hex->rgba conversion.
+         * `color-mix()` is widely supported in modern browsers (Chromium/Safari/Firefox).
+         */
+        ["--tag-color" as keyof React.CSSProperties]: tagObj.color,
+        borderColor: "var(--tag-color)",
+        backgroundColor:
+          "color-mix(in srgb, var(--tag-color) 12%, transparent)",
+      } satisfies React.CSSProperties)
+    : undefined;
+
   return (
     <span
       key={tagObj.id}
@@ -132,7 +145,14 @@ export const Tag: React.FC<TagProps> = ({
         tagClasses?.body
       )}
       onClick={() => onTagClick?.(tagObj)}
+      style={style}
     >
+      {tagObj.color && (
+        <span
+          className="me-1 size-2 rounded-full border shrink-0"
+          style={{ backgroundColor: tagObj.color }}
+        />
+      )}
       {tagObj.text}
       <Button
         type="button"
