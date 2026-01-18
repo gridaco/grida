@@ -121,7 +121,7 @@ function renderDescription(
 
 export function DeleteConfirmationSnippet({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   return (
     <code className="bg-muted p-1 rounded-md text-sm font-mono">
       {children}

@@ -19,7 +19,7 @@ export const ImageWidget = ({
       {...queryattributes(props)}
     >
       {src && (
-        // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src as string}
           width={css.toDimension(width)}

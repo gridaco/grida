@@ -39,9 +39,9 @@ export namespace XSBAuthUsersGridData {
         phone: user.phone,
         last_sign_in_at: user.last_sign_in_at,
         providers:
-          (user.app_metadata
+          ((user.app_metadata
             .providers as GridaXSupabase.SupabaseAuthProvider[]) ??
-          user.app_metadata.provider
+          user.app_metadata.provider)
             ? [
                 user.app_metadata
                   .provider! as GridaXSupabase.SupabaseAuthProvider,

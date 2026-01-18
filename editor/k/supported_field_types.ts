@@ -220,7 +220,6 @@ export const supported_field_types: FormInputType[] = [
 ];
 
 if (process.env.NODE_ENV === "development") {
-  // @ts-ignore
   const dev: FormInputType[] = [
     //
     "checkboxes",

@@ -461,7 +461,7 @@ export default async function Layout({
   }
 }
 
-function Html({ children }: React.PropsWithChildren<{}>) {
+function Html({ children }: React.PropsWithChildren) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body

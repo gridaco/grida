@@ -50,7 +50,7 @@ export function PanelPropertySection({
 
 export function PanelPropertySectionTitle({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   return (
     <span className="col-span-12 text-sm lg:col-span-5 lg:!col-span-4">
       {children}
@@ -58,7 +58,7 @@ export function PanelPropertySectionTitle({
   );
 }
 
-export function PanelPropertyFields({ children }: React.PropsWithChildren<{}>) {
+export function PanelPropertyFields({ children }: React.PropsWithChildren) {
   return (
     <div className="relative col-span-12 flex flex-col gap-6 lg:!col-span-8">
       {children}
@@ -133,7 +133,7 @@ export function PropertyTextInput(
   );
 }
 
-export function PanelHeader({ children }: React.PropsWithChildren<{}>) {
+export function PanelHeader({ children }: React.PropsWithChildren) {
   return (
     <header className="relative space-y-1 py-4 px-4 bg-background sm:px-6 border-b">
       {children}
@@ -141,13 +141,13 @@ export function PanelHeader({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function PanelHeaderTitle({ children }: React.PropsWithChildren<{}>) {
+export function PanelHeaderTitle({ children }: React.PropsWithChildren) {
   return (
     <Dialog.Title className="text-lg font-semibold">{children}</Dialog.Title>
   );
 }
 
-export function PanelHeaderActions({ children }: React.PropsWithChildren<{}>) {
+export function PanelHeaderActions({ children }: React.PropsWithChildren) {
   return (
     <div className="absolute right-0 top-0 bottom-0 flex items-center space-x-2 px-4 py-4">
       {children}
@@ -166,11 +166,11 @@ export function PanelContent({
   );
 }
 
-export function PanelClose({ children }: React.PropsWithChildren<{}>) {
+export function PanelClose({ children }: React.PropsWithChildren) {
   return <Dialog.Close asChild>{children}</Dialog.Close>;
 }
 
-export function PanelFooter({ children }: React.PropsWithChildren<{}>) {
+export function PanelFooter({ children }: React.PropsWithChildren) {
   return (
     <footer className="flex w-full justify-end space-x-3 border-t border-default px-3 py-4">
       {children}

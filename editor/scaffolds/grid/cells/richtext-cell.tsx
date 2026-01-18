@@ -88,8 +88,8 @@ export function RichTextEditCell({
 }: {
   row_id: string;
   field_id: string;
-  defaultValue?: any;
-  onValueCommit?: (value: any) => void;
+  defaultValue?: unknown;
+  onValueCommit?: (value: unknown) => void;
 }) {
   const db_table_id = useDatabaseTableId();
   const uploader = useUploader({ db_table_id, field_id, row_id });

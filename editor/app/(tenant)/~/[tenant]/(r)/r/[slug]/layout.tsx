@@ -59,11 +59,9 @@ async function fetchCampaign({ params }: { params: Params }) {
   };
 }
 
-export async function generateMetadata(
-  props: {
-    params: Promise<Params>;
-  }
-): Promise<Metadata> {
+export async function generateMetadata(props: {
+  params: Promise<Params>;
+}): Promise<Metadata> {
   const params = await props.params;
   const { campaign } = await fetchCampaign({ params: await params });
 
@@ -91,9 +89,7 @@ export default async function Layout(
 ) {
   const params = await props.params;
 
-  const {
-    children
-  } = props;
+  const { children } = props;
 
   const { route, campaign, template } = await fetchCampaign({
     params: await params,

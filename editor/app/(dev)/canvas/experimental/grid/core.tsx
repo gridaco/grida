@@ -103,7 +103,7 @@ const StateProvider = memo(function StateProvider({
   );
 });
 
-export function Provider({ children }: React.PropsWithChildren<{}>) {
+export function Provider({ children }: React.PropsWithChildren) {
   const [state, dispatch] = React.useReducer(reducer, initial);
   return (
     <StateProvider state={state} dispatch={dispatch}>

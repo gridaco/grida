@@ -572,7 +572,6 @@ function OptionEditItem({
                   <Cross1Icon />
                 </Button>
                 <div className="aspect-square bg-neutral-500/50">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={src}
                     alt=""
@@ -590,7 +589,7 @@ function OptionEditItem({
   );
 }
 
-function SlotKnob({ children }: React.PropsWithChildren<{}>) {
+function SlotKnob({ children }: React.PropsWithChildren) {
   return <div className="min-w-5 w-5">{children}</div>;
 }
 

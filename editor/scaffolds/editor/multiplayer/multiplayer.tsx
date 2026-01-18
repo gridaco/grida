@@ -18,7 +18,7 @@ import { PointerCursor } from "./cursor-legacy";
 
 const RT_THROTTLE_MS = 50;
 
-export default function Multiplayer({ children }: React.PropsWithChildren<{}>) {
+export default function Multiplayer({ children }: React.PropsWithChildren) {
   const [state] = useEditorState();
   return (
     <MultiplayerStateProvider
@@ -282,7 +282,6 @@ function MultiplayerLayer() {
     } satisfies Omit<IMultiplayerCursorNotify, "cursor_id">;
     broadcast("NOTIFY", pl);
     // console.log("broadcast", presence_notify_key, pl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presence_notify_key, broadcast]);
 
   useEffect(() => {

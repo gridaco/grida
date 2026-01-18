@@ -199,7 +199,7 @@ async function submit({
   // console.log("submit#meta", meta);
 
   // pre meta processing
-  let ipinfo_data: IpInfo | null = isObjectEmpty(meta.geo)
+  const ipinfo_data: IpInfo | null = isObjectEmpty(meta.geo)
     ? await fetchipinfo(meta.ip)
     : null;
 
@@ -628,7 +628,9 @@ async function submit({
       .select("*");
 
     // extend form_fields with new fields (match the type)
-    v_form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
+    if (new_fields) {
+      v_form_fields!.push(...new_fields.map((f) => ({ ...f, options: [] })));
+    }
   }
 
   // ==================================================
@@ -691,7 +693,7 @@ async function submit({
     Promise<SupabaseStorageUploadReturnType[]>
   > = {};
 
-  // @ts-ignore // TODO: provide all context - currently this is only used for x-supabase storage
+  // @ts-expect-error TODO: provide all context - currently this is only used for x-supabase storage
   const pathrendercontext: TemplateVariables.FormConnectedDatasourcePostgresTransactionCompleteContext =
     {
       TABLE: { pks: X_SUPABASE_MAIN_TABLE_PKS },
@@ -781,7 +783,9 @@ async function submit({
         if (type === "challenge_email") {
           const key = `__challenge_email__${field.id}`;
           const challenge_state =
-            session_raw && key in session_raw ? (session_raw as any)[key] : null;
+            session_raw && key in session_raw
+              ? (session_raw as any)[key]
+              : null;
           return {
             ...base,
             challenge_state,
@@ -1063,7 +1067,7 @@ async function submit({
       // ==================================================
 
       // build info
-      let info: any = {};
+      const info: any = {};
 
       // if there are new fields
       if (needs_to_be_created?.length) {
@@ -1080,7 +1084,7 @@ async function submit({
       }
 
       // build warning
-      let warning: any = {};
+      const warning: any = {};
 
       // if there are ignored fields
       if (ignored_names.length > 0) {
@@ -1466,7 +1470,7 @@ function error(
       }
     }
   } else {
-    let data: any = null;
+    const data: any = null;
     switch (code) {
       case 404: {
         return NextResponse.json({ error: "Form not found" }, { status: 404 });

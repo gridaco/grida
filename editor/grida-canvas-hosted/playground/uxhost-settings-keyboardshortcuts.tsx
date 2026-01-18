@@ -181,7 +181,7 @@ export function KeyboardShortcuts() {
         <div className="px-6 pb-6">
           {filteredActions.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
-              No shortcuts found matching "{searchQuery}"
+              No shortcuts found matching &quot;{searchQuery}&quot;
             </div>
           ) : (
             filteredActions.map((action, index) => (

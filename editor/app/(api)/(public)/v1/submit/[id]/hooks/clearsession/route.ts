@@ -51,7 +51,7 @@ export async function POST(
     .update({
       raw: response_ref.raw
         ? RawdataProcessing.namekeytoidkey(
-            response_ref.raw as {},
+            response_ref.raw as object,
             form_ref.fields
           )
         : {},

@@ -1372,7 +1372,9 @@ function ObjectMenuContent() {
             >
               Subtract
               <DropdownMenuShortcut>
-                {keyboardShortcutText("workbench.surface.object.boolean-subtract")}
+                {keyboardShortcutText(
+                  "workbench.surface.object.boolean-subtract"
+                )}
               </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -1382,7 +1384,9 @@ function ObjectMenuContent() {
             >
               Intersect
               <DropdownMenuShortcut>
-                {keyboardShortcutText("workbench.surface.object.boolean-intersect")}
+                {keyboardShortcutText(
+                  "workbench.surface.object.boolean-intersect"
+                )}
               </DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -1392,7 +1396,9 @@ function ObjectMenuContent() {
             >
               Exclude
               <DropdownMenuShortcut>
-                {keyboardShortcutText("workbench.surface.object.boolean-exclude")}
+                {keyboardShortcutText(
+                  "workbench.surface.object.boolean-exclude"
+                )}
               </DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuSubContent>

@@ -36,7 +36,7 @@ const MentionList = forwardRef(function MentionList(props: any, ref) {
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({
-      // @ts-ignore
+      // @ts-expect-error - Event parameter type mismatch
       event,
     }) => {
       if (event.key === "ArrowUp") {

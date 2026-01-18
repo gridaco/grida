@@ -61,7 +61,7 @@ export function SidebarMenuList({
   );
 }
 
-export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
+export function SidebarMenuGrid({ children }: React.PropsWithChildren) {
   return <div className="grid grid-cols-3 gap-2">{children}</div>;
 }
 

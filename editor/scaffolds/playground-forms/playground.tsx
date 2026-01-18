@@ -74,7 +74,7 @@ export function Playground({
 
   const [theme_preset, set_theme_preset] = useState<string>("blue");
   const [theme, set_theme] = useState(
-    // @ts-ignore
+    // @ts-expect-error - Dynamic palette access by key
     palettes[theme_preset]
   );
   const [__variablecss_txt, __set_variablecss_txt] = useState<string | null>(
@@ -83,7 +83,7 @@ export function Playground({
 
   useEffect(() => {
     set_theme(
-      // @ts-ignore
+      // @ts-expect-error - Dynamic palette access by key
       palettes[theme_preset]
     );
   }, [theme_preset]);

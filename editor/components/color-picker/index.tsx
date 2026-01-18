@@ -12,8 +12,9 @@ type ColorPickerHTMLAttributes = Omit<
   React.HTMLAttributes<HTMLDivElement>,
   "color" | "onChange" | "onChangeCapture"
 >;
-export interface ColorPickerBaseProps<T extends string>
-  extends ColorPickerHTMLAttributes {
+export interface ColorPickerBaseProps<
+  T extends string,
+> extends ColorPickerHTMLAttributes {
   color: T;
   onChange: (newColor: T) => void;
 }

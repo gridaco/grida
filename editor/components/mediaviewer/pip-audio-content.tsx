@@ -84,7 +84,7 @@ export function ContentAudio({
 //
 //
 //
-function PlayerArtwork({ children }: React.PropsWithChildren<{}>) {
+function PlayerArtwork({ children }: React.PropsWithChildren) {
   return (
     <Card className="flex w-24 h-24 aspect-square items-center justify-center">
       {children}
@@ -148,7 +148,7 @@ function PlayerTrigger({
   );
 }
 
-function PlayerPlayTrigger({ children }: React.PropsWithChildren<{}>) {
+function PlayerPlayTrigger({ children }: React.PropsWithChildren) {
   const { play } = useMediaSession();
   return (
     <Button onClick={play} variant="ghost" size="icon">

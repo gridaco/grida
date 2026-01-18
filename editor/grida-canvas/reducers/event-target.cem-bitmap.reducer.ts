@@ -88,7 +88,7 @@ export function on_brush(
 ) {
   assert(draft.tool.type === "brush" || draft.tool.type === "eraser");
 
-  let node_id =
+  const node_id =
     draft.content_edit_mode?.type === "bitmap"
       ? draft.content_edit_mode.node_id
       : null;

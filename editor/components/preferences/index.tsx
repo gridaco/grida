@@ -25,7 +25,7 @@ export function PreferenceBox({
   );
 }
 
-export function PreferenceBody({ children }: React.PropsWithChildren<{}>) {
+export function PreferenceBody({ children }: React.PropsWithChildren) {
   return <div className="px-6 py-4">{children}</div>;
 }
 
@@ -56,7 +56,7 @@ export function PreferenceBoxHeader({
   );
 }
 
-export function PreferenceBoxFooter({ children }: React.PropsWithChildren<{}>) {
+export function PreferenceBoxFooter({ children }: React.PropsWithChildren) {
   return (
     <footer className="bg-surface-100 border-t border-overlay">
       <div className="flex h-16 items-center px-6">
@@ -68,9 +68,7 @@ export function PreferenceBoxFooter({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function PreferenceDescription({
-  children,
-}: React.PropsWithChildren<{}>) {
+export function PreferenceDescription({ children }: React.PropsWithChildren) {
   return <p className="my-2 text-sm opacity-50">{children}</p>;
 }
 
@@ -87,7 +85,7 @@ export function Sector({
   );
 }
 
-export function SectorHeader({ children }: React.PropsWithChildren<{}>) {
+export function SectorHeader({ children }: React.PropsWithChildren) {
   return <header className="flex flex-col gap-1 mb-4">{children}</header>;
 }
 
@@ -103,10 +101,10 @@ export function SectorHeading({
   );
 }
 
-export function SectorDescription({ children }: React.PropsWithChildren<{}>) {
+export function SectorDescription({ children }: React.PropsWithChildren) {
   return <span className="text-sm opacity-50">{children}</span>;
 }
 
-export function SectorBlocks({ children }: React.PropsWithChildren<{}>) {
+export function SectorBlocks({ children }: React.PropsWithChildren) {
   return <div className="flex flex-col gap-8">{children}</div>;
 }

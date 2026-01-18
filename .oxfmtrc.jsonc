@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [],
+  // custom below, zero-config above.
+  // we're migrating from prettier to oxfmt, below will be removed once complete.
+  "printWidth": 80,
+  "trailingComma": "es5",
+}

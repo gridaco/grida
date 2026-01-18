@@ -2,7 +2,12 @@
 
 import React, { useMemo, useEffect } from "react";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
-import { Tree, TreeItem, TreeItemLabel, TreeDragLine } from "@/components/ui-editor/tree";
+import {
+  Tree,
+  TreeItem,
+  TreeItemLabel,
+  TreeDragLine,
+} from "@/components/ui-editor/tree";
 import {
   dragAndDropFeature,
   selectionFeature,
@@ -104,8 +109,8 @@ export function ScenesList() {
   const scene_id = useEditorState(editor, (state) => state.scene_id);
 
   const scenes = useMemo(() => {
-    return Object.values(scenesmap).sort(
-      (a, b) => (a.position ?? "").localeCompare(b.position ?? "")
+    return Object.values(scenesmap).sort((a, b) =>
+      (a.position ?? "").localeCompare(b.position ?? "")
     );
   }, [scenesmap]);
 

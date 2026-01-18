@@ -49,7 +49,7 @@ export function HeaderLogoImage({
   );
 }
 
-export function Header({ children }: React.PropsWithChildren<{}>) {
+export function Header({ children }: React.PropsWithChildren) {
   return (
     <header className="absolute top-0 left-0 right-0 w-full h-20 flex items-center justify-center">
       {children}

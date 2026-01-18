@@ -22,7 +22,6 @@ export const VideoWidget = ({
       style={{ ...divStyles, overflow: "hidden" }}
     >
       {src && (
-        // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
         <video
           src={src as string}
           poster={poster as string}

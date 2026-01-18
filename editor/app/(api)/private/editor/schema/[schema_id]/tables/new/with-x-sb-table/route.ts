@@ -102,7 +102,7 @@ export async function POST(req: NextRequest, context: Context) {
   const { methods: sb_postgrest_methods } =
     SupabasePostgRESTOpenApi.parse_supabase_postgrest_table_path(
       (
-        sb_schema_openapi_docs as any as {
+        sb_schema_openapi_docs as unknown as {
           [schema: string]: SupabasePostgRESTOpenApi.SupabaseOpenAPIDocument;
         }
       )[data.sb_schema_name],

@@ -21,7 +21,10 @@ import {
   insertCustomer,
 } from "@/scaffolds/platform/customer/use-customer-feed";
 import { useTableSpaceInstance } from "@/scaffolds/data-table";
-import { createBrowserClient, createBrowserCIAMClient } from "@/lib/supabase/client";
+import {
+  createBrowserClient,
+  createBrowserCIAMClient,
+} from "@/lib/supabase/client";
 import {
   DataPlatformProvider,
   SchemaNameProvider,

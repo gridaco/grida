@@ -8,7 +8,8 @@ import type cg from "@grida/cg";
  * @deprecated - not ready - do not use in production
  */
 interface PolylineNode
-  extends grida.program.nodes.i.IBaseNode,
+  extends
+    grida.program.nodes.i.IBaseNode,
     grida.program.nodes.i.ISceneNode,
     grida.program.nodes.i.IHrefable,
     grida.program.nodes.i.IPositioning,
@@ -38,7 +39,7 @@ export function SVGPolyLineWidget({
   style,
   points,
   ...props
-}: // @ts-expect-error
+}: // @ts-expect-error - PolylineNode props type mismatch
 grida.program.document.IComputedNodeReactRenderProps<PolylineNode>) {
   const width = Math.max(_width, 1);
   const height = Math.max(_height, 1);

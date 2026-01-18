@@ -132,8 +132,9 @@ function TreeItem<T = any>({
   );
 }
 
-interface TreeItemLabelProps<T = any>
-  extends React.HTMLAttributes<HTMLSpanElement> {
+interface TreeItemLabelProps<
+  T = any,
+> extends React.HTMLAttributes<HTMLSpanElement> {
   item?: ItemInstance<T>;
 }
 

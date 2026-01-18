@@ -43,7 +43,7 @@ export function accessSchema<T extends object>(
 ): TProperty<T> | null {
   let current: TSchema<T> = schema;
 
-  for (let key of path) {
+  for (const key of path) {
     // Check if current schema is an object and has properties
     if (
       "type" in current &&

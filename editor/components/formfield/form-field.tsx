@@ -271,7 +271,6 @@ function MonoFormField({
         }
 
         return (
-          // @ts-ignore
           <Input
             type={type}
             {...(sharedInputProps as React.ComponentProps<"input">)}
@@ -288,7 +287,6 @@ function MonoFormField({
         }
 
         return (
-          // @ts-ignore
           <Textarea
             {...(sharedInputProps as React.ComponentProps<"textarea">)}
           />
@@ -305,7 +303,7 @@ function MonoFormField({
         }
 
         return (
-          // @ts-ignore
+          // @ts-expect-error - PhoneField component prop type mismatch
           <PhoneField
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
@@ -455,7 +453,7 @@ function MonoFormField({
         }
 
         return (
-          // @ts-ignore
+          // @ts-expect-error - RadioGroup component prop type mismatch
           <RadioGroup
             {...(sharedInputProps as React.ComponentProps<"div">)}
             onValueChange={onValueChange}
@@ -479,7 +477,7 @@ function MonoFormField({
       }
       case "checkbox": {
         return (
-          // @ts-ignore
+          // @ts-expect-error - Checkbox component prop type mismatch
           <Checkbox
             {...(sharedInputProps as React.ComponentProps<"input">)}
             onCheckedChange={onCheckedChange}
@@ -489,7 +487,7 @@ function MonoFormField({
       case "toggle": {
         return (
           <fieldset>
-            {/* @ts-ignore */}
+            {/* @ts-expect-error - Toggle component prop type mismatch */}
             <Toggle
               {...(sharedInputProps as React.ComponentProps<"input">)}
               onPressedChange={onCheckedChange}
@@ -501,7 +499,7 @@ function MonoFormField({
       }
       case "switch": {
         return (
-          // @ts-ignore
+          // @ts-expect-error - Switch component prop type mismatch
           <Switch
             {...(sharedInputProps as React.ComponentProps<"input">)}
             onCheckedChange={onCheckedChange}
@@ -532,7 +530,7 @@ function MonoFormField({
       }
       case "range": {
         return (
-          // @ts-ignore
+          // @ts-expect-error - SliderWithValueLabel component prop type mismatch
           <SliderWithValueLabel
             onRangeChange={onRangeChange}
             {...(sharedInputProps as React.ComponentProps<"input">)}
@@ -557,7 +555,6 @@ function MonoFormField({
           return <ReferenceSearchPreview />;
         }
         return (
-          // @ts-ignore
           <ReferenceSearch
             {...(sharedInputProps as React.ComponentProps<"input">)}
             field_id={id ?? ""}
@@ -621,7 +618,7 @@ function MonoFormField({
   // custom layout
   switch (type) {
     // this can only be present on ai generated data.
-    // @ts-ignore
+    // @ts-expect-error - submit type only present in ai generated data
     case "submit": {
       return <></>;
     }
@@ -654,7 +651,7 @@ function MonoFormField({
       const renderItem = (item: Option) => {
         return (
           <label className="flex items-center ps-3">
-            {/* @ts-ignore */}
+            {/* @ts-expect-error - Checkbox component prop type mismatch */}
             <Checkbox
               name={name}
               id={item.id}
@@ -830,7 +827,7 @@ function SafeValueSelect({
 
   return (
     // shadcn select
-    // @ts-ignore
+    // @ts-expect-error - Select component prop type mismatch
     <Select
       {...(inputProps as React.ComponentProps<"select">)}
       // !!this is required, otherwise, the real native select won't change and fail to validate accurately

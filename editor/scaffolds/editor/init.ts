@@ -285,7 +285,7 @@ function initialDatabaseEditorState(
 function initialBucketEditorState(init: BucketDocumentEditorInit): EditorState {
   const base = initialBaseDocumentEditorState(init);
 
-  // @ts-ignore
+  // @ts-expect-error - EditorState type mismatch with base state
   return {
     ...base,
     pages: [],
@@ -385,7 +385,7 @@ function __init_form_start_page_state(
  */
 function initialCanvasEditorState(init: CanvasDocumentEditorInit): EditorState {
   const base = initialBaseDocumentEditorState(init);
-  // @ts-ignore
+  // @ts-expect-error - EditorState type mismatch with base state
   return {
     ...base,
     pages: [],

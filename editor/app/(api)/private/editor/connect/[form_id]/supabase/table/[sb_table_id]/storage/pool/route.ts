@@ -17,7 +17,7 @@ type Context = {
 };
 
 interface XSBStorageBulkResolverRequest {
-  rows: Record<string, any>[];
+  rows: Record<string, unknown>[];
 }
 
 export async function POST(req: NextRequest, context: Context) {

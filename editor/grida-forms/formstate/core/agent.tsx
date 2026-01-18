@@ -13,7 +13,6 @@ export function FormAgentProvider({
 
   useEffect(() => {
     dispatch({ type: "refresh", state: initial });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial.tree]);
 
   return (
@@ -29,7 +28,7 @@ export function FormAgentProvider({
  */
 export function DummyFormAgentStateProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   return (
     <FormAgentProvider initial={initdummy()}>{children}</FormAgentProvider>
   );

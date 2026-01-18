@@ -79,7 +79,7 @@ export default function blockReducer(
         data: {},
       };
 
-      let init: EditorFlatFormBlock = init_block(__shared, block);
+      const init: EditorFlatFormBlock = init_block(__shared, block);
 
       return produce(state, (draft) => {
         switch (block) {

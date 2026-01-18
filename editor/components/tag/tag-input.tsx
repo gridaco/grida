@@ -52,8 +52,7 @@ export interface TagInputStyleClassesProps {
 }
 
 export interface TagInputProps
-  extends OmittedInputProps,
-    VariantProps<typeof tagVariants> {
+  extends OmittedInputProps, VariantProps<typeof tagVariants> {
   placeholder?: string;
   tags: Tag[];
   setTags: React.Dispatch<React.SetStateAction<Tag[]>>;

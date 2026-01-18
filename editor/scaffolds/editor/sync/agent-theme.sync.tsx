@@ -67,7 +67,7 @@ export function useSyncFormAgenthTheme() {
 
 export function FormAgentThemeSyncProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   useSyncFormAgenthTheme();
   return <>{children}</>;
 }

@@ -256,7 +256,7 @@ function FormSiteGeneral({
 }: {
   url: string;
   defaultValues: SiteGeneral;
-  update: (payload: SiteGeneral) => Promise<any>;
+  update: (payload: SiteGeneral) => Promise<unknown>;
 }) {
   const form = useForm<SiteGeneral>({
     defaultValues,

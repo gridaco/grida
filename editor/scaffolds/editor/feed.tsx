@@ -313,7 +313,6 @@ function useXSBTableFeed(
     dispatch({
       type: "data/query/refresh",
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, enabled, ...stableDeps]);
 
   useEffect(() => {
@@ -329,7 +328,6 @@ function useXSBTableFeed(
     } else {
       onFeed?.([], 0);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [res.data]);
 }
 
@@ -422,7 +420,7 @@ function useResolveTransactions(
 
 export function FormResponseSyncProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   const [state] = useEditorState();
   const { tablespace } = state;
   const response_stream =
@@ -436,7 +434,7 @@ export function FormResponseSyncProvider({
 
 export function FormResponseFeedProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   const [state, dispatch] = useEditorState();
 
   const { form, datagrid_table_id, tablespace } = state;
@@ -624,9 +622,7 @@ export function FormResponseSessionFeedProvider({
   return <>{children}</>;
 }
 
-export function CustomerFeedProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
+export function CustomerFeedProvider({ children }: React.PropsWithChildren) {
   const [state, dispatch] = useEditorState();
   const {
     project: { id: project_id },
@@ -721,7 +717,7 @@ export function XSBTableTransactionsQueueProvider({
 
 export function FormXSupabaseMainTableFeedProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren) {
   const [state, dispatch] = useEditorState();
   const fields = useFormFields();
 

@@ -46,7 +46,7 @@ export async function GET(
 
   if (field.reference) {
     const { type, schema, table, column } =
-      field.reference as any as FormFieldReferenceSchema;
+      field.reference as unknown as FormFieldReferenceSchema;
 
     switch (type) {
       case "x-supabase": {

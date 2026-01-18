@@ -413,7 +413,8 @@ export type SchemaMayVaryDocument<S> = {
 );
 
 export interface BaseDocumentEditorState
-  extends IEditorGlobalSavingState,
+  extends
+    IEditorGlobalSavingState,
     IEditorDateContextState,
     IEditorAssetsState,
     IEditorPagesState,
@@ -539,7 +540,8 @@ interface ITablespaceEditorState {
 }
 
 export interface FormEditorState
-  extends BaseDocumentEditorState,
+  extends
+    BaseDocumentEditorState,
     IConnectionsState,
     IEditorSidebarState,
     ITablespaceEditorState,

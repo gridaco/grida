@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   PreferenceBody,
   PreferenceBox,
@@ -66,7 +66,6 @@ export function EndingPagePreferences() {
     handleSubmit,
     control,
     formState: { isSubmitting, isDirty },
-    reset,
     watch,
     setValue,
   } = useForm({
@@ -259,18 +258,14 @@ function Preview({
   return (
     <>
       {template &&
-        React.createElement(
-          // @ts-ignore
-          getComponent(template),
-          {
-            ...texts,
-          } as any
-        )}
+        React.createElement(getComponent(template), {
+          ...texts,
+        })}
     </>
   );
 }
 
-function getComponent(template_id: string) {
+function getComponent(template_id: string): React.ComponentType<any> {
   switch (template_id) {
     case "receipt01":
       return FormCompleteReceipt01;
@@ -283,7 +278,7 @@ function getComponent(template_id: string) {
 function CustomizeTemplate({
   lang,
   title,
-  form_id,
+  form_id: _form_id,
   init,
   onSave,
   ...props
@@ -298,6 +293,7 @@ function CustomizeTemplate({
   onSave?: (template_id: string, data: Record<string, string>) => void;
 }) {
   const { t } = useTranslation();
+  void _form_id;
 
   const onClose = () => {
     props.onOpenChange?.(false);

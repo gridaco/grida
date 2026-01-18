@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const example = require("./supabase-postgrest-swagger.dummy.example.json");
 import { SupabasePostgRESTOpenApi } from "./parse";
 

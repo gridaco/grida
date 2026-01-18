@@ -59,7 +59,7 @@ function ensureContainer(
   nextKey: string | number | undefined
 ): Y.Map<any> | Y.Array<any> {
   if (base instanceof Y.Map && typeof key === "string") {
-    let value = base.get(key);
+    const value = base.get(key);
     if (value instanceof Y.AbstractType) {
       return value as Y.Map<any> | Y.Array<any>;
     }
@@ -79,7 +79,7 @@ function ensureContainer(
   }
 
   if (base instanceof Y.Array && typeof key === "number") {
-    let value = base.get(key);
+    const value = base.get(key);
     if (value instanceof Y.AbstractType) {
       return value as Y.Map<any> | Y.Array<any>;
     }

@@ -781,7 +781,7 @@ function transformdata_pie<T = any>(
 
   return groups.map((group) => {
     const totalValue = data.reduce((acc, item) => {
-      // @ts-ignore
+      // @ts-expect-error - Dynamic property access on chart data
       return acc + item[group];
     }, 0);
 

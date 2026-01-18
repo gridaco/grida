@@ -17,7 +17,7 @@ export const schema = BlockNoteSchema.create({
  * @param value
  * @returns
  */
-export function safeInitialContent(value: any) {
+export function safeInitialContent(value: unknown) {
   if (Array.isArray(value) && value.length > 0) {
     return value;
   }

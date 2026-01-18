@@ -168,7 +168,7 @@ function MultiplayerDemoContent() {
                       <span className="flex-1 truncate">{player.name}</span>
                       {player.message && (
                         <span className="text-muted-foreground truncate max-w-20">
-                          "{player.message}"
+                          &quot;{player.message}&quot;
                         </span>
                       )}
                     </div>

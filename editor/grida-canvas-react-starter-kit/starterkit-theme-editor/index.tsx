@@ -362,7 +362,7 @@ function Typography() {
 
             <h2>Code Block</h2>
             <pre>
-              <code>console.log("Hello, world!");</code>
+              <code>console.log(&quot;Hello, world!&quot;);</code>
             </pre>
 
             <h2>Table</h2>

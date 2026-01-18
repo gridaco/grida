@@ -65,6 +65,6 @@ function PipPlayerContent({
   );
 }
 
-function PipPlayerErrorMessage({ children }: React.PropsWithChildren<{}>) {
+function PipPlayerErrorMessage({ children }: React.PropsWithChildren) {
   return <span className="text-sm text-muted-foreground">{children}</span>;
 }

@@ -33,7 +33,7 @@ export default function EmailChallengePage() {
               <>
                 <strong>Note:</strong> This is a placeholder component. The send
                 button toggles local state only (no network call). OTP input is
-                ephemeral and won't be submitted with the form.
+                ephemeral and won&apos;t be submitted with the form.
               </>
             }
           >

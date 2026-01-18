@@ -69,7 +69,9 @@ export function OpsControl({
             <SquaresSubtractIcon className="size-4" />
             Subtract
             <DropdownMenuShortcut>
-              {keyboardShortcutText("workbench.surface.object.boolean-subtract")}
+              {keyboardShortcutText(
+                "workbench.surface.object.boolean-subtract"
+              )}
             </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -80,7 +82,9 @@ export function OpsControl({
             <SquaresIntersectIcon className="size-4" />
             Intersect
             <DropdownMenuShortcut>
-              {keyboardShortcutText("workbench.surface.object.boolean-intersect")}
+              {keyboardShortcutText(
+                "workbench.surface.object.boolean-intersect"
+              )}
             </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem

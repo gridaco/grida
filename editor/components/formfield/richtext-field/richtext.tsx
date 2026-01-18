@@ -51,7 +51,7 @@ export function RichTextEditorField({
 
   const editor = useCreateBlockNote({
     schema: schema,
-    // @ts-ignore
+    // @ts-expect-error - BlockNote initialContent type mismatch
     initialContent: initialContent,
     // disableExtensions: [],
     dictionary: {

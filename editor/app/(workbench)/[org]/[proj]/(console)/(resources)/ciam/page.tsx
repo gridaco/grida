@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { previewlink } from "@/lib/internal/url";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 
@@ -63,4 +68,3 @@ export default async function CIAMConsolePage({
     </main>
   );
 }
-

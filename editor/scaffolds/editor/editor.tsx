@@ -262,7 +262,7 @@ function useAttributes() {
   }
 }
 
-function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+function FormFieldEditPanelProvider({ children }: React.PropsWithChildren) {
   const [state, dispatch] = useEditorState();
 
   const attributes = useAttributes();
@@ -434,7 +434,7 @@ function useRowEditorRow() {
   return row;
 }
 
-function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+function RowEditPanelProvider({ children }: React.PropsWithChildren) {
   const [state, dispatch] = useEditorState();
 
   const attributes = useAttributes();
@@ -477,7 +477,7 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
+function CustomerPanelProvider({ children }: React.PropsWithChildren) {
   const [state, dispatch] = useEditorState();
 
   return (

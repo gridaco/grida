@@ -16,7 +16,7 @@ export function PhoneFieldDefaultCountryProvider({
   children,
   defaultCountry,
 }: React.PropsWithChildren<{
-  defaultCountry: CountryCode | undefined | (string | {});
+  defaultCountry: CountryCode | undefined | (string & {});
 }>) {
   return (
     <PhoneFieldDefaultCountryContext.Provider

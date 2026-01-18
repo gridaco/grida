@@ -723,11 +723,11 @@ interface EditorProps {
   onBlockDoubleClick?: (id: GridBlockId) => void;
 }
 
-export function GridContext({ children }: React.PropsWithChildren<{}>) {
+export function GridContext({ children }: React.PropsWithChildren) {
   return <Provider>{children}</Provider>;
 }
 
-function Provider({ children }: React.PropsWithChildren<{}>) {
+function Provider({ children }: React.PropsWithChildren) {
   const [state, dispatch] = React.useReducer(reducer, initial);
   return (
     <StateProvider state={state} dispatch={dispatch}>

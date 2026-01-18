@@ -47,8 +47,9 @@ type ClientRenderOptgroup = {
   index?: number;
 };
 
-export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
-  extends BaseRenderBlock {
+export interface ClientFieldRenderBlock<
+  T extends FormInputType = FormInputType,
+> extends BaseRenderBlock {
   type: "field";
   field: {
     id: string;
@@ -105,10 +106,9 @@ export type FileResolveStrategy =
       type: "none";
     };
 
-export interface ClientFileUploadFieldRenderBlock
-  extends ClientFieldRenderBlock<
-    "file" | "image" | "audio" | "video" | "richtext"
-  > {
+export interface ClientFileUploadFieldRenderBlock extends ClientFieldRenderBlock<
+  "file" | "image" | "audio" | "video" | "richtext"
+> {
   field: ClientFieldRenderBlock<
     "file" | "image" | "audio" | "video" | "richtext"
   >["field"] & {

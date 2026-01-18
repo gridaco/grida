@@ -19,7 +19,7 @@ export namespace DataType {
   export type Color = Vanilla.DataType.Color | ColorObject;
 }
 
-// @ts-ignore
+// @ts-expect-error - VanillaCSSProperties type extension
 export interface Properties extends VanillaCSSProperties {
   color?: Vanilla.Globals | DataType.Color;
   backgroundColor?: Vanilla.Globals | DataType.Color;

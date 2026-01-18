@@ -286,8 +286,9 @@ export type DataGridTableViewAction = {
   table_view_type: DataViewType;
 };
 
-export interface DataGridLocalFilterAction
-  extends Partial<EditorState["datagrid_local_filter"]> {
+export interface DataGridLocalFilterAction extends Partial<
+  EditorState["datagrid_local_filter"]
+> {
   type: "editor/data-grid/local-filter";
 }
 
@@ -435,13 +436,15 @@ export interface EditorThemeBackgroundAction {
   background?: FormPageBackgroundSchema;
 }
 
-export interface FormCampaignPreferencesAction
-  extends Partial<EditorState["form"]["campaign"]> {
+export interface FormCampaignPreferencesAction extends Partial<
+  EditorState["form"]["campaign"]
+> {
   type: "editor/form/campaign/preferences";
 }
 
-export interface FormEndingPreferencesAction
-  extends Partial<EditorState["form"]["ending"]> {
+export interface FormEndingPreferencesAction extends Partial<
+  EditorState["form"]["ending"]
+> {
   type: "editor/form/ending/preferences";
 }
 

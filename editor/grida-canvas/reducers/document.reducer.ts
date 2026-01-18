@@ -301,11 +301,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             draft.document.scenes_ref.includes(id) &&
             draft.document.nodes[id]?.type === "scene"
         );
-        
+
         // Ensure all existing scenes are included
         const existingSceneIds = new Set(draft.document.scenes_ref);
         const providedSceneIds = new Set(validSceneIds);
-        
+
         // If not all scenes are provided, keep the order of provided ones and append the rest
         if (existingSceneIds.size !== providedSceneIds.size) {
           const missingScenes = draft.document.scenes_ref.filter(

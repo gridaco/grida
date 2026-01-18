@@ -2,10 +2,6 @@
   "name": "grida",
   "private": true,
   "license": "Apache 2.0",
-  "engines": {
-    "node": ">=22.0.0",
-    "pnpm": ">=10.0.0"
-  },
   "scripts": {
     "dev": "turbo run dev",
     "dev:packages": "turbo run dev --filter=./packages/*",
@@ -15,17 +11,22 @@
     "typecheck": "turbo run typecheck",
     "publish-packages": "turbo run build lint test && changeset version && changeset publish"
   },
-  "packageManager": "pnpm@10.24.0",
-  "resolutions": {},
   "devDependencies": {
     "@changesets/cli": "^2.29.4",
     "@types/node": "^22",
+    "oxfmt": "^0.24.0",
     "prettier": "^3.5.3",
     "tsup": "^8.4.0",
     "turbo": "^2.6.3",
     "typescript": "^5",
     "vitest": "^4"
   },
+  "resolutions": {},
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.24.0",
   "pnpm": {
     "overrides": {
       "@types/react": "19.1.3",

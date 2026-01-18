@@ -155,7 +155,7 @@ function ContentCard({
   );
 }
 
-function CardBackground({ children }: React.PropsWithChildren<{}>) {
+function CardBackground({ children }: React.PropsWithChildren) {
   return <div className="bg-background p-2">{children}</div>;
 }
 

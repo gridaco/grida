@@ -1,4 +1,4 @@
-import { headers, cookies } from "next/headers";
+import { headers } from "next/headers";
 import { match } from "@formatjs/intl-localematcher";
 import Negotiator from "negotiator";
 
@@ -17,7 +17,7 @@ export async function getLocale<T extends string = string>(
     "accept-language": headersList.get("accept-language") || "",
   };
 
-  let languages = new Negotiator({ headers: _headers }).languages();
+  const languages = new Negotiator({ headers: _headers }).languages();
 
   const locale = match(languages, availableLocales, defaultLocale);
 
