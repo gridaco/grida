@@ -23,6 +23,10 @@ type OmittedInputProps = Omit<
 export type Tag = {
   id: string;
   text: string;
+  /**
+   * Optional tint color (e.g. hex string) for the tag.
+   */
+  color?: string;
 };
 
 export interface TagInputStyleClassesProps {
