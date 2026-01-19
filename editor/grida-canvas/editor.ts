@@ -2827,11 +2827,9 @@ export class Editor
   }
 
   private log(...args: any[]) {
-    try {
-      if (this.debug || process.env.NODE_ENV === "development") {
-        this.logger?.(...args);
-      }
-    } catch {}
+    if (this.debug || process.env.NODE_ENV === "development") {
+      this.logger?.(...args);
+    }
   }
 
   private static __isRecord(v: unknown): v is Record<string, unknown> {
@@ -3109,7 +3107,13 @@ export class Editor
       }
 
       if (process.env.NEXT_PUBLIC_GRIDA_WASM_VERBOSE === "1") {
-        this.log("wasm::factory", factory.module);
+        // Don't log factory.module directly - it contains WebAssembly internals
+        // that can't be safely serialized (causes "Invalid array length" errors)
+        // need a better way to log this.
+        this.log("wasm::factory", {
+          type: typeof factory.module,
+          hasModule: !!factory.module,
+        });
       }
 
       const syncDocument = (
