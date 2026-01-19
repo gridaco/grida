@@ -8,6 +8,7 @@ import TenantCustomerPortalAccessEmailVerification, {
 } from "@/theme/templates-email/customer-portal-verification/default";
 import { otp6 } from "@/lib/crypto/otp";
 import { select_lang } from "@/i18n/utils";
+import { getLocale } from "@/i18n/server";
 // TODO: add rate limiting
 export async function POST(
   req: NextRequest,
@@ -132,10 +133,11 @@ export async function POST(
       : undefined;
   const brand_support_contact = publisher.includes("@") ? publisher : undefined;
 
-  const emailLang: CustomerPortalVerificationEmailLang = select_lang(
-    www.lang,
-    supported_languages,
-    "en"
+  // Prefer the visitor's device language. If unsupported, fall back to the tenant default.
+  const fallback_lang = select_lang(www.lang, supported_languages, "en");
+  const emailLang: CustomerPortalVerificationEmailLang = await getLocale(
+    [...supported_languages],
+    fallback_lang
   );
 
   const { error: resend_err } = await resend.emails.send({

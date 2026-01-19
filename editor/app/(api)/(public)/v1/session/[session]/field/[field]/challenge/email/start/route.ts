@@ -8,6 +8,7 @@ import TenantCIAMEmailVerification, {
 import { otp6 } from "@/lib/crypto/otp";
 import { service_role } from "@/lib/supabase/server";
 import { select_lang } from "@/i18n/utils";
+import { getLocale } from "@/i18n/server";
 import {
   challengeEmailStateKey,
   loadChallengeEmailContext,
@@ -153,12 +154,14 @@ export async function POST(
       : undefined;
   const brand_support_contact = publisher.includes("@") ? publisher : undefined;
 
-  const langCandidate =
-    www && typeof www.lang === "string" && www.lang ? www.lang : formDoc.lang;
-  const emailLang: CIAMVerificationEmailLang = select_lang(
-    langCandidate,
-    supported_languages,
-    "en"
+  // Prefer the per-form document language when set; otherwise fall back to tenant/published `www.lang`.
+  // (Treat empty strings as "unset".)
+  const langCandidate = formDoc.lang?.trim() || www?.lang?.trim() || null;
+  // Prefer the visitor's device language. If unsupported, fall back to the form/tenant default.
+  const fallback_lang = select_lang(langCandidate, supported_languages, "en");
+  const emailLang: CIAMVerificationEmailLang = await getLocale(
+    [...supported_languages],
+    fallback_lang
   );
   const { error: resend_err } = await resend.emails.send({
     from: `${brand_name} <no-reply@accounts.grida.co>`,

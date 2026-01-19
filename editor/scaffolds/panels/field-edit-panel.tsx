@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useReducer, useState } from "react";
+import React, { useEffect, useMemo, useReducer, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -21,6 +21,7 @@ import type {
   FormFieldDataSchema,
   FormFieldAutocompleteType,
   PaymentFieldData,
+  PhoneFieldData,
   FormFieldStorageSchema,
   FormFieldReferenceSchema,
 } from "@/grida-forms-hosted/types";
@@ -69,6 +70,11 @@ import { FieldValueExpression } from "./extensions/field-value-expression";
 import { tokens } from "@grida/tokens";
 import { TypeSelect } from "@/components/formfield-type-select";
 import type { Data } from "@/lib/data";
+import { getCountries } from "libphonenumber-js";
+import {
+  PhoneCountryPicker,
+  type PhoneCountryPickerOption,
+} from "@/components/extension/phone-country-picker";
 
 // @ts-expect-error - `FormInputType` includes many variants; this table intentionally defines defaults for a supported subset and treats missing types as `{}` at runtime.
 const default_field_init: {
@@ -144,6 +150,8 @@ const default_field_init: {
     } as PaymentFieldData,
   },
 };
+
+const phone_default_country_codes = getCountries().sort();
 
 export type FieldSave = Omit<FormFieldUpsert, "form_id"> & {
   db_table_id: string;
@@ -241,6 +249,23 @@ export function FieldEditPanel({
     init?.accept ?? undefined
   );
   const [multiple, setMultiple] = useState(init?.multiple || false);
+
+  const phone_default_country_options = useMemo(() => {
+    let displayNames: Intl.DisplayNames | null = null;
+    try {
+      displayNames =
+        typeof Intl !== "undefined" && "DisplayNames" in Intl
+          ? new Intl.DisplayNames(["en"], { type: "region" })
+          : null;
+    } catch {
+      displayNames = null;
+    }
+
+    return phone_default_country_codes.map((code) => ({
+      value: code,
+      label: displayNames?.of(code) ?? code,
+    })) satisfies PhoneCountryPickerOption[];
+  }, []);
 
   const [storage_enabled, __set_storage_enabled] = useState(!!init?.storage);
   const [storage, setStorage] = useState<
@@ -507,6 +532,60 @@ export function FieldEditPanel({
                   onValueChange={setName}
                 />
               </PanelPropertyField>
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={type !== "tel"}>
+            <PanelPropertySectionTitle>Phone</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField
+                label={"Override visitor country"}
+                description="When enabled, the selected country will be used as the default for this phone field."
+              >
+                <Switch
+                  checked={
+                    !!(
+                      (data as PhoneFieldData | null | undefined)?.default_country
+                    )
+                  }
+                  onCheckedChange={(checked) => {
+                    setData((prev) => {
+                      const base =
+                        prev && typeof prev === "object" ? { ...prev } : {};
+
+                      if (!checked) {
+                        delete (base as any).default_country;
+                      } else {
+                        (base as any).default_country =
+                          (base as any).default_country ?? "US";
+                      }
+
+                      return base as any;
+                    });
+                  }}
+                />
+              </PanelPropertyField>
+
+              {!!(
+                (data as PhoneFieldData | null | undefined)?.default_country
+              ) && (
+                <PanelPropertyField label={"Default country"}>
+                  <PhoneCountryPicker
+                    value={
+                      (((data as PhoneFieldData | null | undefined)
+                        ?.default_country as string | undefined) ?? "US") as any
+                    }
+                    options={phone_default_country_options}
+                    onChange={(country) => {
+                      setData((prev) => {
+                        const base =
+                          prev && typeof prev === "object" ? { ...prev } : {};
+                        (base as any).default_country = country;
+                        return base as any;
+                      });
+                    }}
+                  />
+                </PanelPropertyField>
+              )}
             </PanelPropertyFields>
           </PanelPropertySection>
           <PanelPropertySection hidden={type !== "payment"}>

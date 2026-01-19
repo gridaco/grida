@@ -65,7 +65,7 @@ export async function POST(
       autocomplete: init.autocomplete,
       data: safe_data_field({
         type: init.type,
-        data: init.data as any,
+        data: init.data,
       }) as any,
       accept: init.accept,
       multiple: init.multiple,
@@ -323,9 +323,16 @@ function safe_data_field({
   data,
 }: {
   type: FormInputType;
-  data?: FormFieldDataSchema;
+  data?: FormFieldDataSchema | null;
 }): FormFieldDataSchema | undefined | null {
   switch (type) {
+    case "tel": {
+      // Keep `data` as an object (if provided) so we can safely persist tel configs
+      // such as `default_country` without losing shape.
+      if (!data) return data;
+      if (typeof data === "object") return data;
+      return {};
+    }
     case "payment": {
       // TODO: enhance the schema validation with external libraries
       if (!data || !(data as PaymentFieldData).type) {

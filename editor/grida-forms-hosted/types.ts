@@ -1,6 +1,7 @@
 import type { IpInfo } from "@/clients/ipinfo";
 import type palettes from "@/theme/palettes";
 import type { tokens } from "@grida/tokens";
+import type { CountryCode } from "libphonenumber-js/core";
 import type {
   Appearance,
   FontFamily,
@@ -319,7 +320,16 @@ export interface FormResponseField {
   storage_object_paths: string[] | null;
 }
 
-export type FormFieldDataSchema = PaymentFieldData | {};
+export interface PhoneFieldData {
+  /**
+   * Defaults the phone input's country selection (E.164 prefix).
+   *
+   * Stored in `grida_forms.attribute.data` with snake_case naming.
+   */
+  default_country?: CountryCode | (string & {});
+}
+
+export type FormFieldDataSchema = PaymentFieldData | PhoneFieldData | {};
 
 export type FormFieldStorageSchema =
   | XGridaStorageSchema

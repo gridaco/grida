@@ -19,6 +19,8 @@ import { useForm } from "react-hook-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FaviconEditor } from "@/scaffolds/www-theme-config/components/favicon";
 import { SiteDomainsSection } from "./section-domain";
+import type { PostgrestError } from "@supabase/supabase-js";
+import type { Database } from "@app/database";
 
 type ProjectWWW = {
   id: string;
@@ -26,12 +28,16 @@ type ProjectWWW = {
   project_id: number;
   title: string | null;
   description: string | null;
+  lang: string;
   og_image: string | null;
   favicon: {
     src: string;
     srcDark?: string | undefined;
   } | null;
 };
+
+type ProjectWWWUpdate = Partial<ProjectWWW>;
+type WWWUpdateResult = { error: PostgrestError | null };
 
 function useSiteSettings() {
   const project = useProject();
@@ -51,7 +57,7 @@ function useSiteSettings() {
   });
 
   const update = useCallback(
-    async (payload: Partial<ProjectWWW>) => {
+    async (payload: ProjectWWWUpdate): Promise<WWWUpdateResult> => {
       const task = await client
         .from("www")
         .update(payload)
@@ -206,6 +212,7 @@ export default function ProjectWWWSettingsPage() {
         defaultValues={{
           title: data.title,
           description: data.description,
+          lang: data.lang,
         }}
         update={update}
       />
@@ -256,14 +263,20 @@ function FormSiteGeneral({
 }: {
   url: string;
   defaultValues: SiteGeneral;
-  update: (payload: SiteGeneral) => Promise<unknown>;
+  update: (payload: SiteGeneral) => Promise<WWWUpdateResult>;
 }) {
   const form = useForm<SiteGeneral>({
     defaultValues,
   });
 
   const onSubmit = form.handleSubmit(async (values) => {
-    return await update(values);
+    const res = await update(values);
+    // Reset dirty state to the saved values (react-hook-form best practice)
+    // so the Save button disables again until the next change.
+    if (!res.error) {
+      form.reset(values);
+    }
+    return res;
   });
 
   const { isSubmitting, isDirty } = form.formState;
@@ -278,9 +291,10 @@ function FormSiteGeneral({
           url={url}
           disabled={isSubmitting}
           value={form.watch()}
-          onValueChange={({ title, description }) => {
+          onValueChange={({ title, description, lang }) => {
             form.setValue("title", title, { shouldDirty: true });
             form.setValue("description", description, { shouldDirty: true });
+            form.setValue("lang", lang, { shouldDirty: true });
           }}
         />
       </CardContent>

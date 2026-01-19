@@ -1,13 +1,30 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DotsVerticalIcon } from "@radix-ui/react-icons";
 
 export type SiteGeneral = {
   title: string | null;
   description: string | null;
+  /**
+   * Default/fallback language for public/tenant-facing experiences (e.g. verification emails).
+   * Keep this a short language code like "en", "ko".
+   */
+  lang: string;
 };
 
 export function SiteGeneralSection({
@@ -23,9 +40,9 @@ export function SiteGeneralSection({
 }) {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="title">Site Title</Label>
+      <FieldGroup className="gap-4">
+        <Field>
+          <FieldLabel htmlFor="title">Site Title</FieldLabel>
           <Input
             id="title"
             value={value.title ?? ""}
@@ -38,9 +55,10 @@ export function SiteGeneralSection({
             }
             placeholder="Enter your site title"
           />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="description">Site Description</Label>
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="description">Site Description</FieldLabel>
           <Textarea
             id="description"
             disabled={disabled}
@@ -54,8 +72,40 @@ export function SiteGeneralSection({
             placeholder="Enter your site description"
             rows={3}
           />
-        </div>
-      </div>
+        </Field>
+
+        <Field>
+          <FieldLabel>Default (fallback) language</FieldLabel>
+          <Select
+            value={value.lang}
+            onValueChange={(v) =>
+              onValueChange?.({
+                ...value,
+                lang: v,
+              })
+            }
+            disabled={disabled}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">English (default)</SelectItem>
+              <SelectItem value="ko">Korean / 한국어</SelectItem>
+              <SelectItem value="ja">Japanese / 日本語</SelectItem>
+              <SelectItem value="es">Spanish / Español</SelectItem>
+              <SelectItem value="zh">Chinese / 中文</SelectItem>
+            </SelectContent>
+          </Select>
+          <FieldDescription>
+            Grida first tries the visitor’s device language. If it’s not
+            supported, it falls back to this language.
+            <br />
+            Targeting a global audience? Keep this as English. Targeting a
+            specific locale? Set it to match.
+          </FieldDescription>
+        </Field>
+      </FieldGroup>
 
       <div>
         <h3 className="text-sm font-medium mb-2">Preview</h3>

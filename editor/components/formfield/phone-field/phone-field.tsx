@@ -9,7 +9,8 @@ const PhoneFieldDefaultCountryContext = React.createContext<
 
 function usePhoneFieldDefaultCountry(fallback?: CountryCode) {
   const context = React.use(PhoneFieldDefaultCountryContext);
-  return context ?? fallback;
+  // Field-level fallback should override the provider default (geo).
+  return fallback ?? context;
 }
 
 export function PhoneFieldDefaultCountryProvider({
