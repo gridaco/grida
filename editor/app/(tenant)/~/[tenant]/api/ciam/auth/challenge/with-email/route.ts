@@ -8,6 +8,7 @@ import TenantCIAMEmailVerification, {
 } from "@/theme/templates-email/ciam-verifiaction/default";
 import { otp6 } from "@/lib/crypto/otp";
 import { select_lang } from "@/i18n/utils";
+import { getLocale } from "@/i18n/server";
 
 /**
  * POST /api/ciam/auth/challenge/with-email
@@ -118,10 +119,11 @@ export async function POST(
       ? publisher
       : undefined;
 
-    const emailLang: CIAMVerificationEmailLang = select_lang(
-      www.lang,
-      supported_languages,
-      "en"
+    // Prefer the visitor's device language. If unsupported, fall back to the tenant default.
+    const fallback_lang = select_lang(www.lang, supported_languages, "en");
+    const emailLang: CIAMVerificationEmailLang = await getLocale(
+      [...supported_languages],
+      fallback_lang
     );
     const { error: resend_err } = await resend.emails.send({
       from: `${brand_name} <no-reply@accounts.grida.co>`,
