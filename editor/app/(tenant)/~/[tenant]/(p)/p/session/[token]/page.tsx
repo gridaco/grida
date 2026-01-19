@@ -7,6 +7,12 @@ import type { Database } from "@app/database";
 import type { PostgrestError } from "@supabase/supabase-js";
 import CampaignReferrerCard from "../west-campaign-referrer-card";
 
+// TODO(portal): The portal session page is not design-complete yet, but is used in production.
+// Today enterprise customers typically only have one active campaign, so we temporarily redirect
+// directly to the campaign page when there's only a single campaign in the portal session.
+// Remove this once the session page UX is finalized and multi-campaign is common.
+const TMP_SHOULD_REDIRECT_WHEN_SINGLE = true;
+
 type Params = {
   token: string;
 };
@@ -122,6 +128,20 @@ export default async function CustomerPortalSessionPage({
 
   if (referrer_err) {
     console.error("[ciam]/referrer error", referrer_err);
+  }
+
+  if (
+    TMP_SHOULD_REDIRECT_WHEN_SINGLE &&
+    iam_referrers &&
+    iam_referrers.length === 1
+  ) {
+    const r = iam_referrers[0];
+    const path = r?.campaign?.www_route_path;
+    const code = r?.code;
+    if (typeof path === "string" && path && typeof code === "string" && code) {
+      // FIXME: tenant url
+      return redirect(`${path}/t/${code}`);
+    }
   }
 
   console.info("[ciam]/portal session redeemed", {
