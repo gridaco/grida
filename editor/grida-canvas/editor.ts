@@ -4687,7 +4687,8 @@ export class EditorSurface
   // #region drag resize handle
   surfaceStartCornerRadiusGesture(
     selection: string,
-    anchor?: cmath.IntercardinalDirection
+    anchor?: cmath.IntercardinalDirection,
+    altKey?: boolean
   ) {
     this._editor.doc.dispatch({
       type: "surface/gesture/start",
@@ -4695,6 +4696,7 @@ export class EditorSurface
         type: "corner-radius",
         node_id: selection,
         anchor,
+        altKey: altKey ?? false,
       },
     });
   }
