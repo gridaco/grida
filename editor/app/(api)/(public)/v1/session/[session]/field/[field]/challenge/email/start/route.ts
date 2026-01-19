@@ -153,8 +153,9 @@ export async function POST(
       : undefined;
   const brand_support_contact = publisher.includes("@") ? publisher : undefined;
 
-  const langCandidate =
-    www && typeof www.lang === "string" && www.lang ? www.lang : formDoc.lang;
+  // Prefer the per-form document language when set; otherwise fall back to tenant/published `www.lang`.
+  // (Treat empty strings as "unset".)
+  const langCandidate = formDoc.lang?.trim() || www?.lang?.trim() || null;
   const emailLang: CIAMVerificationEmailLang = select_lang(
     langCandidate,
     supported_languages,
