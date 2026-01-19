@@ -128,6 +128,15 @@ async function submit({
   formdata: FormData | URLSearchParams | Map<string, string>;
   meta: SessionMeta;
 }) {
+  function isRecord(v: unknown): v is Record<string, unknown> {
+    return typeof v === "object" && v !== null;
+  }
+
+  function readStringProp(obj: unknown, key: string): string | null {
+    if (!isRecord(obj)) return null;
+    const v = obj[key];
+    return typeof v === "string" && v ? v : null;
+  }
   // console.log("form_id", form_id);
 
   // check for mandatory meta
@@ -204,6 +213,54 @@ async function submit({
     : null;
 
   // customer handling
+  // NOTE: challenge_email can bind a verified customer to the response_session.
+  // When that happens, we must reuse that customer instead of creating a new
+  // fingerprint-based customer (which causes duplicate customers for one respondent).
+
+  const challenge_email_fields = fields.filter(
+    (f) => f.type === "challenge_email"
+  );
+
+  // These are also used later for persistence/binding.
+  let session_raw: Record<string, unknown> | null = null;
+  let session_customer_id: string | null = null;
+  let verified_customer_id: string | null = null;
+
+  if (challenge_email_fields.length > 0 && meta.session) {
+    const { data: response_session, error: response_session_err } =
+      await service_role.forms
+        .from("response_session")
+        .select("id, raw, customer_id")
+        .eq("id", meta.session)
+        .eq("form_id", form_id)
+        .single();
+
+    if (response_session_err || !response_session) {
+      console.error("submit/err/session", response_session_err);
+      return error(ERR.SERVICE_ERROR.code, { form_id }, meta);
+    }
+
+    session_raw =
+      (response_session.raw as Record<string, unknown> | null) ?? null;
+    session_customer_id = response_session.customer_id ?? null;
+
+    // If verification succeeded, the challenge state stores `customer_uid`.
+    // Use it as an authoritative identity fallback (even when response_session.customer_id
+    // wasn't bound due to stricter binding rules).
+    for (const f of challenge_email_fields) {
+      const key = `__challenge_email__${f.id}`;
+      const obj = session_raw?.[key];
+      const state = readStringProp(obj, "state");
+      const customer_uid = readStringProp(obj, "customer_uid");
+      if (state === "challenge-success" && customer_uid) {
+        verified_customer_id = customer_uid;
+        break;
+      }
+    }
+  }
+
+  const effective_session_customer_id =
+    session_customer_id ?? verified_customer_id ?? null;
 
   const _gf_customer_uuid: string | null = qval(
     formdata.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
@@ -227,16 +284,50 @@ async function submit({
 
   // console.log("/submit::_gf_customer_uuid:", _gf_customer_uuid);
 
-  const customer = await upsert_customer_with({
-    project_id: form_reference.project_id,
-    uuid: _gf_customer_uuid,
-    hints: {
-      _fp_fingerprintjs_visitorid,
-      email: _gf_customer_email || undefined,
-      phone: _gf_customer_phone || undefined,
-      name: _gf_customer_name || undefined,
-    },
-  });
+  // Only create/upsert a customer when we do not already have a trusted customer id.
+  // This prevents duplicate customer rows for challenge_email flows.
+  const customer = effective_session_customer_id
+    ? null
+    : await upsert_customer_with({
+        project_id: form_reference.project_id,
+        uuid: _gf_customer_uuid,
+        hints: {
+          _fp_fingerprintjs_visitorid,
+          email: _gf_customer_email || undefined,
+          phone: _gf_customer_phone || undefined,
+          name: _gf_customer_name || undefined,
+        },
+      });
+
+  // Best-effort: if we have a verified/session customer, enrich it with submitted hints.
+  // Avoid writing empty values; keep this non-blocking.
+  if (effective_session_customer_id) {
+    const patch: {
+      last_seen_at: string;
+      email?: string;
+      phone?: string;
+      name?: string;
+    } = { last_seen_at: new Date().toISOString() };
+    if (_gf_customer_email) patch.email = _gf_customer_email;
+    if (_gf_customer_phone) patch.phone = _gf_customer_phone;
+    if (_gf_customer_name) patch.name = _gf_customer_name;
+
+    try {
+      const { error: cus_update_err } = await service_role.workspace
+        .from("customer")
+        .update(patch)
+        .eq("uid", effective_session_customer_id)
+        .eq("project_id", form_reference.project_id);
+      if (cus_update_err) {
+        console.error(
+          "customer::session_customer_update_error:",
+          cus_update_err
+        );
+      }
+    } catch (e) {
+      console.error("customer::session_customer_update_unexpected_error:", e);
+    }
+  }
 
   // console.log("/submit::customer:", customer);
 
@@ -285,7 +376,7 @@ async function submit({
   // TODO: this also needs to be migrated to db constraints
   const max_access_by_customer_error = await validate_max_access_by_customer({
     form_id,
-    customer_id: customer?.uid,
+    customer_id: effective_session_customer_id ?? customer?.uid ?? null,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
   });
@@ -325,35 +416,9 @@ async function submit({
   // ==================================================
   // challenge_email gating (session-scoped verification)
   // ==================================================
-  const challenge_email_fields = fields.filter(
-    (f) => f.type === "challenge_email"
-  );
   const required_challenge_email_fields = challenge_email_fields.filter(
     (f) => f.required
   );
-
-  // These are also used later for persistence/binding.
-  let session_raw: Record<string, unknown> | null = null;
-  let session_customer_id: string | null = null;
-
-  if (challenge_email_fields.length > 0 && meta.session) {
-    const { data: response_session, error: response_session_err } =
-      await service_role.forms
-        .from("response_session")
-        .select("id, raw, customer_id")
-        .eq("id", meta.session)
-        .eq("form_id", form_id)
-        .single();
-
-    if (response_session_err || !response_session) {
-      console.error("submit/err/session", response_session_err);
-      return error(ERR.SERVICE_ERROR.code, { form_id }, meta);
-    }
-
-    session_raw =
-      (response_session.raw as Record<string, unknown> | null) ?? null;
-    session_customer_id = response_session.customer_id ?? null;
-  }
 
   if (required_challenge_email_fields.length > 0) {
     if (!meta.session || !session_raw) {
@@ -508,7 +573,8 @@ async function submit({
         ip: meta.ip,
         // Prefer explicit customer from the submit payload; otherwise use session binding
         // (set only by trusted verification flows).
-        customer_id: customer?.uid ?? session_customer_id,
+        customer_id:
+          effective_session_customer_id ?? customer?.uid ?? session_customer_id,
         x_referer: meta.referer,
         x_useragent: meta.useragent,
         x_ipinfo: ipinfo_data as {},
@@ -545,7 +611,8 @@ async function submit({
             form_id,
             ...({
               fingerprint: _fp_fingerprintjs_visitorid,
-              customer_id: customer?.uid,
+              customer_id:
+                effective_session_customer_id ?? customer?.uid ?? undefined,
               session_id: meta.session || undefined,
             } satisfies FormLinkURLParams["alreadyresponded"]),
           },
