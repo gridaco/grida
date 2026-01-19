@@ -732,7 +732,7 @@ function __self_evt_on_drag(
         break;
       }
       case "corner-radius": {
-        const { node_id, anchor } = draft.gesture;
+        const { node_id, anchor, altKey = false } = draft.gesture;
         const [dx, dy] = delta;
         const node = dq.__getNodeById(draft, node_id);
 
@@ -791,15 +791,38 @@ function __self_evt_on_drag(
 
               const key = keyMap[anchor];
               const current = (node as any)[key] ?? 0;
+              
+              // Check if all corners have the same value
+              const tl = node.rectangular_corner_radius_top_left ?? 0;
+              const tr = node.rectangular_corner_radius_top_right ?? 0;
+              const br = node.rectangular_corner_radius_bottom_right ?? 0;
+              const bl = node.rectangular_corner_radius_bottom_left ?? 0;
+              const isUniform = tl === tr && tr === br && br === bl;
+
               const nextRadius = current + d;
               const nextRadiusClamped = Math.floor(
                 Math.min(maxRadius, Math.max(0, nextRadius))
               );
-              draft.document.nodes[node_id] = nodeReducer(node, {
-                type: "node/change/*",
-                [key]: nextRadiusClamped,
-                node_id,
-              });
+
+              // If Alt key is not pressed and all corners are uniform, adjust all corners
+              // Otherwise, adjust only the clicked corner
+              if (!altKey && isUniform) {
+                draft.document.nodes[node_id] = nodeReducer(node, {
+                  type: "node/change/*",
+                  corner_radius: nextRadiusClamped,
+                  rectangular_corner_radius_top_left: nextRadiusClamped,
+                  rectangular_corner_radius_top_right: nextRadiusClamped,
+                  rectangular_corner_radius_bottom_right: nextRadiusClamped,
+                  rectangular_corner_radius_bottom_left: nextRadiusClamped,
+                  node_id,
+                });
+              } else {
+                draft.document.nodes[node_id] = nodeReducer(node, {
+                  type: "node/change/*",
+                  [key]: nextRadiusClamped,
+                  node_id,
+                });
+              }
             } else {
               const current =
                 typeof node.corner_radius == "number" ? node.corner_radius : 0;

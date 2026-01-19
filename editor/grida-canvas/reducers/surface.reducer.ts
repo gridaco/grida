@@ -538,7 +538,7 @@ function __self_start_gesture(
       break;
     }
     case "corner-radius": {
-      const { node_id, anchor } = gesture;
+      const { node_id, anchor, altKey } = gesture;
 
       self_selectNode(draft, "reset", node_id);
       draft.gesture = {
@@ -550,6 +550,7 @@ function __self_start_gesture(
           context.geometry.getNodeAbsoluteBoundingRect(node_id)!,
         node_id: node_id,
         anchor,
+        altKey: altKey ?? false,
       };
       break;
     }

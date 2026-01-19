@@ -2008,6 +2008,7 @@ export namespace editor.gesture {
     readonly type: "corner-radius";
     readonly node_id: string;
     readonly anchor?: cmath.IntercardinalDirection;
+    readonly altKey?: boolean;
     readonly initial_bounding_rectangle: cmath.Rectangle | null;
   };
 
@@ -4107,7 +4108,8 @@ export namespace editor.api {
     ): void;
     surfaceStartCornerRadiusGesture(
       selection: string,
-      anchor?: cmath.IntercardinalDirection
+      anchor?: cmath.IntercardinalDirection,
+      altKey?: boolean
     ): void;
     surfaceStartRotateGesture(selection: string): void;
     surfaceStartTranslateVectorNetwork(node_id: string): void;
