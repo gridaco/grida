@@ -16,7 +16,7 @@
     "@types/node": "^22",
     "oxfmt": "^0.24.0",
     "prettier": "^3.5.3",
-    "tsup": "^8.4.0",
+    "tsup": "^8.5.0",
     "turbo": "^2.6.3",
     "typescript": "^5",
     "vitest": "^4"
