@@ -1,8 +1,8 @@
 import { Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
@@ -27,15 +27,17 @@ export function PresetShare({ disabled }: { disabled?: boolean }) {
         </div>
         <div className="flex items-center space-x-2 pt-4">
           <div className="grid flex-1 gap-2">
-            <Label htmlFor="link" className="sr-only">
-              Link
-            </Label>
+            <Field>
+              <FieldLabel htmlFor="link" className="sr-only">
+                Link
+              </FieldLabel>
             <Input
               id="link"
               defaultValue="https://platform.openai.com/playground/p/7bbKYQvsVkNmVb8NGcdUOLae?model=text-davinci-003"
               readOnly
               className="h-9"
             />
+            </Field>
           </div>
           <Button type="submit" size="sm" className="px-3">
             <span className="sr-only">Copy</span>

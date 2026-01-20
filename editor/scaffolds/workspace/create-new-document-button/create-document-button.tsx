@@ -27,10 +27,10 @@ import {
   DialogHeader,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import {
   NewDocumentRequest,
@@ -297,8 +297,8 @@ function CreateNewDatabaseDialog({
               </TabsTrigger>
             </TabsList>
             <TabsContent value="database" className="py-4">
-              <div className="grid gap-2">
-                <Label>Database Name</Label>
+              <Field>
+                <FieldLabel>Database Name</FieldLabel>
                 <Input
                   autoFocus
                   required
@@ -307,7 +307,7 @@ function CreateNewDatabaseDialog({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
-                <span className="text-muted-foreground text-xs max-w-80">
+                <FieldDescription className="text-xs max-w-80">
                   {error && (
                     <span className="text-destructive">
                       {error}
@@ -319,8 +319,8 @@ function CreateNewDatabaseDialog({
                     Database name should be unique across the project. lowercase
                     and underscore `_` only.
                   </>
-                </span>
-              </div>
+                </FieldDescription>
+              </Field>
             </TabsContent>
             <TabsContent value="table" className="py-4">
               <article className="prose prose-sm dark:prose-invert">
@@ -401,8 +401,8 @@ function CreateNewBucketDialog({
         </DialogHeader>
         <hr />
         <div className="w-full flex flex-col gap-5">
-          <div className="grid gap-2">
-            <Label>Name of bucket</Label>
+          <Field>
+            <FieldLabel>Name of bucket</FieldLabel>
             <Input
               autoFocus
               required
@@ -411,7 +411,7 @@ function CreateNewBucketDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <span className="text-muted-foreground text-xs max-w-80">
+            <FieldDescription className="text-xs max-w-80">
               {error && (
                 <span className="text-destructive">
                   {error}
@@ -423,13 +423,13 @@ function CreateNewBucketDialog({
                 Bucket name should be unique across the project. lowercase and
                 underscore `_` only.
               </>
-            </span>
-          </div>
+            </FieldDescription>
+          </Field>
           <hr />
           <div className="flex gap-4">
             <Switch disabled checked={isPublic} onCheckedChange={setIsPublic} />
             <div className="grid gap-2">
-              <Label>Public Bucket</Label>
+              <FieldLabel>Public Bucket</FieldLabel>
               <span className="text-xs text-muted-foreground">
                 Anyone can read files from this bucket.
               </span>

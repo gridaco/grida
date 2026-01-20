@@ -68,6 +68,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { XSBTableInfo } from "@/scaffolds/x-supabase/xsb-table-info";
 import { useEditorState } from "@/scaffolds/editor";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
@@ -289,8 +290,8 @@ function ConnectSupabase() {
           <CardContent>
             <div className="flex flex-col gap-10">
               <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="url">Project URL</Label>
+                <Field>
+                  <FieldLabel htmlFor="url">Project URL</FieldLabel>
                   <Input
                     className="font-mono"
                     id="url"
@@ -303,9 +304,9 @@ function ConnectSupabase() {
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                   />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="anonkey">
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="anonkey">
                     Anon Key
                     <Tooltip>
                       <TooltipTrigger>
@@ -317,7 +318,7 @@ function ConnectSupabase() {
                         policies.
                       </TooltipContent>
                     </Tooltip>
-                  </Label>
+                  </FieldLabel>
                   <Input
                     className="font-mono"
                     id="anonkey"
@@ -330,7 +331,7 @@ function ConnectSupabase() {
                     value={anonKey}
                     onChange={(e) => setAnonKey(e.target.value)}
                   />
-                </div>
+                </Field>
               </div>
             </div>
           </CardContent>
@@ -523,8 +524,8 @@ function ConnectServiceRoleKey({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-2">
-          <Label htmlFor="service_role">
+        <Field>
+          <FieldLabel htmlFor="service_role">
             Service Key
             <Tooltip>
               <TooltipTrigger>
@@ -536,7 +537,7 @@ function ConnectServiceRoleKey({
                 this key to perform the request
               </TooltipContent>
             </Tooltip>
-          </Label>
+          </FieldLabel>
           <div>
             {is_service_key_set ? (
               <>
@@ -564,7 +565,7 @@ function ConnectServiceRoleKey({
               </>
             )}
           </div>
-        </div>
+        </Field>
       </CardContent>
       <CardFooter className="flex justify-end">
         <div hidden={!!sb_service_key_id}>

@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -118,10 +118,11 @@ export default function PhoneNumberTool() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="country">Select Country Code</Label>
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor="country">Select Country Code</FieldLabel>
               <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger>
+                <SelectTrigger id="country">
                   <SelectValue placeholder="Select a country" />
                 </SelectTrigger>
                 <SelectContent>
@@ -132,12 +133,12 @@ export default function PhoneNumberTool() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+              </Field>
 
-            <div className="grid gap-2">
-              <Label htmlFor="phoneNumbers">
+              <Field>
+                <FieldLabel htmlFor="phoneNumbers">
                 Enter phone numbers (one per line)
-              </Label>
+                </FieldLabel>
               <Textarea
                 id="phoneNumbers"
                 value={inputText}
@@ -145,7 +146,8 @@ export default function PhoneNumberTool() {
                 placeholder="Enter phone numbers here..."
                 className="min-h-[200px]"
               />
-            </div>
+              </Field>
+            </FieldGroup>
           </CardContent>
           <CardFooter className="flex gap-2">
             <Button onClick={processPhoneNumbers} className="flex-1">

@@ -43,6 +43,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -411,26 +412,28 @@ function CreateNewSchemaTableDialog({
         </DialogHeader>
         {/*  */}
         <div className="py-4 space-y-4">
-          <div className="grid gap-2">
-            <Label>Name</Label>
-            <Controller
-              name="name"
-              control={control}
-              render={({ field }) => (
-                <Input placeholder="table_name" {...field} />
-              )}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Description</Label>
-            <Controller
-              name="description"
-              control={control}
-              render={({ field }) => (
-                <Input placeholder="Optional" {...field} />
-              )}
-            />
-          </div>
+          <FieldGroup className="gap-4">
+            <Field>
+              <FieldLabel>Name</FieldLabel>
+              <Controller
+                name="name"
+                control={control}
+                render={({ field }) => (
+                  <Input placeholder="table_name" {...field} />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel>Description</FieldLabel>
+              <Controller
+                name="description"
+                control={control}
+                render={({ field }) => (
+                  <Input placeholder="Optional" {...field} />
+                )}
+              />
+            </Field>
+          </FieldGroup>
         </div>
         <DialogFooter>
           <DialogClose asChild>

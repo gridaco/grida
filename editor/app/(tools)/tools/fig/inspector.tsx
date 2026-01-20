@@ -17,6 +17,7 @@ import type { GUID, NodeChange } from "@grida/io-figma/fig-kiwi/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import { NodeTypeIcon } from "./node-type-icon";
@@ -228,30 +229,32 @@ function FigmaPasteInfo({ meta, more }: { meta: FigmaMeta; more: PasteMore }) {
         <FigmaLink href={figmaUrl(meta.fileKey, undefined)} />
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="fileKey">File Key</Label>
+        <Field className="gap-2">
+          <FieldLabel htmlFor="fileKey">File Key</FieldLabel>
           <Input id="fileKey" value={meta.fileKey} readOnly />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="dataType">Data Type</Label>
+        </Field>
+        <Field className="gap-2">
+          <FieldLabel htmlFor="dataType">Data Type</FieldLabel>
           <Input id="dataType" value={meta.dataType} readOnly />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="pasteID">Paste ID</Label>
+        </Field>
+        <Field className="gap-2">
+          <FieldLabel htmlFor="pasteID">Paste ID</FieldLabel>
           <Input id="pasteID" value={meta.pasteID.toString()} readOnly />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="pasteFileKey">Paste File Key</Label>
+        </Field>
+        <Field className="gap-2">
+          <FieldLabel htmlFor="pasteFileKey">Paste File Key</FieldLabel>
           <Input id="pasteFileKey" value={more.pasteFileKey ?? ""} readOnly />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="pasteBranchSourceFileKey">Branch Source File</Label>
+        </Field>
+        <Field className="gap-2">
+          <FieldLabel htmlFor="pasteBranchSourceFileKey">
+            Branch Source File
+          </FieldLabel>
           <Input
             id="pasteBranchSourceFileKey"
             value={more.pasteBranchSourceFileKey ?? ""}
             readOnly
           />
-        </div>
+        </Field>
       </CardContent>
     </Card>
   );

@@ -8,8 +8,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export function PresetSave({ disabled }: { disabled?: boolean }) {
   return (
@@ -27,16 +27,16 @@ export function PresetSave({ disabled }: { disabled?: boolean }) {
             can access later or share with others.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
+        <FieldGroup className="py-4 gap-4">
+          <Field>
+            <FieldLabel htmlFor="name">Name</FieldLabel>
             <Input id="name" autoFocus />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="description">Description</FieldLabel>
             <Input id="description" />
-          </div>
-        </div>
+          </Field>
+        </FieldGroup>
         <DialogFooter>
           <Button type="submit">Save</Button>
         </DialogFooter>

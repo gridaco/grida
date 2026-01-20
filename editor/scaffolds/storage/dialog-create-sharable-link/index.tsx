@@ -6,12 +6,19 @@ import {
   DialogClose,
   DialogContent,
   DialogHeader,
+  DialogTitle,
 } from "@/components/ui-editor/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { wellkown } from "@/utils/mimetype";
 import { useStorageEditor } from "../core";
 import { Safari, SafariToolbar } from "@/components/frames/safari";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { Cross2Icon, Link2Icon } from "@radix-ui/react-icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -223,6 +230,7 @@ export default function CreateViewerLinkDialog({
     <Dialog {...props}>
       <DialogContent hideCloseButton fullScreen className="flex flex-col p-4">
         <DialogHeader className="flex flex-row justify-between">
+          <DialogTitle className="sr-only">Create Sharable Link</DialogTitle>
           <div>
             <DialogClose asChild>
               <Button variant="ghost" size="sm">
@@ -263,9 +271,11 @@ export default function CreateViewerLinkDialog({
                 </Badge>
               )}
             </Label>
-            <div className="grid gap-5">
-              <div className="grid gap-2">
-                <Label className="text-xs text-muted-foreground">Viewer</Label>
+            <FieldGroup className="gap-5">
+              <Field>
+                <FieldLabel className="text-xs text-muted-foreground">
+                  Viewer
+                </FieldLabel>
                 <ToggleGroup
                   type="single"
                   value={_viewer?.app}
@@ -281,9 +291,11 @@ export default function CreateViewerLinkDialog({
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
-              </div>
-              <div className="grid gap-2">
-                <Label className="text-xs text-muted-foreground">Title</Label>
+              </Field>
+              <Field>
+                <FieldLabel className="text-xs text-muted-foreground">
+                  Title
+                </FieldLabel>
                 <Input
                   value={_viewer?.title}
                   onChange={(e) => {
@@ -292,12 +304,14 @@ export default function CreateViewerLinkDialog({
                   }}
                   placeholder="Custom Title"
                 />
-              </div>
-              <div className="grid gap-2">
-                <Label className="text-xs text-muted-foreground">Logo</Label>
-                <p className="text-xs text-muted-foreground">
+              </Field>
+              <Field>
+                <FieldLabel className="text-xs text-muted-foreground">
+                  Logo
+                </FieldLabel>
+                <FieldDescription className="text-xs text-muted-foreground">
                   Logos may not appear in all viewers.
-                </p>
+                </FieldDescription>
                 <ImageResourcePicker
                   value={_viewer?.logo}
                   onValueChange={(logo) => {
@@ -305,8 +319,8 @@ export default function CreateViewerLinkDialog({
                     setViewer((v) => create_viewer(v!, { logo: logourl }));
                   }}
                 />
-              </div>
-            </div>
+              </Field>
+            </FieldGroup>
           </aside>
         </div>
       </DialogContent>

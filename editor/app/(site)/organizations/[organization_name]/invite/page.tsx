@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { GridaLogo } from "@/components/grida-logo";
 import {
   Breadcrumb,
@@ -40,10 +40,10 @@ export default async function NewOrganizationSetupInvitePage({
             Learn more about permissions for organizations →
           </Link>
         </section>
-        <div className="grid gap-2">
-          <Label>Search by username, full name or email address</Label>
+        <Field>
+          <FieldLabel>Search by username, full name or email address</FieldLabel>
           <Input placeholder="Organization name" />
-        </div>
+        </Field>
         <footer className="flex flex-col gap-2 w-full py-10 border-t">
           <Button className="w-full">Complete setup</Button>
           <Button variant="link" className="w-full">
