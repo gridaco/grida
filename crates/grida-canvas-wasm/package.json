@@ -1,36 +1,38 @@
 {
   "name": "@grida/canvas-wasm",
-  "description": "WASM bindings for Grida Canvas",
   "version": "0.90.0-canary.0",
+  "private": false,
+  "description": "WASM bindings for Grida Canvas",
   "keywords": [
-    "grida",
+    "2d",
     "canvas",
+    "grida",
     "wasm",
     "webgl",
-    "webgpu",
-    "2d"
+    "webgpu"
   ],
-  "private": false,
-  "main": "dist/index.js",
+  "homepage": "https://grida.co",
   "license": "Apache-2.0",
   "author": "Grida",
   "repository": "https://github.com/gridaco/grida.git",
-  "homepage": "https://grida.co",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsup",
+    "postbuild": "node ./scripts/postbuild-patch-emscripten-js-glue.cjs",
     "dev": "tsup --watch",
     "serve": "serve -p 4020",
     "test": "vitest run",
     "prepack": "just build",
-    "prepublishOnly": "[ $(du -sk lib 2>/dev/null | cut -f1) -lt 15360 ]"
+    "prepublishOnly": "[ $(du -sk lib 2>/dev/null | cut -f1) -lt 15360 ]",
+    "typecheck": "tsc --noEmit"
   },
-  "files": [
-    "dist"
-  ],
   "devDependencies": {
+    "@types/node": "^22",
     "@webgpu/types": "^0.1.61",
     "serve": "^14.2.4",
-    "tsup": "^8.5.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5"
   }
 }

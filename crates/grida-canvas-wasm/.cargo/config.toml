@@ -1,7 +1,7 @@
 [profile.release]
-opt-level = 3           # optimize for size ("z" has runtime performance impact, keep this 3)
-lto = true              # use link time optimization
-codegen-units = 1       # allow cross-crate inlining & dedup
+opt-level = 3 # optimize for size ("z" has runtime performance impact, keep this 3)
+lto = true # use link time optimization
+codegen-units = 1 # allow cross-crate inlining & dedup
 # NOTE:
 # Newer Rust stable toolchains ship `wasm32-unknown-emscripten` std/core built
 # with `panic=unwind`. If we force `panic=abort` here, rustc fails with:
@@ -10,7 +10,7 @@ codegen-units = 1       # allow cross-crate inlining & dedup
 # with nightly `-Z build-std` (core + panic_abort) for wasm32-unknown-emscripten.
 # `panic=unwind` increases the wasm size by 0.5mb compared to `panic=abort`
 panic = "unwind"
-strip = "symbols"       # strip symbols from final artifact
+strip = "symbols" # strip symbols from final artifact
 debug = false
 
 
@@ -34,31 +34,34 @@ linker = "emcc"
 
 # Linker arguments passed to Emscripten
 rustflags = [
-    # Allow undefined symbols (useful for dynamic linking and Skia integration)
-    "-C", "link-arg=-sERROR_ON_UNDEFINED_SYMBOLS=0",
-    
-    # Currently only targeting web (fs=false)
-    # Target web environment (browser) instead of Node.js
-    # We will be removing this once we figure out to make SSR/CSR not fail.
-    "-C", "link-arg=-sENVIRONMENT=web",
-    
-    # Enable WebGL2 support for hardware-accelerated graphics
-    "-C", "link-arg=-sMAX_WEBGL_VERSION=2",
-    "-C", "link-arg=-sUSE_WEBGL2=1",
-    
-    # Allow dynamic memory growth (important for large graphics operations)
-    "-C", "link-arg=-sALLOW_MEMORY_GROWTH=1",
-    "-C", "link-arg=-sINITIAL_MEMORY=256MB",
-    
-    # Create modular output (factory function instead of global Module)
-    "-C", "link-arg=-sMODULARIZE=1",
-    
-    # Set the export function name for the modular output
-    "-C", "link-arg=-sEXPORT_NAME=createGridaCanvas",
-    
-    # Export specific runtime methods for JavaScript access
-    # GL: WebGL context access
-    # UTF8 functions: String conversion utilities
-    # HEAP functions: Direct memory access for performance-critical operations
-    "-C", "link-arg=-sEXPORTED_RUNTIME_METHODS=['GL','lengthBytesUTF8','stringToUTF8','UTF8ToString','HEAP32','HEAPU8','HEAPU16','HEAPU32','HEAPF32']"
+  # Allow undefined symbols (useful for dynamic linking and Skia integration)
+  "-C",
+  "link-arg=-sERROR_ON_UNDEFINED_SYMBOLS=0",
+  # Currently only targeting web (fs=false)
+  # Target both web (browser) and Node.js.
+  # NOTE: this affects the generated Emscripten JS glue (loader/runtime selection).
+  "-C",
+  "link-arg=-sENVIRONMENT=web,node",
+  # Enable WebGL2 support for hardware-accelerated graphics
+  "-C",
+  "link-arg=-sMAX_WEBGL_VERSION=2",
+  "-C",
+  "link-arg=-sUSE_WEBGL2=1",
+  # Allow dynamic memory growth (important for large graphics operations)
+  "-C",
+  "link-arg=-sALLOW_MEMORY_GROWTH=1",
+  "-C",
+  "link-arg=-sINITIAL_MEMORY=256MB",
+  # Create modular output (factory function instead of global Module)
+  "-C",
+  "link-arg=-sMODULARIZE=1",
+  # Set the export function name for the modular output
+  "-C",
+  "link-arg=-sEXPORT_NAME=createGridaCanvas",
+  # Export specific runtime methods for JavaScript access
+  # GL: WebGL context access
+  # UTF8 functions: String conversion utilities
+  # HEAP functions: Direct memory access for performance-critical operations
+  "-C",
+  "link-arg=-sEXPORTED_RUNTIME_METHODS=['GL','lengthBytesUTF8','stringToUTF8','UTF8ToString','HEAP32','HEAPU8','HEAPU16','HEAPU32','HEAPF32']",
 ]

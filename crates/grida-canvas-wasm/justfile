@@ -71,7 +71,7 @@ info:
     @echo "Configuration:"
     @echo "  - Linker arguments configured in .cargo/config.toml"
     @echo "  - ERROR_ON_UNDEFINED_SYMBOLS=0 (allow undefined symbols)"
-    @echo "  - ENVIRONMENT=web (web environment)"
+    @echo "  - ENVIRONMENT=web,node (web + node environments)"
     @echo "  - MAX_WEBGL_VERSION=2 (WebGL2 support)"
     @echo "  - ALLOW_MEMORY_GROWTH=1 (dynamic memory growth)"
     @echo "  - MODULARIZE=1 (modular output)"
