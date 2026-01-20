@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -12,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { DollarSign, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
   Collapsible,
   CollapsibleContent,
@@ -118,8 +118,10 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
         </div>
 
         <div className="grid md:grid-cols-2 gap-4 p-4 border rounded-md">
-          <div>
-            <Label htmlFor="conversion-currency">Conversion Currency</Label>
+          <Field>
+            <FieldLabel htmlFor="conversion-currency">
+              Conversion Currency
+            </FieldLabel>
             <Select
               value={data.conversion_currency}
               onValueChange={(value) =>
@@ -137,10 +139,10 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
-          <div>
-            <Label htmlFor="conversion-value">Conversion Value</Label>
+          <Field>
+            <FieldLabel htmlFor="conversion-value">Conversion Value</FieldLabel>
             <Input
               id="conversion-value"
               type="number"
@@ -154,10 +156,10 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
                 })
               }
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <FieldDescription>
               The estimated value of each successful referral conversion.
-            </p>
-          </div>
+            </FieldDescription>
+          </Field>
         </div>
 
         <Collapsible

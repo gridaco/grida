@@ -931,7 +931,10 @@ export type EditorSurface_StartGesture = {
         selection: string | string[];
       })
     | Pick<editor.gesture.GesturePadding, "type" | "node_id" | "side">
-    | Pick<editor.gesture.GestureCornerRadius, "type" | "node_id" | "anchor" | "altKey">
+    | Pick<
+        editor.gesture.GestureCornerRadius,
+        "type" | "node_id" | "anchor" | "altKey"
+      >
     | Pick<
         editor.gesture.GestureCurve,
         "type" | "control" | "node_id" | "segment"

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Pencil2Icon } from "@radix-ui/react-icons";
@@ -99,7 +100,8 @@ function UpdateNameDialog({
             This update will affect all live sites currently using this domain
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4 flex flex-col gap-2">
+        <Field className="py-4">
+          <FieldLabel className="sr-only">Domain name</FieldLabel>
           <div className="flex h-9 items-center border rounded-md px-3 py-1 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 bg-muted">
             <Input
               className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-0 shadow-none"
@@ -115,15 +117,15 @@ function UpdateNameDialog({
               .grida.site
             </span>
           </div>
-          <p
+          <FieldDescription
             data-error={!!error}
             className="text-xs text-muted-foreground data-[error=true]:text-destructive"
           >
             {error
               ? error
               : "lowercase letters, numbers, and dashes are allowed"}
-          </p>
-        </div>
+          </FieldDescription>
+        </Field>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="ghost" size="sm">

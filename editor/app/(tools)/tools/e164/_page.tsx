@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -118,34 +118,36 @@ export default function PhoneNumberTool() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="country">Select Country Code</Label>
-              <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a country" />
-                </SelectTrigger>
-                <SelectContent>
-                  {countries.map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor="country">Select Country Code</FieldLabel>
+                <Select value={country} onValueChange={setCountry}>
+                  <SelectTrigger id="country">
+                    <SelectValue placeholder="Select a country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <div className="grid gap-2">
-              <Label htmlFor="phoneNumbers">
-                Enter phone numbers (one per line)
-              </Label>
-              <Textarea
-                id="phoneNumbers"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Enter phone numbers here..."
-                className="min-h-[200px]"
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="phoneNumbers">
+                  Enter phone numbers (one per line)
+                </FieldLabel>
+                <Textarea
+                  id="phoneNumbers"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Enter phone numbers here..."
+                  className="min-h-[200px]"
+                />
+              </Field>
+            </FieldGroup>
           </CardContent>
           <CardFooter className="flex gap-2">
             <Button onClick={processPhoneNumbers} className="flex-1">

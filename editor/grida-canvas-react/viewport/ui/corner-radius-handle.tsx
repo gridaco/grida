@@ -50,11 +50,14 @@ export function NodeOverlayCornerRadiusHandle({
   }, [node, anchor]);
 
   // Mathematical constants: computed once per size change
-  const labelOffsets = useMemo(() => ({
-    X: size / 2 + 4,
-    Y_TOP: size / 2 + 4,
-    Y_BOTTOM: size / 2 + 20,
-  }), [size]);
+  const labelOffsets = useMemo(
+    () => ({
+      X: size / 2 + 4,
+      Y_TOP: size / 2 + 4,
+      Y_BOTTOM: size / 2 + 20,
+    }),
+    [size]
+  );
 
   // Shared geometry calculations: compute once, use multiple times
   const geometry = useMemo(() => {
@@ -106,7 +109,15 @@ export function NodeOverlayCornerRadiusHandle({
       M_x,
       M_y,
     };
-  }, [editor.geometryProvider, node_id, anchor, currentRadius, transform, size, margin]);
+  }, [
+    editor.geometryProvider,
+    node_id,
+    anchor,
+    currentRadius,
+    transform,
+    size,
+    margin,
+  ]);
 
   // Calculate handle position: at arc center O when radius >= margin, otherwise at corner with margin
   const handleStyle = useMemo(() => {
@@ -180,10 +191,22 @@ export function NodeOverlayCornerRadiusHandle({
 
     // Margin-based: label inside direction from handle
     const labelPositions = {
-      nw: { top: `${minmargin + labelOffsets.Y_TOP}px`, left: `${minmargin + labelOffsets.X}px` },
-      ne: { top: `${minmargin + labelOffsets.Y_TOP}px`, right: `${minmargin + labelOffsets.X}px` },
-      se: { bottom: `${minmargin + labelOffsets.X}px`, right: `${minmargin + labelOffsets.X}px` },
-      sw: { bottom: `${minmargin + labelOffsets.X}px`, left: `${minmargin + labelOffsets.X}px` },
+      nw: {
+        top: `${minmargin + labelOffsets.Y_TOP}px`,
+        left: `${minmargin + labelOffsets.X}px`,
+      },
+      ne: {
+        top: `${minmargin + labelOffsets.Y_TOP}px`,
+        right: `${minmargin + labelOffsets.X}px`,
+      },
+      se: {
+        bottom: `${minmargin + labelOffsets.X}px`,
+        right: `${minmargin + labelOffsets.X}px`,
+      },
+      sw: {
+        bottom: `${minmargin + labelOffsets.X}px`,
+        left: `${minmargin + labelOffsets.X}px`,
+      },
     } as const;
 
     return labelPositions[anchor];

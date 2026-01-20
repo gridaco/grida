@@ -20,7 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Slider } from "@/components/ui/slider";
 import cmath from "@grida/cmath";
 import kolor from "@grida/color";
@@ -241,14 +241,14 @@ function BrushDetailDialog({
       {/*  */}
       <DialogContent className="flex">
         <aside className="flex-1 flex flex-col p-4 gap-4">
-          <div className="grid gap-2">
-            <Label className="text-xs">Hardness</Label>
+          <Field>
+            <FieldLabel className="text-xs">Hardness</FieldLabel>
             <Slider min={0} max={100} />
-          </div>
-          <div className="grid gap-2">
-            <Label className="text-xs">Spacing</Label>
+          </Field>
+          <Field>
+            <FieldLabel className="text-xs">Spacing</FieldLabel>
             <Slider min={0} max={100} />
-          </div>
+          </Field>
         </aside>
         <aside className="flex-1">
           <img
@@ -265,7 +265,6 @@ function BrushDetailDialog({
 function BrushItem({
   selected,
   className,
-  brush,
   thumbnail,
   label,
   ...props
@@ -273,7 +272,6 @@ function BrushItem({
   selected?: boolean;
   label: string;
   thumbnail: string;
-  brush?: BitmapEditorBrush;
 }) {
   return (
     <div

@@ -5,8 +5,8 @@ import Image from "next/image";
 import { Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/components/lib/utils";
@@ -267,9 +267,9 @@ export default function OrderPage() {
               <h2 className="text-xl font-semibold mb-4">
                 Enter Order Details
               </h2>
-              <div className="grid gap-4">
-                <div>
-                  <Label htmlFor="quantity">Quantity</Label>
+              <FieldGroup className="gap-4">
+                <Field>
+                  <FieldLabel htmlFor="quantity">Quantity</FieldLabel>
                   <Input
                     id="quantity"
                     name="quantity"
@@ -281,9 +281,11 @@ export default function OrderPage() {
                     onChange={handleInputChange}
                     required
                   />
-                </div>
-                <div>
-                  <Label htmlFor="customization">Customization Details</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="customization">
+                    Customization Details
+                  </FieldLabel>
                   <Textarea
                     id="customization"
                     name="customization"
@@ -291,8 +293,8 @@ export default function OrderPage() {
                     onChange={handleInputChange}
                     placeholder="Enter any specific customization requests"
                   />
-                </div>
-              </div>
+                </Field>
+              </FieldGroup>
             </section>
 
             <section>

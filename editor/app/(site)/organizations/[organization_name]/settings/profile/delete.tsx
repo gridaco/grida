@@ -12,7 +12,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 export function DeleteOrganizationConfirm({
@@ -45,10 +45,10 @@ export function DeleteOrganizationConfirm({
           method="post"
           onSubmit={() => setBusy(true)}
         >
-          <div className="grid gap-2">
-            <Label htmlFor="confirm">
+          <Field>
+            <FieldLabel htmlFor="confirm">
               Enter this organization’s name to confirm
-            </Label>
+            </FieldLabel>
             <Input
               id="confirm"
               name="confirm"
@@ -56,7 +56,7 @@ export function DeleteOrganizationConfirm({
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
             />
-          </div>
+          </Field>
         </form>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>

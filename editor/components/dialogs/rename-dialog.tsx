@@ -13,8 +13,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 // Update the interface to allow for Promise<boolean> return type
 interface RenameDialogProps {
@@ -83,11 +88,11 @@ export function RenameDialog({
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name" className="text-left">
+          <FieldGroup className="py-4 gap-4">
+            <Field>
+              <FieldLabel htmlFor="name" className="text-left">
                 Name
-              </Label>
+              </FieldLabel>
               <Input
                 id="name"
                 value={name}
@@ -100,9 +105,9 @@ export function RenameDialog({
                 autoFocus
                 disabled={isLoading}
               />
-              {error && <p className="text-sm text-red-500">{error}</p>}
-            </div>
-          </div>
+              <FieldError>{error}</FieldError>
+            </Field>
+          </FieldGroup>
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={isLoading}>

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Plus,
   Target,
@@ -405,12 +405,12 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                       <Trash2 className="size-4" />
                     </Button>
 
-                    <div className="grid gap-4">
+                    <FieldGroup className="gap-4">
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor={`goal-trigger-${index}`}>
+                        <Field>
+                          <FieldLabel htmlFor={`goal-trigger-${index}`}>
                             Trigger
-                          </Label>
+                          </FieldLabel>
                           <Select
                             value={goal.trigger_name}
                             onValueChange={(value) =>
@@ -431,13 +431,13 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                               ))}
                             </SelectContent>
                           </Select>
-                        </div>
+                        </Field>
 
                         {index > 0 && (
-                          <div>
-                            <Label htmlFor={`goal-depends-${index}`}>
+                          <Field>
+                            <FieldLabel htmlFor={`goal-depends-${index}`}>
                               Depends On
-                            </Label>
+                            </FieldLabel>
                             <Select
                               value={goal.depends_on || ""}
                               onValueChange={(value) =>
@@ -463,14 +463,14 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                                   ))}
                               </SelectContent>
                             </Select>
-                          </div>
+                          </Field>
                         )}
                       </div>
 
-                      <div>
-                        <Label htmlFor={`goal-desc-${index}`}>
+                      <Field>
+                        <FieldLabel htmlFor={`goal-desc-${index}`}>
                           Description
-                        </Label>
+                        </FieldLabel>
                         <Textarea
                           id={`goal-desc-${index}`}
                           placeholder="Describe what the user needs to do..."
@@ -480,8 +480,8 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                           }
                           rows={2}
                         />
-                      </div>
-                    </div>
+                      </Field>
+                    </FieldGroup>
                   </div>
                 ))}
               </div>
@@ -652,12 +652,12 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                       <Trash2 className="size-4" />
                     </Button>
 
-                    <div className="grid gap-4">
+                    <FieldGroup className="gap-4">
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor={`goal-trigger-${index}`}>
+                        <Field>
+                          <FieldLabel htmlFor={`goal-trigger-${index}`}>
                             Trigger
-                          </Label>
+                          </FieldLabel>
                           <Select
                             value={goal.trigger_name}
                             onValueChange={(value) =>
@@ -678,13 +678,13 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                               ))}
                             </SelectContent>
                           </Select>
-                        </div>
+                        </Field>
 
                         {index > 0 && (
-                          <div>
-                            <Label htmlFor={`goal-depends-${index}`}>
+                          <Field>
+                            <FieldLabel htmlFor={`goal-depends-${index}`}>
                               Depends On
-                            </Label>
+                            </FieldLabel>
                             <Select
                               value={goal.depends_on || ""}
                               onValueChange={(value) =>
@@ -710,14 +710,14 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                                   ))}
                               </SelectContent>
                             </Select>
-                          </div>
+                          </Field>
                         )}
                       </div>
 
-                      <div>
-                        <Label htmlFor={`goal-desc-${index}`}>
+                      <Field>
+                        <FieldLabel htmlFor={`goal-desc-${index}`}>
                           Description
-                        </Label>
+                        </FieldLabel>
                         <Textarea
                           id={`goal-desc-${index}`}
                           placeholder="Describe what the user needs to do..."
@@ -727,8 +727,8 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                           }
                           rows={2}
                         />
-                      </div>
-                    </div>
+                      </Field>
+                    </FieldGroup>
                   </div>
                 ))}
               </div>

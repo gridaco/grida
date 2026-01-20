@@ -101,11 +101,17 @@ export function PhoneCountryPicker({
         <Button
           type="button"
           variant="outline"
-          className={cn("w-full justify-between gap-2 px-3 focus:z-10", className)}
+          className={cn(
+            "w-full justify-between gap-2 px-3 focus:z-10",
+            className
+          )}
           disabled={disabled}
         >
           <span className="flex min-w-0 items-center gap-2">
-            <FlagComponent country={selectedCountry} countryName={selectedLabel} />
+            <FlagComponent
+              country={selectedCountry}
+              countryName={selectedLabel}
+            />
             <span className="line-clamp-1 text-left">{selectedLabel}</span>
             <span className="ml-auto shrink-0 text-sm text-foreground/50">{`+${RPNInput.getCountryCallingCode(
               selectedCountry
@@ -143,4 +149,3 @@ export function PhoneCountryPicker({
     </Popover>
   );
 }
-

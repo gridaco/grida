@@ -6,8 +6,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -114,8 +114,8 @@ export function AuthPolicyForm({ policyId }: AuthPolicyFormProps) {
       <Card>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Policy Name</Label>
+            <Field>
+              <FieldLabel htmlFor="name">Policy Name</FieldLabel>
               <Input
                 id="name"
                 name="name"
@@ -124,24 +124,27 @@ export function AuthPolicyForm({ policyId }: AuthPolicyFormProps) {
                 onChange={handleInputChange}
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="enabled">Status</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="enabled">Status</FieldLabel>
               <div className="flex items-center space-x-2 pt-2">
                 <Switch
                   id="enabled"
                   checked={formData.enabled}
                   onCheckedChange={handleEnabledChange}
                 />
-                <Label htmlFor="enabled" className="cursor-pointer">
+                <label
+                  htmlFor="enabled"
+                  className="cursor-pointer text-sm font-medium"
+                >
                   {formData.enabled ? "Enabled" : "Disabled"}
-                </Label>
+                </label>
               </div>
-            </div>
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+          <Field>
+            <FieldLabel htmlFor="description">Description</FieldLabel>
             <Textarea
               id="description"
               name="description"
@@ -150,10 +153,10 @@ export function AuthPolicyForm({ policyId }: AuthPolicyFormProps) {
               onChange={handleInputChange}
               rows={2}
             />
-          </div>
+          </Field>
 
           <div className="space-y-2">
-            <Label>Access Scopes</Label>
+            <FieldLabel>Access Scopes</FieldLabel>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {availableScopes.map((scope) => (
                 <div key={scope.id} className="flex items-center space-x-2">
@@ -164,31 +167,31 @@ export function AuthPolicyForm({ policyId }: AuthPolicyFormProps) {
                       handleScopeToggle(scope.id, checked as boolean)
                     }
                   />
-                  <Label
+                  <label
                     htmlFor={`scope-${scope.id}`}
                     className="cursor-pointer"
                   >
                     {scope.label}
-                  </Label>
+                  </label>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="challenges">
+          <Field>
+            <FieldLabel htmlFor="challenges">
               Challenges (JSON)
               <span className="text-xs text-muted-foreground ml-2">
                 Define authentication challenges in JSON format
               </span>
-            </Label>
+            </FieldLabel>
             <AuthPolicyJsonEditor
               defaultValue={formData.challenges}
               onValueChange={(challenges) => {
                 setFormData({ ...formData, challenges });
               }}
             />
-          </div>
+          </Field>
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button

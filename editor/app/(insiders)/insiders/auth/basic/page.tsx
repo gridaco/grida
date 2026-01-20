@@ -7,8 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { GridaLogo } from "@/components/grida-logo";
 import Link from "next/link";
 
@@ -64,25 +64,30 @@ function Form({ searchParams }: { searchParams: SerachParams }) {
             <input type="hidden" name="next" value={searchParams.next} />
             <div className="grid gap-6">
               <div className="grid gap-6">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="insider@grida.co"
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Input
-                    id="password"
-                    name="password"
-                    placeholder="password"
-                    type="password"
-                    required
-                  />
-                </div>
+                <FieldGroup className="gap-6">
+                  <Field>
+                    <FieldLabel htmlFor="email">Email</FieldLabel>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="insider@grida.co"
+                      required
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="password" className="sr-only">
+                      Password
+                    </FieldLabel>
+                    <Input
+                      id="password"
+                      name="password"
+                      placeholder="password"
+                      type="password"
+                      required
+                    />
+                  </Field>
+                </FieldGroup>
                 <Button type="submit" className="w-full">
                   Login
                 </Button>

@@ -13,8 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { notFound, redirect } from "next/navigation";
 import { GridaLogo } from "@/components/grida-logo";
 import { DeleteOrganizationConfirm } from "./delete";
@@ -65,52 +65,56 @@ export default async function OrganizationsSettingsProfilePage({
             action={`/private/accounts/organizations/${organization_name}/profile`}
             encType="multipart/form-data"
             method="POST"
-            className="flex flex-col gap-10 py-4"
+            className="py-4"
           >
-            <div className="grid gap-2">
-              <Label>Name</Label>
-              <Input disabled readOnly value={data.name} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="display_name">Organization display name</Label>
-              <Input
-                id="display_name"
-                name="display_name"
-                required
-                placeholder="Organization display name"
-                defaultValue={data.display_name ?? undefined}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email (will be public)</Label>
-              <Input
-                type="email"
-                id="email"
-                name="email"
-                required
-                placeholder="alice@acme.com"
-                defaultValue={data.email ?? undefined}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Input
-                id="description"
-                name="description"
-                placeholder="Organization description"
-                defaultValue={data.description ?? undefined}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="blog">URL</Label>
-              <Input
-                type="url"
-                id="blog"
-                name="blog"
-                placeholder="https://acme.com"
-                defaultValue={data.blog ?? undefined}
-              />
-            </div>
+            <FieldGroup className="gap-10">
+              <Field>
+                <FieldLabel>Name</FieldLabel>
+                <Input disabled readOnly value={data.name} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="display_name">
+                  Organization display name
+                </FieldLabel>
+                <Input
+                  id="display_name"
+                  name="display_name"
+                  required
+                  placeholder="Organization display name"
+                  defaultValue={data.display_name ?? undefined}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="email">Email (will be public)</FieldLabel>
+                <Input
+                  type="email"
+                  id="email"
+                  name="email"
+                  required
+                  placeholder="alice@acme.com"
+                  defaultValue={data.email ?? undefined}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="description">Description</FieldLabel>
+                <Input
+                  id="description"
+                  name="description"
+                  placeholder="Organization description"
+                  defaultValue={data.description ?? undefined}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="blog">URL</FieldLabel>
+                <Input
+                  type="url"
+                  id="blog"
+                  name="blog"
+                  placeholder="https://acme.com"
+                  defaultValue={data.blog ?? undefined}
+                />
+              </Field>
+            </FieldGroup>
           </form>
         </CardContent>
         <CardFooter className="flex justify-end items-center border-t pt-6">

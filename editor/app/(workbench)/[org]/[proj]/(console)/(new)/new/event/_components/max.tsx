@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 interface CapacityDialogProps {
   defaultCapacity?: number;
@@ -50,8 +50,8 @@ export function MaxDialog({
         </DialogDescription>
 
         <div className="space-y-6 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="capacity">Maximum Attendees</Label>
+          <Field>
+            <FieldLabel htmlFor="capacity">Maximum Attendees</FieldLabel>
             <Input
               id="capacity"
               type="number"
@@ -61,7 +61,7 @@ export function MaxDialog({
               }
               min={1}
             />
-          </div>
+          </Field>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">

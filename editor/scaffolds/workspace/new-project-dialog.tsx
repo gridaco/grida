@@ -12,8 +12,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useDebounce } from "@uidotdev/usehooks";
 import React, { useEffect, useState } from "react";
 
@@ -88,8 +88,8 @@ export function CreateNewProjectDialog({
             setBusy(true);
           }}
         >
-          <div className="grid gap-2">
-            <Label htmlFor="name">Project name</Label>
+          <Field>
+            <FieldLabel htmlFor="name">Project name</FieldLabel>
             <div className="relative">
               <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center">
                 {pending && (
@@ -107,13 +107,13 @@ export function CreateNewProjectDialog({
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <span
+            <FieldDescription
               data-error={error}
-              className="text-muted-foreground text-sm data-[error='true']:text-destructive"
+              className="data-[error='true']:text-destructive"
             >
               {message}
-            </span>
-          </div>
+            </FieldDescription>
+          </Field>
         </form>
         <DialogFooter>
           <DialogClose>

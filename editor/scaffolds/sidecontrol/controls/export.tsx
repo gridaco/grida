@@ -38,7 +38,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 
 /**
  * Available scale presets for auto-assignment when adding new export configs
@@ -642,9 +642,9 @@ function ExportConfigPopoverContent({
 
   return (
     <PopoverContent align="end" side="left" className="w-64">
-      <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label>Suffix</Label>
+      <FieldGroup className="gap-4">
+        <Field>
+          <FieldLabel>Suffix</FieldLabel>
           <Input
             placeholder="e.g., @2x, -dark"
             value={suffix}
@@ -652,10 +652,10 @@ function ExportConfigPopoverContent({
             disabled={disabled}
             className={WorkbenchUI.inputVariants({ size: "xs" })}
           />
-        </div>
+        </Field>
         {editorTypes.internal.export_settings.supportsQuality(format) && (
-          <div className="grid gap-2">
-            <Label>Quality</Label>
+          <Field>
+            <FieldLabel>Quality</FieldLabel>
             <PropertyEnum
               value={getQualityLabel(quality)}
               onValueChange={handleQualityChange}
@@ -663,10 +663,10 @@ function ExportConfigPopoverContent({
               placeholder="High"
               enum={["High", "Medium", "Low"]}
             />
-          </div>
+          </Field>
         )}
-        <div className="grid gap-2">
-          <Label>Constraint</Label>
+        <Field>
+          <FieldLabel>Constraint</FieldLabel>
           <PropertyEnum<
             grida.program.document.NodeExportSettingsConstraints["type"]
           >
@@ -704,8 +704,8 @@ function ExportConfigPopoverContent({
               className={WorkbenchUI.inputVariants({ size: "xs" })}
             />
           )}
-        </div>
-      </div>
+        </Field>
+      </FieldGroup>
     </PopoverContent>
   );
 }

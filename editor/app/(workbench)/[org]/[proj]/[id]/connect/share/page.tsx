@@ -11,6 +11,7 @@ import {
   SectorHeader,
   SectorHeading,
 } from "@/components/preferences";
+import { Field, FieldGroup, FieldTitle } from "@/components/ui/field";
 import { useEditorState } from "@/scaffolds/editor";
 import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
 import React from "react";
@@ -43,20 +44,20 @@ export default function WithLink() {
           <PreferenceBox>
             <PreferenceBoxHeader heading={<>Built-in Page URL</>} />
             <PreferenceBody>
-              <div className="w-full flex flex-col gap-4">
-                <div className="grid gap-2">
-                  <label className="text-sm text-muted-foreground">
+              <FieldGroup className="gap-4">
+                <Field>
+                  <FieldTitle className="text-sm text-muted-foreground">
                     Your custom domain URL (may change)
-                  </label>
+                  </FieldTitle>
                   <CopyToClipboardInput value={url_tenant} />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm text-muted-foreground">
+                </Field>
+                <Field>
+                  <FieldTitle className="text-sm text-muted-foreground">
                     Static URL (always available)
-                  </label>
+                  </FieldTitle>
                   <CopyToClipboardInput value={url} />
-                </div>
-              </div>
+                </Field>
+              </FieldGroup>
             </PreferenceBody>
           </PreferenceBox>
           <PreferenceBox>

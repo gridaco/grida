@@ -1,7 +1,7 @@
 "use client";
 
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Gift } from "lucide-react";
 
 interface InviteeRewardStepProps {
@@ -60,8 +60,8 @@ export function InviteeRewardStep({
         </p>
 
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="invitee-value">Reward Value</Label>
+          <Field>
+            <FieldLabel htmlFor="invitee-value">Reward Value</FieldLabel>
             <Input
               id="invitee-value"
               type="number"
@@ -75,13 +75,13 @@ export function InviteeRewardStep({
                 )
               }
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <FieldDescription className="text-xs text-muted-foreground mt-1">
               The amount of {getCurrencyLabel()} the invitee will receive.
-            </p>
-          </div>
+            </FieldDescription>
+          </Field>
 
-          <div>
-            <Label htmlFor="invitee-description">Description</Label>
+          <Field>
+            <FieldLabel htmlFor="invitee-description">Description</FieldLabel>
             <Input
               id="invitee-description"
               placeholder={`${data.invitee_onboarding_reward.value} ${getCurrencyLabel()} welcome bonus`}
@@ -90,10 +90,10 @@ export function InviteeRewardStep({
                 updateInviteeReward("description", e.target.value)
               }
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <FieldDescription className="text-xs text-muted-foreground mt-1">
               This will be shown to invitees when they join.
-            </p>
-          </div>
+            </FieldDescription>
+          </Field>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Platform } from "@/lib/platform";
 import { Smile } from "lucide-react";
@@ -35,8 +35,8 @@ export function GeneralStep({ data, updateData }: GeneralStepProps) {
       </div>
 
       <div className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="title">Campaign Title</Label>
+        <Field>
+          <FieldLabel htmlFor="title">Campaign Title</FieldLabel>
           <Input
             id="title"
             placeholder="Spring 2025 Referral Program"
@@ -46,13 +46,13 @@ export function GeneralStep({ data, updateData }: GeneralStepProps) {
             maxLength={40}
             required
           />
-          <p className="text-xs text-muted-foreground">
+          <FieldDescription className="text-xs text-muted-foreground">
             This title will be visible to your users.
-          </p>
-        </div>
+          </FieldDescription>
+        </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="description">Campaign Description</Label>
+        <Field>
+          <FieldLabel htmlFor="description">Campaign Description</FieldLabel>
           <Textarea
             id="description"
             placeholder="Describe the purpose and goals of this campaign..."
@@ -60,10 +60,10 @@ export function GeneralStep({ data, updateData }: GeneralStepProps) {
             onChange={(e) => updateData({ description: e.target.value })}
             rows={4}
           />
-          <p className="text-xs text-muted-foreground">
+          <FieldDescription className="text-xs text-muted-foreground">
             This description is visible to your users.
-          </p>
-        </div>
+          </FieldDescription>
+        </Field>
       </div>
     </div>
   );

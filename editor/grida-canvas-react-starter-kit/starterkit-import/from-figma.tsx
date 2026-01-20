@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import * as Figma from "figma-api";
 import { Label } from "@/components/ui/label";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
   Dialog,
   DialogClose,
@@ -457,8 +458,8 @@ function FigmaApiImportTab({
         onSubmit={onSubmit}
         className="flex flex-col gap-4"
       >
-        <div className="grid gap-2">
-          <Label>Import from Node URL</Label>
+        <Field>
+          <FieldLabel>Import from Node URL</FieldLabel>
           <Input
             type="url"
             placeholder="https://www.figma.com/design/xxxxx/xxxx?node-id=123-456"
@@ -471,25 +472,25 @@ function FigmaApiImportTab({
                 );
                 form.current!.filekey.value = filekey;
                 form.current!.nodeid.value = nodeid;
-              } catch (e) {}
+              } catch {}
             }}
           />
-          <p className="text-xs text-muted-foreground">
+          <FieldDescription className="text-xs text-muted-foreground">
             Tip: Press Cmd/Ctrl + L in Figma to copy the selection URL
-          </p>
-        </div>
+          </FieldDescription>
+        </Field>
         <hr />
-        <div className="grid gap-2">
-          <Label>File Key</Label>
+        <Field>
+          <FieldLabel>File Key</FieldLabel>
           <Input
             name="filekey"
             required
             type="text"
             placeholder="xxxxxxxxxxxxxxxxxxxxxx"
           />
-        </div>
-        <div className="grid gap-2">
-          <Label>Node ID</Label>
+        </Field>
+        <Field>
+          <FieldLabel>Node ID</FieldLabel>
           <Input
             name="nodeid"
             required
@@ -497,12 +498,12 @@ function FigmaApiImportTab({
             placeholder="123:456"
             pattern="[0-9:]+"
           />
-          <p className="text-xs text-muted-foreground">
+          <FieldDescription className="text-xs text-muted-foreground">
             Import any selection (frames, shapes, groups, etc.)
-          </p>
-        </div>
-        <div className="grid gap-2">
-          <Label>Personal Access Token</Label>
+          </FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel>Personal Access Token</FieldLabel>
           <Input
             name="token"
             required
@@ -511,7 +512,7 @@ function FigmaApiImportTab({
             onChange={(e) => setToken(e.target.value)}
             placeholder="figd_xxxxxxxxxxxx"
           />
-        </div>
+        </Field>
       </form>
 
       <DialogFooter>

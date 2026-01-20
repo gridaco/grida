@@ -10,8 +10,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useDebounce } from "@uidotdev/usehooks";
 import Link from "next/link";
 import { Spinner } from "@/components/ui/spinner";
@@ -86,8 +86,8 @@ export default function NewOrganizationSetupPage(props: {
           setBusy(true);
         }}
       >
-        <div className="grid gap-2">
-          <Label htmlFor="name">Organization name</Label>
+        <Field>
+          <FieldLabel htmlFor="name">Organization name</FieldLabel>
           <div className="relative">
             <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center">
               {pending && (
@@ -105,15 +105,15 @@ export default function NewOrganizationSetupPage(props: {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <span
+          <FieldDescription
             data-error={error}
-            className="text-muted-foreground text-sm data-[error='true']:text-destructive"
+            className="data-[error='true']:text-destructive"
           >
             {message}
-          </span>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="email">Contact email</Label>
+          </FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="email">Contact email</FieldLabel>
           <Input
             id="email"
             name="email"
@@ -122,10 +122,10 @@ export default function NewOrganizationSetupPage(props: {
             pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
             //
           />
-          <span className="text-muted-foreground text-sm">
+          <FieldDescription>
             This will be the name of your account on Grida.
-          </span>
-        </div>
+          </FieldDescription>
+        </Field>
         <footer className="w-full py-10 border-t">
           <Submit disabled={!valid || busy} />
         </footer>

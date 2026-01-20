@@ -1,7 +1,7 @@
 "use client";
 
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,25 +83,25 @@ function Info() {
         <CardDescription>This is shown to your customers</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-6">
-          <div className="grid gap-3">
-            <Label htmlFor="name">Name</Label>
+        <FieldGroup className="gap-6">
+          <Field>
+            <FieldLabel htmlFor="name">Name</FieldLabel>
             <Input
               id="name"
               type="text"
               className="w-full"
               placeholder="Product Name"
             />
-          </div>
-          <div className="grid gap-3">
-            <Label htmlFor="description">Description</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="description">Description</FieldLabel>
             <Textarea
               id="description"
               className="min-h-32"
               placeholder="Product Description"
             />
-          </div>
-        </div>
+          </Field>
+        </FieldGroup>
       </CardContent>
     </Card>
   );
@@ -316,8 +316,8 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
   return (
     <Card className="shadow-none">
       <CardContent className="pt-4 flex flex-col gap-6">
-        <Label className="grid gap-3">
-          Option Name
+        <Field>
+          <FieldLabel>Option Name</FieldLabel>
           <Input
             type="text"
             className="w-full"
@@ -325,9 +325,9 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
             placeholder="Size, Color, etc."
             onChange={(e) => handleNameChange(e.target.value)}
           />
-        </Label>
-        <Label className="grid gap-3">
-          Option Values
+        </Field>
+        <Field>
+          <FieldLabel>Option Values</FieldLabel>
           <fieldset className="w-full flex flex-col gap-2">
             {values.map((value, i) => (
               <div key={i} className="flex gap-2">
@@ -357,7 +357,7 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
               </div>
             ))}
           </fieldset>
-        </Label>
+        </Field>
       </CardContent>
       <CardFooter>
         <Button variant="ghost" size="sm" onClick={onDelete}>
