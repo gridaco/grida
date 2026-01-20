@@ -61,7 +61,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { StandaloneMediaView } from "@/components/mediaviewer";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -602,8 +602,8 @@ function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
             mkdir(name);
           }}
         >
-          <div className="grid gap-2">
-            <Label>Name</Label>
+          <Field>
+            <FieldLabel>Name</FieldLabel>
             <Input
               autoFocus
               autoComplete="off"
@@ -614,7 +614,7 @@ function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-          </div>
+          </Field>
         </form>
         <hr />
         <DialogFooter>

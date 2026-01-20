@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { ArrowRight, Upload, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -85,17 +86,19 @@ export default function CustomOrderPage() {
       >
         {currentStep === 0 && (
           <div className="space-y-6">
-            <div>
-              <Label htmlFor="projectName">Project Name</Label>
+            <Field>
+              <FieldLabel htmlFor="projectName">Project Name</FieldLabel>
               <Input id="projectName" placeholder="Enter your project name" />
-            </div>
-            <div>
-              <Label htmlFor="projectDescription">Project Description</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="projectDescription">
+                Project Description
+              </FieldLabel>
               <Textarea
                 id="projectDescription"
                 placeholder="Describe your project in detail"
               />
-            </div>
+            </Field>
             <div>
               <Label>Project Type</Label>
               <RadioGroup defaultValue="branding">
@@ -120,27 +123,33 @@ export default function CustomOrderPage() {
 
         {currentStep === 1 && (
           <div className="space-y-6">
-            <div>
-              <Label htmlFor="stylePreference">Style Preference</Label>
+            <Field>
+              <FieldLabel htmlFor="stylePreference">
+                Style Preference
+              </FieldLabel>
               <Input
                 id="stylePreference"
                 placeholder="e.g., Modern, Vintage, Minimalist"
               />
-            </div>
-            <div>
-              <Label htmlFor="colorScheme">Preferred Color Scheme</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="colorScheme">
+                Preferred Color Scheme
+              </FieldLabel>
               <Input
                 id="colorScheme"
                 placeholder="e.g., Blue and white, Earth tones"
               />
-            </div>
-            <div>
-              <Label htmlFor="inspiration">Inspiration or Examples</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="inspiration">
+                Inspiration or Examples
+              </FieldLabel>
               <Textarea
                 id="inspiration"
                 placeholder="Share links or descriptions of designs you like"
               />
-            </div>
+            </Field>
           </div>
         )}
 

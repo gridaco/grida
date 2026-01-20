@@ -107,7 +107,10 @@ export function CreateNewProjectDialog({
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <FieldDescription data-error={error} className="data-[error='true']:text-destructive">
+            <FieldDescription
+              data-error={error}
+              className="data-[error='true']:text-destructive"
+            >
               {message}
             </FieldDescription>
           </Field>

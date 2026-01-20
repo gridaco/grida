@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -126,8 +126,8 @@ function ConnectStoreForm() {
           <h4>
             <span>Create New Store for this Form</span>
           </h4>
-          <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
+          <Field>
+            <FieldLabel htmlFor="name">Name</FieldLabel>
             <Input
               id="name"
               name="name"
@@ -135,7 +135,7 @@ function ConnectStoreForm() {
               defaultValue={generated_form_store_name(state.form.form_title)}
               placeholder="Store Name"
             />
-          </div>
+          </Field>
         </>
       )}
     </form>

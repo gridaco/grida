@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -226,27 +227,29 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
 
                 {data.reward_currency_type === "custom" && (
                   <div className="mt-2">
-                    <Label htmlFor="custom-currency" className="text-sm">
-                      Custom Currency Name
-                    </Label>
-                    <Select
-                      value={data.reward_currency}
-                      onValueChange={(value) =>
-                        updateData({ reward_currency: value })
-                      }
-                    >
-                      <SelectTrigger id="custom-currency" className="mt-1">
-                        <SelectValue placeholder="Select currency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="XTS">XTS</SelectItem>
-                        <SelectItem value="Points">Points</SelectItem>
-                        <SelectItem value="Credits">Credits</SelectItem>
-                        <SelectItem value="Coins">Coins</SelectItem>
-                        <SelectItem value="Stars">Stars</SelectItem>
-                        <SelectItem value="Gems">Gems</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Field>
+                      <FieldLabel htmlFor="custom-currency" className="text-sm">
+                        Custom Currency Name
+                      </FieldLabel>
+                      <Select
+                        value={data.reward_currency}
+                        onValueChange={(value) =>
+                          updateData({ reward_currency: value })
+                        }
+                      >
+                        <SelectTrigger id="custom-currency" className="mt-1">
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="XTS">XTS</SelectItem>
+                          <SelectItem value="Points">Points</SelectItem>
+                          <SelectItem value="Credits">Credits</SelectItem>
+                          <SelectItem value="Coins">Coins</SelectItem>
+                          <SelectItem value="Stars">Stars</SelectItem>
+                          <SelectItem value="Gems">Gems</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
                   </div>
                 )}
               </div>

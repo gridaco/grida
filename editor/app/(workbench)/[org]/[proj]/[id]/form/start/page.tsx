@@ -9,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet-without-overlay";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -223,7 +224,7 @@ function StartPageEditor({ template_id }: { template_id: string }) {
         <FormEditorAgentThemeProvider>
           <div className="w-full px-10 overflow-scroll">
             <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">
-              <SandboxWrapper className="pointer-events-auto rounded-2xl shadow-2xl border overflow-hidden hover:outline hover:outline-2 hover:outline-workbench-accent-sky">
+              <SandboxWrapper className="pointer-events-auto rounded-2xl shadow-2xl border overflow-hidden hover:outline-2 hover:outline-workbench-accent-sky">
                 <div className="w-full min-h-[852px] h-[80dvh]">
                   <FormStartPage.TemplateRenderer
                     name={template_id}
@@ -350,7 +351,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                 </Collapsible>
               </Card>
             </div>
-            <div className="w-full grid gap-4">
+            <FieldGroup className="gap-4">
               {keys.map((key) => {
                 const def = rootProperties[key];
 
@@ -362,18 +363,18 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                 const label = def.title || key;
 
                 return (
-                  <div key={key} className="grid gap-2">
-                    <Label>{label}</Label>
+                  <Field key={key}>
+                    <FieldLabel>{label}</FieldLabel>
                     <PropertyField
                       name={key}
                       definition={def}
                       value={value}
                       onValueChange={change}
                     />
-                  </div>
+                  </Field>
                 );
               })}
-            </div>
+            </FieldGroup>
             {/* <div className="grid gap-2">
               <Label>Media</Label>
               <CMSImageAssetField

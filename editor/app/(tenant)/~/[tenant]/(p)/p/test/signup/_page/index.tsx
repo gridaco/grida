@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { UserCheck2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Card,
@@ -12,7 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import {
   InputOTP,
   InputOTPGroup,
@@ -151,8 +151,8 @@ export function CustomerSignupTestClient({
               </div>
             </div>
             <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">{t.email}</Label>
+              <Field>
+                <FieldLabel htmlFor="email">{t.email}</FieldLabel>
                 <Input
                   id="email"
                   type="email"
@@ -162,7 +162,7 @@ export function CustomerSignupTestClient({
                   disabled={isLoading}
                   required
                 />
-              </div>
+              </Field>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? t.sending : t.continue_with_email}
               </Button>

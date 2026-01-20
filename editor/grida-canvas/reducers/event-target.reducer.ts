@@ -791,7 +791,7 @@ function __self_evt_on_drag(
 
               const key = keyMap[anchor];
               const current = (node as any)[key] ?? 0;
-              
+
               // Check if all corners have the same value
               const tl = node.rectangular_corner_radius_top_left ?? 0;
               const tr = node.rectangular_corner_radius_top_right ?? 0;

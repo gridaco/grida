@@ -15,7 +15,7 @@ import { documentpreviewlink } from "@/lib/internal/url";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
-import { Label } from "@/components/ui/label";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { type WWWTemplateEditorInstance } from "@/scaffolds/platform/www";
 import assert from "assert";
 import { NavbarLogoEditor } from "@/scaffolds/www-theme-config/components/navbar-logo";
@@ -184,8 +184,8 @@ function TemplateEditor({
                 </CardHeader>
                 <CardContent className="flex-1">
                   <div className="flex flex-col gap-8">
-                    <div className="grid gap-2">
-                      <Label>Image</Label>
+                    <Field>
+                      <FieldLabel>Image</FieldLabel>
                       <CMSImageField
                         uploader={template.upload}
                         value={
@@ -203,9 +203,9 @@ function TemplateEditor({
                           });
                         }}
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Title</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Title</FieldLabel>
                       <Input
                         value={values?.components?.referrer?.title}
                         onChange={(e) => {
@@ -216,9 +216,9 @@ function TemplateEditor({
                         }}
                         placeholder="Enter your title"
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Description</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Description</FieldLabel>
                       <Textarea
                         value={values?.components?.referrer?.description}
                         onChange={(e) => {
@@ -229,9 +229,9 @@ function TemplateEditor({
                         }}
                         placeholder="Enter your description"
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Invitation Card Content</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Invitation Card Content</FieldLabel>
                       <CMSRichText
                         value={
                           values?.components?.referrer?.invitation_card_content
@@ -248,14 +248,14 @@ function TemplateEditor({
                           );
                         }}
                       />
-                      <p className="text-xs text-muted-foreground">
+                      <FieldDescription className="text-xs text-muted-foreground">
                         This content appears inside the invitation card on the
                         referrer page.
-                      </p>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Show Invitation List</Label>
-                      <label className="flex items-center gap-2">
+                      </FieldDescription>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Show Invitation List</FieldLabel>
+                      <div className="flex items-center gap-2">
                         <Checkbox
                           checked={
                             !!values?.components?.referrer?.show_invitations
@@ -267,13 +267,13 @@ function TemplateEditor({
                             );
                           }}
                         />
-                        <span className="text-sm text-muted-foreground">
+                        <FieldDescription className="text-sm text-muted-foreground">
                           Show the invite list section on the referrer page.
-                        </span>
-                      </label>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Button Text</Label>
+                        </FieldDescription>
+                      </div>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Button Text</FieldLabel>
                       <Input
                         value={values?.components?.referrer?.cta}
                         onChange={(e) => {
@@ -281,9 +281,9 @@ function TemplateEditor({
                         }}
                         placeholder="Button Text"
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Article</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Article</FieldLabel>
                       <CMSRichText
                         value={
                           values?.components?.referrer?.article?.html ?? ""
@@ -296,7 +296,7 @@ function TemplateEditor({
                           });
                         }}
                       />
-                    </div>
+                    </Field>
                   </div>
                 </CardContent>
               </TabsContent>
@@ -306,8 +306,8 @@ function TemplateEditor({
                 </CardHeader>
                 <CardContent className="flex-1">
                   <div className="flex flex-col gap-8">
-                    <div className="grid gap-2">
-                      <Label>Article</Label>
+                    <Field>
+                      <FieldLabel>Article</FieldLabel>
                       <CMSRichText
                         value={
                           values?.components?.["referrer-share"]?.article
@@ -321,9 +321,9 @@ function TemplateEditor({
                           });
                         }}
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Consent</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Consent</FieldLabel>
                       <Textarea
                         value={
                           values?.components?.["referrer-share"]?.consent ?? ""
@@ -336,9 +336,9 @@ function TemplateEditor({
                         }}
                         placeholder="Enter your consent"
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Button Text</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Button Text</FieldLabel>
                       <Input
                         value={values?.components?.referrer?.cta}
                         onChange={(e) => {
@@ -349,7 +349,7 @@ function TemplateEditor({
                         }}
                         placeholder="Button Text"
                       />
-                    </div>
+                    </Field>
                   </div>
                 </CardContent>
               </TabsContent>
@@ -359,8 +359,8 @@ function TemplateEditor({
                 </CardHeader>
                 <CardContent className="flex-1">
                   <div className="flex flex-col gap-8">
-                    <div className="grid gap-2">
-                      <Label>Message</Label>
+                    <Field>
+                      <FieldLabel>Message</FieldLabel>
                       <Textarea
                         placeholder="Enter your message"
                         value={
@@ -374,7 +374,7 @@ function TemplateEditor({
                           );
                         }}
                       />
-                    </div>
+                    </Field>
                   </div>
                 </CardContent>
               </TabsContent>
@@ -397,8 +397,8 @@ function TemplateEditor({
                 </CardHeader>
                 <CardContent className="flex-1 overflow-y-auto">
                   <div className="flex flex-col gap-8">
-                    <div className="grid gap-2">
-                      <Label>Ticket Image</Label>
+                    <Field>
+                      <FieldLabel>Ticket Image</FieldLabel>
                       <CMSImageField
                         uploader={template.upload}
                         value={
@@ -418,7 +418,7 @@ function TemplateEditor({
                           });
                         }}
                       />
-                    </div>
+                    </Field>
                   </div>
                 </CardContent>
               </TabsContent>
@@ -441,8 +441,8 @@ function TemplateEditor({
                 </CardHeader>
                 <CardContent className="flex-1 overflow-y-auto">
                   <div className="flex flex-col gap-8">
-                    <div className="grid gap-2">
-                      <Label>Image</Label>
+                    <Field>
+                      <FieldLabel>Image</FieldLabel>
                       <CMSImageField
                         uploader={template.upload}
                         value={
@@ -460,9 +460,9 @@ function TemplateEditor({
                           });
                         }}
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Title</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Title</FieldLabel>
 
                       <Input
                         value={values?.components?.invitation?.title}
@@ -474,9 +474,9 @@ function TemplateEditor({
                         }}
                         placeholder="Enter your title"
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Description</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Description</FieldLabel>
                       <Textarea
                         value={
                           values?.components?.invitation?.description as string
@@ -489,9 +489,9 @@ function TemplateEditor({
                         }}
                         placeholder="Enter your description"
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Invitation Card Content</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Invitation Card Content</FieldLabel>
                       <CMSRichText
                         value={
                           values?.components?.invitation
@@ -508,13 +508,13 @@ function TemplateEditor({
                           );
                         }}
                       />
-                      <p className="text-xs text-muted-foreground">
+                      <FieldDescription className="text-xs text-muted-foreground">
                         This content appears inside the invitation card on the
                         invitee page.
-                      </p>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Button Text</Label>
+                      </FieldDescription>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Button Text</FieldLabel>
                       <Input
                         value={values?.components?.invitation?.cta as string}
                         onChange={(e) => {
@@ -525,9 +525,9 @@ function TemplateEditor({
                         }}
                         placeholder="Button Text"
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Article</Label>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Article</FieldLabel>
                       <CMSRichText
                         value={
                           values?.components?.invitation?.article?.html ?? ""
@@ -540,7 +540,7 @@ function TemplateEditor({
                           });
                         }}
                       />
-                    </div>
+                    </Field>
                   </div>
                 </CardContent>
               </TabsContent>
@@ -564,8 +564,8 @@ function TemplateEditor({
                       }}
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Locale</Label>
+                  <Field>
+                    <FieldLabel>Locale</FieldLabel>
                     <Select
                       value={values?.locale}
                       onValueChange={(v) => {
@@ -580,7 +580,7 @@ function TemplateEditor({
                         <SelectItem value="en">English</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
+                  </Field>
                   <div className="mt-10">
                     You can{" "}
                     <Link

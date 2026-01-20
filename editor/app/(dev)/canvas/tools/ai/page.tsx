@@ -9,7 +9,7 @@ import { PresetSelector } from "./_components/preset-selector";
 import { PresetShare } from "./_components/preset-share";
 import { presets } from "./_data/presets";
 import { ModelParams } from "./_components/model-params";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { MinimalChatBox } from "@/components/chat";
 import { readStreamableValue } from "@ai-sdk/rsc";
 import { Canvas } from "./_components/canvas";
@@ -108,39 +108,39 @@ export default function PlaygroundPage() {
                   />
                   <ModelParams />
                 </div>
-                <div className="flex-1 flex flex-col gap-2">
-                  <Label className="text-sm text-muted-foreground">
+                <Field className="flex-1">
+                  <FieldLabel className="text-sm text-muted-foreground">
                     System Message
-                  </Label>
+                  </FieldLabel>
                   <Textarea
                     placeholder="Describe desired model behaviour"
                     className="resize-none flex-1 p-4 h-full"
                     value={system1}
                     onChange={(e) => setSystem1(e.target.value)}
                   />
-                </div>
-                <div className="flex-1 flex flex-col gap-2">
-                  <Label className="text-sm text-muted-foreground">
+                </Field>
+                <Field className="flex-1">
+                  <FieldLabel className="text-sm text-muted-foreground">
                     Expert Message
-                  </Label>
+                  </FieldLabel>
                   <Textarea
                     placeholder="Describe desired model behaviour"
                     className="resize-none flex-1 p-4 h-full"
                     value={system2}
                     onChange={(e) => setSystem2(e.target.value)}
                   />
-                </div>
-                <div className="flex-1 flex flex-col gap-2">
-                  <Label className="text-sm text-muted-foreground">
+                </Field>
+                <Field className="flex-1">
+                  <FieldLabel className="text-sm text-muted-foreground">
                     Context Message
-                  </Label>
+                  </FieldLabel>
                   <Textarea
                     placeholder="Describe desired model behaviour"
                     className="resize-none flex-1 p-4 h-full"
                     value={system3}
                     onChange={(e) => setSystem3(e.target.value)}
                   />
-                </div>
+                </Field>
               </div>
             </aside>
             <aside className="flex-[2] flex flex-col gap-4">

@@ -41,7 +41,9 @@ export default async function NewOrganizationSetupInvitePage({
           </Link>
         </section>
         <Field>
-          <FieldLabel>Search by username, full name or email address</FieldLabel>
+          <FieldLabel>
+            Search by username, full name or email address
+          </FieldLabel>
           <Input placeholder="Organization name" />
         </Field>
         <footer className="flex flex-col gap-2 w-full py-10 border-t">

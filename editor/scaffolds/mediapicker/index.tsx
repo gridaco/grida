@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { useGridaFormsPublicUpload } from "@/scaffolds/asset";
 import { FileIO } from "@/lib/file";
@@ -64,13 +64,13 @@ function FromUrl() {
   const [url, setUrl] = useState("");
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor="url">
+    <Field>
+      <FieldLabel htmlFor="url">
         URL to{" "}
         <span className="font-mono text-muted-foreground text-sm">
           .png .jpeg .gif
         </span>
-      </Label>
+      </FieldLabel>
       <Input
         id="url"
         type="text"
@@ -84,7 +84,7 @@ function FromUrl() {
           <img className="object-contain" src={url} alt="" />
         )}
       </div>
-    </div>
+    </Field>
   );
 }
 

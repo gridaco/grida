@@ -121,31 +121,31 @@ export default function PhoneNumberTool() {
             <FieldGroup className="gap-4">
               <Field>
                 <FieldLabel htmlFor="country">Select Country Code</FieldLabel>
-              <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger id="country">
-                  <SelectValue placeholder="Select a country" />
-                </SelectTrigger>
-                <SelectContent>
-                  {countries.map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Select value={country} onValueChange={setCountry}>
+                  <SelectTrigger id="country">
+                    <SelectValue placeholder="Select a country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
 
               <Field>
                 <FieldLabel htmlFor="phoneNumbers">
-                Enter phone numbers (one per line)
+                  Enter phone numbers (one per line)
                 </FieldLabel>
-              <Textarea
-                id="phoneNumbers"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Enter phone numbers here..."
-                className="min-h-[200px]"
-              />
+                <Textarea
+                  id="phoneNumbers"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Enter phone numbers here..."
+                  className="min-h-[200px]"
+                />
               </Field>
             </FieldGroup>
           </CardContent>

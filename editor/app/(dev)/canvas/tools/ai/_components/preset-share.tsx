@@ -31,12 +31,12 @@ export function PresetShare({ disabled }: { disabled?: boolean }) {
               <FieldLabel htmlFor="link" className="sr-only">
                 Link
               </FieldLabel>
-            <Input
-              id="link"
-              defaultValue="https://platform.openai.com/playground/p/7bbKYQvsVkNmVb8NGcdUOLae?model=text-davinci-003"
-              readOnly
-              className="h-9"
-            />
+              <Input
+                id="link"
+                defaultValue="https://platform.openai.com/playground/p/7bbKYQvsVkNmVb8NGcdUOLae?model=text-davinci-003"
+                readOnly
+                className="h-9"
+              />
             </Field>
           </div>
           <Button type="submit" size="sm" className="px-3">

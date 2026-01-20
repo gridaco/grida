@@ -543,9 +543,8 @@ export function FieldEditPanel({
               >
                 <Switch
                   checked={
-                    !!(
-                      (data as PhoneFieldData | null | undefined)?.default_country
-                    )
+                    !!(data as PhoneFieldData | null | undefined)
+                      ?.default_country
                   }
                   onCheckedChange={(checked) => {
                     setData((prev) => {
@@ -565,9 +564,8 @@ export function FieldEditPanel({
                 />
               </PanelPropertyField>
 
-              {!!(
-                (data as PhoneFieldData | null | undefined)?.default_country
-              ) && (
+              {!!(data as PhoneFieldData | null | undefined)
+                ?.default_country && (
                 <PanelPropertyField label={"Default country"}>
                   <PhoneCountryPicker
                     value={

@@ -14,7 +14,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -377,113 +382,115 @@ function SimulationPlanner({
         </small>
       </header>
       <hr className="my-4" />
-      <div className="grid gap-4">
-        <Label htmlFor="n">Number of Submissions</Label>
-        <Input
-          id="n"
-          min={1}
-          max={1000}
-          type="number"
-          placeholder="100"
-          value={n}
-          onChange={(e) => setN(Number(e.target.value))}
-        />
-      </div>
-      <div className="grid gap-4">
-        <Label htmlFor="n">
-          Number of Bots{" "}
-          <small className="text-muted-foreground">
-            Number of customer identities to simulate
-          </small>
-        </Label>
-        <Input
-          id="n"
-          min={1}
-          max={1000}
-          type="number"
-          value={bots}
-          onChange={(e) => setBots(Number(e.target.value))}
-        />
-      </div>
-      <div className="grid gap-4">
-        <Label htmlFor="maxq">
-          Max Q{" "}
-          <small className="text-muted-foreground">
-            (max number of concurrent submissions)
-          </small>
-        </Label>
-        <Slider
-          id="maxq"
-          min={1}
-          step={5}
-          max={1000}
-          value={[maxq]}
-          onValueChange={(v) => setMaxQ(v[0])}
-        />
-        <small>{maxq}</small>
-      </div>
-      <div className="grid gap-4">
-        <Label htmlFor="delay">
-          Delay in Millisecond{" "}
-          <small className="text-muted-foreground">(1s = 1,000ms)</small>
-        </Label>
-        <Slider
-          id="delay"
-          min={0}
-          max={10000}
-          value={[delay]}
-          onValueChange={(v) => setDelay(v[0])}
-        />
-        <small>{delay}ms</small>
-      </div>
-      <div className="grid gap-4">
-        <Label htmlFor="randomness">
-          Random Coefficient{" "}
-          <small className="text-muted-foreground">
-            (randomness across simulation)
-          </small>
-        </Label>
-        <Slider
-          id="randomness"
-          min={0}
-          max={1}
-          step={0.01}
-          value={[randomness]}
-          onValueChange={(v) => setRandomness(v[0])}
-        />
-        <small>{randomness}</small>
-      </div>
-      <div className="grid gap-4">
-        <Label htmlFor="loctype">
-          Location{" "}
-          <small className="text-muted-foreground">
-            (where each submission will be from)
-          </small>
-        </Label>
-        <Select
-          value={loctype}
-          // @ts-expect-error - Select onValueChange type mismatch with strict union type
-          onValueChange={setLoctype}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="world">World Wide</SelectItem>
-            <SelectItem value="point">Based on Your Location</SelectItem>
-          </SelectContent>
-        </Select>
-        <small className="text-muted-foreground">
-          {loctype === "point" ? (
-            <span>
-              Your location:{" "}
-              {point ? `${point.latitude}, ${point.longitude}` : "Loading..."}
-            </span>
-          ) : (
-            "World wide"
-          )}
-        </small>
-      </div>
+      <FieldGroup className="gap-4">
+        <Field>
+          <FieldLabel htmlFor="n">Number of Submissions</FieldLabel>
+          <Input
+            id="n"
+            min={1}
+            max={1000}
+            type="number"
+            placeholder="100"
+            value={n}
+            onChange={(e) => setN(Number(e.target.value))}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="bots">
+            Number of Bots{" "}
+            <small className="text-muted-foreground">
+              Number of customer identities to simulate
+            </small>
+          </FieldLabel>
+          <Input
+            id="bots"
+            min={1}
+            max={1000}
+            type="number"
+            value={bots}
+            onChange={(e) => setBots(Number(e.target.value))}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="maxq">
+            Max Q{" "}
+            <small className="text-muted-foreground">
+              (max number of concurrent submissions)
+            </small>
+          </FieldLabel>
+          <Slider
+            id="maxq"
+            min={1}
+            step={5}
+            max={1000}
+            value={[maxq]}
+            onValueChange={(v) => setMaxQ(v[0])}
+          />
+          <FieldDescription>{maxq}</FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="delay">
+            Delay in Millisecond{" "}
+            <small className="text-muted-foreground">(1s = 1,000ms)</small>
+          </FieldLabel>
+          <Slider
+            id="delay"
+            min={0}
+            max={10000}
+            value={[delay]}
+            onValueChange={(v) => setDelay(v[0])}
+          />
+          <FieldDescription>{delay}ms</FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="randomness">
+            Random Coefficient{" "}
+            <small className="text-muted-foreground">
+              (randomness across simulation)
+            </small>
+          </FieldLabel>
+          <Slider
+            id="randomness"
+            min={0}
+            max={1}
+            step={0.01}
+            value={[randomness]}
+            onValueChange={(v) => setRandomness(v[0])}
+          />
+          <FieldDescription>{randomness}</FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="loctype">
+            Location{" "}
+            <small className="text-muted-foreground">
+              (where each submission will be from)
+            </small>
+          </FieldLabel>
+          <Select
+            value={loctype}
+            // @ts-expect-error - Select onValueChange type mismatch with strict union type
+            onValueChange={setLoctype}
+          >
+            <SelectTrigger id="loctype">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="world">World Wide</SelectItem>
+              <SelectItem value="point">Based on Your Location</SelectItem>
+            </SelectContent>
+          </Select>
+          <FieldDescription className="text-muted-foreground">
+            {loctype === "point" ? (
+              <span>
+                Your location:{" "}
+                {point ? `${point.latitude}, ${point.longitude}` : "Loading..."}
+              </span>
+            ) : (
+              "World wide"
+            )}
+          </FieldDescription>
+        </Field>
+      </FieldGroup>
       <Dialog>
         <DialogTrigger asChild>
           <Button variant={"secondary"}>Start Simulation</Button>

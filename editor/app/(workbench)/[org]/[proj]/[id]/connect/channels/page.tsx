@@ -21,7 +21,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
   EnvelopeClosedIcon,
   LightningBoltIcon,
@@ -59,6 +58,7 @@ import { toast } from "sonner";
 import React from "react";
 import { MessageCircleIcon } from "lucide-react";
 import { useEditorState } from "@/scaffolds/editor";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 
 const SMS_DEFAULT_ORIGINATOR = process.env
   .NEXT_PUBLIC_BIRD_SMS_DEFAULT_ORIGINATOR as string;
@@ -114,8 +114,8 @@ export default function ConnectChannels() {
                 />
               </div>
               <section className="py-5">
-                <div className="grid gap-2">
-                  <Label htmlFor="originator">Originator</Label>
+                <Field>
+                  <FieldLabel htmlFor="originator">Originator</FieldLabel>
                   <Select name="originator" defaultValue="default">
                     <SelectTrigger id="originator">
                       <SelectValue />
@@ -126,7 +126,7 @@ export default function ConnectChannels() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
               </section>
               <section className="my-10">
                 <AboutSMSFees />
@@ -202,8 +202,8 @@ export default function ConnectChannels() {
                 </MailAppFrame>
               </div>
               <section className="py-5">
-                <div className="grid gap-2">
-                  <Label htmlFor="emailfrom">From</Label>
+                <Field>
+                  <FieldLabel htmlFor="emailfrom">From</FieldLabel>
                   <Select name="emailfrom" defaultValue="default">
                     <SelectTrigger id="emailfrom">
                       <SelectValue />
@@ -214,7 +214,7 @@ export default function ConnectChannels() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
               </section>
             </PreferenceBody>
           </PreferenceBox>
@@ -303,36 +303,38 @@ function TestSMS({ form_id }: { form_id: string }) {
         </DialogHeader>
         <div className="grid grid-cols-3 gap-4">
           <aside className="col-span-1 grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="originator">Originator</Label>
-              <Input
-                id="originator"
-                type="tel"
-                value={SMS_DEFAULT_ORIGINATOR}
-                readOnly
-                disabled
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Enter your phone number"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="message">Message</Label>
-              <Textarea
-                id="message"
-                placeholder="Enter your message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={3}
-              />
-            </div>
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor="originator">Originator</FieldLabel>
+                <Input
+                  id="originator"
+                  type="tel"
+                  value={SMS_DEFAULT_ORIGINATOR}
+                  readOnly
+                  disabled
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="phone">Phone Number</FieldLabel>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter your phone number"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="message">Message</FieldLabel>
+                <Textarea
+                  id="message"
+                  placeholder="Enter your message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={3}
+                />
+              </Field>
+            </FieldGroup>
           </aside>
           <aside className="col-span-2 shadow-lg rounded-lg border-2 overflow-hidden">
             <MessageAppFrame

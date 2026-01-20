@@ -4,8 +4,8 @@ import { useState } from "react";
 import { MapPin, Phone, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -39,8 +39,8 @@ export default function ContactPage() {
       <div className="grid md:grid-cols-2 gap-8">
         <div>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <Label htmlFor="name">Name</Label>
+            <Field>
+              <FieldLabel htmlFor="name">Name</FieldLabel>
               <Input
                 id="name"
                 name="name"
@@ -48,9 +48,9 @@ export default function ContactPage() {
                 onChange={handleInputChange}
                 required
               />
-            </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
                 name="email"
@@ -59,9 +59,9 @@ export default function ContactPage() {
                 onChange={handleInputChange}
                 required
               />
-            </div>
-            <div>
-              <Label htmlFor="message">Message</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="message">Message</FieldLabel>
               <Textarea
                 id="message"
                 name="message"
@@ -70,7 +70,7 @@ export default function ContactPage() {
                 required
                 className="min-h-[150px]"
               />
-            </div>
+            </Field>
             <Button type="submit" className="w-full">
               Send Message
             </Button>
