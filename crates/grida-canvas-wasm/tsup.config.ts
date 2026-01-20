@@ -7,4 +7,8 @@ export default defineConfig({
   dts: true,
   clean: true,
   publicDir: "./lib/bin",
+  // Keep the Emscripten glue as a separate file in dist/ (copied via publicDir).
+  // This avoids bundling it into dist/index.js where bundlers (Turbopack) may
+  // try to resolve Node built-ins.
+  external: ["./grida-canvas-wasm"],
 });

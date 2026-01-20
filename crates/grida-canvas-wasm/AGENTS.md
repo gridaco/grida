@@ -10,6 +10,31 @@ as new apis are introduced via `main.rs`, we also need to update the `grida-canv
 
 Note: the artifacts are git included for faster CI builds.
 
+## Bundler compatibility (Next.js Turbopack + dual-env Emscripten glue)
+
+When building the WASM glue with `-sENVIRONMENT=web,node`, Emscripten emits a Node-only branch that uses Node built-ins (`fs`, `path`, sometimes `crypto`). Some bundlers (notably **Next.js Turbopack**) will still try to resolve those built-ins when the module is imported from a Client Component and fail with **"Can't resolve 'fs'"**.
+
+We keep a **single package** that works in both browser and Node by combining three measures:
+
+- **Patch Emscripten glue to use `node:*` built-ins**
+  - Script: `scripts/prebuild-patch-emscripten-js-glue.cjs`
+  - Patched file: `lib/bin/grida-canvas-wasm.js`
+  - Rewrites `require("fs")` → `require("node:fs")`, `require("path")` → `require("node:path")`, `require("crypto")` → `require("node:crypto")`
+  - Reference issue: `https://github.com/emscripten-core/emscripten/issues/26134`
+
+- **Do NOT bundle the Emscripten glue into `dist/index.*`**
+  - `lib/index.ts` imports `./grida-canvas-wasm` (a thin wrapper)
+  - Wrapper: `lib/grida-canvas-wasm.ts` imports `./bin/grida-canvas-wasm`
+  - `tsup.config.ts` sets `external: ["./grida-canvas-wasm"]` and copies `lib/bin/*` via `publicDir`
+  - Result: `dist/index.js` only imports `./grida-canvas-wasm`, and the actual glue stays as `dist/grida-canvas-wasm.js` (copied), so Turbopack never sees Node built-ins inside the bundled entry.
+
+- **Run the glue patch before bundling**
+  - `package.json` uses `prebuild` to patch `lib/bin/grida-canvas-wasm.js` before `tsup` runs.
+
+⚠️ Notes:
+- Simply setting `tsup.external` to `["node:fs", "node:path", ...]` is **not sufficient** here; bundling the glue can still produce `require("fs")` in `dist/index.js`, which breaks Turbopack.
+- If you change `lib/index.ts` to import `./bin/grida-canvas-wasm` directly (no wrapper + external), re-verify `pnpm --filter editor build` with Turbopack.
+
 ## Build System
 
 This project uses a unified `justfile` build system for all WASM build configurations.

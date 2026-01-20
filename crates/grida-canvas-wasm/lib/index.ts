@@ -1,4 +1,4 @@
-import createGridaCanvas from "./bin/grida-canvas-wasm";
+import createGridaCanvas from "./grida-canvas-wasm";
 import { version as _version } from "../package.json";
 import { Scene } from "./modules/canvas";
 import { svgtypes } from "./modules/svg-bindings";
