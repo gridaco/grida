@@ -11,6 +11,12 @@
  *
  * Reference: https://github.com/emscripten-core/emscripten/issues/26134
  *
+ * Note: As of Emscripten 4.0.23, the generated dual-env glue can still contain
+ * bare Node built-in imports (e.g. `require("fs")`). If/when Emscripten >= 4.0.24
+ * includes the upstream `node:` prefix change (see PR https://github.com/emscripten-core/emscripten/pull/26079),
+ * we should be able to drop this patch (and the `prebuild` hook) after verifying
+ * `pnpm --filter editor build` and the Node smoke tests still pass.
+ *
  * This patch keeps Node support (still requires fs/path at runtime in Node)
  * while preventing the bundler from statically resolving built-ins for the client.
  */
