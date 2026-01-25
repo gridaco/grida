@@ -3,6 +3,7 @@ import { FontsAPI } from "./fonts";
 import { MarkdownAPI } from "./markdown";
 import { SVGAPI } from "./svg";
 import { memory } from "./memory";
+import { ffi } from "./ffi";
 
 const ApplicationCommandID = {
   ZoomIn: 1,
@@ -42,16 +43,31 @@ export class Scene {
     this.svgkit = new SVGAPI(module);
   }
 
+  private _assertAlive() {
+    if (this.appptr === 0) {
+      throw new Error("Scene is disposed");
+    }
+  }
+
+  /**
+   * Release the underlying WASM application instance.
+   *
+   * After calling this, the `Scene` instance must not be used again.
+   */
+  dispose() {
+    if (this.appptr === 0) return;
+    this.module._destroy(this.appptr);
+    this.appptr = 0;
+  }
+
   /**
    * Allocates memory for a string and returns pointer and length.
    * @param txt - String to allocate
    * @returns [pointer, length] tuple
    */
   _alloc_string(txt: string): [number, number] {
-    const len = this.module.lengthBytesUTF8(txt) + 1;
-    const ptr = this.module._allocate(len);
-    this.module.stringToUTF8(txt, ptr, len);
-    return [ptr, len];
+    this._assertAlive();
+    return ffi.allocString(this.module, txt);
   }
 
   /**
@@ -60,7 +76,8 @@ export class Scene {
    * @param len - Length of allocated memory
    */
   _free_string(ptr: number, len: number) {
-    this.module._deallocate(ptr, len);
+    this._assertAlive();
+    ffi.free(this.module, ptr, len);
   }
 
   /**
@@ -68,12 +85,14 @@ export class Scene {
    * @param data - The JSON string to load.
    */
   loadScene(data: string) {
+    this._assertAlive();
     const [ptr, len] = this._alloc_string(data);
     this.module._load_scene_json(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
   }
 
   applyTransactions(batch: unknown[][]): TransactionApplyReport[] | null {
+    this._assertAlive();
     const json = JSON.stringify(batch);
     const [ptr, len] = this._alloc_string(json);
     const outptr = this.module._apply_scene_transactions(
@@ -85,9 +104,7 @@ export class Scene {
     if (outptr === 0) {
       return null;
     }
-    const str = this.module.UTF8ToString(outptr);
-    const outlen = this.module.lengthBytesUTF8(str) + 1;
-    this._free_string(outptr, outlen);
+    const str = ffi.readLenPrefixedString(this.module, outptr);
     return JSON.parse(str) as TransactionApplyReport[];
   }
 
@@ -95,6 +112,7 @@ export class Scene {
    * @deprecated - test use only
    */
   loadDummyScene() {
+    this._assertAlive();
     this.module._load_dummy_scene(this.appptr);
   }
 
@@ -102,6 +120,7 @@ export class Scene {
    * @deprecated - test use only
    */
   loadBenchmarkScene(cols: number, rows: number) {
+    this._assertAlive();
     this.module._load_benchmark_scene(this.appptr, cols, rows);
   }
 
@@ -115,25 +134,21 @@ export class Scene {
    * @param data - Raw font file bytes (e.g. TTF/OTF).
    */
   addFont(family: string, data: Uint8Array) {
+    this._assertAlive();
     const [fptr, flen] = this._alloc_string(family);
-    const len = data.length;
-    const ptr = this.module._allocate(len);
-    this.module.HEAPU8.set(data, ptr);
+    const [ptr, len] = ffi.allocBytes(this.module, data);
     this.module._add_font(this.appptr, fptr, flen - 1, ptr, len);
-    this.module._deallocate(fptr, flen);
-    this.module._deallocate(ptr, len);
+    this._free_string(fptr, flen);
+    ffi.free(this.module, ptr, len);
   }
 
   addImage(data: Uint8Array): CreateImageResourceResult | false {
-    const len = data.length;
-    const ptr = this.module._allocate(len);
-    this.module.HEAPU8.set(data, ptr);
+    this._assertAlive();
+    const [ptr, len] = ffi.allocBytes(this.module, data);
     const out = this.module._add_image(this.appptr, ptr, len);
-    this.module._deallocate(ptr, len);
+    ffi.free(this.module, ptr, len);
     if (out === 0) return false;
-    const txt = this.module.UTF8ToString(out);
-    const hlen = this.module.lengthBytesUTF8(txt) + 1;
-    this._free_string(out, hlen);
+    const txt = ffi.readLenPrefixedString(this.module, out);
     try {
       return JSON.parse(txt) as CreateImageResourceResult;
     } catch {
@@ -142,22 +157,16 @@ export class Scene {
   }
 
   getImageBytes(ref: string): Uint8Array | null {
+    this._assertAlive();
     const [ptr, len] = this._alloc_string(ref);
     const outptr = this.module._get_image_bytes(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
     if (outptr === 0) return null;
-    const lengthBytes = this.module.HEAPU8.slice(outptr, outptr + 4);
-    const dataLength = new Uint32Array(
-      lengthBytes.buffer,
-      lengthBytes.byteOffset,
-      1
-    )[0];
-    const data = this.module.HEAPU8.slice(outptr + 4, outptr + 4 + dataLength);
-    this.module._deallocate(outptr, 4 + dataLength);
-    return new Uint8Array(data);
+    return ffi.readLenPrefixedBytes(this.module, outptr);
   }
 
   getImageSize(ref: string): { width: number; height: number } | null {
+    this._assertAlive();
     const [ptr, len] = this._alloc_string(ref);
     const outptr = this.module._get_image_size(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
@@ -168,28 +177,28 @@ export class Scene {
   }
 
   hasMissingFonts(): boolean {
+    this._assertAlive();
     return this.module._has_missing_fonts(this.appptr);
   }
 
   listMissingFonts(): types.FontKey[] {
+    this._assertAlive();
     const ptr = this.module._list_missing_fonts(this.appptr);
     if (ptr === 0) return [];
-    const str = this.module.UTF8ToString(ptr);
-    const len = this.module.lengthBytesUTF8(str) + 1;
-    this._free_string(ptr, len);
+    const str = ffi.readLenPrefixedString(this.module, ptr);
     return JSON.parse(str);
   }
 
   listAvailableFonts(): types.FontKey[] {
+    this._assertAlive();
     const ptr = this.module._list_available_fonts(this.appptr);
     if (ptr === 0) return [];
-    const str = this.module.UTF8ToString(ptr);
-    const len = this.module.lengthBytesUTF8(str) + 1;
-    this._free_string(ptr, len);
+    const str = ffi.readLenPrefixedString(this.module, ptr);
     return JSON.parse(str);
   }
 
   setFallbackFonts(fonts: string[]) {
+    this._assertAlive();
     const json = JSON.stringify(fonts);
     const [ptr, len] = this._alloc_string(json);
     this.module._set_default_fallback_fonts(this.appptr, ptr, len - 1);
@@ -197,11 +206,10 @@ export class Scene {
   }
 
   getFallbackFonts(): string[] {
+    this._assertAlive();
     const ptr = this.module._get_default_fallback_fonts(this.appptr);
     if (ptr === 0) return [];
-    const str = this.module.UTF8ToString(ptr);
-    const len = this.module.lengthBytesUTF8(str) + 1;
-    this._free_string(ptr, len);
+    const str = ffi.readLenPrefixedString(this.module, ptr);
     return JSON.parse(str);
   }
 
@@ -212,6 +220,7 @@ export class Scene {
    * @default - performance.now()
    */
   tick(time?: number) {
+    this._assertAlive();
     this.module._tick(this.appptr, time ?? performance.now());
   }
 
@@ -221,14 +230,17 @@ export class Scene {
    * @param height - The height of the surface.
    */
   resize(width: number, height: number) {
+    this._assertAlive();
     this.module._resize_surface(this.appptr, width, height);
   }
 
   redraw() {
+    this._assertAlive();
     this.module._redraw(this.appptr);
   }
 
   setMainCameraTransform(transform: types.Transform2D) {
+    this._assertAlive();
     this.module._set_main_camera_transform(
       this.appptr,
       transform[0][0], // a
@@ -241,28 +253,26 @@ export class Scene {
   }
 
   getNodeIdFromPoint(x: number, y: number): string | null {
+    this._assertAlive();
     const ptr = this.module._get_node_id_from_point(this.appptr, x, y);
     if (ptr === 0) {
       return null;
     }
-    const str = this.module.UTF8ToString(ptr);
-    const len = this.module.lengthBytesUTF8(str) + 1;
-    this._free_string(ptr, len);
-    return str;
+    return ffi.readLenPrefixedString(this.module, ptr);
   }
 
   getNodeIdsFromPoint(x: number, y: number): string[] {
+    this._assertAlive();
     const ptr = this.module._get_node_ids_from_point(this.appptr, x, y);
     if (ptr === 0) {
       return [];
     }
-    const str = this.module.UTF8ToString(ptr);
-    const len = this.module.lengthBytesUTF8(str) + 1;
-    this._free_string(ptr, len);
+    const str = ffi.readLenPrefixedString(this.module, ptr);
     return JSON.parse(str);
   }
 
   getNodeIdsFromEnvelope(envelope: types.Rect): string[] {
+    this._assertAlive();
     const ptr = this.module._get_node_ids_from_envelope(
       this.appptr,
       envelope.x,
@@ -273,13 +283,12 @@ export class Scene {
     if (ptr === 0) {
       return [];
     }
-    const str = this.module.UTF8ToString(ptr);
-    const len = this.module.lengthBytesUTF8(str) + 1;
-    this._free_string(ptr, len);
+    const str = ffi.readLenPrefixedString(this.module, ptr);
     return JSON.parse(str);
   }
 
   getNodeAbsoluteBoundingBox(id: string): types.Rect | null {
+    this._assertAlive();
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._get_node_absolute_bounding_box(
       this.appptr,
@@ -303,6 +312,7 @@ export class Scene {
    * Supports primitive shapes and text nodes.
    */
   toVectorNetwork(id: string): types.VectorNetwork | null {
+    this._assertAlive();
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._to_vector_network(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
@@ -311,9 +321,7 @@ export class Scene {
       return null;
     }
 
-    const str = this.module.UTF8ToString(outptr);
-    const outlen = this.module.lengthBytesUTF8(str) + 1;
-    this._free_string(outptr, outlen);
+    const str = ffi.readLenPrefixedString(this.module, outptr);
     return JSON.parse(str);
   }
 
@@ -323,6 +331,7 @@ export class Scene {
   ): {
     data: Uint8Array;
   } {
+    this._assertAlive();
     const [id_ptr, id_len] = this._alloc_string(id);
     const [fmt_ptr, fmt_len] = this._alloc_string(JSON.stringify(format));
     const outptr = this.module._export_node_as(
@@ -339,38 +348,28 @@ export class Scene {
       throw new Error(`Failed to export node as ${format.format}`);
     }
 
-    // Read the length from the first 4 bytes (little-endian u32)
-    const lengthBytes = this.module.HEAPU8.slice(outptr, outptr + 4);
-    const dataLength = new Uint32Array(
-      lengthBytes.buffer,
-      lengthBytes.byteOffset,
-      1
-    )[0];
-
-    // Read the actual data starting after the length prefix
-    const data = this.module.HEAPU8.slice(outptr + 4, outptr + 4 + dataLength);
-
-    // Free the entire allocated block (length + data)
-    this.module._deallocate(outptr, 4 + dataLength);
-
     return {
-      data: new Uint8Array(data),
+      data: ffi.readLenPrefixedBytes(this.module, outptr),
     };
   }
 
   execCommand(command: "ZoomIn" | "ZoomOut") {
+    this._assertAlive();
     this.module._command(this.appptr, ApplicationCommandID[command], 0, 0);
   }
 
   execCommandPan(tx: number, ty: number) {
+    this._assertAlive();
     this.module._command(this.appptr, ApplicationCommandID.Pan, tx, ty);
   }
 
   execCommandZoomDelta(tz: number) {
+    this._assertAlive();
     this.module._command(this.appptr, ApplicationCommandID.ZoomDelta, tz, 0);
   }
 
   pointermove(x: number, y: number) {
+    this._assertAlive();
     this.module._pointer_move(this.appptr, x, y);
   }
 
@@ -378,6 +377,7 @@ export class Scene {
     nodes?: string[];
     style?: { strokeWidth?: number; stroke?: string };
   }) {
+    this._assertAlive();
     const json = JSON.stringify({
       nodes: opts?.nodes ?? [],
       style: opts?.style,
@@ -388,6 +388,7 @@ export class Scene {
   }
 
   runtime_renderer_set_cache_tile(enable: boolean) {
+    this._assertAlive();
     this.module._runtime_renderer_set_cache_tile(this.appptr, enable);
   }
 
@@ -396,14 +397,17 @@ export class Scene {
   // ====================================================================================================
 
   setDebug(debug: boolean) {
+    this._assertAlive();
     this.module._set_debug(this.appptr, debug);
   }
 
   toggleDebug() {
+    this._assertAlive();
     this.module._toggle_debug(this.appptr);
   }
 
   setVerbose(verbose: boolean) {
+    this._assertAlive();
     this.module._set_verbose(this.appptr, verbose);
   }
 
@@ -412,6 +416,7 @@ export class Scene {
    * @param show - The visibility of the tiles.
    */
   devtools_rendering_set_show_tiles(show: boolean) {
+    this._assertAlive();
     this.module._devtools_rendering_set_show_tiles(this.appptr, show);
   }
 
@@ -420,6 +425,7 @@ export class Scene {
    * @param show - The visibility of the FPS meter.
    */
   devtools_rendering_set_show_fps_meter(show: boolean) {
+    this._assertAlive();
     this.module._devtools_rendering_set_show_fps_meter(this.appptr, show);
   }
 
@@ -428,6 +434,7 @@ export class Scene {
    * @param show - The visibility of the stats.
    */
   devtools_rendering_set_show_stats(show: boolean) {
+    this._assertAlive();
     this.module._devtools_rendering_set_show_stats(this.appptr, show);
   }
 
@@ -436,6 +443,7 @@ export class Scene {
    * @param show - The visibility of the hit testing.
    */
   devtools_rendering_set_show_hit_testing(show: boolean) {
+    this._assertAlive();
     this.module._devtools_rendering_set_show_hit_testing(this.appptr, show);
   }
 
@@ -444,6 +452,7 @@ export class Scene {
    * @param show - The visibility of the ruler.
    */
   devtools_rendering_set_show_ruler(show: boolean) {
+    this._assertAlive();
     this.module._devtools_rendering_set_show_ruler(this.appptr, show);
   }
 }

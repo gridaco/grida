@@ -1,6 +1,10 @@
 // @vitest-environment node
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+
+import { createCanvas } from "..";
 
 /**
  * WASM API Validation Tests (Node)
@@ -32,7 +36,9 @@ const EXPECTED_FUNCTIONS = [
 
   // initialization / app lifecycle
   { name: "_init", paramCount: 3 },
+  { name: "_init_with_backend", paramCount: 4 },
   { name: "_tick", paramCount: 2 },
+  { name: "_destroy", paramCount: 1 },
   { name: "_resize_surface", paramCount: 3 },
   { name: "_redraw", paramCount: 1 },
 
@@ -103,6 +109,28 @@ const EXPECTED_RUNTIME_METHODS = [
 describe("WASM API Validation", () => {
   it("instantiates module in Node", () => {
     expect(module).toBeTruthy();
+  });
+
+  it("dispose guard: throws after dispose (raster)", async () => {
+    expect(typeof createCanvas).toBe("function");
+
+    const canvas = await createCanvas({
+      backend: "raster",
+      width: 64,
+      height: 64,
+      useEmbeddedFonts: true,
+    });
+
+    const doc = readFileSync(resolve(process.cwd(), "example/rectangle.grida1"), "utf8");
+    canvas.loadScene(doc);
+    canvas.dispose();
+
+    expect(() =>
+      canvas.exportNodeAs("rectangle", {
+        format: "PNG",
+        constraints: { type: "none", value: 1 },
+      })
+    ).toThrow(/disposed/i);
   });
 
   describe("C exports", () => {

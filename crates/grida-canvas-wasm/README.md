@@ -8,6 +8,8 @@ WASM bindings for Grida Canvas.
 pnpm install @grida/canvas-wasm
 ```
 
+### Browser (WebGL)
+
 ```ts
 import init from "@grida/canvas-wasm";
 
@@ -24,6 +26,29 @@ const scene = factory.createWebGLCanvasSurface(canvas);
 
 // ready to draw
 scene.loadDummyScene();
+```
+
+### Node (raster export)
+
+```ts
+import { createCanvas } from "@grida/canvas-wasm";
+import { readFileSync, writeFileSync } from "node:fs";
+
+const canvas = await createCanvas({
+  backend: "raster",
+  width: 256,
+  height: 256,
+});
+
+const doc = readFileSync("example/rectangle.grida1", "utf8");
+canvas.loadScene(doc);
+
+const { data } = canvas.exportNodeAs("rectangle", {
+  format: "PNG",
+  constraints: { type: "none", value: 1 },
+});
+
+writeFileSync("out.png", Buffer.from(data));
 ```
 
 ## Serving locally for development

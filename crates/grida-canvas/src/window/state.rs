@@ -5,6 +5,8 @@ use skia_safe::{
 
 use gl;
 
+use crate::runtime::scene::Backend;
+
 pub struct GpuState {
     pub context: DirectContext,
     pub framebuffer_info: FramebufferInfo,
@@ -17,6 +19,76 @@ pub struct GpuState {
 pub struct SurfaceState {
     gpu_state: GpuState,
     surface: Surface,
+}
+
+/// CPU raster surface state (no GPU context).
+pub struct RasterSurfaceState {
+    surface: Surface,
+}
+
+impl RasterSurfaceState {
+    pub fn new(width: i32, height: i32) -> Self {
+        let surface =
+            skia_safe::surfaces::raster_n32_premul((width, height)).expect("raster surface");
+        Self { surface }
+    }
+
+    pub fn resize(&mut self, width: i32, height: i32) {
+        self.surface =
+            skia_safe::surfaces::raster_n32_premul((width, height)).expect("raster surface");
+    }
+
+    pub fn surface_mut_ptr(&mut self) -> *mut Surface {
+        &mut self.surface as *mut Surface
+    }
+
+    pub fn surface_mut(&mut self) -> &mut Surface {
+        &mut self.surface
+    }
+}
+
+/// A backend-agnostic surface state used by the core application.
+pub enum AnySurfaceState {
+    Gpu(SurfaceState),
+    Raster(RasterSurfaceState),
+}
+
+impl AnySurfaceState {
+    pub fn from_gpu(state: SurfaceState) -> Self {
+        Self::Gpu(state)
+    }
+
+    pub fn new_raster(width: i32, height: i32) -> Self {
+        Self::Raster(RasterSurfaceState::new(width, height))
+    }
+
+    pub fn resize(&mut self, width: i32, height: i32) {
+        match self {
+            AnySurfaceState::Gpu(state) => state.resize(width, height),
+            AnySurfaceState::Raster(state) => state.resize(width, height),
+        }
+    }
+
+    pub fn surface_mut_ptr(&mut self) -> *mut Surface {
+        match self {
+            AnySurfaceState::Gpu(state) => state.surface_mut_ptr(),
+            AnySurfaceState::Raster(state) => state.surface_mut_ptr(),
+        }
+    }
+
+    pub fn surface_mut(&mut self) -> &mut Surface {
+        match self {
+            AnySurfaceState::Gpu(state) => state.surface_mut(),
+            AnySurfaceState::Raster(state) => state.surface_mut(),
+        }
+    }
+
+    pub fn backend(&mut self) -> Backend {
+        match self {
+            AnySurfaceState::Gpu(_) => Backend::GL(self.surface_mut_ptr()),
+            AnySurfaceState::Raster(_) => Backend::Raster(self.surface_mut_ptr()),
+        }
+    }
 }
 
 impl SurfaceState {

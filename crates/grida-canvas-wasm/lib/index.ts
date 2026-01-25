@@ -124,7 +124,7 @@ export default async function init(
   );
 }
 
-interface CreateWebGLCanvasSurfaceOptions {
+interface CreateSurfaceOptions {
   /**
    * when true, embedded fonts will be registered and used for text rendering.
    * @default true
@@ -141,7 +141,7 @@ class ApplicationFactory {
 
   createWebGLCanvasSurface(
     canvas: HTMLCanvasElement,
-    options: CreateWebGLCanvasSurfaceOptions = { use_embedded_fonts: true }
+    options: CreateSurfaceOptions = { use_embedded_fonts: true }
   ): Scene {
     const context = canvas.getContext("webgl2", {
       antialias: true,
@@ -180,3 +180,127 @@ class ApplicationFactory {
 }
 
 export type { ApplicationFactory };
+
+/**
+ * Internal numeric backend ids for the WASM ABI (`_init_with_backend`).
+ *
+ * Keep in sync with Rust (`crates/grida-canvas-wasm/src/wasm_application.rs`).
+ */
+const BACKEND_ID = {
+  WebGL: 0,
+  Raster: 1,
+} as const;
+
+export type CreateCanvasOptions =
+  | {
+      backend?: "webgl";
+      canvas: HTMLCanvasElement;
+      locateFile?: GridaCanvasModuleInitOptions["locateFile"];
+      useEmbeddedFonts?: boolean;
+    }
+  | {
+      backend: "raster";
+      width: number;
+      height: number;
+      locateFile?: GridaCanvasModuleInitOptions["locateFile"];
+      useEmbeddedFonts?: boolean;
+    };
+
+export class Canvas {
+  private readonly _backend: "webgl" | "raster";
+  private readonly _scene: Scene;
+
+  private constructor(backend: "webgl" | "raster", scene: Scene) {
+    this._backend = backend;
+    this._scene = scene;
+  }
+
+  get backend() {
+    return this._backend;
+  }
+
+  loadScene(json: string) {
+    this._scene.loadScene(json);
+  }
+
+  addFont(family: string, bytes: Uint8Array) {
+    this._scene.addFont(family, bytes);
+  }
+
+  exportNodeAs(id: string, format: types.ExportAs): { data: Uint8Array } {
+    return this._scene.exportNodeAs(id, format);
+  }
+
+  /**
+   * Release the underlying WASM application instance.
+   *
+   * After calling this, the `Canvas` (and its internal `Scene`) must not be used again.
+   */
+  dispose() {
+    this._scene.dispose();
+  }
+
+  /**
+   * Access the underlying WebGL `Scene` when `backend === "webgl"`.
+   * Returns `null` for raster canvases.
+   */
+  asWebGL(): Scene | null {
+    return this._backend === "webgl" ? this._scene : null;
+  }
+
+  /** @internal */
+  static _fromWebGL(scene: Scene) {
+    return new Canvas("webgl", scene);
+  }
+
+  /** @internal */
+  static _fromRaster(scene: Scene) {
+    return new Canvas("raster", scene);
+  }
+}
+
+/**
+ * Create a canvas instance backed by either:
+ * - **WebGL**: interactive rendering in the browser
+ * - **Raster**: headless CPU rendering (useful for Node export pipelines)
+ */
+export async function createCanvas(opts: CreateCanvasOptions): Promise<Canvas> {
+  const bindings = await createGridaCanvas({
+    locateFile: opts.locateFile
+      ? (file, __scriptDirectory) => opts.locateFile!(file, version)
+      : undefined,
+  });
+
+  const module = bindings as createGridaCanvas.GridaCanvasWasmBindings;
+  const useEmbeddedFonts = opts.useEmbeddedFonts ?? true;
+
+  if (opts.backend === "raster") {
+    const appptr = module._init_with_backend(
+      BACKEND_ID.Raster,
+      opts.width,
+      opts.height,
+      useEmbeddedFonts
+    );
+    return Canvas._fromRaster(new Scene(module, appptr));
+  }
+
+  // Default: webgl
+  const context = opts.canvas.getContext("webgl2", {
+    antialias: true,
+    depth: true,
+    stencil: true,
+    alpha: true,
+  });
+  if (!context) throw new Error("Failed to get WebGL2 context");
+  const handle = module.GL.registerContext(context, { majorVersion: 2 });
+  module.GL.makeContextCurrent(handle);
+  const appptr = module._init_with_backend(
+    BACKEND_ID.WebGL,
+    opts.canvas.width,
+    opts.canvas.height,
+    useEmbeddedFonts
+  );
+  const scene = new Scene(module, appptr);
+  scene.resize(opts.canvas.width, opts.canvas.height);
+  return Canvas._fromWebGL(scene);
+}
