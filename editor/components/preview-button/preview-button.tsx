@@ -8,7 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/components/lib/utils";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Button } from "@/components/ui/button";
 import { editorlink, formlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
 import Link from "next/link";
@@ -21,28 +22,30 @@ export function PreviewButton() {
   const built_in_agent_url = formlink("", form.form_id);
 
   return (
-    <div role="group" className="inline-flex rounded-md shadow-sm">
-      <Link href={built_in_agent_url} target="_blank">
-        <button
-          type="button"
-          className={cn(
-            "h-7 inline-flex items-center px-4 py-2 text-sm font-medium border rounded-s-lg focus:z-10 focus:ring-2",
-            "gap-2"
-          )}
-          title="Preview"
-        >
+    <ButtonGroup>
+      <Button
+        asChild
+        size="sm"
+        className="h-7"
+        title="Preview"
+        variant="outline"
+      >
+        <Link href={built_in_agent_url} target="_blank">
           {/* <EyeOpenIcon className="mx-auto" width={20} height={20} /> */}
           Preview
-        </button>
-      </Link>
+        </Link>
+      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
+          <Button
+            aria-label="Preview options"
+            className="h-7"
+            size="icon-sm"
             type="button"
-            className="h-7 inline-flex items-center px-2 py-2 text-sm font-medium border-t border-b border-r rounded-e-lg focus:z-10 focus:ring-2"
+            variant="outline"
           >
             <ChevronDownIcon />
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <Link
@@ -71,6 +74,6 @@ export function PreviewButton() {
           </Link>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </ButtonGroup>
   );
 }

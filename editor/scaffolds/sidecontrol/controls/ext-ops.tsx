@@ -1,5 +1,6 @@
 import { cn } from "@/components/lib/utils";
 import { buttonVariants } from "@/components/ui-editor/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,27 +28,30 @@ export function OpsControl({
   className?: string;
 }) {
   return (
-    <div
+    <ButtonGroup
       aria-disabled={disabled}
       className={cn(
-        "group/ops flex items-center justify-center gap-0",
+        "group/ops items-center justify-center gap-0",
         className
       )}
     >
       <button
         disabled={disabled}
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "icon" }),
-          "rounded-r-none"
-        )}
+        className={buttonVariants({ variant: "ghost", size: "icon" })}
         onClick={() => onOp?.("union")}
       >
         <SquaresUniteIcon />
       </button>
-      <div className="h-full border-r border-transparent" />
+      <ButtonGroupSeparator className="bg-transparent" />
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger disabled={disabled} className="p-0 px-1">
-          <CaretDownIcon className="size-3" />
+        <DropdownMenuTrigger asChild>
+          <button
+            disabled={disabled}
+            className="p-0 px-1 rounded-md focus-visible:outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+            type="button"
+          >
+            <CaretDownIcon className="size-3" />
+          </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="end">
           <DropdownMenuItem
@@ -100,6 +104,6 @@ export function OpsControl({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </ButtonGroup>
   );
 }

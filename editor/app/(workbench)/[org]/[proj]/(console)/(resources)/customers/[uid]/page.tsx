@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -437,12 +438,11 @@ export default function CustomerDetailPage(props0: {
             </DropdownMenuContent>
           </DropdownMenu>
           {/* TODO: db cursor navigation */}
-          <div className="flex">
+          <ButtonGroup>
             <Button
               disabled
               variant="outline"
               size="sm"
-              className="rounded-r-none border-r-0"
             >
               <ChevronLeft className="size-4" />
             </Button>
@@ -450,11 +450,10 @@ export default function CustomerDetailPage(props0: {
               disabled
               variant="outline"
               size="sm"
-              className="rounded-l-none"
             >
               <ChevronRight className="size-4" />
             </Button>
-          </div>
+          </ButtonGroup>
         </div>
       </header>
 
