@@ -1,7 +1,5 @@
-import {
-  ActionGroup,
-  ActionGroupItem,
-} from "@/components/ui-editor/action-group";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { buttonVariants } from "@/components/ui-editor/button";
 import {
   Tooltip,
   TooltipContent,
@@ -41,7 +39,7 @@ export function AlignControl({
     >
       <HorizontalItems disabled={disabled} onAlign={onAlign} />
       <VerticalItems disabled={disabled} onAlign={onAlign} />
-      <ActionGroup size="icon" variant="outline">
+      <ButtonGroup>
         <Item
           disabled={disabled}
           tooltip="Distribute horizontally"
@@ -60,7 +58,7 @@ export function AlignControl({
         >
           <SpaceEvenlyVerticallyIcon className="size-2.5" />
         </Item>
-      </ActionGroup>
+      </ButtonGroup>
     </div>
   );
 }
@@ -75,7 +73,7 @@ function HorizontalItems({
   }) => void;
 }) {
   return (
-    <ActionGroup size="icon" variant="outline">
+    <ButtonGroup>
       <Item
         disabled={disabled}
         tooltip="Align left"
@@ -103,7 +101,7 @@ function HorizontalItems({
       >
         <AlignRightIcon className="size-2.5" />
       </Item>
-    </ActionGroup>
+    </ButtonGroup>
   );
 }
 
@@ -117,7 +115,7 @@ function VerticalItems({
   }) => void;
 }) {
   return (
-    <ActionGroup size="icon" variant="outline">
+    <ButtonGroup>
       <Item
         disabled={disabled}
         tooltip="Align top"
@@ -145,7 +143,7 @@ function VerticalItems({
       >
         <AlignBottomIcon className="size-2.5" />
       </Item>
-    </ActionGroup>
+    </ButtonGroup>
   );
 }
 
@@ -162,13 +160,18 @@ function Item({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <ActionGroupItem
+        <button
           disabled={disabled}
           onClick={onClick}
-          className="[&_svg:not([class*='size-'])]:size-3"
+          type="button"
+          aria-label={tooltip}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "icon" }),
+            "bg-transparent"
+          )}
         >
           {children}
-        </ActionGroupItem>
+        </button>
       </TooltipTrigger>
       <TooltipContent collisionPadding={4}>{tooltip}</TooltipContent>
     </Tooltip>
