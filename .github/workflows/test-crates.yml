@@ -6,8 +6,8 @@ on:
       - main
   pull_request:
     paths:
-      - ".github/workflows/*"
-      - "crates/*"
+      - ".github/workflows/**"
+      - "crates/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
