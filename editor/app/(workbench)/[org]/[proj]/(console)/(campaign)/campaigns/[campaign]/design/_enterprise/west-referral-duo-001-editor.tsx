@@ -21,6 +21,7 @@ import assert from "assert";
 import { NavbarLogoEditor } from "@/scaffolds/www-theme-config/components/navbar-logo";
 import { toast } from "sonner";
 import { CampaignTemplateDuo001Viewer } from "./template-duo-001-viewer";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -52,6 +53,41 @@ type CanvasComponent =
   | "referrer-share-message"
   | "invitation-ux-overlay"
   | "invitation";
+
+function RightPanelTab({
+  value,
+  title,
+  action,
+  children,
+}: React.PropsWithChildren<{
+  value: EditorTab;
+  title: React.ReactNode;
+  action?: React.ReactNode;
+}>) {
+  return (
+    <TabsContent value={value} className="m-0 h-full min-h-0">
+      <Card className="h-full min-h-0 flex flex-col overflow-hidden">
+        <CardHeader className="flex-none">
+          <CardTitle className={action ? "flex justify-between items-center" : ""}>
+            <span>{title}</span>
+            {action ? <span>{action}</span> : null}
+          </CardTitle>
+        </CardHeader>
+        {/* 
+          Important: stop wheel/touch bubbling so canvas-level handlers
+          can't steal scroll when cursor is over the right panel.
+        */}
+        <ScrollArea
+          className="flex-1 min-h-0 overscroll-contain"
+          onWheelCapture={(e) => e.stopPropagation()}
+          onTouchMoveCapture={(e) => e.stopPropagation()}
+        >
+          <CardContent className="pt-0">{children}</CardContent>
+        </ScrollArea>
+      </Card>
+    </TabsContent>
+  );
+}
 
 function getCanvasFocus(tab: EditorTab): { node: CanvasComponent } | null {
   switch (tab) {
@@ -138,9 +174,9 @@ function TemplateEditor({
             {template.saving ? "Saving..." : "Save & Publish Changes"}
           </Button>
         </header>
-        <div className="flex-1 h-full flex gap-4 p-4 overflow-hidden">
+        <div className="flex-1 min-h-0 h-full flex gap-4 p-4 overflow-hidden">
           {focus && (
-            <aside className="flex-[2] overflow-hidden">
+            <aside className="flex-[2] min-h-0 overflow-hidden">
               <CampaignTemplateDuo001Viewer
                 focus={focus}
                 props={props}
@@ -163,437 +199,384 @@ function TemplateEditor({
               />
             </aside>
           )}
-          <aside className="flex-1 flex flex-col w-full">
-            <Card className="flex flex-1 overflow-scroll flex-col">
-              <TabsContent value="referrer" className="m-0">
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-center">
-                    <span>Referrer</span>
-                    <span>
-                      <Link
-                        href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_REFERRER}`}
-                        target="_blank"
-                      >
-                        <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon />
-                          Preview Referrer
-                        </Button>
-                      </Link>
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <div className="flex flex-col gap-8">
-                    <Field>
-                      <FieldLabel>Image</FieldLabel>
-                      <CMSImageField
-                        uploader={template.upload}
-                        value={
-                          values?.components?.referrer?.image?.src
-                            ? {
-                                publicUrl:
-                                  values.components.referrer?.image?.src,
-                              }
-                            : undefined
-                        }
-                        onValueChange={(r) => {
-                          props.set("components.referrer.image", {
-                            type: "image",
-                            src: r?.publicUrl,
-                          });
-                        }}
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Title</FieldLabel>
-                      <Input
-                        value={values?.components?.referrer?.title}
-                        onChange={(e) => {
-                          props.set(
-                            "components.referrer.title",
-                            e.target.value
-                          );
-                        }}
-                        placeholder="Enter your title"
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Description</FieldLabel>
-                      <Textarea
-                        value={values?.components?.referrer?.description}
-                        onChange={(e) => {
-                          props.set(
-                            "components.referrer.description",
-                            e.target.value
-                          );
-                        }}
-                        placeholder="Enter your description"
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Invitation Card Content</FieldLabel>
-                      <CMSRichText
-                        value={
-                          values?.components?.referrer?.invitation_card_content
-                            ?.html ?? ""
-                        }
-                        uploader={template.upload}
-                        onValueChange={(value) => {
-                          props.set(
-                            "components.referrer.invitation_card_content",
-                            {
-                              type: "richtext",
-                              html: value,
-                            }
-                          );
-                        }}
-                      />
-                      <FieldDescription className="text-xs text-muted-foreground">
-                        This content appears inside the invitation card on the
-                        referrer page.
-                      </FieldDescription>
-                    </Field>
-                    <Field>
-                      <FieldLabel>Show Invitation List</FieldLabel>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          checked={
-                            !!values?.components?.referrer?.show_invitations
+          <aside className="flex-1 min-h-0 flex flex-col w-full">
+            <RightPanelTab
+              value="referrer"
+              title="Referrer"
+              action={
+                <Link
+                  href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_REFERRER}`}
+                  target="_blank"
+                >
+                  <Button size="xs" variant="outline">
+                    <OpenInNewWindowIcon />
+                    Preview Referrer
+                  </Button>
+                </Link>
+              }
+            >
+              <div className="flex flex-col gap-8">
+                <Field>
+                  <FieldLabel>Image</FieldLabel>
+                  <CMSImageField
+                    uploader={template.upload}
+                    value={
+                      values?.components?.referrer?.image?.src
+                        ? {
+                            publicUrl: values.components.referrer?.image?.src,
                           }
-                          onCheckedChange={(checked) => {
-                            props.set(
-                              "components.referrer.show_invitations",
-                              !!checked
-                            );
-                          }}
-                        />
-                        <FieldDescription className="text-sm text-muted-foreground">
-                          Show the invite list section on the referrer page.
-                        </FieldDescription>
-                      </div>
-                    </Field>
-                    <Field>
-                      <FieldLabel>Button Text</FieldLabel>
-                      <Input
-                        value={values?.components?.referrer?.cta}
-                        onChange={(e) => {
-                          props.set("components.referrer.cta", e.target.value);
-                        }}
-                        placeholder="Button Text"
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Article</FieldLabel>
-                      <CMSRichText
-                        value={
-                          values?.components?.referrer?.article?.html ?? ""
-                        }
-                        uploader={template.upload}
-                        onValueChange={(value) => {
-                          props.set("components.referrer.article", {
-                            type: "richtext",
-                            html: value,
-                          });
-                        }}
-                      />
-                    </Field>
-                  </div>
-                </CardContent>
-              </TabsContent>
-              <TabsContent value="referrer-share" className="m-0">
-                <CardHeader>
-                  <CardTitle>Referrer Share</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <div className="flex flex-col gap-8">
-                    <Field>
-                      <FieldLabel>Article</FieldLabel>
-                      <CMSRichText
-                        value={
-                          values?.components?.["referrer-share"]?.article
-                            ?.html ?? ""
-                        }
-                        uploader={template.upload}
-                        onValueChange={(value) => {
-                          props.set("components.referrer-share.article", {
-                            type: "richtext",
-                            html: value,
-                          });
-                        }}
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Consent</FieldLabel>
-                      <Textarea
-                        value={
-                          values?.components?.["referrer-share"]?.consent ?? ""
-                        }
-                        onChange={(e) => {
-                          props.set(
-                            "components.referrer-share.consent",
-                            e.target.value
-                          );
-                        }}
-                        placeholder="Enter your consent"
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Button Text</FieldLabel>
-                      <Input
-                        value={values?.components?.referrer?.cta}
-                        onChange={(e) => {
-                          props.set(
-                            "components.referrer-share.cta",
-                            e.target.value
-                          );
-                        }}
-                        placeholder="Button Text"
-                      />
-                    </Field>
-                  </div>
-                </CardContent>
-              </TabsContent>
-              <TabsContent value="referrer-share-message" className="m-0">
-                <CardHeader>
-                  <CardTitle>Referrer Share Message</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <div className="flex flex-col gap-8">
-                    <Field>
-                      <FieldLabel>Message</FieldLabel>
-                      <Textarea
-                        placeholder="Enter your message"
-                        value={
-                          values?.components?.["referrer-share-message"]
-                            ?.message ?? ""
-                        }
-                        onChange={(e) => {
-                          props.set(
-                            "components.referrer-share-message.message",
-                            e.target.value
-                          );
-                        }}
-                      />
-                    </Field>
-                  </div>
-                </CardContent>
-              </TabsContent>
-              <TabsContent value="invitation-ux-overlay" className="m-0">
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-center">
-                    <span>Invitation Ticket</span>
-                    <span>
-                      <Link
-                        href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_INVITATION}`}
-                        target="_blank"
-                      >
-                        <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon />
-                          Preview Invitation
-                        </Button>
-                      </Link>
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
-                  <div className="flex flex-col gap-8">
-                    <Field>
-                      <FieldLabel>Ticket Image</FieldLabel>
-                      <CMSImageField
-                        uploader={template.upload}
-                        value={
-                          values?.components?.["invitation-ux-overlay"]?.image
-                            ?.src
-                            ? {
-                                publicUrl:
-                                  values.components["invitation-ux-overlay"]
-                                    ?.image?.src,
-                              }
-                            : undefined
-                        }
-                        onValueChange={(r) => {
-                          props.set("components.invitation-ux-overlay.image", {
-                            type: "image",
-                            src: r?.publicUrl,
-                          });
-                        }}
-                      />
-                    </Field>
-                  </div>
-                </CardContent>
-              </TabsContent>
-              <TabsContent value="invitation" className="m-0">
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-center">
-                    <span>Invitation</span>
-                    <span>
-                      <Link
-                        href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_INVITATION}`}
-                        target="_blank"
-                      >
-                        <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon />
-                          Preview Invitation
-                        </Button>
-                      </Link>
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
-                  <div className="flex flex-col gap-8">
-                    <Field>
-                      <FieldLabel>Image</FieldLabel>
-                      <CMSImageField
-                        uploader={template.upload}
-                        value={
-                          values?.components?.invitation?.image?.src
-                            ? {
-                                publicUrl:
-                                  values.components.invitation?.image?.src,
-                              }
-                            : undefined
-                        }
-                        onValueChange={(r) => {
-                          props.set("components.invitation.image", {
-                            type: "image",
-                            src: r?.publicUrl,
-                          });
-                        }}
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Title</FieldLabel>
-
-                      <Input
-                        value={values?.components?.invitation?.title}
-                        onChange={(e) => {
-                          props.set(
-                            "components.invitation.title",
-                            e.target.value
-                          );
-                        }}
-                        placeholder="Enter your title"
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Description</FieldLabel>
-                      <Textarea
-                        value={
-                          values?.components?.invitation?.description as string
-                        }
-                        onChange={(e) => {
-                          props.set(
-                            "components.invitation.description",
-                            e.target.value
-                          );
-                        }}
-                        placeholder="Enter your description"
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Invitation Card Content</FieldLabel>
-                      <CMSRichText
-                        value={
-                          values?.components?.invitation
-                            ?.invitation_card_content?.html ?? ""
-                        }
-                        uploader={template.upload}
-                        onValueChange={(value) => {
-                          props.set(
-                            "components.invitation.invitation_card_content",
-                            {
-                              type: "richtext",
-                              html: value,
-                            }
-                          );
-                        }}
-                      />
-                      <FieldDescription className="text-xs text-muted-foreground">
-                        This content appears inside the invitation card on the
-                        invitee page.
-                      </FieldDescription>
-                    </Field>
-                    <Field>
-                      <FieldLabel>Button Text</FieldLabel>
-                      <Input
-                        value={values?.components?.invitation?.cta as string}
-                        onChange={(e) => {
-                          props.set(
-                            "components.invitation.cta",
-                            e.target.value
-                          );
-                        }}
-                        placeholder="Button Text"
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Article</FieldLabel>
-                      <CMSRichText
-                        value={
-                          values?.components?.invitation?.article?.html ?? ""
-                        }
-                        uploader={template.upload}
-                        onValueChange={(value) => {
-                          props.set("components.invitation.article", {
-                            type: "richtext",
-                            html: value,
-                          });
-                        }}
-                      />
-                    </Field>
-                  </div>
-                </CardContent>
-              </TabsContent>
-              <TabsContent value="theme" className="m-0">
-                <CardHeader>
-                  <CardTitle>Theme</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
-                  <div className="grid gap-2">
-                    <NavbarLogoEditor
-                      logo={values?.theme?.navbar?.logo}
-                      uploader={template.upload}
-                      onLogoChange={(file, type) => {
-                        if (type === "src")
-                          props.set("theme.navbar.logo.src", file.publicUrl);
-                        if (type === "srcDark")
-                          props.set(
-                            "theme.navbar.logo.srcDark",
-                            file.publicUrl
-                          );
+                        : undefined
+                    }
+                    onValueChange={(r) => {
+                      props.set("components.referrer.image", {
+                        type: "image",
+                        src: r?.publicUrl,
+                      });
+                    }}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Title</FieldLabel>
+                  <Input
+                    value={values?.components?.referrer?.title}
+                    onChange={(e) => {
+                      props.set("components.referrer.title", e.target.value);
+                    }}
+                    placeholder="Enter your title"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Description</FieldLabel>
+                  <Textarea
+                    value={values?.components?.referrer?.description}
+                    onChange={(e) => {
+                      props.set(
+                        "components.referrer.description",
+                        e.target.value
+                      );
+                    }}
+                    placeholder="Enter your description"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Invitation Card Content</FieldLabel>
+                  <CMSRichText
+                    value={
+                      values?.components?.referrer?.invitation_card_content
+                        ?.html ?? ""
+                    }
+                    uploader={template.upload}
+                    onValueChange={(value) => {
+                      props.set("components.referrer.invitation_card_content", {
+                        type: "richtext",
+                        html: value,
+                      });
+                    }}
+                  />
+                  <FieldDescription className="text-xs text-muted-foreground">
+                    This content appears inside the invitation card on the
+                    referrer page.
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>Show Invitation List</FieldLabel>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={!!values?.components?.referrer?.show_invitations}
+                      onCheckedChange={(checked) => {
+                        props.set(
+                          "components.referrer.show_invitations",
+                          !!checked
+                        );
                       }}
                     />
+                    <FieldDescription className="text-sm text-muted-foreground">
+                      Show the invite list section on the referrer page.
+                    </FieldDescription>
                   </div>
-                  <Field>
-                    <FieldLabel>Locale</FieldLabel>
-                    <Select
-                      value={values?.locale}
-                      onValueChange={(v) => {
-                        props.set("locale", v);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Locale" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ko">Korean</SelectItem>
-                        <SelectItem value="en">English</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <div className="mt-10">
-                    You can{" "}
-                    <Link
-                      href={`/${project.organization_name}/${project.name}/www`}
-                      target="_blank"
-                      className="underline"
-                    >
-                      manage site settings here
-                    </Link>
-                  </div>
-                </CardContent>
-              </TabsContent>
-            </Card>
+                </Field>
+                <Field>
+                  <FieldLabel>Button Text</FieldLabel>
+                  <Input
+                    value={values?.components?.referrer?.cta}
+                    onChange={(e) => {
+                      props.set("components.referrer.cta", e.target.value);
+                    }}
+                    placeholder="Button Text"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Article</FieldLabel>
+                  <CMSRichText
+                    value={values?.components?.referrer?.article?.html ?? ""}
+                    uploader={template.upload}
+                    onValueChange={(value) => {
+                      props.set("components.referrer.article", {
+                        type: "richtext",
+                        html: value,
+                      });
+                    }}
+                  />
+                </Field>
+              </div>
+            </RightPanelTab>
+
+            <RightPanelTab value="referrer-share" title="Referrer Share">
+              <div className="flex flex-col gap-8">
+                <Field>
+                  <FieldLabel>Article</FieldLabel>
+                  <CMSRichText
+                    value={
+                      values?.components?.["referrer-share"]?.article?.html ?? ""
+                    }
+                    uploader={template.upload}
+                    onValueChange={(value) => {
+                      props.set("components.referrer-share.article", {
+                        type: "richtext",
+                        html: value,
+                      });
+                    }}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Consent</FieldLabel>
+                  <Textarea
+                    value={values?.components?.["referrer-share"]?.consent ?? ""}
+                    onChange={(e) => {
+                      props.set(
+                        "components.referrer-share.consent",
+                        e.target.value
+                      );
+                    }}
+                    placeholder="Enter your consent"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Button Text</FieldLabel>
+                  <Input
+                    value={values?.components?.referrer?.cta}
+                    onChange={(e) => {
+                      props.set("components.referrer-share.cta", e.target.value);
+                    }}
+                    placeholder="Button Text"
+                  />
+                </Field>
+              </div>
+            </RightPanelTab>
+
+            <RightPanelTab
+              value="referrer-share-message"
+              title="Referrer Share Message"
+            >
+              <div className="flex flex-col gap-8">
+                <Field>
+                  <FieldLabel>Message</FieldLabel>
+                  <Textarea
+                    placeholder="Enter your message"
+                    value={
+                      values?.components?.["referrer-share-message"]?.message ??
+                      ""
+                    }
+                    onChange={(e) => {
+                      props.set(
+                        "components.referrer-share-message.message",
+                        e.target.value
+                      );
+                    }}
+                  />
+                </Field>
+              </div>
+            </RightPanelTab>
+
+            <RightPanelTab
+              value="invitation-ux-overlay"
+              title="Invitation Ticket"
+              action={
+                <Link
+                  href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_INVITATION}`}
+                  target="_blank"
+                >
+                  <Button size="xs" variant="outline">
+                    <OpenInNewWindowIcon />
+                    Preview Invitation
+                  </Button>
+                </Link>
+              }
+            >
+              <div className="flex flex-col gap-8">
+                <Field>
+                  <FieldLabel>Ticket Image</FieldLabel>
+                  <CMSImageField
+                    uploader={template.upload}
+                    value={
+                      values?.components?.["invitation-ux-overlay"]?.image?.src
+                        ? {
+                            publicUrl:
+                              values.components["invitation-ux-overlay"]?.image
+                                ?.src,
+                          }
+                        : undefined
+                    }
+                    onValueChange={(r) => {
+                      props.set("components.invitation-ux-overlay.image", {
+                        type: "image",
+                        src: r?.publicUrl,
+                      });
+                    }}
+                  />
+                </Field>
+              </div>
+            </RightPanelTab>
+
+            <RightPanelTab
+              value="invitation"
+              title="Invitation"
+              action={
+                <Link
+                  href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_INVITATION}`}
+                  target="_blank"
+                >
+                  <Button size="xs" variant="outline">
+                    <OpenInNewWindowIcon />
+                    Preview Invitation
+                  </Button>
+                </Link>
+              }
+            >
+              <div className="flex flex-col gap-8">
+                <Field>
+                  <FieldLabel>Image</FieldLabel>
+                  <CMSImageField
+                    uploader={template.upload}
+                    value={
+                      values?.components?.invitation?.image?.src
+                        ? {
+                            publicUrl: values.components.invitation?.image?.src,
+                          }
+                        : undefined
+                    }
+                    onValueChange={(r) => {
+                      props.set("components.invitation.image", {
+                        type: "image",
+                        src: r?.publicUrl,
+                      });
+                    }}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Title</FieldLabel>
+
+                  <Input
+                    value={values?.components?.invitation?.title}
+                    onChange={(e) => {
+                      props.set("components.invitation.title", e.target.value);
+                    }}
+                    placeholder="Enter your title"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Description</FieldLabel>
+                  <Textarea
+                    value={values?.components?.invitation?.description as string}
+                    onChange={(e) => {
+                      props.set(
+                        "components.invitation.description",
+                        e.target.value
+                      );
+                    }}
+                    placeholder="Enter your description"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Invitation Card Content</FieldLabel>
+                  <CMSRichText
+                    value={
+                      values?.components?.invitation?.invitation_card_content
+                        ?.html ?? ""
+                    }
+                    uploader={template.upload}
+                    onValueChange={(value) => {
+                      props.set(
+                        "components.invitation.invitation_card_content",
+                        {
+                          type: "richtext",
+                          html: value,
+                        }
+                      );
+                    }}
+                  />
+                  <FieldDescription className="text-xs text-muted-foreground">
+                    This content appears inside the invitation card on the
+                    invitee page.
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>Button Text</FieldLabel>
+                  <Input
+                    value={values?.components?.invitation?.cta as string}
+                    onChange={(e) => {
+                      props.set("components.invitation.cta", e.target.value);
+                    }}
+                    placeholder="Button Text"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Article</FieldLabel>
+                  <CMSRichText
+                    value={values?.components?.invitation?.article?.html ?? ""}
+                    uploader={template.upload}
+                    onValueChange={(value) => {
+                      props.set("components.invitation.article", {
+                        type: "richtext",
+                        html: value,
+                      });
+                    }}
+                  />
+                </Field>
+              </div>
+            </RightPanelTab>
+
+            <RightPanelTab value="theme" title="Theme">
+              <div className="grid gap-2">
+                <NavbarLogoEditor
+                  logo={values?.theme?.navbar?.logo}
+                  uploader={template.upload}
+                  onLogoChange={(file, type) => {
+                    if (type === "src")
+                      props.set("theme.navbar.logo.src", file.publicUrl);
+                    if (type === "srcDark")
+                      props.set("theme.navbar.logo.srcDark", file.publicUrl);
+                  }}
+                />
+              </div>
+              <Field>
+                <FieldLabel>Locale</FieldLabel>
+                <Select
+                  value={values?.locale}
+                  onValueChange={(v) => {
+                    props.set("locale", v);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Locale" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ko">Korean</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <div className="mt-10">
+                You can{" "}
+                <Link
+                  href={`/${project.organization_name}/${project.name}/www`}
+                  target="_blank"
+                  className="underline"
+                >
+                  manage site settings here
+                </Link>
+              </div>
+            </RightPanelTab>
           </aside>
         </div>
       </Tabs>
