@@ -2,12 +2,6 @@
   "name": "@grida/fonts",
   "version": "0.0.0",
   "private": false,
-  "scripts": {
-    "typecheck": "tsc --noEmit",
-    "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts --watch",
-    "build": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts",
-    "test": "vitest run"
-  },
   "files": [
     "dist"
   ],
@@ -53,7 +47,13 @@
       "require": "./dist/k.js"
     }
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts --watch",
+    "build": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts",
+    "test": "vitest run"
+  },
   "devDependencies": {
-    "@types/node": "^22.15.28"
+    "@types/node": "^22"
   }
 }

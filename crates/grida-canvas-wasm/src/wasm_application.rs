@@ -1,13 +1,29 @@
 use crate::_internal::*;
 use cg::window::application::ApplicationApi;
-use cg::window::application_emscripten::EmscriptenApplication;
+use cg::window::application::UnknownTargetApplication;
 use serde::Serialize;
 use std::boxed::Box;
-use std::ffi::CString;
+
+fn alloc_len_prefixed(bytes: &[u8]) -> *const u8 {
+    let Ok(len_u32) = u32::try_from(bytes.len()) else {
+        return std::ptr::null();
+    };
+    let total = 4 + bytes.len();
+    let out = allocate(total) as *mut u8;
+    let len_bytes = len_u32.to_le_bytes();
+    unsafe {
+        std::ptr::copy_nonoverlapping(len_bytes.as_ptr(), out, 4);
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), out.add(4), bytes.len());
+    }
+    out
+}
 
 // ====================================================================================================
 // #region: main app lifecycle
 // ====================================================================================================
+
+const BACKEND_WEBGL: u32 = 0;
+const BACKEND_RASTER: u32 = 1;
 
 #[no_mangle]
 /// js::_init
@@ -15,25 +31,65 @@ pub extern "C" fn init(
     width: i32,
     height: i32,
     use_embedded_fonts: bool,
-) -> Box<EmscriptenApplication> {
-    EmscriptenApplication::new(
-        width,
-        height,
-        cg::runtime::scene::RendererOptions { use_embedded_fonts },
-    )
+) -> Box<UnknownTargetApplication> {
+    init_with_backend(BACKEND_WEBGL, width, height, use_embedded_fonts)
+}
+
+#[no_mangle]
+/// js::_init_with_backend
+///
+/// backend_id:
+/// - 0 (`BACKEND_WEBGL`): webgl (emscripten/webgl2)
+/// - 1 (`BACKEND_RASTER`): raster (cpu)
+pub extern "C" fn init_with_backend(
+    backend_id: u32,
+    width: i32,
+    height: i32,
+    use_embedded_fonts: bool,
+) -> Box<UnknownTargetApplication> {
+    let options = cg::runtime::scene::RendererOptions { use_embedded_fonts };
+    match backend_id {
+        BACKEND_RASTER => UnknownTargetApplication::new_raster(width, height, options),
+        _ => cg::window::application_emscripten::new_webgl_app(width, height, options),
+    }
 }
 
 #[no_mangle]
 /// js::_tick
-pub unsafe extern "C" fn tick(app: *mut EmscriptenApplication, time: f64) {
+pub unsafe extern "C" fn tick(app: *mut UnknownTargetApplication, time: f64) {
     if let Some(app) = app.as_mut() {
         app.tick(time);
     }
 }
 
 #[no_mangle]
+/// js::_destroy
+///
+/// Release an application created by `_init(...)` / `_init_with_backend(...)`.
+///
+/// - Raster (headless) apps are freed immediately.
+/// - WebGL apps are driven by an Emscripten RAF loop; `_destroy` first requests
+///   the loop to stop, then the loop frees the application on its final tick.
+pub unsafe extern "C" fn destroy(app: *mut UnknownTargetApplication) {
+    let Some(app_ref) = app.as_mut() else {
+        return;
+    };
+
+    if app_ref.auto_tick() {
+        app_ref.request_stop();
+        return;
+    }
+
+    drop(Box::from_raw(app));
+}
+
+#[no_mangle]
 /// js::_resize_surface
-pub unsafe extern "C" fn resize_surface(app: *mut EmscriptenApplication, width: i32, height: i32) {
+pub unsafe extern "C" fn resize_surface(
+    app: *mut UnknownTargetApplication,
+    width: i32,
+    height: i32,
+) {
     if let Some(app) = app.as_mut() {
         app.resize(width as u32, height as u32);
     }
@@ -41,7 +97,7 @@ pub unsafe extern "C" fn resize_surface(app: *mut EmscriptenApplication, width: 
 
 #[no_mangle]
 /// js::_redraw
-pub unsafe extern "C" fn redraw(app: *mut EmscriptenApplication) {
+pub unsafe extern "C" fn redraw(app: *mut UnknownTargetApplication) {
     if let Some(app) = app.as_mut() {
         app.redraw();
     }
@@ -50,7 +106,7 @@ pub unsafe extern "C" fn redraw(app: *mut EmscriptenApplication) {
 #[no_mangle]
 /// js::_load_scene_json
 pub unsafe extern "C" fn load_scene_json(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
 ) {
@@ -65,7 +121,7 @@ pub unsafe extern "C" fn load_scene_json(
 #[no_mangle]
 /// js::_apply_scene_transactions
 pub unsafe extern "C" fn apply_scene_transactions(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
 ) -> *const u8 {
@@ -74,9 +130,7 @@ pub unsafe extern "C" fn apply_scene_transactions(
             match app.apply_document_transactions_json(&json) {
                 Ok(reports) => {
                     if let Ok(output) = serde_json::to_string(&reports) {
-                        if let Ok(cstr) = CString::new(output) {
-                            return cstr.into_raw() as *const u8;
-                        }
+                        return alloc_len_prefixed(output.as_bytes());
                     }
                 }
                 Err(err) => {
@@ -90,7 +144,7 @@ pub unsafe extern "C" fn apply_scene_transactions(
 
 #[no_mangle]
 /// js::_pointer_move
-pub unsafe extern "C" fn pointer_move(app: *mut EmscriptenApplication, x: f32, y: f32) {
+pub unsafe extern "C" fn pointer_move(app: *mut UnknownTargetApplication, x: f32, y: f32) {
     if let Some(app) = app.as_mut() {
         app.pointer_move(x, y);
     }
@@ -98,7 +152,7 @@ pub unsafe extern "C" fn pointer_move(app: *mut EmscriptenApplication, x: f32, y
 
 #[no_mangle]
 /// js::_command
-pub unsafe extern "C" fn command(app: *mut EmscriptenApplication, id: u32, a: f32, b: f32) {
+pub unsafe extern "C" fn command(app: *mut UnknownTargetApplication, id: u32, a: f32, b: f32) {
     use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {
         let cmd = match id {
@@ -115,7 +169,7 @@ pub unsafe extern "C" fn command(app: *mut EmscriptenApplication, id: u32, a: f3
 #[no_mangle]
 /// js::_set_main_camera_transform
 pub unsafe extern "C" fn set_main_camera_transform(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     a: f32,
     c: f32,
     e: f32,
@@ -148,7 +202,7 @@ pub struct CreateImageResourceResult {
 #[no_mangle]
 /// js::_add_image
 pub unsafe extern "C" fn add_image(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     data_ptr: *const u8,
     data_len: usize,
 ) -> *const u8 {
@@ -163,9 +217,7 @@ pub unsafe extern "C" fn add_image(
             r#type,
         };
         if let Ok(json) = serde_json::to_string(&result) {
-            if let Ok(cstr) = CString::new(json) {
-                return cstr.into_raw() as *const u8;
-            }
+            return alloc_len_prefixed(json.as_bytes());
         }
     }
     std::ptr::null()
@@ -174,7 +226,7 @@ pub unsafe extern "C" fn add_image(
 #[no_mangle]
 /// js::_get_image_bytes
 pub unsafe extern "C" fn get_image_bytes(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
 ) -> *const u8 {
@@ -194,7 +246,7 @@ pub unsafe extern "C" fn get_image_bytes(
 #[no_mangle]
 /// js::_get_image_size
 pub unsafe extern "C" fn get_image_size(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
 ) -> *const u32 {
@@ -226,7 +278,7 @@ pub struct FontKey {
 #[no_mangle]
 /// js::_add_font
 pub unsafe extern "C" fn add_font(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     family_ptr: *const u8,
     family_len: usize,
     data_ptr: *const u8,
@@ -242,7 +294,7 @@ pub unsafe extern "C" fn add_font(
 
 #[no_mangle]
 /// js::_has_missing_fonts
-pub unsafe extern "C" fn has_missing_fonts(app: *mut EmscriptenApplication) -> bool {
+pub unsafe extern "C" fn has_missing_fonts(app: *mut UnknownTargetApplication) -> bool {
     if let Some(app) = app.as_ref() {
         app.has_missing_fonts()
     } else {
@@ -252,9 +304,8 @@ pub unsafe extern "C" fn has_missing_fonts(app: *mut EmscriptenApplication) -> b
 
 #[no_mangle]
 /// js::_list_missing_fonts
-pub unsafe extern "C" fn list_missing_fonts(app: *mut EmscriptenApplication) -> *const u8 {
+pub unsafe extern "C" fn list_missing_fonts(app: *mut UnknownTargetApplication) -> *const u8 {
     use serde_json;
-    use std::ffi::CString;
 
     if let Some(app) = app.as_ref() {
         let fonts = app
@@ -263,9 +314,7 @@ pub unsafe extern "C" fn list_missing_fonts(app: *mut EmscriptenApplication) -> 
             .map(|family| FontKey { family })
             .collect::<Vec<FontKey>>();
         if let Ok(json) = serde_json::to_string(&fonts) {
-            if let Ok(cstr) = CString::new(json) {
-                return cstr.into_raw() as *const u8;
-            }
+            return alloc_len_prefixed(json.as_bytes());
         }
     }
     std::ptr::null()
@@ -273,9 +322,8 @@ pub unsafe extern "C" fn list_missing_fonts(app: *mut EmscriptenApplication) -> 
 
 #[no_mangle]
 /// js::_list_available_fonts
-pub unsafe extern "C" fn list_available_fonts(app: *mut EmscriptenApplication) -> *const u8 {
+pub unsafe extern "C" fn list_available_fonts(app: *mut UnknownTargetApplication) -> *const u8 {
     use serde_json;
-    use std::ffi::CString;
 
     if let Some(app) = app.as_ref() {
         let fonts = app
@@ -284,9 +332,7 @@ pub unsafe extern "C" fn list_available_fonts(app: *mut EmscriptenApplication) -
             .map(|family| FontKey { family })
             .collect::<Vec<FontKey>>();
         if let Ok(json) = serde_json::to_string(&fonts) {
-            if let Ok(cstr) = CString::new(json) {
-                return cstr.into_raw() as *const u8;
-            }
+            return alloc_len_prefixed(json.as_bytes());
         }
     }
     std::ptr::null()
@@ -295,7 +341,7 @@ pub unsafe extern "C" fn list_available_fonts(app: *mut EmscriptenApplication) -
 #[no_mangle]
 /// js::_set_default_fallback_fonts
 pub unsafe extern "C" fn set_default_fallback_fonts(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
 ) {
@@ -311,16 +357,15 @@ pub unsafe extern "C" fn set_default_fallback_fonts(
 
 #[no_mangle]
 /// js::_get_default_fallback_fonts
-pub unsafe extern "C" fn get_default_fallback_fonts(app: *mut EmscriptenApplication) -> *const u8 {
+pub unsafe extern "C" fn get_default_fallback_fonts(
+    app: *mut UnknownTargetApplication,
+) -> *const u8 {
     use serde_json;
-    use std::ffi::CString;
 
     if let Some(app) = app.as_ref() {
         let fonts = app.get_default_fallback_fonts();
         if let Ok(json) = serde_json::to_string(&fonts) {
-            if let Ok(cstr) = CString::new(json) {
-                return cstr.into_raw() as *const u8;
-            }
+            return alloc_len_prefixed(json.as_bytes());
         }
     }
     std::ptr::null()
@@ -335,15 +380,13 @@ pub unsafe extern "C" fn get_default_fallback_fonts(app: *mut EmscriptenApplicat
 #[no_mangle]
 /// js::_get_node_id_from_point
 pub unsafe extern "C" fn get_node_id_from_point(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
 ) -> *const u8 {
-    use std::ffi::CString;
-
     if let Some(app) = app.as_mut() {
         if let Some(s) = app.get_node_id_from_point([x, y]) {
-            return CString::new(s).unwrap().into_raw() as *const u8;
+            return alloc_len_prefixed(s.as_bytes());
         }
     }
     std::ptr::null()
@@ -352,19 +395,16 @@ pub unsafe extern "C" fn get_node_id_from_point(
 #[no_mangle]
 /// js::_get_node_ids_from_point
 pub unsafe extern "C" fn get_node_ids_from_point(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
 ) -> *const u8 {
     use serde_json;
-    use std::ffi::CString;
 
     if let Some(app) = app.as_mut() {
         let ids = app.get_node_ids_from_point([x, y]);
         if let Ok(json) = serde_json::to_string(&ids) {
-            if let Ok(cstr) = CString::new(json) {
-                return cstr.into_raw() as *const u8;
-            }
+            return alloc_len_prefixed(json.as_bytes());
         }
     }
 
@@ -374,7 +414,7 @@ pub unsafe extern "C" fn get_node_ids_from_point(
 #[no_mangle]
 /// js::_get_node_ids_from_envelope
 pub unsafe extern "C" fn get_node_ids_from_envelope(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
     w: f32,
@@ -382,14 +422,11 @@ pub unsafe extern "C" fn get_node_ids_from_envelope(
 ) -> *const u8 {
     use math2::rect::Rectangle;
     use serde_json;
-    use std::ffi::CString;
 
     if let Some(app) = app.as_mut() {
         let ids = app.get_node_ids_from_envelope(Rectangle::from_xywh(x, y, w, h));
         if let Ok(json) = serde_json::to_string(&ids) {
-            if let Ok(cstr) = CString::new(json) {
-                return cstr.into_raw() as *const u8;
-            }
+            return alloc_len_prefixed(json.as_bytes());
         }
     }
 
@@ -399,7 +436,7 @@ pub unsafe extern "C" fn get_node_ids_from_envelope(
 #[no_mangle]
 /// js::_get_node_absolute_bounding_box
 pub unsafe extern "C" fn get_node_absolute_bounding_box(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
 ) -> *const f32 {
@@ -426,7 +463,7 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
 #[no_mangle]
 /// js::_export_node_as
 pub unsafe extern "C" fn export_node_as(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
     fmt_ptr: *const u8,
@@ -468,12 +505,11 @@ pub unsafe extern "C" fn export_node_as(
 #[no_mangle]
 /// js::_to_vector_network
 pub unsafe extern "C" fn to_vector_network(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
 ) -> *const u8 {
     use serde_json;
-    use std::ffi::CString;
 
     let (Some(app), Some(id)) = (app.as_mut(), __str_from_ptr_len(id_ptr, id_len)) else {
         return std::ptr::null();
@@ -481,9 +517,7 @@ pub unsafe extern "C" fn to_vector_network(
 
     if let Some(vn) = app.to_vector_network(&id) {
         if let Ok(json) = serde_json::to_string(&vn) {
-            if let Ok(cstr) = CString::new(json) {
-                return cstr.into_raw() as *const u8;
-            }
+            return alloc_len_prefixed(json.as_bytes());
         }
     }
 
@@ -498,7 +532,7 @@ pub unsafe extern "C" fn to_vector_network(
 
 #[no_mangle]
 /// js::_set_debug
-pub unsafe extern "C" fn set_debug(app: *mut EmscriptenApplication, debug: bool) {
+pub unsafe extern "C" fn set_debug(app: *mut UnknownTargetApplication, debug: bool) {
     if let Some(app) = app.as_mut() {
         app.set_debug(debug);
     }
@@ -506,7 +540,7 @@ pub unsafe extern "C" fn set_debug(app: *mut EmscriptenApplication, debug: bool)
 
 #[no_mangle]
 /// js::_toggle_debug
-pub unsafe extern "C" fn toggle_debug(app: *mut EmscriptenApplication) {
+pub unsafe extern "C" fn toggle_debug(app: *mut UnknownTargetApplication) {
     if let Some(app) = app.as_mut() {
         app.toggle_debug();
     }
@@ -514,7 +548,7 @@ pub unsafe extern "C" fn toggle_debug(app: *mut EmscriptenApplication) {
 
 #[no_mangle]
 /// js::_set_verbose
-pub unsafe extern "C" fn set_verbose(app: *mut EmscriptenApplication, verbose: bool) {
+pub unsafe extern "C" fn set_verbose(app: *mut UnknownTargetApplication, verbose: bool) {
     if let Some(app) = app.as_mut() {
         app.set_verbose(verbose);
     }
@@ -523,7 +557,7 @@ pub unsafe extern "C" fn set_verbose(app: *mut EmscriptenApplication, verbose: b
 #[no_mangle]
 /// js::_devtools_rendering_set_show_ruler
 pub unsafe extern "C" fn devtools_rendering_set_show_ruler(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     show: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -534,7 +568,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_ruler(
 #[no_mangle]
 /// js::_devtools_rendering_set_show_tiles
 pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     enabled: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -545,7 +579,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
 #[no_mangle]
 /// js::_runtime_renderer_set_cache_tile
 pub unsafe extern "C" fn runtime_renderer_set_cache_tile(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     enabled: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -556,7 +590,7 @@ pub unsafe extern "C" fn runtime_renderer_set_cache_tile(
 #[no_mangle]
 /// js::_devtools_rendering_set_show_fps_meter
 pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     show: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -567,7 +601,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
 #[no_mangle]
 /// js::_devtools_rendering_set_show_stats
 pub unsafe extern "C" fn devtools_rendering_set_show_stats(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     show: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -578,7 +612,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_stats(
 #[no_mangle]
 /// js::_devtools_rendering_set_show_hit_testing
 pub unsafe extern "C" fn devtools_rendering_set_show_hit_testing(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     show: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -595,7 +629,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_hit_testing(
 #[no_mangle]
 /// js::_highlight_strokes
 pub unsafe extern "C" fn highlight_strokes(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
 ) {
@@ -647,7 +681,7 @@ pub unsafe extern "C" fn highlight_strokes(
 
 #[no_mangle]
 /// js::_load_dummy_scene
-pub unsafe extern "C" fn load_dummy_scene(app: *mut EmscriptenApplication) {
+pub unsafe extern "C" fn load_dummy_scene(app: *mut UnknownTargetApplication) {
     if let Some(app) = app.as_mut() {
         app.load_dummy_scene();
     }
@@ -656,7 +690,7 @@ pub unsafe extern "C" fn load_dummy_scene(app: *mut EmscriptenApplication) {
 #[no_mangle]
 /// js::_load_benchmark_scene
 pub unsafe extern "C" fn load_benchmark_scene(
-    app: *mut EmscriptenApplication,
+    app: *mut UnknownTargetApplication,
     cols: u32,
     rows: u32,
 ) {

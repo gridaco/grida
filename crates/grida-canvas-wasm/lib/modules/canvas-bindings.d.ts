@@ -1,6 +1,6 @@
 declare namespace canvas {
   type Ptr = number;
-  type GridaCanvasWebGlApplicationPtr = number;
+  type GridaCanvasApplicationPtr = number;
 
   export interface CanvasModule {
     // core memory wrapper
@@ -14,72 +14,80 @@ declare namespace canvas {
       width: number,
       height: number,
       use_embedded_fonts: boolean
-    ): GridaCanvasWebGlApplicationPtr;
+    ): GridaCanvasApplicationPtr;
+
+    _init_with_backend(
+      backend_id: number,
+      width: number,
+      height: number,
+      use_embedded_fonts: boolean
+    ): GridaCanvasApplicationPtr;
 
     // ====================================================================================================
     // APPLICATION METHODS
     // ====================================================================================================
-    _tick(state: GridaCanvasWebGlApplicationPtr, time: number): void;
+    _tick(state: GridaCanvasApplicationPtr, time: number): void;
+    _destroy(state: GridaCanvasApplicationPtr): void;
     _resize_surface(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       width: number,
       height: number
     ): void;
-    _redraw(state: GridaCanvasWebGlApplicationPtr): void;
+    _redraw(state: GridaCanvasApplicationPtr): void;
     _load_scene_json(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number
     ): void;
     _apply_scene_transactions(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number
     ): Ptr;
-    _load_dummy_scene(state: GridaCanvasWebGlApplicationPtr): void;
+    _load_dummy_scene(state: GridaCanvasApplicationPtr): void;
     _load_benchmark_scene(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       cols: number,
       rows: number
     ): void;
     _pointer_move(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       x: number,
       y: number
     ): void;
     _add_font(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       family_ptr: number,
       family_len: number,
       data_ptr: number,
       data_len: number
     ): void;
     _add_image(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       data_ptr: number,
       data_len: number
     ): Ptr;
     _get_image_bytes(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       ref_ptr: number,
       ref_len: number
     ): Ptr;
     _get_image_size(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       ref_ptr: number,
       ref_len: number
     ): Ptr;
-    _has_missing_fonts(state: GridaCanvasWebGlApplicationPtr): boolean;
-    _list_missing_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
-    _list_available_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
+    _has_missing_fonts(state: GridaCanvasApplicationPtr): boolean;
+    _list_missing_fonts(state: GridaCanvasApplicationPtr): Ptr;
+    _list_available_fonts(state: GridaCanvasApplicationPtr): Ptr;
     _set_default_fallback_fonts(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number
     ): void;
-    _get_default_fallback_fonts(state: GridaCanvasWebGlApplicationPtr): Ptr;
+    _get_default_fallback_fonts(state: GridaCanvasApplicationPtr): Ptr;
     _set_main_camera_transform(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       a: number,
       c: number,
       e: number,
@@ -88,30 +96,30 @@ declare namespace canvas {
       f: number
     ): void;
     _get_node_id_from_point(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       x: number,
       y: number
     ): Ptr;
     _get_node_ids_from_point(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       x: number,
       y: number
     ): Ptr;
     _get_node_ids_from_envelope(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       x: number,
       y: number,
       w: number,
       h: number
     ): Ptr;
     _get_node_absolute_bounding_box(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number
     ): Ptr;
 
     _export_node_as(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       id_ptr: number,
       id_len: number,
       fmt_ptr: number,
@@ -119,50 +127,50 @@ declare namespace canvas {
     ): Ptr;
 
     _to_vector_network(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       id_ptr: number,
       id_len: number
     ): Ptr;
 
     _command(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       id: number,
       a: number,
       b: number
     ): void;
 
     _highlight_strokes(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number
     ): void;
 
-    _set_debug(state: GridaCanvasWebGlApplicationPtr, debug: boolean): void;
-    _toggle_debug(state: GridaCanvasWebGlApplicationPtr): void;
-    _set_verbose(state: GridaCanvasWebGlApplicationPtr, verbose: boolean): void;
+    _set_debug(state: GridaCanvasApplicationPtr, debug: boolean): void;
+    _toggle_debug(state: GridaCanvasApplicationPtr): void;
+    _set_verbose(state: GridaCanvasApplicationPtr, verbose: boolean): void;
     _devtools_rendering_set_show_tiles(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       show: boolean
     ): void;
     _devtools_rendering_set_show_fps_meter(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       show: boolean
     ): void;
     _devtools_rendering_set_show_stats(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       show: boolean
     ): void;
     _devtools_rendering_set_show_hit_testing(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       show: boolean
     ): void;
     _devtools_rendering_set_show_ruler(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       show: boolean
     ): void;
 
     _runtime_renderer_set_cache_tile(
-      state: GridaCanvasWebGlApplicationPtr,
+      state: GridaCanvasApplicationPtr,
       enabled: boolean
     ): void;
   }

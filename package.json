@@ -7,6 +7,7 @@
     "dev:packages": "turbo run dev --filter=./packages/*",
     "generate": "turbo run generate",
     "build": "turbo run build",
+    "build:packages": "turbo run build --filter=./packages/*",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "publish-packages": "turbo run build lint test && changeset version && changeset publish"
@@ -16,7 +17,7 @@
     "@types/node": "^22",
     "oxfmt": "^0.24.0",
     "prettier": "^3.5.3",
-    "tsup": "^8.4.0",
+    "tsup": "^8.5.0",
     "turbo": "^2.6.3",
     "typescript": "^5",
     "vitest": "^4"

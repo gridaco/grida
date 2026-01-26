@@ -78,6 +78,85 @@ unsafe extern "C" fn request_animation_frame_callback(
     true
 }
 
+#[cfg(target_os = "emscripten")]
+unsafe extern "C" fn request_animation_frame_callback_unknown_target(
+    time: f64,
+    user_data: *mut std::os::raw::c_void,
+) -> bool {
+    if !user_data.is_null() {
+        let app_ptr = user_data as *mut UnknownTargetApplication;
+        let app = &mut *app_ptr;
+
+        // Stop the loop and free the application when requested.
+        // This avoids a use-after-free if the host calls into `_destroy(...)`
+        // while the RAF loop is still active.
+        if !app.running() {
+            drop(Box::from_raw(app_ptr));
+            return false;
+        }
+
+        app.tick(time);
+    }
+    true
+}
+
+/// Create a WebGL-backed [`UnknownTargetApplication`] (Emscripten/WebGL).
+///
+/// This keeps all platform-specific GL setup and the internal RAF tick loop
+/// contained to this module, while the returned application is backend-agnostic
+/// core logic.
+pub fn new_webgl_app(
+    width: i32,
+    height: i32,
+    options: RendererOptions,
+) -> Box<UnknownTargetApplication> {
+    init_gl();
+    let mut gpu_state = create_gpu_state();
+    let surface = state::create_surface(&mut gpu_state, width, height);
+    let GpuState {
+        context,
+        framebuffer_info,
+    } = gpu_state;
+    let mut state = SurfaceState::from_parts(context, framebuffer_info, surface);
+
+    let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
+    let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
+
+    let camera = Camera2D::new(crate::node::schema::Size {
+        width: width as f32,
+        height: height as f32,
+    });
+
+    let backend = Backend::GL(state.surface_mut_ptr());
+    let mut app = Box::new(UnknownTargetApplication::new(
+        crate::window::state::AnySurfaceState::from_gpu(state),
+        backend,
+        camera,
+        120,
+        image_rx,
+        font_rx,
+        None,
+        options,
+    ));
+    app.set_auto_tick(true);
+
+    #[cfg(target_os = "emscripten")]
+    unsafe {
+        let app_ptr = Box::into_raw(app);
+        emscripten_request_animation_frame_loop(
+            Some(request_animation_frame_callback_unknown_target),
+            app_ptr as *mut _,
+        );
+        return Box::from_raw(app_ptr);
+    }
+
+    #[cfg(not(target_os = "emscripten"))]
+    {
+        // This constructor is intended for wasm/emscripten only.
+        app
+    }
+}
+
 pub struct EmscriptenApplication {
     pub(crate) base: UnknownTargetApplication,
 }
@@ -219,7 +298,14 @@ impl EmscriptenApplication {
 
         let backend = Backend::GL(state.surface_mut_ptr());
         let base = UnknownTargetApplication::new(
-            state, backend, camera, 120, image_rx, font_rx, None, options,
+            crate::window::state::AnySurfaceState::from_gpu(state),
+            backend,
+            camera,
+            120,
+            image_rx,
+            font_rx,
+            None,
+            options,
         );
         let _app = Box::new(Self { base });
 

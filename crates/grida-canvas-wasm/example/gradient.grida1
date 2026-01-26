@@ -1,0 +1,68 @@
+{
+  "version": "0.90.0-beta+20260108",
+  "document": {
+    "nodes": {
+      "gradient-rect": {
+        "id": "gradient-rect",
+        "name": "gradient-rect",
+        "locked": false,
+        "active": true,
+        "layout_positioning": "absolute",
+        "layout_inset_top": 24,
+        "layout_inset_left": 24,
+        "opacity": 1,
+        "z_index": 0,
+        "rotation": 0,
+        "layout_target_width": 208,
+        "layout_target_height": 208,
+        "type": "rectangle",
+        "corner_radius": 32,
+        "effects": [],
+        "stroke_width": 0,
+        "stroke_cap": "butt",
+        "fill_paints": [
+          {
+            "type": "linear_gradient",
+            "active": true,
+            "stops": [
+              {
+                "offset": 0,
+                "color": { "r": 0.94, "g": 0.33, "b": 0.31, "a": 1 }
+              },
+              {
+                "offset": 1,
+                "color": { "r": 0.25, "g": 0.48, "b": 0.96, "a": 1 }
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "type": "scene",
+        "id": "main",
+        "name": "main",
+        "active": true,
+        "locked": false,
+        "constraints": {
+          "children": "multiple"
+        },
+        "guides": [],
+        "edges": [],
+        "background_color": {
+          "r": 0.96,
+          "g": 0.96,
+          "b": 0.96,
+          "a": 1
+        }
+      }
+    },
+    "links": {
+      "main": ["gradient-rect"]
+    },
+    "scenes_ref": ["main"],
+    "bitmaps": {},
+    "images": {},
+    "properties": {}
+  }
+}
+

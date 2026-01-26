@@ -130,7 +130,7 @@ pub struct UnknownTargetApplication {
     pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) request_redraw: crate::runtime::scene::RequestRedrawCallback,
     pub(crate) renderer: Renderer,
-    pub(crate) state: super::state::SurfaceState,
+    pub(crate) state: super::state::AnySurfaceState,
     pub(crate) input: super::input::InputState,
     pub(crate) document_json: Option<Value>,
     pub(crate) hit_test_result: Option<crate::node::schema::NodeId>,
@@ -157,6 +157,12 @@ pub struct UnknownTargetApplication {
     /// Maintained across scene loads to enable API calls with string IDs
     id_mapping: std::collections::HashMap<UserNodeId, NodeId>,
     id_mapping_reverse: std::collections::HashMap<NodeId, UserNodeId>,
+
+    /// When `false`, any platform-managed tick loop (e.g. Emscripten RAF) should stop.
+    running: bool,
+    /// When `true`, this application is driven by a platform-managed tick loop
+    /// and should be freed by that loop after `running` becomes `false`.
+    auto_tick: bool,
 }
 
 impl ApplicationApi for UnknownTargetApplication {
@@ -170,7 +176,7 @@ impl ApplicationApi for UnknownTargetApplication {
     /// Update backing resources after a window resize.
     fn resize(&mut self, width: u32, height: u32) {
         self.state.resize(width as i32, height as i32);
-        self.renderer.backend = Backend::GL(self.state.surface_mut_ptr());
+        self.renderer.backend = self.state.backend();
 
         // Update viewport context (source of truth)
         self.renderer
@@ -432,6 +438,25 @@ impl ApplicationApi for UnknownTargetApplication {
 }
 
 impl UnknownTargetApplication {
+    /// Mark whether this application is driven by a platform-managed tick loop
+    /// (e.g. Emscripten RAF).
+    pub fn set_auto_tick(&mut self, enabled: bool) {
+        self.auto_tick = enabled;
+    }
+
+    pub fn auto_tick(&self) -> bool {
+        self.auto_tick
+    }
+
+    /// Request the platform-managed tick loop (if any) to stop.
+    pub fn request_stop(&mut self) {
+        self.running = false;
+    }
+
+    pub fn running(&self) -> bool {
+        self.running
+    }
+
     pub fn renderer_mut(&mut self) -> &mut Renderer {
         &mut self.renderer
     }
@@ -477,7 +502,7 @@ impl UnknownTargetApplication {
     /// the given backend and camera. Each platform should supply a callback
     /// that requests a redraw on the host when invoked.
     pub fn new(
-        state: super::state::SurfaceState,
+        state: super::state::AnySurfaceState,
         backend: Backend,
         camera: Camera2D,
         target_fps: u32,
@@ -523,7 +548,37 @@ impl UnknownTargetApplication {
             queue_stable_debounce_millis: 50,
             id_mapping: std::collections::HashMap::new(),
             id_mapping_reverse: std::collections::HashMap::new(),
+            running: true,
+            auto_tick: false,
         }
+    }
+
+    /// Create a new headless (CPU/raster) application.
+    ///
+    /// This is backend-agnostic core logic (no window/GL). Intended for
+    /// Node/CLI export pipelines, but also usable in wasm.
+    pub fn new_raster(width: i32, height: i32, options: crate::runtime::scene::RendererOptions) -> Box<Self> {
+        let ( _image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
+        let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
+
+        let camera = Camera2D::new(crate::node::schema::Size {
+            width: width as f32,
+            height: height as f32,
+        });
+
+        let mut state = super::state::AnySurfaceState::new_raster(width, height);
+        let backend = state.backend();
+
+        Box::new(Self::new(
+            state,
+            backend,
+            camera,
+            120,
+            image_rx,
+            font_rx,
+            None,
+            options,
+        ))
     }
 
     /// Request a redraw from the host window using the provided callback.
@@ -604,7 +659,7 @@ impl UnknownTargetApplication {
         outcome.reports
     }
 
-    pub(crate) fn apply_document_transactions_json(
+    pub fn apply_document_transactions_json(
         &mut self,
         json: &str,
     ) -> Result<Vec<TransactionApplyReport>, serde_json::Error> {
@@ -770,8 +825,19 @@ impl UnknownTargetApplication {
         self.renderer.fonts.mark_missing(family);
     }
 
+    /// Register font bytes with the renderer.
+    pub fn add_font(&mut self, family: &str, data: &[u8]) {
+        self.renderer.add_font(family, data);
+        self.renderer.invalidate_cache();
+    }
+
+    /// Register image bytes with the renderer and return metadata.
+    pub fn add_image(&mut self, data: &[u8]) -> (String, String, u32, u32, String) {
+        self.renderer.add_image(data)
+    }
+
     /// Perform a redraw and print diagnostic information.
-    pub(crate) fn redraw(&mut self) {
+    pub fn redraw(&mut self) {
         let now = self.clock.now() + self.last_frame_time.elapsed().as_secs_f64() * 1000.0;
         self.tick(now);
 
@@ -888,7 +954,7 @@ impl UnknownTargetApplication {
 
     /// Update the cursor position and run a debounced hit test.
     #[allow(dead_code)]
-    pub(crate) fn pointer_move(&mut self, x: f32, y: f32) {
+    pub fn pointer_move(&mut self, x: f32, y: f32) {
         self.input.cursor = [x, y];
         self.perform_hit_test();
     }
