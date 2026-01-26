@@ -37,11 +37,11 @@ rustflags = [
   # Allow undefined symbols (useful for dynamic linking and Skia integration)
   "-C",
   "link-arg=-sERROR_ON_UNDEFINED_SYMBOLS=0",
-  # CI note: ubuntu runners link with `-fwasm-exceptions`, and Emscripten errors
-  # if `DISABLE_EXCEPTION_CATCHING=0` is present. Force it to 1 to avoid the
-  # incompatible combination.
+  # Prefer JS-based exceptions over wasm exceptions. Some toolchains pass
+  # `-fwasm-exceptions` implicitly; `-fexceptions` makes the model explicit and
+  # avoids incompatibilities with Emscripten's DISABLE_EXCEPTION_* defaults.
   "-C",
-  "link-arg=-sDISABLE_EXCEPTION_CATCHING=1",
+  "link-arg=-fexceptions",
   # Rust std for wasm32-unknown-emscripten is built with panic=unwind, which
   # requires Emscripten longjmp support during linking.
   #
