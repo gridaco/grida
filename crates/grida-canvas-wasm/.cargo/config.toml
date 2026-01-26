@@ -40,7 +40,7 @@ rustflags = [
   # Rust std for wasm32-unknown-emscripten is built with panic=unwind, which
   # requires Emscripten longjmp support during linking.
   "-C",
-  "link-arg=-sSUPPORT_LONGJMP=1",
+  "link-arg=-sSUPPORT_LONGJMP=wasm",
   # Currently only targeting web (fs=false)
   # Target both web (browser) and Node.js.
   # NOTE: this affects the generated Emscripten JS glue (loader/runtime selection).
