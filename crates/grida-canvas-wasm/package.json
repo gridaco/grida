@@ -21,7 +21,6 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsup",
-    "prebuild": "node ./scripts/prebuild-patch-emscripten-js-glue.cjs",
     "dev": "tsup --watch",
     "serve": "serve -p 4020",
     "test": "vitest run",
