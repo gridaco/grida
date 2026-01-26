@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { UserCheck2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -39,14 +39,19 @@ const dictionary = {
     back: "← Back",
   },
   ko: {
-    title: "계속 하려면 로그인하세요",
-    description: "이메일을 입력하시면 고객 포털 인증 코드를 보내드립니다.",
+    // TODO: This is enterprise-specific copy. Replace hardcoding with a proper
+    // template/i18n engine (e.g. template variables per tenant/campaign).
+    // title: "계속 하려면 로그인하세요",
+    title: "Polestar 추천 프로그램 로그인", // TODO: remove
+    // description: "이메일을 입력하시면 고객 포털 인증 코드를 보내드립니다.",
+    description:
+      "Polestar 차량 구매 시 사용하신 Polestar ID (이메일 주소)를 입력하여 로그인하세요.", // TODO: remove
     email: "이메일",
     continue_with_email: "이메일로 계속하기",
     sending: "전송중...",
     verification: "인증하기",
     verification_description:
-      "계정이 있으시다면, <strong>{email}</strong>로 코드를 보냈습니다. 아래에 입력해 주세요.",
+      "입력하신 <strong>{email}</strong>로 인증 코드를 발송하였습니다. 아래에 입력해 주세요. 코드를 수신하지 못한 경우, 정확한 이메일을 입력하였는지 다시 한 번 확인해 주세요.",
     verifying: "인증중...",
     back: "← 뒤로",
   },
