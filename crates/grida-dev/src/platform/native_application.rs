@@ -2,9 +2,9 @@ use super::winit::{winit_window, WinitResult};
 use cg::node::schema::Size;
 use cg::resources::{FontMessage, ImageMessage};
 use cg::runtime::camera::Camera2D;
-use cg::runtime::scene::Backend;
 use cg::window::application::{ApplicationApi, HostEvent, UnknownTargetApplication};
 use cg::window::command::ApplicationCommand;
+use cg::window::state::AnySurfaceState;
 use futures::channel::mpsc;
 use glutin::{
     context::PossiblyCurrentContext,
@@ -114,7 +114,7 @@ impl NativeApplication {
         fit_scene_on_load: bool,
     ) -> (Self, EventLoop<HostEvent>) {
         let WinitResult {
-            mut state,
+            state,
             el,
             window,
             gl_surface,
@@ -128,7 +128,8 @@ impl NativeApplication {
             height: height as f32 * scale_factor as f32,
         });
 
-        let backend = Backend::GL(state.surface_mut_ptr());
+        let mut state = AnySurfaceState::from_gpu(state);
+        let backend = state.backend();
         let redraw_cb: Arc<dyn Fn()> = {
             let redraw_proxy = proxy.clone();
             Arc::new(move || {

@@ -1206,9 +1206,6 @@ pub struct JSONBooleanOperationNode {
 fn default_active() -> bool {
     true
 }
-fn default_locked() -> bool {
-    false
-}
 fn default_false() -> bool {
     false
 }
@@ -1218,10 +1215,6 @@ fn default_opacity() -> f32 {
 fn default_rotation() -> f32 {
     0.0
 }
-fn default_z_index() -> i32 {
-    0
-}
-
 fn default_stroke_width() -> f32 {
     0.0
 }

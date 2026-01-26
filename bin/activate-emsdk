@@ -14,8 +14,9 @@ EMSDK_ROOT = os.path.join('third_party', 'externals', 'emsdk')
 
 EMSDK_PATH = os.path.join(EMSDK_ROOT, 'emsdk.py')
 
-# This should match what's in //MODULE.bazel
-EMSDK_VERSION = '4.0.7'
+# Keep this aligned with the emsdk submodule and local builds.
+# (The emsdk git submodule is currently at 5.0.0.)
+EMSDK_VERSION = '5.0.0'
 
 def main():
     if sysconfig.get_platform() in ['linux-aarch64', 'linux-arm64']:
