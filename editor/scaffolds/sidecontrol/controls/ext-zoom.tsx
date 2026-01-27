@@ -5,8 +5,13 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WorkbenchUI } from "@/components/workbench";
@@ -23,6 +28,7 @@ export function ZoomControl({ className }: { className?: string }) {
   const editor = useCurrentEditor();
   const ruler = useEditorState(editor, (state) => state.ruler);
   const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
+  const pixelpreview = useEditorState(editor, (state) => state.pixelpreview);
   const { scaleX } = useTransformState();
 
   const pct = Math.round(scaleX * 100);
@@ -112,6 +118,41 @@ export function ZoomControl({ className }: { className?: string }) {
           Zoom to 200%
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Pixel preview
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuRadioGroup
+              value={pixelpreview}
+              onValueChange={(v) => {
+                editor.surface.surfaceConfigurePixelPreviewScale(
+                  v as "disabled" | "1x" | "2x"
+                );
+              }}
+            >
+              <DropdownMenuRadioItem value="disabled" className="text-xs">
+                Disabled
+                <DropdownMenuShortcut>
+                  {keyboardShortcutText(
+                    "workbench.surface.view.toggle-pixel-preview"
+                  )}
+                </DropdownMenuShortcut>
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="1x" className="text-xs">
+                1x
+                <DropdownMenuShortcut>
+                  {keyboardShortcutText(
+                    "workbench.surface.view.toggle-pixel-preview"
+                  )}
+                </DropdownMenuShortcut>
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="2x" className="text-xs">
+                2x
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuCheckboxItem
           checked={pixelgrid === "on"}
           onSelect={() => {

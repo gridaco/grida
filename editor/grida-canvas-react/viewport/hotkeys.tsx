@@ -464,6 +464,11 @@ export function useEditorHotKeys() {
     toast.success(`Pixel Grid ${v === "on" ? "on" : "off"}`);
   });
 
+  useHotkeys("meta+shift+alt+p, ctrl+shift+alt+p", () => {
+    const v = editor.surface.surfaceTogglePixelPreview();
+    toast.success(`Pixel Preview ${v === "disabled" ? "disabled" : v}`);
+  });
+
   // Remove fill: ⌥/ (macOS) / Alt+/ (Windows/Linux)
   useHotkeys(
     "alt+slash",

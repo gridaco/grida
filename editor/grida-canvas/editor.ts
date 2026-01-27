@@ -3025,6 +3025,25 @@ export class Editor
   }
 
   /**
+   * Apply Pixel Preview scale to the WASM renderer (no-op for non-canvas backend).
+   *
+   * This is intentionally internal: UI toggles should update editor state, and this
+   * bridges the state to the runtime.
+   */
+  public __runtime_renderer_set_pixel_preview_scale(
+    scale: "disabled" | "1x" | "2x"
+  ) {
+    if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) return;
+    const n = scale === "2x" ? 2 : scale === "1x" ? 1 : 0;
+    this._m_wasm_canvas_scene.runtime_renderer_set_pixel_preview_scale(n);
+    // Stable Pixel Preview is the default policy when Pixel Preview is enabled.
+    if (n !== 0) {
+      this._m_wasm_canvas_scene.runtime_renderer_set_pixel_preview_stable(true);
+    }
+    this._m_wasm_canvas_scene.redraw();
+  }
+
+  /**
    * mount the canvas surface
    * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
    * @param el canvas element
@@ -3231,6 +3250,13 @@ export class Editor
         (_, v) => {
           this._m_wasm_canvas_scene?.setDebug(v);
           this._m_wasm_canvas_scene?.redraw();
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) => state.pixelpreview,
+        (_, v) => {
+          this.__runtime_renderer_set_pixel_preview_scale(v);
         }
       );
 
@@ -4497,6 +4523,27 @@ export class EditorSurface
     return next;
   }
   // #endregion IPixelGridActions implementation
+
+  // #region IPixelPreviewActions implementation
+  surfaceConfigurePixelPreviewScale(scale: "disabled" | "1x" | "2x") {
+    this.dispatch({
+      type: "surface/pixel-preview",
+      scale,
+    });
+  }
+
+  /**
+   * Toggle behavior (V1):
+   * - If currently disabled: restore `pixelpreview_last`
+   * - Otherwise: disable
+   */
+  surfaceTogglePixelPreview(): "disabled" | "1x" | "2x" {
+    const { pixelpreview, pixelpreview_last } = this.state;
+    const next = pixelpreview === "disabled" ? pixelpreview_last : "disabled";
+    this.surfaceConfigurePixelPreviewScale(next);
+    return next;
+  }
+  // #endregion IPixelPreviewActions implementation
 
   // #region IRulerActions implementation
   surfaceConfigureRuler(state: "on" | "off") {

@@ -91,6 +91,8 @@ const EXPECTED_FUNCTIONS = [
   { name: "_devtools_rendering_set_show_hit_testing", paramCount: 2 },
   { name: "_devtools_rendering_set_show_ruler", paramCount: 2 },
   { name: "_runtime_renderer_set_cache_tile", paramCount: 2 },
+  { name: "_runtime_renderer_set_pixel_preview_scale", paramCount: 2 },
+  { name: "_runtime_renderer_set_pixel_preview_stable", paramCount: 2 },
 ] as const;
 
 // Expected Emscripten runtime methods

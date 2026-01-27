@@ -222,6 +222,14 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.runtime_renderer_set_cache_tile(cache);
     }
 
+    fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {
+        self.base.runtime_renderer_set_pixel_preview_scale(scale);
+    }
+
+    fn runtime_renderer_set_pixel_preview_stable(&mut self, stable: bool) {
+        self.base.runtime_renderer_set_pixel_preview_stable(stable);
+    }
+
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
         self.base.set_main_camera_transform(transform);
     }

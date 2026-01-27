@@ -173,5 +173,15 @@ declare namespace canvas {
       state: GridaCanvasApplicationPtr,
       enabled: boolean
     ): void;
+
+    _runtime_renderer_set_pixel_preview_scale(
+      state: GridaCanvasApplicationPtr,
+      scale: number
+    ): void;
+
+    _runtime_renderer_set_pixel_preview_stable(
+      state: GridaCanvasApplicationPtr,
+      stable: boolean
+    ): void;
   }
 }
