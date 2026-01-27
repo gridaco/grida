@@ -35,7 +35,11 @@ import {
 } from "@/scaffolds/data-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import {
+  ButtonGroup,
+  ButtonGroupSeparator,
+} from "@/components/ui/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -359,29 +363,16 @@ function NewButton({ onNewData }: { onNewData?: () => void }) {
           onNewData?.();
         }}
       />
-      <div role="group" className="inline-flex rounded-md shadow-sm">
-        <button
-          type="button"
-          onClick={onDefaultClick}
-          className={cn(
-            buttonVariants({ variant: "default", size: "sm" }),
-            "border rounded-s-lg rounded-e-none focus:z-10 focus:ring-2",
-            "gap-2"
-          )}
-        >
+      <ButtonGroup className="rounded-md shadow-sm">
+        <Button onClick={onDefaultClick} size="sm" type="button">
           New
-        </button>
+        </Button>
+        <ButtonGroupSeparator />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className={cn(
-                buttonVariants({ variant: "default", size: "sm" }),
-                "pl-1.5 pr-1.5 py-1 border-t border-b border-r rounded-s-none rounded-e-lg focus:z-10 focus:ring-2"
-              )}
-            >
+            <Button aria-label="New options" size="icon-sm" type="button">
               <ChevronDownIcon />
-            </button>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="bottom" align="end">
             <DropdownMenuItem onSelect={onImportFromCSVClick}>
@@ -390,7 +381,7 @@ function NewButton({ onNewData }: { onNewData?: () => void }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
+      </ButtonGroup>
     </div>
   );
 }

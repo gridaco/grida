@@ -1,6 +1,10 @@
 # Grida Canvas WASM Build System
 # Unified build system for all WASM build configurations
 
+# Shared snippet used by debug/release builds.
+# Keep this inline (vs. a separate recipe) so the sourced `emsdk_env.sh` affects the same shell.
+_wasm32_unknown_emscripten_env := "rustup target add wasm32-unknown-emscripten; (cd ../.. && ./bin/activate-emsdk); . ../../third_party/externals/emsdk/emsdk_env.sh; command -v emcc >/dev/null 2>&1; export CC=emcc CXX=em++ AR=emar"
+
 # Default recipe - shows available commands
 default:
     @echo "🚀 Grida Canvas WASM Build System"
@@ -81,10 +85,9 @@ info:
 # Internal recipe: Build WASM (debug mode)
 _build_wasm32_unknown_emscripten_debug:
     @echo "🔨 Building for wasm32-unknown-emscripten target..."
-    @bash -c '. ../../third_party/externals/emsdk/emsdk_env.sh && \
-        export CC=emcc && \
-        export CXX=em++ && \
-        export AR=emar && \
+    @bash -c 'set -euo pipefail; \
+        {{_wasm32_unknown_emscripten_env}}; \
+        echo "🧰 $(emcc --version | { IFS= read -r l; echo "$l"; })"; \
         time cargo build --target wasm32-unknown-emscripten'
     @echo "✅ Build completed successfully!"
     @echo "📁 Output file: ../../target/wasm32-unknown-emscripten/debug/grida_canvas_wasm.wasm"
@@ -93,10 +96,9 @@ _build_wasm32_unknown_emscripten_debug:
 # Internal recipe: Build WASM (release mode)
 _build_wasm32_unknown_emscripten_release:
     @echo "🔨 Building for wasm32-unknown-emscripten target (Production Mode)..."
-    @bash -c '. ../../third_party/externals/emsdk/emsdk_env.sh && \
-        export CC=emcc && \
-        export CXX=em++ && \
-        export AR=emar && \
+    @bash -c 'set -euo pipefail; \
+        {{_wasm32_unknown_emscripten_env}}; \
+        echo "🧰 $(emcc --version | { IFS= read -r l; echo "$l"; })"; \
         time cargo build --release --target wasm32-unknown-emscripten'
     @echo "✅ Production build completed successfully!"
     @echo "📁 Output file: ../../target/wasm32-unknown-emscripten/release/grida_canvas_wasm.wasm"

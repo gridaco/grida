@@ -17,6 +17,25 @@ corepack enable pnpm
 brew install just
 ```
 
+## Rust / Canvas (Skia) prerequisites
+
+Some Rust crates (e.g. the canvas backend) build Skia via `skia-bindings`, which requires `ninja` to be available on your system.
+
+**macOS**
+
+```bash
+brew install ninja
+ninja --version
+```
+
+**Ubuntu/Debian**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ninja-build
+ninja --version
+```
+
 Then, install the dependencies and run the development server:
 
 ```bash

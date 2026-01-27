@@ -17,7 +17,7 @@ export function XSBSQLLiteralInput({
   };
 }) {
   const fksearchComponent = React.useMemo(() => {
-    return ({
+    function FkSearchComponent({
       value,
       onValueChange,
       relation,
@@ -27,16 +27,20 @@ export function XSBSQLLiteralInput({
       onValueChange: (value: any) => void;
       relation: any;
       className?: string;
-    }) => (
-      <XSBSQLForeignKeySearchInput
-        value={value}
-        onValueChange={onValueChange}
-        relation={relation}
-        supabase_project_id={supabase.supabase_project_id}
-        supabase_schema_name={supabase.supabase_schema_name}
-        className={className}
-      />
-    );
+    }) {
+      return (
+        <XSBSQLForeignKeySearchInput
+          value={value}
+          onValueChange={onValueChange}
+          relation={relation}
+          supabase_project_id={supabase.supabase_project_id}
+          supabase_schema_name={supabase.supabase_schema_name}
+          className={className}
+        />
+      );
+    }
+
+    return FkSearchComponent;
   }, [supabase.supabase_project_id, supabase.supabase_schema_name]);
 
   return (

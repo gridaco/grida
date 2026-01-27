@@ -48,6 +48,7 @@ export default class ContentEditable extends React.Component<Props> {
 
   render() {
     const { tagName, html, innerRef, ...props } = this.props;
+    const children = this.props.children;
 
     return React.createElement(
       tagName || "div",
@@ -65,9 +66,9 @@ export default class ContentEditable extends React.Component<Props> {
         onKeyUp: this.props.onKeyUp || this.emitChange,
         onKeyDown: this.props.onKeyDown || this.emitChange,
         contentEditable: this.props.contentEditable,
-        dangerouslySetInnerHTML: { __html: html },
+        ...(children == null ? { dangerouslySetInnerHTML: { __html: html } } : {}),
       },
-      this.props.children
+      children == null ? undefined : children
     );
   }
 
