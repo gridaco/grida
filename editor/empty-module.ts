@@ -1,1 +1,2 @@
-export default {};
+const empty = {};
+export default empty;

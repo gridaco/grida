@@ -73,6 +73,7 @@ export function ListItem({
 
               return (
                 <TooltipContainer
+                  key={field.id}
                   className="min-w-6 size-6 rounded-xs overflow-hidden"
                   label={field.name}
                 >

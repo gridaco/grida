@@ -18,6 +18,7 @@ export const ScreenRoot = React.forwardRef<
     </div>
   );
 });
+ScreenRoot.displayName = "ScreenRoot";
 
 export function ScreenCenter({ children }: React.PropsWithChildren) {
   return (

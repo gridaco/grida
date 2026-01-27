@@ -32,13 +32,18 @@ export function SidebarMenuGroup({
       <SidebarGroupLabel>{menu.label}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          {menu.children.map((item, index) =>
-            item.type === "separator" ? (
-              <hr />
+          {menu.children.map((item, index) => {
+            const key =
+              item.type === "separator"
+                ? `separator-${index}`
+                : item.id ?? `item-${index}`;
+
+            return item.type === "separator" ? (
+              <hr key={key} />
             ) : (
-              <Tree key={index} item={item} selection={selection} />
-            )
-          )}
+              <Tree key={key} item={item} selection={selection} />
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
@@ -89,7 +94,11 @@ export function Tree({
         <CollapsibleContent>
           <SidebarMenuSub className="mx-0 ms-3.5">
             {item.children.map((subItem, index) => (
-              <Tree key={index} item={subItem} selection={selection} />
+              <Tree
+                key={subItem.id ?? `subitem-${index}`}
+                item={subItem}
+                selection={selection}
+              />
             ))}
           </SidebarMenuSub>
         </CollapsibleContent>
