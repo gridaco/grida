@@ -635,7 +635,9 @@ function MonoFormField({
           className="flex flex-row gap-1 justify-between items-center"
         >
           <div className="flex flex-col gap-2">
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <LabelText />
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <HelpText />
           </div>
           {renderInput()}
@@ -647,7 +649,9 @@ function MonoFormField({
         <Root type={type} className="items-top flex space-x-2">
           {renderInput()}
           <div className="grid gap-1.5 leading-none">
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <LabelText />
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <HelpText />
           </div>
         </Root>
@@ -682,7 +686,9 @@ function MonoFormField({
 
       return (
         <Root type={type} className="flex flex-col gap-1">
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <LabelText htmlFor="none" />
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <HelpText />
           <Card className="p-0">
             <fieldset className="not-prose">
@@ -704,8 +710,10 @@ function MonoFormField({
     case "radio": {
       return (
         <Root type={type} className="flex flex-col gap-1">
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <LabelText htmlFor="none" />
           {renderInput()}
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <HelpText />
         </Root>
       );
@@ -714,7 +722,9 @@ function MonoFormField({
       if (options) {
         return (
           <Root type={type} className="grid gap-1">
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <LabelText htmlFor="none" />
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <HelpText />
             <ToggleGroupRootWithValue
               name={name}
@@ -759,8 +769,10 @@ function MonoFormField({
 
   return (
     <Root type={type} className="grid gap-2">
+      {/* eslint-disable-next-line react-hooks/static-components */}
       <LabelText />
       {renderInput()}
+      {/* eslint-disable-next-line react-hooks/static-components */}
       <HelpText />
     </Root>
   );

@@ -72,26 +72,18 @@ export interface FeTypeConstraints {
   noise?: boolean;
 }
 
-function getIcon(fe: cg.FilterEffect) {
-  switch (fe.type) {
-    case "filter-blur": {
-      return FeLayerBlurIcon;
-    }
-    case "backdrop-filter-blur": {
-      return FeBackdropBlurIcon;
-    }
-    case "shadow": {
-      if (fe.inset) {
-        return ShadowInnerIcon;
-      }
-      return ShadowOuterIcon;
-    }
-    case "glass": {
-      return FeGlassIcon;
-    }
-    case "noise": {
-      return FeNoiseIcon;
-    }
+function FeIcon({ value }: { value: cg.FilterEffect }) {
+  switch (value.type) {
+    case "filter-blur":
+      return <FeLayerBlurIcon />;
+    case "backdrop-filter-blur":
+      return <FeBackdropBlurIcon />;
+    case "shadow":
+      return value.inset ? <ShadowInnerIcon /> : <ShadowOuterIcon />;
+    case "glass":
+      return <FeGlassIcon />;
+    case "noise":
+      return <FeNoiseIcon />;
   }
 }
 
@@ -170,7 +162,6 @@ export function FeControl({
   onRemove?: () => void;
   constraints?: FeTypeConstraints;
 }) {
-  const Icon = getIcon(value);
   const isActive = value.active ?? true;
 
   const handleToggleActive = (checked: boolean) => {
@@ -188,7 +179,7 @@ export function FeControl({
         />
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon">
-            <Icon />
+            <FeIcon value={value} />
           </Button>
         </PopoverTrigger>
         <div className="flex items-center flex-1/2">

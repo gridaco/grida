@@ -169,32 +169,13 @@ function FilePreview({
     }
   }, [file]);
 
-  const Body = () => {
-    if (file.type?.startsWith("image/") || accept?.includes("image/")) {
-      return (
-        <Image
-          className="size-20 rounded-md object-cover"
-          src={src}
-          alt={file.name ?? ""}
-          height={80}
-          width={80}
-        />
-      );
-    }
-
-    return (
-      <div className="w-full flex justify-center gap-2 p-2 items-center">
-        <FileIcon className="size-8" />
-        <span className="pr-4 inline-block max-w-40 break-all whitespace-normal text-xs text-muted-foreground">
-          {file.name}
-        </span>
-      </div>
-    );
-  };
+  const isImage = Boolean(
+    file.type?.startsWith("image/") || accept?.includes("image/")
+  );
 
   return (
     <div className="relativ h-20e">
-      <Body />
+      <FilePreviewBody isImage={isImage} src={src} name={file.name} />
       {(status === "uploading" || status === "pending") && (
         <div className="absolute top-0 left-0 right-0 bottom-0 bg-black/50 flex items-center justify-center">
           <Spinner />
@@ -205,6 +186,37 @@ function FilePreview({
           <ExclamationTriangleIcon className="text-destructive" />
         </div>
       )}
+    </div>
+  );
+}
+
+function FilePreviewBody({
+  isImage,
+  src,
+  name,
+}: {
+  isImage: boolean;
+  src: string;
+  name?: string;
+}) {
+  if (isImage) {
+    return (
+      <Image
+        className="size-20 rounded-md object-cover"
+        src={src}
+        alt={name ?? ""}
+        height={80}
+        width={80}
+      />
+    );
+  }
+
+  return (
+    <div className="w-full flex justify-center gap-2 p-2 items-center">
+      <FileIcon className="size-8" />
+      <span className="pr-4 inline-block max-w-40 break-all whitespace-normal text-xs text-muted-foreground">
+        {name}
+      </span>
     </div>
   );
 }
