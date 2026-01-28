@@ -52,11 +52,11 @@ const eslintConfig = defineConfig([
             // =========================
             "jsx-a11y/alt-text": "error",
             "jsx-a11y/role-has-required-aria-props": "error",
+            "react/display-name": "error",
 
             // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
             // =========================
-            "react/display-name": "off",
             "react/no-danger-with-children": "off",
             "react/jsx-key": "off",
             "import/no-anonymous-default-export": "off",
