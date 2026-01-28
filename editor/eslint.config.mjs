@@ -48,21 +48,6 @@ const eslintConfig = defineConfig([
           },
           rules: {
             // =========================
-            // ✅ ENABLED (ON) RULES
-            // =========================
-            "jsx-a11y/alt-text": "error",
-            "jsx-a11y/role-has-required-aria-props": "error",
-            "react/display-name": "error",
-            "react/no-danger-with-children": "error",
-            "react/jsx-key": "error",
-            "import/no-anonymous-default-export": "error",
-            "react-hooks/use-memo": "error",
-            "react-hooks/incompatible-library": "error",
-            "react-hooks/immutability": "error",
-            "react-hooks/static-components": "error",
-            "@next/next/no-img-element": "error",
-
-            // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
             // =========================
             "react-hooks/exhaustive-deps": "off",

@@ -3,6 +3,7 @@
   "private": true,
   "license": "Apache 2.0",
   "scripts": {
+    "lint": "turbo run lint",
     "dev": "turbo run dev",
     "dev:packages": "turbo run dev --filter=./packages/*",
     "generate": "turbo run generate",
