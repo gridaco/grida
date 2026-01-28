@@ -3045,7 +3045,22 @@ export class Editor
 
   public __runtime_renderer_set_outline_mode(state: "on" | "off") {
     if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) return;
-    this._m_wasm_canvas_scene.runtime_renderer_set_outline_mode(state === "on");
+    // RenderPolicy flags (must match Rust: `crates/grida-canvas/src/runtime/render_policy.rs`)
+    const FLAG_RENDER_FILLS = 1 << 0;
+    const FLAG_RENDER_STROKES = 1 << 1;
+    const FLAG_RENDER_OUTLINES_ALWAYS = 1 << 2;
+    const FLAG_EFFECTS_ENABLED = 1 << 3;
+    const FLAG_COMPOSITING_ENABLED = 1 << 4;
+
+    const flags =
+      state === "on"
+        ? FLAG_RENDER_OUTLINES_ALWAYS
+        : FLAG_RENDER_FILLS |
+          FLAG_RENDER_STROKES |
+          FLAG_EFFECTS_ENABLED |
+          FLAG_COMPOSITING_ENABLED;
+
+    this._m_wasm_canvas_scene.runtime_renderer_set_render_policy_flags(flags);
     this._m_wasm_canvas_scene.redraw();
   }
 
