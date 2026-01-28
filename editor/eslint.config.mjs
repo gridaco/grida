@@ -2,6 +2,17 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+// PROGRESSIVE_ENABLEMENT
+// The editor's ESLint setup is intentionally **partial** today.
+//
+// We want `eslint-config-next/core-web-vitals` enabled long-term, but turning it
+// on all at once currently produces too many violations to fix in one pass.
+//
+// With progressive enablement on (default), we keep a single chosen rule
+// enabled and "mock" (disable) the rest, then migrate rule-by-rule.
+//
+// Set `GRIDA_ESLINT_PROGRESSIVE=0` to disable this gate and see the full,
+// unmocked rule set (useful to measure total remaining work).
 const PROGRESSIVE_ENABLEMENT = process.env.GRIDA_ESLINT_PROGRESSIVE !== "0";
 
 const eslintConfig = defineConfig([
