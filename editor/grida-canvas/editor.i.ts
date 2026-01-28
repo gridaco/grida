@@ -985,6 +985,24 @@ export namespace editor.state {
   }
 
   /**
+   * Pixel Preview (Figma-style): controls internal rasterization scale for pixelated zoom.
+   *
+   * - `disabled`: normal rendering
+   * - `1x`: most pixelated
+   * - `2x`: less pixelated
+   *
+   * @volatile
+   */
+  export interface IEditorFeaturePixelPreviewState {
+    pixelpreview: "disabled" | "1x" | "2x";
+    /**
+     * Last non-disabled value, used for toggle shortcut behavior:
+     * `disabled ↔ last_non_disabled`.
+     */
+    pixelpreview_last: "1x" | "2x";
+  }
+
+  /**
    * @volatile
    */
   export interface IEditorFeatureMeasurementState {
@@ -1499,6 +1517,7 @@ export namespace editor.state {
       editor.state.IEditorFeatureBrushState,
       editor.state.IEditorFeatureRulerState,
       editor.state.IEditorFeaturePixelGridState,
+      editor.state.IEditorFeaturePixelPreviewState,
       editor.state.IEditorFeatureRepeatableDuplicateState,
       //
       editor.state.IEditorFeatureMeasurementState,
@@ -1681,6 +1700,8 @@ export namespace editor.state {
       gesture_modifiers: editor.config.DEFAULT_GESTURE_MODIFIERS,
       ruler: "on",
       pixelgrid: "on",
+      pixelpreview: "disabled",
+      pixelpreview_last: "1x",
       when_not_removable: "deactivate",
       document_ctx: new tree.graph.Graph(doc).lut,
       pointer_hit_testing_config: editor.config.DEFAULT_HIT_TESTING_CONFIG,
@@ -4144,6 +4165,11 @@ export namespace editor.api {
     // ruler
     surfaceConfigureRuler(state: "on" | "off"): void;
     surfaceToggleRuler(): "on" | "off";
+    //
+
+    // pixel preview
+    surfaceConfigurePixelPreviewScale(scale: "disabled" | "1x" | "2x"): void;
+    surfaceTogglePixelPreview(): "disabled" | "1x" | "2x";
     //
 
     //

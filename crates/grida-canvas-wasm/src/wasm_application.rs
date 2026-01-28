@@ -588,6 +588,28 @@ pub unsafe extern "C" fn runtime_renderer_set_cache_tile(
 }
 
 #[no_mangle]
+/// js::_runtime_renderer_set_pixel_preview_scale
+pub unsafe extern "C" fn runtime_renderer_set_pixel_preview_scale(
+    app: *mut UnknownTargetApplication,
+    scale: u32,
+) {
+    if let Some(app) = app.as_mut() {
+        app.runtime_renderer_set_pixel_preview_scale((scale as u8).min(2));
+    }
+}
+
+#[no_mangle]
+/// js::_runtime_renderer_set_pixel_preview_stable
+pub unsafe extern "C" fn runtime_renderer_set_pixel_preview_stable(
+    app: *mut UnknownTargetApplication,
+    stable: bool,
+) {
+    if let Some(app) = app.as_mut() {
+        app.runtime_renderer_set_pixel_preview_stable(stable);
+    }
+}
+
+#[no_mangle]
 /// js::_devtools_rendering_set_show_fps_meter
 pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
     app: *mut UnknownTargetApplication,

@@ -181,6 +181,13 @@ export const actions = {
     keybindings: kb(KeyCode.Quote, M.Shift),
   },
 
+  ["workbench.surface.view.toggle-pixel-preview"]: {
+    name: "toggle pixel preview",
+    description: "Toggle pixel preview (disabled ↔ last used scale)",
+    command: "workbench.surface.view.toggle-pixel-preview",
+    keybindings: kb(KeyCode.KeyP, M.CtrlCmd | M.Shift | M.Alt),
+  },
+
   ["workbench.surface.view.preview"]: {
     name: "preview",
     description: "preview current selection",

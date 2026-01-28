@@ -392,6 +392,16 @@ export class Scene {
     this.module._runtime_renderer_set_cache_tile(this.appptr, enable);
   }
 
+  runtime_renderer_set_pixel_preview_scale(scale: number) {
+    this._assertAlive();
+    this.module._runtime_renderer_set_pixel_preview_scale(this.appptr, scale);
+  }
+
+  runtime_renderer_set_pixel_preview_stable(stable: boolean) {
+    this._assertAlive();
+    this.module._runtime_renderer_set_pixel_preview_stable(this.appptr, stable);
+  }
+
   // ====================================================================================================
   // DEVTOOLS
   // ====================================================================================================

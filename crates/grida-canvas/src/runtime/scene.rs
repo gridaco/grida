@@ -8,14 +8,19 @@ use crate::{
     cache,
     resources::{self, ByteStore, Resources},
     runtime::{
-        camera::Camera2D, config::RuntimeRendererConfig, font_repository::FontRepository,
-        image_repository::ImageRepository, system_images,
+        camera::Camera2D,
+        config::{PixelPreviewStrategy, RuntimeRendererConfig},
+        font_repository::FontRepository,
+        image_repository::ImageRepository,
+        pixel_preview::{compute_pixel_preview_plan, PixelPreviewInputs},
+        system_images,
     },
 };
 
 use math2::{self, rect, region};
 use skia_safe::{
-    surfaces, Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface,
+    surfaces, Canvas, FilterMode, Image, MipmapMode, Paint as SkPaint, Picture, PictureRecorder,
+    Rect, SamplingOptions, Surface,
 };
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
@@ -193,6 +198,52 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    #[inline]
+    fn clear_and_paint_background(
+        canvas: &Canvas,
+        background_color: Option<CGColor>,
+        width: f32,
+        height: f32,
+    ) {
+        canvas.clear(skia_safe::Color::TRANSPARENT);
+
+        if let Some(bg_color) = background_color {
+            let color: skia_safe::Color = bg_color.into();
+            let mut paint = SkPaint::default();
+            paint.set_color(color);
+            canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
+        }
+    }
+
+    #[inline]
+    fn prefill_picture_cache_for_plan(&mut self, plan: &FramePlan) {
+        // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
+        for (_region, indices) in &plan.regions {
+            for idx in indices {
+                if let Some(entry) = self.scene_cache.layers.layers.get(*idx).cloned() {
+                    let id = entry.id;
+                    let _ = self.with_recording_cached(&id, |painter| {
+                        painter.draw_layer(&entry.layer);
+                    });
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn draw_layers_with_scene_cache(&mut self, canvas: &Canvas, plan: &FramePlan) -> usize {
+        self.prefill_picture_cache_for_plan(plan);
+
+        let painter = Painter::new_with_scene_cache(
+            canvas,
+            &self.fonts,
+            &self.images,
+            &self.scene_cache,
+        );
+        painter.draw_layer_list(&self.scene_cache.layers);
+        painter.cache_picture_hits()
+    }
+
     pub fn new(
         backend: Backend,
         request_redraw: Option<RequestRedrawCallback>,
@@ -300,6 +351,30 @@ impl Renderer {
         if !enable {
             self.scene_cache.tile.clear_all();
         }
+    }
+
+    /// Configure pixel preview scale.
+    ///
+    /// - 0: Disabled
+    /// - 1: 1x
+    /// - 2: 2x
+    pub fn set_pixel_preview_scale(&mut self, scale: u8) {
+        self.config.pixel_preview_scale = match scale {
+            1 | 2 => scale,
+            _ => 0,
+        };
+    }
+
+    pub fn set_pixel_preview_strategy(&mut self, strategy: PixelPreviewStrategy) {
+        self.config.pixel_preview_strategy = strategy;
+    }
+
+    pub fn set_pixel_preview_strategy_stable(&mut self, stable: bool) {
+        self.set_pixel_preview_strategy(if stable {
+            PixelPreviewStrategy::Stable
+        } else {
+            PixelPreviewStrategy::Accurate
+        });
     }
 
     /// Render the queued frame if any and return the completed statistics.
@@ -602,16 +677,79 @@ impl Renderer {
     ) -> DrawResult {
         let __before_paint = Instant::now();
 
+        let zoom = self.camera.get_zoom();
+        let pixel_preview_scale = self.config.pixel_preview_scale;
+        let pixel_preview_strategy = self.config.pixel_preview_strategy;
+
+        // Pixel Preview: render the scene at a reduced internal resolution, then
+        // scale up with nearest-neighbor sampling.
+        //
+        // Only activate when zooming in beyond the selected preview scale.
+        // (At zoom <= scale, this would not be a downsample and is effectively a no-op.)
+        let cam_t = self.camera.get_transform();
+        let pixel_preview = compute_pixel_preview_plan(PixelPreviewInputs {
+            viewport: Size { width, height },
+            zoom,
+            pixel_preview_scale,
+            strategy: pixel_preview_strategy,
+            camera_center: (cam_t.x(), cam_t.y()),
+            camera_rotation: cam_t.rotation(),
+        });
+
+        if pixel_preview.enabled {
+            let (surf_w, surf_h) = pixel_preview.surface_px;
+            if let Some(mut offscreen) = surfaces::raster_n32_premul((surf_w, surf_h)) {
+                let off_canvas = offscreen.canvas();
+                Self::clear_and_paint_background(
+                    off_canvas,
+                    background_color,
+                    surf_w as f32,
+                    surf_h as f32,
+                );
+
+                off_canvas.save();
+                if pixel_preview.overscan_pad_px != 0 {
+                    let (tx, ty) = pixel_preview.offscreen_canvas_translate;
+                    off_canvas.translate((tx, ty));
+                }
+                off_canvas.concat(&sk::sk_matrix(pixel_preview.view_matrix.matrix));
+                let cache_picture_used = self.draw_layers_with_scene_cache(off_canvas, plan);
+
+                off_canvas.restore();
+
+                // Present: upscale to the main canvas using nearest-neighbor sampling.
+                Self::clear_and_paint_background(canvas, background_color, width, height);
+
+                let image = offscreen.image_snapshot();
+                let sampling = SamplingOptions::new(FilterMode::Nearest, MipmapMode::None);
+                let mut paint = SkPaint::default();
+                paint.set_anti_alias(false);
+                let pr = pixel_preview.src_rect;
+                let src = Rect::from_xywh(pr.x, pr.y, pr.w, pr.h);
+                canvas.draw_image_rect_with_sampling_options(
+                    &image,
+                    Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                    Rect::new(0.0, 0.0, width, height),
+                    sampling,
+                    &paint,
+                );
+
+                let __painter_duration = __before_paint.elapsed();
+
+                return DrawResult {
+                    painter_duration: __painter_duration,
+                    cache_picture_used,
+                    cache_picture_size: self.scene_cache.picture.len(),
+                    cache_geometry_size: self.scene_cache.geometry.len(),
+                    tiles_total: self.scene_cache.tile.tiles().len(),
+                    tiles_used: 0,
+                };
+            }
+        }
+
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
-        // Paint background color first if present
-        if let Some(bg_color) = background_color {
-            let color: skia_safe::Color = bg_color.into();
-            let mut paint = SkPaint::default();
-            paint.set_color(color);
-            // Paint the entire canvas with the background color
-            canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
-        }
+        Self::clear_and_paint_background(canvas, background_color, width, height);
 
         canvas.save();
 
@@ -652,22 +790,7 @@ impl Renderer {
             }
         }
 
-        // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
-        for (_region, indices) in &plan.regions {
-            for idx in indices {
-                if let Some(entry) = self.scene_cache.layers.layers.get(*idx).cloned() {
-                    let id = entry.id;
-                    let _ = self.with_recording_cached(&id, |painter| {
-                        painter.draw_layer(&entry.layer);
-                    });
-                }
-            }
-        }
-
-        let painter =
-            Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
-        painter.draw_layer_list(&self.scene_cache.layers);
-        let cache_picture_used = painter.cache_picture_hits();
+        let cache_picture_used = self.draw_layers_with_scene_cache(canvas, plan);
 
         let __painter_duration = __before_paint.elapsed();
 

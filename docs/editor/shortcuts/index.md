@@ -166,6 +166,7 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 | Zoom out          | `⌘ + -` or `⌘ + Minus` | `Ctrl + -` or `Ctrl + Minus` | Zoom out                      |
 | Toggle ruler      | `⇧ + R`                | `⇧ + R`                      | Toggle ruler visibility       |
 | Toggle pixel grid | `⇧ + '`                | `⇧ + '`                      | Toggle pixel grid visibility  |
+| Toggle pixel preview | `⌘ + ⇧ + ⌥ + P`     | `Ctrl + ⇧ + Alt + P`         | Toggle pixel preview (Disabled ↔ last used 1x/2x) |
 | Preview           | `⇧ + Space`            | `⇧ + Space`                  | Preview current selection     |
 
 ## Brush Tools

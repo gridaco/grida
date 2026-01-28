@@ -85,6 +85,16 @@ function __self_set_pixelgrid(
   draft.pixelgrid = pixelgrid;
 }
 
+function __self_set_pixelpreview(
+  draft: editor.state.IEditorState,
+  pixelpreview: "disabled" | "1x" | "2x"
+) {
+  draft.pixelpreview = pixelpreview;
+  if (pixelpreview !== "disabled") {
+    draft.pixelpreview_last = pixelpreview;
+  }
+}
+
 function __self_guide_delete(draft: editor.state.IEditorState, idx: number) {
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.nodes[
@@ -919,6 +929,11 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       case "surface/pixel-grid": {
         const { state: pixelgridstate } = action;
         __self_set_pixelgrid(draft, pixelgridstate);
+        break;
+      }
+      case "surface/pixel-preview": {
+        const { scale } = action;
+        __self_set_pixelpreview(draft, scale);
         break;
       }
       case "surface/content-edit-mode/try-enter": {

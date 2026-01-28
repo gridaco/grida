@@ -49,6 +49,19 @@ pub trait ApplicationApi {
     /// Enable or disable caching of raster tiles.
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
 
+    /// Configure Pixel Preview scale.
+    ///
+    /// - 0: Disabled
+    /// - 1: 1x
+    /// - 2: 2x
+    fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8);
+
+    /// Configure Pixel Preview strategy (stability policy).
+    ///
+    /// When `stable` is true, the renderer will use a deterministic mapping intended
+    /// for design tooling (reduces shimmer across pan+zoom).
+    fn runtime_renderer_set_pixel_preview_stable(&mut self, stable: bool);
+
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
     fn devtools_rendering_set_show_fps_meter(&mut self, show: bool);
@@ -376,6 +389,16 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
         self.renderer.set_cache_tile(cache);
+    }
+
+    fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {
+        self.renderer.set_pixel_preview_scale(scale);
+        self.queue();
+    }
+
+    fn runtime_renderer_set_pixel_preview_stable(&mut self, stable: bool) {
+        self.renderer.set_pixel_preview_strategy_stable(stable);
+        self.queue();
     }
 
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {

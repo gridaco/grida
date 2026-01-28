@@ -47,6 +47,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
@@ -105,6 +107,7 @@ export function PlaygroundMenuContent({
   // Get editor state for View menu
   const ruler = useEditorState(instance, (state) => state.ruler);
   const pixelgrid = useEditorState(instance, (state) => state.pixelgrid);
+  const pixelpreview = useEditorState(instance, (state) => state.pixelpreview);
 
   // Get editor state for Edit menu
   const selection = useEditorState(instance, (state) => state.selection);
@@ -219,6 +222,7 @@ export function PlaygroundMenuContent({
         <ViewMenuContent
           pixelgrid={pixelgrid}
           ruler={ruler}
+          pixelpreview={pixelpreview}
           toggleVisibility={toggleVisibility}
           toggleMinimal={toggleMinimal}
         />
@@ -418,11 +422,13 @@ function EditMenuContent({
 function ViewMenuContent({
   pixelgrid,
   ruler,
+  pixelpreview,
   toggleVisibility,
   toggleMinimal,
 }: {
   pixelgrid: string;
   ruler: string;
+  pixelpreview: string;
   toggleVisibility?: () => void;
   toggleMinimal?: () => void;
 }) {
@@ -485,6 +491,41 @@ function ViewMenuContent({
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         {/* Display Options */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Pixel preview
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuRadioGroup
+              value={pixelpreview}
+              onValueChange={(v) => {
+                instance.surface.surfaceConfigurePixelPreviewScale(
+                  v as "disabled" | "1x" | "2x"
+                );
+              }}
+            >
+              <DropdownMenuRadioItem value="disabled" className="text-xs">
+                Disabled
+                <DropdownMenuShortcut>
+                  {keyboardShortcutText(
+                    "workbench.surface.view.toggle-pixel-preview"
+                  )}
+                </DropdownMenuShortcut>
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="1x" className="text-xs">
+                1x
+                <DropdownMenuShortcut>
+                  {keyboardShortcutText(
+                    "workbench.surface.view.toggle-pixel-preview"
+                  )}
+                </DropdownMenuShortcut>
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="2x" className="text-xs">
+                2x
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuCheckboxItem
           checked={pixelgrid === "on"}
           onSelect={() => {
