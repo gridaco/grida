@@ -846,6 +846,7 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 export type SurfaceAction =
   | EditorSurface_RulerAndGuideAction
   | EditorSurface_PixelGridStateAction
+  | EditorSurface_OutlineModeAction
   | EditorSurface_PixelPreviewScaleAction
   | EditorSurface_ChangeBrushAction
   | EditorSurface_ChangeBrushSizeAction
@@ -869,6 +870,11 @@ export interface EditorSurface_RulerStateAction {
 
 export interface EditorSurface_PixelGridStateAction {
   type: "surface/pixel-grid";
+  state: "on" | "off";
+}
+
+export interface EditorSurface_OutlineModeAction {
+  type: "surface/outline-mode";
   state: "on" | "off";
 }
 

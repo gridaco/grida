@@ -85,6 +85,13 @@ function __self_set_pixelgrid(
   draft.pixelgrid = pixelgrid;
 }
 
+function __self_set_outline_mode(
+  draft: editor.state.IEditorState,
+  outline_mode: "on" | "off"
+) {
+  draft.outline_mode = outline_mode;
+}
+
 function __self_set_pixelpreview(
   draft: editor.state.IEditorState,
   pixelpreview: "disabled" | "1x" | "2x"
@@ -929,6 +936,11 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       case "surface/pixel-grid": {
         const { state: pixelgridstate } = action;
         __self_set_pixelgrid(draft, pixelgridstate);
+        break;
+      }
+      case "surface/outline-mode": {
+        const { state: outlinemodestate } = action;
+        __self_set_outline_mode(draft, outlinemodestate);
         break;
       }
       case "surface/pixel-preview": {
