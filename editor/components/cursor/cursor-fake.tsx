@@ -85,6 +85,7 @@ export function FakeLocalPointerCursorPNG({
     <div {...props} className={cn("relative z-[99999]", className)}>
       <img
         src={cursors.default_png.url}
+        alt="local-cursor"
         className={cn("pointer-events-none size-8")}
         style={{
           transform: "translate(-14px, -14px)",

@@ -68,12 +68,14 @@ function RightPanelTab({
     <TabsContent value={value} className="m-0 h-full min-h-0">
       <Card className="h-full min-h-0 flex flex-col overflow-hidden">
         <CardHeader className="flex-none">
-          <CardTitle className={action ? "flex justify-between items-center" : ""}>
+          <CardTitle
+            className={action ? "flex justify-between items-center" : ""}
+          >
             <span>{title}</span>
             {action ? <span>{action}</span> : null}
           </CardTitle>
         </CardHeader>
-        {/* 
+        {/*
           Important: stop wheel/touch bubbling so canvas-level handlers
           can't steal scroll when cursor is over the right panel.
         */}
@@ -327,7 +329,8 @@ function TemplateEditor({
                   <FieldLabel>Article</FieldLabel>
                   <CMSRichText
                     value={
-                      values?.components?.["referrer-share"]?.article?.html ?? ""
+                      values?.components?.["referrer-share"]?.article?.html ??
+                      ""
                     }
                     uploader={template.upload}
                     onValueChange={(value) => {
@@ -341,7 +344,9 @@ function TemplateEditor({
                 <Field>
                   <FieldLabel>Consent</FieldLabel>
                   <Textarea
-                    value={values?.components?.["referrer-share"]?.consent ?? ""}
+                    value={
+                      values?.components?.["referrer-share"]?.consent ?? ""
+                    }
                     onChange={(e) => {
                       props.set(
                         "components.referrer-share.consent",
@@ -356,7 +361,10 @@ function TemplateEditor({
                   <Input
                     value={values?.components?.referrer?.cta}
                     onChange={(e) => {
-                      props.set("components.referrer-share.cta", e.target.value);
+                      props.set(
+                        "components.referrer-share.cta",
+                        e.target.value
+                      );
                     }}
                     placeholder="Button Text"
                   />
@@ -477,7 +485,9 @@ function TemplateEditor({
                 <Field>
                   <FieldLabel>Description</FieldLabel>
                   <Textarea
-                    value={values?.components?.invitation?.description as string}
+                    value={
+                      values?.components?.invitation?.description as string
+                    }
                     onChange={(e) => {
                       props.set(
                         "components.invitation.description",

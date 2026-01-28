@@ -1,6 +1,9 @@
 import { cn } from "@/components/lib/utils";
 import { buttonVariants } from "@/components/ui-editor/button";
-import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
+import {
+  ButtonGroup,
+  ButtonGroupSeparator,
+} from "@/components/ui/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,10 +33,7 @@ export function OpsControl({
   return (
     <ButtonGroup
       aria-disabled={disabled}
-      className={cn(
-        "group/ops items-center justify-center gap-0",
-        className
-      )}
+      className={cn("group/ops items-center justify-center gap-0", className)}
     >
       <button
         disabled={disabled}

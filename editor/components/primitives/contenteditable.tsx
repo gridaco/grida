@@ -66,7 +66,9 @@ export default class ContentEditable extends React.Component<Props> {
         onKeyUp: this.props.onKeyUp || this.emitChange,
         onKeyDown: this.props.onKeyDown || this.emitChange,
         contentEditable: this.props.contentEditable,
-        ...(children == null ? { dangerouslySetInnerHTML: { __html: html } } : {}),
+        ...(children == null
+          ? { dangerouslySetInnerHTML: { __html: html } }
+          : {}),
       },
       children == null ? undefined : children
     );
