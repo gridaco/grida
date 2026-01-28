@@ -51,6 +51,7 @@ const eslintConfig = defineConfig([
             // ✅ ENABLED (ON) RULES
             // =========================
             "jsx-a11y/alt-text": "error",
+            "jsx-a11y/role-has-required-aria-props": "error",
 
             // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
@@ -69,7 +70,6 @@ const eslintConfig = defineConfig([
             "react-hooks/immutability": "off",
             "react-hooks/use-memo": "off",
             "react-hooks/refs": "off",
-            "jsx-a11y/role-has-required-aria-props": "off",
             "@next/next/no-img-element": "off",
           },
         },

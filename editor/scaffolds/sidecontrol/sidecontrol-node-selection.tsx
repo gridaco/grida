@@ -1421,6 +1421,7 @@ function SectionText({ node_id }: { node_id: string }) {
             <PropertyLineLabel>Font</PropertyLineLabel>
             <div className="flex-1">
               <FontFamilyControl
+                id="sidecontrol-font-family-single"
                 value={font_family}
                 onValueChange={actions.fontFamily}
               />
@@ -1549,6 +1550,7 @@ function SectionMixedText({ ids }: { ids: string[] }) {
             <PropertyLineLabel>Font</PropertyLineLabel>
             <div className="flex-1">
               <FontFamilyControl
+                id="sidecontrol-font-family-mixed"
                 value={font_family?.value}
                 onValueChange={(value: string) => {
                   const target = font_family?.ids ?? ids;
