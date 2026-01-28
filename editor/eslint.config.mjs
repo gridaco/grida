@@ -56,6 +56,7 @@ const eslintConfig = defineConfig([
             "react/no-danger-with-children": "error",
             "react/jsx-key": "error",
             "import/no-anonymous-default-export": "error",
+            "react-hooks/use-memo": "error",
 
             // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
@@ -68,7 +69,6 @@ const eslintConfig = defineConfig([
             "react-hooks/incompatible-library": "off",
             "react-hooks/purity": "off",
             "react-hooks/immutability": "off",
-            "react-hooks/use-memo": "off",
             "react-hooks/refs": "off",
             "@next/next/no-img-element": "off",
           },

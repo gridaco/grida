@@ -1,13 +1,7 @@
 "use client";
 import grida from "@grida/schema";
 import { produce } from "immer";
-import {
-  DependencyList,
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-} from "react";
+import { useCallback, useEffect, useMemo, useReducer } from "react";
 import { flatten, unflatten } from "flat";
 
 /**
@@ -132,10 +126,11 @@ function reducer(state: State, action: Action): State {
   });
 }
 
-export function usePropsEditor<T extends Record<string, any>>(
-  { schema, initialProps, onChange }: UseTemplateEditorArgs<T>,
-  deps: DependencyList = []
-): PropsEditorInstance {
+export function usePropsEditor<T extends Record<string, any>>({
+  schema,
+  initialProps,
+  onChange,
+}: UseTemplateEditorArgs<T>): PropsEditorInstance {
   const [state, dispatch] = useReducer(reducer, {
     schema,
     props: initialProps,
@@ -163,6 +158,6 @@ export function usePropsEditor<T extends Record<string, any>>(
       mergedDefaultProps,
       set,
     }),
-    [state, dispatch, ...deps]
+    [state.props, mergedDefaultProps, set]
   );
 }

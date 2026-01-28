@@ -104,21 +104,23 @@ export function useDocumentAssetUpload(): {
   const storage = useStorageClient();
   const createAsset = useCreateAsset();
 
-  const uploadPrivate = useCallback(
-    __make_asset_uploader({
-      createAsset,
-      storage,
-      is_public: false,
-    }),
+  const uploadPrivate = useMemo(
+    () =>
+      __make_asset_uploader({
+        createAsset,
+        storage,
+        is_public: false,
+      }),
     [storage, createAsset]
   );
 
-  const uploadPublic = useCallback(
-    __make_asset_uploader({
-      createAsset,
-      storage,
-      is_public: true,
-    }),
+  const uploadPublic = useMemo(
+    () =>
+      __make_asset_uploader({
+        createAsset,
+        storage,
+        is_public: true,
+      }),
     [storage, createAsset]
   );
 
