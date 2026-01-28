@@ -55,11 +55,11 @@ const eslintConfig = defineConfig([
             "react/display-name": "error",
             "react/no-danger-with-children": "error",
             "react/jsx-key": "error",
+            "import/no-anonymous-default-export": "error",
 
             // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
             // =========================
-            "import/no-anonymous-default-export": "off",
             "react-hooks/exhaustive-deps": "off",
             "react-hooks/rules-of-hooks": "off",
             "react-hooks/set-state-in-effect": "off",
