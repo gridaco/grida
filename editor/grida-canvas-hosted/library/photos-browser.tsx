@@ -349,6 +349,7 @@ function PhotosBrowserImpl({
     [photos, containerWidth]
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns functions that React Compiler cannot memoize safely.
   const virtualizer = useVirtualizer({
     count: photos.length,
     getScrollElement: () => scrollRef.current,

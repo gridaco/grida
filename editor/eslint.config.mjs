@@ -57,6 +57,7 @@ const eslintConfig = defineConfig([
             "react/jsx-key": "error",
             "import/no-anonymous-default-export": "error",
             "react-hooks/use-memo": "error",
+            "react-hooks/incompatible-library": "error",
 
             // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
@@ -66,7 +67,6 @@ const eslintConfig = defineConfig([
             "react-hooks/set-state-in-effect": "off",
             "react-hooks/preserve-manual-memoization": "off",
             "react-hooks/static-components": "off",
-            "react-hooks/incompatible-library": "off",
             "react-hooks/purity": "off",
             "react-hooks/immutability": "off",
             "react-hooks/refs": "off",

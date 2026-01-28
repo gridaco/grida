@@ -15,7 +15,7 @@ import { useProject } from "@/scaffolds/workspace";
 import { useCallback, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { Spinner } from "@/components/ui/spinner";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FaviconEditor } from "@/scaffolds/www-theme-config/components/favicon";
 import { SiteDomainsSection } from "./section-domain";
@@ -280,6 +280,15 @@ function FormSiteGeneral({
   });
 
   const { isSubmitting, isDirty } = form.formState;
+  const watched = useWatch({
+    control: form.control,
+    defaultValue: defaultValues,
+  });
+  const values: SiteGeneral = {
+    title: watched?.title ?? defaultValues.title,
+    description: watched?.description ?? defaultValues.description,
+    lang: watched?.lang ?? defaultValues.lang,
+  };
 
   return (
     <Card>
@@ -290,7 +299,7 @@ function FormSiteGeneral({
         <SiteGeneralSection
           url={url}
           disabled={isSubmitting}
-          value={form.watch()}
+          value={values}
           onValueChange={({ title, description, lang }) => {
             form.setValue("title", title, { shouldDirty: true });
             form.setValue("description", description, { shouldDirty: true });

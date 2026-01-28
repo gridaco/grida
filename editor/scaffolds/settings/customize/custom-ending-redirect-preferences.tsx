@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { useEditorState } from "@/scaffolds/editor";
 import { Spinner } from "@/components/ui/spinner";
 import { PrivateEditorApi } from "@/lib/private";
@@ -30,7 +30,6 @@ export function EndingRedirectPreferences() {
     control,
     formState: { isSubmitting, isDirty },
     reset,
-    watch,
   } = useForm({
     defaultValues: {
       is_redirect_after_response_uri_enabled:
@@ -65,7 +64,10 @@ export function EndingRedirectPreferences() {
     } catch (error) {}
   };
 
-  const enabled = watch("is_redirect_after_response_uri_enabled");
+  const enabled = useWatch({
+    control,
+    name: "is_redirect_after_response_uri_enabled",
+  });
 
   return (
     <PreferenceBox>
