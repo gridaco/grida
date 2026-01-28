@@ -17,6 +17,8 @@ pub struct RuntimeRendererConfig {
     pub pixel_preview_scale: u8,
     /// Pixel preview strategy (stability policy).
     pub pixel_preview_strategy: PixelPreviewStrategy,
+    /// Render policy describing how content/effects/compositing should be rendered.
+    pub render_policy: super::render_policy::RenderPolicy,
 }
 
 impl Default for RuntimeRendererConfig {
@@ -26,6 +28,7 @@ impl Default for RuntimeRendererConfig {
             pixel_preview_scale: 0,
             // Stable is the default policy when Pixel Preview is used.
             pixel_preview_strategy: PixelPreviewStrategy::Stable,
+            render_policy: Default::default(),
         }
     }
 }

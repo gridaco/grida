@@ -3,6 +3,7 @@ use crate::cg::prelude::*;
 use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::Painter;
 use crate::runtime::counter::FrameCounter;
+use crate::runtime::render_policy::RenderPolicy;
 use crate::sk;
 use crate::{
     cache,
@@ -217,12 +218,13 @@ impl Renderer {
 
     #[inline]
     fn prefill_picture_cache_for_plan(&mut self, plan: &FramePlan) {
+        let variant_key = self.config.render_policy.variant_key();
         // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
         for (_region, indices) in &plan.regions {
             for idx in indices {
                 if let Some(entry) = self.scene_cache.layers.layers.get(*idx).cloned() {
                     let id = entry.id;
-                    let _ = self.with_recording_cached(&id, |painter| {
+                    let _ = self.with_recording_cached(&id, variant_key, |painter| {
                         painter.draw_layer(&entry.layer);
                     });
                 }
@@ -239,6 +241,7 @@ impl Renderer {
             &self.fonts,
             &self.images,
             &self.scene_cache,
+            self.config.render_policy,
         );
         painter.draw_layer_list(&self.scene_cache.layers);
         painter.cache_picture_hits()
@@ -377,6 +380,20 @@ impl Renderer {
         });
     }
 
+    /// Enable or disable outline mode (wireframe).
+    pub fn set_outline_mode(&mut self, enable: bool) {
+        self.config.render_policy = if enable {
+            RenderPolicy::WIREFRAME_DEFAULT
+        } else {
+            RenderPolicy::STANDARD
+        };
+    }
+
+    /// Configure the renderer render policy (standard vs wireframe presets, etc).
+    pub fn set_render_policy(&mut self, policy: RenderPolicy) {
+        self.config.render_policy = policy;
+    }
+
     /// Render the queued frame if any and return the completed statistics.
     /// Intended to be called by the host when a redraw request is received.
     pub fn flush(&mut self) -> FrameFlushResult {
@@ -402,7 +419,8 @@ impl Renderer {
         let mut canvas = surface.canvas();
         let draw = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
-        if self.config.cache_tile && frame.stable {
+        let effective_cache_tile = self.config.cache_tile && self.config.render_policy.allows_tile_cache();
+        if effective_cache_tile && frame.stable {
             // if !self.camera.has_zoom_changed() {}
             self.scene_cache.update_tiles(&self.camera, surface, true);
         }
@@ -577,8 +595,13 @@ impl Renderer {
             bounds.y + bounds.height,
         );
         let canvas = recorder.begin_recording(sk_bounds, true);
-        let painter =
-            Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
+        let painter = Painter::new_with_scene_cache(
+            canvas,
+            &self.fonts,
+            &self.images,
+            &self.scene_cache,
+            self.config.render_policy,
+        );
         draw(&painter);
         recorder.finish_recording_as_picture(None)
     }
@@ -586,9 +609,14 @@ impl Renderer {
     fn with_recording_cached(
         &mut self,
         id: &NodeId,
+        variant_key: u64,
         draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
-        if let Some(pic) = self.scene_cache.picture.get_node_picture(id) {
+        if let Some(pic) = self
+            .scene_cache
+            .picture
+            .get_node_picture_variant(id, variant_key)
+        {
             return Some(pic.clone());
         }
 
@@ -600,7 +628,7 @@ impl Renderer {
         if let Some(pic) = &pic {
             self.scene_cache
                 .picture
-                .set_node_picture(id.clone(), pic.clone());
+                .set_node_picture_variant(id.clone(), variant_key, pic.clone());
         }
         pic
     }
@@ -618,7 +646,8 @@ impl Renderer {
             ImageTileCacheResolutionStrategy::ForceCache
         };
 
-        let (visible_tiles, tile_rects) = if self.config.cache_tile {
+        let effective_cache_tile = self.config.cache_tile && self.config.render_policy.allows_tile_cache();
+        let (visible_tiles, tile_rects) = if effective_cache_tile {
             let region_tiles = self
                 .scene_cache
                 .tile
@@ -631,7 +660,7 @@ impl Renderer {
             (Vec::new(), Vec::new())
         };
 
-        let painter_region = if stable || !self.config.cache_tile {
+        let painter_region = if stable || !effective_cache_tile {
             vec![bounds]
         } else {
             region::difference(bounds, &tile_rects)
@@ -680,6 +709,7 @@ impl Renderer {
         let zoom = self.camera.get_zoom();
         let pixel_preview_scale = self.config.pixel_preview_scale;
         let pixel_preview_strategy = self.config.pixel_preview_strategy;
+        let effective_cache_tile = self.config.cache_tile && self.config.render_policy.allows_tile_cache();
 
         // Pixel Preview: render the scene at a reduced internal resolution, then
         // scale up with nearest-neighbor sampling.
@@ -759,34 +789,36 @@ impl Renderer {
         // Always draw via command pipeline. Tiles are drawn first (as a backdrop),
         // then the full command stream composes the final result.
 
-        // draw image cache tiles
-        for tk in plan.tiles.iter() {
-            let tile_at_zoom = self.scene_cache.tile.get_tile(&tk.key);
-            if let Some(tile_at_zoom) = tile_at_zoom {
-                let image = &tile_at_zoom.image;
-                let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
-                let r = tk.rect;
-                let dst = Rect::from_xywh(r.x, r.y, r.width, r.height);
-                let mut paint = SkPaint::default();
+        if effective_cache_tile {
+            // draw image cache tiles
+            for tk in plan.tiles.iter() {
+                let tile_at_zoom = self.scene_cache.tile.get_tile(&tk.key);
+                if let Some(tile_at_zoom) = tile_at_zoom {
+                    let image = &tile_at_zoom.image;
+                    let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
+                    let r = tk.rect;
+                    let dst = Rect::from_xywh(r.x, r.y, r.width, r.height);
+                    let mut paint = SkPaint::default();
 
-                // Apply adaptive blur filter when the tile was captured at a lower zoom level
-                // (lower resolution) than the current view
-                if tk.blur && tk.blur_radius > 0.0 {
-                    let blur_filter = skia_safe::image_filters::blur(
-                        (tk.blur_radius, tk.blur_radius),
-                        None,
-                        None,
-                        None,
+                    // Apply adaptive blur filter when the tile was captured at a lower zoom level
+                    // (lower resolution) than the current view
+                    if tk.blur && tk.blur_radius > 0.0 {
+                        let blur_filter = skia_safe::image_filters::blur(
+                            (tk.blur_radius, tk.blur_radius),
+                            None,
+                            None,
+                            None,
+                        );
+                        paint.set_image_filter(blur_filter);
+                    }
+
+                    canvas.draw_image_rect(
+                        image,
+                        Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                        dst,
+                        &paint,
                     );
-                    paint.set_image_filter(blur_filter);
                 }
-
-                canvas.draw_image_rect(
-                    image,
-                    Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
-                    dst,
-                    &paint,
-                );
             }
         }
 
@@ -802,7 +834,7 @@ impl Renderer {
             cache_picture_size: self.scene_cache.picture.len(),
             cache_geometry_size: self.scene_cache.geometry.len(),
             tiles_total: self.scene_cache.tile.tiles().len(),
-            tiles_used: plan.tiles.len(),
+            tiles_used: if effective_cache_tile { plan.tiles.len() } else { 0 },
         }
         //
     }
@@ -839,8 +871,13 @@ impl Renderer {
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
         // Always use the command pipeline for export to ensure masks are applied
-        let painter =
-            Painter::new_with_scene_cache(canvas, &self.fonts, &self.images, &self.scene_cache);
+        let painter = Painter::new_with_scene_cache(
+            canvas,
+            &self.fonts,
+            &self.images,
+            &self.scene_cache,
+            self.config.render_policy,
+        );
         painter.draw_layer_list(&self.scene_cache.layers);
 
         let __painter_duration = __before_paint.elapsed();
@@ -951,7 +988,7 @@ mod tests {
         );
 
         // no scene loaded so geometry cache is empty
-        let pic = renderer.with_recording_cached(&9999, |_| {});
+        let pic = renderer.with_recording_cached(&9999, 0, |_| {});
         assert!(pic.is_none());
 
         renderer.free();

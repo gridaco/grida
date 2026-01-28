@@ -62,6 +62,15 @@ pub trait ApplicationApi {
     /// for design tooling (reduces shimmer across pan+zoom).
     fn runtime_renderer_set_pixel_preview_stable(&mut self, stable: bool);
 
+    /// Configure render policy via flags.
+    ///
+    /// This is the primary host/WASM boundary for toggling renderer behavior
+    /// without introducing feature-specific APIs.
+    fn runtime_renderer_set_render_policy_flags(
+        &mut self,
+        flags: crate::runtime::render_policy::RenderPolicyFlags,
+    );
+
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
     fn devtools_rendering_set_show_fps_meter(&mut self, show: bool);
@@ -401,6 +410,15 @@ impl ApplicationApi for UnknownTargetApplication {
         self.queue();
     }
 
+    fn runtime_renderer_set_render_policy_flags(
+        &mut self,
+        flags: crate::runtime::render_policy::RenderPolicyFlags,
+    ) {
+        let policy = crate::runtime::render_policy::RenderPolicy::from_flags(flags);
+        self.renderer.set_render_policy(policy);
+        self.queue();
+    }
+
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
         self.devtools_rendering_show_tiles = debug;
     }
@@ -580,8 +598,12 @@ impl UnknownTargetApplication {
     ///
     /// This is backend-agnostic core logic (no window/GL). Intended for
     /// Node/CLI export pipelines, but also usable in wasm.
-    pub fn new_raster(width: i32, height: i32, options: crate::runtime::scene::RendererOptions) -> Box<Self> {
-        let ( _image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
+    pub fn new_raster(
+        width: i32,
+        height: i32,
+        options: crate::runtime::scene::RendererOptions,
+    ) -> Box<Self> {
+        let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
 
         let camera = Camera2D::new(crate::node::schema::Size {
@@ -593,14 +615,7 @@ impl UnknownTargetApplication {
         let backend = state.backend();
 
         Box::new(Self::new(
-            state,
-            backend,
-            camera,
-            120,
-            image_rx,
-            font_rx,
-            None,
-            options,
+            state, backend, camera, 120, image_rx, font_rx, None, options,
         ))
     }
 
