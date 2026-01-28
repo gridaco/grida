@@ -244,6 +244,7 @@ function MonoFormField({
       <>
         <span>{label || name}</span>
         {src && (
+          // eslint-disable-next-line @next/next/no-img-element -- Intentional: dynamic option icon (remote/user-provided).
           <img
             src={src}
             alt={label || name}
@@ -673,6 +674,7 @@ function MonoFormField({
             <span className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300">
               {item.label}
               {item.src && (
+                // eslint-disable-next-line @next/next/no-img-element -- Intentional: dynamic option icon (remote/user-provided).
                 <img
                   src={item.src}
                   alt={item.label || item.value}
@@ -869,6 +871,7 @@ function SafeValueSelect({
             >
               {option.src ? (
                 <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: dynamic option icon (remote/user-provided). */}
                   <img
                     src={option.src}
                     alt={option.label || option.value}

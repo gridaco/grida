@@ -167,6 +167,7 @@ export default function IOSVGPage() {
                 <div className="flex w-full h-96 p-4 border overflow-scroll">
                   <div className="flex-1">
                     {raw ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- Intentional: render a data: SVG preview (Next/Image not applicable).
                       <img
                         src={`data:image/svg+xml;utf8,${encodeURIComponent(raw)}`}
                         alt="raw svg"

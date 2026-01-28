@@ -661,6 +661,7 @@ function BlockRenderer({
       );
     }
     case "image": {
+      // eslint-disable-next-line @next/next/no-img-element -- Intentional: renders user-provided form content (external URLs).
       return <img {...__shared_root_attr} src={block.src} alt="" />;
     }
     case "video": {

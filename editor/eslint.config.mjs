@@ -60,6 +60,7 @@ const eslintConfig = defineConfig([
             "react-hooks/incompatible-library": "error",
             "react-hooks/immutability": "error",
             "react-hooks/static-components": "error",
+            "@next/next/no-img-element": "error",
 
             // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
@@ -70,7 +71,6 @@ const eslintConfig = defineConfig([
             "react-hooks/preserve-manual-memoization": "off",
             "react-hooks/purity": "off",
             "react-hooks/refs": "off",
-            "@next/next/no-img-element": "off",
           },
         },
       ]

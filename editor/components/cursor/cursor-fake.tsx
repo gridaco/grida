@@ -83,6 +83,7 @@ export function FakeLocalPointerCursorPNG({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div {...props} className={cn("relative z-[99999]", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: UI cursor sprite (not content imagery). */}
       <img
         src={cursors.default_png.url}
         alt="local-cursor"

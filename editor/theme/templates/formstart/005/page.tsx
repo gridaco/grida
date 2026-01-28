@@ -100,6 +100,7 @@ function Media() {
           media?.map((it, index) => {
             return (
               <CarouselItem key={index} className="p-0">
+                {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: carousel uses user-provided media URLs. */}
                 <img
                   src={it.publicUrl}
                   alt=""

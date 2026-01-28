@@ -107,6 +107,7 @@ export function ImageView({
   if (!imageUrl) return null;
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- Intentional: renders a canvas-exported data URL (Next/Image not applicable).
     <img
       className={cn("w-full h-full object-contain", className)}
       alt="Paint image"

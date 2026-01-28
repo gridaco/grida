@@ -572,6 +572,7 @@ function OptionEditItem({
                   <Cross1Icon />
                 </Button>
                 <div className="aspect-square bg-neutral-500/50">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: preview uses user-provided URL (avoid Next/Image constraints here). */}
                   <img
                     src={src}
                     alt=""
