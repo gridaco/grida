@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@/components/lib/utils";
 import { motion } from "motion/react";
 import {
   type CSSProperties,
@@ -10,13 +10,13 @@ import {
   useMemo,
 } from "react";
 
-export type TextShimmerProps = {
+export interface TextShimmerProps {
   children: string;
   as?: ElementType;
   className?: string;
   duration?: number;
   spread?: number;
-};
+}
 
 const ShimmerComponent = ({
   children,
@@ -35,6 +35,7 @@ const ShimmerComponent = ({
   );
 
   return (
+    // eslint-disable-next-line react-hooks/static-components -- its from https://ai-sdk.dev/elements/components/shimmer, we dont have code ownership over it.
     <MotionComponent
       animate={{ backgroundPosition: "0% center" }}
       className={cn(

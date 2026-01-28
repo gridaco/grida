@@ -20,7 +20,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
 import { Spinner } from "@/components/ui/spinner";
@@ -37,7 +37,6 @@ export function RestrictNumberOfResponseByCustomer() {
     control,
     formState: { isSubmitting, isDirty },
     reset,
-    watch,
   } = useForm({
     defaultValues: {
       enabled: form.campaign.is_max_form_responses_by_customer_enabled,
@@ -69,8 +68,8 @@ export function RestrictNumberOfResponseByCustomer() {
     } catch (error) {}
   };
 
-  const enabled = watch("enabled");
-  const n = watch("max");
+  const enabled = useWatch({ control, name: "enabled" });
+  const n = useWatch({ control, name: "max" });
 
   return (
     <PreferenceBox>
@@ -198,7 +197,6 @@ export function MaxRespoonses() {
     control,
     formState: { isSubmitting, isDirty },
     reset,
-    watch,
   } = useForm({
     defaultValues: {
       enabled: form.campaign.is_max_form_responses_in_total_enabled,
@@ -228,7 +226,7 @@ export function MaxRespoonses() {
     } catch (error) {}
   };
 
-  const enabled = watch("enabled");
+  const enabled = useWatch({ control, name: "enabled" });
 
   return (
     <PreferenceBox>

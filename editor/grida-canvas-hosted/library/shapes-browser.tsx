@@ -200,6 +200,7 @@ export function ShapesBrowser({ onInsert, onDragStart }: ShapesBrowserProps) {
     [cellSize]
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns functions that React Compiler cannot memoize safely.
   const rowVirtualizer = useVirtualizer({
     count: Math.ceil(shapes.length / COLUMN_COUNT),
     getScrollElement: () => scrollParentRef.current,

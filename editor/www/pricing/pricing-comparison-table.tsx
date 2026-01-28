@@ -20,45 +20,47 @@ import {
   TicketIcon,
 } from "lucide-react";
 
+function PricingMobileHeader({
+  plans,
+  description,
+  priceDescription,
+  price,
+  plan,
+  showDollarSign = true,
+  from = false,
+}: {
+  plans: PricingInformation[];
+  description: string;
+  priceDescription: string;
+  price: string;
+  plan: string;
+  showDollarSign?: boolean;
+  from?: boolean;
+}) {
+  const selectedPlan = plans.find((p) => p.name === plan)!;
+
+  return (
+    <div className="mt-8 px-4 mobile-header">
+      <h2 className="text-foreground text-3xl font-medium uppercase font-mono">
+        {plan}
+      </h2>
+      <div className="flex items-baseline gap-2">
+        {from && <span className="text-foreground text-base">From</span>}
+        {showDollarSign ? (
+          <span className="h1 font-mono">{price}</span>
+        ) : (
+          <span className="text-foreground-light">{price}</span>
+        )}
+
+        <p className="p opacity-50">{priceDescription}</p>
+      </div>
+      <Button className="mt-2">{selectedPlan.cta}</Button>
+    </div>
+  );
+}
+
 const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   const [activeMobilePlan, setActiveMobilePlan] = useState("Free");
-
-  const MobileHeader = ({
-    description,
-    priceDescription,
-    price,
-    plan,
-    showDollarSign = true,
-    from = false,
-  }: {
-    description: string;
-    priceDescription: string;
-    price: string;
-    plan: string;
-    showDollarSign?: boolean;
-    from?: boolean;
-  }) => {
-    const selectedPlan = plans.find((p: any) => p.name === plan)!;
-
-    return (
-      <div className="mt-8 px-4 mobile-header">
-        <h2 className="text-foreground text-3xl font-medium uppercase font-mono">
-          {plan}
-        </h2>
-        <div className="flex items-baseline gap-2">
-          {from && <span className="text-foreground text-base">From</span>}
-          {showDollarSign ? (
-            <span className="h1 font-mono">{price}</span>
-          ) : (
-            <span className="text-foreground-light">{price}</span>
-          )}
-
-          <p className="p opacity-50">{priceDescription}</p>
-        </div>
-        <Button className="mt-2">{selectedPlan.cta}</Button>
-      </div>
-    );
-  };
 
   return (
     <div
@@ -87,7 +89,8 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
         </div>
         {activeMobilePlan === "Free" && (
           <>
-            <MobileHeader
+            <PricingMobileHeader
+              plans={plans}
               plan="Free"
               price={"$0"}
               priceDescription={""}
@@ -142,7 +145,8 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
 
         {activeMobilePlan === "Pro" && (
           <>
-            <MobileHeader
+            <PricingMobileHeader
+              plans={plans}
               plan="Pro"
               from={false}
               price={"$20"}
@@ -192,7 +196,8 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
 
         {activeMobilePlan === "Team" && (
           <>
-            <MobileHeader
+            <PricingMobileHeader
+              plans={plans}
               plan="Team"
               from={false}
               price={"$60"}
@@ -242,7 +247,8 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
 
         {activeMobilePlan === "Enterprise" && (
           <>
-            <MobileHeader
+            <PricingMobileHeader
+              plans={plans}
               plan="Enterprise"
               price={"Contact us"}
               priceDescription={""}

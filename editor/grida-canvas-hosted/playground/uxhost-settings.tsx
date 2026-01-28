@@ -155,6 +155,7 @@ export function SettingsDialog({
                         id="debug-mode"
                         checked={editor.debug}
                         onCheckedChange={(v) => {
+                          // eslint-disable-next-line react-hooks/immutability -- getter/setter
                           editor.debug = v;
                         }}
                       />

@@ -251,6 +251,7 @@ function BrushDetailDialog({
           </Field>
         </aside>
         <aside className="flex-1">
+          {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: brush thumbnail preview (not content imagery). */}
           <img
             className="w-full h-32 object-contain"
             src={definedbrush.thumbnail}
@@ -284,6 +285,7 @@ function BrushItem({
     >
       <span className="text-xs text-muted-foreground">{label}</span>
       <div className="w-full h-16 mt-2">
+        {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: brush thumbnail preview (not content imagery). */}
         <img
           className="w-full h-full select-none pointer-events-none"
           src={thumbnail}

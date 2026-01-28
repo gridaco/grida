@@ -35,6 +35,7 @@ interface VirtualizedCommandProps {
   onSelectOption?: (option: string) => void;
   renderer?: (props: ItemRendererProps) => React.ReactNode;
   onValueSeeked?: (option: string | null) => void;
+  listId?: string;
 }
 
 function DefaultRenderer({
@@ -62,6 +63,7 @@ const VirtualizedCommand = ({
   onSelectOption,
   renderer = DefaultRenderer,
   onValueSeeked,
+  listId,
 }: VirtualizedCommandProps) => {
   const [search, setSearch] = React.useState("");
 
@@ -75,6 +77,7 @@ const VirtualizedCommand = ({
   const parentRef = React.useRef<HTMLDivElement>(null);
   const { sync } = useValueSeekedSelector(parentRef, onValueSeeked, "selected");
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns functions that React Compiler cannot memoize safely.
   const virtualizer = useVirtualizer({
     count: filteredOptions.length,
     getScrollElement: () => parentRef.current,
@@ -116,7 +119,7 @@ const VirtualizedCommand = ({
             position: "relative",
           }}
         >
-          <CommandList>
+          <CommandList id={listId}>
             {virtualOptions.map((virtualOption) => (
               <CommandItem
                 style={{
@@ -147,6 +150,7 @@ const VirtualizedCommand = ({
 };
 
 interface VirtualizedComboboxProps {
+  id?: string;
   value?: string;
   onValueChange?: (value: string) => void;
   options: string[];
@@ -163,6 +167,7 @@ interface VirtualizedComboboxProps {
 }
 
 export function VirtualizedCombobox({
+  id,
   value,
   onValueChange,
   options,
@@ -177,6 +182,7 @@ export function VirtualizedCombobox({
   className,
 }: VirtualizedComboboxProps) {
   const [open, setOpen] = React.useState<boolean>(false);
+  const listId = id ? `${id}-list` : "virtualized-combobox-list";
   const optionItems = React.useMemo(
     () => options.map((option) => ({ value: option, label: option })),
     [options]
@@ -186,9 +192,11 @@ export function VirtualizedCombobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          id={id}
           type="button"
           role="combobox"
           aria-expanded={open}
+          aria-controls={open ? listId : undefined}
           className={cn("flex w-full justify-between items-center", className)}
         >
           <span className="line-clamp-1 text-left">
@@ -211,6 +219,7 @@ export function VirtualizedCombobox({
           selectedOption={value ?? ""}
           renderer={renderer}
           onValueSeeked={onValueSeeked}
+          listId={listId}
           onSelectOption={(currentValue) => {
             onValueChange?.(currentValue === value ? "" : currentValue);
             setOpen(false);

@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
 import type { FormMethod } from "@/grida-forms-hosted/types";
@@ -33,7 +33,6 @@ export function FormMethodPreference() {
     control,
     formState: { isSubmitting, isDirty },
     reset,
-    watch,
   } = useForm({
     defaultValues: {
       method: initial.method,
@@ -56,7 +55,7 @@ export function FormMethodPreference() {
     } catch (error) {}
   };
 
-  const method = watch("method");
+  const method = useWatch({ control, name: "method" });
 
   return (
     <PreferenceBox>

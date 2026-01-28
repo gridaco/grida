@@ -36,7 +36,7 @@ export function SidebarMenuGroup({
             const key =
               item.type === "separator"
                 ? `separator-${index}`
-                : item.id ?? `item-${index}`;
+                : (item.id ?? `item-${index}`);
 
             return item.type === "separator" ? (
               <hr key={key} />

@@ -235,6 +235,7 @@ export function LogosBrowser({
     []
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns functions that React Compiler cannot memoize safely.
   const rowVirtualizer = useVirtualizer({
     count: Math.ceil(logos.length / COLUMN_COUNT),
     getScrollElement: () => scrollParentRef.current,

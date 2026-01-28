@@ -47,7 +47,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useEditorState } from "@/scaffolds/editor";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { Spinner } from "@/components/ui/spinner";
 
 export function EndingPagePreferences() {
@@ -66,7 +66,6 @@ export function EndingPagePreferences() {
     handleSubmit,
     control,
     formState: { isSubmitting, isDirty },
-    watch,
     setValue,
   } = useForm({
     defaultValues: {
@@ -108,9 +107,9 @@ export function EndingPagePreferences() {
 
   const onSubmit = handleSubmit(save);
 
-  const enabled = watch("is_ending_page_enabled");
-  const template = watch("ending_page_template_id");
-  const overrides = watch("overrides");
+  const enabled = useWatch({ control, name: "is_ending_page_enabled" });
+  const template = useWatch({ control, name: "ending_page_template_id" });
+  const overrides = useWatch({ control, name: "overrides" });
   const disabled = !!overrides || !enabled;
 
   return (

@@ -205,27 +205,6 @@ export default function CreateViewerLinkDialog({
 
   const viewer = useDebounce(_viewer, 500);
 
-  const Body = () => {
-    switch (viewer?.type) {
-      case "pdf": {
-        return <ViewerBody viewer={viewer} />;
-      }
-      case undefined:
-        return (
-          <div>
-            <p>Viewer not available for this file type {file.mimetype}</p>
-          </div>
-        );
-      default: {
-        return (
-          <div>
-            <p>Viewer not available for {viewer?.type}</p>
-          </div>
-        );
-      }
-    }
-  };
-
   return (
     <Dialog {...props}>
       <DialogContent hideCloseButton fullScreen className="flex flex-col p-4">
@@ -258,7 +237,7 @@ export default function CreateViewerLinkDialog({
             <Safari className="shadow-xl flex flex-col">
               <SafariToolbar mode="simple" url={viewer?.url} />
               <div className="flex-1 overflow-auto">
-                <Body />
+                <CreateViewerLinkDialogBody viewer={viewer} file={file} />
               </div>
             </Safari>
           </aside>
@@ -326,4 +305,29 @@ export default function CreateViewerLinkDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function CreateViewerLinkDialogBody({
+  viewer,
+  file,
+}: {
+  viewer?: Viewer;
+  file: vfs.FileNode;
+}) {
+  switch (viewer?.type) {
+    case "pdf":
+      return <ViewerBody viewer={viewer} />;
+    case undefined:
+      return (
+        <div>
+          <p>Viewer not available for this file type {file.mimetype}</p>
+        </div>
+      );
+    default:
+      return (
+        <div>
+          <p>Viewer not available for {viewer?.type}</p>
+        </div>
+      );
+  }
 }

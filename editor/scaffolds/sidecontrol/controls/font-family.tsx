@@ -93,6 +93,7 @@ function FontFamilyCommand({
   selectedFontFamily,
   onSelectFontFamily,
   onValueSeeked,
+  listId,
 }: {
   height: string | number;
   fonts: GoogleWebFontListItem[];
@@ -102,6 +103,7 @@ function FontFamilyCommand({
   selectedFontFamily: string;
   onSelectFontFamily?: (fontFamily: string) => void;
   onValueSeeked?: (fontFamily: string | null) => void;
+  listId?: string;
 }) {
   const {
     value: displayValue,
@@ -164,6 +166,7 @@ function FontFamilyCommand({
   const parentRef = React.useRef<HTMLDivElement>(null);
   const { sync } = useValueSeekedSelector(parentRef, onValueSeeked, "selected");
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns functions that React Compiler cannot memoize safely.
   const virtualizer = useVirtualizer({
     count: filteredFontFamilies.length,
     getScrollElement: () => parentRef.current,
@@ -245,7 +248,7 @@ function FontFamilyCommand({
             position: "relative",
           }}
         >
-          <CommandList>
+          <CommandList id={listId}>
             {virtualItems.map((virtualItem) => {
               const fontFamily = filteredFontFamilies[virtualItem.index];
               return (
@@ -278,10 +281,12 @@ function FontFamilyCommand({
 }
 
 export function FontFamilyControl({
+  id,
   value,
   onValueChange,
   onValueSeeked,
 }: {
+  id?: string;
   value?: TMixed<string>;
   onValueChange?: (value: string) => void;
   onValueSeeked?: (value: string | null) => void;
@@ -301,14 +306,17 @@ export function FontFamilyControl({
   );
   const mixed = value === grida.mixed;
   const [open, setOpen] = React.useState<boolean>(false);
+  const listId = id ? `${id}-list` : "font-family-combobox-list";
 
   return (
     <Popover modal={false} open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          id={id}
           type="button"
           role="combobox"
           aria-expanded={open}
+          aria-controls={open ? listId : undefined}
           className={cn(
             "flex w-full justify-between items-center overflow-hidden",
             WorkbenchUI.inputVariants({ size: "xs" })
@@ -334,6 +342,7 @@ export function FontFamilyControl({
           placeholder="Font"
           selectedFontFamily={mixed ? "" : value || ""}
           onValueSeeked={onValueSeeked}
+          listId={listId}
           onSelectFontFamily={(currentValue) => {
             onValueChange?.(currentValue === value ? "" : currentValue);
             setOpen(false);

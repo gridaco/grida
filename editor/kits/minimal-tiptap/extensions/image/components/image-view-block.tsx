@@ -263,6 +263,7 @@ export const ImageViewBlock: React.FC<NodeViewProps> = ({
                   setImageState((prev) => ({ ...prev, isZoomed: false }))
                 }
               >
+                {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: editor image node renders arbitrary URLs. */}
                 <img
                   className={cn(
                     "h-auto rounded object-contain transition-shadow",

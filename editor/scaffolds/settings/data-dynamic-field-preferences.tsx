@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import type { FormResponseUnknownFieldHandlingStrategyType } from "@/grida-forms-hosted/types";
 import { Button } from "@/components/ui/button";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
 import { Spinner } from "@/components/ui/spinner";
@@ -37,7 +37,6 @@ export function UnknownFieldPreferences() {
     control,
     formState: { isSubmitting, isDirty },
     reset,
-    watch,
   } = useForm({
     defaultValues: {
       strategy: unknown_field_handling_strategy,
@@ -62,7 +61,7 @@ export function UnknownFieldPreferences() {
     } catch (error) {}
   };
 
-  const strategy = watch("strategy");
+  const strategy = useWatch({ control, name: "strategy" });
 
   return (
     <PreferenceBox>

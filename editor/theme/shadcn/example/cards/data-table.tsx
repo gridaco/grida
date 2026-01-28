@@ -177,6 +177,7 @@ export function CardsDataTable() {
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns functions that React Compiler cannot memoize safely.
   const table = useReactTable({
     data,
     columns,

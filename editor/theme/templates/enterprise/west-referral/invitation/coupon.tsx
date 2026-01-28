@@ -80,6 +80,7 @@ export default function InvitationCouponTemplate({
           gradientColors={["#000", "#333", "#666"]}
         >
           {design.coupon && (
+            // eslint-disable-next-line @next/next/no-img-element -- Intentional: campaign-provided asset URL (avoid Next/Image constraints here).
             <img
               src={design.coupon.src}
               alt={design.coupon.alt}

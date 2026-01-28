@@ -112,6 +112,7 @@ function Consumer() {
               transition={{ duration: 1, delay: 2 }}
               className="w-full h-full"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: template background image URL (avoid Next/Image constraints here). */}
               <img
                 src={image}
                 alt=""
@@ -132,6 +133,7 @@ function Consumer() {
         </motion.div>
       </ScreenMobileFrame>
       <ScreenRootBackground>
+        {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: blurred background image URL (avoid Next/Image constraints here). */}
         <img
           src={image}
           alt=""

@@ -222,11 +222,7 @@ export default function Overview() {
 function MainChart({ data }: { data: AnalyzedData }) {
   const [chartData, setChartData] = useState<any[]>([]);
 
-  useEffect(() => {
-    processData(data);
-  }, [data]);
-
-  const processData = (data: AnalyzedData) => {
+  function processData(data: AnalyzedData) {
     if (!data.events.length) return;
 
     const grouped = Analytics.serialize(data.events, {
@@ -266,7 +262,11 @@ function MainChart({ data }: { data: AnalyzedData }) {
       (a, b) => a.date.getTime() - b.date.getTime()
     );
     setChartData(chartData);
-  };
+  }
+
+  useEffect(() => {
+    processData(data);
+  }, [data]);
 
   return (
     <ChartContainer

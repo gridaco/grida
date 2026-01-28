@@ -152,6 +152,7 @@ export default function _002() {
               transition={{ duration: 1, delay: 2 }}
               className="w-full h-full"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: template background image URL (avoid Next/Image constraints here). */}
               <img
                 src={data.background.src}
                 alt=""
@@ -180,6 +181,7 @@ export default function _002() {
         </motion.div>
       </ScreenMobileFrame>
       <ScreenRootBackground>
+        {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: blurred background image URL (avoid Next/Image constraints here). */}
         <img
           src={data.background.src}
           alt=""

@@ -244,6 +244,7 @@ function MonoFormField({
       <>
         <span>{label || name}</span>
         {src && (
+          // eslint-disable-next-line @next/next/no-img-element -- Intentional: dynamic option icon (remote/user-provided).
           <img
             src={src}
             alt={label || name}
@@ -635,7 +636,9 @@ function MonoFormField({
           className="flex flex-row gap-1 justify-between items-center"
         >
           <div className="flex flex-col gap-2">
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <LabelText />
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <HelpText />
           </div>
           {renderInput()}
@@ -647,7 +650,9 @@ function MonoFormField({
         <Root type={type} className="items-top flex space-x-2">
           {renderInput()}
           <div className="grid gap-1.5 leading-none">
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <LabelText />
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <HelpText />
           </div>
         </Root>
@@ -669,6 +674,7 @@ function MonoFormField({
             <span className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300">
               {item.label}
               {item.src && (
+                // eslint-disable-next-line @next/next/no-img-element -- Intentional: dynamic option icon (remote/user-provided).
                 <img
                   src={item.src}
                   alt={item.label || item.value}
@@ -682,7 +688,9 @@ function MonoFormField({
 
       return (
         <Root type={type} className="flex flex-col gap-1">
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <LabelText htmlFor="none" />
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <HelpText />
           <Card className="p-0">
             <fieldset className="not-prose">
@@ -704,8 +712,10 @@ function MonoFormField({
     case "radio": {
       return (
         <Root type={type} className="flex flex-col gap-1">
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <LabelText htmlFor="none" />
           {renderInput()}
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <HelpText />
         </Root>
       );
@@ -714,7 +724,9 @@ function MonoFormField({
       if (options) {
         return (
           <Root type={type} className="grid gap-1">
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <LabelText htmlFor="none" />
+            {/* eslint-disable-next-line react-hooks/static-components */}
             <HelpText />
             <ToggleGroupRootWithValue
               name={name}
@@ -759,8 +771,10 @@ function MonoFormField({
 
   return (
     <Root type={type} className="grid gap-2">
+      {/* eslint-disable-next-line react-hooks/static-components */}
       <LabelText />
       {renderInput()}
+      {/* eslint-disable-next-line react-hooks/static-components */}
       <HelpText />
     </Root>
   );
@@ -857,6 +871,7 @@ function SafeValueSelect({
             >
               {option.src ? (
                 <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: dynamic option icon (remote/user-provided). */}
                   <img
                     src={option.src}
                     alt={option.label || option.value}

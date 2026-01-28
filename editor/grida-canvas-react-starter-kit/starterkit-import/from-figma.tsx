@@ -374,6 +374,7 @@ function FigFileImportTab({
             <Card className="p-4 space-y-4">
               {parsed.thumbnailUrl && (
                 <div className="flex justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: remote thumbnail URL from Figma import. */}
                   <img
                     src={parsed.thumbnailUrl}
                     alt="File thumbnail"

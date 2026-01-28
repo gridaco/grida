@@ -439,18 +439,10 @@ export default function CustomerDetailPage(props0: {
           </DropdownMenu>
           {/* TODO: db cursor navigation */}
           <ButtonGroup>
-            <Button
-              disabled
-              variant="outline"
-              size="sm"
-            >
+            <Button disabled variant="outline" size="sm">
               <ChevronLeft className="size-4" />
             </Button>
-            <Button
-              disabled
-              variant="outline"
-              size="sm"
-            >
+            <Button disabled variant="outline" size="sm">
               <ChevronRight className="size-4" />
             </Button>
           </ButtonGroup>
