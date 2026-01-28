@@ -40,25 +40,15 @@ function RGBHexInputInner(
     onValueCommit,
   });
 
-  const mergeRefs = React.useCallback(
-    (node: HTMLInputElement) => {
-      if (hexInput.ref.current !== node) {
-        hexInput.ref.current = node;
-      }
-      if (typeof ref === "function") {
-        ref(node);
-      } else if (ref) {
-        (ref as React.RefObject<HTMLInputElement | null>).current = node;
-      }
-    },
-    [ref, hexInput.ref]
-  );
+  const { ref: inputRef, ...inputProps } = hexInput;
+
+  React.useImperativeHandle(ref, () => inputRef.current!, [inputRef]);
 
   return (
     <input
       {...props}
-      {...hexInput}
-      ref={mergeRefs}
+      {...inputProps}
+      ref={inputRef}
       className={cn(WorkbenchUI.rawInputVariants({ size: "xs" }), className)}
       onFocus={(e) => {
         hexInput.onFocus();

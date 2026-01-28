@@ -58,6 +58,7 @@ const eslintConfig = defineConfig([
             "import/no-anonymous-default-export": "error",
             "react-hooks/use-memo": "error",
             "react-hooks/incompatible-library": "error",
+            "react-hooks/immutability": "error",
 
             // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
@@ -68,7 +69,6 @@ const eslintConfig = defineConfig([
             "react-hooks/preserve-manual-memoization": "off",
             "react-hooks/static-components": "off",
             "react-hooks/purity": "off",
-            "react-hooks/immutability": "off",
             "react-hooks/refs": "off",
             "@next/next/no-img-element": "off",
           },
