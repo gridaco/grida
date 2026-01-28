@@ -54,11 +54,11 @@ const eslintConfig = defineConfig([
             "jsx-a11y/role-has-required-aria-props": "error",
             "react/display-name": "error",
             "react/no-danger-with-children": "error",
+            "react/jsx-key": "error",
 
             // =========================
             // 💤 TEMPORARILY DISABLED (MOCKED) RULES
             // =========================
-            "react/jsx-key": "off",
             "import/no-anonymous-default-export": "off",
             "react-hooks/exhaustive-deps": "off",
             "react-hooks/rules-of-hooks": "off",
