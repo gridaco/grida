@@ -37,6 +37,7 @@ import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
+import { computeRenderPolicyFlagsForOutlineFeature } from "./render-policy-flags";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknownNode,
@@ -3043,24 +3044,18 @@ export class Editor
     this._m_wasm_canvas_scene.redraw();
   }
 
-  public __runtime_renderer_set_outline_mode(state: "on" | "off") {
+  public __runtime_renderer_set_outline_mode(
+    state: "on" | "off",
+    outline_mode_ignores_clips: boolean
+  ) {
     if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) return;
-    // RenderPolicy flags (must match Rust: `crates/grida-canvas/src/runtime/render_policy.rs`)
-    const FLAG_RENDER_FILLS = 1 << 0;
-    const FLAG_RENDER_STROKES = 1 << 1;
-    const FLAG_RENDER_OUTLINES_ALWAYS = 1 << 2;
-    const FLAG_EFFECTS_ENABLED = 1 << 3;
-    const FLAG_COMPOSITING_ENABLED = 1 << 4;
-
-    const flags =
-      state === "on"
-        ? FLAG_RENDER_OUTLINES_ALWAYS
-        : FLAG_RENDER_FILLS |
-          FLAG_RENDER_STROKES |
-          FLAG_EFFECTS_ENABLED |
-          FLAG_COMPOSITING_ENABLED;
-
-    this._m_wasm_canvas_scene.runtime_renderer_set_render_policy_flags(flags);
+    const withIgnoreClips = computeRenderPolicyFlagsForOutlineFeature(
+      state,
+      outline_mode_ignores_clips
+    );
+    this._m_wasm_canvas_scene.runtime_renderer_set_render_policy_flags(
+      withIgnoreClips
+    );
     this._m_wasm_canvas_scene.redraw();
   }
 
@@ -3282,9 +3277,14 @@ export class Editor
       );
 
       this.doc.subscribeWithSelector(
-        (state) => state.outline_mode,
-        (_, v) => {
-          this.__runtime_renderer_set_outline_mode(v);
+        (state) =>
+          [state.outline_mode, state.outline_mode_ignores_clips] as const,
+        (_, [outline_mode, outline_mode_ignores_clips]) => {
+          // Always compute flags from the *new* state values (avoid stale `this.state`).
+          this.__runtime_renderer_set_outline_mode(
+            outline_mode,
+            outline_mode_ignores_clips
+          );
         }
       );
 
@@ -4588,6 +4588,26 @@ export class EditorSurface
     return next;
   }
   // #endregion IOutlineModeActions implementation
+
+  // #region IOutlineIgnoresClipsActions implementation
+  surfaceConfigureOutlineModeIgnoresClips(value: boolean) {
+    // UX rule: only meaningful while outlines are enabled.
+    if (this.state.outline_mode !== "on") return;
+    this.dispatch({
+      type: "surface/outline-mode-ignores-clips",
+      value,
+    });
+  }
+
+  surfaceToggleOutlineModeIgnoresClips(): boolean {
+    const { outline_mode_ignores_clips } = this.state;
+    // UX rule: only meaningful while outlines are enabled.
+    if (this.state.outline_mode !== "on") return outline_mode_ignores_clips;
+    const next = !outline_mode_ignores_clips;
+    this.surfaceConfigureOutlineModeIgnoresClips(next);
+    return next;
+  }
+  // #endregion IOutlineIgnoresClipsActions implementation
 
   // #region IRulerActions implementation
   surfaceConfigureRuler(state: "on" | "off") {

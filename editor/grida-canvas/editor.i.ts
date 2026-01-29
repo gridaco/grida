@@ -989,6 +989,11 @@ export namespace editor.state {
    */
   export interface IEditorFeatureOutlineModeState {
     outline_mode: "on" | "off";
+    /**
+     * Preference: when outlines mode is enabled, ignore clip paths / masks.
+     * This flag is only *effective* while `outline_mode === "on"`.
+     */
+    outline_mode_ignores_clips: boolean;
   }
 
   /**
@@ -1709,6 +1714,7 @@ export namespace editor.state {
       ruler: "on",
       pixelgrid: "on",
       outline_mode: "off",
+      outline_mode_ignores_clips: true,
       pixelpreview: "disabled",
       pixelpreview_last: "1x",
       when_not_removable: "deactivate",
@@ -4184,6 +4190,8 @@ export namespace editor.api {
     // outline mode
     surfaceConfigureOutlineMode(state: "on" | "off"): void;
     surfaceToggleOutlineMode(): "on" | "off";
+    surfaceConfigureOutlineModeIgnoresClips(value: boolean): void;
+    surfaceToggleOutlineModeIgnoresClips(): boolean;
     //
 
     //

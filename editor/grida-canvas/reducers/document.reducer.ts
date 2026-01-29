@@ -2023,6 +2023,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "surface/guide/delete":
     case "surface/pixel-grid":
     case "surface/outline-mode":
+    case "surface/outline-mode-ignores-clips":
     case "surface/pixel-preview":
     case "surface/content-edit-mode/try-enter":
     case "surface/content-edit-mode/paint/gradient":

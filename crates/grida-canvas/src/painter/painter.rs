@@ -35,6 +35,32 @@ pub struct Painter<'a> {
 }
 
 impl<'a> Painter<'a> {
+    #[inline]
+    fn with_optional_clip_path<F: FnOnce()>(&self, clip: Option<&Path>, f: F) {
+        if self.policy.ignore_clips_content {
+            f();
+            return;
+        }
+        if let Some(clip) = clip {
+            self.canvas.save();
+            self.canvas.clip_path(clip, None, true);
+            f();
+            self.canvas.restore();
+        } else {
+            f();
+        }
+    }
+
+    #[inline]
+    fn draw_mask_group_or_passthrough(&self, group: &PainterMaskGroup) {
+        if self.policy.ignore_clips_content {
+            // Ignore masks/clips: draw content as-is (no mask application).
+            self.draw_render_commands(&group.content_commands);
+        } else {
+            self.draw_mask_group(group);
+        }
+    }
+
     /// Create a new Painter that uses the SceneCache's paragraph cache
     pub fn new_with_scene_cache(
         canvas: &'a skia_safe::Canvas,
@@ -917,14 +943,9 @@ impl<'a> Painter<'a> {
                                     }
                                 });
                             };
-                            if let Some(clip) = clip_path {
-                                self.canvas.save();
-                                self.canvas.clip_path(clip, None, true);
+                            self.with_optional_clip_path(clip_path.as_ref(), || {
                                 self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                                self.canvas.restore();
-                            } else {
-                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            }
+                            });
                         });
                     },
                 );
@@ -1034,14 +1055,9 @@ impl<'a> Painter<'a> {
                                 }
                             };
 
-                            if let Some(clip) = clip_path {
-                                self.canvas.save();
-                                self.canvas.clip_path(clip, None, true);
+                            self.with_optional_clip_path(clip_path.as_ref(), || {
                                 draw_with_effects();
-                                self.canvas.restore();
-                            } else {
-                                draw_with_effects();
-                            }
+                            });
                         });
                     },
                 );
@@ -1110,14 +1126,9 @@ impl<'a> Painter<'a> {
                                     }
                                 });
                             };
-                            if let Some(clip) = clip_path {
-                                self.canvas.save();
-                                self.canvas.clip_path(clip, None, true);
+                            self.with_optional_clip_path(clip_path.as_ref(), || {
                                 self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                                self.canvas.restore();
-                            } else {
-                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            }
+                            });
                         });
                     },
                 );
@@ -1141,99 +1152,100 @@ impl<'a> Painter<'a> {
                 self.canvas.save();
                 self.canvas
                     .concat(&sk::sk_matrix(shape_layer.base.transform.matrix));
-
-                let path = shape_layer.shape.to_path();
-                let paint = self.outline_sk_paint(style);
-                self.canvas.draw_path(&path, &paint);
+                self.with_optional_clip_path(shape_layer.base.clip_path.as_ref(), || {
+                    let path = shape_layer.shape.to_path();
+                    let paint = self.outline_sk_paint(style);
+                    self.canvas.draw_path(&path, &paint);
+                });
                 self.canvas.restore();
             }
             PainterPictureLayer::Vector(vector_layer) => {
                 self.canvas.save();
                 self.canvas
                     .concat(&sk::sk_matrix(vector_layer.base.transform.matrix));
+                self.with_optional_clip_path(vector_layer.base.clip_path.as_ref(), || {
+                    let vn_painter = crate::vectornetwork::vn_painter::VNPainter::new_with_images(
+                        self.canvas,
+                        self.images,
+                    );
 
-                let vn_painter = crate::vectornetwork::vn_painter::VNPainter::new_with_images(
-                    self.canvas,
-                    self.images,
-                );
+                    let stroke_options = StrokeOptions {
+                        stroke_width: style.width,
+                        stroke_align: StrokeAlign::Center,
+                        stroke_cap: StrokeCap::Butt,
+                        stroke_join: StrokeJoin::Miter,
+                        stroke_miter_limit: crate::cg::types::StrokeMiterLimit(4.0),
+                        paints: crate::cg::types::Paints::new([crate::cg::types::Paint::Solid(
+                            crate::cg::types::SolidPaint {
+                                color: style.color,
+                                blend_mode: Default::default(),
+                                active: true,
+                            },
+                        )]),
+                        width_profile: None,
+                        stroke_dash_array: None,
+                    };
 
-                let stroke_options = StrokeOptions {
-                    stroke_width: style.width,
-                    stroke_align: StrokeAlign::Center,
-                    stroke_cap: StrokeCap::Butt,
-                    stroke_join: StrokeJoin::Miter,
-                    stroke_miter_limit: crate::cg::types::StrokeMiterLimit(4.0),
-                    paints: crate::cg::types::Paints::new([crate::cg::types::Paint::Solid(
-                        crate::cg::types::SolidPaint {
-                            color: style.color,
-                            blend_mode: Default::default(),
-                            active: true,
-                        },
-                    )]),
-                    width_profile: None,
-                    stroke_dash_array: None,
-                };
-
-                self.draw_vector_strokes(
-                    &vn_painter,
-                    &vector_layer.vector,
-                    &stroke_options,
-                    vector_layer.corner_radius,
-                );
-
+                    self.draw_vector_strokes(
+                        &vn_painter,
+                        &vector_layer.vector,
+                        &stroke_options,
+                        vector_layer.corner_radius,
+                    );
+                });
                 self.canvas.restore();
             }
             PainterPictureLayer::Text(text_layer) => {
                 self.canvas.save();
                 self.canvas
                     .concat(&sk::sk_matrix(text_layer.base.transform.matrix));
+                self.with_optional_clip_path(text_layer.base.clip_path.as_ref(), || {
+                    // Ensure we can shape text even when fills are empty.
+                    let fills: crate::cg::types::Paints = if text_layer.fills.is_empty() {
+                        crate::cg::types::Paints::new([crate::cg::types::Paint::Solid(
+                            crate::cg::types::SolidPaint {
+                                color: crate::cg::color::CGColor::TRANSPARENT,
+                                blend_mode: Default::default(),
+                                active: true,
+                            },
+                        )])
+                    } else {
+                        text_layer.fills.clone()
+                    };
 
-                // Ensure we can shape text even when fills are empty.
-                let fills: crate::cg::types::Paints = if text_layer.fills.is_empty() {
-                    crate::cg::types::Paints::new([crate::cg::types::Paint::Solid(
-                        crate::cg::types::SolidPaint {
-                            color: crate::cg::color::CGColor::TRANSPARENT,
-                            blend_mode: Default::default(),
-                            active: true,
+                    let paragraph = self.cached_paragraph(
+                        &text_layer.base.id,
+                        &text_layer.text,
+                        &text_layer.width,
+                        &text_layer.max_lines,
+                        &text_layer.ellipsis,
+                        &fills,
+                        &text_layer.text_align,
+                        &text_layer.text_align_vertical,
+                        &text_layer.text_style,
+                    );
+
+                    let layout_size = {
+                        let para = paragraph.borrow();
+                        (para.max_width(), para.height())
+                    };
+
+                    let layout_height = layout_size.1;
+                    let y_offset = match text_layer.height {
+                        Some(h) => match text_layer.text_align_vertical {
+                            TextAlignVertical::Top => 0.0,
+                            TextAlignVertical::Center => (h - layout_height) / 2.0,
+                            TextAlignVertical::Bottom => h - layout_height,
                         },
-                    )])
-                } else {
-                    text_layer.fills.clone()
-                };
+                        None => 0.0,
+                    };
 
-                let paragraph = self.cached_paragraph(
-                    &text_layer.base.id,
-                    &text_layer.text,
-                    &text_layer.width,
-                    &text_layer.max_lines,
-                    &text_layer.ellipsis,
-                    &fills,
-                    &text_layer.text_align,
-                    &text_layer.text_align_vertical,
-                    &text_layer.text_style,
-                );
-
-                let layout_size = {
-                    let para = paragraph.borrow();
-                    (para.max_width(), para.height())
-                };
-
-                let layout_height = layout_size.1;
-                let y_offset = match text_layer.height {
-                    Some(h) => match text_layer.text_align_vertical {
-                        TextAlignVertical::Top => 0.0,
-                        TextAlignVertical::Center => (h - layout_height) / 2.0,
-                        TextAlignVertical::Bottom => h - layout_height,
-                    },
-                    None => 0.0,
-                };
-
-                let glyph_path = self.build_text_glyph_path(&paragraph, y_offset);
-                if !glyph_path.is_empty() {
-                    let paint = self.outline_sk_paint(style);
-                    self.canvas.draw_path(&glyph_path, &paint);
-                }
-
+                    let glyph_path = self.build_text_glyph_path(&paragraph, y_offset);
+                    if !glyph_path.is_empty() {
+                        let paint = self.outline_sk_paint(style);
+                        self.canvas.draw_path(&glyph_path, &paint);
+                    }
+                });
                 self.canvas.restore();
             }
         }
@@ -1284,7 +1296,9 @@ impl<'a> Painter<'a> {
                     }
                     self.draw_layer(layer)
                 }
-                PainterRenderCommand::MaskGroup(group) => self.draw_mask_group(group),
+                PainterRenderCommand::MaskGroup(group) => {
+                    self.draw_mask_group_or_passthrough(group)
+                }
             }
         }
     }

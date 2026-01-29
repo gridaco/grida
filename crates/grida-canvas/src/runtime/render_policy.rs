@@ -68,6 +68,10 @@ pub struct RenderPolicy {
     pub content: ContentPolicy,
     pub effects: EffectsPolicy,
     pub compositing: CompositingPolicy,
+    /// When true, clip paths / mask groups are ignored (content is not clipped).
+    ///
+    /// This is intended for debugging/inspection (e.g. outline mode).
+    pub ignore_clips_content: bool,
 }
 
 impl RenderPolicy {
@@ -79,6 +83,7 @@ impl RenderPolicy {
         },
         effects: EffectsPolicy::Enabled,
         compositing: CompositingPolicy::Enabled,
+        ignore_clips_content: false,
     };
 
     /// Convenience preset used by the editor feature \"Show outlines\".
@@ -89,6 +94,8 @@ impl RenderPolicy {
         }),
         effects: EffectsPolicy::Disabled,
         compositing: CompositingPolicy::Disabled,
+        // Wireframe is primarily used for inspection; by default, ignore clips.
+        ignore_clips_content: true,
     };
 
     /// True only for the default renderer behavior (full fills/strokes + effects + compositing).
@@ -209,6 +216,7 @@ pub const FLAG_RENDER_STROKES: RenderPolicyFlags = 1 << 1;
 pub const FLAG_RENDER_OUTLINES_ALWAYS: RenderPolicyFlags = 1 << 2;
 pub const FLAG_EFFECTS_ENABLED: RenderPolicyFlags = 1 << 3;
 pub const FLAG_COMPOSITING_ENABLED: RenderPolicyFlags = 1 << 4;
+pub const FLAG_IGNORE_CLIPS_CONTENT: RenderPolicyFlags = 1 << 5;
 
 impl RenderPolicy {
     /// Build a policy from flags.
@@ -229,11 +237,14 @@ impl RenderPolicy {
             CompositingPolicy::Disabled
         };
 
+        let ignore_clips_content = (flags & FLAG_IGNORE_CLIPS_CONTENT) != 0;
+
         if (flags & FLAG_RENDER_OUTLINES_ALWAYS) != 0 {
             // Outline style is currently encoded in the preset; can be expanded later.
             let mut p = Self::WIREFRAME_DEFAULT;
             p.effects = effects;
             p.compositing = compositing;
+            p.ignore_clips_content = ignore_clips_content;
             return p;
         }
 
@@ -244,6 +255,7 @@ impl RenderPolicy {
             },
             effects,
             compositing,
+            ignore_clips_content,
         }
     }
 
@@ -255,6 +267,9 @@ impl RenderPolicy {
         }
         if self.compositing == CompositingPolicy::Enabled {
             flags |= FLAG_COMPOSITING_ENABLED;
+        }
+        if self.ignore_clips_content {
+            flags |= FLAG_IGNORE_CLIPS_CONTENT;
         }
 
         match self.content {

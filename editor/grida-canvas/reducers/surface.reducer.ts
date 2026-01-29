@@ -92,6 +92,13 @@ function __self_set_outline_mode(
   draft.outline_mode = outline_mode;
 }
 
+function __self_set_outline_mode_ignores_clips(
+  draft: editor.state.IEditorState,
+  value: boolean
+) {
+  draft.outline_mode_ignores_clips = value;
+}
+
 function __self_set_pixelpreview(
   draft: editor.state.IEditorState,
   pixelpreview: "disabled" | "1x" | "2x"
@@ -941,6 +948,14 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       case "surface/outline-mode": {
         const { state: outlinemodestate } = action;
         __self_set_outline_mode(draft, outlinemodestate);
+        break;
+      }
+      case "surface/outline-mode-ignores-clips": {
+        const { value } = action;
+        // UX rule: preference can only be changed while outlines are enabled.
+        if (draft.outline_mode === "on") {
+          __self_set_outline_mode_ignores_clips(draft, value);
+        }
         break;
       }
       case "surface/pixel-preview": {
