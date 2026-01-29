@@ -37,6 +37,7 @@ import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
+import { computeRenderPolicyFlagsForOutlineFeature } from "./render-policy-flags";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknownNode,
@@ -3043,6 +3044,21 @@ export class Editor
     this._m_wasm_canvas_scene.redraw();
   }
 
+  public __runtime_renderer_set_outline_mode(
+    state: "on" | "off",
+    outline_mode_ignores_clips: boolean
+  ) {
+    if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) return;
+    const withIgnoreClips = computeRenderPolicyFlagsForOutlineFeature(
+      state,
+      outline_mode_ignores_clips
+    );
+    this._m_wasm_canvas_scene.runtime_renderer_set_render_policy_flags(
+      withIgnoreClips
+    );
+    this._m_wasm_canvas_scene.redraw();
+  }
+
   /**
    * mount the canvas surface
    * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
@@ -3257,6 +3273,18 @@ export class Editor
         (state) => state.pixelpreview,
         (_, v) => {
           this.__runtime_renderer_set_pixel_preview_scale(v);
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) =>
+          [state.outline_mode, state.outline_mode_ignores_clips] as const,
+        (_, [outline_mode, outline_mode_ignores_clips]) => {
+          // Always compute flags from the *new* state values (avoid stale `this.state`).
+          this.__runtime_renderer_set_outline_mode(
+            outline_mode,
+            outline_mode_ignores_clips
+          );
         }
       );
 
@@ -4544,6 +4572,42 @@ export class EditorSurface
     return next;
   }
   // #endregion IPixelPreviewActions implementation
+
+  // #region IOutlineModeActions implementation
+  surfaceConfigureOutlineMode(state: "on" | "off") {
+    this.dispatch({
+      type: "surface/outline-mode",
+      state,
+    });
+  }
+
+  surfaceToggleOutlineMode(): "on" | "off" {
+    const { outline_mode } = this.state;
+    const next = outline_mode === "on" ? "off" : "on";
+    this.surfaceConfigureOutlineMode(next);
+    return next;
+  }
+  // #endregion IOutlineModeActions implementation
+
+  // #region IOutlineIgnoresClipsActions implementation
+  surfaceConfigureOutlineModeIgnoresClips(value: boolean) {
+    // UX rule: only meaningful while outlines are enabled.
+    if (this.state.outline_mode !== "on") return;
+    this.dispatch({
+      type: "surface/outline-mode-ignores-clips",
+      value,
+    });
+  }
+
+  surfaceToggleOutlineModeIgnoresClips(): boolean {
+    const { outline_mode_ignores_clips } = this.state;
+    // UX rule: only meaningful while outlines are enabled.
+    if (this.state.outline_mode !== "on") return outline_mode_ignores_clips;
+    const next = !outline_mode_ignores_clips;
+    this.surfaceConfigureOutlineModeIgnoresClips(next);
+    return next;
+  }
+  // #endregion IOutlineIgnoresClipsActions implementation
 
   // #region IRulerActions implementation
   surfaceConfigureRuler(state: "on" | "off") {

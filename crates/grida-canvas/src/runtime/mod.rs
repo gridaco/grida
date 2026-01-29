@@ -4,5 +4,6 @@ pub mod counter;
 pub mod font_repository;
 pub mod image_repository;
 pub mod pixel_preview;
+pub mod render_policy;
 pub mod scene;
 pub mod system_images;

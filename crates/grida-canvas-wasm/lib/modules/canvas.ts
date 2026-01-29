@@ -402,6 +402,16 @@ export class Scene {
     this.module._runtime_renderer_set_pixel_preview_stable(this.appptr, stable);
   }
 
+  runtime_renderer_set_render_policy_flags(flags: number) {
+    this._assertAlive();
+    this.module._runtime_renderer_set_render_policy_flags(this.appptr, flags);
+  }
+
+  runtime_renderer_set_outline_mode(enable: boolean) {
+    this._assertAlive();
+    this.module._runtime_renderer_set_outline_mode(this.appptr, enable);
+  }
+
   // ====================================================================================================
   // DEVTOOLS
   // ====================================================================================================

@@ -7,6 +7,7 @@ use super::text_stroke;
 use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::prelude::*;
 use crate::node::schema::*;
+use crate::runtime::render_policy::{OutlineStyle, RenderPolicy};
 use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;
 use crate::sk;
@@ -29,16 +30,46 @@ pub struct Painter<'a> {
     path_cache: RefCell<VectorPathCache>,
     scene_cache: Option<&'a SceneCache>,
     cache_hits: RefCell<usize>,
+    policy: RenderPolicy,
+    variant_key: u64,
 }
 
 impl<'a> Painter<'a> {
+    #[inline]
+    fn with_optional_clip_path<F: FnOnce()>(&self, clip: Option<&Path>, f: F) {
+        if self.policy.ignore_clips_content {
+            f();
+            return;
+        }
+        if let Some(clip) = clip {
+            self.canvas.save();
+            self.canvas.clip_path(clip, None, true);
+            f();
+            self.canvas.restore();
+        } else {
+            f();
+        }
+    }
+
+    #[inline]
+    fn draw_mask_group_or_passthrough(&self, group: &PainterMaskGroup) {
+        if self.policy.ignore_clips_content {
+            // Ignore masks/clips: draw content as-is (no mask application).
+            self.draw_render_commands(&group.content_commands);
+        } else {
+            self.draw_mask_group(group);
+        }
+    }
+
     /// Create a new Painter that uses the SceneCache's paragraph cache
     pub fn new_with_scene_cache(
         canvas: &'a skia_safe::Canvas,
         fonts: &'a FontRepository,
         images: &'a ImageRepository,
         scene_cache: &'a SceneCache,
+        policy: RenderPolicy,
     ) -> Self {
+        let variant_key = policy.variant_key();
         Self {
             canvas,
             fonts,
@@ -46,6 +77,8 @@ impl<'a> Painter<'a> {
             path_cache: RefCell::new(VectorPathCache::new()),
             scene_cache: Some(scene_cache), // Store reference to scene cache
             cache_hits: RefCell::new(0),
+            policy,
+            variant_key,
         }
     }
 
@@ -791,6 +824,7 @@ impl<'a> Painter<'a> {
             stroke_align,
             (layout_size.0, container_height),
             y_offset,
+            true,
         );
     }
 
@@ -802,6 +836,7 @@ impl<'a> Painter<'a> {
         stroke_align: &StrokeAlign,
         layout_size: (f32, f32),
         y_offset: f32,
+        render_fill: bool,
     ) {
         self.canvas.save();
         self.canvas.translate((0.0, y_offset));
@@ -827,7 +862,9 @@ impl<'a> Painter<'a> {
         }
 
         // Now we can simply paint the paragraph - all paint handling is done in paragraph()
-        paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
+        if render_fill {
+            paragraph.borrow().paint(self.canvas, Point::new(0.0, 0.0));
+        }
 
         if stroke_width > 0.0
             && !strokes.is_empty()
@@ -856,6 +893,18 @@ impl<'a> Painter<'a> {
 
     /// Draw a single [`PainterPictureLayer`].
     pub fn draw_layer(&self, layer: &PainterPictureLayer) {
+        if !self.policy.is_wireframe() {
+            self.draw_layer_standard(layer);
+            return;
+        }
+
+        let Some(style) = self.policy.outline_style() else {
+            return;
+        };
+        self.draw_layer_outline(layer, style);
+    }
+
+    fn draw_layer_standard(&self, layer: &PainterPictureLayer) {
         match layer {
             PainterPictureLayer::Shape(shape_layer) => {
                 self.with_blendmode(
@@ -871,29 +920,32 @@ impl<'a> Painter<'a> {
                             let draw_content = || {
                                 self.with_opacity(shape_layer.base.opacity, || {
                                     // 1. Fills
-                                    self.draw_fills(shape, &shape_layer.fills);
+                                    if self.policy.render_fills() {
+                                        self.draw_fills(shape, &shape_layer.fills);
 
-                                    // 2. Noise (only if fills are visible)
-                                    if !shape_layer.fills.is_empty()
-                                        && !effect_ref.noises.is_empty()
-                                    {
-                                        self.draw_noise_effects(shape, &effect_ref.noises);
+                                        // 2. Noise (only if fills are visible)
+                                        if !shape_layer.fills.is_empty()
+                                            && !effect_ref.noises.is_empty()
+                                        {
+                                            self.draw_noise_effects(shape, &effect_ref.noises);
+                                        }
                                     }
 
                                     // 3. Strokes
-                                    if let Some(path) = &shape_layer.stroke_path {
-                                        self.draw_stroke_path(shape, path, &shape_layer.strokes);
+                                    if self.policy.render_strokes() {
+                                        if let Some(path) = &shape_layer.stroke_path {
+                                            self.draw_stroke_path(
+                                                shape,
+                                                path,
+                                                &shape_layer.strokes,
+                                            );
+                                        }
                                     }
                                 });
                             };
-                            if let Some(clip) = clip_path {
-                                self.canvas.save();
-                                self.canvas.clip_path(clip, None, true);
+                            self.with_optional_clip_path(clip_path.as_ref(), || {
                                 self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                                self.canvas.restore();
-                            } else {
-                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            }
+                            });
                         });
                     },
                 );
@@ -947,11 +999,20 @@ impl<'a> Painter<'a> {
                                     }
                                     self.draw_text_paragraph(
                                         &paragraph,
-                                        &text_layer.strokes,
-                                        text_layer.stroke_width,
+                                        if self.policy.render_strokes() {
+                                            &text_layer.strokes
+                                        } else {
+                                            &[]
+                                        },
+                                        if self.policy.render_strokes() {
+                                            text_layer.stroke_width
+                                        } else {
+                                            0.0
+                                        },
                                         &text_layer.stroke_align,
                                         (layout_size.0, container_height),
                                         y_offset,
+                                        self.policy.render_fills(),
                                     );
                                 });
                             };
@@ -994,14 +1055,9 @@ impl<'a> Painter<'a> {
                                 }
                             };
 
-                            if let Some(clip) = clip_path {
-                                self.canvas.save();
-                                self.canvas.clip_path(clip, None, true);
+                            self.with_optional_clip_path(clip_path.as_ref(), || {
                                 draw_with_effects();
-                                self.canvas.restore();
-                            } else {
-                                draw_with_effects();
-                            }
+                            });
                         });
                     },
                 );
@@ -1026,59 +1082,202 @@ impl<'a> Painter<'a> {
                                         self.images,
                                     );
 
-                                    // 1. Render fills only (pass None for strokes)
-                                    vn_painter.draw(
-                                        &vector_layer.vector,
-                                        &vector_layer.fills,
-                                        None,
-                                        vector_layer.corner_radius,
-                                    );
-
-                                    // 2. Apply noise effects (only if fills are visible)
-                                    if !vector_layer.fills.is_empty()
-                                        && !effect_ref.noises.is_empty()
-                                    {
-                                        self.draw_noise_effects(shape, &effect_ref.noises);
-                                    }
-
-                                    // 3. Render strokes separately
-                                    if !vector_layer.strokes.is_empty() {
-                                        let stroke_options = StrokeOptions {
-                                            stroke_width: vector_layer.stroke_width,
-                                            stroke_align: vector_layer.stroke_align,
-                                            stroke_cap: vector_layer.stroke_cap,
-                                            stroke_join: vector_layer.stroke_join,
-                                            stroke_miter_limit: vector_layer.stroke_miter_limit,
-                                            paints: vector_layer.strokes.clone(),
-                                            width_profile: vector_layer
-                                                .stroke_width_profile
-                                                .clone(),
-                                            stroke_dash_array: vector_layer
-                                                .stroke_dash_array
-                                                .clone(),
-                                        };
-                                        self.draw_vector_strokes(
-                                            &vn_painter,
+                                    if self.policy.render_fills() {
+                                        // 1. Render fills only (pass None for strokes)
+                                        vn_painter.draw(
                                             &vector_layer.vector,
-                                            &stroke_options,
+                                            &vector_layer.fills,
+                                            None,
                                             vector_layer.corner_radius,
                                         );
+
+                                        // 2. Apply noise effects (only if fills are visible)
+                                        if !vector_layer.fills.is_empty()
+                                            && !effect_ref.noises.is_empty()
+                                        {
+                                            self.draw_noise_effects(shape, &effect_ref.noises);
+                                        }
+                                    }
+
+                                    if self.policy.render_strokes() {
+                                        // 3. Render strokes separately
+                                        if !vector_layer.strokes.is_empty() {
+                                            let stroke_options = StrokeOptions {
+                                                stroke_width: vector_layer.stroke_width,
+                                                stroke_align: vector_layer.stroke_align,
+                                                stroke_cap: vector_layer.stroke_cap,
+                                                stroke_join: vector_layer.stroke_join,
+                                                stroke_miter_limit: vector_layer.stroke_miter_limit,
+                                                paints: vector_layer.strokes.clone(),
+                                                width_profile: vector_layer
+                                                    .stroke_width_profile
+                                                    .clone(),
+                                                stroke_dash_array: vector_layer
+                                                    .stroke_dash_array
+                                                    .clone(),
+                                            };
+                                            self.draw_vector_strokes(
+                                                &vn_painter,
+                                                &vector_layer.vector,
+                                                &stroke_options,
+                                                vector_layer.corner_radius,
+                                            );
+                                        }
                                     }
                                 });
                             };
-                            if let Some(clip) = clip_path {
-                                self.canvas.save();
-                                self.canvas.clip_path(clip, None, true);
+                            self.with_optional_clip_path(clip_path.as_ref(), || {
                                 self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                                self.canvas.restore();
-                            } else {
-                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            }
+                            });
                         });
                     },
                 );
             }
         }
+    }
+
+    fn outline_sk_paint(&self, style: OutlineStyle) -> SkPaint {
+        let mut paint = SkPaint::default();
+        let color: skia_safe::Color = style.color.into();
+        paint.set_color(color);
+        paint.set_style(skia_safe::paint::Style::Stroke);
+        paint.set_stroke_width(style.width);
+        paint.set_anti_alias(true);
+        paint
+    }
+
+    fn draw_layer_outline(&self, layer: &PainterPictureLayer, style: OutlineStyle) {
+        match layer {
+            PainterPictureLayer::Shape(shape_layer) => {
+                self.canvas.save();
+                self.canvas
+                    .concat(&sk::sk_matrix(shape_layer.base.transform.matrix));
+                self.with_optional_clip_path(shape_layer.base.clip_path.as_ref(), || {
+                    let path = shape_layer.shape.to_path();
+                    let paint = self.outline_sk_paint(style);
+                    self.canvas.draw_path(&path, &paint);
+                });
+                self.canvas.restore();
+            }
+            PainterPictureLayer::Vector(vector_layer) => {
+                self.canvas.save();
+                self.canvas
+                    .concat(&sk::sk_matrix(vector_layer.base.transform.matrix));
+                self.with_optional_clip_path(vector_layer.base.clip_path.as_ref(), || {
+                    let vn_painter = crate::vectornetwork::vn_painter::VNPainter::new_with_images(
+                        self.canvas,
+                        self.images,
+                    );
+
+                    let stroke_options = StrokeOptions {
+                        stroke_width: style.width,
+                        stroke_align: StrokeAlign::Center,
+                        stroke_cap: StrokeCap::Butt,
+                        stroke_join: StrokeJoin::Miter,
+                        stroke_miter_limit: crate::cg::types::StrokeMiterLimit(4.0),
+                        paints: crate::cg::types::Paints::new([crate::cg::types::Paint::Solid(
+                            crate::cg::types::SolidPaint {
+                                color: style.color,
+                                blend_mode: Default::default(),
+                                active: true,
+                            },
+                        )]),
+                        width_profile: None,
+                        stroke_dash_array: None,
+                    };
+
+                    self.draw_vector_strokes(
+                        &vn_painter,
+                        &vector_layer.vector,
+                        &stroke_options,
+                        vector_layer.corner_radius,
+                    );
+                });
+                self.canvas.restore();
+            }
+            PainterPictureLayer::Text(text_layer) => {
+                self.canvas.save();
+                self.canvas
+                    .concat(&sk::sk_matrix(text_layer.base.transform.matrix));
+                self.with_optional_clip_path(text_layer.base.clip_path.as_ref(), || {
+                    // Ensure we can shape text even when fills are empty.
+                    let fills: crate::cg::types::Paints = if text_layer.fills.is_empty() {
+                        crate::cg::types::Paints::new([crate::cg::types::Paint::Solid(
+                            crate::cg::types::SolidPaint {
+                                color: crate::cg::color::CGColor::TRANSPARENT,
+                                blend_mode: Default::default(),
+                                active: true,
+                            },
+                        )])
+                    } else {
+                        text_layer.fills.clone()
+                    };
+
+                    let paragraph = self.cached_paragraph(
+                        &text_layer.base.id,
+                        &text_layer.text,
+                        &text_layer.width,
+                        &text_layer.max_lines,
+                        &text_layer.ellipsis,
+                        &fills,
+                        &text_layer.text_align,
+                        &text_layer.text_align_vertical,
+                        &text_layer.text_style,
+                    );
+
+                    let layout_size = {
+                        let para = paragraph.borrow();
+                        (para.max_width(), para.height())
+                    };
+
+                    let layout_height = layout_size.1;
+                    let y_offset = match text_layer.height {
+                        Some(h) => match text_layer.text_align_vertical {
+                            TextAlignVertical::Top => 0.0,
+                            TextAlignVertical::Center => (h - layout_height) / 2.0,
+                            TextAlignVertical::Bottom => h - layout_height,
+                        },
+                        None => 0.0,
+                    };
+
+                    let glyph_path = self.build_text_glyph_path(&paragraph, y_offset);
+                    if !glyph_path.is_empty() {
+                        let paint = self.outline_sk_paint(style);
+                        self.canvas.draw_path(&glyph_path, &paint);
+                    }
+                });
+                self.canvas.restore();
+            }
+        }
+    }
+
+    fn build_text_glyph_path(
+        &self,
+        paragraph: &Rc<RefCell<textlayout::Paragraph>>,
+        y_offset: f32,
+    ) -> Path {
+        let mut builder = PathBuilder::new();
+        paragraph.borrow_mut().visit(|_, info| {
+            if let Some(info) = info {
+                let glyphs = info.glyphs();
+                let positions = info.positions();
+                let origin = info.origin();
+                let font = info.font();
+                for (glyph, pos) in glyphs.iter().zip(positions.iter()) {
+                    if let Some(glyph_path) = font.get_path(*glyph) {
+                        let offset = Point::new(pos.x + origin.x, pos.y + origin.y + y_offset);
+                        if offset.x != 0.0 || offset.y != 0.0 {
+                            let transformed =
+                                glyph_path.make_transform(&Matrix::translate((offset.x, offset.y)));
+                            builder.add_path(&transformed);
+                        } else {
+                            builder.add_path(&glyph_path);
+                        }
+                    }
+                }
+            }
+        });
+        builder.detach()
     }
 
     fn draw_render_commands(&self, commands: &[PainterRenderCommand]) {
@@ -1087,7 +1286,9 @@ impl<'a> Painter<'a> {
                 PainterRenderCommand::Draw(layer) => {
                     // Prefer cached picture if available
                     if let Some(scene_cache) = self.scene_cache {
-                        if let Some(pic) = scene_cache.picture.get_node_picture(layer.id()) {
+                        if let Some(pic) =
+                            scene_cache.get_node_picture_variant(layer.id(), self.variant_key)
+                        {
                             self.canvas.draw_picture(pic, None, None);
                             *self.cache_hits.borrow_mut() += 1;
                             continue;
@@ -1095,7 +1296,9 @@ impl<'a> Painter<'a> {
                     }
                     self.draw_layer(layer)
                 }
-                PainterRenderCommand::MaskGroup(group) => self.draw_mask_group(group),
+                PainterRenderCommand::MaskGroup(group) => {
+                    self.draw_mask_group_or_passthrough(group)
+                }
             }
         }
     }
@@ -1170,7 +1373,34 @@ impl<'a> Painter<'a> {
 
     /// Draw all layers in a [`LayerList`].
     pub fn draw_layer_list(&self, list: &LayerList) {
+        if !self.policy.is_wireframe() {
+            self.draw_layer_list_standard(list);
+        } else {
+            self.draw_layer_list_outline(list);
+        }
+    }
+
+    fn draw_layer_list_standard(&self, list: &LayerList) {
         self.draw_render_commands(&list.commands);
+    }
+
+    fn draw_layer_list_outline(&self, list: &LayerList) {
+        let Some(style) = self.policy.outline_style() else {
+            // Non-standard policy without an outline style: nothing to draw.
+            return;
+        };
+
+        for entry in &list.layers {
+            if let Some(scene_cache) = self.scene_cache {
+                if let Some(pic) = scene_cache.get_node_picture_variant(&entry.id, self.variant_key)
+                {
+                    self.canvas.draw_picture(pic, None, None);
+                    *self.cache_hits.borrow_mut() += 1;
+                    continue;
+                }
+            }
+            self.draw_layer_outline(&entry.layer, style);
+        }
     }
 
     pub fn cache_picture_hits(&self) -> usize {

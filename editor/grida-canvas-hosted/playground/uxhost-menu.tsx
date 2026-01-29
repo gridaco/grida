@@ -47,8 +47,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
@@ -107,6 +105,11 @@ export function PlaygroundMenuContent({
   // Get editor state for View menu
   const ruler = useEditorState(instance, (state) => state.ruler);
   const pixelgrid = useEditorState(instance, (state) => state.pixelgrid);
+  const outline_mode = useEditorState(instance, (state) => state.outline_mode);
+  const outline_mode_ignores_clips = useEditorState(
+    instance,
+    (state) => state.outline_mode_ignores_clips
+  );
   const pixelpreview = useEditorState(instance, (state) => state.pixelpreview);
 
   // Get editor state for Edit menu
@@ -222,6 +225,8 @@ export function PlaygroundMenuContent({
         <ViewMenuContent
           pixelgrid={pixelgrid}
           ruler={ruler}
+          outline_mode={outline_mode}
+          outline_mode_ignores_clips={outline_mode_ignores_clips}
           pixelpreview={pixelpreview}
           toggleVisibility={toggleVisibility}
           toggleMinimal={toggleMinimal}
@@ -422,12 +427,16 @@ function EditMenuContent({
 function ViewMenuContent({
   pixelgrid,
   ruler,
+  outline_mode,
+  outline_mode_ignores_clips,
   pixelpreview,
   toggleVisibility,
   toggleMinimal,
 }: {
   pixelgrid: string;
   ruler: string;
+  outline_mode: string;
+  outline_mode_ignores_clips: boolean;
   pixelpreview: string;
   toggleVisibility?: () => void;
   toggleMinimal?: () => void;
@@ -491,41 +500,20 @@ function ViewMenuContent({
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         {/* Display Options */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            Pixel preview
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-40">
-            <DropdownMenuRadioGroup
-              value={pixelpreview}
-              onValueChange={(v) => {
-                instance.surface.surfaceConfigurePixelPreviewScale(
-                  v as "disabled" | "1x" | "2x"
-                );
-              }}
-            >
-              <DropdownMenuRadioItem value="disabled" className="text-xs">
-                Disabled
-                <DropdownMenuShortcut>
-                  {keyboardShortcutText(
-                    "workbench.surface.view.toggle-pixel-preview"
-                  )}
-                </DropdownMenuShortcut>
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="1x" className="text-xs">
-                1x
-                <DropdownMenuShortcut>
-                  {keyboardShortcutText(
-                    "workbench.surface.view.toggle-pixel-preview"
-                  )}
-                </DropdownMenuShortcut>
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="2x" className="text-xs">
-                2x
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        <DropdownMenuCheckboxItem
+          checked={pixelpreview !== "disabled"}
+          onSelect={() => {
+            instance.surface.surfaceTogglePixelPreview();
+          }}
+          className="text-xs"
+        >
+          Pixel preview
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.view.toggle-pixel-preview"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={pixelgrid === "on"}
           onSelect={() => {
@@ -552,6 +540,37 @@ function ViewMenuContent({
             {keyboardShortcutText("workbench.surface.view.hide-show-ruler")}
           </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Outlines
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuCheckboxItem
+              checked={outline_mode === "on"}
+              onSelect={() => {
+                instance.surface.surfaceToggleOutlineMode();
+              }}
+              className="text-xs"
+            >
+              Show outlines
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.view.toggle-outline-mode"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={outline_mode_ignores_clips}
+              disabled={outline_mode !== "on"}
+              onSelect={() => {
+                instance.surface.surfaceToggleOutlineModeIgnoresClips();
+              }}
+              className="text-xs"
+            >
+              Ignore clips content
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         {/* UI Visibility */}
         {toggleVisibility && toggleMinimal && (
           <>

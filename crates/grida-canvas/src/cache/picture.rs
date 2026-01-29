@@ -21,14 +21,18 @@ impl Default for PictureCacheStrategy {
 #[derive(Debug, Clone)]
 pub struct PictureCache {
     strategy: PictureCacheStrategy,
-    node_pictures: HashMap<NodeId, Picture>,
+    /// Fast-path store for the default render variant (variant key = 0).
+    default_store: HashMap<NodeId, Picture>,
+    /// Store for non-default render variants (variant key != 0).
+    variant_store: HashMap<(NodeId, u64), Picture>,
 }
 
 impl PictureCache {
     pub fn new() -> Self {
         Self {
             strategy: PictureCacheStrategy::default(),
-            node_pictures: HashMap::new(),
+            default_store: HashMap::new(),
+            variant_store: HashMap::new(),
         }
     }
 
@@ -42,15 +46,36 @@ impl PictureCache {
     }
 
     pub fn get_node_picture(&self, id: &NodeId) -> Option<&Picture> {
-        self.node_pictures.get(id)
+        self.default_store.get(id)
     }
 
     pub fn set_node_picture(&mut self, id: NodeId, picture: Picture) {
-        self.node_pictures.insert(id, picture);
+        self.default_store.insert(id, picture);
+    }
+
+    /// Lookup a picture for a node in a specific render variant.
+    ///
+    /// - `variant_key = 0` resolves to the default fast-path store.
+    pub fn get_node_picture_variant(&self, id: &NodeId, variant_key: u64) -> Option<&Picture> {
+        if variant_key == 0 {
+            return self.default_store.get(id);
+        }
+        self.variant_store.get(&(id.clone(), variant_key))
+    }
+
+    /// Store a picture for a node in a specific render variant.
+    ///
+    /// - `variant_key = 0` resolves to the default fast-path store.
+    pub fn set_node_picture_variant(&mut self, id: NodeId, variant_key: u64, picture: Picture) {
+        if variant_key == 0 {
+            self.default_store.insert(id, picture);
+            return;
+        }
+        self.variant_store.insert((id, variant_key), picture);
     }
 
     pub fn len(&self) -> usize {
-        self.node_pictures.len()
+        self.default_store.len() + self.variant_store.len()
     }
 
     pub fn depth(&self) -> Option<usize> {
@@ -58,6 +83,7 @@ impl PictureCache {
     }
 
     pub fn invalidate(&mut self) {
-        self.node_pictures.clear();
+        self.default_store.clear();
+        self.variant_store.clear();
     }
 }

@@ -230,6 +230,13 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.runtime_renderer_set_pixel_preview_stable(stable);
     }
 
+    fn runtime_renderer_set_render_policy_flags(
+        &mut self,
+        flags: crate::runtime::render_policy::RenderPolicyFlags,
+    ) {
+        self.base.runtime_renderer_set_render_policy_flags(flags);
+    }
+
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
         self.base.set_main_camera_transform(transform);
     }
