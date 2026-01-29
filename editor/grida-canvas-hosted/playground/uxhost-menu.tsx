@@ -47,8 +47,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
@@ -502,41 +500,46 @@ function ViewMenuContent({
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         {/* Display Options */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            Pixel preview
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-40">
-            <DropdownMenuRadioGroup
-              value={pixelpreview}
-              onValueChange={(v) => {
-                instance.surface.surfaceConfigurePixelPreviewScale(
-                  v as "disabled" | "1x" | "2x"
-                );
-              }}
-            >
-              <DropdownMenuRadioItem value="disabled" className="text-xs">
-                Disabled
-                <DropdownMenuShortcut>
-                  {keyboardShortcutText(
-                    "workbench.surface.view.toggle-pixel-preview"
-                  )}
-                </DropdownMenuShortcut>
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="1x" className="text-xs">
-                1x
-                <DropdownMenuShortcut>
-                  {keyboardShortcutText(
-                    "workbench.surface.view.toggle-pixel-preview"
-                  )}
-                </DropdownMenuShortcut>
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="2x" className="text-xs">
-                2x
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        <DropdownMenuCheckboxItem
+          checked={pixelpreview !== "disabled"}
+          onSelect={() => {
+            instance.surface.surfaceTogglePixelPreview();
+          }}
+          className="text-xs"
+        >
+          Pixel preview
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.view.toggle-pixel-preview"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={pixelgrid === "on"}
+          onSelect={() => {
+            instance.surface.surfaceTogglePixelGrid();
+          }}
+          className="text-xs"
+        >
+          Pixel grid
+          <DropdownMenuShortcut>
+            {keyboardShortcutText(
+              "workbench.surface.view.hide-show-pixel-grid"
+            )}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={ruler === "on"}
+          onSelect={() => {
+            instance.surface.surfaceToggleRuler();
+          }}
+          className="text-xs"
+        >
+          Ruler
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.hide-show-ruler")}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="text-xs">
             Outlines
@@ -568,32 +571,6 @@ function ViewMenuContent({
             </DropdownMenuCheckboxItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-        <DropdownMenuCheckboxItem
-          checked={pixelgrid === "on"}
-          onSelect={() => {
-            instance.surface.surfaceTogglePixelGrid();
-          }}
-          className="text-xs"
-        >
-          Pixel grid
-          <DropdownMenuShortcut>
-            {keyboardShortcutText(
-              "workbench.surface.view.hide-show-pixel-grid"
-            )}
-          </DropdownMenuShortcut>
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={ruler === "on"}
-          onSelect={() => {
-            instance.surface.surfaceToggleRuler();
-          }}
-          className="text-xs"
-        >
-          Ruler
-          <DropdownMenuShortcut>
-            {keyboardShortcutText("workbench.surface.view.hide-show-ruler")}
-          </DropdownMenuShortcut>
-        </DropdownMenuCheckboxItem>
         {/* UI Visibility */}
         {toggleVisibility && toggleMinimal && (
           <>

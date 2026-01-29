@@ -125,6 +125,37 @@ export function ZoomControl({ className }: { className?: string }) {
         <DropdownMenuSeparator />
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="text-xs">
+            Outlines
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuCheckboxItem
+              checked={outline_mode === "on"}
+              onSelect={() => {
+                editor.surface.surfaceToggleOutlineMode();
+              }}
+              className="text-xs"
+            >
+              Show outlines
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.view.toggle-outline-mode"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={outline_mode_ignores_clips}
+              disabled={outline_mode !== "on"}
+              onSelect={() => {
+                editor.surface.surfaceToggleOutlineModeIgnoresClips();
+              }}
+              className="text-xs"
+            >
+              Ignore clips content
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
             Pixel preview
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-40">
@@ -156,37 +187,6 @@ export function ZoomControl({ className }: { className?: string }) {
                 2x
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="text-xs">
-            Outlines
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-40">
-            <DropdownMenuCheckboxItem
-              checked={outline_mode === "on"}
-              onSelect={() => {
-                editor.surface.surfaceToggleOutlineMode();
-              }}
-              className="text-xs"
-            >
-              Show outlines
-              <DropdownMenuShortcut>
-                {keyboardShortcutText(
-                  "workbench.surface.view.toggle-outline-mode"
-                )}
-              </DropdownMenuShortcut>
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={outline_mode_ignores_clips}
-              disabled={outline_mode !== "on"}
-              onSelect={() => {
-                editor.surface.surfaceToggleOutlineModeIgnoresClips();
-              }}
-              className="text-xs"
-            >
-              Ignore clips content
-            </DropdownMenuCheckboxItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuCheckboxItem
