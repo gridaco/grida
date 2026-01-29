@@ -3043,6 +3043,27 @@ export class Editor
     this._m_wasm_canvas_scene.redraw();
   }
 
+  public __runtime_renderer_set_outline_mode(state: "on" | "off") {
+    if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) return;
+    // RenderPolicy flags (must match Rust: `crates/grida-canvas/src/runtime/render_policy.rs`)
+    const FLAG_RENDER_FILLS = 1 << 0;
+    const FLAG_RENDER_STROKES = 1 << 1;
+    const FLAG_RENDER_OUTLINES_ALWAYS = 1 << 2;
+    const FLAG_EFFECTS_ENABLED = 1 << 3;
+    const FLAG_COMPOSITING_ENABLED = 1 << 4;
+
+    const flags =
+      state === "on"
+        ? FLAG_RENDER_OUTLINES_ALWAYS
+        : FLAG_RENDER_FILLS |
+          FLAG_RENDER_STROKES |
+          FLAG_EFFECTS_ENABLED |
+          FLAG_COMPOSITING_ENABLED;
+
+    this._m_wasm_canvas_scene.runtime_renderer_set_render_policy_flags(flags);
+    this._m_wasm_canvas_scene.redraw();
+  }
+
   /**
    * mount the canvas surface
    * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
@@ -3257,6 +3278,13 @@ export class Editor
         (state) => state.pixelpreview,
         (_, v) => {
           this.__runtime_renderer_set_pixel_preview_scale(v);
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) => state.outline_mode,
+        (_, v) => {
+          this.__runtime_renderer_set_outline_mode(v);
         }
       );
 
@@ -4544,6 +4572,22 @@ export class EditorSurface
     return next;
   }
   // #endregion IPixelPreviewActions implementation
+
+  // #region IOutlineModeActions implementation
+  surfaceConfigureOutlineMode(state: "on" | "off") {
+    this.dispatch({
+      type: "surface/outline-mode",
+      state,
+    });
+  }
+
+  surfaceToggleOutlineMode(): "on" | "off" {
+    const { outline_mode } = this.state;
+    const next = outline_mode === "on" ? "off" : "on";
+    this.surfaceConfigureOutlineMode(next);
+    return next;
+  }
+  // #endregion IOutlineModeActions implementation
 
   // #region IRulerActions implementation
   surfaceConfigureRuler(state: "on" | "off") {

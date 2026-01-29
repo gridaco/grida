@@ -985,6 +985,13 @@ export namespace editor.state {
   }
 
   /**
+   * @volatile
+   */
+  export interface IEditorFeatureOutlineModeState {
+    outline_mode: "on" | "off";
+  }
+
+  /**
    * Pixel Preview (Figma-style): controls internal rasterization scale for pixelated zoom.
    *
    * - `disabled`: normal rendering
@@ -1517,6 +1524,7 @@ export namespace editor.state {
       editor.state.IEditorFeatureBrushState,
       editor.state.IEditorFeatureRulerState,
       editor.state.IEditorFeaturePixelGridState,
+      editor.state.IEditorFeatureOutlineModeState,
       editor.state.IEditorFeaturePixelPreviewState,
       editor.state.IEditorFeatureRepeatableDuplicateState,
       //
@@ -1700,6 +1708,7 @@ export namespace editor.state {
       gesture_modifiers: editor.config.DEFAULT_GESTURE_MODIFIERS,
       ruler: "on",
       pixelgrid: "on",
+      outline_mode: "off",
       pixelpreview: "disabled",
       pixelpreview_last: "1x",
       when_not_removable: "deactivate",
@@ -4170,6 +4179,11 @@ export namespace editor.api {
     // pixel preview
     surfaceConfigurePixelPreviewScale(scale: "disabled" | "1x" | "2x"): void;
     surfaceTogglePixelPreview(): "disabled" | "1x" | "2x";
+    //
+
+    // outline mode
+    surfaceConfigureOutlineMode(state: "on" | "off"): void;
+    surfaceToggleOutlineMode(): "on" | "off";
     //
 
     //

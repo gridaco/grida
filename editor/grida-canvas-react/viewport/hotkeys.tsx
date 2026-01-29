@@ -464,6 +464,24 @@ export function useEditorHotKeys() {
     toast.success(`Pixel Grid ${v === "on" ? "on" : "off"}`);
   });
 
+  useHotkeys("meta+shift+o, ctrl+shift+o", () => {
+    const v = editor.surface.surfaceToggleOutlineMode();
+    toast.success(`Outline Mode ${v === "on" ? "on" : "off"}`);
+  });
+
+  useHotkeys(
+    "meta+y, ctrl+y",
+    (e) => {
+      // prevent default browser behavior (e.g. open history)
+      e.preventDefault();
+      const v = editor.surface.surfaceToggleOutlineMode();
+      toast.success(`Outline Mode ${v === "on" ? "on" : "off"}`);
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
   useHotkeys("meta+shift+alt+p, ctrl+shift+alt+p", () => {
     const v = editor.surface.surfaceTogglePixelPreview();
     toast.success(`Pixel Preview ${v === "disabled" ? "disabled" : v}`);

@@ -132,9 +132,20 @@ impl SceneCache {
         self.picture.get_node_picture(id)
     }
 
+    /// Return a picture for a specific node in a specific render variant if cached.
+    pub fn get_node_picture_variant(&self, id: &NodeId, variant_key: u64) -> Option<&Picture> {
+        self.picture.get_node_picture_variant(id, variant_key)
+    }
+
     /// Store a picture for a node.
     pub fn set_node_picture(&mut self, id: NodeId, picture: Picture) {
         self.picture.set_node_picture(id, picture);
+    }
+
+    /// Store a picture for a node in a specific render variant.
+    pub fn set_node_picture_variant(&mut self, id: NodeId, variant_key: u64, picture: Picture) {
+        self.picture
+            .set_node_picture_variant(id, variant_key, picture);
     }
 
     /// Query painter layer indices whose bounds intersect with the given rectangle.

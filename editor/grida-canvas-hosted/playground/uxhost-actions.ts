@@ -188,6 +188,16 @@ export const actions = {
     keybindings: kb(KeyCode.KeyP, M.CtrlCmd | M.Shift | M.Alt),
   },
 
+  ["workbench.surface.view.toggle-outline-mode"]: {
+    name: "toggle outline mode",
+    description: "Toggle outline mode (wireframe)",
+    command: "workbench.surface.view.toggle-outline-mode",
+    keybindings: [
+      kb(KeyCode.KeyO, M.CtrlCmd | M.Shift),
+      kb(KeyCode.KeyY, M.CtrlCmd),
+    ],
+  },
+
   ["workbench.surface.view.preview"]: {
     name: "preview",
     description: "preview current selection",

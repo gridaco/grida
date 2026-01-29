@@ -157,17 +157,18 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 
 ## View & Zoom
 
-| Action            | macOS                  | Windows/Linux                | Description                   |
-| ----------------- | ---------------------- | ---------------------------- | ----------------------------- |
-| Zoom to fit       | `⇧ + 1` or `⇧ + 9`     | `⇧ + 1` or `⇧ + 9`           | Zoom to fit all content       |
-| Zoom to selection | `⇧ + 2`                | `⇧ + 2`                      | Zoom to the current selection |
-| Zoom to 100%      | `⇧ + 0`                | `⇧ + 0`                      | Zoom to 100%                  |
-| Zoom in           | `⌘ + =` or `⌘ + Plus`  | `Ctrl + =` or `Ctrl + Plus`  | Zoom in                       |
-| Zoom out          | `⌘ + -` or `⌘ + Minus` | `Ctrl + -` or `Ctrl + Minus` | Zoom out                      |
-| Toggle ruler      | `⇧ + R`                | `⇧ + R`                      | Toggle ruler visibility       |
-| Toggle pixel grid | `⇧ + '`                | `⇧ + '`                      | Toggle pixel grid visibility  |
-| Toggle pixel preview | `⌘ + ⇧ + ⌥ + P`     | `Ctrl + ⇧ + Alt + P`         | Toggle pixel preview (Disabled ↔ last used 1x/2x) |
-| Preview           | `⇧ + Space`            | `⇧ + Space`                  | Preview current selection     |
+| Action               | macOS                  | Windows/Linux                | Description                                        |
+| -------------------- | ---------------------- | ---------------------------- | -------------------------------------------------- |
+| Zoom to fit          | `⇧ + 1` or `⇧ + 9`     | `⇧ + 1` or `⇧ + 9`           | Zoom to fit all content                            |
+| Zoom to selection    | `⇧ + 2`                | `⇧ + 2`                      | Zoom to the current selection                      |
+| Zoom to 100%         | `⇧ + 0`                | `⇧ + 0`                      | Zoom to 100%                                       |
+| Zoom in              | `⌘ + =` or `⌘ + Plus`  | `Ctrl + =` or `Ctrl + Plus`  | Zoom in                                            |
+| Zoom out             | `⌘ + -` or `⌘ + Minus` | `Ctrl + -` or `Ctrl + Minus` | Zoom out                                           |
+| Toggle ruler         | `⇧ + R`                | `⇧ + R`                      | Toggle ruler visibility                            |
+| Toggle pixel grid    | `⇧ + '`                | `⇧ + '`                      | Toggle pixel grid visibility                       |
+| Toggle pixel preview | `⌘ + ⇧ + ⌥ + P`        | `Ctrl + ⇧ + Alt + P`         | Toggle pixel preview (Disabled ↔ last used 1x/2x) |
+| Toggle outline mode  | `⌘ + ⇧ + O` or `⌘ + Y` | `Ctrl + ⇧ + O` or `Ctrl + Y` | Toggle outline mode (wireframe)                    |
+| Preview              | `⇧ + Space`            | `⇧ + Space`                  | Preview current selection                          |
 
 ## Brush Tools
 

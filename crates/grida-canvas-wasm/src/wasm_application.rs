@@ -610,6 +610,38 @@ pub unsafe extern "C" fn runtime_renderer_set_pixel_preview_stable(
 }
 
 #[no_mangle]
+/// js::_runtime_renderer_set_render_policy_flags
+pub unsafe extern "C" fn runtime_renderer_set_render_policy_flags(
+    app: *mut UnknownTargetApplication,
+    flags: u32,
+) {
+    if let Some(app) = app.as_mut() {
+        app.runtime_renderer_set_render_policy_flags(flags);
+    }
+}
+
+#[no_mangle]
+/// js::_runtime_renderer_set_outline_mode
+///
+/// Back-compat shim: delegates to `runtime_renderer_set_render_policy_flags`.
+pub unsafe extern "C" fn runtime_renderer_set_outline_mode(
+    app: *mut UnknownTargetApplication,
+    enable: bool,
+) {
+    use cg::runtime::render_policy::{
+        RenderPolicy, RenderPolicyFlags, FLAG_RENDER_OUTLINES_ALWAYS,
+    };
+    if let Some(app) = app.as_mut() {
+        let flags: RenderPolicyFlags = if enable {
+            FLAG_RENDER_OUTLINES_ALWAYS
+        } else {
+            RenderPolicy::STANDARD.to_flags()
+        };
+        app.runtime_renderer_set_render_policy_flags(flags);
+    }
+}
+
+#[no_mangle]
 /// js::_devtools_rendering_set_show_fps_meter
 pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
     app: *mut UnknownTargetApplication,

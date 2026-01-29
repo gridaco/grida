@@ -50,11 +50,7 @@ declare namespace canvas {
       cols: number,
       rows: number
     ): void;
-    _pointer_move(
-      state: GridaCanvasApplicationPtr,
-      x: number,
-      y: number
-    ): void;
+    _pointer_move(state: GridaCanvasApplicationPtr, x: number, y: number): void;
     _add_font(
       state: GridaCanvasApplicationPtr,
       family_ptr: number,
@@ -182,6 +178,16 @@ declare namespace canvas {
     _runtime_renderer_set_pixel_preview_stable(
       state: GridaCanvasApplicationPtr,
       stable: boolean
+    ): void;
+
+    _runtime_renderer_set_render_policy_flags(
+      state: GridaCanvasApplicationPtr,
+      flags: number
+    ): void;
+
+    _runtime_renderer_set_outline_mode(
+      state: GridaCanvasApplicationPtr,
+      enable: boolean
     ): void;
   }
 }

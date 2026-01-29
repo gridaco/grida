@@ -107,6 +107,7 @@ export function PlaygroundMenuContent({
   // Get editor state for View menu
   const ruler = useEditorState(instance, (state) => state.ruler);
   const pixelgrid = useEditorState(instance, (state) => state.pixelgrid);
+  const outline_mode = useEditorState(instance, (state) => state.outline_mode);
   const pixelpreview = useEditorState(instance, (state) => state.pixelpreview);
 
   // Get editor state for Edit menu
@@ -222,6 +223,7 @@ export function PlaygroundMenuContent({
         <ViewMenuContent
           pixelgrid={pixelgrid}
           ruler={ruler}
+          outline_mode={outline_mode}
           pixelpreview={pixelpreview}
           toggleVisibility={toggleVisibility}
           toggleMinimal={toggleMinimal}
@@ -422,12 +424,14 @@ function EditMenuContent({
 function ViewMenuContent({
   pixelgrid,
   ruler,
+  outline_mode,
   pixelpreview,
   toggleVisibility,
   toggleMinimal,
 }: {
   pixelgrid: string;
   ruler: string;
+  outline_mode: string;
   pixelpreview: string;
   toggleVisibility?: () => void;
   toggleMinimal?: () => void;
@@ -538,6 +542,18 @@ function ViewMenuContent({
             {keyboardShortcutText(
               "workbench.surface.view.hide-show-pixel-grid"
             )}
+          </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={outline_mode === "on"}
+          onSelect={() => {
+            instance.surface.surfaceToggleOutlineMode();
+          }}
+          className="text-xs"
+        >
+          Show outlines
+          <DropdownMenuShortcut>
+            {keyboardShortcutText("workbench.surface.view.toggle-outline-mode")}
           </DropdownMenuShortcut>
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
