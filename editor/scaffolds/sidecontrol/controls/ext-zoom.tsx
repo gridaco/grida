@@ -29,6 +29,11 @@ export function ZoomControl({ className }: { className?: string }) {
   const ruler = useEditorState(editor, (state) => state.ruler);
   const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
   const pixelpreview = useEditorState(editor, (state) => state.pixelpreview);
+  const outline_mode = useEditorState(editor, (state) => state.outline_mode);
+  const outline_mode_ignores_clips = useEditorState(
+    editor,
+    (state) => state.outline_mode_ignores_clips
+  );
   const { scaleX } = useTransformState();
 
   const pct = Math.round(scaleX * 100);
@@ -151,6 +156,37 @@ export function ZoomControl({ className }: { className?: string }) {
                 2x
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Outlines
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuCheckboxItem
+              checked={outline_mode === "on"}
+              onSelect={() => {
+                editor.surface.surfaceToggleOutlineMode();
+              }}
+              className="text-xs"
+            >
+              Show outlines
+              <DropdownMenuShortcut>
+                {keyboardShortcutText(
+                  "workbench.surface.view.toggle-outline-mode"
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={outline_mode_ignores_clips}
+              disabled={outline_mode !== "on"}
+              onSelect={() => {
+                editor.surface.surfaceToggleOutlineModeIgnoresClips();
+              }}
+              className="text-xs"
+            >
+              Ignore clips content
+            </DropdownMenuCheckboxItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuCheckboxItem
