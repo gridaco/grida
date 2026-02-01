@@ -162,9 +162,9 @@ function CampaignThemeStylesEditor({
    */
   maxWidthClassName?: string;
 }) {
+  const defaultPalette = "neutral" satisfies CampaignThemeConfig["palette"];
   const enabled = !!styles?.palette;
-  const palette =
-    styles?.palette ?? ("neutral" satisfies CampaignThemeConfig["palette"]);
+  const palette = styles?.palette ?? defaultPalette;
 
   const paletteobj = palette ? allPalettes[palette] : undefined;
   const defaultRadius = paletteobj?.light["--radius"] ?? "0.5rem";
@@ -189,8 +189,7 @@ function CampaignThemeStylesEditor({
                 return;
               }
               onStylesChange({
-                palette:
-                  palette ?? ("blue" satisfies CampaignThemeConfig["palette"]),
+                palette: palette ?? defaultPalette,
                 radius: styles?.radius,
               });
             }}

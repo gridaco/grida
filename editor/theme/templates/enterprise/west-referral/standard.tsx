@@ -119,7 +119,7 @@ export function MainImage({
         className
       )}
     >
-      <figure className="w-full max-w-[400px] max-h-[400px] shadow-xl overflow-hidden z-10 rounded-[var(--radius)] aspect-square">
+      <figure className="w-full max-w-[400px] max-h-[400px] shadow-xl overflow-hidden z-10 aspect-square">
         {src ? (
           <Image
             src={src}
