@@ -25,5 +25,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build Packages
         run: pnpm turbo build --filter='./packages/*'
+      - name: Run Lint (Next.js apps)
+        run: pnpm turbo lint --filter='./apps/*' --filter=./editor
       - name: Run Tests
         run: pnpm turbo test --filter='!./crates/*'
