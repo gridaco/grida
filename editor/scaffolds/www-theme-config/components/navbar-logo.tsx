@@ -10,6 +10,57 @@ type Logo = {
   srcDark?: string | undefined;
 };
 
+function LogoThemePanel({
+  title,
+  logo,
+  dark,
+  inputId,
+  uploadType,
+  uploader,
+  onLogoChange,
+}: {
+  title: string;
+  logo?: string;
+  dark?: boolean;
+  inputId: string;
+  uploadType: "src" | "srcDark";
+  uploader: (
+    file: File,
+    type: "src" | "srcDark"
+  ) => Promise<FileIO.UploadResult>;
+  onLogoChange?: (file: FileIO.UploadResult, type: "src" | "srcDark") => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <LogoPreview logo={logo} dark={dark} />
+      <p className="text-sm text-center">{title}</p>
+      <p className="text-xs text-center text-gray-500">
+        Use SVG for best speed
+      </p>
+      <div className="flex justify-center">
+        <Button variant="outline" size="sm" className="w-24" asChild>
+          <label htmlFor={inputId}>
+            Upload
+            <input
+              id={inputId}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  uploader(e.target.files[0], uploadType).then((r) => {
+                    onLogoChange?.(r, uploadType);
+                  });
+                }
+              }}
+            />
+          </label>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function NavbarLogoEditor({
   logo,
   uploader,
@@ -38,73 +89,28 @@ export function NavbarLogoEditor({
         </div>
 
         {/* Right column with previews */}
-        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Light Theme Preview */}
-          <div className="flex flex-col items-center gap-2">
-            <LogoPreview
-              logo={logo?.src ? getPublicUrl(logo.src) : undefined}
-            />
-            <p className="text-sm text-center">Light Theme</p>
-            <p className="text-xs text-center text-gray-500">
-              Use SVG for best speed
-            </p>
-            <div className="flex justify-center">
-              <Button variant="outline" size="sm" className="w-24" asChild>
-                <label htmlFor="logo-upload">
-                  Upload
-                  <input
-                    id="logo-upload"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        uploader(e.target.files[0], "src").then((r) => {
-                          onLogoChange?.(r, "src");
-                        });
-                      }
-                    }}
-                  />
-                </label>
-              </Button>
-            </div>
-          </div>
-
-          {/* Dark Theme Preview */}
-          <div className="flex flex-col items-center gap-2">
-            <LogoPreview
-              logo={
-                logo?.srcDark || logo?.src
-                  ? getPublicUrl(logo?.srcDark || logo?.src)
-                  : undefined
-              }
-              dark
-            />
-            <p className="text-sm text-center">Dark Theme</p>
-            <p className="text-xs text-center text-gray-500">
-              Use SVG for best speed
-            </p>
-            <div className="flex justify-center">
-              <Button variant="outline" size="sm" className="w-24" asChild>
-                <label htmlFor="logo-dark-upload">
-                  Upload
-                  <input
-                    id="logo-dark-upload"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        uploader(e.target.files[0], "srcDark").then((r) => {
-                          onLogoChange?.(r, "srcDark");
-                        });
-                      }
-                    }}
-                  />
-                </label>
-              </Button>
-            </div>
-          </div>
+        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <LogoThemePanel
+            title="Light Theme"
+            logo={logo?.src ? getPublicUrl(logo.src) : undefined}
+            inputId="logo-upload"
+            uploadType="src"
+            uploader={uploader}
+            onLogoChange={onLogoChange}
+          />
+          <LogoThemePanel
+            title="Dark Theme"
+            logo={
+              logo?.srcDark || logo?.src
+                ? getPublicUrl(logo?.srcDark || logo?.src)
+                : undefined
+            }
+            dark
+            inputId="logo-dark-upload"
+            uploadType="srcDark"
+            uploader={uploader}
+            onLogoChange={onLogoChange}
+          />
         </div>
       </div>
     </div>

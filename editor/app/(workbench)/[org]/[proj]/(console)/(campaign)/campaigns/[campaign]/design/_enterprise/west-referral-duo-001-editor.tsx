@@ -18,19 +18,12 @@ import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { type WWWTemplateEditorInstance } from "@/scaffolds/platform/www";
 import assert from "assert";
-import { NavbarLogoEditor } from "@/scaffolds/www-theme-config/components/navbar-logo";
 import { toast } from "sonner";
 import { CampaignTemplateDuo001Viewer } from "./template-duo-001-viewer";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import { Checkbox } from "@/components/ui/checkbox";
+import { EnterpriseCampaignThemeTab } from "./theme-tab";
 
 export function EnterpriseWestReferralDuo001Editor({
   template,
@@ -115,7 +108,7 @@ function getCanvasFocus(tab: EditorTab): { node: CanvasComponent } | null {
 function TemplateEditor({
   template,
 }: {
-  template: WWWTemplateEditorInstance<any>;
+  template: WWWTemplateEditorInstance<TemplateData.West_Referrral__Duo_001>;
 }) {
   assert(template.data, "data should be warmed");
 
@@ -133,7 +126,9 @@ function TemplateEditor({
 
   const props = usePropsEditor<TemplateData.West_Referrral__Duo_001>({
     initialProps: template.data,
-    onChange: template.set,
+    onChange: (next) => {
+      template.set(next as unknown as TemplateData.West_Referrral__Duo_001);
+    },
   });
 
   const values = props.mergedDefaultProps as unknown as
@@ -547,45 +542,28 @@ function TemplateEditor({
             </RightPanelTab>
 
             <RightPanelTab value="theme" title="Theme">
-              <div className="grid gap-2">
-                <NavbarLogoEditor
-                  logo={values?.theme?.navbar?.logo}
-                  uploader={template.upload}
-                  onLogoChange={(file, type) => {
-                    if (type === "src")
-                      props.set("theme.navbar.logo.src", file.publicUrl);
-                    if (type === "srcDark")
-                      props.set("theme.navbar.logo.srcDark", file.publicUrl);
-                  }}
-                />
-              </div>
-              <Field>
-                <FieldLabel>Locale</FieldLabel>
-                <Select
-                  value={values?.locale}
-                  onValueChange={(v) => {
-                    props.set("locale", v);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Locale" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ko">Korean</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <div className="mt-10">
-                You can{" "}
-                <Link
-                  href={`/${project.organization_name}/${project.name}/www`}
-                  target="_blank"
-                  className="underline"
-                >
-                  manage site settings here
-                </Link>
-              </div>
+              <EnterpriseCampaignThemeTab
+                project={{
+                  organization_name: project.organization_name,
+                  name: project.name,
+                }}
+                logo={values?.theme?.navbar?.logo}
+                uploader={template.upload}
+                onLogoChange={(file, type) => {
+                  if (type === "src")
+                    props.set("theme.navbar.logo.src", file.publicUrl);
+                  if (type === "srcDark")
+                    props.set("theme.navbar.logo.srcDark", file.publicUrl);
+                }}
+                styles={values?.theme?.styles}
+                onStylesChange={(next) => {
+                  props.set("theme.styles", next);
+                }}
+                locale={values?.locale}
+                onLocaleChange={(v) => {
+                  props.set("locale", v);
+                }}
+              />
             </RightPanelTab>
           </aside>
         </div>

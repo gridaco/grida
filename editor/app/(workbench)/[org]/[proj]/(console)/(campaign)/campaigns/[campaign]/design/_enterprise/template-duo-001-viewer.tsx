@@ -24,6 +24,11 @@ import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
 import MessageAppFrame from "@/components/frames/message-app-frame";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
+import { useTheme } from "next-themes";
+import {
+  campaignShadcnThemeToInlineStyle,
+  resolveCampaignShadcnTheme,
+} from "@/theme/shadcn/campaign-theme";
 
 const document: editor.state.IEditorStateInit = {
   editable: true,
@@ -217,6 +222,13 @@ export function CampaignTemplateDuo001Viewer({
   onDoubleClick?: () => void;
 }) {
   const instance = useEditor(editor.state.init(document));
+  const { resolvedTheme } = useTheme();
+  const scheme = resolvedTheme === "dark" ? "dark" : "light";
+
+  const shadcnTheme = resolveCampaignShadcnTheme(props.props.theme?.styles);
+  const scopedThemeStyle = shadcnTheme
+    ? campaignShadcnThemeToInlineStyle(shadcnTheme, scheme)
+    : undefined;
 
   return (
     <CampaignViewerContextAndPropsContext.Provider
@@ -240,7 +252,10 @@ export function CampaignTemplateDuo001Viewer({
         >
           <PreviewProvider>
             <div className="w-full h-full flex-1">
-              <div className="w-full h-full border rounded-xl shadow-xl overflow-hidden">
+              <div
+                className="w-full h-full border rounded-xl shadow-xl overflow-hidden"
+                style={scopedThemeStyle}
+              >
                 <div className="w-full h-full flex">
                   <StandaloneSceneBackground className="w-full h-full flex flex-col relative bg-muted">
                     <div className="absolute top-4 right-4 z-50 pointer-events-auto">
@@ -295,7 +310,13 @@ function EditorUXServer({ focus }: { focus: { node?: string } }) {
   return <></>;
 }
 
-function CustomComponent_Viewer__Referrer(componentprops: any) {
+type ViewerComponentProps = {
+  style?: React.CSSProperties;
+} & Parameters<typeof queryattributes>[0];
+
+function CustomComponent_Viewer__Referrer(
+  componentprops: ViewerComponentProps
+) {
   const { campaign, props, locale } = useViewerContext();
 
   return (
@@ -333,7 +354,9 @@ function CustomComponent_Viewer__Referrer(componentprops: any) {
   );
 }
 
-function CustomComponent_Viewer__ReferrerShare(componentprops: any) {
+function CustomComponent_Viewer__ReferrerShare(
+  componentprops: ViewerComponentProps
+) {
   const { campaign, props, locale } = useViewerContext();
 
   return (
@@ -359,7 +382,9 @@ function CustomComponent_Viewer__ReferrerShare(componentprops: any) {
   );
 }
 
-function CustomComponent_Viewer__ReferrerShareMessage(componentprops: any) {
+function CustomComponent_Viewer__ReferrerShareMessage(
+  componentprops: ViewerComponentProps
+) {
   const { campaign, props, locale } = useViewerContext();
 
   const message = props?.components?.["referrer-share-message"]?.message;
@@ -395,7 +420,9 @@ function CustomComponent_Viewer__ReferrerShareMessage(componentprops: any) {
   );
 }
 
-function CustomComponent_Viewer__Invitation(componentprops: any) {
+function CustomComponent_Viewer__Invitation(
+  componentprops: ViewerComponentProps
+) {
   const { campaign, props, locale } = useViewerContext();
 
   return (
@@ -434,7 +461,9 @@ function CustomComponent_Viewer__Invitation(componentprops: any) {
   );
 }
 
-function CustomComponent_Viewer__InvitationUXOverlay(componentprops: any) {
+function CustomComponent_Viewer__InvitationUXOverlay(
+  componentprops: ViewerComponentProps
+) {
   const { campaign, props, locale } = useViewerContext();
 
   return (

@@ -177,10 +177,10 @@ export default function InvitationPageTemplate({
           <Standard.Section>
             <Card
               data-testid="west-referral-invitation-card"
-              className="relative overflow-hidden rounded-xl border-0 py-0"
+              className="relative overflow-hidden border-0 py-0"
             >
               <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
-              <div className="px-4 py-1.5 m-0.5 relative border border-background rounded-t-[10px] overflow-hidden flex items-center z-10">
+              <div className="px-4 py-1.5 m-0.5 relative border border-background overflow-hidden flex items-center z-10">
                 {/* background */}
                 <div className="absolute inset-0 bg-gradient-to-bl from-[#A07CFE] to-[#FFBE7B] opacity-30" />
                 <div className="z-10 flex items-center gap-2">
