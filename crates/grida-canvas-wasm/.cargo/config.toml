@@ -34,15 +34,15 @@ linker = "emcc"
 
 # Linker arguments passed to Emscripten
 rustflags = [
+  # Use legacy SjLj exceptions instead of wasm EH.
+  "-C",
+  "target-feature=-exception-handling",
   # Allow undefined symbols (useful for dynamic linking and Skia integration)
   "-C",
   "link-arg=-sERROR_ON_UNDEFINED_SYMBOLS=0",
-  # Ensure setjmp/longjmp support via wasm EH (compatible with -fwasm-exceptions).
+  # Ensure setjmp/longjmp support via Emscripten SjLj.
   "-C",
-  "link-arg=-sSUPPORT_LONGJMP=wasm",
-  # Allow exception catching so invoke wrappers are generated.
-  "-C",
-  "link-arg=-sDISABLE_EXCEPTION_CATCHING=0",
+  "link-arg=-sSUPPORT_LONGJMP=emscripten",
   # Target both web (browser) and Node.js.
   # NOTE: this affects the generated Emscripten JS glue (loader/runtime selection).
   "-C",
