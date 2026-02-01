@@ -40,6 +40,9 @@ rustflags = [
   # Ensure setjmp/longjmp support via wasm EH (compatible with -fwasm-exceptions).
   "-C",
   "link-arg=-sSUPPORT_LONGJMP=wasm",
+  # Allow exception catching so invoke wrappers are generated.
+  "-C",
+  "link-arg=-sDISABLE_EXCEPTION_CATCHING=0",
   # Target both web (browser) and Node.js.
   # NOTE: this affects the generated Emscripten JS glue (loader/runtime selection).
   "-C",
