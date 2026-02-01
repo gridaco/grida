@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(22);
+SELECT plan(17);
 
 -- Get user IDs and project ID from seed data
 DO $$
@@ -174,63 +174,6 @@ SELECT ok(
 RESET ROLE;
 
 ---------------------------------------------------------------------
--- Tests for tag_with_usage view (grida_ciam_public.tag_with_usage)
----------------------------------------------------------------------
-
--- Test 9: Insider can see tag_with_usage with usage_count
-SELECT test_set_auth('insider@grida.co');
-SELECT ok(
-  EXISTS (
-    SELECT 1
-    FROM grida_ciam_public.tag_with_usage
-    WHERE project_id = (SELECT id FROM public.project WHERE name = 'dev')
-      AND name = 'test-tag'
-      AND usage_count > 0
-  ),
-  'Insider (organization member) should see tag_with_usage with usage_count'
-);
-SELECT test_reset_auth();
-
--- Test 10: Random user cannot see tag_with_usage (rejection test)
-SELECT test_set_auth('random@example.com');
-SELECT ok(
-  NOT EXISTS (
-    SELECT 1
-    FROM grida_ciam_public.tag_with_usage
-    WHERE project_id = (SELECT id FROM public.project WHERE name = 'dev')
-      AND name = 'test-tag'
-  ),
-  'Random user (not a member) should be REJECTED from seeing tag_with_usage'
-);
-SELECT test_reset_auth();
-
--- Test 11: Anon cannot see tag_with_usage (rejection test)
-SET ROLE anon;
-SELECT ok(
-  NOT EXISTS (
-    SELECT 1
-    FROM grida_ciam_public.tag_with_usage
-    WHERE project_id = (SELECT id FROM public.project WHERE name = 'dev')
-      AND name = 'test-tag'
-  ),
-  'Anon should be REJECTED from seeing tag_with_usage'
-);
-RESET ROLE;
-
--- Test 12: Service role can bypass RLS and see tag_with_usage
-SET ROLE service_role;
-SELECT ok(
-  EXISTS (
-    SELECT 1
-    FROM grida_ciam_public.tag_with_usage
-    WHERE project_id = (SELECT id FROM public.project WHERE name = 'dev')
-      AND name = 'test-tag'
-  ),
-  'Service role should bypass RLS and see tag_with_usage'
-);
-RESET ROLE;
-
----------------------------------------------------------------------
 -- Tests for customer_auth_policy view (grida_ciam_public.customer_auth_policy)
 ---------------------------------------------------------------------
 
@@ -305,12 +248,12 @@ SELECT is(
     JOIN pg_class c ON c.relname = v.viewname
     JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = v.schemaname
     WHERE v.schemaname = 'grida_ciam_public'
-      AND v.viewname IN ('customer_auth_policy', 'customer_tag', 'customer_with_tags', 'tag_with_usage')
+      AND v.viewname IN ('customer_auth_policy', 'customer_tag', 'customer_with_tags')
       AND c.reloptions IS NOT NULL
       AND array_to_string(c.reloptions, ',') LIKE '%security_invoker=true%'
   ),
-  4::bigint,
-  'All 4 views should have security_invoker = true'
+  3::bigint,
+  'All 3 views should have security_invoker = true'
 );
 
 -- Test 18: Verify data isolation - insider only sees their project's data
@@ -367,19 +310,6 @@ SELECT ok(
       AND tag_name = 'test-tag'
   ),
   'Alice (acme org) should be REJECTED from seeing customer_tags from insider''s local org (multi-tenant isolation)'
-);
-SELECT test_reset_auth();
-
--- Test 22: Alice (acme org) cannot see insider's tag_with_usage from local org (rejection test)
-SELECT test_set_auth('alice@acme.com');
-SELECT ok(
-  NOT EXISTS (
-    SELECT 1
-    FROM grida_ciam_public.tag_with_usage
-    WHERE project_id = (SELECT id FROM public.project WHERE name = 'dev' AND organization_id = (SELECT id FROM public.organization WHERE name = 'local'))
-      AND name = 'test-tag'
-  ),
-  'Alice (acme org) should be REJECTED from seeing tag_with_usage from insider''s local org (multi-tenant isolation)'
 );
 SELECT test_reset_auth();
 

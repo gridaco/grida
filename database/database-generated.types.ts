@@ -4488,6 +4488,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_project: {
+        Args: { p_confirm: string; p_project_id: number }
+        Returns: boolean
+      }
       find_project: {
         Args: { p_org_ref: string; p_proj_ref: string }
         Returns: {

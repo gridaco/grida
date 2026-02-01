@@ -15,6 +15,23 @@ export const username_validation_messages = {
 } as const;
 
 /**
+ * Project name must match DB `project_name_check`.
+ *
+ * DB constraint: `^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){1,38}$`
+ * - lowercase letters + digits
+ * - dashes allowed, but not consecutively and not at the end
+ * - length: 2–39
+ */
+export const PROJECT_NAME_REGEX = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){1,38}$/;
+
+export function validateProjectName(name: string): string | null {
+  if (!PROJECT_NAME_REGEX.test(name)) {
+    return "Use 2–39 characters: lowercase letters, numbers, and single dashes (e.g. my-project).";
+  }
+  return null;
+}
+
+/**
  * Regex for validating a database name, table name, schema name, etc.
  */
 export const SCHEMANAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
