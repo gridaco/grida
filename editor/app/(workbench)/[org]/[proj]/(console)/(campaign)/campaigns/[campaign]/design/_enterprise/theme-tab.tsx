@@ -148,7 +148,7 @@ function CampaignThemeStylesEditor({
   styles,
   onStylesChange,
   className,
-  title = "Campaign Theme",
+  title = "Styles",
   description = "Customize colors and roundness for this campaign. This won’t affect others.",
   maxWidthClassName = "max-w-3xl",
 }: {
