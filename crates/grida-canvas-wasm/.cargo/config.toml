@@ -37,9 +37,9 @@ rustflags = [
   # Allow undefined symbols (useful for dynamic linking and Skia integration)
   "-C",
   "link-arg=-sERROR_ON_UNDEFINED_SYMBOLS=0",
-  # Ensure setjmp/longjmp support for system libs (e.g. libpng).
+  # Ensure setjmp/longjmp support via wasm EH (compatible with -fwasm-exceptions).
   "-C",
-  "link-arg=-sSUPPORT_LONGJMP=emscripten",
+  "link-arg=-sSUPPORT_LONGJMP=wasm",
   # Target both web (browser) and Node.js.
   # NOTE: this affects the generated Emscripten JS glue (loader/runtime selection).
   "-C",
