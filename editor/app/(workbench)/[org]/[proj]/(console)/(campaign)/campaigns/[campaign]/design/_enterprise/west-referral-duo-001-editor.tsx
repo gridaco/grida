@@ -21,13 +21,6 @@ import assert from "assert";
 import { toast } from "sonner";
 import { CampaignTemplateDuo001Viewer } from "./template-duo-001-viewer";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EnterpriseCampaignThemeTab } from "./theme-tab";
@@ -557,7 +550,8 @@ function TemplateEditor({
                 logo={values?.theme?.navbar?.logo}
                 uploader={template.upload}
                 onLogoChange={(file, type) => {
-                  if (type === "src") props.set("theme.navbar.logo.src", file.publicUrl);
+                  if (type === "src")
+                    props.set("theme.navbar.logo.src", file.publicUrl);
                   if (type === "srcDark")
                     props.set("theme.navbar.logo.srcDark", file.publicUrl);
                 }}

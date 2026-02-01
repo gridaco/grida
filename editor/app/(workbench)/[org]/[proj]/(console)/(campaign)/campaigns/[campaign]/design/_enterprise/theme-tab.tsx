@@ -3,8 +3,15 @@
 import type React from "react";
 import Link from "next/link";
 import { cn } from "@/components/lib/utils";
-import type ReactType from "react";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -20,9 +27,7 @@ import type palettes from "@/theme/palettes";
 import * as _palettes from "@/theme/palettes";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Button } from "@/components/ui-editor/button";
 
 type ProjectLinkTarget = {
   organization_name: string;
@@ -69,16 +74,16 @@ function EnableToggle({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <Field orientation="horizontal" className={className}>
       <Checkbox
         checked={checked}
         onCheckedChange={(v) => onCheckedChange(!!v)}
       />
-      <div className="grid">
-        <Label>{label}</Label>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-    </div>
+      <FieldContent>
+        <FieldLabel>{label}</FieldLabel>
+        <FieldDescription>{description}</FieldDescription>
+      </FieldContent>
+    </Field>
   );
 }
 
@@ -106,13 +111,13 @@ function RadiusControl({
   const radiusPx = parseRadiusToPx(value) ?? 8;
 
   return (
-    <div className={cn("grid gap-2", className)}>
+    <Field className={className}>
       <div className="flex items-end justify-between gap-2">
         <div className="grid gap-1">
-          <Label>Roundness</Label>
-          <p className="text-xs text-muted-foreground">
+          <FieldLabel>Roundness</FieldLabel>
+          <FieldDescription>
             Controls corner roundness across the page.
-          </p>
+          </FieldDescription>
         </div>
         <div className="w-28">
           <Input
@@ -135,31 +140,7 @@ function RadiusControl({
           onValueChange(`${v}px`);
         }}
       />
-    </div>
-  );
-}
-
-function ResetToPresetButton({
-  disabled,
-  onClick,
-  children = "Reset to preset",
-  className,
-}: {
-  disabled?: boolean;
-  onClick: () => void;
-  children?: ReactType.ReactNode;
-  className?: string;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      disabled={disabled}
-      onClick={onClick}
-      className={className}
-    >
-      {children}
-    </Button>
+    </Field>
   );
 }
 
@@ -168,7 +149,7 @@ function CampaignThemeStylesEditor({
   onStylesChange,
   className,
   title = "Campaign Theme",
-  description = "Customize palette and roundness for campaign pages.",
+  description = "Customize colors and roundness for this campaign. This won’t affect others.",
   maxWidthClassName = "max-w-3xl",
 }: {
   styles?: CampaignThemeConfig | null;
@@ -190,138 +171,118 @@ function CampaignThemeStylesEditor({
   const radius = styles?.radius ?? defaultRadius;
 
   return (
-    <div className={cn("mt-6", maxWidthClassName, className)}>
-      <div className="rounded-xl border bg-background p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Left column with label and info */}
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold">{title}</h2>
-            <p className="text-sm text-muted-foreground">{description}</p>
-          </div>
+    <div className={cn("mt-10", maxWidthClassName, className)}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Left column with label and info */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
 
-          {/* Right column with controls */}
-          <div className="md:col-span-2 grid gap-6">
-            <EnableToggle
-              checked={enabled}
-              onCheckedChange={(v) => {
-                if (!v) {
-                  onStylesChange(undefined);
-                  return;
-                }
+        {/* Right column with controls */}
+        <FieldGroup className="md:col-span-2 flex flex-col gap-8">
+          <EnableToggle
+            checked={enabled}
+            onCheckedChange={(v) => {
+              if (!v) {
+                onStylesChange(undefined);
+                return;
+              }
+              onStylesChange({
+                palette:
+                  palette ?? ("blue" satisfies CampaignThemeConfig["palette"]),
+                radius: styles?.radius,
+              });
+            }}
+          />
+
+          <Field>
+            <FieldLabel>Palette</FieldLabel>
+            <Select
+              value={palette ?? ""}
+              disabled={!enabled}
+              onValueChange={(v) => {
+                const next =
+                  v && v in allPalettes
+                    ? (v as CampaignThemeConfig["palette"])
+                    : undefined;
                 onStylesChange({
-                  palette:
-                    palette ??
-                    ("blue" satisfies CampaignThemeConfig["palette"]),
+                  palette: next,
                   radius: styles?.radius,
                 });
               }}
-            />
-
-            <div className="grid gap-2">
-              <div className="text-sm font-medium">Palette</div>
-              <Select
-                value={palette ?? ""}
-                disabled={!enabled}
-                onValueChange={(v) => {
-                  const next =
-                    v && v in allPalettes
-                      ? (v as CampaignThemeConfig["palette"])
-                      : undefined;
-                  onStylesChange({
-                    palette: next,
-                    radius: styles?.radius,
-                  });
-                }}
+            >
+              <SelectTrigger
+                className={cn("w-full", paletteobj && "!h-16 px-2 py-2")}
               >
-                <SelectTrigger
-                  className={cn("w-full", paletteobj && "!h-16 px-2 py-2")}
-                >
-                  <SelectValue>
-                    {paletteobj && palette ? (
-                      <div className="flex items-center gap-2">
-                        <PaletteColorChip
-                          primary={paletteobj.light["--primary"]}
-                          secondary={paletteobj.light["--secondary"]}
-                          background={paletteobj.light["--background"]}
-                          className="min-w-12 size-12 rounded-sm border"
-                        />
-                        <span className="text-xs text-muted-foreground text-ellipsis overflow-hidden">
-                          {palette}
-                        </span>
-                      </div>
-                    ) : (
-                      <>Select palette</>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(paletteGroups).map((variant) => {
-                    const group = paletteGroups[variant];
-                    return (
-                      <SelectGroup
-                        key={variant}
-                        className="flex flex-col gap-2"
-                      >
-                        <SelectLabel>{variant}</SelectLabel>
-                        {Object.keys(group).map((key) => {
-                          const colors = group[key];
-                          return (
-                            <SelectItem key={key} value={key}>
-                              <div className="flex gap-2 items-center">
-                                <PaletteColorChip
-                                  primary={colors.light["--primary"]}
-                                  secondary={colors.light["--secondary"]}
-                                  background={colors.light["--background"]}
-                                  onSelect={() => {
-                                    onStylesChange({
-                                      palette:
-                                        key as CampaignThemeConfig["palette"],
-                                      radius: styles?.radius,
-                                    });
-                                  }}
-                                  selected={key === palette}
-                                  className="size-10 rounded-sm"
-                                />
-                                <span className="text-ellipsis overflow-hidden">
-                                  {key}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectGroup>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
+                <SelectValue>
+                  {paletteobj && palette ? (
+                    <div className="flex items-center gap-2">
+                      <PaletteColorChip
+                        primary={paletteobj.light["--primary"]}
+                        secondary={paletteobj.light["--secondary"]}
+                        background={paletteobj.light["--background"]}
+                        className="min-w-12 size-12 rounded-sm border"
+                      />
+                      <span className="text-xs text-muted-foreground text-ellipsis overflow-hidden">
+                        {palette}
+                      </span>
+                    </div>
+                  ) : (
+                    <>Select palette</>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {Object.keys(paletteGroups).map((variant) => {
+                  const group = paletteGroups[variant];
+                  return (
+                    <SelectGroup key={variant} className="flex flex-col gap-2">
+                      <SelectLabel>{variant}</SelectLabel>
+                      {Object.keys(group).map((key) => {
+                        const colors = group[key];
+                        return (
+                          <SelectItem key={key} value={key}>
+                            <div className="flex gap-2 items-center">
+                              <PaletteColorChip
+                                primary={colors.light["--primary"]}
+                                secondary={colors.light["--secondary"]}
+                                background={colors.light["--background"]}
+                                onSelect={() => {
+                                  onStylesChange({
+                                    palette:
+                                      key as CampaignThemeConfig["palette"],
+                                    radius: styles?.radius,
+                                  });
+                                }}
+                                selected={key === palette}
+                                className="size-10 rounded-sm"
+                              />
+                              <span className="text-ellipsis overflow-hidden">
+                                {key}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectGroup>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </Field>
 
-            <RadiusControl
-              value={radius}
-              disabled={!enabled}
-              onValueChange={(v) => {
-                onStylesChange({
-                  palette,
-                  radius: v,
-                });
-              }}
-            />
-
-            <div>
-              <ResetToPresetButton
-                disabled={!enabled}
-                onClick={() => {
-                  onStylesChange({
-                    palette,
-                    radius: undefined,
-                  });
-                }}
-              >
-                Reset radius
-              </ResetToPresetButton>
-            </div>
-          </div>
-        </div>
+          <RadiusControl
+            value={radius}
+            disabled={!enabled}
+            onValueChange={(v) => {
+              onStylesChange({
+                palette,
+                radius: v,
+              });
+            }}
+          />
+        </FieldGroup>
       </div>
     </div>
   );
@@ -358,10 +319,14 @@ export function EnterpriseCampaignThemeTab({
         />
       </div>
 
+      <FieldSeparator className="my-6" />
+
       <CampaignThemeStylesEditor
         styles={styles}
         onStylesChange={onStylesChange}
       />
+
+      <FieldSeparator className="my-6" />
 
       <Field>
         <FieldLabel>Locale</FieldLabel>
@@ -376,15 +341,20 @@ export function EnterpriseCampaignThemeTab({
         </Select>
       </Field>
 
-      <div className="mt-10">
-        You can{" "}
-        <Link
-          href={`/${project.organization_name}/${project.name}/www`}
-          target="_blank"
-          className="underline"
-        >
-          manage site settings here
-        </Link>
+      <FieldSeparator className="my-6" />
+
+      <div>
+        <div className="font-medium">General Site Settings</div>
+        <div className="mt-2">
+          You can{" "}
+          <Link
+            href={`/${project.organization_name}/${project.name}/www`}
+            target="_blank"
+            className="underline inline-flex items-center gap-1"
+          >
+            manage site settings here <OpenInNewWindowIcon />
+          </Link>
+        </div>
       </div>
     </>
   );
