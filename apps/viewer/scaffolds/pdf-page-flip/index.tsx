@@ -40,8 +40,8 @@ interface FlipPageProps {
   onLinkClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
-const FlipPage: React.FC<FlipPageProps> = React.forwardRef(
-  ({ onLinkClick, pageNumber, width, height, ...props }, ref) => {
+const FlipPage: React.FC<FlipPageProps> = React.forwardRef<HTMLDivElement, FlipPageProps>(
+  ({ onLinkClick, pageNumber, width, height }, ref) => {
     return (
       <div
         className="shadow-lg rounded-sm overflow-hidden"
@@ -144,10 +144,10 @@ const PDFViewer = ({
 
     if (!title) {
       document.getMetadata().then(({ info }) => {
-        try {
-          const pdfTitle = (info as any)["Title"];
-          if (pdfTitle) setTitle(pdfTitle);
-        } catch (e) {}
+        const infoRecord = info as Record<string, unknown> | null | undefined;
+        const pdfTitle =
+          typeof infoRecord?.Title === "string" ? infoRecord.Title : undefined;
+        if (pdfTitle) setTitle(pdfTitle);
       });
     }
     setNumPages(document.numPages);
@@ -245,13 +245,16 @@ const PDFViewer = ({
                     number={index + 1}
                     pageNumber={index + 1}
                     onLinkClick={(e) => {
-                      const anchor = (e.target as HTMLElement).closest("a")!;
+                      const anchor = (e.target as HTMLElement).closest("a");
+                      if (!anchor) return;
                       const href = anchor.getAttribute("href");
                       if (!href || href === "#") {
                         const id = anchor.dataset.elementId;
                         if (id) {
                           e.preventDefault();
-                          findPageNumberByAnnotationId(doc.current!, id).then(
+                          const currentDoc = doc.current;
+                          if (!currentDoc) return;
+                          findPageNumberByAnnotationId(currentDoc, id).then(
                             (pagenum) => {
                               if (pagenum) {
                                 setPage(pagenum);
@@ -278,6 +281,7 @@ const PDFViewer = ({
       </div>
       {logo && (
         <div className="fixed bottom-4 right-4 z-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={logo}
             alt="logo"

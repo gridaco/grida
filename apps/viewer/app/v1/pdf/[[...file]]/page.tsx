@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import PDFViewer from "./viewer";
-import { Metadata } from "next";
 
 const FIRST_PARTY_BASE_STORAGE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1";
