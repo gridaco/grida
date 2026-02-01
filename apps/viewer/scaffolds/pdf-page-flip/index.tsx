@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import Image from "next/image";
 import HTMLFlipBook from "react-pageflip";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Document, Page } from "react-pdf";
@@ -282,14 +281,11 @@ const PDFViewer = ({
       </div>
       {logo && (
         <div className="fixed bottom-4 right-4 z-0">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={logo}
             alt="logo"
-            width={128}
-            height={96}
-            loader={({ src }) => src}
-            unoptimized
-            className="w-auto h-auto max-w-32 max-h-24 object-contain"
+            className="w-full h-full max-w-32 max-h-24"
           />
         </div>
       )}
