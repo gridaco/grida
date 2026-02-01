@@ -37,6 +37,14 @@ type Position = {
   color: string;
 };
 
+type PointData = {
+  size: number;
+  order: number;
+  color: string;
+  lat: number;
+  lng: number;
+};
+
 export type GlobeConfig = {
   pointSize?: number;
   globeColor?: string;
@@ -163,21 +171,21 @@ export function Globe({ globeConfig, data }: WorldProps) {
 
     globeRef.current
       .arcsData(data)
-      .arcStartLat((d: Position) => d.startLat)
-      .arcStartLng((d: Position) => d.startLng)
-      .arcEndLat((d: Position) => d.endLat)
-      .arcEndLng((d: Position) => d.endLng)
-      .arcColor((e: Position) => e.color)
-      .arcAltitude((e: Position) => e.arcAlt)
+      .arcStartLat((d: object) => (d as Position).startLat)
+      .arcStartLng((d: object) => (d as Position).startLng)
+      .arcEndLat((d: object) => (d as Position).endLat)
+      .arcEndLng((d: object) => (d as Position).endLng)
+      .arcColor((e: object) => (e as Position).color)
+      .arcAltitude((e: object) => (e as Position).arcAlt)
       .arcStroke(() => [0.32, 0.28, 0.3][Math.round(Math.random() * 2)])
       .arcDashLength(defaultProps.arcLength)
-      .arcDashInitialGap((e: Position) => e.order)
+      .arcDashInitialGap((e: object) => (e as Position).order)
       .arcDashGap(15)
       .arcDashAnimateTime(() => defaultProps.arcTime);
 
     globeRef.current
       .pointsData(filteredPoints)
-      .pointColor((e: { color: string }) => e.color)
+      .pointColor((e: object) => (e as PointData).color)
       .pointsMerge(true)
       .pointAltitude(0.0)
       .pointRadius(2);
