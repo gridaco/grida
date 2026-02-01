@@ -354,12 +354,11 @@ export function NavProjects({
         placeholder={deleteProjectDialog.data?.match}
         match={deleteProjectDialog.data?.match}
         onDelete={async ({ id }) => {
-          const { count, error } = await client
-            .from("project")
-            .delete({ count: "exact" })
-            .eq("id", id);
+          const { data, error } = await client.rpc("delete_project", {
+            p_project_id: id,
+          });
           if (error) return false;
-          if (count === 1) {
+          if (data === true) {
             // TODO: needs to revalidate
             router.replace(`/${orgname}`);
             return true;
