@@ -1,0 +1,25 @@
+# see https://supabase.com/docs/guides/deployment/ci/testing for details
+name: "database-tests"
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/database-tests.yml"
+      - "database/**"
+      - "supabase/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: printf '[]' > supabase/signing_keys.json && supabase gen signing-key --append --yes
+      - run: supabase db start
+      - run: supabase test db

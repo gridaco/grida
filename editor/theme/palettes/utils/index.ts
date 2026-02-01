@@ -1,5 +1,6 @@
 import { z } from "zod/v3";
 import type { Theme, Palette } from "../types";
+export * from "./color";
 
 export function stringfyThemeVariables(theme: z.infer<typeof Theme>) {
   // Convert values
@@ -24,7 +25,9 @@ const indent = (str: string) =>
     .map((line) => `  ${line}`)
     .join("\n");
 
-const stringifyHSL = (value: { h: number; s: number; l: number } | string) => {
+export const stringifyHSL = (
+  value: { h: number; s: number; l: number } | string
+) => {
   if (typeof value === "string") {
     if (value.startsWith("hsl")) {
       return value;
@@ -35,7 +38,8 @@ const stringifyHSL = (value: { h: number; s: number; l: number } | string) => {
   return `hsl(${value.h} ${value.s}% ${value.l}%)`;
 };
 
-const stringifyREM = (value: any) => value;
+const stringifyREM = (value: unknown) =>
+  typeof value === "string" ? value : String(value);
 
 export function stringfyPalette(palette: z.infer<typeof Palette>) {
   return Object.entries(palette)

@@ -76,7 +76,7 @@ export default function InvitationCouponTemplate({
             console.log("started");
             setStarted(true);
           }}
-          className="relative flex items-center justify-center overflow-hidden rounded-2xl bg-background border shadow-lg"
+          className="relative flex items-center justify-center overflow-hidden bg-background border shadow-lg"
           gradientColors={["#000", "#333", "#666"]}
         >
           {design.coupon && (

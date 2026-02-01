@@ -59,6 +59,7 @@ import { Badge } from "@/components/ui/badge";
 import { Labels } from "@/k/labels";
 import { Button } from "@/components/ui-editor/button";
 import { ShineBorder } from "@/www/ui/shine-border";
+import { validateProjectName } from "@/services/utils/regex";
 import type {
   GDocument,
   OrganizationWithAvatar,
@@ -327,11 +328,16 @@ export function NavProjects({
         title="Rename Project"
         description="Enter a new name for this project."
         currentName={renameProjectDialog.data?.name}
+        nameHint="Lowercase letters, numbers, and dashes (e.g. my-project)."
+        validateName={(name) => validateProjectName(name)}
         onRename={async (id: string, newName: string): Promise<boolean> => {
-          const { count } = await client
+          const { count, error } = await client
             .from("project")
             .update({ name: newName }, { count: "exact" })
             .eq("id", parseInt(id));
+          if (error) {
+            throw new Error("Couldn’t rename the project. Please try again.");
+          }
           return count === 1;
           // TODO: needs to revalidate
         }}
@@ -353,13 +359,13 @@ export function NavProjects({
         }
         placeholder={deleteProjectDialog.data?.match}
         match={deleteProjectDialog.data?.match}
-        onDelete={async ({ id }) => {
-          const { count, error } = await client
-            .from("project")
-            .delete({ count: "exact" })
-            .eq("id", id);
+        onDelete={async ({ id }, user_confirmation_txt) => {
+          const { data, error } = await client.rpc("delete_project", {
+            p_project_id: id,
+            p_confirm: user_confirmation_txt,
+          });
           if (error) return false;
-          if (count === 1) {
+          if (data === true) {
             // TODO: needs to revalidate
             router.replace(`/${orgname}`);
             return true;

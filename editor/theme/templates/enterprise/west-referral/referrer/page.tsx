@@ -291,10 +291,10 @@ export default function ReferrerPageTemplate({
             <Standard.Section className="py-4">
               <Card
                 data-testid="west-referral-referrer-invitation-card"
-                className="relative overflow-hidden rounded-xl border-0 p-0"
+                className="relative overflow-hidden border-0 p-0 gap-2"
               >
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
-                <div className="px-4 py-1.5 m-0.5 relative border border-background rounded-t-[10px] overflow-hidden flex items-center z-10">
+                <div className="px-4 py-1.5 m-0.5 relative border border-background overflow-hidden flex items-center z-10">
                   {/* background */}
                   <div className="absolute inset-0 bg-gradient-to-bl from-[#A07CFE] to-[#FFBE7B] opacity-30" />
                   <div className="z-10 flex items-center gap-2">
@@ -369,7 +369,7 @@ export default function ReferrerPageTemplate({
 
             {design.show_invitations && invitations.length > 0 && (
               <Standard.Section>
-                <Card className="relative overflow-hidden rounded-xl py-2 border-0">
+                <Card className="relative overflow-hidden py-2 border-0">
                   {invitations?.map((inv, index) => (
                     <motion.div
                       key={inv.id}
