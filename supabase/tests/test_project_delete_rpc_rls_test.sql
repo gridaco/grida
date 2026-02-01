@@ -1,27 +1,43 @@
 BEGIN;
-SELECT plan(6);
+SELECT plan(12);
 
--- Setup: create a throwaway project under a seeded org.
+-- Setup: create throwaway projects under seeded orgs.
 DO $$
 DECLARE
-  org_id bigint;
-  project_id bigint;
-  project_name text := 'rls-delete-test-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
+  local_org_id bigint;
+  acme_org_id bigint;
+  local_project_id bigint;
+  acme_project_id bigint;
+  -- Keep project names short; grida_www assigns a derived www.name with max length 32.
+  local_project_name text :=
+    'tloc-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
+  acme_project_name text :=
+    'tacm-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
 BEGIN
-  -- Use seeded org
-  SELECT id INTO org_id FROM public.organization WHERE name = 'local' LIMIT 1;
-  IF org_id IS NULL THEN
+  -- Use seeded orgs
+  SELECT id INTO local_org_id FROM public.organization WHERE name = 'local' LIMIT 1;
+  IF local_org_id IS NULL THEN
     RAISE EXCEPTION 'seed org "local" not found';
   END IF;
 
-  -- Create project as service_role (bypass RLS for setup)
+  SELECT id INTO acme_org_id FROM public.organization WHERE name = 'acme' LIMIT 1;
+  IF acme_org_id IS NULL THEN
+    RAISE EXCEPTION 'seed org "acme" not found';
+  END IF;
+
+  -- Create projects as service_role (bypass RLS for setup)
   SET LOCAL ROLE service_role;
   INSERT INTO public.project (organization_id, name)
-  VALUES (org_id, project_name)
-  RETURNING id INTO project_id;
+  VALUES (local_org_id, local_project_name)
+  RETURNING id INTO local_project_id;
+
+  INSERT INTO public.project (organization_id, name)
+  VALUES (acme_org_id, acme_project_name)
+  RETURNING id INTO acme_project_id;
   RESET ROLE;
 
-  PERFORM set_config('test.project_id', project_id::text, false);
+  PERFORM set_config('test.project_id_local', local_project_id::text, false);
+  PERFORM set_config('test.project_id_acme', acme_project_id::text, false);
 END $$;
 
 -- Helper: set auth context as authenticated user.
@@ -50,51 +66,146 @@ AS $$
   RESET ROLE;
 $$;
 
--- 1) Sanity: project exists (service_role)
+-- 1) Sanity: local project exists (service_role)
 SET ROLE service_role;
 SELECT ok(
-  EXISTS (SELECT 1 FROM public.project WHERE id = current_setting('test.project_id')::bigint),
-  'Setup created a project'
+  EXISTS (
+    SELECT 1
+    FROM public.project
+    WHERE id = current_setting('test.project_id_local')::bigint
+  ),
+  'Setup created local project'
 );
 RESET ROLE;
 
--- 2) Random user (not member) cannot delete via RPC (RLS enforced)
+-- 2) Sanity: acme project exists (service_role)
+SET ROLE service_role;
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.project
+    WHERE id = current_setting('test.project_id_acme')::bigint
+  ),
+  'Setup created acme project'
+);
+RESET ROLE;
+
+-- 3) Random user (not member) cannot delete local via RPC (RLS enforced)
 SELECT test_set_auth('random@example.com');
 SELECT is(
-  public.delete_project(current_setting('test.project_id')::bigint),
+  public.delete_project(
+    current_setting('test.project_id_local')::bigint,
+    'DELETE whatever'
+  ),
   false,
-  'Non-member delete_project returns false (RLS enforced)'
+  'Random user cannot delete local project'
 );
 SELECT test_reset_auth();
 
--- 3) Project still exists after rejected delete
+-- 4) Insider cannot delete acme project (cross-tenant rejection)
+SELECT test_set_auth('insider@grida.co');
+SELECT is(
+  public.delete_project(
+    current_setting('test.project_id_acme')::bigint,
+    'DELETE whatever'
+  ),
+  false,
+  'Insider cannot delete acme project (cross-tenant)'
+);
+SELECT test_reset_auth();
+
+-- 5) Alice (acme) cannot delete local project (cross-tenant rejection)
+SELECT test_set_auth('alice@acme.com');
+SELECT is(
+  public.delete_project(
+    current_setting('test.project_id_local')::bigint,
+    'DELETE whatever'
+  ),
+  false,
+  'Alice cannot delete local project (cross-tenant)'
+);
+SELECT test_reset_auth();
+
+-- 6) Local project still exists after rejected deletes (service_role)
 SET ROLE service_role;
 SELECT ok(
-  EXISTS (SELECT 1 FROM public.project WHERE id = current_setting('test.project_id')::bigint),
-  'Project not deleted by non-member'
+  EXISTS (
+    SELECT 1
+    FROM public.project
+    WHERE id = current_setting('test.project_id_local')::bigint
+  ),
+  'Local project not deleted by rejected callers'
 );
 RESET ROLE;
 
--- 4) Insider (member) can delete via RPC
+-- 7) Acme project still exists after rejected deletes (service_role)
+SET ROLE service_role;
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.project
+    WHERE id = current_setting('test.project_id_acme')::bigint
+  ),
+  'Acme project not deleted by rejected callers'
+);
+RESET ROLE;
+
+-- 8) Insider (local member) can delete local project via RPC
 SELECT test_set_auth('insider@grida.co');
 SELECT is(
-  public.delete_project(current_setting('test.project_id')::bigint),
+  public.delete_project(
+    current_setting('test.project_id_local')::bigint,
+    'DELETE ' ||
+      (select name from public.project where id = current_setting('test.project_id_local')::bigint)
+  ),
   true,
-  'Member delete_project returns true'
-);
-
--- 5) Project is deleted for insider session
-SELECT ok(
-  NOT EXISTS (SELECT 1 FROM public.project WHERE id = current_setting('test.project_id')::bigint),
-  'Project row is deleted'
+  'Insider can delete local project'
 );
 SELECT test_reset_auth();
 
--- 6) Project is deleted (service_role sees it too)
+-- 9) Local project is deleted (service_role sees it)
 SET ROLE service_role;
 SELECT ok(
-  NOT EXISTS (SELECT 1 FROM public.project WHERE id = current_setting('test.project_id')::bigint),
-  'Project row is deleted (verified as service_role)'
+  NOT EXISTS (
+    SELECT 1
+    FROM public.project
+    WHERE id = current_setting('test.project_id_local')::bigint
+  ),
+  'Local project row is deleted'
+);
+RESET ROLE;
+
+-- 10) Alice (acme member) cannot delete acme project with wrong confirmation
+SELECT test_set_auth('alice@acme.com');
+SELECT is(
+  public.delete_project(current_setting('test.project_id_acme')::bigint, 'DELETE wrong'),
+  false,
+  'Alice cannot delete acme project with wrong confirmation'
+);
+SELECT test_reset_auth();
+
+-- 10) Alice (acme member) can delete acme project via RPC
+SELECT test_set_auth('alice@acme.com');
+SELECT is(
+  public.delete_project(
+    current_setting('test.project_id_acme')::bigint,
+    'DELETE ' ||
+      (select name from public.project where id = current_setting('test.project_id_acme')::bigint)
+  ),
+  true,
+  'Alice can delete acme project'
+);
+SELECT test_reset_auth();
+
+-- 11) Acme project is deleted (service_role sees it)
+SET ROLE service_role;
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM public.project
+    WHERE id = current_setting('test.project_id_acme')::bigint
+  ),
+  'Acme project row is deleted'
 );
 RESET ROLE;
 

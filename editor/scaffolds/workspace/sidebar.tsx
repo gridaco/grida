@@ -353,9 +353,10 @@ export function NavProjects({
         }
         placeholder={deleteProjectDialog.data?.match}
         match={deleteProjectDialog.data?.match}
-        onDelete={async ({ id }) => {
+        onDelete={async ({ id }, user_confirmation_txt) => {
           const { data, error } = await client.rpc("delete_project", {
             p_project_id: id,
+            p_confirm: user_confirmation_txt,
           });
           if (error) return false;
           if (data === true) {
