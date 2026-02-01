@@ -12,6 +12,25 @@ export type CampaignThemeConfig = {
   radius?: string;
 };
 
+/**
+ * Strict CSS length validation for radius overrides.
+ * Prevents CSS injection when building inline `<style>` strings.
+ *
+ * Allowed:
+ * - `0`
+ * - `<number><unit>` where unit is one of:
+ *   px, rem, em, %, ch, ex, cm, mm, in, pt, pc, vh, vw, vmin, vmax
+ */
+const CSS_LENGTH_RE =
+  /^(?:0|(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:px|rem|em|%|ch|ex|cm|mm|in|pt|pc|vh|vw|vmin|vmax))$/;
+
+function sanitizeRadiusOverride(value: string): string | null {
+  const v = value.trim();
+  if (!v) return null;
+  if (CSS_LENGTH_RE.test(v)) return v;
+  return "0";
+}
+
 function resolvePresetTheme(palette?: string): ResolvedTheme | null {
   if (!palette) return null;
   if (!(palette in palettes)) return null;
@@ -33,7 +52,10 @@ export function resolveCampaignShadcnTheme(
   const theme = resolvePresetTheme(config?.palette);
   if (!theme) return null;
 
-  const radius = typeof config?.radius === "string" ? config.radius.trim() : "";
+  const radius =
+    typeof config?.radius === "string"
+      ? sanitizeRadiusOverride(config.radius)
+      : null;
 
   if (radius) {
     theme.light["--radius"] = radius;
