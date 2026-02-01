@@ -3,7 +3,7 @@
 
 # Shared snippet used by debug/release builds.
 # Keep this inline (vs. a separate recipe) so the sourced `emsdk_env.sh` affects the same shell.
-_wasm32_unknown_emscripten_env := "rustup target add wasm32-unknown-emscripten; (cd ../.. && ./bin/activate-emsdk); . ../../third_party/externals/emsdk/emsdk_env.sh; command -v emcc >/dev/null 2>&1; export CC=emcc CXX=em++ AR=emar"
+_wasm32_unknown_emscripten_env := "rustup target add wasm32-unknown-emscripten; (cd ../.. && ./bin/activate-emsdk); . ../../third_party/externals/emsdk/emsdk_env.sh; command -v emcc >/dev/null 2>&1; export CC=emcc CXX=em++ AR=emar; export SKIA_GN_ARGS='extra_cflags=[\"-fwasm-exceptions\",\"-sSUPPORT_LONGJMP=wasm\",\"-sWASM_LEGACY_EXCEPTIONS=1\"]'"
 
 # Default recipe - shows available commands
 default:
