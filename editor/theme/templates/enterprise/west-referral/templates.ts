@@ -1,4 +1,6 @@
 export namespace TemplateData {
+  export type PaletteKey = keyof typeof import("@/theme/palettes").default;
+
   export interface West_Referrral__Duo_001 {
     template_id: "grida_west_referral.duo-000";
     locale: "en" | "ko";
@@ -8,6 +10,21 @@ export namespace TemplateData {
           src: string;
           srcDark?: string;
         };
+      };
+      /**
+       * Styles overrides for campaign pages (non-expert settings).
+       * This is persisted inside `grida_www.template.data` per campaign template.
+       */
+      styles?: {
+        /**
+         * Base palette preset key (saved string; must match keys in `theme/palettes`).
+         * If omitted, campaign pages use the default app theme.
+         */
+        palette?: PaletteKey;
+        /**
+         * Override for `--radius` (e.g. `"0.75rem"` or `"12px"`).
+         */
+        radius?: string;
       };
     };
     components: {
