@@ -20,5 +20,6 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+      - run: supabase gen signing-key --algorithm ES256 > supabase/signing_keys.json
       - run: supabase db start
       - run: supabase test db
