@@ -20,6 +20,20 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - run: printf '[]' > supabase/signing_keys.json && supabase gen signing-key --append --yes
+      - name: Ensure signing key exists (CI)
+        run: |
+          set -euo pipefail
+
+          # `supabase gen signing-key` expects the file to exist.
+          # `signing_keys.json` is gitignored, so CI starts without it.
+          if [ ! -f supabase/signing_keys.json ]; then
+            printf '[]' > supabase/signing_keys.json
+          fi
+
+          # Work around older CLI panics when `--append` is used with an empty array.
+          # Only generate a key if the file currently has no keys.
+          if [ "$(tr -d ' \n\t' < supabase/signing_keys.json)" = "[]" ]; then
+            supabase gen signing-key --yes
+          fi
       - run: supabase db start
       - run: supabase test db
