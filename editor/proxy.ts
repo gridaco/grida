@@ -1,3 +1,14 @@
+/**
+ * @fileoverview
+ * Next.js Proxy entrypoint.
+ *
+ * Starting in **Next.js 16**, `proxy.ts` is the new name for what used to be
+ * `middleware.ts` (same runtime + semantics) — it is *not* a custom concept in
+ * this repo. Keep implementing and maintaining this file exactly as we would
+ * have done in `middleware.ts`.
+ *
+ * Reference: https://nextjs.org/docs/app/getting-started/proxy
+ */
 import { NextResponse } from "next/server";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
