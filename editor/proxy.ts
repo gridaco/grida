@@ -75,61 +75,8 @@ export async function proxy(req: NextRequest) {
   }
   // ------------------------------------------------------------
 
-  // #region tanent matching
-
-  const host = req.headers.get("host");
-  // Host can be null (or malformed) in some proxy / local contributor setups.
-  // If we can't reliably parse it, skip tenant matching rather than throwing.
-  if (!host) {
-    return res;
-  }
-
-  let url: URL;
-  try {
-    url = new URL(`https://${host}`);
-  } catch {
-    return res;
-  }
-
-  const hostname = url.hostname;
-
-  // ignore if vercel preview url
-  if (
-    Env.server.IS_HOSTED &&
-    (host === process.env.VERCEL_URL || host === process.env.VERCEL_BRANCH_URL)
-  ) {
-    return res;
-  }
-
-  const tanentwww = TanantMiddleware.analyze(url, !Env.server.IS_HOSTED);
-
-  // www.grida.site => grida.co
-  if (tanentwww.name === "www") {
-    const website = new URL("/", Env.web.HOST);
-    return NextResponse.redirect(website, {
-      status: 301,
-    });
-  }
-
-  // tenant.grida.site => "/~/[tenant]/**"
-  if (tanentwww.name) {
-    const url = req.nextUrl.clone();
-    url.pathname = `/~/${tanentwww.name}${req.nextUrl.pathname}`;
-
-    return NextResponse.rewrite(url, {
-      request: { headers: req.headers },
-      status: res.status,
-    });
-  }
-
-  // block direct access to the tanent layout
-  if (
-    hostname === (IS_DEV ? "localhost" : process.env.NEXT_PUBLIC_URL) &&
-    req.nextUrl.pathname.startsWith("/~/")
-  ) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-  // #endregion tanent
+  const routed = await TanantMiddleware.routeProxyRequest(req, res);
+  if (routed) return routed;
 
   return res;
 }

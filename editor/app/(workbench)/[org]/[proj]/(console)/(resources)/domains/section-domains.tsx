@@ -47,7 +47,7 @@ type DomainRow = {
   canonical: boolean;
   kind: DomainKind;
   last_error: string | null;
-  vercel: any | null;
+  vercel: unknown | null;
 };
 
 type ApiListResponse = {
@@ -89,9 +89,15 @@ function dnsInstructions(domain: DomainRow): DnsInstruction[] {
   // Important: Vercel's `verification[]` is about ownership challenges (commonly TXT),
   // and does NOT replace the base A/CNAME routing record. So we append verification
   // records to the base instructions when present.
-  const vercelDomain = domain.vercel?.domain as
-    | { name?: string; apexName?: string; verification?: any[] }
-    | undefined;
+  const vercel = domain.vercel as unknown;
+  const vercelDomain = (vercel &&
+  typeof vercel === "object" &&
+  !Array.isArray(vercel) &&
+  "domain" in vercel)
+    ? ((vercel as { domain?: unknown }).domain as
+        | { name?: string; apexName?: string; verification?: unknown[] }
+        | undefined)
+    : undefined;
 
   const fqdn = String(vercelDomain?.name ?? domain.hostname);
   const apexName = String(
@@ -119,17 +125,19 @@ function dnsInstructions(domain: DomainRow): DnsInstruction[] {
   const verification = vercelDomain?.verification;
   const provider: DnsInstruction[] = Array.isArray(verification)
     ? verification
-        .map((v: any) => {
-          const type = v.type ?? v.recordType ?? v.kind ?? "DNS";
-          const name = v.domain ?? v.name ?? v.recordName ?? "@";
-          const value = v.value ?? v.target ?? v.expectedValue ?? "";
+        .map((v: unknown) => {
+          if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+          const o = v as Record<string, unknown>;
+          const type = o.type ?? o.recordType ?? o.kind ?? "DNS";
+          const name = o.domain ?? o.name ?? o.recordName ?? "@";
+          const value = o.value ?? o.target ?? o.expectedValue ?? "";
           return {
             type: String(type).toUpperCase(),
             name: String(name),
             value: String(value),
-          };
+          } satisfies DnsInstruction;
         })
-        .filter((x: any) => x?.type && x?.name && x?.value)
+        .filter((x): x is DnsInstruction => Boolean(x?.type && x?.name && x?.value))
     : [];
 
   // Dedupe.
