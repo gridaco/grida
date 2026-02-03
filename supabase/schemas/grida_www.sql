@@ -100,6 +100,107 @@ CREATE TRIGGER set_www_name BEFORE INSERT ON grida_www.www FOR EACH ROW WHEN (NE
 ALTER TABLE grida_www.www ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_project_membership" ON grida_www.www USING (public.rls_project(project_id)) WITH CHECK (public.rls_project(project_id));
 
+---------------------------------------------------------------------
+-- [Custom Domains] -- hostname -> www mapping
+---------------------------------------------------------------------
+CREATE TABLE grida_www.domain (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
+  hostname TEXT NOT NULL,
+
+  -- pending: user declared / awaiting DNS; active: usable in routing; error: last provider error
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'error')),
+
+  -- exactly one canonical hostname per tenant (enforced by partial unique index)
+  canonical BOOLEAN NOT NULL DEFAULT false,
+
+  -- derived: apex vs subdomain
+  kind TEXT GENERATED ALWAYS AS (
+    CASE
+      WHEN array_length(string_to_array(hostname, '.'), 1) = 2 THEN 'apex'
+      ELSE 'subdomain'
+    END
+  ) STORED,
+
+  vercel JSONB,
+  -- last time we attempted to sync/verify the domain with the provider
+  last_checked_at TIMESTAMPTZ,
+  last_verified_at TIMESTAMPTZ,
+  -- stable internal classification for last_error
+  last_error_code TEXT,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX grida_www_domain_hostname_lower_uniq
+ON grida_www.domain ((lower(hostname)));
+
+CREATE UNIQUE INDEX grida_www_domain_canonical_per_www_uniq
+ON grida_www.domain (www_id)
+WHERE canonical AND status = 'active';
+
+CREATE TRIGGER handle_updated_at
+BEFORE UPDATE ON grida_www.domain
+FOR EACH ROW
+EXECUTE FUNCTION extensions.moddatetime('updated_at');
+
+ALTER TABLE grida_www.domain ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_www_editor" ON grida_www.domain USING (grida_www.rls_www(www_id)) WITH CHECK (grida_www.rls_www(www_id));
+
+-- Harden against public enumeration.
+-- Domain mapping is identity; listing mappings should remain tenant-scoped.
+DROP POLICY IF EXISTS public_read_active ON grida_www.domain;
+
+CREATE OR REPLACE FUNCTION public.www_resolve_hostname(p_hostname TEXT)
+RETURNS TABLE (
+  www_id UUID,
+  www_name TEXT,
+  canonical_hostname TEXT
+) AS $$
+  WITH requested AS (
+    SELECT d.www_id
+    FROM grida_www.domain d
+    WHERE lower(d.hostname) = lower(p_hostname)
+      AND d.status = 'active'
+    LIMIT 1
+  ),
+  canon AS (
+    SELECT d2.hostname AS canonical_hostname
+    FROM grida_www.domain d2
+    JOIN requested r ON r.www_id = d2.www_id
+    WHERE d2.status = 'active'
+      AND d2.canonical = true
+    LIMIT 1
+  )
+  SELECT w.id, w.name, (SELECT canonical_hostname FROM canon)
+  FROM requested r
+  JOIN grida_www.www w ON w.id = r.www_id;
+$$ LANGUAGE sql STABLE;
+
+REVOKE ALL ON FUNCTION public.www_resolve_hostname(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.www_resolve_hostname(TEXT) FROM anon;
+REVOKE ALL ON FUNCTION public.www_resolve_hostname(TEXT) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.www_resolve_hostname(TEXT) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.www_get_canonical_hostname(p_www_name TEXT)
+RETURNS TABLE (
+  canonical_hostname TEXT
+) AS $$
+  SELECT d.hostname AS canonical_hostname
+  FROM grida_www.domain d
+  JOIN grida_www.www w ON w.id = d.www_id
+  WHERE lower(w.name) = lower(p_www_name)
+    AND d.status = 'active'
+    AND d.canonical = true
+  LIMIT 1;
+$$ LANGUAGE sql STABLE;
+
+REVOKE ALL ON FUNCTION public.www_get_canonical_hostname(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.www_get_canonical_hostname(TEXT) FROM anon;
+REVOKE ALL ON FUNCTION public.www_get_canonical_hostname(TEXT) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.www_get_canonical_hostname(TEXT) TO service_role;
+
 
 ---------------------------------------------------------------------
 -- [rls_www] --

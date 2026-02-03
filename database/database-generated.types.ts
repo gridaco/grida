@@ -3540,7 +3540,7 @@ export type Database = {
       analyze: {
         Args: {
           p_campaign_id: string
-          p_interval?: unknown
+          p_interval?: string
           p_names?: string[]
           p_time_from?: string
           p_time_to?: string
@@ -3654,6 +3654,69 @@ export type Database = {
   }
   grida_www: {
     Tables: {
+      domain: {
+        Row: {
+          canonical: boolean
+          created_at: string
+          hostname: string
+          id: string
+          kind: string | null
+          last_checked_at: string | null
+          last_error: string | null
+          last_error_code: string | null
+          last_verified_at: string | null
+          status: string
+          updated_at: string
+          vercel: Json | null
+          www_id: string
+        }
+        Insert: {
+          canonical?: boolean
+          created_at?: string
+          hostname: string
+          id?: string
+          kind?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_error_code?: string | null
+          last_verified_at?: string | null
+          status?: string
+          updated_at?: string
+          vercel?: Json | null
+          www_id: string
+        }
+        Update: {
+          canonical?: boolean
+          created_at?: string
+          hostname?: string
+          id?: string
+          kind?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_error_code?: string | null
+          last_verified_at?: string | null
+          status?: string
+          updated_at?: string
+          vercel?: Json | null
+          www_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domain_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domain_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       layout: {
         Row: {
           base_path: string | null
@@ -4561,6 +4624,20 @@ export type Database = {
           p_project_name: string
         }
         Returns: undefined
+      }
+      www_get_canonical_hostname: {
+        Args: { p_www_name: string }
+        Returns: {
+          canonical_hostname: string
+        }[]
+      }
+      www_resolve_hostname: {
+        Args: { p_hostname: string }
+        Returns: {
+          canonical_hostname: string
+          www_id: string
+          www_name: string
+        }[]
       }
     }
     Enums: {

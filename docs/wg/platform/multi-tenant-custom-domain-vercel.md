@@ -188,6 +188,74 @@ No application‑level trust is placed on user input.
 
 ---
 
+## Edge cases & security risks (operationally important)
+
+This section documents edge cases that commonly confuse operators and create real security risk if handled casually.
+These are not “rare” at scale; they are normal internet behavior.
+
+### Dangling DNS + reclaim hazard after removal
+
+**Problem**
+
+If a hostname is removed from Grida/Vercel but the customer **does not** remove the DNS record (A/CNAME) pointing to Vercel,
+then the hostname may become **re-attachable** and **re-verifiable** (quickly) by whoever can add it to the Vercel project.
+
+**Why this matters**
+
+- DNS resolution is treated as the default proof of control (see “Domain verification semantics”).
+- If the DNS still points at Vercel, “control” may appear satisfied.
+
+**Invariant**
+
+- A domain must never resolve to the wrong tenant.
+
+**Mitigation**
+
+- Treat domain removal as a two-step operation:
+  - Detach from Vercel (transport identity)
+  - Remove or change DNS at the registrar (ownership intent)
+- Grida should be explicit in UX/runbook: if DNS is left pointing to Vercel, the domain can be re-attached and may route elsewhere.
+
+This is not a platform bug; it is a property of DNS-based ownership.
+
+### Domain claimed elsewhere (TXT verification required)
+
+When Vercel reports that a domain is already claimed in another Vercel account or ownership is ambiguous (see “Domain verification semantics”),
+Grida must:
+
+- Keep the domain in a safe `pending` state
+- Surface the TXT record challenge issued by Vercel
+- Provide clear instructions and failure transparency (no silent failure)
+
+### Hostname collision and “www” duplicates
+
+Common duplicates include:
+
+- `example.com` vs `www.example.com`
+- `tenant.grida.site` vs `example.com`
+
+Policy (see “Canonicalization & redirect policy”):
+
+- Exactly one canonical hostname per tenant
+- All non-canonical hosts must `301` redirect to the canonical host
+
+### Reserved and blacklisted hostnames
+
+To preserve tenant isolation and prevent hijacking:
+
+- Platform-owned hostnames (app/service) must never be claimable as user custom domains.
+- Provider/keyword blacklists may be necessary (e.g. blocking hostnames containing `vercel`) because some provider-owned hostnames
+  can be immediately verified/linked, creating a hijack surface.
+
+These lists must be code-owned and reviewed as security primitives.
+
+### Preview and local development hosts
+
+Preview URLs and local development hostnames are not stable identities and must not be claimable.
+Routing logic must treat them as special cases and avoid polluting the domain registry.
+
+---
+
 ## Operational expectations
 
 ### Propagation reality
@@ -205,6 +273,34 @@ Failures must be attributable to one of:
 - External provider error (Vercel)
 
 Silent failure is unacceptable.
+
+---
+
+## Operator runbook (non-binding but recommended)
+
+### Adding a domain (apex vs subdomain)
+
+- **Apex** (`example.com`): instruct user to set `A @ -> 76.76.21.21` (see “Apex domains”).
+- **Subdomain** (`app.example.com`): instruct user to set `CNAME app -> <vercel_target_alias>` (see “Subdomains”).
+
+### Verifying a domain
+
+- Expect delays: DNS propagation is real (see “Operational expectations”).
+- If verification remains pending:
+  - Check DNS resolution (does it point to Vercel?)
+  - If Vercel requires TXT challenge, ensure the TXT record is present (see “Domain verification semantics”)
+  - Re-run verification (Vercel verify endpoint) after DNS changes
+
+### Removing a domain safely
+
+Recommended order:
+
+1. **Remove DNS record** (or change it away from Vercel) at the customer’s registrar
+2. Detach the domain from the Vercel project
+3. Remove the mapping from Grida
+
+If step (1) is skipped, the domain may remain effectively “verifiable” while pointed at Vercel, which increases the risk of
+unintended reassociation.
 
 ---
 
