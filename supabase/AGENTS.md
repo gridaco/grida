@@ -64,6 +64,25 @@ So you must manage **three layers**:
 
 ---
 
+## Schema conventions (API surface vs internal organization)
+
+This codebase currently contains **multiple schema conventions** and is not perfectly aligned. Going forward, our **best-effort standard** is:
+
+- **`public` is the API surface**.
+  - For Supabase/PostgREST and any “public API” access, we aim to expose only what is intentionally supported under `public`.
+  - Prefer exposing **views** (and, when necessary, **RPC functions**) in `public` as the stable interface.
+- **Non-`public` schemas are for internal organization**.
+  - Use domain schemas (e.g. `grida_*`) to organize and isolate underlying tables, especially when it improves maintainability and security review.
+  - These schemas should be treated as **implementation detail**, not a contract.
+- **Wrap, don’t leak**.
+  - If underlying tables live outside `public`, expose the relevant, permissioned subset via `public.<view>` (or a carefully audited `public` RPC) rather than granting direct access to non-`public` relations.
+  - Keep wrappers tenant-safe (RLS-safe, no widening joins) and backed by pgTAP tests.
+- **Be explicit and defensive**.
+  - Minimize grants; avoid accidental exposure via default privileges.
+  - For any `SECURITY DEFINER` in `public`, set a safe `search_path`, fully qualify referenced relations, validate tenant boundary inside the function, and prove behavior with tests.
+
+---
+
 ## RLS policy patterns (recommended)
 
 - **Always write both sides**:
