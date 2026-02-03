@@ -4,6 +4,8 @@ import {
   AlertDialogContent,
   AlertDialogFooter,
   AlertDialogCancel,
+  AlertDialogTitle,
+  AlertDialogDescription,
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
 
@@ -13,6 +15,11 @@ export default function WelcomeDialog(
   return (
     <AlertDialog {...props}>
       <AlertDialogContent className="overflow-hidden border-none">
+        <AlertDialogTitle className="sr-only">WelcomeDialog</AlertDialogTitle>
+        <AlertDialogDescription>
+          You&#39;re about to launch a referral campaign powered by{" "}
+          <strong>Grida WEST</strong> — the easiest way to grow through sharing.
+        </AlertDialogDescription>
         <article className="prose prose-sm dark:prose-invert">
           <Image
             src="/west/logo-with-type.png"
