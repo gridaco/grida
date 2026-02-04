@@ -44,6 +44,8 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
 
       - name: Add wasm32-unknown-emscripten target
         run: rustup target add wasm32-unknown-emscripten
