@@ -2,9 +2,19 @@
 title: Multi-tenant Custom Domains on Vercel
 ---
 
+| feature id            | status      | description                                                                                                      | PRs                                               |
+| --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `byod-domains-vercel` | implemented | Multi-tenant BYOD domains (apex + subdomain) on Vercel: identity mapping, DNS verification, canonical redirects. | [#515](https://github.com/gridaco/grida/pull/515) |
+
 # Multi-tenant Custom Domains on Vercel
 
-> Long-lived invariants and architectural decisions for Grida custom domain support when Vercel is the edge provider.
+> Long-lived invariants and architectural decisions for Grida **BYOD (Bring Your Own Domain)** support when Vercel is the edge provider.
+
+## Terminology
+
+- **BYOD (Bring Your Own Domain)**: user-owned domains attached to a tenant (apex or subdomain), e.g. `example.com`, `app.example.com`.
+- **Platform domain**: Grida-provided domains under platform-controlled suffixes, e.g. `tenant.grida.site`, `tenant.grida.app`.
+- **Custom domain**: legacy synonym for BYOD in older code/docs. Prefer “BYOD” for semantics and traceability.
 
 ## Audience
 
@@ -14,7 +24,7 @@ title: Multi-tenant Custom Domains on Vercel
 
 ## Purpose
 
-Capture long‑lived architectural truths and invariants for custom domain support. This document intentionally avoids task-level instructions and short-term implementation details.
+Capture long‑lived architectural truths and invariants for BYOD support. This document intentionally avoids task-level instructions and short-term implementation details.
 
 ---
 

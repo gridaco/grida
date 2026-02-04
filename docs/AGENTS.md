@@ -20,6 +20,21 @@ Other folders under `/docs` are **not actively managed**.
 - Unless you have a specific task, **avoid editing** content outside `docs/wg/**` and `docs/reference/**`.
 - Do not edit generated artifacts under `/apps/docs/docs/**`.
 
+## Conventions
+
+### `_history/` directories (unlisted docs)
+
+Use a `_history/` folder inside any docs subdirectory (e.g. `docs/wg/platform/_history/`) for **historical snapshots** and other “record only” documents that should **not** appear in Docusaurus navigation.
+
+- Put these documents under a `_history/` folder.
+- Mark them as **unlisted** via frontmatter:
+
+```md
+---
+unlisted: true
+---
+```
+
 ## Structure
 
 | directory                        | name          | description                                                            | active |
