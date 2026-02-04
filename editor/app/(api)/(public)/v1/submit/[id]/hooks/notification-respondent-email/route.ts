@@ -60,13 +60,7 @@ export async function POST(
     console.error("notification-respondent-email/err/form", form_err);
   if (!form) return notFound();
 
-  const cfg = (form.notification_respondent_email ?? {}) as Partial<{
-    enabled: boolean;
-    from_name: string | null;
-    subject_template: string | null;
-    body_html_template: string | null;
-    reply_to: string | null;
-  }>;
+  const cfg = form.notification_respondent_email;
 
   if (!cfg.enabled) {
     return NextResponse.json(

@@ -1,6 +1,7 @@
 import type { IpInfo } from "@/clients/ipinfo";
 import type palettes from "@/theme/palettes";
 import type { tokens } from "@grida/tokens";
+import type { FormNotificationRespondentEmailConfig } from "@app/database";
 import type { CountryCode } from "libphonenumber-js/core";
 import type {
   Appearance,
@@ -31,13 +32,7 @@ export interface Form {
    *
    * Stored in DB as `jsonb`.
    */
-  notification_respondent_email: {
-    enabled?: boolean;
-    from_name?: string | null;
-    subject_template?: string | null;
-    body_html_template?: string | null;
-    reply_to?: string | null;
-  } | null;
+  notification_respondent_email: FormNotificationRespondentEmailConfig;
   project_id: number;
   title: string;
   unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;

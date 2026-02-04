@@ -41,6 +41,7 @@ import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { xsb_table_conn_init } from "@/scaffolds/editor/init";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Win32LinuxWindowSafeArea } from "@/host/desktop";
+import type { FormNotificationRespondentEmailConfig } from "@app/database";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -176,6 +177,10 @@ export default async function Layout({
         fields: FormFieldDefinition[];
       };
 
+      const notification_respondent_email =
+        (form.notification_respondent_email ??
+          {}) as FormNotificationRespondentEmailConfig;
+
       const supabase_connection_state = form.supabase_connection
         ? await client.getXSBMainTableConnectionState(form.supabase_connection)
         : null;
@@ -232,25 +237,15 @@ export default async function Layout({
                 },
                 notification_respondent_email: {
                   enabled:
-                    (
-                      (form.notification_respondent_email ?? {}) as any
-                    )?.enabled ?? false,
+                    notification_respondent_email.enabled ?? false,
                   from_name:
-                    (
-                      (form.notification_respondent_email ?? {}) as any
-                    )?.from_name ?? null,
+                    notification_respondent_email.from_name ?? null,
                   subject_template:
-                    (
-                      (form.notification_respondent_email ?? {}) as any
-                    )?.subject_template ?? null,
+                    notification_respondent_email.subject_template ?? null,
                   body_html_template:
-                    (
-                      (form.notification_respondent_email ?? {}) as any
-                    )?.body_html_template ?? null,
+                    notification_respondent_email.body_html_template ?? null,
                   reply_to:
-                    (
-                      (form.notification_respondent_email ?? {}) as any
-                    )?.reply_to ?? null,
+                    notification_respondent_email.reply_to ?? null,
                 },
                 form_security: {
                   unknown_field_handling_strategy:
