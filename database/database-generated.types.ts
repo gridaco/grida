@@ -1220,6 +1220,7 @@ export type Database = {
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
           name: string
+          notification_respondent_email: Json
           project_id: number
           scheduling_close_at: string | null
           scheduling_open_at: string | null
@@ -1241,6 +1242,7 @@ export type Database = {
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           name?: string
+          notification_respondent_email?: Json
           project_id: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -1262,6 +1264,7 @@ export type Database = {
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           name?: string
+          notification_respondent_email?: Json
           project_id?: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null

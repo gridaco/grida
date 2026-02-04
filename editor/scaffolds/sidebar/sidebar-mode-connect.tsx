@@ -69,17 +69,19 @@ function DoctypeForms() {
               <Link2Icon className="size-4" />
               Share
             </SidebarMenuLinkButton>
-            <SidebarMenuItem>
-              {/* <Link href={`connect/domain`}> */}
-              <SidebarMenuButton disabled size="sm">
-                <GlobeIcon className="size-4" />
-                Domain
-                <Badge variant="outline" className="ms-auto">
-                  enterprise
-                </Badge>
-              </SidebarMenuButton>
-              {/* </Link> */}
-            </SidebarMenuItem>
+            <SidebarMenuLinkButton
+              size="sm"
+              link={{
+                href: `/${basepath}/domains`,
+                target: "_blank",
+              }}
+            >
+              <GlobeIcon className="size-4" />
+              Domain
+              <Badge variant="outline" className="ms-auto">
+                enterprise
+              </Badge>
+            </SidebarMenuLinkButton>
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -295,17 +297,19 @@ function DoctypeSite() {
               <Link2Icon className="size-4" />
               Share
             </SidebarMenuLinkButton> */}
-            <SidebarMenuItem>
-              {/* <Link href={`connect/domain`}> */}
-              <SidebarMenuButton disabled size="sm">
-                <GlobeIcon className="size-4" />
-                Domain
-                <Badge variant="outline" className="ms-auto">
-                  enterprise
-                </Badge>
-              </SidebarMenuButton>
-              {/* </Link> */}
-            </SidebarMenuItem>
+            <SidebarMenuLinkButton
+              size="sm"
+              link={{
+                href: `/${basepath}/domains`,
+                target: "_blank",
+              }}
+            >
+              <GlobeIcon className="size-4" />
+              Domain
+              <Badge variant="outline" className="ms-auto">
+                enterprise
+              </Badge>
+            </SidebarMenuLinkButton>
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>

@@ -26,6 +26,18 @@ export interface Form {
   is_max_form_responses_in_total_enabled: boolean;
   max_form_responses_by_customer: number | null;
   max_form_responses_in_total: number | null;
+  /**
+   * Admin-configurable respondent email notification settings.
+   *
+   * Stored in DB as `jsonb`.
+   */
+  notification_respondent_email: {
+    enabled?: boolean;
+    from_name?: string | null;
+    subject_template?: string | null;
+    body_html_template?: string | null;
+    reply_to?: string | null;
+  } | null;
   project_id: number;
   title: string;
   unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;

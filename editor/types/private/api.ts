@@ -112,6 +112,15 @@ export type UpdateFormUnknownFieldsHandlingStrategyRequest = {
   strategy?: FormResponseUnknownFieldHandlingStrategyType;
 };
 
+export type UpdateFormNotificationRespondentEmailRequest = {
+  form_id: string;
+  enabled: boolean;
+  from_name?: string | null;
+  subject_template?: string | null;
+  body_html_template?: string | null;
+  reply_to?: string | null;
+};
+
 export type CreateNewSchemaTableRequest = {
   schema_id: string;
   table_name: string;

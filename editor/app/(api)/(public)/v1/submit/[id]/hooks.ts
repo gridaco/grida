@@ -51,6 +51,27 @@ export namespace OnSubmit {
       }),
     });
   }
+
+  export async function notification_respondent_email({
+    form_id,
+    response_id,
+  }: {
+    form_id: string;
+    response_id: string;
+  }) {
+    return fetch(
+      `${Env.server.HOST}/v1/submit/${form_id}/hooks/notification-respondent-email`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          response_id,
+        }),
+      }
+    );
+  }
 }
 
 export namespace OnSubmitProcessors {

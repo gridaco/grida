@@ -24,6 +24,7 @@ import type {
   EditorThemePoweredByBrandingAction,
   FormCampaignPreferencesAction,
   FormEndingPreferencesAction,
+  FormNotificationRespondentEmailPreferencesAction,
   EditorThemeAppearanceAction,
   // DataGridViewAction,
   DataGridTableViewAction,
@@ -346,6 +347,17 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       return produce(state, (draft) => {
         draft.form.ending = {
           ...draft.form.ending,
+          ...pref,
+        };
+      });
+    }
+    case "editor/form/notification_respondent_email/preferences": {
+      const { type, ...pref } = <
+        FormNotificationRespondentEmailPreferencesAction
+      >action;
+      return produce(state, (draft) => {
+        draft.form.notification_respondent_email = {
+          ...draft.form.notification_respondent_email,
           ...pref,
         };
       });

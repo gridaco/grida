@@ -230,6 +230,28 @@ export default async function Layout({
                   scheduling_close_at: form.scheduling_close_at,
                   scheduling_tz: form.scheduling_tz || undefined,
                 },
+                notification_respondent_email: {
+                  enabled:
+                    (
+                      (form.notification_respondent_email ?? {}) as any
+                    )?.enabled ?? false,
+                  from_name:
+                    (
+                      (form.notification_respondent_email ?? {}) as any
+                    )?.from_name ?? null,
+                  subject_template:
+                    (
+                      (form.notification_respondent_email ?? {}) as any
+                    )?.subject_template ?? null,
+                  body_html_template:
+                    (
+                      (form.notification_respondent_email ?? {}) as any
+                    )?.body_html_template ?? null,
+                  reply_to:
+                    (
+                      (form.notification_respondent_email ?? {}) as any
+                    )?.reply_to ?? null,
+                },
                 form_security: {
                   unknown_field_handling_strategy:
                     form.unknown_field_handling_strategy,

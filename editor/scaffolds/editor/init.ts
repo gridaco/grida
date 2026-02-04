@@ -635,6 +635,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       form_title: init.form_title,
       campaign: init.campaign,
       ending: init.ending,
+      notification_respondent_email: init.notification_respondent_email,
       fields: init.fields,
       form_security: init.form_security,
       available_field_ids: block_available_field_ids,

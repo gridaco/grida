@@ -61,6 +61,7 @@ export type EditorAction =
   | EditorThemeBackgroundAction
   | FormCampaignPreferencesAction
   | FormEndingPreferencesAction
+  | FormNotificationRespondentEmailPreferencesAction
   | FormStartPageInitAction
   | FormStartPageRemoveAction;
 
@@ -446,6 +447,12 @@ export interface FormEndingPreferencesAction extends Partial<
   EditorState["form"]["ending"]
 > {
   type: "editor/form/ending/preferences";
+}
+
+export interface FormNotificationRespondentEmailPreferencesAction extends Partial<
+  EditorState["form"]["notification_respondent_email"]
+> {
+  type: "editor/form/notification_respondent_email/preferences";
 }
 
 export interface FormStartPageInitAction {

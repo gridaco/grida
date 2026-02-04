@@ -100,6 +100,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_id: string;
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
+  notification_respondent_email: EditorState["form"]["notification_respondent_email"];
 
   /**
    * the start document as-is (the typing is ignored - this should be assured before being actually passed under the provider)
@@ -570,6 +571,13 @@ export interface FormEditorState
       is_ending_page_enabled: boolean;
       ending_page_template_id: EndingPageTemplateID | null;
       ending_page_i18n_overrides: EndingPageI18nOverrides | null;
+    };
+    notification_respondent_email: {
+      enabled: boolean;
+      from_name: string | null;
+      subject_template: string | null;
+      body_html_template: string | null;
+      reply_to: string | null;
     };
     form_security: {
       unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
