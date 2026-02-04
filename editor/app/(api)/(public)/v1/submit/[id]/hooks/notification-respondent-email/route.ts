@@ -8,12 +8,35 @@ import { renderRespondentEmail } from "@/services/form/respondent-email";
 
 type Params = { id: string };
 
+/**
+ * Guard this public hook endpoint with a shared S2S key.
+ *
+ * This route uses `service_role` and can send emails, so it must not be
+ * callable by arbitrary third-parties.
+ */
+const GRIDA_S2S_PRIVATE_API_KEY = process.env.GRIDA_S2S_PRIVATE_API_KEY;
+
 export async function POST(
   req: NextRequest,
   context: {
     params: Promise<Params>;
   }
 ) {
+  const provided =
+    req.headers.get("x-grida-s2s-key") ?? req.headers.get("x-hook-secret");
+  if (!GRIDA_S2S_PRIVATE_API_KEY) {
+    console.error(
+      "notification-respondent-email/err/misconfigured: GRIDA_S2S_PRIVATE_API_KEY missing"
+    );
+    return NextResponse.json({ ok: false }, { status: 500 });
+  }
+  if (!provided) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
+  if (provided !== GRIDA_S2S_PRIVATE_API_KEY) {
+    return NextResponse.json({ ok: false }, { status: 403 });
+  }
+
   const { id: form_id } = await context.params;
   const { response_id } = await req.json();
 
