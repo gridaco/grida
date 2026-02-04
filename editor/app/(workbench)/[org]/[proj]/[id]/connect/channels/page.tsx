@@ -110,7 +110,7 @@ export default function ConnectChannels() {
                     }}
                     messages={[
                       {
-                        message: "Event is openning soon. Register now!",
+                        message: "Event is opening soon. Register now!",
                         role: "incoming",
                       },
                       {
