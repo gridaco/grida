@@ -28,6 +28,7 @@ import {
   TagIcon,
   LockKeyholeIcon,
   BookUserIcon,
+  GlobeIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -55,6 +56,7 @@ export type ResourceTypeIconName =
   | "chart-pie"
   | "commerce"
   | "connect"
+  | "domain"
   | "campaign"
   | "customer"
   | "customer-portal"
@@ -122,6 +124,8 @@ export function ResourceTypeIcon({
       return <MegaphoneIcon {...props} />;
     case "connect":
       return <PlugIcon {...props} />;
+    case "domain":
+      return <GlobeIcon {...props} />;
     case "v0_site":
       return <AppWindowIcon {...props} />;
     case "v0_canvas":

@@ -106,6 +106,14 @@ export default async function Layout({
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     </Link>
+                    <Link href={`/${org}/${proj}/domains`}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton size="sm">
+                          <ResourceTypeIcon type="domain" className="size-4" />
+                          Domains
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </Link>
                     <Link href={`/${org}/${proj}/analytics`}>
                       <SidebarMenuItem>
                         <SidebarMenuButton size="sm">

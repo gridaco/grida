@@ -1,6 +1,30 @@
+/**
+ * @fileoverview
+ * Manual type overrides for the Supabase database schema.
+ *
+ * ## Role
+ * Supabase CLI generates `database-generated.types.ts`, but those types are not always strong enough
+ * or may not reflect application-level guarantees. Common cases:
+ * - **Views**: view columns are often typed as optional/nullable too broadly by the generator.
+ * - **`jsonb` with enforced schema**: when the DB enforces a JSON shape (via constraints/triggers),
+ *   we may want a stronger, explicit TypeScript type.
+ *
+ * This file provides a **manually managed override layer** (via `MergeDeep`) to make development
+ * safer and more ergonomic with trusted, strong types.
+ *
+ * ## Modification policy (important)
+ * - **Prefer not to edit this file**. If the generated types are correct, keep them as-is.
+ * - **Only add/adjust overrides when you are 100% certain** the runtime data matches the override.
+ *   These overrides are **blindly trusted** by TypeScript and can hide real runtime/DB mismatches.
+ * - **Best for known generator limitations** (especially **Views**) or well-defined, enforced JSON
+ *   shapes. When possible, prefer improving the DB/schema and re-generating types instead.
+ */
 // https://supabase.com/docs/reference/javascript/typescript-support#helper-types-for-tables-and-joins
 import { MergeDeep } from "type-fest";
-import { Database as DatabaseGenerated } from "./database-generated.types";
+import {
+  Database as DatabaseGenerated,
+  type Json,
+} from "./database-generated.types";
 export { type Json } from "./database-generated.types";
 
 type SystemSchema_Favicon = {

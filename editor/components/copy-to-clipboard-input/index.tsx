@@ -1,51 +1,57 @@
 "use client";
 
-import React, { useState } from "react";
+import * as React from "react";
 import { CheckIcon, CopyIcon } from "@radix-ui/react-icons";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export function CopyToClipboardInput({ value }: { value: string }) {
-  const [isCopied, setIsCopied] = useState(false);
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
-  const onCopyClick = () => {
-    navigator.clipboard.writeText(value);
-    setIsCopied(true);
-    toast.success("Copied to clipboard");
-    setTimeout(() => {
-      setIsCopied(false);
-    }, 2000);
-  };
+export function CopyToClipboardInput({ value }: { value: string }) {
+  const inputId = React.useId();
+  const [isCopied, setIsCopied] = React.useState(false);
+
+  const onCopyClick = React.useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setIsCopied(true);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy");
+    }
+  }, [value]);
 
   return (
-    <div className="relative">
-      <Input id="npm-install-copy-text" type="text" value={value} readOnly />
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={onCopyClick}
-        data-copy-to-clipboard-target="npm-install-copy-text"
-        className="absolute end-0 top-1/2 -translate-y-1/2"
-        type="button"
-      >
-        <span
-          className="inline-flex items-center"
-          style={{
-            display: isCopied ? "none" : "inline-flex",
-          }}
+    <InputGroup className="w-full">
+      <InputGroupInput
+        id={inputId}
+        type="text"
+        value={value}
+        readOnly
+        className="min-w-0 font-mono"
+      />
+      <InputGroupAddon align="inline-end">
+        <InputGroupButton
+          aria-label="Copy"
+          title="Copy"
+          variant="outline"
+          size="icon-xs"
+          onClick={onCopyClick}
+          data-copy-to-clipboard-target={inputId}
+          type="button"
         >
-          <CopyIcon className="size-3" />
-        </span>
-        <span
-          className="inline-flex items-center justify-center"
-          style={{
-            display: isCopied ? "inline-flex" : "none",
-          }}
-        >
-          <CheckIcon />
-        </span>
-      </Button>
-    </div>
+          {isCopied ? (
+            <CheckIcon className="size-3" />
+          ) : (
+            <CopyIcon className="size-3" />
+          )}
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }
