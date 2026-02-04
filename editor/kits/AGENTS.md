@@ -56,6 +56,7 @@ General conventions:
 | kit              | description                                      | entry                   |
 | ---------------- | ------------------------------------------------ | ----------------------- |
 | `minimal-tiptap` | Opinionated rich-text editor kit (Tiptap-based). | `@/kits/minimal-tiptap` |
+| `email-template-authoring` | Email-client-style template authoring UI. | `@/kits/email-template-authoring` |
 
 ## API design guidelines
 
