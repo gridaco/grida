@@ -14,7 +14,7 @@ type Params = { id: string };
  * This route uses `service_role` and can send emails, so it must not be
  * callable by arbitrary third-parties.
  */
-const GRIDA_S2S_PRIVATE_API_KEY = process.env.GRIDA_S2S_PRIVATE_API_KEY;
+const GRIDA_S2S_PRIVATE_API_KEY = process.env.GRIDA_S2S_PRIVATE_API_KEY ?? null;
 
 export async function POST(
   req: NextRequest,
@@ -22,8 +22,7 @@ export async function POST(
     params: Promise<Params>;
   }
 ) {
-  const provided =
-    req.headers.get("x-grida-s2s-key") ?? req.headers.get("x-hook-secret");
+  const provided = req.headers.get("x-grida-s2s-key");
   if (!GRIDA_S2S_PRIVATE_API_KEY) {
     console.error(
       "notification-respondent-email/err/misconfigured: GRIDA_S2S_PRIVATE_API_KEY missing"
