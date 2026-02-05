@@ -7,17 +7,24 @@ import {
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Link from "next/link";
-import { CodeIcon, FigmaIcon, FrameIcon, ImageIcon } from "lucide-react";
+import {
+  CodeIcon,
+  FigmaIcon,
+  FrameIcon,
+  ImageIcon,
+  KeyRoundIcon,
+} from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Grida Tools | Free Developer & Design Tools",
   description:
-    "Free tools for developers and designers. Generate blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
+    "Free tools for developers and designers. Generate server secrets, blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
   keywords: [
     "free tools",
     "developer tools",
     "design tools",
+    "server secret generator",
     "blob generator",
     "halftone generator",
     "figma inspector",
@@ -28,7 +35,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Grida Tools | Free Developer & Design Tools",
     description:
-      "Free tools for developers and designers. Generate blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
+      "Free tools for developers and designers. Generate server secrets, blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
     type: "website",
     url: "https://grida.co/tools",
   },
@@ -62,6 +69,13 @@ const categories: { name: string; tools: Tool[] }[] = [
   {
     name: "Developer Tools",
     tools: [
+      {
+        title: "Server Secret Generator",
+        description:
+          "Generate S2S API keys, webhook secrets, JWT secrets, and more.",
+        link: "/tools/keygen",
+        icon: KeyRoundIcon,
+      },
       {
         title: ".fig Inspector",
         description: "Parse and inspect Figma .fig files and clipboard data",

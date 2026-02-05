@@ -128,6 +128,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
+      url: "https://grida.co/tools/keygen",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: "https://grida.co/tools/blobs",
       changeFrequency: "yearly",
       priority: 0.5,
