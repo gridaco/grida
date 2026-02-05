@@ -4,7 +4,10 @@ import { Env } from "@/env";
 import { resend } from "@/clients/resend";
 import EmailTemplate from "@/theme/templates-email/formcomplete/default";
 
-const GRIDA_S2S_PRIVATE_API_KEY = process.env.GRIDA_S2S_PRIVATE_API_KEY;
+// In hosted env, avoid calling the deployment domain (`*.vercel.app`) since it
+// can be protected upstream (401) even when our app routes would allow it.
+const HOOK_BASE_URL = Env.server.IS_HOSTED ? Env.web.HOST : Env.server.HOST;
+const GRIDA_S2S_PRIVATE_API_KEY = process.env.GRIDA_S2S_PRIVATE_API_KEY ?? null;
 
 const bird = new Bird(
   process.env.BIRD_WORKSPACE_ID as string,
@@ -24,7 +27,7 @@ export namespace OnSubmit {
     response_id: string;
     session_id: string;
   }) {
-    return fetch(`${Env.server.HOST}/v1/submit/${form_id}/hooks/clearsession`, {
+    return fetch(`${HOOK_BASE_URL}/v1/submit/${form_id}/hooks/clearsession`, {
       headers: {
         "Content-Type": "application/json",
       },
@@ -43,7 +46,7 @@ export namespace OnSubmit {
     form_id: string;
     response_id: string;
   }) {
-    return fetch(`${Env.server.HOST}/v1/submit/${form_id}/hooks/postindexing`, {
+    return fetch(`${HOOK_BASE_URL}/v1/submit/${form_id}/hooks/postindexing`, {
       headers: {
         "Content-Type": "application/json",
       },
@@ -62,7 +65,7 @@ export namespace OnSubmit {
     response_id: string;
   }) {
     return fetch(
-      `${Env.server.HOST}/v1/submit/${form_id}/hooks/notification-respondent-email`,
+      `${HOOK_BASE_URL}/v1/submit/${form_id}/hooks/notification-respondent-email`,
       {
         headers: {
           "Content-Type": "application/json",
