@@ -3,7 +3,7 @@
 import React from "react";
 import { useSearchParams } from "next/navigation";
 
-export function SupportsDarkMode({ children }: React.PropsWithChildren<{}>) {
+export function SupportsDarkMode({ children }: React.PropsWithChildren) {
   const searchParams = useSearchParams();
 
   const qdark = searchParams.get("dark");

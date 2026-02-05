@@ -18,9 +18,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { useForm, useWatch } from "react-hook-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FaviconEditor } from "@/scaffolds/www-theme-config/components/favicon";
-import { SiteDomainsSection } from "./section-domain";
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { Database } from "@app/database";
+import {
+  DEFAULT_PLATFORM_APEX_DOMAIN,
+  platformSiteHostnameForTenant,
+} from "@/lib/domains";
 
 type ProjectWWW = {
   id: string;
@@ -181,8 +183,6 @@ export default function ProjectWWWSettingsPage() {
     update,
     updateFavicon,
     updateOgImage,
-    checkDomainName,
-    changeDomainName,
     getPublicUrl,
   } = useSiteSettings();
 
@@ -208,21 +208,16 @@ export default function ProjectWWWSettingsPage() {
   return (
     <div className="container my-20 max-w-screen-md space-y-20">
       <FormSiteGeneral
-        url={`${data.name}.grida.site`}
+        url={platformSiteHostnameForTenant(
+          data.name,
+          DEFAULT_PLATFORM_APEX_DOMAIN
+        )}
         defaultValues={{
           title: data.title,
           description: data.description,
           lang: data.lang,
         }}
         update={update}
-      />
-
-      <FormSiteDomain
-        defaultValues={{
-          name: data.name,
-        }}
-        changeDomainName={changeDomainName}
-        checkDomainName={checkDomainName}
       />
 
       <Card>
@@ -319,36 +314,6 @@ function FormSiteGeneral({
           )}
         </Button>
       </CardFooter>
-    </Card>
-  );
-}
-
-function FormSiteDomain({
-  defaultValues,
-  changeDomainName,
-  checkDomainName,
-}: {
-  checkDomainName: (name: string) => Promise<boolean>;
-  changeDomainName: (name: string) => Promise<boolean>;
-  defaultValues: {
-    name: string;
-  };
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Domains</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <SiteDomainsSection
-          onDomainNameChange={async (name) => {
-            const available = await checkDomainName(name);
-            if (!available) return false;
-            return await changeDomainName(name);
-          }}
-          name={defaultValues.name}
-        />
-      </CardContent>
     </Card>
   );
 }

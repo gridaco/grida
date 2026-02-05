@@ -1,6 +1,30 @@
+/**
+ * @fileoverview
+ * Manual type overrides for the Supabase database schema.
+ *
+ * ## Role
+ * Supabase CLI generates `database-generated.types.ts`, but those types are not always strong enough
+ * or may not reflect application-level guarantees. Common cases:
+ * - **Views**: view columns are often typed as optional/nullable too broadly by the generator.
+ * - **`jsonb` with enforced schema**: when the DB enforces a JSON shape (via constraints/triggers),
+ *   we may want a stronger, explicit TypeScript type.
+ *
+ * This file provides a **manually managed override layer** (via `MergeDeep`) to make development
+ * safer and more ergonomic with trusted, strong types.
+ *
+ * ## Modification policy (important)
+ * - **Prefer not to edit this file**. If the generated types are correct, keep them as-is.
+ * - **Only add/adjust overrides when you are 100% certain** the runtime data matches the override.
+ *   These overrides are **blindly trusted** by TypeScript and can hide real runtime/DB mismatches.
+ * - **Best for known generator limitations** (especially **Views**) or well-defined, enforced JSON
+ *   shapes. When possible, prefer improving the DB/schema and re-generating types instead.
+ */
 // https://supabase.com/docs/reference/javascript/typescript-support#helper-types-for-tables-and-joins
 import { MergeDeep } from "type-fest";
-import { Database as DatabaseGenerated } from "./database-generated.types";
+import {
+  Database as DatabaseGenerated,
+  type Json,
+} from "./database-generated.types";
 export { type Json } from "./database-generated.types";
 
 type SystemSchema_Favicon = {
@@ -9,6 +33,21 @@ type SystemSchema_Favicon = {
 };
 
 type DBDocType = DatabaseGenerated["public"]["Enums"]["doctype"];
+
+/**
+ * `grida_forms.form.notification_respondent_email`
+ *
+ * DB-enforced JSON schema (see migration):
+ * - optional keys only
+ * - no additional properties
+ */
+export type FormNotificationRespondentEmailConfig = {
+  enabled?: boolean;
+  from_name?: string | null;
+  subject_template?: string | null;
+  body_html_template?: string | null;
+  reply_to?: string | null;
+};
 
 // Override the type for a specific column in a view:
 export type Database = MergeDeep<
@@ -80,6 +119,30 @@ export type Database = MergeDeep<
             route_path: string;
             document_id: string;
             document_type: DBDocType;
+          };
+        };
+      };
+    };
+    grida_forms: {
+      Tables: {
+        form: {
+          Row: Omit<
+            DatabaseGenerated["grida_forms"]["Tables"]["form"]["Row"],
+            "notification_respondent_email"
+          > & {
+            notification_respondent_email: FormNotificationRespondentEmailConfig;
+          };
+          Insert: Omit<
+            DatabaseGenerated["grida_forms"]["Tables"]["form"]["Insert"],
+            "notification_respondent_email"
+          > & {
+            notification_respondent_email?: FormNotificationRespondentEmailConfig;
+          };
+          Update: Omit<
+            DatabaseGenerated["grida_forms"]["Tables"]["form"]["Update"],
+            "notification_respondent_email"
+          > & {
+            notification_respondent_email?: FormNotificationRespondentEmailConfig;
           };
         };
       };

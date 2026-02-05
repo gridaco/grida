@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
-  EnvelopeClosedIcon,
   LightningBoltIcon,
   QuestionMarkCircledIcon,
 } from "@radix-ui/react-icons";
@@ -40,7 +39,6 @@ import {
 } from "@/components/ui/select";
 import MessageAppFrame from "@/components/frames/message-app-frame";
 import { bird_sms_fees } from "@/k/sms_fees";
-import MailAppFrame from "@/components/frames/mail-app-frame";
 import {
   Dialog,
   DialogContent,
@@ -59,6 +57,7 @@ import React from "react";
 import { MessageCircleIcon } from "lucide-react";
 import { useEditorState } from "@/scaffolds/editor";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { NotificationRespondentEmailPreferences } from "@/scaffolds/settings/notification-respondent-email-preferences";
 
 const SMS_DEFAULT_ORIGINATOR = process.env
   .NEXT_PUBLIC_BIRD_SMS_DEFAULT_ORIGINATOR as string;
@@ -80,142 +79,67 @@ export default function ConnectChannels() {
           </SectorDescription>
         </SectorHeader>
         <SectorBlocks>
-          <PreferenceBox>
+          <NotificationRespondentEmailPreferences />
+          <PreferenceBox disabled>
             <PreferenceBoxHeader
               heading={
                 <>
                   <MessageCircleIcon className="inline me-2 size-5 align-middle" />
                   SMS Notifications
                   <Badge variant="outline" className="ms-2 align-middle">
-                    Add-on
+                    Coming soon
                   </Badge>
                 </>
               }
-            />
-            <PreferenceBody>
-              <div className="max-w-sm max-h-96 rounded-3xl border-4 overflow-hidden">
-                <MessageAppFrame
-                  hideInput
-                  sender={{
-                    name: "Grida Forms",
-                    avatar: "GR",
-                    phone: SMS_DEFAULT_ORIGINATOR,
-                  }}
-                  messages={[
-                    {
-                      message: "Event is openning soon. Register now!",
-                      role: "incoming",
-                    },
-                    {
-                      message: "Your submission has been received.",
-                      role: "incoming",
-                    },
-                  ]}
-                />
-              </div>
-              <section className="py-5">
-                <Field>
-                  <FieldLabel htmlFor="originator">Originator</FieldLabel>
-                  <Select name="originator" defaultValue="default">
-                    <SelectTrigger id="originator">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="default">
-                        {SMS_DEFAULT_ORIGINATOR} (default)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </section>
-              <section className="my-10">
-                <AboutSMSFees />
-                <TestSMS form_id={form.form_id} />
-              </section>
-            </PreferenceBody>
-          </PreferenceBox>
-          <PreferenceBox>
-            <PreferenceBoxHeader
-              heading={
+              description={
                 <>
-                  <EnvelopeClosedIcon className="inline me-2 size-5 align-middle" />
-                  Email Notifications
+                  SMS notifications are not ready yet. This section is currently
+                  disabled.
                 </>
               }
             />
             <PreferenceBody>
-              <div className="max-h-96 rounded-3xl border-4 overflow-hidden">
-                <MailAppFrame
-                  sidebarHidden
-                  message={{
-                    at: "Just now",
-                    from: {
+              <div className="pointer-events-none">
+                <div className="max-w-sm max-h-96 rounded-3xl border-4 overflow-hidden">
+                  <MessageAppFrame
+                    hideInput
+                    sender={{
                       name: "Grida Forms",
-                      email: "notifications@grida.co",
                       avatar: "GR",
-                    },
-                    title: "Your Ticket is Ready",
-                  }}
-                  messages={[
-                    {
-                      from: "Grida Forms",
-                      title: "Your Ticket is Ready",
-                      at: "Just now",
-                    },
-                    {
-                      from: "Grida Forms",
-                      title: "Your submission has been received",
-                      at: "20 Minutes ago",
-                    },
-                    {
-                      from: "Grida Forms",
-                      title: "Registration is now open",
-                      at: "28 Minutes ago",
-                    },
-                  ]}
-                >
-                  <p>Dear team,</p>
-                  <p>
-                    Im excited to announce the release of our latest feature
-                    update. This release includes several new capabilities that
-                    will help you work more efficiently and effectively.
-                  </p>
-                  <p>Some of the key highlights include:</p>
-                  <ul>
-                    <li>Improved email search and filtering</li>
-                    <li>Enhanced email templates and signatures</li>
-                    <li>
-                      Seamless integration with our project management tools
-                    </li>
-                  </ul>
-                  <p>
-                    Weve been working hard to deliver these improvements, and
-                    were confident they will have a positive impact on your
-                    daily workflow. Please let me know if you have any questions
-                    or feedback.
-                  </p>
-                  <p>
-                    Best regards,
-                    <br />
-                    Jared
-                  </p>
-                </MailAppFrame>
+                      phone: SMS_DEFAULT_ORIGINATOR,
+                    }}
+                    messages={[
+                      {
+                        message: "Event is opening soon. Register now!",
+                        role: "incoming",
+                      },
+                      {
+                        message: "Your submission has been received.",
+                        role: "incoming",
+                      },
+                    ]}
+                  />
+                </div>
+                <section className="py-5">
+                  <Field>
+                    <FieldLabel htmlFor="originator">Originator</FieldLabel>
+                    <Select name="originator" defaultValue="default">
+                      <SelectTrigger id="originator">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">
+                          {SMS_DEFAULT_ORIGINATOR} (default)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </section>
+                <section className="my-10">
+                  <AboutSMSFees />
+                  <TestSMS form_id={form.form_id} />
+                </section>
               </div>
-              <section className="py-5">
-                <Field>
-                  <FieldLabel htmlFor="emailfrom">From</FieldLabel>
-                  <Select name="emailfrom" defaultValue="default">
-                    <SelectTrigger id="emailfrom">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="default">
-                        notifications@grida.co
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </section>
             </PreferenceBody>
           </PreferenceBox>
           <PreferenceBox>

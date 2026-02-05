@@ -15,6 +15,7 @@ import {
   UpdateFormAccessMaxResponseInTotalRequest,
   UpdateFormMethodRequest,
   UpdateFormRedirectAfterSubmissionRequest,
+  UpdateFormNotificationRespondentEmailRequest,
   UpdateFormScheduleRequest,
   UpdateFormUnknownFieldsHandlingStrategyRequest,
   XSupabasePrivateApiTypes,
@@ -159,6 +160,15 @@ export namespace PrivateEditorApi {
     ) {
       return Axios.post<EditorApiResponseOk>(
         `/private/editor/settings/unknown-fields`,
+        data
+      );
+    }
+
+    export function updateNotificationRespondentEmail(
+      data: UpdateFormNotificationRespondentEmailRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/notification-respondent-email`,
         data
       );
     }

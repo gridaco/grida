@@ -1114,6 +1114,17 @@ async function submit({
     console.error("submit/err/hooks/postindexing", e);
   }
 
+  // respondent email hook (best-effort)
+  // TODO: move to PGMQ/jobs for retryable delivery
+  try {
+    OnSubmit.notification_respondent_email({
+      form_id,
+      response_id: response_reference_obj.id,
+    });
+  } catch (e) {
+    console.error("submit/err/hooks/notification-respondent-email", e);
+  }
+
   // notification hooks are not ready yet
   // try {
   //   await hook_notifications({ form_id });

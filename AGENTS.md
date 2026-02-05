@@ -182,6 +182,9 @@ pnpm dev:packages --concurrency 100
 # run tests except for rust crates
 turbo test --filter='!./crates/*'
 
+# run lint (CI enforces lint for Next.js apps)
+turbo lint
+
 # run build (all, not recommended)
 turbo build
 

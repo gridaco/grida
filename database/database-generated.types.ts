@@ -1220,6 +1220,7 @@ export type Database = {
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
           name: string
+          notification_respondent_email: Json
           project_id: number
           scheduling_close_at: string | null
           scheduling_open_at: string | null
@@ -1241,6 +1242,7 @@ export type Database = {
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           name?: string
+          notification_respondent_email?: Json
           project_id: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -1262,6 +1264,7 @@ export type Database = {
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           name?: string
+          notification_respondent_email?: Json
           project_id?: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -3540,7 +3543,7 @@ export type Database = {
       analyze: {
         Args: {
           p_campaign_id: string
-          p_interval?: unknown
+          p_interval?: string
           p_names?: string[]
           p_time_from?: string
           p_time_to?: string
@@ -3654,6 +3657,69 @@ export type Database = {
   }
   grida_www: {
     Tables: {
+      domain: {
+        Row: {
+          canonical: boolean
+          created_at: string
+          hostname: string
+          id: string
+          kind: string | null
+          last_checked_at: string | null
+          last_error: string | null
+          last_error_code: string | null
+          last_verified_at: string | null
+          status: string
+          updated_at: string
+          vercel: Json | null
+          www_id: string
+        }
+        Insert: {
+          canonical?: boolean
+          created_at?: string
+          hostname: string
+          id?: string
+          kind?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_error_code?: string | null
+          last_verified_at?: string | null
+          status?: string
+          updated_at?: string
+          vercel?: Json | null
+          www_id: string
+        }
+        Update: {
+          canonical?: boolean
+          created_at?: string
+          hostname?: string
+          id?: string
+          kind?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_error_code?: string | null
+          last_verified_at?: string | null
+          status?: string
+          updated_at?: string
+          vercel?: Json | null
+          www_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domain_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domain_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       layout: {
         Row: {
           base_path: string | null
@@ -4488,6 +4554,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_project: {
+        Args: { p_confirm: string; p_project_id: number }
+        Returns: boolean
+      }
       find_project: {
         Args: { p_org_ref: string; p_proj_ref: string }
         Returns: {
@@ -4557,6 +4627,20 @@ export type Database = {
           p_project_name: string
         }
         Returns: undefined
+      }
+      www_get_canonical_hostname: {
+        Args: { p_www_name: string }
+        Returns: {
+          canonical_hostname: string
+        }[]
+      }
+      www_resolve_hostname: {
+        Args: { p_hostname: string }
+        Returns: {
+          canonical_hostname: string
+          www_id: string
+          www_name: string
+        }[]
       }
     }
     Enums: {

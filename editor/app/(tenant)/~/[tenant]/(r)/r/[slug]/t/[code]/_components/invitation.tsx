@@ -7,6 +7,10 @@ import { Platform } from "@/lib/platform";
 import InvitationPageTemplate from "@/theme/templates/enterprise/west-referral/invitation/page";
 import InvitationCouponTemplate from "@/theme/templates/enterprise/west-referral/invitation/coupon";
 import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
+import {
+  campaignShadcnThemeToCssText,
+  resolveCampaignShadcnTheme,
+} from "@/theme/shadcn/campaign-theme";
 
 interface CampaignPublicData {
   "signup-form-id": string;
@@ -29,9 +33,18 @@ export default function InvitationPage({
   const _t = template.theme;
   const _u = template.components["invitation-ux-overlay"];
   const _i = template.components.invitation;
+  const shadcnTheme = resolveCampaignShadcnTheme(_t?.styles);
 
   return (
     <ScreenRoot>
+      {shadcnTheme && (
+        <style
+          id="campaign-shadcn-theme"
+          dangerouslySetInnerHTML={{
+            __html: campaignShadcnThemeToCssText(shadcnTheme),
+          }}
+        />
+      )}
       <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.DialogContent className="fixed inset-0 p-0 border-none outline-none bg-background data-[state=closed]:animate-out data-[state=closed]:fade-out-0 z-10">

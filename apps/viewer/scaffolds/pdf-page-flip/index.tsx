@@ -1,10 +1,10 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import HTMLFlipBook from "react-pageflip";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Document, Page } from "react-pdf";
 import { pdfjs } from "react-pdf";
-import { useMeasure, useMediaQuery } from "@uidotdev/usehooks";
+import { useMediaQuery } from "@uidotdev/usehooks";
 import { PDFDocumentProxy } from "pdfjs-dist";
 // import { PDFLinkService } from "pdfjs-dist/web/pdf_viewer";
 
@@ -40,8 +40,8 @@ interface FlipPageProps {
   onLinkClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
-const FlipPage: React.FC<FlipPageProps> = React.forwardRef(
-  ({ onLinkClick, pageNumber, width, height, ...props }, ref) => {
+const FlipPage: React.FC<FlipPageProps> = React.forwardRef<HTMLDivElement, FlipPageProps>(
+  ({ onLinkClick, pageNumber, width, height }, ref) => {
     return (
       <div
         className="shadow-lg rounded-sm overflow-hidden"
@@ -125,17 +125,14 @@ const PDFViewer = ({
   const [numPages, setNumPages] = useState<number>(0);
   const [title, setTitle] = useState<string | undefined>(_title);
   const [currentPage, setCurrentPage] = useState(0);
-  const [rawSize, setRawSize] = useState<
-    { width: number; height: number } | undefined
-  >(undefined);
   const [cachedDimensions, setCachedDimensions] = useState<{
     width: number;
     height: number;
   } | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const book = useRef(null);
   const doc = useRef<PDFDocumentProxy | null>(null);
   const isPortrait = useMediaQuery("only screen and (max-width : 768px)");
-  const [ref, { width: _width, height: _height }] = useMeasure();
 
   const onDocumentLoadSuccess: OnDocumentLoadSuccess = async (
     document: PDFDocumentProxy
@@ -144,31 +141,34 @@ const PDFViewer = ({
 
     if (!title) {
       document.getMetadata().then(({ info }) => {
-        try {
-          const pdfTitle = (info as any)["Title"];
-          if (pdfTitle) setTitle(pdfTitle);
-        } catch (e) {}
+        const infoRecord = info as Record<string, unknown> | null | undefined;
+        const pdfTitle =
+          typeof infoRecord?.Title === "string" ? infoRecord.Title : undefined;
+        if (pdfTitle) setTitle(pdfTitle);
       });
     }
     setNumPages(document.numPages);
     document.getPage(1).then((page) => {
       const [, , width, height] = page.view;
-      setRawSize({ width, height });
+      const container = containerRef.current;
+      if (!container) return;
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      if (!containerWidth || !containerHeight) return;
+      const computed = scaltToFit(
+        containerWidth / (isPortrait ? 1 : 2),
+        containerHeight,
+        width,
+        height
+      );
+      setCachedDimensions((current) => {
+        if (current) return current;
+        return { width: computed.width, height: computed.height };
+      });
     });
   };
 
   // Cache dimensions once resolved; ignore subsequent resizes.
-  useEffect(() => {
-    if (_width && _height && rawSize && !cachedDimensions) {
-      const computed = scaltToFit(
-        _width / (isPortrait ? 1 : 2),
-        _height,
-        rawSize.width,
-        rawSize.height
-      );
-      setCachedDimensions({ width: computed.width, height: computed.height });
-    }
-  }, [_width, _height, rawSize, isPortrait, cachedDimensions]);
 
   const nextPage = () => {
     if (book.current) {
@@ -211,7 +211,7 @@ const PDFViewer = ({
           onPrev={prevPage}
         />
         <div
-          ref={ref}
+          ref={containerRef}
           className="w-full h-full flex flex-col justify-center items-center"
         >
           <Document
@@ -245,13 +245,16 @@ const PDFViewer = ({
                     number={index + 1}
                     pageNumber={index + 1}
                     onLinkClick={(e) => {
-                      const anchor = (e.target as HTMLElement).closest("a")!;
+                      const anchor = (e.target as HTMLElement).closest("a");
+                      if (!anchor) return;
                       const href = anchor.getAttribute("href");
                       if (!href || href === "#") {
                         const id = anchor.dataset.elementId;
                         if (id) {
                           e.preventDefault();
-                          findPageNumberByAnnotationId(doc.current!, id).then(
+                          const currentDoc = doc.current;
+                          if (!currentDoc) return;
+                          findPageNumberByAnnotationId(currentDoc, id).then(
                             (pagenum) => {
                               if (pagenum) {
                                 setPage(pagenum);
@@ -278,6 +281,7 @@ const PDFViewer = ({
       </div>
       {logo && (
         <div className="fixed bottom-4 right-4 z-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={logo}
             alt="logo"
@@ -346,34 +350,27 @@ function NavigationPageNumberControl({
   const end = Math.min(page + 2, numPages);
   const isStart = start === 1;
   const isEnd = end === numPages;
-  const [txt, setTxt] = useState<string>(
-    isPortrait || isStart || isEnd ? start.toString() : `${start}-${end}`
-  );
-
-  useEffect(() => {
-    if (isPortrait || isStart || isEnd) {
-      setTxt(start.toString());
-    } else {
-      setTxt(`${start}-${end}`);
-    }
-  }, [start, end, isPortrait, isStart, isEnd]);
+  const displayValue =
+    isPortrait || isStart || isEnd ? start.toString() : `${start}-${end}`;
 
   return (
     <div className="mt-4 flex items-center gap-4 pointer-events-auto">
       <span className="text-sm">
         <input
+          key={displayValue}
           type="text"
           autoComplete="off"
           className="w-7 rounded-sm border text-center"
-          value={txt}
-          onChange={(e) => setTxt(e.target.value)}
+          defaultValue={displayValue}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          onBlur={() => {
-            const page = parseInt(txt);
+          onBlur={(e) => {
+            const page = parseInt(e.currentTarget.value, 10);
             if (page > 0 && page <= numPages) {
-              onPageChange && onPageChange(page - 1);
+              if (onPageChange) {
+                onPageChange(page - 1);
+              }
             }
           }}
         />
