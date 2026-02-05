@@ -4,6 +4,8 @@ import { Env } from "@/env";
 import { resend } from "@/clients/resend";
 import EmailTemplate from "@/theme/templates-email/formcomplete/default";
 
+const GRIDA_S2S_PRIVATE_API_KEY = process.env.GRIDA_S2S_PRIVATE_API_KEY;
+
 const bird = new Bird(
   process.env.BIRD_WORKSPACE_ID as string,
   process.env.BIRD_SMS_CHANNEL_ID as string,
@@ -64,6 +66,9 @@ export namespace OnSubmit {
       {
         headers: {
           "Content-Type": "application/json",
+          ...(GRIDA_S2S_PRIVATE_API_KEY
+            ? { "x-grida-s2s-key": GRIDA_S2S_PRIVATE_API_KEY }
+            : {}),
         },
         method: "POST",
         body: JSON.stringify({
