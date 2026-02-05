@@ -63,7 +63,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: test-native
+          add-rust-environment-hash-key: false
           cache-all-crates: true
+          cache-workspace-crates: true
+          cache-on-failure: true
 
       - name: Run cargo tests
         env:
