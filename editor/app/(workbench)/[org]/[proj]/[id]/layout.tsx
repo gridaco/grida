@@ -41,6 +41,7 @@ import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { xsb_table_conn_init } from "@/scaffolds/editor/init";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Win32LinuxWindowSafeArea } from "@/host/desktop";
+import type { FormNotificationRespondentEmailConfig } from "@app/database";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -176,6 +177,10 @@ export default async function Layout({
         fields: FormFieldDefinition[];
       };
 
+      const notification_respondent_email =
+        (form.notification_respondent_email ??
+          {}) as FormNotificationRespondentEmailConfig;
+
       const supabase_connection_state = form.supabase_connection
         ? await client.getXSBMainTableConnectionState(form.supabase_connection)
         : null;
@@ -229,6 +234,18 @@ export default async function Layout({
                   scheduling_open_at: form.scheduling_open_at,
                   scheduling_close_at: form.scheduling_close_at,
                   scheduling_tz: form.scheduling_tz || undefined,
+                },
+                notification_respondent_email: {
+                  enabled:
+                    notification_respondent_email.enabled ?? false,
+                  from_name:
+                    notification_respondent_email.from_name ?? null,
+                  subject_template:
+                    notification_respondent_email.subject_template ?? null,
+                  body_html_template:
+                    notification_respondent_email.body_html_template ?? null,
+                  reply_to:
+                    notification_respondent_email.reply_to ?? null,
                 },
                 form_security: {
                   unknown_field_handling_strategy:

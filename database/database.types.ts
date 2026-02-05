@@ -34,6 +34,21 @@ type SystemSchema_Favicon = {
 
 type DBDocType = DatabaseGenerated["public"]["Enums"]["doctype"];
 
+/**
+ * `grida_forms.form.notification_respondent_email`
+ *
+ * DB-enforced JSON schema (see migration):
+ * - optional keys only
+ * - no additional properties
+ */
+export type FormNotificationRespondentEmailConfig = {
+  enabled?: boolean;
+  from_name?: string | null;
+  subject_template?: string | null;
+  body_html_template?: string | null;
+  reply_to?: string | null;
+};
+
 // Override the type for a specific column in a view:
 export type Database = MergeDeep<
   DatabaseGenerated,
@@ -104,6 +119,30 @@ export type Database = MergeDeep<
             route_path: string;
             document_id: string;
             document_type: DBDocType;
+          };
+        };
+      };
+    };
+    grida_forms: {
+      Tables: {
+        form: {
+          Row: Omit<
+            DatabaseGenerated["grida_forms"]["Tables"]["form"]["Row"],
+            "notification_respondent_email"
+          > & {
+            notification_respondent_email: FormNotificationRespondentEmailConfig;
+          };
+          Insert: Omit<
+            DatabaseGenerated["grida_forms"]["Tables"]["form"]["Insert"],
+            "notification_respondent_email"
+          > & {
+            notification_respondent_email?: FormNotificationRespondentEmailConfig;
+          };
+          Update: Omit<
+            DatabaseGenerated["grida_forms"]["Tables"]["form"]["Update"],
+            "notification_respondent_email"
+          > & {
+            notification_respondent_email?: FormNotificationRespondentEmailConfig;
           };
         };
       };

@@ -1,3 +1,7 @@
+---
+unlisted: true
+---
+
 # Docs agent guide (`/docs`)
 
 This directory is the **source of truth** for documentation content.
@@ -44,6 +48,7 @@ unlisted: true
 | [/docs/math](./math)             | math          | Math reference, used for internal docs referencing                     | yes    |
 | [/docs/platform](./platform)     | platform      | Grida Platform (API/Spec) documents                                    | yes    |
 | [/docs/editor](./editor)         | editor        | Grida Editor - User Documentation                                      | yes    |
+| [/docs/forms](./forms)           | forms         | Grida Forms - User Documentation                                       | yes    |
 | [/docs/canvas](./canvas)         | canvas        | Grida Canvas SDK - User Documentation                                  | no     |
 | [/docs/cli](./cli)               | cli           | Grida CLI - User Documentation                                         | yes    |
 | [/docs/together](./together)     | together      | Contributing, Support, Community, etc                                  | yes    |
