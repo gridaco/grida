@@ -48,6 +48,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
@@ -605,27 +607,20 @@ function PreferencesMenuContent() {
             Theme
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-40">
-            <DropdownMenuCheckboxItem
-              checked={resolvedTheme === "light"}
-              onSelect={() => setTheme("light")}
-              className="text-xs"
+            <DropdownMenuRadioGroup
+              value={resolvedTheme}
+              onValueChange={(value) => setTheme(value)}
             >
-              Light
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={resolvedTheme === "dark"}
-              onSelect={() => setTheme("dark")}
-              className="text-xs"
-            >
-              Dark
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={resolvedTheme === "system"}
-              onSelect={() => setTheme("system")}
-              className="text-xs"
-            >
-              System
-            </DropdownMenuCheckboxItem>
+              <DropdownMenuRadioItem value="light" className="text-xs">
+                Light
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="dark" className="text-xs">
+                Dark
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="system" className="text-xs">
+                System
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
       </DropdownMenuSubContent>
