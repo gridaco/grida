@@ -43,10 +43,13 @@ import {
   SpaceEvenlyHorizontallyIcon,
   SpaceEvenlyVerticallyIcon,
 } from "@radix-ui/react-icons";
+import { useTheme } from "next-themes";
 import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
@@ -244,6 +247,7 @@ export function PlaygroundMenuContent({
             settingsDialog.openDialog();
           }}
         />
+        <PreferencesMenuContent />
         <DevelopersMenuContent />
         <DropdownMenuSeparator />
         <Link href={sitemap.links.github} target="_blank">
@@ -583,6 +587,42 @@ function ViewMenuContent({
             </DropdownMenuItem>
           </>
         )}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function PreferencesMenuContent() {
+  const { theme, setTheme } = useTheme();
+  const resolvedTheme = theme ?? "system";
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">
+        Preferences
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Theme
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuRadioGroup
+              value={resolvedTheme}
+              onValueChange={(value) => setTheme(value)}
+            >
+              <DropdownMenuRadioItem value="light" className="text-xs">
+                Light
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="dark" className="text-xs">
+                Dark
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="system" className="text-xs">
+                System
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   );
