@@ -43,6 +43,7 @@ import {
   SpaceEvenlyHorizontallyIcon,
   SpaceEvenlyVerticallyIcon,
 } from "@radix-ui/react-icons";
+import { useTheme } from "next-themes";
 import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -244,6 +245,7 @@ export function PlaygroundMenuContent({
             settingsDialog.openDialog();
           }}
         />
+        <PreferencesMenuContent />
         <DevelopersMenuContent />
         <DropdownMenuSeparator />
         <Link href={sitemap.links.github} target="_blank">
@@ -583,6 +585,49 @@ function ViewMenuContent({
             </DropdownMenuItem>
           </>
         )}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+function PreferencesMenuContent() {
+  const { theme, setTheme } = useTheme();
+  const resolvedTheme = theme ?? "system";
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="text-xs">
+        Preferences
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            Theme
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuCheckboxItem
+              checked={resolvedTheme === "light"}
+              onSelect={() => setTheme("light")}
+              className="text-xs"
+            >
+              Light
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={resolvedTheme === "dark"}
+              onSelect={() => setTheme("dark")}
+              className="text-xs"
+            >
+              Dark
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={resolvedTheme === "system"}
+              onSelect={() => setTheme("system")}
+              className="text-xs"
+            >
+              System
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   );
