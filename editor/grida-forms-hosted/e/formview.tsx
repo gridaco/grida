@@ -57,6 +57,9 @@ import { useValue } from "@/lib/spock";
 import { Spinner } from "@/components/ui/spinner";
 import { PhoneFieldDefaultCountryProvider } from "@/components/formfield/phone-field";
 import type { FormAgentGeo } from "@/grida-forms/formstate/core/geo";
+import resources from "@/i18n";
+import { select_lang } from "@/i18n/utils";
+import { supported_form_page_languages } from "@/k/supported_languages";
 
 const html_form_id = "form";
 
@@ -94,25 +97,46 @@ export interface FormViewTranslation {
   };
 }
 
-const default_form_view_translation_en: FormViewTranslation = {
-  next: "Next",
-  back: "Back",
-  submit: "Submit",
-  pay: "Pay",
-  email_challenge: {
-    verify: "Verify",
-    sending: "Sending",
-    verify_code: "Verify",
-    enter_verification_code: "Enter verification code",
-    code_sent: "A verification code has been sent to your inbox.",
-    didnt_receive_code: "Didn't receive a code?",
-    resend: "Resend",
-    retry: "Retry",
-    code_expired: "Verification code has expired.",
-    incorrect_code: "Incorrect verification code. Please try again.",
-    error_occurred: "An error occurred. Please try again later.",
-  },
-};
+/**
+ * Build a {@link FormViewTranslation} from shared i18n resources for the
+ * given language code.  Unknown / unsupported codes fall back to `"en"`.
+ */
+function build_form_view_translation(lang: string): FormViewTranslation {
+  const lng = select_lang(lang, supported_form_page_languages, "en");
+  const t = resources[lng].translation;
+  const ec = t.email_challenge;
+
+  return {
+    next: t.next,
+    back: t.back,
+    submit: t.submit,
+    pay: t.pay,
+    email_challenge: {
+      verify: t.verify,
+      sending: t.sending,
+      verify_code: ec.verify_code,
+      enter_verification_code: ec.enter_verification_code,
+      code_sent: ec.code_sent,
+      didnt_receive_code: ec.didnt_receive_code,
+      resend: t.resend,
+      retry: t.retry,
+      code_expired: ec.code_expired,
+      incorrect_code: ec.incorrect_code,
+      error_occurred: ec.error_occurred,
+    },
+  };
+}
+
+/** Canonical English translation, derived from the shared i18n resources. */
+const default_form_view_translation_en = build_form_view_translation("en");
+
+const FormViewTranslationContext = React.createContext<FormViewTranslation>(
+  default_form_view_translation_en
+);
+
+function useFormViewTranslation() {
+  return React.useContext(FormViewTranslationContext);
+}
 
 type FormViewRootProps = {
   form_id: string;
@@ -122,6 +146,21 @@ type FormViewRootProps = {
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
   defaultValues?: { [key: string]: string };
+  /**
+   * Optional language code (e.g. `"ko"`, `"en"`).
+   * Resolves a {@link FormViewTranslation} from the shared i18n resources and
+   * provides it via context so that `FormView.Body`, `FormView.Prev`,
+   * `FormView.Next`, and `FormView.Submit` are automatically localised.
+   *
+   * An explicit {@link translation} prop takes precedence over `lang`.
+   */
+  lang?: string;
+  /**
+   * Explicit {@link FormViewTranslation} object.
+   * Takes precedence over {@link lang}.  When both are omitted the context
+   * defaults to English.
+   */
+  translation?: FormViewTranslation;
 };
 
 export function GridaFormsFormView(
@@ -143,7 +182,6 @@ export function GridaFormsFormView(
       >
         <GridaFormBody {...props} />
         <GridaFormFooter
-          translation={props.translation}
           is_powered_by_branding_enabled={
             props.config.is_powered_by_branding_enabled
           }
@@ -155,9 +193,24 @@ export function GridaFormsFormView(
 
 export function FormViewRoot({
   children,
+  lang,
+  translation: translationProp,
   ...props
 }: React.PropsWithChildren<FormViewRootProps>) {
-  return <Providers {...props}>{children}</Providers>;
+  const translation = useMemo(
+    () =>
+      translationProp ??
+      (lang
+        ? build_form_view_translation(lang)
+        : default_form_view_translation_en),
+    [translationProp, lang]
+  );
+
+  return (
+    <FormViewTranslationContext.Provider value={translation}>
+      <Providers {...props}>{children}</Providers>
+    </FormViewTranslationContext.Provider>
+  );
 }
 
 function Providers({
@@ -236,11 +289,13 @@ export function FormBody({
   onSubmit,
   onAfterSubmit,
   className,
-  translation = default_form_view_translation_en,
+  translation: translationProp,
   config,
   stylesheet,
   ...formattributes
 }: FormBodyProps & HtmlFormElementProps & IOnSubmit) {
+  const contextTranslation = useFormViewTranslation();
+  const translation = translationProp ?? contextTranslation;
   const [state, dispatch] = useFormAgentState();
   const { tree, session_id, current_section_id, submit_hidden, onNext } =
     useFormAgent();
@@ -322,16 +377,14 @@ export function FormBody({
 
 function GridaFormFooter({
   is_powered_by_branding_enabled,
-  translation = default_form_view_translation_en,
 }: {
   is_powered_by_branding_enabled: boolean;
-  translation?: FormViewTranslation;
 }) {
   const { pay_hidden } = useFormAgent();
 
   return (
     <>
-      <Footer shouldHidePay={pay_hidden} translation={translation} />
+      <Footer shouldHidePay={pay_hidden} />
       {/* on desktop, branding attribute is below footer */}
       {is_powered_by_branding_enabled && (
         <div className="hidden md:block">
@@ -342,13 +395,9 @@ function GridaFormFooter({
   );
 }
 
-function Footer({
-  translation,
-  shouldHidePay,
-}: {
-  shouldHidePay: boolean;
-  translation: FormViewTranslation;
-}) {
+function Footer({ shouldHidePay }: { shouldHidePay: boolean }) {
+  const translation = useFormViewTranslation();
+
   return (
     <footer
       className={cn(
@@ -358,9 +407,9 @@ function Footer({
         "md:static md:justify-start md:bg-transparent md:dark:bg-transparent"
       )}
     >
-      <FormPrev>{translation.back}</FormPrev>
-      <FormNext className="flex-1 md:w-auto">{translation.next}</FormNext>
-      <FormSubmit className="flex-1 md:w-auto">{translation.submit}</FormSubmit>
+      <FormPrev />
+      <FormNext className="flex-1 md:w-auto" />
+      <FormSubmit className="flex-1 md:w-auto" />
       <TossPaymentsPayButton
         data-pay-hidden={shouldHidePay}
         className={cn(
@@ -382,6 +431,7 @@ function FormPrev({
   className?: string;
 }>) {
   const { has_previous, onPrevious } = useFormAgent();
+  const translation = useFormViewTranslation();
 
   return (
     <Button
@@ -390,7 +440,7 @@ function FormPrev({
       className={cn("data-[next-hidden='true']:hidden", className)}
       onClick={onPrevious}
     >
-      {children}
+      {children ?? translation.back}
     </Button>
   );
 }
@@ -402,6 +452,7 @@ function FormNext({
   className?: string;
 }>) {
   const { has_next } = useFormAgent();
+  const translation = useFormViewTranslation();
 
   return (
     <Button
@@ -411,7 +462,7 @@ function FormNext({
       type="submit"
       className={cn("data-[next-hidden='true']:hidden", className)}
     >
-      {children}
+      {children ?? translation.next}
     </Button>
   );
 }
@@ -423,6 +474,7 @@ function FormSubmit({
   className?: string;
 }>) {
   const { submit_hidden, is_submitting } = useFormAgent();
+  const translation = useFormViewTranslation();
 
   return (
     <Button
@@ -442,7 +494,7 @@ function FormSubmit({
           <Spinner className="me-2" />
         </div>
       )}
-      {children}
+      {children ?? translation.submit}
     </Button>
   );
 }
