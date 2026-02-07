@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(14);
+SELECT plan(16);
 
 ---------------------------------------------------------------------
 -- Seed fixtures
@@ -225,10 +225,45 @@ SELECT throws_ok(
 SELECT test_reset_auth();
 
 ---------------------------------------------------------------------
+-- portal_preset delete isolation
+---------------------------------------------------------------------
+
+-- Test 14: Insider can delete their own preset
+SELECT test_set_auth('insider@grida.co');
+SELECT lives_ok(
+  format(
+    'DELETE FROM grida_ciam_public.portal_preset WHERE id = %L',
+    current_setting('test.preset_b')
+  ),
+  'Insider can delete their own preset'
+);
+SELECT test_reset_auth();
+
+-- Test 15: Outsider cannot delete insider's preset
+SELECT test_set_auth('random@example.com');
+DO $$
+DECLARE
+  affected int;
+BEGIN
+  EXECUTE format(
+    'DELETE FROM grida_ciam_public.portal_preset WHERE id = %L',
+    current_setting('test.preset_a')
+  );
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  PERFORM set_config('test.outsider_delete_count', affected::text, true);
+END $$;
+SELECT is(
+  current_setting('test.outsider_delete_count')::int,
+  0,
+  'Outsider delete should affect 0 rows (RLS hides the row)'
+);
+SELECT test_reset_auth();
+
+---------------------------------------------------------------------
 -- view uses security_invoker
 ---------------------------------------------------------------------
 
--- Test 14: View has security_invoker = true
+-- Test 16: View has security_invoker = true
 SELECT is(
   (SELECT COUNT(*)
    FROM pg_views v

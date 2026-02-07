@@ -819,7 +819,7 @@ CREATE OR REPLACE FUNCTION grida_ciam_public.set_primary_portal_preset(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions, pg_temp
+SET search_path = pg_catalog, public
 AS $function$
 BEGIN
   IF NOT public.rls_project(p_project_id) THEN
@@ -843,5 +843,6 @@ BEGIN
 END;
 $function$;
 
+REVOKE EXECUTE ON FUNCTION grida_ciam_public.set_primary_portal_preset(bigint, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION grida_ciam_public.set_primary_portal_preset(bigint, uuid)
   TO authenticated, service_role;

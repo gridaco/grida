@@ -11,6 +11,8 @@ import { select_lang } from "@/i18n/utils";
 import { getLocale } from "@/i18n/server";
 import { renderPortalVerificationEmail } from "@/services/ciam/portal-verification-email";
 import type { PortalPresetVerificationEmailTemplate } from "@app/database";
+import { sanitize_email_display_name } from "@/utils/sanitize";
+
 // TODO: add rate limiting
 export async function POST(
   req: NextRequest,
@@ -171,8 +173,9 @@ export async function POST(
       },
     });
 
-    const fromName =
-      preset_template.from_name?.trim() || brand_name;
+    const fromName = sanitize_email_display_name(
+      preset_template.from_name?.trim() || brand_name
+    );
     const replyTo = preset_template.reply_to?.trim() || undefined;
 
     const { error } = await resend.emails.send({
@@ -192,7 +195,7 @@ export async function POST(
     );
 
     const { error } = await resend.emails.send({
-      from: `${brand_name} <no-reply@accounts.grida.co>`,
+      from: `${sanitize_email_display_name(brand_name)} <no-reply@accounts.grida.co>`,
       to: emailNormalized,
       subject: subject(emailLang, {
         brand_name,
