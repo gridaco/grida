@@ -695,3 +695,154 @@ $$;
 
 GRANT EXECUTE ON FUNCTION grida_ciam_public.revoke_customer_portal_sessions(bigint, uuid)
 TO service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam.portal_preset]
+-- Per-project portal presets (multiple allowed, one primary).
+-- Stores admin-authored verification email template and login page text as JSONB.
+---------------------------------------------------------------------
+
+CREATE TABLE grida_ciam.portal_preset (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    project_id bigint NOT NULL REFERENCES public.project(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    is_primary boolean NOT NULL DEFAULT false,
+    verification_email_template jsonb NOT NULL DEFAULT '{}'::jsonb,
+    portal_login_page jsonb NOT NULL DEFAULT '{"template_id":"202602-default"}'::jsonb
+);
+
+ALTER TABLE grida_ciam.portal_preset
+  ADD CONSTRAINT portal_preset_verification_email_template_check
+  CHECK (
+    extensions.jsonb_matches_schema(
+      '{
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled":            { "type": "boolean" },
+          "from_name":          { "type": ["string", "null"] },
+          "subject_template":   { "type": ["string", "null"] },
+          "body_html_template": { "type": ["string", "null"] },
+          "reply_to":           { "type": ["string", "null"] }
+        }
+      }'::json,
+      verification_email_template
+    )
+  );
+
+ALTER TABLE grida_ciam.portal_preset
+  ADD CONSTRAINT portal_preset_portal_login_page_check
+  CHECK (
+    extensions.jsonb_matches_schema(
+      '{
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["template_id"],
+        "properties": {
+          "template_id":             { "const": "202602-default" },
+          "email_step_title":        { "type": ["string", "null"] },
+          "email_step_description":  { "type": ["string", "null"] },
+          "email_step_button_label": { "type": ["string", "null"] },
+          "otp_step_title":          { "type": ["string", "null"] },
+          "otp_step_description":    { "type": ["string", "null"] }
+        }
+      }'::json,
+      portal_login_page
+    )
+  );
+
+CREATE UNIQUE INDEX portal_preset_primary_per_project
+  ON grida_ciam.portal_preset (project_id)
+  WHERE (is_primary = true);
+
+CREATE INDEX portal_preset_project_idx
+  ON grida_ciam.portal_preset (project_id);
+
+CREATE OR REPLACE FUNCTION grida_ciam.set_portal_preset_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_portal_preset_updated_at
+  BEFORE UPDATE ON grida_ciam.portal_preset
+  FOR EACH ROW
+  EXECUTE FUNCTION grida_ciam.set_portal_preset_updated_at();
+
+ALTER TABLE grida_ciam.portal_preset ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "access_based_on_project_membership"
+  ON grida_ciam.portal_preset
+  USING  (public.rls_project(project_id))
+  WITH CHECK (public.rls_project(project_id));
+
+GRANT ALL ON TABLE grida_ciam.portal_preset TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.portal_preset]
+-- Public-facing view
+---------------------------------------------------------------------
+
+CREATE VIEW grida_ciam_public.portal_preset
+WITH (security_invoker = true)
+AS
+SELECT
+  id,
+  created_at,
+  updated_at,
+  project_id,
+  name,
+  is_primary,
+  verification_email_template,
+  portal_login_page
+FROM grida_ciam.portal_preset;
+
+GRANT ALL ON TABLE grida_ciam_public.portal_preset TO anon, authenticated, service_role;
+
+---------------------------------------------------------------------
+-- [grida_ciam_public.set_primary_portal_preset]
+-- Atomically sets one preset as primary for a project.
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION grida_ciam_public.set_primary_portal_preset(
+  p_project_id bigint,
+  p_preset_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+BEGIN
+  IF NOT public.rls_project(p_project_id) THEN
+    RAISE EXCEPTION 'access denied';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM grida_ciam.portal_preset
+    WHERE id = p_preset_id AND project_id = p_project_id
+  ) THEN
+    RAISE EXCEPTION 'preset not found';
+  END IF;
+
+  UPDATE grida_ciam.portal_preset
+  SET is_primary = false
+  WHERE project_id = p_project_id AND is_primary = true;
+
+  UPDATE grida_ciam.portal_preset
+  SET is_primary = true
+  WHERE id = p_preset_id;
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION grida_ciam_public.set_primary_portal_preset(bigint, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION grida_ciam_public.set_primary_portal_preset(bigint, uuid)
+  TO authenticated, service_role;

@@ -1,7 +1,22 @@
 "use client";
 
 import React from "react";
+import {
+  ArchiveIcon,
+  ForwardIcon,
+  ReplyIcon,
+  StarIcon,
+  TrashIcon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { Safari, SafariToolbar } from "@/components/frames/safari";
+import {
+  EmailFrame,
+  EmailFrameSubject,
+  EmailFrameSender,
+  EmailFrameBody,
+} from "@/components/frames/email-frame";
 
 export default function FramesPage() {
   return (
@@ -164,6 +179,88 @@ export default function FramesPage() {
           </div>
           <div className="grid grid-cols-1 gap-4">
             <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-2">Email Frame (composable)</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Composable email preview: EmailFrame, Subject, Sender, Body.
+                Used inside Mail App Frame and standalone.
+              </p>
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    With actions
+                  </p>
+                  <EmailFrame>
+                    <EmailFrameSubject
+                      actions={
+                        <>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <ReplyIcon className="h-3.5 w-3.5" />
+                            <span className="sr-only">Reply</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <ForwardIcon className="h-3.5 w-3.5" />
+                            <span className="sr-only">Forward</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <ArchiveIcon className="h-3.5 w-3.5" />
+                            <span className="sr-only">Archive</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <TrashIcon className="h-3.5 w-3.5" />
+                            <span className="sr-only">Delete</span>
+                          </Button>
+                        </>
+                      }
+                    >
+                      Your invoice for January 2026
+                    </EmailFrameSubject>
+                    <EmailFrameSender
+                      name="Sarah Chen"
+                      email="sarah@acme.co"
+                      to="me"
+                      date="Jan 31, 2026"
+                    />
+                    <EmailFrameBody>
+                      <p>Hi there,</p>
+                      <p className="mt-3">
+                        Please find attached your invoice for January 2026. The
+                        total amount due is $2,400.00 and payment is due by
+                        February 15, 2026.
+                      </p>
+                      <p className="mt-3">
+                        If you have any questions about this invoice, feel free
+                        to reply to this email or reach out to our billing team.
+                      </p>
+                      <p className="mt-3">
+                        Best regards,
+                        <br />
+                        Sarah Chen
+                      </p>
+                    </EmailFrameBody>
+                  </EmailFrame>
+                </div>
+                <Separator />
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Minimal
+                  </p>
+                  <EmailFrame>
+                    <EmailFrameSender
+                      name="GitHub"
+                      email="noreply@github.com"
+                      date="2h ago"
+                    />
+                    <EmailFrameBody>
+                      <p className="text-muted-foreground">
+                        [acme/dashboard] Pull request #142 was merged by
+                        @sarah-chen.
+                      </p>
+                    </EmailFrameBody>
+                  </EmailFrame>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border rounded-lg">
               <h3 className="font-semibold mb-2">Safari</h3>
               <p className="text-sm text-gray-600 mb-4">
                 macOS Safari browser frame with realistic chrome
@@ -173,11 +270,95 @@ export default function FramesPage() {
                 <div className="w-full h-full bg-gradient-to-br from-indigo-50 to-pink-50" />
               </Safari>
             </div>
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-2">Mail (email preview)</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Email frame for previewing email templates
+              </p>
+              <div className="h-96 overflow-hidden rounded-lg border">
+                <EmailFrame className="h-full flex flex-col">
+                  <EmailFrameSubject>Your verification code</EmailFrameSubject>
+                  <EmailFrameSender
+                    name="Acme Support"
+                    email="no-reply@acme.co"
+                    date="Just now"
+                  />
+                  <EmailFrameBody className="prose prose-stone dark:prose-invert max-w-none">
+                    <h2>Your verification code</h2>
+                    <p>
+                      Hi Alice, use the following code to verify your identity:
+                    </p>
+                    <p
+                      style={{
+                        fontSize: "2rem",
+                        fontWeight: "bold",
+                        letterSpacing: "0.25em",
+                      }}
+                    >
+                      123456
+                    </p>
+                    <p>This code expires in 10 minutes.</p>
+                    <hr />
+                    <p>
+                      If you did not request this, you can safely ignore this
+                      email.
+                    </p>
+                  </EmailFrameBody>
+                </EmailFrame>
+              </div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-2">
+                Mail (long content, scrollable)
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Email body scrolls when content exceeds the frame height
+              </p>
+              <div className="h-96 overflow-hidden rounded-lg border">
+                <EmailFrame className="h-full flex flex-col">
+                  <EmailFrameSubject>Thanks for your submission</EmailFrameSubject>
+                  <EmailFrameSender
+                    name="Grida Forms"
+                    email="no-reply@accounts.grida.co"
+                    date="Just now"
+                  />
+                  <EmailFrameBody className="prose prose-stone dark:prose-invert max-w-none">
+                    <h2>Thanks for registering!</h2>
+                    <p>We received your submission for the Annual Conference.</p>
+                    <p>Your registration number: #042</p>
+                    <h3>What happens next?</h3>
+                    <ul>
+                      <li>You will receive a confirmation email within 24 hours</li>
+                      <li>Our team will review your application</li>
+                      <li>If approved, you will get your ticket via email</li>
+                    </ul>
+                    <h3>Event details</h3>
+                    <p>
+                      Date: March 15, 2026
+                      <br />
+                      Location: Convention Center, Hall A<br />
+                      Time: 9:00 AM - 5:00 PM
+                    </p>
+                    <h3>Important notes</h3>
+                    <p>
+                      Please bring a valid ID and your ticket (digital or printed)
+                      to the event. Doors open at 8:30 AM for registration.
+                    </p>
+                    <p>
+                      If you have any dietary requirements, please let us know at
+                      least 48 hours before the event.
+                    </p>
+                    <p>We look forward to seeing you there!</p>
+                    <hr />
+                    <p style={{ fontSize: "0.75rem", color: "#666" }}>
+                      This is an automated message. If you did not submit this
+                      form, please contact support@example.com.
+                    </p>
+                  </EmailFrameBody>
+                </EmailFrame>
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-gray-500 italic">
-            More frame styles (Mail, Messages, etc.) are available in the
-            components library.
-          </p>
         </section>
       </div>
     </main>

@@ -1,69 +1,22 @@
 "use client";
 
 import React, { useState } from "react";
-import { UserCheck2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
-import { Spinner } from "@/components/ui/spinner";
-import { template } from "@/utils/template";
+import { PortalLoginView } from "@/theme/templates/portal-login/202602-default/portal-login-view";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import type { PortalPresetLoginPage } from "@app/database";
 
 type Step = "email" | "otp";
 
-const dictionary = {
-  en: {
-    title: "Log in to manage your account",
-    description:
-      "Enter your email and we will send you a verification code directly to your customer portal.",
-    email: "Email",
-    continue_with_email: "Continue with Email",
-    sending: "Sending...",
-    verification: "Verification",
-    verification_description:
-      "If you have an account, We have sent a code to <strong>{email}</strong>. Enter it below.",
-    verifying: "Verifying...",
-    back: "← Back",
-  },
-  ko: {
-    // TODO: This is enterprise-specific copy. Replace hardcoding with a proper
-    // template/i18n engine (e.g. template variables per tenant/campaign).
-    // title: "계속 하려면 로그인하세요",
-    title: "Polestar 추천 프로그램 로그인", // TODO: remove
-    // description: "이메일을 입력하시면 고객 포털 인증 코드를 보내드립니다.",
-    description:
-      "Polestar 차량 구매 시 사용하신 Polestar ID (이메일 주소)를 입력하여 로그인하세요.", // TODO: remove
-    email: "이메일",
-    continue_with_email: "이메일로 계속하기",
-    sending: "전송중...",
-    verification: "인증하기",
-    verification_description:
-      "입력하신 <strong>{email}</strong>로 인증 코드를 발송하였습니다. 아래에 입력해 주세요. 코드를 수신하지 못한 경우, 정확한 이메일을 입력하였는지 다시 한 번 확인해 주세요.",
-    verifying: "인증중...",
-    back: "← 뒤로",
-  },
-};
-
-interface CustomerPropsMinimalCustomizationProps {
+interface PortalLoginProps {
   locale?: string;
+  overrides?: PortalPresetLoginPage | null;
 }
 
 export default function PortalLogin({
   locale = "en",
-}: CustomerPropsMinimalCustomizationProps) {
+  overrides,
+}: PortalLoginProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -81,8 +34,6 @@ export default function PortalLogin({
     const json = await res.json().catch(() => ({}));
     return {
       ok: res.ok,
-      // Note: endpoint returns ok even when the email isn't registered.
-      // We store challenge_id if present, but do not depend on it for the email step UI.
       challenge_id: (json as any)?.challenge_id as string | undefined,
     };
   };
@@ -97,14 +48,13 @@ export default function PortalLogin({
     }
 
     setIsLoading(true);
-    sendEmail?.(email)
+    sendEmail(email)
       .then(({ ok, challenge_id }) => {
         if (ok) {
           setChallengeId(challenge_id ?? null);
           setStep("otp");
         } else {
           toast.error("Something went wrong");
-          return;
         }
       })
       .finally(() => {
@@ -116,9 +66,6 @@ export default function PortalLogin({
     setIsLoading(true);
     setError("");
 
-    // CIAM flow:
-    // Customer portal access is verified via CIAM OTP challenge verification.
-    // This intentionally does NOT use Supabase Auth.
     if (!challengeId) {
       setIsLoading(false);
       setError("Invalid or expired OTP");
@@ -151,127 +98,19 @@ export default function PortalLogin({
     router.replace(session_url);
   };
 
-  const t = dictionary[locale as keyof typeof dictionary];
-
   return (
-    <div className="flex flex-col gap-6">
-      {step === "email" && (
-        <form onSubmit={handleEmail}>
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col items-center gap-2">
-              <div className="flex flex-col items-center gap-2 font-medium">
-                <div className="flex size-8 items-center justify-center rounded-md">
-                  <UserCheck2Icon className="size-6" />
-                </div>
-              </div>
-              <h1 className="text-xl font-bold">{t.title}</h1>
-              <div className="text-center text-sm">
-                <span className="text-muted-foreground">{t.description}</span>
-              </div>
-            </div>
-            <div className="flex flex-col gap-6">
-              <Field>
-                <FieldLabel htmlFor="email">{t.email}</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
-                  required
-                />
-              </Field>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? t.sending : t.continue_with_email}
-              </Button>
-            </div>
-          </div>
-        </form>
-      )}
-      {step === "otp" && (
-        <Card className="w-full max-w-md border-none bg-transparent shadow-none">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">
-              {t.verification}
-            </CardTitle>
-            <CardDescription className="max-w-xs">
-              <span className="text-sm text-muted-foreground">
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: template(t.verification_description, { email }),
-                  }}
-                />
-              </span>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <OTP disabled={isLoading} onComplete={handleOtp} />
-
-            {error && (
-              <div className="mt-4">
-                <span className="text-destructive text-sm">{error}</span>
-              </div>
-            )}
-
-            <div className="mt-4">
-              <Button
-                variant="link"
-                className="px-0 text-muted-foreground"
-                disabled={isLoading}
-                onClick={() => setStep("email")}
-              >
-                {isLoading ? (
-                  <>
-                    <Spinner className="me-2" />
-                    {t.verifying}
-                  </>
-                ) : (
-                  <>{t.back}</>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function OTP({
-  disabled,
-  onComplete,
-}: {
-  disabled?: boolean;
-  onComplete?: (otp: string) => void;
-}) {
-  return (
-    <InputOTP
-      maxLength={6}
-      disabled={disabled}
-      inputMode="numeric"
-      onComplete={(otp) => {
-        onComplete?.(otp);
-      }}
-    >
-      <InputOTPGroup>
-        <InputOTPSlot index={0} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={1} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={2} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={3} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={4} />
-      </InputOTPGroup>
-      <InputOTPGroup>
-        <InputOTPSlot index={5} />
-      </InputOTPGroup>
-    </InputOTP>
+    <PortalLoginView
+      overrides={overrides}
+      step={step}
+      locale={locale}
+      viewOnly={false}
+      email={email}
+      onEmailChange={setEmail}
+      onEmailSubmit={handleEmail}
+      isLoading={isLoading}
+      onOtpComplete={handleOtp}
+      onBack={() => setStep("email")}
+      error={error}
+    />
   );
 }

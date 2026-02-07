@@ -49,6 +49,40 @@ export type FormNotificationRespondentEmailConfig = {
   reply_to?: string | null;
 };
 
+/**
+ * `grida_ciam.portal_preset.verification_email_template`
+ *
+ * DB-enforced JSON schema (same shape as FormNotificationRespondentEmailConfig).
+ */
+export type PortalPresetVerificationEmailTemplate = {
+  enabled?: boolean;
+  from_name?: string | null;
+  subject_template?: string | null;
+  body_html_template?: string | null;
+  reply_to?: string | null;
+};
+
+/**
+ * `grida_ciam.portal_preset.portal_login_page`
+ *
+ * DB-enforced JSON schema for login page text overrides.
+ *
+ * The required `template_id` discriminator allows future schema revisions:
+ * introduce a new template_id value (e.g. "202607-v2") with its own shape,
+ * add it to the union, and the old DB constraint will reject stale rows,
+ * forcing an explicit data migration.
+ */
+export type PortalPresetLoginPage = PortalPresetLoginPage_202602Default;
+
+export type PortalPresetLoginPage_202602Default = {
+  template_id: "202602-default";
+  email_step_title?: string | null;
+  email_step_description?: string | null;
+  email_step_button_label?: string | null;
+  otp_step_title?: string | null;
+  otp_step_description?: string | null;
+};
+
 // Override the type for a specific column in a view:
 export type Database = MergeDeep<
   DatabaseGenerated,
@@ -72,6 +106,22 @@ export type Database = MergeDeep<
            */
           Insert: DatabaseGenerated["public"]["Tables"]["customer"]["Insert"] & {
             tags?: string[] | null;
+          };
+        };
+        portal_preset: {
+          // View mirrors the table 1:1; reference the table type and only
+          // narrow the two JSONB columns from Json to their enforced shapes.
+          Row: Omit<DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Row"], "verification_email_template" | "portal_login_page"> & {
+            verification_email_template: PortalPresetVerificationEmailTemplate;
+            portal_login_page: PortalPresetLoginPage;
+          };
+          Insert: Omit<DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Insert"], "verification_email_template" | "portal_login_page"> & {
+            verification_email_template?: PortalPresetVerificationEmailTemplate;
+            portal_login_page?: PortalPresetLoginPage;
+          };
+          Update: Omit<DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Update"], "verification_email_template" | "portal_login_page"> & {
+            verification_email_template?: PortalPresetVerificationEmailTemplate;
+            portal_login_page?: PortalPresetLoginPage;
           };
         };
       };

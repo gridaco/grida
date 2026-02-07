@@ -24,6 +24,7 @@ export type ControlledField<T> =
       value: T;
       onValueChange: (value: T) => void;
       disabled?: boolean;
+      placeholder?: string;
     };
 
 export type EmailTemplateAuthoringKitProps = {
@@ -50,16 +51,15 @@ export type EmailTemplateAuthoringKitProps = {
 function renderRow({
   label,
   field,
-  placeholder,
 }: {
   label: string;
   field: ControlledField<string>;
-  placeholder?: string;
 }) {
   if (field.state === "off") return null;
 
   const disabled =
     field.state === "disabled" ? true : Boolean(field.disabled);
+  const placeholder = field.state === "on" ? field.placeholder : undefined;
 
   return (
     <InputGroup
@@ -83,17 +83,12 @@ function renderRow({
   );
 }
 
-function renderBody({
-  field,
-  placeholder,
-}: {
-  field: ControlledField<string>;
-  placeholder?: string;
-}) {
+function renderBody({ field }: { field: ControlledField<string> }) {
   if (field.state === "off") return null;
 
   const disabled =
     field.state === "disabled" ? true : Boolean(field.disabled);
+  const placeholder = field.state === "on" ? field.placeholder : undefined;
 
   return (
     <InputGroup className="rounded-none rounded-b-md border-0 border-t">
@@ -129,34 +124,12 @@ export function EmailTemplateAuthoringKit({
       {notice}
 
       <div className="rounded-md border">
-        {renderRow({
-          label: "To:",
-          field: fields.to,
-        })}
-        {renderRow({
-          label: "Reply to:",
-          field: fields.replyTo,
-          placeholder: "support@yourdomain.com",
-        })}
-        {renderRow({
-          label: "Subject:",
-          field: fields.subject,
-          placeholder: "Thanks, {{fields.first_name}}",
-        })}
-        {renderRow({
-          label: "From name:",
-          field: fields.fromName,
-          placeholder: "Grida Forms",
-        })}
-        {renderRow({
-          label: "From:",
-          field: fields.from,
-        })}
-        {renderBody({
-          field: fields.bodyHtml,
-          placeholder:
-            "<h1>Thanks</h1>\n<p>We received your submission for {{form_title}}.</p>",
-        })}
+        {renderRow({ label: "To:", field: fields.to })}
+        {renderRow({ label: "Reply to:", field: fields.replyTo })}
+        {renderRow({ label: "Subject:", field: fields.subject })}
+        {renderRow({ label: "From name:", field: fields.fromName })}
+        {renderRow({ label: "From:", field: fields.from })}
+        {renderBody({ field: fields.bodyHtml })}
       </div>
 
       {helper}

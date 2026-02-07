@@ -9,6 +9,10 @@ import TenantCustomerPortalAccessEmailVerification, {
 import { otp6 } from "@/lib/crypto/otp";
 import { select_lang } from "@/i18n/utils";
 import { getLocale } from "@/i18n/server";
+import { renderPortalVerificationEmail } from "@/services/ciam/portal-verification-email";
+import type { PortalPresetVerificationEmailTemplate } from "@app/database";
+import { sanitize_email_display_name } from "@/utils/sanitize";
+
 // TODO: add rate limiting
 export async function POST(
   req: NextRequest,
@@ -133,29 +137,81 @@ export async function POST(
       : undefined;
   const brand_support_contact = publisher.includes("@") ? publisher : undefined;
 
-  // Prefer the visitor's device language. If unsupported, fall back to the tenant default.
-  const fallback_lang = select_lang(www.lang, supported_languages, "en");
-  const emailLang: CustomerPortalVerificationEmailLang = await getLocale(
-    [...supported_languages],
-    fallback_lang
-  );
+  // Check for a primary portal preset with a custom email template.
+  const { data: preset_list } = await service_role.ciam
+    .from("portal_preset")
+    .select("verification_email_template")
+    .eq("project_id", projectId)
+    .eq("is_primary", true)
+    .limit(1);
 
-  const { error: resend_err } = await resend.emails.send({
-    from: `${brand_name} <no-reply@accounts.grida.co>`,
-    to: emailNormalized,
-    subject: subject(emailLang, {
-      brand_name,
-      email_otp: otp,
-    }),
-    react: TenantCustomerPortalAccessEmailVerification({
-      email_otp: otp,
-      customer_name: customer.name ?? undefined,
-      brand_name: brand_name,
-      brand_support_url,
-      brand_support_contact,
-      lang: emailLang,
-    }),
-  });
+  const preset_template: PortalPresetVerificationEmailTemplate | null =
+    preset_list && preset_list.length > 0
+      ? (preset_list[0]
+          .verification_email_template as PortalPresetVerificationEmailTemplate)
+      : null;
+
+  const useCustomTemplate =
+    preset_template?.enabled &&
+    typeof preset_template.body_html_template === "string" &&
+    preset_template.body_html_template.trim().length > 0;
+
+  let resend_err: Error | null = null;
+
+  if (useCustomTemplate) {
+    // Admin-authored HTML template via Handlebars.
+    const { subject: renderedSubject, html } = renderPortalVerificationEmail({
+      subject_template: preset_template.subject_template ?? null,
+      body_html_template: preset_template.body_html_template!,
+      context: {
+        email_otp: otp,
+        brand_name,
+        customer_name: customer.name ?? undefined,
+        expires_in_minutes,
+        brand_support_url,
+        brand_support_contact,
+      },
+    });
+
+    const fromName = sanitize_email_display_name(
+      preset_template.from_name?.trim() || brand_name
+    );
+    const replyTo = preset_template.reply_to?.trim() || undefined;
+
+    const { error } = await resend.emails.send({
+      from: `${fromName} <no-reply@accounts.grida.co>`,
+      to: emailNormalized,
+      subject: renderedSubject,
+      html,
+      ...(replyTo ? { replyTo } : {}),
+    });
+    resend_err = error;
+  } else {
+    // Default React Email template.
+    const fallback_lang = select_lang(www.lang, supported_languages, "en");
+    const emailLang: CustomerPortalVerificationEmailLang = await getLocale(
+      [...supported_languages],
+      fallback_lang
+    );
+
+    const { error } = await resend.emails.send({
+      from: `${sanitize_email_display_name(brand_name)} <no-reply@accounts.grida.co>`,
+      to: emailNormalized,
+      subject: subject(emailLang, {
+        brand_name,
+        email_otp: otp,
+      }),
+      react: TenantCustomerPortalAccessEmailVerification({
+        email_otp: otp,
+        customer_name: customer.name ?? undefined,
+        brand_name: brand_name,
+        brand_support_url,
+        brand_support_contact,
+        lang: emailLang,
+      }),
+    });
+    resend_err = error;
+  }
 
   if (resend_err) {
     console.error("[portal]/error while sending email", resend_err, email);

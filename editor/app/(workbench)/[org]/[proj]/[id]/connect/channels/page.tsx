@@ -1,17 +1,11 @@
 "use client";
 
-import { BirdLogo, KakaoTalkLogo, WhatsAppLogo } from "@/components/logos";
+import { useMemo, useState, type ReactNode } from "react";
+import React from "react";
 import Link from "next/link";
-import {
-  PreferenceBody,
-  PreferenceBox,
-  PreferenceBoxHeader,
-  Sector,
-  SectorBlocks,
-  SectorDescription,
-  SectorHeader,
-  SectorHeading,
-} from "@/components/preferences";
+import { toast } from "sonner";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { BirdLogo, KakaoTalkLogo, WhatsAppLogo } from "@/components/logos";
 import {
   Table,
   TableBody,
@@ -51,56 +45,347 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
-import { toast } from "sonner";
-import React from "react";
+import { Switch } from "@/components/ui/switch";
+import { Spinner } from "@/components/ui/spinner";
+import { Separator } from "@/components/ui/separator";
 import { MessageCircleIcon } from "lucide-react";
 import { useEditorState } from "@/scaffolds/editor";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { NotificationRespondentEmailPreferences } from "@/scaffolds/settings/notification-respondent-email-preferences";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
+import { PrivateEditorApi } from "@/lib/private";
+import { EmailTemplateAuthoringKit } from "@/kits/email-template-authoring";
+import {
+  EmailFrame,
+  EmailFrameSubject,
+  EmailFrameSender,
+  EmailFrameBody,
+} from "@/components/frames/email-frame";
 
 const SMS_DEFAULT_ORIGINATOR = process.env
   .NEXT_PUBLIC_BIRD_SMS_DEFAULT_ORIGINATOR as string;
 
+function ControlsPreviewLayout({
+  controls,
+  preview,
+}: {
+  controls: ReactNode;
+  preview?: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[4fr_6fr] gap-0 min-h-0">
+      <div className="py-10 pr-8">{controls}</div>
+      <div className="py-10 pl-8 pr-8 bg-muted/40 rounded-r-lg">
+        {preview ?? null}
+      </div>
+    </div>
+  );
+}
+
+type EmailFormValues = {
+  enabled: boolean;
+  from_name: string | null;
+  subject_template: string | null;
+  body_html_template: string | null;
+  reply_to: string | null;
+};
+
 export default function ConnectChannels() {
-  const [state] = useEditorState();
+  const [state, dispatch] = useEditorState();
   const { form } = state;
 
+  const isCiamEnabled = useMemo(() => {
+    return form.fields.some((f) => f.type === "challenge_email");
+  }, [form.fields]);
+
+  const emailInitial = form.notification_respondent_email;
+
+  const emailForm = useForm<EmailFormValues>({
+    defaultValues: {
+      enabled: emailInitial.enabled,
+      from_name: emailInitial.from_name,
+      subject_template: emailInitial.subject_template,
+      body_html_template: emailInitial.body_html_template,
+      reply_to: emailInitial.reply_to,
+    },
+  });
+
+  const {
+    handleSubmit: handleEmailSubmit,
+    control: emailControl,
+    setValue: setEmailValue,
+    formState: { isSubmitting: emailSubmitting, isDirty: emailDirty },
+    reset: resetEmail,
+  } = emailForm;
+
+  const emailEnabled = useWatch({ control: emailControl, name: "enabled" });
+  const reply_to = useWatch({ control: emailControl, name: "reply_to" });
+  const from_name = useWatch({ control: emailControl, name: "from_name" });
+  const subject_template = useWatch({
+    control: emailControl,
+    name: "subject_template",
+  });
+  const body_html_template = useWatch({
+    control: emailControl,
+    name: "body_html_template",
+  });
+
+  const onEmailSubmit = async (data: EmailFormValues) => {
+    const req = PrivateEditorApi.Settings.updateNotificationRespondentEmail({
+      form_id: form.form_id,
+      enabled: data.enabled,
+      from_name: data.from_name,
+      subject_template: data.subject_template,
+      body_html_template: data.body_html_template,
+      reply_to: data.reply_to,
+    }).then(() => {
+      dispatch({
+        type: "editor/form/notification_respondent_email/preferences",
+        enabled: data.enabled,
+        from_name: data.from_name,
+        subject_template: data.subject_template,
+        body_html_template: data.body_html_template,
+        reply_to: data.reply_to,
+      });
+    });
+
+    try {
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
+      resetEmail(data);
+    } catch {
+      // toast.promise handles UI
+    }
+  };
+
+  const emailInputDisabled = !emailEnabled || !isCiamEnabled;
+
   return (
-    <main className="max-w-2xl mx-auto">
-      <Sector>
-        <SectorHeader>
-          <SectorHeading>
+    <div className="container mx-auto max-w-7xl">
+        <header className="py-10">
+          <h1 className="text-2xl font-black">
             Channels
             <Badge className="ms-2 align-middle">Pro</Badge>
-          </SectorHeading>
-          <SectorDescription>
+          </h1>
+          <p className="text-muted-foreground mt-1">
             Connect with your customers through SMS and Email.
-          </SectorDescription>
-        </SectorHeader>
-        <SectorBlocks>
-          <NotificationRespondentEmailPreferences />
-          <PreferenceBox disabled>
-            <PreferenceBoxHeader
-              heading={
-                <>
+          </p>
+        </header>
+
+        <div className="space-y-0 pb-20">
+          {/* Email notifications */}
+          <ControlsPreviewLayout
+            controls={
+              <FieldSet className="space-y-4">
+                <Field
+                  orientation="horizontal"
+                  className="flex-row items-center justify-between gap-4"
+                >
+                  <FieldLegend variant="legend">
+                    Respondent Email Notifications
+                    <Badge className="ms-2 align-middle">Pro</Badge>
+                  </FieldLegend>
+                  <Controller
+                    name="enabled"
+                    control={emailControl}
+                    render={({ field }) => (
+                      <Switch
+                        id="notification-respondent-email-enabled"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={!isCiamEnabled}
+                      />
+                    )}
+                  />
+                </Field>
+                <FieldDescription>
+                  Send a confirmation email after a successful submission (CIAM
+                  / verified email only).
+                </FieldDescription>
+                {emailEnabled ? (
+                  <form
+                    id="notification-respondent-email"
+                    onSubmit={handleEmailSubmit(onEmailSubmit)}
+                    className="space-y-4"
+                  >
+                    <EmailTemplateAuthoringKit
+                      notice={
+                        !isCiamEnabled ? (
+                          <FieldDescription>
+                            This notification requires CIAM email verification.
+                            Add a <code>challenge_email</code> field to enable
+                            verified respondent email sending.
+                          </FieldDescription>
+                        ) : null
+                      }
+                      helper={
+                        <FieldDescription>
+                          Supported variables: <code>{`{{form_title}}`}</code>,{" "}
+                          <code>{`{{response.idx}}`}</code>,{" "}
+                          <code>{`{{fields.<field_name>}}`}</code>.
+                        </FieldDescription>
+                      }
+                      fields={{
+                        to: {
+                          state: "disabled",
+                          value: "Respondent (verified email)",
+                        },
+                        replyTo: {
+                          state: "on",
+                          value: reply_to ?? "",
+                          disabled: emailInputDisabled,
+                          placeholder: "support@yourdomain.com",
+                          onValueChange: (v: string) =>
+                            setEmailValue("reply_to", v || null, {
+                              shouldDirty: true,
+                            }),
+                        },
+                        subject: {
+                          state: "on",
+                          value: subject_template ?? "",
+                          disabled: emailInputDisabled,
+                          placeholder: "Thanks, {{fields.first_name}}",
+                          onValueChange: (v: string) =>
+                            setEmailValue("subject_template", v || null, {
+                              shouldDirty: true,
+                            }),
+                        },
+                        fromName: {
+                          state: "on",
+                          value: from_name ?? "",
+                          disabled: emailInputDisabled,
+                          placeholder: "Grida Forms",
+                          onValueChange: (v: string) =>
+                            setEmailValue("from_name", v || null, {
+                              shouldDirty: true,
+                            }),
+                        },
+                        from: {
+                          state: "disabled",
+                          value: `${from_name?.trim() || "Grida Forms"} <no-reply@accounts.grida.co>`,
+                        },
+                        bodyHtml: {
+                          state: "on",
+                          value: body_html_template ?? "",
+                          disabled: emailInputDisabled,
+                          placeholder:
+                            "<h1>Thanks</h1>\n<p>We received your submission for {{form_title}}.</p>",
+                          onValueChange: (v: string) =>
+                            setEmailValue("body_html_template", v || null, {
+                              shouldDirty: true,
+                            }),
+                        },
+                      }}
+                    />
+                    <Button
+                      form="notification-respondent-email"
+                      type="submit"
+                      disabled={
+                        emailSubmitting || !emailDirty || !isCiamEnabled
+                      }
+                    >
+                      {emailSubmitting ? <Spinner /> : "Save"}
+                    </Button>
+                  </form>
+                ) : (
+                  <FieldGroup className="space-y-4">
+                    <FieldDescription>
+                      Enable the toggle above to customize the respondent email
+                      notification.
+                    </FieldDescription>
+                    <Button
+                      disabled={
+                        emailSubmitting || !emailDirty || !isCiamEnabled
+                      }
+                      onClick={handleEmailSubmit(onEmailSubmit)}
+                    >
+                      {emailSubmitting ? <Spinner /> : "Save"}
+                    </Button>
+                  </FieldGroup>
+                )}
+              </FieldSet>
+            }
+            preview={
+              <div className="w-full aspect-video overflow-hidden rounded-lg border bg-background">
+                <EmailFrame className="h-full flex flex-col">
+                  <EmailFrameSubject>
+                    {subject_template?.trim() ||
+                      "Your submission has been received"}
+                  </EmailFrameSubject>
+                  <EmailFrameSender
+                    name={from_name?.trim() || "Grida Forms"}
+                    email="no-reply@accounts.grida.co"
+                    date="Just now"
+                  />
+                  <EmailFrameBody className="prose prose-stone dark:prose-invert max-w-none">
+                    {body_html_template?.trim() ? (
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: body_html_template,
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <p>Thanks for your submission.</p>
+                        <p>
+                          Tip: add a body HTML template below to preview the
+                          email content here.
+                        </p>
+                      </>
+                    )}
+                  </EmailFrameBody>
+                </EmailFrame>
+              </div>
+            }
+          />
+
+          <Separator />
+
+          {/* SMS notifications */}
+          <ControlsPreviewLayout
+            controls={
+              <FieldSet className="space-y-4 pointer-events-none opacity-60">
+                <FieldLegend variant="legend">
                   <MessageCircleIcon className="inline me-2 size-5 align-middle" />
                   SMS Notifications
                   <Badge variant="outline" className="ms-2 align-middle">
                     Coming soon
                   </Badge>
-                </>
-              }
-              description={
-                <>
+                </FieldLegend>
+                <FieldDescription>
                   SMS notifications are not ready yet. This section is currently
                   disabled.
-                </>
-              }
-            />
-            <PreferenceBody>
-              <div className="pointer-events-none">
-                <div className="max-w-sm max-h-96 rounded-3xl border-4 overflow-hidden">
+                </FieldDescription>
+                <Field>
+                  <FieldLabel htmlFor="originator">Originator</FieldLabel>
+                  <Select name="originator" defaultValue="default">
+                    <SelectTrigger id="originator">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">
+                        {SMS_DEFAULT_ORIGINATOR} (default)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <div className="space-y-4">
+                  <AboutSMSFees />
+                  <TestSMS form_id={form.form_id} />
+                </div>
+              </FieldSet>
+            }
+            preview={
+              <div className="pointer-events-none opacity-60 flex justify-center">
+                <div className="w-full max-w-xs aspect-[9/16] rounded-3xl border-4 overflow-hidden">
                   <MessageAppFrame
                     hideInput
                     sender={{
@@ -120,63 +405,51 @@ export default function ConnectChannels() {
                     ]}
                   />
                 </div>
-                <section className="py-5">
-                  <Field>
-                    <FieldLabel htmlFor="originator">Originator</FieldLabel>
-                    <Select name="originator" defaultValue="default">
-                      <SelectTrigger id="originator">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">
-                          {SMS_DEFAULT_ORIGINATOR} (default)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                </section>
-                <section className="my-10">
-                  <AboutSMSFees />
-                  <TestSMS form_id={form.form_id} />
-                </section>
               </div>
-            </PreferenceBody>
-          </PreferenceBox>
-          <PreferenceBox>
-            <PreferenceBoxHeader
-              heading={
-                <>
+            }
+          />
+
+          <Separator />
+
+          {/* WhatsApp */}
+          <ControlsPreviewLayout
+            controls={
+              <FieldSet className="space-y-2">
+                <FieldLegend variant="legend">
                   <WhatsAppLogo className="inline me-2 size-5 align-middle" />
                   WhatsApp
                   <Badge variant="outline" className="ms-2 align-middle">
                     Add-on
                   </Badge>
-                </>
-              }
-            />
-            <PreferenceBody>
-              Contact us to enable WhatsApp for your project.
-            </PreferenceBody>
-          </PreferenceBox>
-          <PreferenceBox>
-            <PreferenceBoxHeader
-              heading={
-                <>
+                </FieldLegend>
+                <FieldDescription>
+                  Contact us to enable WhatsApp for your project.
+                </FieldDescription>
+              </FieldSet>
+            }
+          />
+
+          <Separator />
+
+          {/* Kakao Talk */}
+          <ControlsPreviewLayout
+            controls={
+              <FieldSet className="space-y-2">
+                <FieldLegend variant="legend">
                   <KakaoTalkLogo className="inline me-2 size-5 align-middle" />
                   Kakao Talk
                   <Badge variant="outline" className="ms-2 align-middle">
                     Enterprise
                   </Badge>
-                </>
-              }
-            />
-            <PreferenceBody>
-              Contact us to enable Kakao Talk for your enterprise account.
-            </PreferenceBody>
-          </PreferenceBox>
-        </SectorBlocks>
-      </Sector>
-    </main>
+                </FieldLegend>
+                <FieldDescription>
+                  Contact us to enable Kakao Talk for your enterprise account.
+                </FieldDescription>
+              </FieldSet>
+            }
+          />
+        </div>
+      </div>
   );
 }
 
