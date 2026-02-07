@@ -119,7 +119,7 @@ export default function PortalPresetsPage() {
         <header className="py-10 flex justify-between items-start">
           <div>
             <span className="flex items-center gap-2 text-2xl font-black select-none">
-              Portal Presets
+              Customer Portal
             </span>
             <p className="text-sm text-muted-foreground mt-1">
               Manage customer portal variants and customize the OTP verification
@@ -135,7 +135,7 @@ export default function PortalPresetsPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create Portal Preset</DialogTitle>
+                <DialogTitle>Create Preset</DialogTitle>
                 <DialogDescription>
                   Give your preset a name. You can configure the email template
                   after creation.

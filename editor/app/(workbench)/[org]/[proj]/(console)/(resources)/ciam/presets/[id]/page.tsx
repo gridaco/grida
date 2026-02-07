@@ -34,9 +34,17 @@ import {
   DeleteConfirmationSnippet,
 } from "@/components/dialogs/delete-confirmation-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { ArrowLeftIcon, StarIcon } from "lucide-react";
+import { ArrowLeftIcon, ExternalLink, StarIcon } from "lucide-react";
 import Link from "next/link";
-import { Label } from "@/components/ui/label";
+import { previewlink } from "@/lib/internal/url";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import type {
   Database,
   PortalPresetVerificationEmailTemplate,
@@ -87,7 +95,7 @@ export default function PortalPresetEditPage() {
 
   // --- Name form (isolated) ---
   const nameForm = useForm<{ name: string }>({
-    values: preset ? { name: preset.name } : undefined,
+    values: preset ? { name: preset.name ?? "" } : undefined,
   });
 
   const onNameSubmit = async (data: { name: string }) => {
@@ -137,7 +145,7 @@ export default function PortalPresetEditPage() {
   const subject_template = useWatch({ control, name: "subject_template" });
   const body_html_template = useWatch({ control, name: "body_html_template" });
 
-  // --- Login page text form (isolated) ---
+  // --- Login page form (isolated) ---
   const loginPageForm = useForm<LoginPageFormValues>({
     values: preset
       ? {
@@ -172,7 +180,7 @@ export default function PortalPresetEditPage() {
     try {
       await toast.promise(req, {
         loading: "Saving...",
-        success: "Login page text saved",
+        success: "Login page saved",
         error: "Failed to save",
       });
       mutate();
@@ -275,7 +283,7 @@ export default function PortalPresetEditPage() {
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeftIcon className="size-3" />
-            Back to Presets
+            Back to Customer Portal
           </Link>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -320,11 +328,20 @@ export default function PortalPresetEditPage() {
                 name="name"
                 control={nameForm.control}
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    placeholder="Preset name"
-                    className="max-w-sm"
-                  />
+                  <FieldSet>
+                    <FieldLegend variant="label">Name</FieldLegend>
+                    <FieldGroup>
+                      <Field className="max-w-sm">
+                        <FieldLabel htmlFor="preset-name">Preset name</FieldLabel>
+                        <Input
+                          id="preset-name"
+                          {...field}
+                          value={field.value ?? ""}
+                          placeholder="Preset name"
+                        />
+                      </Field>
+                    </FieldGroup>
+                  </FieldSet>
                 )}
               />
             </CardContent>
@@ -341,97 +358,127 @@ export default function PortalPresetEditPage() {
             </CardFooter>
           </Card>
 
-          {/* Login page text overrides */}
+          {/* Login page overrides */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Login Page Text</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Override the default text shown on the customer portal login
-                page. Leave a field empty to use the default.
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="text-base">Login Page</CardTitle>
+                <Button variant="ghost" size="sm" asChild className="shrink-0">
+                  <a
+                    href={previewlink({
+                      org: params.org,
+                      proj: params.proj,
+                      path: "/p/login",
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="size-3" />
+                    View
+                  </a>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <form
                 id="portal-preset-login-page"
                 onSubmit={loginPageForm.handleSubmit(onLoginPageSubmit)}
-                className="space-y-6"
               >
-                <fieldset className="space-y-4">
-                  <legend className="text-sm font-medium">Email Step</legend>
-                  <div className="space-y-2">
-                    <Label htmlFor="lp-email-title">Title</Label>
-                    <Controller
-                      name="email_step_title"
-                      control={loginPageForm.control}
-                      render={({ field }) => (
-                        <Input
-                          id="lp-email-title"
-                          {...field}
-                          placeholder="Log in to manage your account"
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lp-email-desc">Description</Label>
-                    <Controller
-                      name="email_step_description"
-                      control={loginPageForm.control}
-                      render={({ field }) => (
-                        <Input
-                          id="lp-email-desc"
-                          {...field}
-                          placeholder="Enter your email and we will send you a verification code..."
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lp-email-btn">Button Label</Label>
-                    <Controller
-                      name="email_step_button_label"
-                      control={loginPageForm.control}
-                      render={({ field }) => (
-                        <Input
-                          id="lp-email-btn"
-                          {...field}
-                          placeholder="Continue with Email"
-                        />
-                      )}
-                    />
-                  </div>
-                </fieldset>
-                <fieldset className="space-y-4">
-                  <legend className="text-sm font-medium">OTP Step</legend>
-                  <div className="space-y-2">
-                    <Label htmlFor="lp-otp-title">Title</Label>
-                    <Controller
-                      name="otp_step_title"
-                      control={loginPageForm.control}
-                      render={({ field }) => (
-                        <Input
-                          id="lp-otp-title"
-                          {...field}
-                          placeholder="Verification"
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lp-otp-desc">Description</Label>
-                    <Controller
-                      name="otp_step_description"
-                      control={loginPageForm.control}
-                      render={({ field }) => (
-                        <Input
-                          id="lp-otp-desc"
-                          {...field}
-                          placeholder="We have sent a code to your email. Enter it below."
-                        />
-                      )}
-                    />
-                  </div>
-                </fieldset>
+                <FieldSet>
+                  <FieldLegend>Login Page</FieldLegend>
+                  <FieldDescription>
+                    Override the default text shown on the customer portal login
+                    page. Leave a field empty to use the default.
+                  </FieldDescription>
+                  <FieldGroup className="flex flex-col gap-6">
+                    <FieldSet>
+                      <FieldLegend>Email Step</FieldLegend>
+                      <FieldGroup>
+                        <Field>
+                          <FieldLabel htmlFor="lp-email-title">Title</FieldLabel>
+                          <Controller
+                            name="email_step_title"
+                            control={loginPageForm.control}
+                            render={({ field }) => (
+                              <Input
+                                id="lp-email-title"
+                                {...field}
+                                value={field.value ?? ""}
+                                placeholder="Log in to manage your account"
+                              />
+                            )}
+                          />
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor="lp-email-desc">Description</FieldLabel>
+                          <Controller
+                            name="email_step_description"
+                            control={loginPageForm.control}
+                            render={({ field }) => (
+                              <Input
+                                id="lp-email-desc"
+                                {...field}
+                                value={field.value ?? ""}
+                                placeholder="Enter your email and we will send you a verification code..."
+                              />
+                            )}
+                          />
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor="lp-email-btn">Button Label</FieldLabel>
+                          <Controller
+                            name="email_step_button_label"
+                            control={loginPageForm.control}
+                            render={({ field }) => (
+                              <Input
+                                id="lp-email-btn"
+                                {...field}
+                                value={field.value ?? ""}
+                                placeholder="Continue with Email"
+                              />
+                            )}
+                          />
+                        </Field>
+                      </FieldGroup>
+                    </FieldSet>
+                    <FieldSet>
+                      <FieldLegend>OTP Step</FieldLegend>
+                      <FieldGroup>
+                        <Field>
+                          <FieldLabel htmlFor="lp-otp-title">Title</FieldLabel>
+                          <Controller
+                            name="otp_step_title"
+                            control={loginPageForm.control}
+                            render={({ field }) => (
+                              <Input
+                                id="lp-otp-title"
+                                {...field}
+                                value={field.value ?? ""}
+                                placeholder="Verification"
+                              />
+                            )}
+                          />
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor="lp-otp-desc">Description</FieldLabel>
+                          <Controller
+                            name="otp_step_description"
+                            control={loginPageForm.control}
+                            render={({ field }) => (
+                              <Input
+                                id="lp-otp-desc"
+                                {...field}
+                                value={field.value ?? ""}
+                                placeholder="We have sent a code to your email. Enter it below."
+                              />
+                            )}
+                          />
+                        </Field>
+                      </FieldGroup>
+                    </FieldSet>
+                  </FieldGroup>
+                </FieldSet>
               </form>
             </CardContent>
             <CardFooter className="flex justify-end">
@@ -459,7 +506,7 @@ export default function PortalPresetEditPage() {
                   control={control}
                   render={({ field }) => (
                     <Switch
-                      checked={field.value}
+                      checked={field.value ?? false}
                       onCheckedChange={field.onChange}
                     />
                   )}
