@@ -7,26 +7,12 @@ import { createBrowserCIAMClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  PreferenceBody,
-  PreferenceBox,
-  PreferenceBoxFooter,
-  PreferenceBoxHeader,
-  PreferenceDescription,
-} from "@/components/preferences";
 import { EmailTemplateAuthoringKit } from "@/kits/email-template-authoring";
 import MailAppFrame from "@/components/frames/mail-app-frame";
 import {
@@ -45,6 +31,11 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Safari, SafariToolbar } from "@/components/frames/safari";
+import { PortalLoginView } from "@/theme/templates/portal-login/202602-default/portal-login-view";
+import { Separator } from "@/components/ui/separator";
+import type { ReactNode } from "react";
 import type {
   Database,
   PortalPresetVerificationEmailTemplate,
@@ -69,6 +60,21 @@ type LoginPageFormValues = {
   otp_step_title: string;
   otp_step_description: string;
 };
+
+function ControlsPreviewLayout({
+  controls,
+  preview,
+}: {
+  controls: ReactNode;
+  preview?: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[4fr_6fr] gap-0 min-h-0">
+      <div className="py-10 pr-8">{controls}</div>
+      <div className="py-10 pl-8 pr-8 bg-muted/40 rounded-r-lg">{preview ?? null}</div>
+    </div>
+  );
+}
 
 export default function PortalPresetEditPage() {
   const params = useParams<{ id: string; org: string; proj: string }>();
@@ -157,6 +163,21 @@ export default function PortalPresetEditPage() {
         }
       : undefined,
   });
+
+  const loginPageOverrides = useWatch({
+    control: loginPageForm.control,
+  });
+  const loginPagePreviewOverrides: PortalPresetLoginPage | null = useMemo(() => {
+    const v = loginPageOverrides;
+    return {
+      template_id: "202602-default",
+      email_step_title: v?.email_step_title?.trim() || null,
+      email_step_description: v?.email_step_description?.trim() || null,
+      email_step_button_label: v?.email_step_button_label?.trim() || null,
+      otp_step_title: v?.otp_step_title?.trim() || null,
+      otp_step_description: v?.otp_step_description?.trim() || null,
+    };
+  }, [loginPageOverrides]);
 
   const onLoginPageSubmit = async (data: LoginPageFormValues) => {
     const loginPage: PortalPresetLoginPage = {
@@ -266,7 +287,7 @@ export default function PortalPresetEditPage() {
   if (isLoading || !preset) {
     return (
       <main className="w-full h-full overflow-y-auto">
-        <div className="container mx-auto max-w-screen-md py-10 space-y-6">
+        <div className="container mx-auto max-w-7xl py-10 space-y-6">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-64 w-full rounded-lg" />
         </div>
@@ -276,7 +297,7 @@ export default function PortalPresetEditPage() {
 
   return (
     <main className="w-full h-full overflow-y-auto">
-      <div className="container mx-auto max-w-screen-md">
+      <div className="container mx-auto max-w-7xl px-4">
         <header className="py-10 space-y-4">
           <Link
             href={basePath}
@@ -317,253 +338,258 @@ export default function PortalPresetEditPage() {
           </div>
         </header>
 
-        <div className="space-y-8 pb-20">
+        <div className="space-y-0 pb-20">
           {/* Preset name */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Preset Name</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Controller
-                name="name"
-                control={nameForm.control}
-                render={({ field }) => (
-                  <FieldSet>
-                    <FieldLegend variant="label">Name</FieldLegend>
-                    <FieldGroup>
-                      <Field className="max-w-sm">
-                        <FieldLabel htmlFor="preset-name">Preset name</FieldLabel>
-                        <Input
-                          id="preset-name"
-                          {...field}
-                          value={field.value ?? ""}
-                          placeholder="Preset name"
-                        />
-                      </Field>
-                    </FieldGroup>
-                  </FieldSet>
-                )}
-              />
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button
-                disabled={
-                  nameForm.formState.isSubmitting ||
-                  !nameForm.formState.isDirty
-                }
-                onClick={nameForm.handleSubmit(onNameSubmit)}
-              >
-                {nameForm.formState.isSubmitting ? <Spinner /> : "Save"}
-              </Button>
-            </CardFooter>
-          </Card>
-
-          {/* Login page overrides */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">Login Page</CardTitle>
-                <Button variant="ghost" size="sm" asChild className="shrink-0">
-                  <a
-                    href={previewlink({
-                      org: params.org,
-                      proj: params.proj,
-                      path: "/p/login",
-                    })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5"
-                  >
-                    <ExternalLink className="size-3" />
-                    View
-                  </a>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <form
-                id="portal-preset-login-page"
-                onSubmit={loginPageForm.handleSubmit(onLoginPageSubmit)}
-              >
-                <FieldSet>
-                  <FieldLegend>Login Page</FieldLegend>
-                  <FieldDescription>
-                    Override the default text shown on the customer portal login
-                    page. Leave a field empty to use the default.
-                  </FieldDescription>
-                  <FieldGroup className="flex flex-col gap-6">
-                    <FieldSet>
-                      <FieldLegend>Email Step</FieldLegend>
-                      <FieldGroup>
-                        <Field>
-                          <FieldLabel htmlFor="lp-email-title">Title</FieldLabel>
-                          <Controller
-                            name="email_step_title"
-                            control={loginPageForm.control}
-                            render={({ field }) => (
-                              <Input
-                                id="lp-email-title"
-                                {...field}
-                                value={field.value ?? ""}
-                                placeholder="Log in to manage your account"
-                              />
-                            )}
-                          />
-                        </Field>
-                        <Field>
-                          <FieldLabel htmlFor="lp-email-desc">Description</FieldLabel>
-                          <Controller
-                            name="email_step_description"
-                            control={loginPageForm.control}
-                            render={({ field }) => (
-                              <Input
-                                id="lp-email-desc"
-                                {...field}
-                                value={field.value ?? ""}
-                                placeholder="Enter your email and we will send you a verification code..."
-                              />
-                            )}
-                          />
-                        </Field>
-                        <Field>
-                          <FieldLabel htmlFor="lp-email-btn">Button Label</FieldLabel>
-                          <Controller
-                            name="email_step_button_label"
-                            control={loginPageForm.control}
-                            render={({ field }) => (
-                              <Input
-                                id="lp-email-btn"
-                                {...field}
-                                value={field.value ?? ""}
-                                placeholder="Continue with Email"
-                              />
-                            )}
-                          />
-                        </Field>
-                      </FieldGroup>
-                    </FieldSet>
-                    <FieldSet>
-                      <FieldLegend>OTP Step</FieldLegend>
-                      <FieldGroup>
-                        <Field>
-                          <FieldLabel htmlFor="lp-otp-title">Title</FieldLabel>
-                          <Controller
-                            name="otp_step_title"
-                            control={loginPageForm.control}
-                            render={({ field }) => (
-                              <Input
-                                id="lp-otp-title"
-                                {...field}
-                                value={field.value ?? ""}
-                                placeholder="Verification"
-                              />
-                            )}
-                          />
-                        </Field>
-                        <Field>
-                          <FieldLabel htmlFor="lp-otp-desc">Description</FieldLabel>
-                          <Controller
-                            name="otp_step_description"
-                            control={loginPageForm.control}
-                            render={({ field }) => (
-                              <Input
-                                id="lp-otp-desc"
-                                {...field}
-                                value={field.value ?? ""}
-                                placeholder="We have sent a code to your email. Enter it below."
-                              />
-                            )}
-                          />
-                        </Field>
-                      </FieldGroup>
-                    </FieldSet>
-                  </FieldGroup>
-                </FieldSet>
-              </form>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button
-                form="portal-preset-login-page"
-                type="submit"
-                disabled={
-                  loginPageForm.formState.isSubmitting ||
-                  !loginPageForm.formState.isDirty
-                }
-              >
-                {loginPageForm.formState.isSubmitting ? <Spinner /> : "Save"}
-              </Button>
-            </CardFooter>
-          </Card>
-
-          {/* Email template */}
-          <PreferenceBox>
-            <PreferenceBoxHeader
-              heading="Verification Email Template"
-              description="Customize the OTP email sent to customers when they log into the customer portal."
-              actions={
+          <ControlsPreviewLayout
+            controls={
+              <FieldSet className="space-y-4">
+                <FieldLegend variant="legend">Preset Name</FieldLegend>
+                <FieldGroup>
                 <Controller
-                  name="enabled"
-                  control={control}
+                  name="name"
+                  control={nameForm.control}
                   render={({ field }) => (
-                    <Switch
-                      checked={field.value ?? false}
-                      onCheckedChange={field.onChange}
-                    />
+                    <FieldSet>
+                      <FieldLegend variant="label">Name</FieldLegend>
+                      <FieldGroup>
+                        <Field className="max-w-sm">
+                          <FieldLabel htmlFor="preset-name">Preset name</FieldLabel>
+                          <Input
+                            id="preset-name"
+                            {...field}
+                            value={field.value ?? ""}
+                            placeholder="Preset name"
+                          />
+                        </Field>
+                      </FieldGroup>
+                    </FieldSet>
                   )}
                 />
-              }
-            />
-            {enabled ? (
-              <>
-                <PreferenceBody>
-                  <div className="h-96 overflow-hidden rounded-3xl border-4 mb-6">
-                    <MailAppFrame
-                      sidebarHidden
-                      message={{
-                        at: "Just now",
-                        from: {
-                          name: from_name?.trim() || "Portal",
-                          email: "no-reply@accounts.grida.co",
-                          avatar: "P",
-                        },
-                        title:
-                          subject_template?.trim() ||
-                          "Your verification code",
-                      }}
-                      messages={[
-                        {
-                          from: from_name?.trim() || "Portal",
-                          title:
-                            subject_template?.trim() ||
-                            "Your verification code",
-                          at: "Just now",
-                        },
-                      ]}
+                <Button
+                  disabled={
+                    nameForm.formState.isSubmitting ||
+                    !nameForm.formState.isDirty
+                  }
+                  onClick={nameForm.handleSubmit(onNameSubmit)}
+                >
+                  {nameForm.formState.isSubmitting ? <Spinner /> : "Save"}
+                </Button>
+                </FieldGroup>
+              </FieldSet>
+            }
+          />
+
+          <Separator />
+
+          {/* Login page */}
+          <ControlsPreviewLayout
+            controls={
+              <FieldSet className="space-y-4">
+                <form
+                  id="portal-preset-login-page"
+                  onSubmit={loginPageForm.handleSubmit(onLoginPageSubmit)}
+                  className="space-y-6"
+                >
+                  <FieldSet>
+                    <FieldLegend>Login Page</FieldLegend>
+                    <FieldDescription>
+                      Override the default text shown on the customer portal login
+                      page. Leave a field empty to use the default.
+                    </FieldDescription>
+                    <FieldGroup className="flex flex-col gap-6">
+                      <FieldSet>
+                        <FieldLegend>Email Step</FieldLegend>
+                        <FieldGroup>
+                          <Field>
+                            <FieldLabel htmlFor="lp-email-title">Title</FieldLabel>
+                            <Controller
+                              name="email_step_title"
+                              control={loginPageForm.control}
+                              render={({ field }) => (
+                                <Input
+                                  id="lp-email-title"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  placeholder="Log in to manage your account"
+                                />
+                              )}
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel htmlFor="lp-email-desc">Description</FieldLabel>
+                            <Controller
+                              name="email_step_description"
+                              control={loginPageForm.control}
+                              render={({ field }) => (
+                                <Input
+                                  id="lp-email-desc"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  placeholder="Enter your email and we will send you a verification code..."
+                                />
+                              )}
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel htmlFor="lp-email-btn">Button Label</FieldLabel>
+                            <Controller
+                              name="email_step_button_label"
+                              control={loginPageForm.control}
+                              render={({ field }) => (
+                                <Input
+                                  id="lp-email-btn"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  placeholder="Continue with Email"
+                                />
+                              )}
+                            />
+                          </Field>
+                        </FieldGroup>
+                      </FieldSet>
+                      <FieldSet>
+                        <FieldLegend>OTP Step</FieldLegend>
+                        <FieldGroup>
+                          <Field>
+                            <FieldLabel htmlFor="lp-otp-title">Title</FieldLabel>
+                            <Controller
+                              name="otp_step_title"
+                              control={loginPageForm.control}
+                              render={({ field }) => (
+                                <Input
+                                  id="lp-otp-title"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  placeholder="Verification"
+                                />
+                              )}
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel htmlFor="lp-otp-desc">Description</FieldLabel>
+                            <Controller
+                              name="otp_step_description"
+                              control={loginPageForm.control}
+                              render={({ field }) => (
+                                <Input
+                                  id="lp-otp-desc"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  placeholder="We have sent a code to your email. Enter it below."
+                                />
+                              )}
+                            />
+                          </Field>
+                        </FieldGroup>
+                      </FieldSet>
+                    </FieldGroup>
+                  </FieldSet>
+                  <Button
+                    form="portal-preset-login-page"
+                    type="submit"
+                    disabled={
+                      loginPageForm.formState.isSubmitting ||
+                      !loginPageForm.formState.isDirty
+                    }
+                  >
+                    {loginPageForm.formState.isSubmitting ? <Spinner /> : "Save"}
+                  </Button>
+                </form>
+              </FieldSet>
+            }
+            preview={
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href={previewlink({
+                        org: params.org,
+                        proj: params.proj,
+                        path: "/p/login",
+                      })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5"
                     >
-                      {body_html_template?.trim() ? (
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: body_html_template,
-                          }}
+                      <ExternalLink className="size-3" />
+                      Open
+                    </a>
+                  </Button>
+                </div>
+                <Tabs defaultValue="email" className="w-full">
+                  <TabsList className="w-full">
+                    <TabsTrigger value="email" className="flex-1">Email Step</TabsTrigger>
+                    <TabsTrigger value="otp" className="flex-1">OTP Step</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="email" className="mt-4">
+                    <Safari className="flex w-full flex-col aspect-video shadow-lg overflow-hidden rounded-lg border">
+                      <SafariToolbar
+                        url={previewlink({
+                          org: params.org,
+                          proj: params.proj,
+                          path: "/p/login",
+                        })}
+                      />
+                      <div className="flex-1 overflow-auto bg-background p-6">
+                        <PortalLoginView
+                          overrides={loginPagePreviewOverrides}
+                          step="email"
+                          viewOnly
                         />
-                      ) : (
-                        <>
-                          <p>Your verification code is: <strong>123456</strong></p>
-                          <p className="text-muted-foreground text-sm mt-2">
-                            Tip: add a body HTML template below to preview the
-                            email content here.
-                          </p>
-                        </>
-                      )}
-                    </MailAppFrame>
-                  </div>
+                      </div>
+                    </Safari>
+                  </TabsContent>
+                  <TabsContent value="otp" className="mt-4">
+                    <Safari className="flex w-full flex-col aspect-video shadow-lg overflow-hidden rounded-lg border">
+                      <SafariToolbar
+                        url={previewlink({
+                          org: params.org,
+                          proj: params.proj,
+                          path: "/p/login",
+                        })}
+                      />
+                      <div className="flex-1 overflow-auto bg-background p-6">
+                        <PortalLoginView
+                          overrides={loginPagePreviewOverrides}
+                          step="otp"
+                          viewOnly
+                        />
+                      </div>
+                    </Safari>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            }
+          />
+
+          <Separator />
+
+          {/* Email template */}
+          <ControlsPreviewLayout
+            controls={
+              <FieldSet className="space-y-4">
+                <Field orientation="horizontal" className="flex-row items-center justify-between gap-4">
+                  <FieldLegend variant="legend">Verification Email Template</FieldLegend>
+                  <Controller
+                    name="enabled"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        checked={field.value ?? false}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                </Field>
+                {enabled ? (
                   <form
                     id="portal-preset-email-template"
                     onSubmit={handleSubmit(onSubmit)}
+                    className="space-y-4"
                   >
                     <EmailTemplateAuthoringKit
                       helper={
-                        <PreferenceDescription>
+                        <FieldDescription>
                           Supported variables:{" "}
                           <code>{"{{email_otp}}"}</code>,{" "}
                           <code>{"{{brand_name}}"}</code>,{" "}
@@ -571,7 +597,7 @@ export default function PortalPresetEditPage() {
                           <code>{"{{expires_in_minutes}}"}</code>,{" "}
                           <code>{"{{brand_support_url}}"}</code>,{" "}
                           <code>{"{{brand_support_contact}}"}</code>.
-                        </PreferenceDescription>
+                        </FieldDescription>
                       }
                       fields={{
                         to: {
@@ -622,26 +648,76 @@ export default function PortalPresetEditPage() {
                         },
                       }}
                     />
+                    <Button
+                      form="portal-preset-email-template"
+                      type="submit"
+                      disabled={isSubmitting || !isDirty}
+                    >
+                      {isSubmitting ? <Spinner /> : "Save"}
+                    </Button>
                   </form>
-                </PreferenceBody>
-              </>
-            ) : (
-              <PreferenceBody>
-                <PreferenceDescription>
-                  Enable the toggle above to customize the verification email.
-                  When disabled, the default Grida verification email is used.
-                </PreferenceDescription>
-              </PreferenceBody>
-            )}
-            <PreferenceBoxFooter>
-              <Button
-                disabled={isSubmitting || !isDirty}
-                onClick={handleSubmit(onSubmit)}
-              >
-                {isSubmitting ? <Spinner /> : "Save"}
-              </Button>
-            </PreferenceBoxFooter>
-          </PreferenceBox>
+                ) : (
+                  <FieldGroup className="space-y-4">
+                    <FieldDescription>
+                      Enable the toggle above to customize the verification email.
+                      When disabled, the default Grida verification email is used.
+                    </FieldDescription>
+                    <Button
+                      disabled={isSubmitting || !isDirty}
+                      onClick={handleSubmit(onSubmit)}
+                    >
+                      {isSubmitting ? <Spinner /> : "Save"}
+                    </Button>
+                  </FieldGroup>
+                )}
+              </FieldSet>
+            }
+            preview={
+              enabled ? (
+                <div className="w-full aspect-video overflow-hidden rounded-lg border bg-background">
+                  <MailAppFrame
+                    sidebarHidden
+                    message={{
+                      at: "Just now",
+                      from: {
+                        name: from_name?.trim() || "Portal",
+                        email: "no-reply@accounts.grida.co",
+                        avatar: "P",
+                      },
+                      title:
+                        subject_template?.trim() ||
+                        "Your verification code",
+                    }}
+                    messages={[
+                      {
+                        from: from_name?.trim() || "Portal",
+                        title:
+                          subject_template?.trim() ||
+                          "Your verification code",
+                        at: "Just now",
+                      },
+                    ]}
+                  >
+                    {body_html_template?.trim() ? (
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: body_html_template,
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <p>Your verification code is: <strong>123456</strong></p>
+                        <p className="text-muted-foreground text-sm mt-2">
+                          Tip: add a body HTML template to preview the
+                          email content here.
+                        </p>
+                      </>
+                    )}
+                  </MailAppFrame>
+                </div>
+              ) : null
+            }
+          />
         </div>
       </div>
       <DeleteConfirmationAlertDialog
