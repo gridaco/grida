@@ -1,5 +1,12 @@
-import EmptyWelcome from "@/components/empty";
+import { Table2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 export function EmptyRowsRenderer({
   loading,
@@ -20,21 +27,21 @@ export function EmptyRowsRenderer({
     );
   return (
     <div className="col-span-full w-full h-full flex items-center justify-center">
-      <EmptyWelcome
-        title={
-          hasPredicates ? <span>No Results</span> : <span>Table is empty</span>
-        }
-        paragraph={
-          hasPredicates ? (
-            <span>
-              No records match the criteria. Try changing the filters or search
-              query.
-            </span>
-          ) : (
-            <span>Create a new record to get started</span>
-          )
-        }
-      />
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Table2 />
+          </EmptyMedia>
+          <EmptyTitle>
+            {hasPredicates ? "No Results" : "Table is empty"}
+          </EmptyTitle>
+          <EmptyDescription>
+            {hasPredicates
+              ? "No records match the criteria. Try changing the filters or search query."
+              : "Create a new record to get started"}
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     </div>
   );
 }

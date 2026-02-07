@@ -2,7 +2,6 @@
 
 import React, { useEffect } from "react";
 import { TableIcon } from "@radix-ui/react-icons";
-import EmptyWelcome from "@/components/empty";
 import Image from "next/image";
 import {
   Dialog,
@@ -14,6 +13,13 @@ import {
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Button } from "@/components/ui/button";
 import artwork from "../../../../../../../../../public/images/abstract-database-illustration.png";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 export default function WelcomeNewPage() {
   const welcome = useDialogState();
@@ -28,11 +34,17 @@ export default function WelcomeNewPage() {
 
   return (
     <>
-      <EmptyWelcome
-        art={<TableIcon className="size-10 text-muted-foreground" />}
-        title={"Create your first table"}
-        paragraph={"Let's get started by creating your first table."}
-      />
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <TableIcon className="size-6" />
+          </EmptyMedia>
+          <EmptyTitle>Create your first table</EmptyTitle>
+          <EmptyDescription>
+            Let&apos;s get started by creating your first table.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
       <Dialog {...welcome.props}>
         <DialogContent hideCloseButton className="outline-none overflow-hidden">
           <div className="-m-6">
