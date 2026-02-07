@@ -36,13 +36,17 @@ import {
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ArrowLeftIcon, StarIcon } from "lucide-react";
 import Link from "next/link";
-import type { Database, PortalPresetVerificationEmailTemplate } from "@app/database";
+import { Label } from "@/components/ui/label";
+import type {
+  Database,
+  PortalPresetVerificationEmailTemplate,
+  PortalPresetLoginPage,
+} from "@app/database";
 
 type PortalPresetRow =
   Database["grida_ciam_public"]["Views"]["portal_preset"]["Row"];
 
-type FormValues = {
-  name: string;
+type EmailFormValues = {
   enabled: boolean;
   from_name: string | null;
   subject_template: string | null;
@@ -50,17 +54,13 @@ type FormValues = {
   reply_to: string | null;
 };
 
-function presetToFormValues(preset: PortalPresetRow): FormValues {
-  const t = preset.verification_email_template ?? {};
-  return {
-    name: preset.name,
-    enabled: t.enabled ?? false,
-    from_name: t.from_name ?? null,
-    subject_template: t.subject_template ?? null,
-    body_html_template: t.body_html_template ?? null,
-    reply_to: t.reply_to ?? null,
-  };
-}
+type LoginPageFormValues = {
+  email_step_title: string;
+  email_step_description: string;
+  email_step_button_label: string;
+  otp_step_title: string;
+  otp_step_description: string;
+};
 
 export default function PortalPresetEditPage() {
   const params = useParams<{ id: string; org: string; proj: string }>();
@@ -111,20 +111,25 @@ export default function PortalPresetEditPage() {
   };
 
   // --- Email template form (isolated) ---
+  const emailForm = useForm<EmailFormValues>({
+    values: preset
+      ? {
+          enabled: preset.verification_email_template?.enabled ?? false,
+          from_name: preset.verification_email_template?.from_name ?? null,
+          subject_template: preset.verification_email_template?.subject_template ?? null,
+          body_html_template: preset.verification_email_template?.body_html_template ?? null,
+          reply_to: preset.verification_email_template?.reply_to ?? null,
+        }
+      : undefined,
+  });
+
   const {
     handleSubmit,
     control,
     setValue,
     formState: { isSubmitting, isDirty },
     reset,
-  } = useForm<Omit<FormValues, "name">>({
-    values: preset
-      ? (() => {
-          const { name: _, ...rest } = presetToFormValues(preset);
-          return rest;
-        })()
-      : undefined,
-  });
+  } = emailForm;
 
   const enabled = useWatch({ control, name: "enabled" });
   const reply_to = useWatch({ control, name: "reply_to" });
@@ -132,7 +137,52 @@ export default function PortalPresetEditPage() {
   const subject_template = useWatch({ control, name: "subject_template" });
   const body_html_template = useWatch({ control, name: "body_html_template" });
 
-  const onSubmit = async (data: Omit<FormValues, "name">) => {
+  // --- Login page text form (isolated) ---
+  const loginPageForm = useForm<LoginPageFormValues>({
+    values: preset
+      ? {
+          email_step_title: preset.portal_login_page?.email_step_title ?? "",
+          email_step_description: preset.portal_login_page?.email_step_description ?? "",
+          email_step_button_label: preset.portal_login_page?.email_step_button_label ?? "",
+          otp_step_title: preset.portal_login_page?.otp_step_title ?? "",
+          otp_step_description: preset.portal_login_page?.otp_step_description ?? "",
+        }
+      : undefined,
+  });
+
+  const onLoginPageSubmit = async (data: LoginPageFormValues) => {
+    const loginPage: PortalPresetLoginPage = {
+      template_id: "202602-default",
+      email_step_title: data.email_step_title || null,
+      email_step_description: data.email_step_description || null,
+      email_step_button_label: data.email_step_button_label || null,
+      otp_step_title: data.otp_step_title || null,
+      otp_step_description: data.otp_step_description || null,
+    };
+
+    const req = Promise.resolve(
+      client
+        .from("portal_preset")
+        .update({ portal_login_page: loginPage as any })
+        .eq("id", params.id)
+    ).then(({ error }) => {
+      if (error) throw error;
+    });
+
+    try {
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Login page text saved",
+        error: "Failed to save",
+      });
+      mutate();
+      loginPageForm.reset(data);
+    } catch {
+      // toast handles UI
+    }
+  };
+
+  const onSubmit = async (data: EmailFormValues) => {
     const template: PortalPresetVerificationEmailTemplate = {
       enabled: data.enabled,
       from_name: data.from_name,
@@ -287,6 +337,113 @@ export default function PortalPresetEditPage() {
                 onClick={nameForm.handleSubmit(onNameSubmit)}
               >
                 {nameForm.formState.isSubmitting ? <Spinner /> : "Save"}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Login page text overrides */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Login Page Text</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Override the default text shown on the customer portal login
+                page. Leave a field empty to use the default.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <form
+                id="portal-preset-login-page"
+                onSubmit={loginPageForm.handleSubmit(onLoginPageSubmit)}
+                className="space-y-6"
+              >
+                <fieldset className="space-y-4">
+                  <legend className="text-sm font-medium">Email Step</legend>
+                  <div className="space-y-2">
+                    <Label htmlFor="lp-email-title">Title</Label>
+                    <Controller
+                      name="email_step_title"
+                      control={loginPageForm.control}
+                      render={({ field }) => (
+                        <Input
+                          id="lp-email-title"
+                          {...field}
+                          placeholder="Log in to manage your account"
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lp-email-desc">Description</Label>
+                    <Controller
+                      name="email_step_description"
+                      control={loginPageForm.control}
+                      render={({ field }) => (
+                        <Input
+                          id="lp-email-desc"
+                          {...field}
+                          placeholder="Enter your email and we will send you a verification code..."
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lp-email-btn">Button Label</Label>
+                    <Controller
+                      name="email_step_button_label"
+                      control={loginPageForm.control}
+                      render={({ field }) => (
+                        <Input
+                          id="lp-email-btn"
+                          {...field}
+                          placeholder="Continue with Email"
+                        />
+                      )}
+                    />
+                  </div>
+                </fieldset>
+                <fieldset className="space-y-4">
+                  <legend className="text-sm font-medium">OTP Step</legend>
+                  <div className="space-y-2">
+                    <Label htmlFor="lp-otp-title">Title</Label>
+                    <Controller
+                      name="otp_step_title"
+                      control={loginPageForm.control}
+                      render={({ field }) => (
+                        <Input
+                          id="lp-otp-title"
+                          {...field}
+                          placeholder="Verification"
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lp-otp-desc">Description</Label>
+                    <Controller
+                      name="otp_step_description"
+                      control={loginPageForm.control}
+                      render={({ field }) => (
+                        <Input
+                          id="lp-otp-desc"
+                          {...field}
+                          placeholder="We have sent a code to your email. Enter it below."
+                        />
+                      )}
+                    />
+                  </div>
+                </fieldset>
+              </form>
+            </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button
+                form="portal-preset-login-page"
+                type="submit"
+                disabled={
+                  loginPageForm.formState.isSubmitting ||
+                  !loginPageForm.formState.isDirty
+                }
+              >
+                {loginPageForm.formState.isSubmitting ? <Spinner /> : "Save"}
               </Button>
             </CardFooter>
           </Card>

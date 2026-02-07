@@ -3,6 +3,7 @@
 -- Adds a per-project "portal preset" table so admins can create multiple
 -- portal variants, pick one as primary, and customise the customer-portal
 -- OTP verification email with admin-authored HTML (Handlebars).
+-- Also stores optional login-page text overrides per preset.
 
 ---------------------------------------------------------------------
 -- [grida_ciam.portal_preset]
@@ -15,7 +16,8 @@ CREATE TABLE grida_ciam.portal_preset (
     project_id bigint NOT NULL REFERENCES public.project(id) ON DELETE CASCADE,
     name text NOT NULL,
     is_primary boolean NOT NULL DEFAULT false,
-    verification_email_template jsonb NOT NULL DEFAULT '{}'::jsonb
+    verification_email_template jsonb NOT NULL DEFAULT '{}'::jsonb,
+    portal_login_page jsonb NOT NULL DEFAULT '{"template_id":"202602-default"}'::jsonb
 );
 
 -- JSON schema guard (mirrors grida_forms.form.notification_respondent_email shape).
@@ -36,6 +38,32 @@ ALTER TABLE grida_ciam.portal_preset
         }
       }'::json,
       verification_email_template
+    )
+  );
+
+-- JSON schema guard for portal login page text overrides.
+-- The required "template_id" field acts as a version discriminator; future
+-- schema revisions introduce a new template_id value + a new constraint,
+-- making stale rows fail validation and forcing an explicit migration.
+ALTER TABLE grida_ciam.portal_preset
+  ADD CONSTRAINT portal_preset_portal_login_page_check
+  CHECK (
+    extensions.jsonb_matches_schema(
+      '{
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["template_id"],
+        "properties": {
+          "template_id":             { "const": "202602-default" },
+          "email_step_title":        { "type": ["string", "null"] },
+          "email_step_description":  { "type": ["string", "null"] },
+          "email_step_button_label": { "type": ["string", "null"] },
+          "otp_step_title":          { "type": ["string", "null"] },
+          "otp_step_description":    { "type": ["string", "null"] }
+        }
+      }'::json,
+      portal_login_page
     )
   );
 
@@ -94,7 +122,8 @@ SELECT
   project_id,
   name,
   is_primary,
-  verification_email_template
+  verification_email_template,
+  portal_login_page
 FROM grida_ciam.portal_preset;
 
 GRANT ALL ON TABLE grida_ciam_public.portal_preset TO anon, authenticated, service_role;

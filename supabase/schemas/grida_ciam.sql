@@ -699,7 +699,7 @@ TO service_role;
 ---------------------------------------------------------------------
 -- [grida_ciam.portal_preset]
 -- Per-project portal presets (multiple allowed, one primary).
--- Stores admin-authored verification email template as JSONB.
+-- Stores admin-authored verification email template and login page text as JSONB.
 ---------------------------------------------------------------------
 
 CREATE TABLE grida_ciam.portal_preset (
@@ -709,7 +709,8 @@ CREATE TABLE grida_ciam.portal_preset (
     project_id bigint NOT NULL REFERENCES public.project(id) ON DELETE CASCADE,
     name text NOT NULL,
     is_primary boolean NOT NULL DEFAULT false,
-    verification_email_template jsonb NOT NULL DEFAULT '{}'::jsonb
+    verification_email_template jsonb NOT NULL DEFAULT '{}'::jsonb,
+    portal_login_page jsonb NOT NULL DEFAULT '{"template_id":"202602-default"}'::jsonb
 );
 
 ALTER TABLE grida_ciam.portal_preset
@@ -729,6 +730,28 @@ ALTER TABLE grida_ciam.portal_preset
         }
       }'::json,
       verification_email_template
+    )
+  );
+
+ALTER TABLE grida_ciam.portal_preset
+  ADD CONSTRAINT portal_preset_portal_login_page_check
+  CHECK (
+    extensions.jsonb_matches_schema(
+      '{
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["template_id"],
+        "properties": {
+          "template_id":             { "const": "202602-default" },
+          "email_step_title":        { "type": ["string", "null"] },
+          "email_step_description":  { "type": ["string", "null"] },
+          "email_step_button_label": { "type": ["string", "null"] },
+          "otp_step_title":          { "type": ["string", "null"] },
+          "otp_step_description":    { "type": ["string", "null"] }
+        }
+      }'::json,
+      portal_login_page
     )
   );
 
@@ -778,7 +801,8 @@ SELECT
   project_id,
   name,
   is_primary,
-  verification_email_template
+  verification_email_template,
+  portal_login_page
 FROM grida_ciam.portal_preset;
 
 GRANT ALL ON TABLE grida_ciam_public.portal_preset TO anon, authenticated, service_role;

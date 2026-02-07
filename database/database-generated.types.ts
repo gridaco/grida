@@ -193,6 +193,7 @@ export type Database = {
           id: string
           is_primary: boolean
           name: string
+          portal_login_page: Json
           project_id: number
           updated_at: string
           verification_email_template: Json
@@ -202,6 +203,7 @@ export type Database = {
           id?: string
           is_primary?: boolean
           name: string
+          portal_login_page?: Json
           project_id: number
           updated_at?: string
           verification_email_template?: Json
@@ -211,6 +213,7 @@ export type Database = {
           id?: string
           is_primary?: boolean
           name?: string
+          portal_login_page?: Json
           project_id?: number
           updated_at?: string
           verification_email_template?: Json
@@ -331,6 +334,7 @@ export type Database = {
           id: string | null
           is_primary: boolean | null
           name: string | null
+          portal_login_page: Json | null
           project_id: number | null
           updated_at: string | null
           verification_email_template: Json | null
@@ -340,6 +344,7 @@ export type Database = {
           id?: string | null
           is_primary?: boolean | null
           name?: string | null
+          portal_login_page?: Json | null
           project_id?: number | null
           updated_at?: string | null
           verification_email_template?: Json | null
@@ -349,6 +354,7 @@ export type Database = {
           id?: string | null
           is_primary?: boolean | null
           name?: string | null
+          portal_login_page?: Json | null
           project_id?: number | null
           updated_at?: string | null
           verification_email_template?: Json | null
@@ -5227,3 +5233,4 @@ export const Constants = {
     },
   },
 } as const
+
