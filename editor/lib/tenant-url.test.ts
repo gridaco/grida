@@ -141,6 +141,15 @@ describe("lib/tenant-url", () => {
         prefer_canonical: true,
       })
     ).resolves.toBe(`https://acme.${DEFAULT_PLATFORM_APEX_DOMAIN}/west`);
+
+    await expect(
+      buildTenantSiteBaseUrl({
+        www_name: "acme",
+        www_route_path: "/west/",
+        hosted: true,
+        prefer_canonical: true,
+      })
+    ).resolves.toBe(`https://acme.${DEFAULT_PLATFORM_APEX_DOMAIN}/west`);
   });
 });
 

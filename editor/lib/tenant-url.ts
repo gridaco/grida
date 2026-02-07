@@ -41,9 +41,16 @@ async function getCanonicalHostnameForTenant(
 }
 
 function normalizeRoutePath(www_route_path?: string | null): string {
-  const raw = (www_route_path ?? "").trim();
+  let raw = (www_route_path ?? "").trim();
   if (!raw) return "";
-  if (raw === "/") return "";
+
+  // Remove any trailing slashes first ("/west/" -> "/west", "///" -> "").
+  raw = raw.replace(/\/+$/, "");
+  if (!raw || raw === "/") return "";
+
+  // Ensure at most one leading slash ("//west" -> "/west").
+  raw = raw.replace(/^\/+/, "/");
+
   return raw.startsWith("/") ? raw : `/${raw}`;
 }
 
@@ -52,8 +59,16 @@ function normalizeRoutePath(www_route_path?: string | null): string {
  *
  * Return shape:
  * - Always returns a string that **does not end with `/`**
- * - Examples:\n+ *   - `https://acme.example.com/west`\n+ *   - `https://acme.grida.site/west`\n+ *   - `http://acme.localhost:3000/west`\n+ *   - `https://acme.grida.site` (when `www_route_path` is empty)\n+ *
- * Intended usage:\n+ * - Build links by simple templating: `${base}/t/${code}`\n+ */
+ *
+ * Examples:
+ * - `https://acme.example.com/west`
+ * - `https://acme.grida.site/west`
+ * - `http://acme.localhost:3000/west`
+ * - `https://acme.grida.site` (when `www_route_path` is empty)
+ *
+ * Intended usage:
+ * - Build links by simple templating: `${base}/t/${code}`
+ */
 export async function buildTenantSiteBaseUrl({
   www_name,
   www_route_path,
@@ -84,4 +99,3 @@ export async function buildTenantSiteBaseUrl({
 
   return `https://${canonicalHost ?? platformHost}${route}`;
 }
-
