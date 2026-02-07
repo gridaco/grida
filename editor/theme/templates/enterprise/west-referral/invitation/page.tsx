@@ -249,6 +249,7 @@ export default function InvitationPageTemplate({
             form_id={data.signup_form_id}
             invitation_code={code}
             client={client}
+            locale={locale}
             copy={t}
             onClaimed={() => {
               setClaimed(true);
@@ -290,6 +291,7 @@ function SignUpForm({
   form_id,
   invitation_code,
   client,
+  locale,
   copy,
   onClaimed,
   ...props
@@ -297,6 +299,7 @@ function SignUpForm({
   form_id: string;
   invitation_code: string;
   client?: Platform.WEST.Referral.WestReferralClient;
+  locale: keyof typeof dictionary;
   copy: (typeof dictionary)[keyof typeof dictionary];
   onClaimed?: () => void;
 }) {
@@ -349,7 +352,7 @@ function SignUpForm({
             This prevents the loading skeleton from rendering inline on the page. */}
         {isOpen ? (
           hasForm ? (
-            <FormViewProvider form_id={form_id}>
+            <FormViewProvider form_id={form_id} locale={locale}>
               <div className="flex min-h-0 flex-1 flex-col">
                 {/* Scrollable form area (critical for small screens). */}
                 <ScrollArea className="min-h-0 flex-1">
@@ -365,11 +368,10 @@ function SignUpForm({
                 </ScrollArea>
 
                 {/* Fixed action area */}
-                {/* TODO: have i18n */}
                 <DrawerFooter className="pt-2 border-t bg-background pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-                  <FormView.Prev>Previous</FormView.Prev>
-                  <FormView.Next>Next</FormView.Next>
-                  <FormView.Submit>Save</FormView.Submit>
+                  <FormView.Prev />
+                  <FormView.Next />
+                  <FormView.Submit />
                 </DrawerFooter>
               </div>
             </FormViewProvider>
@@ -388,9 +390,11 @@ function SignUpForm({
 
 function FormViewProvider({
   form_id,
+  locale,
   children,
 }: React.PropsWithChildren<{
   form_id: string;
+  locale: string;
 }>) {
   // TODO: make FormViewProvider accept a configurable loading/empty state renderer
   // (or allow callers to fully control loading UX). For now, we keep a simple
@@ -419,12 +423,13 @@ function FormViewProvider({
     );
   }
 
-  const { blocks, tree, fields, default_values } = data;
+  const { blocks, tree, fields, default_values, lang } = data;
 
   return (
     <FormView.Root
       form_id={form_id}
       session_id={session}
+      lang={lang ?? locale}
       fields={fields}
       defaultValues={default_values}
       blocks={blocks}
