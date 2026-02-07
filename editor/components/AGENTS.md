@@ -16,6 +16,7 @@ If you find yourself adding heavy state machines, feature workflows, or global/e
 - **Avoid global state coupling**: prefer props and local state; do not require editor/workbench global stores just to render.
 - **Composable styling**: prefer `className` + merge helper (e.g. `cn(...)`) and avoid “closed” styling that can’t be overridden.
 - **Small surface area**: keep components narrowly-scoped; split when a component becomes a mini-feature.
+- **No new directories by default**: do not create new folders under `components/` unless explicitly required. This tree is intentionally curated by project maintainers, and everything here should remain broadly reusable.
 
 ## Directory map (highlighted)
 
