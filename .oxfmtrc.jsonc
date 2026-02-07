@@ -5,4 +5,7 @@
   // we're migrating from prettier to oxfmt, below will be removed once complete.
   "printWidth": 80,
   "trailingComma": "es5",
+  "experimentalSortPackageJson": {
+    "sortScripts": true,
+  },
 }
