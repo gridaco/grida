@@ -292,7 +292,7 @@ export default function PortalPresetEditPage() {
   if (isLoading || !preset) {
     return (
       <main className="w-full h-full overflow-y-auto">
-        <div className="container mx-auto max-w-7xl py-10 space-y-6">
+        <div className="container mx-auto py-10 space-y-6">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-64 w-full rounded-lg" />
         </div>
@@ -302,7 +302,7 @@ export default function PortalPresetEditPage() {
 
   return (
     <main className="w-full h-full overflow-y-auto">
-      <div className="container mx-auto max-w-7xl px-4">
+      <div className="container mx-auto px-4">
         <header className="py-10 space-y-4">
           <Link
             href={basePath}

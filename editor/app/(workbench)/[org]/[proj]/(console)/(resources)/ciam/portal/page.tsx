@@ -115,7 +115,7 @@ export default function PortalPresetsPage() {
 
   return (
     <main className="w-full h-full overflow-y-auto">
-      <div className="container mx-auto max-w-screen-md">
+      <div className="container mx-auto py-10">
         <header className="py-10 flex justify-between items-start">
           <div>
             <span className="flex items-center gap-2 text-2xl font-black select-none">
