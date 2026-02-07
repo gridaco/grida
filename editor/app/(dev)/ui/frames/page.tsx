@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Safari, SafariToolbar } from "@/components/frames/safari";
+import MailAppFrame from "@/components/frames/mail-app-frame";
 
 export default function FramesPage() {
   return (
@@ -173,11 +174,115 @@ export default function FramesPage() {
                 <div className="w-full h-full bg-gradient-to-br from-indigo-50 to-pink-50" />
               </Safari>
             </div>
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-2">Mail (sidebar hidden)</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Email client frame for previewing email templates
+              </p>
+              <div className="h-96 overflow-hidden rounded-lg border">
+                <MailAppFrame
+                  sidebarHidden
+                  message={{
+                    at: "Just now",
+                    from: {
+                      name: "Acme Support",
+                      email: "no-reply@acme.co",
+                      avatar: "AC",
+                    },
+                    title: "Your verification code",
+                  }}
+                  messages={[
+                    {
+                      from: "Acme Support",
+                      title: "Your verification code",
+                      at: "Just now",
+                    },
+                  ]}
+                >
+                  <h2>Your verification code</h2>
+                  <p>
+                    Hi Alice, use the following code to verify your identity:
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "2rem",
+                      fontWeight: "bold",
+                      letterSpacing: "0.25em",
+                    }}
+                  >
+                    123456
+                  </p>
+                  <p>This code expires in 10 minutes.</p>
+                  <hr />
+                  <p>
+                    If you did not request this, you can safely ignore this
+                    email.
+                  </p>
+                </MailAppFrame>
+              </div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-2">
+                Mail (long content, scrollable)
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Email body scrolls when content exceeds the frame height
+              </p>
+              <div className="h-96 overflow-hidden rounded-lg border">
+                <MailAppFrame
+                  sidebarHidden
+                  message={{
+                    at: "Just now",
+                    from: {
+                      name: "Grida Forms",
+                      email: "no-reply@accounts.grida.co",
+                      avatar: "GR",
+                    },
+                    title: "Thanks for your submission",
+                  }}
+                  messages={[
+                    {
+                      from: "Grida Forms",
+                      title: "Thanks for your submission",
+                      at: "Just now",
+                    },
+                  ]}
+                >
+                  <h2>Thanks for registering!</h2>
+                  <p>We received your submission for the Annual Conference.</p>
+                  <p>Your registration number: #042</p>
+                  <h3>What happens next?</h3>
+                  <ul>
+                    <li>You will receive a confirmation email within 24 hours</li>
+                    <li>Our team will review your application</li>
+                    <li>If approved, you will get your ticket via email</li>
+                  </ul>
+                  <h3>Event details</h3>
+                  <p>
+                    Date: March 15, 2026
+                    <br />
+                    Location: Convention Center, Hall A<br />
+                    Time: 9:00 AM - 5:00 PM
+                  </p>
+                  <h3>Important notes</h3>
+                  <p>
+                    Please bring a valid ID and your ticket (digital or printed)
+                    to the event. Doors open at 8:30 AM for registration.
+                  </p>
+                  <p>
+                    If you have any dietary requirements, please let us know at
+                    least 48 hours before the event.
+                  </p>
+                  <p>We look forward to seeing you there!</p>
+                  <hr />
+                  <p style={{ fontSize: "0.75rem", color: "#666" }}>
+                    This is an automated message. If you did not submit this
+                    form, please contact support@example.com.
+                  </p>
+                </MailAppFrame>
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-gray-500 italic">
-            More frame styles (Mail, Messages, etc.) are available in the
-            components library.
-          </p>
         </section>
       </div>
     </main>

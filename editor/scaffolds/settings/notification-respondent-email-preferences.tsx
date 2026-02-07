@@ -126,7 +126,7 @@ export function NotificationRespondentEmailPreferences() {
         }
       />
       <PreferenceBody>
-        <div className="max-h-96 rounded-3xl border-4 mb-6">
+        <div className="h-96 overflow-hidden rounded-3xl border-4 mb-6">
           <MailAppFrame
             sidebarHidden
             message={{
@@ -194,6 +194,7 @@ export function NotificationRespondentEmailPreferences() {
                 state: "on",
                 value: reply_to ?? "",
                 disabled: inputDisabled,
+                placeholder: "support@yourdomain.com",
                 onValueChange: (v: string) =>
                   setValue("reply_to", v || null, {
                     shouldDirty: true,
@@ -203,6 +204,7 @@ export function NotificationRespondentEmailPreferences() {
                 state: "on",
                 value: subject_template ?? "",
                 disabled: inputDisabled,
+                placeholder: "Thanks, {{fields.first_name}}",
                 onValueChange: (v: string) =>
                   setValue("subject_template", v || null, {
                     shouldDirty: true,
@@ -212,6 +214,7 @@ export function NotificationRespondentEmailPreferences() {
                 state: "on",
                 value: from_name ?? "",
                 disabled: inputDisabled,
+                placeholder: "Grida Forms",
                 onValueChange: (v: string) =>
                   setValue("from_name", v || null, { shouldDirty: true }),
               },
@@ -223,6 +226,8 @@ export function NotificationRespondentEmailPreferences() {
                 state: "on",
                 value: body_html_template ?? "",
                 disabled: inputDisabled,
+                placeholder:
+                  "<h1>Thanks</h1>\n<p>We received your submission for {{form_title}}.</p>",
                 onValueChange: (v: string) =>
                   setValue("body_html_template", v || null, {
                     shouldDirty: true,

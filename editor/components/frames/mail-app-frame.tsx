@@ -46,7 +46,7 @@ export default function MailAppFrame({
   return (
     <div
       data-sidebar-hidden={sidebarHidden}
-      className="grid h-full w-full lg:data-[sidebar-hidden='false']:grid-cols-[320px_1fr]"
+      className="grid h-full min-h-[32rem] w-full overflow-hidden lg:data-[sidebar-hidden='false']:grid-cols-[320px_1fr]"
     >
       <div
         className={cn(
@@ -97,8 +97,8 @@ export default function MailAppFrame({
           </div>
         </div>
       </div>
-      <div className="flex flex-col">
-        <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-gray-100/40 px-6 dark:bg-gray-800/40">
+      <div className="flex min-h-0 flex-col overflow-hidden">
+        <header className="flex h-14 lg:h-[60px] shrink-0 items-center gap-4 border-b bg-gray-100/40 px-6 dark:bg-gray-800/40">
           <div className="w-full flex-1">
             <div className="relative">
               <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-gray-500 dark:text-gray-400" />
@@ -129,11 +129,11 @@ export default function MailAppFrame({
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8">
-          <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
-            <div className="bg-white rounded-lg shadow-sm dark:bg-gray-950">
-              <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between border-b px-4 py-3 dark:border-gray-800">
+        <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 md:gap-8">
+          <div className="grid min-h-0 flex-1 grid-rows-[1fr] gap-4 md:grid-cols-[1fr_2fr]">
+            <div className="min-h-0 bg-white rounded-lg shadow-sm overflow-hidden dark:bg-gray-950">
+              <div className="flex flex-col h-full overflow-hidden">
+                <div className="flex shrink-0 items-center justify-between border-b px-4 py-3 dark:border-gray-800">
                   <h2 className="text-lg font-medium">Inbox</h2>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
                     {today.toLocaleDateString()}
@@ -173,10 +173,10 @@ export default function MailAppFrame({
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow-sm dark:bg-gray-950">
-              <div className="flex h-full flex-col">
-                <div className="flex items-center justify-between border-b px-4 py-3 dark:border-gray-800">
-                  <h2 className="text-lg font-medium">{message.title}</h2>
+            <div className="min-h-0 bg-white rounded-lg shadow-sm overflow-hidden dark:bg-gray-950">
+              <div className="flex h-full flex-col overflow-hidden">
+                <div className="flex shrink-0 items-center justify-between border-b px-4 py-3 dark:border-gray-800">
+                  <h2 className="text-lg font-medium truncate">{message.title}</h2>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
                     {message.at}
                   </div>
