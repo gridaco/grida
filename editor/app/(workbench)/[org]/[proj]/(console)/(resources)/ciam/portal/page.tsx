@@ -27,7 +27,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { PlusIcon, StarIcon } from "lucide-react";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Mail, PlusIcon, StarIcon } from "lucide-react";
 import type { Database } from "@app/database";
 
 type PortalPresetRow =
@@ -81,8 +89,7 @@ function usePortalPresets() {
 }
 
 export default function PortalPresetsPage() {
-  const { presets, isLoading, createPreset, setPrimary } =
-    usePortalPresets();
+  const { presets, isLoading, createPreset, setPrimary } = usePortalPresets();
   const pathname = usePathname();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -168,15 +175,24 @@ export default function PortalPresetsPage() {
             ))}
           </div>
         ) : !presets || presets.length === 0 ? (
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-base">No presets yet</CardTitle>
-              <CardDescription>
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Mail />
+              </EmptyMedia>
+              <EmptyTitle>No presets yet</EmptyTitle>
+              <EmptyDescription>
                 Create a portal preset to customize the verification email sent
                 to customers when they log in.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button size="sm" onClick={() => setDialogOpen(true)}>
+                <PlusIcon className="size-4" />
+                New Preset
+              </Button>
+            </EmptyContent>
+          </Empty>
         ) : (
           <div className="space-y-3">
             {presets.map((preset) => (

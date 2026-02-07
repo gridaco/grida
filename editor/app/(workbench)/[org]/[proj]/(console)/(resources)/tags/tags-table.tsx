@@ -19,8 +19,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { EditTagDialog } from "./edit-tag-dialog";
 import { DeleteTagDialog } from "./delete-tag-dialog";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Tag, Trash2 } from "lucide-react";
 import { useTags } from "@/scaffolds/workspace";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import type { Platform } from "@/lib/platform";
 
 function getContrastColor(hexColor: string) {
@@ -100,8 +107,18 @@ export function TagsTable() {
           <TableBody>
             {tags.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center">
-                  No tags found. Create your first tag to get started.
+                <TableCell colSpan={4} className="p-0">
+                  <Empty className="border-0 border-t py-12">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Tag />
+                      </EmptyMedia>
+                      <EmptyTitle>No tags found</EmptyTitle>
+                      <EmptyDescription>
+                        Create your first tag to get started.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 </TableCell>
               </TableRow>
             ) : (

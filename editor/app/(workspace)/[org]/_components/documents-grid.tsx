@@ -7,7 +7,7 @@ import {
   GridCard,
   RowCard,
 } from "@/app/(workspace)/[org]/_components/form-card";
-import { BoxSelectIcon } from "lucide-react";
+import { FileText } from "lucide-react";
 import { editorlink } from "@/host/url";
 import {
   ContextMenu,
@@ -22,6 +22,13 @@ import {
   DeleteConfirmationAlertDialog,
   DeleteConfirmationSnippet,
 } from "@/components/dialogs/delete-confirmation-dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { TrashIcon } from "@radix-ui/react-icons";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -125,15 +132,18 @@ export function DocumentsGrid({
       )}
 
       {documents.length === 0 && (
-        <div className="w-full h-96 flex items-center justify-center">
-          <div className="flex flex-col items-center justify-center gap-8">
-            <div className="flex flex-col gap-2 items-center">
-              <BoxSelectIcon className="size-6 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">
-                No documents yet
-              </span>
-            </div>
-          </div>
+        <div className="col-span-full w-full min-h-96 flex items-center justify-center">
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FileText />
+              </EmptyMedia>
+              <EmptyTitle>No documents yet</EmptyTitle>
+              <EmptyDescription>
+                Create a document to get started.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </div>
       )}
       {documents.map((doc, i) => {
