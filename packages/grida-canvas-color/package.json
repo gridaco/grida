@@ -1,22 +1,20 @@
 {
   "name": "@grida/color",
-  "description": "Grida Core Graphics Color Lib",
   "version": "0.0.0",
+  "private": false,
+  "description": "Grida Core Graphics Color Lib",
+  "keywords": [
+    "canvas",
+    "color",
+    "grida"
+  ],
   "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
   "author": "softmarshmallow",
-  "private": false,
-  "keywords": [
-    "grida",
-    "canvas",
-    "color"
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
   ],
-  "scripts": {
-    "dev": "tsup index.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts --format cjs,esm --dts",
-    "test": "vitest run"
-  },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -27,7 +25,9 @@
       "require": "./dist/index.js"
     }
   },
-  "files": [
-    "dist"
-  ]
+  "scripts": {
+    "build": "tsup index.ts --format cjs,esm --dts",
+    "dev": "tsup index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run"
+  }
 }

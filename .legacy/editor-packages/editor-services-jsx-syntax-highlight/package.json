@@ -5,11 +5,11 @@
   "dependencies": {
     "@code-editor/webworker-services-core": "workspace:^"
   },
-  "peerDependencies": {
-    "@monaco-editor/react": "^4.4.1",
+  "devDependencies": {
     "monaco-editor": "^0.46.0"
   },
-  "devDependencies": {
+  "peerDependencies": {
+    "@monaco-editor/react": "^4.4.1",
     "monaco-editor": "^0.46.0"
   }
 }

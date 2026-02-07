@@ -1,7 +1,7 @@
 {
   "name": "@grida/io-svg",
-  "description": "SVG I/O for Grida Canvas",
   "private": true,
+  "description": "SVG I/O for Grida Canvas",
   "dependencies": {
     "@grida/color": "workspace:*",
     "@grida/vn": "workspace:*"

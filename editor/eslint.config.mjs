@@ -31,11 +31,9 @@ const eslintConfig = defineConfig([
     rules: {
       // preserve
       "@typescript-eslint/no-namespace": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
       // remove when ready
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-empty-object-type": "off",
-      "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/no-unused-expressions": "off",
     },
   },
   ...(PROGRESSIVE_ENABLEMENT

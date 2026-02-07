@@ -1,22 +1,22 @@
 {
-    "name": "@app/blocks",
-    "version": "0.0.0",
-    "dependencies": {
-        "@base-sdk/functions-code-format": "^0.0.0",
-        "@design-sdk/core-types": "^0.0.53",
-        "@design-sdk/url-analysis": "^0.0.53",
-        "@emotion/styled": "^11.11.0",
-        "@monaco-editor/react": "^4.2.2",
-        "@reflect-blocks/figma-embed": "0.0.4",
-        "monaco-editor": "^0.26.1",
-        "nanoid": "^3.1.23"
-    },
-    "peerDependencies": {
-        "@types/node": "^16.4.13",
-        "react": "^18.2.0"
-    },
-    "devDependencies": {
-        "@types/react": "18.2.58",
-        "react": "^18.2.0"
-    }
+  "name": "@app/blocks",
+  "version": "0.0.0",
+  "dependencies": {
+    "@base-sdk/functions-code-format": "^0.0.0",
+    "@design-sdk/core-types": "^0.0.53",
+    "@design-sdk/url-analysis": "^0.0.53",
+    "@emotion/styled": "^11.11.0",
+    "@monaco-editor/react": "^4.2.2",
+    "@reflect-blocks/figma-embed": "0.0.4",
+    "monaco-editor": "^0.26.1",
+    "nanoid": "^3.1.23"
+  },
+  "devDependencies": {
+    "@types/react": "18.2.58",
+    "react": "^18.2.0"
+  },
+  "peerDependencies": {
+    "@types/node": "^16.4.13",
+    "react": "^18.2.0"
+  }
 }

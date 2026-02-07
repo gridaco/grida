@@ -1,39 +1,33 @@
 {
   "name": "@grida/number-input",
-  "description": "Core parsing, formatting, and UI binding utilities for number inputs with multi-unit support",
   "version": "0.0.0",
+  "private": false,
+  "description": "Core parsing, formatting, and UI binding utilities for number inputs with multi-unit support",
+  "keywords": [
+    "accessibility",
+    "format",
+    "grida",
+    "hook",
+    "input",
+    "number",
+    "parsing",
+    "precision",
+    "react",
+    "scaling",
+    "ui",
+    "units",
+    "validation"
+  ],
   "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
   "author": "softmarshmallow",
-  "private": false,
-  "keywords": [
-    "number",
-    "format",
-    "parsing",
-    "input",
-    "react",
-    "hook",
-    "ui",
-    "accessibility",
-    "units",
-    "scaling",
-    "precision",
-    "validation",
-    "grida"
-  ],
-  "scripts": {
-    "typecheck": "tsc --noEmit",
-    "dev": "tsup src/index.ts src/react/index.ts --format cjs,esm --dts --watch",
-    "build": "tsup src/index.ts src/react/index.ts --format cjs,esm --dts",
-    "test": "vitest run"
-  },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "repository": "https://github.com/gridaco/grida",
   "files": [
     "dist"
   ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -46,10 +40,21 @@
       "require": "./dist/react/index.js"
     }
   },
+  "scripts": {
+    "build": "tsup src/index.ts src/react/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts src/react/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {},
+  "devDependencies": {
+    "@types/react": "^19",
+    "@use-gesture/react": "^10",
+    "react": "^19.0.0"
+  },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0",
-    "@use-gesture/react": "^10"
+    "@use-gesture/react": "^10",
+    "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -58,10 +63,5 @@
     "@use-gesture/react": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "@types/react": "^19",
-    "@use-gesture/react": "^10",
-    "react": "^19.0.0"
   }
 }

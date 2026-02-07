@@ -1,25 +1,24 @@
 {
   "name": "desktop",
   "version": "0.0.1",
+  "private": true,
   "description": "Grida Desktop App",
-  "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
   "keywords": [],
+  "homepage": "https://grida.co",
+  "license": "MIT",
   "author": {
     "name": "Grida",
     "email": "hello@grida.co"
   },
-  "private": true,
+  "repository": "https://github.com/gridaco/grida",
   "main": ".vite/build/main.js",
-  "packageManager": "pnpm@10.10.0",
   "scripts": {
     "dev": "electron-forge start",
-    "package": "electron-forge package",
+    "lint": "eslint --ext .ts,.tsx .",
     "make": "electron-forge make",
-    "publish:prerelease": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx ."
+    "package": "electron-forge package",
+    "publish:prerelease": "electron-forge publish"
   },
-  "license": "MIT",
   "dependencies": {
     "clsx": "^2.1.1",
     "electron-squirrel-startup": "^1.0.1",
@@ -59,5 +58,6 @@
     "ts-node": "^10.0.0",
     "typescript": "^5",
     "vite": "^6.3.5"
-  }
+  },
+  "packageManager": "pnpm@10.10.0"
 }

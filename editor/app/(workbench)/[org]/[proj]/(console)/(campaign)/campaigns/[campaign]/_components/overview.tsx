@@ -27,7 +27,14 @@ import {
 import { Analytics } from "@/lib/analytics";
 import useSWR from "swr";
 import { useCampaign } from "../store";
-import { ActivityIcon, Loader2 } from "lucide-react";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Activity, Loader2 } from "lucide-react";
 
 interface DateRange {
   from: Date;
@@ -92,16 +99,18 @@ function getEventTotals(data: AnalyzedData): EventTotal[] {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-12">
-      <div className="rounded-full bg-muted p-4 mb-4">
-        <ActivityIcon className="size-8 text-muted-foreground" />
-      </div>
-      <h3 className="text-lg font-medium mb-2">No activity yet</h3>
-      <p className="text-sm text-muted-foreground text-center max-w-sm">
-        Your campaign is ready to go! Once participants start engaging with your
-        campaign, you&apos;ll see activity data here.
-      </p>
-    </div>
+    <Empty className="w-full h-full">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Activity />
+        </EmptyMedia>
+        <EmptyTitle>No activity yet</EmptyTitle>
+        <EmptyDescription>
+          Your campaign is ready to go! Once participants start engaging with
+          your campaign, you&apos;ll see activity data here.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 

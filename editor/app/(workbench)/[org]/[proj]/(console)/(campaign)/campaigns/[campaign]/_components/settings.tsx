@@ -72,6 +72,9 @@ import { Platform } from "@/lib/platform";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
+import { DeleteConfirmationAlertDialog } from "@/components/dialogs/delete-confirmation-dialog";
+import { useProject } from "@/scaffolds/workspace";
+import { useRouter } from "next/navigation";
 import type { Database } from "@app/database";
 
 // Timezone options
@@ -215,6 +218,9 @@ function Body({
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const project = useProject();
+  const router = useRouter();
 
   const form = useForm<CampaignFormValues>({
     resolver: zodResolver(formSchema) as any,
@@ -262,6 +268,12 @@ function Body({
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger
+              value="danger"
+              className="text-destructive data-[state=active]:text-destructive"
+            >
+              Danger Zone
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </CardHeader>
@@ -612,6 +624,66 @@ function Body({
                     projectId={project_id}
                   />
                 </div>
+              </div>
+            )}
+
+            {activeTab === "danger" && (
+              <div>
+                <h3 className="text-lg font-medium text-destructive">
+                  Danger Zone
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Irreversible actions for this campaign.
+                </p>
+                <div className="rounded-lg border border-destructive/50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-medium">Delete Campaign</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Permanently delete this campaign and all associated
+                        data, including participants, rewards, challenges, and
+                        events. This action cannot be undone.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      Delete Campaign
+                    </Button>
+                  </div>
+                </div>
+                <DeleteConfirmationAlertDialog
+                  title="Delete Campaign"
+                  description={`This action is irreversible. This will permanently delete the campaign and all associated data including participants, rewards, challenges, and events. Type the campaign title to confirm.`}
+                  match={defaultValues.title ?? "Untitled Campaign"}
+                  data={{ id: campaign_id }}
+                  open={deleteDialogOpen}
+                  onOpenChange={setDeleteDialogOpen}
+                  onDelete={async () => {
+                    const res = await fetch(
+                      `/private/west/campaigns/${campaign_id}`,
+                      {
+                        method: "DELETE",
+                        headers: {
+                          "x-grida-editor-user-current-project-id":
+                            project.id.toString(),
+                        },
+                      }
+                    );
+                    if (!res.ok) {
+                      const body = await res.json().catch(() => ({}));
+                      toast.error(body.error ?? "Failed to delete campaign");
+                      return false;
+                    }
+                    toast.success("Campaign deleted");
+                    router.push(
+                      `/${project.organization_name}/${project.name}/campaigns`
+                    );
+                    return true;
+                  }}
+                />
               </div>
             )}
           </CardContent>

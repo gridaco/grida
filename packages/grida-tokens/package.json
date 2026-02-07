@@ -1,30 +1,25 @@
 {
   "name": "@grida/tokens",
-  "description": "Grida AST logic model",
   "version": "0.0.0",
-  "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
-  "license": "MIT",
-  "author": "softmarshmallow",
   "private": false,
+  "description": "Grida AST logic model",
   "keywords": [
-    "grida",
-    "design",
-    "tokens",
     "ast",
+    "design",
+    "grida",
+    "tokens",
     "typescript"
   ],
-  "scripts": {
-    "dev": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts --watch",
-    "build": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts",
-    "test": "vitest run"
-  },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "homepage": "https://grida.co",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "repository": "https://github.com/gridaco/grida",
   "files": [
     "dist"
   ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -41,5 +36,10 @@
       "import": "./dist/locales.mjs",
       "require": "./dist/locales.js"
     }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts --watch",
+    "test": "vitest run"
   }
 }

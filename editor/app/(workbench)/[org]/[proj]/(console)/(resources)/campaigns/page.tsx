@@ -1,12 +1,19 @@
 "use client";
 import Link from "next/link";
+import { Megaphone } from "lucide-react";
 import { CampaignCard } from "./campaign-card";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { Spinner } from "@/components/ui/spinner";
 import { Platform } from "@/lib/platform";
 import { Button } from "@/components/ui/button";
-import EmptyWelcome from "@/components/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import useSWR from "swr";
 
 export default function CampaignsPage() {
@@ -50,12 +57,18 @@ export default function CampaignsPage() {
       </header>
       <hr className="my-4" />
       {campaigns.length === 0 && (
-        <EmptyWelcome
-          title={"No Campaigns"}
-          paragraph={
-            "Campaign is for Enterprise customers. please contact your administrator for setting up campaigns"
-          }
-        />
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Megaphone />
+            </EmptyMedia>
+            <EmptyTitle>No Campaigns</EmptyTitle>
+            <EmptyDescription>
+              Campaign is for Enterprise customers. Please contact your
+              administrator for setting up campaigns.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {campaigns.map((c) => {

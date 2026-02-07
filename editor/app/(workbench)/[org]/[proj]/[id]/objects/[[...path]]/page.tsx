@@ -9,6 +9,14 @@ import React, {
 } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { FolderIcon, GridIcon, ListIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -639,13 +647,20 @@ function FolderEmptyState() {
   }, [plainFiles, upload]);
 
   return (
-    <div className="w-full px-4 py-16 flex flex-col items-center justify-center gap-4 border border-dashed rounded-lg">
-      <UploadIcon className="size-8" />
-      <h6 className="text-lg text-muted-foreground">
-        Drop files here to upload
-      </h6>
-      <Button onClick={openFilePicker}>Upload</Button>
-    </div>
+    <Empty className="border w-full">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <UploadIcon />
+        </EmptyMedia>
+        <EmptyTitle>Drop files here to upload</EmptyTitle>
+        <EmptyDescription>
+          Upload files to this folder or drag and drop them here.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={openFilePicker}>Upload</Button>
+      </EmptyContent>
+    </Empty>
   );
 }
 

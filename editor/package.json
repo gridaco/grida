@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "dev": "next dev",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
+    "start": "next start",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit",
-    "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.0",

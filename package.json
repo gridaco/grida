@@ -3,15 +3,15 @@
   "private": true,
   "license": "Apache 2.0",
   "scripts": {
-    "lint": "turbo run lint",
+    "build": "turbo run build",
+    "build:packages": "turbo run build --filter=./packages/*",
     "dev": "turbo run dev",
     "dev:packages": "turbo run dev --filter=./packages/*",
     "generate": "turbo run generate",
-    "build": "turbo run build",
-    "build:packages": "turbo run build --filter=./packages/*",
+    "lint": "turbo run lint",
+    "publish-packages": "turbo run build lint test && changeset version && changeset publish",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck",
-    "publish-packages": "turbo run build lint test && changeset version && changeset publish"
+    "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.4",

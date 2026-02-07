@@ -1,31 +1,31 @@
 {
   "name": "@grida/mixed-properties",
-  "description": "Mixed property analysis utilities for Grida",
   "version": "0.0.0",
-  "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
-  "license": "MIT",
-  "author": "softmarshmallow",
   "private": false,
+  "description": "Mixed property analysis utilities for Grida",
   "keywords": [
+    "aggregator",
     "grida",
     "json",
     "jsonsschema",
-    "aggregator",
     "mixed",
     "properties"
   ],
-  "scripts": {
-    "dev": "tsup index.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts --format cjs,esm --dts",
-    "test": "vitest run"
-  },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "homepage": "https://grida.co",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "repository": "https://github.com/gridaco/grida",
   "files": [
     "dist"
   ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup index.ts --format cjs,esm --dts",
+    "dev": "tsup index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run"
+  },
   "dependencies": {
     "fast-deep-equal": "^3.1.3"
   },

@@ -1,7 +1,7 @@
 {
   "name": "@grida/bitmap",
-  "description": "Core Bitmap Graphics Editor",
   "private": true,
+  "description": "Core Bitmap Graphics Editor",
   "dependencies": {
     "@grida/cmath": "workspace:*",
     "@grida/color": "workspace:*"

@@ -63,6 +63,11 @@ Grida heavily relies on Supabase (PostgreSQL).
 - electron with electron-forge
 - vite
 
+**Tooling**
+
+- Turborepo - monorepo build orchestration
+- oxfmt (oxc) - code formatter
+
 ## Documentation
 
 Documentation files are located in the `./docs` directory.

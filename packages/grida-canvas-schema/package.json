@@ -1,10 +1,10 @@
 {
   "name": "@grida/schema",
-  "description": "Grida Canvas Document Model",
   "private": true,
+  "description": "Grida Canvas Document Model",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@grida/cg": "workspace:*"

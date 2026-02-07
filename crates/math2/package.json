@@ -1,7 +1,7 @@
 {
   "name": "@crates/math2",
-  "description": "turbo ci rust wrapper",
   "private": true,
+  "description": "turbo ci rust wrapper",
   "scripts": {
     "build": "cargo build --release"
   }

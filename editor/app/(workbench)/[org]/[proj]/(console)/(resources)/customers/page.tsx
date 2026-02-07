@@ -353,6 +353,7 @@ function NewButton({ onNewData }: { onNewData?: () => void }) {
             toast.error("Failed to create customer");
             return false;
           }
+          onNewData?.();
           return true;
         }}
       />

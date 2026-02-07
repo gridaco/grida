@@ -1,32 +1,28 @@
 {
   "name": "@grida/transparency-grid",
-  "description": "Transparency Grid component for Infinite Canvas",
   "version": "0.0.0",
-  "homepage": "https://grida.co/packages/@grida/transparency-grid",
-  "repository": "https://github.com/gridaco/grida",
-  "license": "MIT",
-  "author": "softmarshmallow",
   "private": false,
+  "description": "Transparency Grid component for Infinite Canvas",
   "keywords": [
-    "grida",
     "canvas",
-    "transparency",
-    "grid",
     "checkerboard",
     "design",
     "editor",
-    "react"
+    "grid",
+    "grida",
+    "react",
+    "transparency"
   ],
-  "scripts": {
-    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch",
-    "build": "tsup index.ts react.tsx --format cjs,esm --dts"
-  },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "homepage": "https://grida.co/packages/@grida/transparency-grid",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "repository": "https://github.com/gridaco/grida",
   "files": [
     "dist"
   ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -38,6 +34,10 @@
       "import": "./dist/react.mjs",
       "require": "./dist/react.js"
     }
+  },
+  "scripts": {
+    "build": "tsup index.ts react.tsx --format cjs,esm --dts",
+    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch"
   },
   "dependencies": {
     "color-parse": "^2.0.2"

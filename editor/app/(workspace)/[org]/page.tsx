@@ -12,14 +12,16 @@ import {
 import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/grida-forms-hosted/e/powered-by-brand-footer";
-import { BoxSelectIcon } from "lucide-react";
+import { FolderPlus } from "lucide-react";
 import { CreateNewProjectDialog } from "@/scaffolds/workspace/new-project-dialog";
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,26 +72,25 @@ export default function OrganizationDashboardPage(props: {
         ) : (
           <>
             {projects.length === 0 && (
-              <Card>
-                <CardContent className="py-16">
-                  <CardHeader />
-                  <div className="flex flex-col items-center justify-center gap-8">
-                    <div className="flex flex-col gap-2 items-center">
-                      <BoxSelectIcon className="size-12 text-muted-foreground" />
-                      <h2 className="text-lg text-muted-foreground">
-                        No projects yet
-                      </h2>
-                    </div>
-                    <CreateNewProjectDialog org={organization.name}>
-                      <Button variant="outline">
-                        <PlusIcon />
-                        Create your first project
-                      </Button>
-                    </CreateNewProjectDialog>
-                  </div>
-                  <CardFooter />
-                </CardContent>
-              </Card>
+              <Empty className="border">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <FolderPlus />
+                  </EmptyMedia>
+                  <EmptyTitle>No projects yet</EmptyTitle>
+                  <EmptyDescription>
+                    Create your first project to get started.
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <CreateNewProjectDialog org={organization.name}>
+                    <Button variant="outline">
+                      <PlusIcon />
+                      Create your first project
+                    </Button>
+                  </CreateNewProjectDialog>
+                </EmptyContent>
+              </Empty>
             )}
             {projects.map((p) => {
               const projectdocuments = documents.filter(
