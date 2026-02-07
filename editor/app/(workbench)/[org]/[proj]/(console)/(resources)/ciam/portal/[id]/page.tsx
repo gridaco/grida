@@ -281,13 +281,13 @@ export default function PortalPresetEditPage() {
         return false;
       }
       toast.success("Preset deleted");
-      router.push(`/${params.org}/${params.proj}/ciam/presets`);
+      router.push(`/${params.org}/${params.proj}/ciam/portal`);
       return true;
     },
     [client, params, router]
   );
 
-  const basePath = `/${params.org}/${params.proj}/ciam/presets`;
+  const basePath = `/${params.org}/${params.proj}/ciam/portal`;
 
   if (isLoading || !preset) {
     return (

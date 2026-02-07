@@ -99,7 +99,7 @@ export function ConsoleResourcesSidebar({
                 <ShieldCheckIcon className="size-4" />
                 CIAM
               </SidebarMenuLink>
-              <SidebarMenuLink href={`${basePath}/ciam/presets`}>
+              <SidebarMenuLink href={`${basePath}/ciam/portal`}>
                 <Store className="size-4" />
                 Customer Portal
               </SidebarMenuLink>
