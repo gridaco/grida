@@ -1,4 +1,5 @@
 import { service_role } from "@/lib/supabase/server";
+import { buildTenantSiteBaseUrl } from "@/lib/tenant-url";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { Platform } from "@/lib/platform";
@@ -49,13 +50,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: mint_err }, { status: 500 });
   }
 
-  const { www_name, www_route_path } = invitation.campaign;
-  const baseUrl = new URL(
-    www_route_path ?? "",
-    IS_HOSTED
-      ? `https://${www_name}.grida.site/`
-      : `http://${www_name}.localhost:3000/`
-  );
+  const { www_name: raw_www_name, www_route_path } = invitation.campaign;
+  assert(raw_www_name, "campaign.www_name is required");
+
+  const baseUrl = await buildTenantSiteBaseUrl({
+    www_name: raw_www_name,
+    www_route_path,
+    hosted: IS_HOSTED,
+    prefer_canonical: true,
+  });
+  const inviteUrl = `${baseUrl}/t/${invitation.code}`;
 
   return NextResponse.json({
     data: {
@@ -63,7 +67,7 @@ export async function POST(req: NextRequest) {
       sharable: {
         referrer_name: invitation.referrer.referrer_name ?? "",
         invitation_code: invitation.code,
-        url: `${baseUrl.toString()}/t/${invitation.code}`,
+        url: inviteUrl,
       } satisfies Platform.WEST.Referral.SharableContext,
     },
     error: null,
