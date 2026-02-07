@@ -23,19 +23,18 @@ export interface Translation {
   submit: string;
   pay: string;
   home: string;
-  // Common UI labels (forms)
-  verify?: string;
-  resend?: string;
-  retry?: string;
-  sending?: string;
-  email_challenge?: {
-    verify_code?: string;
-    enter_verification_code?: string;
-    code_sent?: string;
-    didnt_receive_code?: string;
-    code_expired?: string;
-    incorrect_code?: string;
-    error_occurred?: string;
+  verify: string;
+  resend: string;
+  retry: string;
+  sending: string;
+  email_challenge: {
+    verify_code: string;
+    enter_verification_code: string;
+    code_sent: string;
+    didnt_receive_code: string;
+    code_expired: string;
+    incorrect_code: string;
+    error_occurred: string;
   };
   left_in_stock: string;
   sold_out: string;
