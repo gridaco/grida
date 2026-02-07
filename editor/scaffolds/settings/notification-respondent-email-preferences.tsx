@@ -17,7 +17,12 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { useEditorState } from "@/scaffolds/editor";
 import { Badge } from "@/components/ui/badge";
 import { EmailTemplateAuthoringKit } from "@/kits/email-template-authoring";
-import MailAppFrame from "@/components/frames/mail-app-frame";
+import {
+  EmailFrame,
+  EmailFrameSubject,
+  EmailFrameSender,
+  EmailFrameBody,
+} from "@/components/frames/email-frame";
 
 type FormValues = {
   enabled: boolean;
@@ -126,46 +131,35 @@ export function NotificationRespondentEmailPreferences() {
         }
       />
       <PreferenceBody>
-        <div className="h-96 overflow-hidden rounded-3xl border-4 mb-6">
-          <MailAppFrame
-            sidebarHidden
-            message={{
-              at: "Just now",
-              from: {
-                name: from_name?.trim() || "Grida Forms",
-                email: "no-reply@accounts.grida.co",
-                avatar: "GR",
-              },
-              title:
-                subject_template?.trim() || "Your submission has been received",
-            }}
-            messages={[
-              {
-                from: "Grida Forms",
-                title:
-                  subject_template?.trim() ||
-                  "Your submission has been received",
-                at: "Just now",
-              },
-            ]}
-          >
-            {body_html_template?.trim() ? (
-              <div
-                // Admin-authored HTML preview. This is only rendered inside the editor.
-                dangerouslySetInnerHTML={{
-                  __html: body_html_template,
-                }}
-              />
-            ) : (
-              <>
-                <p>Thanks for your submission.</p>
-                <p>
-                  Tip: add a body HTML template below to preview the email
-                  content here.
-                </p>
-              </>
-            )}
-          </MailAppFrame>
+        <div className="h-96 overflow-hidden mb-6">
+          <EmailFrame className="h-full flex flex-col">
+            <EmailFrameSubject>
+              {subject_template?.trim() || "Your submission has been received"}
+            </EmailFrameSubject>
+            <EmailFrameSender
+              name={from_name?.trim() || "Grida Forms"}
+              email="no-reply@accounts.grida.co"
+              date="Just now"
+            />
+            <EmailFrameBody className="prose prose-stone dark:prose-invert max-w-none">
+              {body_html_template?.trim() ? (
+                <div
+                  // Admin-authored HTML preview. This is only rendered inside the editor.
+                  dangerouslySetInnerHTML={{
+                    __html: body_html_template,
+                  }}
+                />
+              ) : (
+                <>
+                  <p>Thanks for your submission.</p>
+                  <p>
+                    Tip: add a body HTML template below to preview the email
+                    content here.
+                  </p>
+                </>
+              )}
+            </EmailFrameBody>
+          </EmailFrame>
         </div>
         <form
           id="notification-respondent-email"

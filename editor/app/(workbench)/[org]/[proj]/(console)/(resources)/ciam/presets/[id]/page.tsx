@@ -14,7 +14,12 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmailTemplateAuthoringKit } from "@/kits/email-template-authoring";
-import MailAppFrame from "@/components/frames/mail-app-frame";
+import {
+  EmailFrame,
+  EmailFrameSubject,
+  EmailFrameSender,
+  EmailFrameBody,
+} from "@/components/frames/email-frame";
 import {
   DeleteConfirmationAlertDialog,
   DeleteConfirmationSnippet,
@@ -675,45 +680,35 @@ export default function PortalPresetEditPage() {
             preview={
               enabled ? (
                 <div className="w-full aspect-video overflow-hidden rounded-lg border bg-background">
-                  <MailAppFrame
-                    sidebarHidden
-                    message={{
-                      at: "Just now",
-                      from: {
-                        name: from_name?.trim() || "Portal",
-                        email: "no-reply@accounts.grida.co",
-                        avatar: "P",
-                      },
-                      title:
-                        subject_template?.trim() ||
-                        "Your verification code",
-                    }}
-                    messages={[
-                      {
-                        from: from_name?.trim() || "Portal",
-                        title:
-                          subject_template?.trim() ||
-                          "Your verification code",
-                        at: "Just now",
-                      },
-                    ]}
-                  >
-                    {body_html_template?.trim() ? (
-                      <div
-                        dangerouslySetInnerHTML={{
-                          __html: body_html_template,
-                        }}
-                      />
-                    ) : (
-                      <>
-                        <p>Your verification code is: <strong>123456</strong></p>
-                        <p className="text-muted-foreground text-sm mt-2">
-                          Tip: add a body HTML template to preview the
-                          email content here.
-                        </p>
-                      </>
-                    )}
-                  </MailAppFrame>
+                  <EmailFrame className="h-full flex flex-col">
+                    <EmailFrameSubject>
+                      {subject_template?.trim() || "Your verification code"}
+                    </EmailFrameSubject>
+                    <EmailFrameSender
+                      name={from_name?.trim() || "Portal"}
+                      email="no-reply@accounts.grida.co"
+                      date="Just now"
+                    />
+                    <EmailFrameBody className="prose prose-stone dark:prose-invert max-w-none">
+                      {body_html_template?.trim() ? (
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: body_html_template,
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <p>
+                            Your verification code is: <strong>123456</strong>
+                          </p>
+                          <p className="text-muted-foreground text-sm mt-2">
+                            Tip: add a body HTML template to preview the email
+                            content here.
+                          </p>
+                        </>
+                      )}
+                    </EmailFrameBody>
+                  </EmailFrame>
                 </div>
               ) : null
             }
