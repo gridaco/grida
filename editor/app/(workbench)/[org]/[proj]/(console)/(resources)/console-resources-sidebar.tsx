@@ -15,7 +15,7 @@ import {
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { DarwinSidebarHeaderDragArea } from "@/host/desktop";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
-import { HomeIcon, ShieldCheckIcon } from "lucide-react";
+import { HomeIcon, MailIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -98,6 +98,10 @@ export function ConsoleResourcesSidebar({
               <SidebarMenuLink href={`${basePath}/ciam`}>
                 <ShieldCheckIcon className="size-4" />
                 CIAM
+              </SidebarMenuLink>
+              <SidebarMenuLink href={`${basePath}/ciam/presets`}>
+                <MailIcon className="size-4" />
+                Portal Presets
               </SidebarMenuLink>
             </SidebarMenu>
           </SidebarGroupContent>

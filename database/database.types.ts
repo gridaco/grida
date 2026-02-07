@@ -49,6 +49,19 @@ export type FormNotificationRespondentEmailConfig = {
   reply_to?: string | null;
 };
 
+/**
+ * `grida_ciam.portal_preset.verification_email_template`
+ *
+ * DB-enforced JSON schema (same shape as FormNotificationRespondentEmailConfig).
+ */
+export type PortalPresetVerificationEmailTemplate = {
+  enabled?: boolean;
+  from_name?: string | null;
+  subject_template?: string | null;
+  body_html_template?: string | null;
+  reply_to?: string | null;
+};
+
 // Override the type for a specific column in a view:
 export type Database = MergeDeep<
   DatabaseGenerated,
@@ -73,6 +86,36 @@ export type Database = MergeDeep<
           Insert: DatabaseGenerated["public"]["Tables"]["customer"]["Insert"] & {
             tags?: string[] | null;
           };
+        };
+        portal_preset: {
+          Row: {
+            id: string;
+            created_at: string;
+            updated_at: string;
+            project_id: number;
+            name: string;
+            is_primary: boolean;
+            verification_email_template: PortalPresetVerificationEmailTemplate;
+          };
+          Insert: {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+            project_id: number;
+            name: string;
+            is_primary?: boolean;
+            verification_email_template?: PortalPresetVerificationEmailTemplate;
+          };
+          Update: {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+            project_id?: number;
+            name?: string;
+            is_primary?: boolean;
+            verification_email_template?: PortalPresetVerificationEmailTemplate;
+          };
+          Relationships: [];
         };
       };
     };

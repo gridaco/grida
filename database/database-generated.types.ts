@@ -187,6 +187,36 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_preset: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          name: string
+          project_id: number
+          updated_at: string
+          verification_email_template: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          name: string
+          project_id: number
+          updated_at?: string
+          verification_email_template?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          name?: string
+          project_id?: number
+          updated_at?: string
+          verification_email_template?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -295,6 +325,36 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_preset: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          is_primary: boolean | null
+          name: string | null
+          project_id: number | null
+          updated_at: string | null
+          verification_email_template: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          name?: string | null
+          project_id?: number | null
+          updated_at?: string | null
+          verification_email_template?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          name?: string | null
+          project_id?: number | null
+          updated_at?: string | null
+          verification_email_template?: Json | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_customer_otp_challenge: {
@@ -335,6 +395,10 @@ export type Database = {
       }
       revoke_customer_portal_sessions: {
         Args: { p_customer_uid: string; p_project_id: number }
+        Returns: undefined
+      }
+      set_primary_portal_preset: {
+        Args: { p_preset_id: string; p_project_id: number }
         Returns: undefined
       }
       touch_customer_portal_session: {
@@ -5163,4 +5227,3 @@ export const Constants = {
     },
   },
 } as const
-
