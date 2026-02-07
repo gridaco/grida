@@ -1,23 +1,19 @@
 {
   "name": "@grida/tailwindcss-colors",
-  "description": "Tailwind CSS color data package - provides color values in multiple formats (RGBA, HEX, OKLCH) for programmatic use. Not intended for direct CSS import in production.",
   "version": "4.0.1",
-  "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
-  "license": "MIT",
-  "author": "softmarshmallow",
   "private": false,
+  "description": "Tailwind CSS color data package - provides color values in multiple formats (RGBA, HEX, OKLCH) for programmatic use. Not intended for direct CSS import in production.",
   "keywords": [
+    "colors",
+    "data",
     "grida",
     "tailwind",
-    "colors",
-    "tailwindcss",
-    "data"
+    "tailwindcss"
   ],
-  "scripts": {
-    "generate": "deno run --allow-read --allow-write --allow-net --allow-env --no-prompt scripts/generate.ts",
-    "prepublishOnly": "pnpm generate"
-  },
+  "homepage": "https://grida.co",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "repository": "https://github.com/gridaco/grida",
   "files": [
     "css",
     "json",
@@ -33,5 +29,9 @@
     "./json/rgba.json": "./json/rgba.json",
     "./json/hex.json": "./json/hex.json",
     "./json/oklch.json": "./json/oklch.json"
+  },
+  "scripts": {
+    "generate": "deno run --allow-read --allow-write --allow-net --allow-env --no-prompt scripts/generate.ts",
+    "prepublishOnly": "pnpm generate"
   }
 }

@@ -48,10 +48,10 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts --watch",
     "build": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts",
-    "test": "vitest run"
+    "dev": "tsup google.ts fontface.ts fontface-dom.ts typr/index.ts parse/index.ts parser-worker/index.ts parser-worker/worker.ts k.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22"

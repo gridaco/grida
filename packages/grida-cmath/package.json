@@ -1,40 +1,35 @@
 {
   "name": "@grida/cmath",
+  "version": "0.0.0",
   "description": "unopinionated canvas math",
   "keywords": [
-    "canvas",
-    "math",
-    "geometry",
-    "vector",
-    "rectangle",
-    "circle",
-    "ellipse",
-    "polygon",
-    "path",
-    "svg",
     "bezier",
     "blob",
+    "canvas",
+    "circle",
     "dnd",
+    "ellipse",
+    "geometry",
     "layout",
+    "math",
     "measurement",
-    "snap"
+    "path",
+    "polygon",
+    "rectangle",
+    "snap",
+    "svg",
+    "vector"
   ],
-  "version": "0.0.0",
   "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
   "author": "softmarshmallow",
-  "scripts": {
-    "dev": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts",
-    "test": "vitest run"
-  },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "repository": "https://github.com/gridaco/grida",
   "files": [
     "dist"
   ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -66,5 +61,10 @@
       "import": "./dist/_snap.mjs",
       "require": "./dist/_snap.js"
     }
+  },
+  "scripts": {
+    "build": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts",
+    "dev": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts --watch",
+    "test": "vitest run"
   }
 }

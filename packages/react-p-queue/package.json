@@ -1,38 +1,41 @@
 {
   "name": "react-p-queue",
-  "description": "A React library for handling promise-based queue management with support for batch processing, throttling, and concurrency control using `p-queue`",
   "version": "0.0.0",
-  "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
-  "license": "MIT",
-  "author": "softmarshmallow",
   "private": false,
+  "description": "A React library for handling promise-based queue management with support for batch processing, throttling, and concurrency control using `p-queue`",
   "keywords": [
+    "batch",
+    "concurrency",
     "grida",
-    "react",
     "p-queue",
     "queue",
-    "batch",
-    "throttle",
-    "concurrency"
+    "react",
+    "throttle"
   ],
-  "scripts": {
-    "dev": "tsup index.tsx --format cjs,esm --dts --watch",
-    "build": "tsup index.tsx --format cjs,esm --dts",
-    "test": "vitest run"
-  },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "homepage": "https://grida.co",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "repository": "https://github.com/gridaco/grida",
   "files": [
     "dist"
   ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     }
+  },
+  "scripts": {
+    "build": "tsup index.tsx --format cjs,esm --dts",
+    "dev": "tsup index.tsx --format cjs,esm --dts --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "p-queue": "^7.4.1"
   },
   "devDependencies": {
     "@types/react": "^19",
@@ -41,8 +44,5 @@
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
-  },
-  "dependencies": {
-    "p-queue": "^7.4.1"
   }
 }

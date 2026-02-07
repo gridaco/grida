@@ -1,36 +1,36 @@
 {
   "name": "@grida/sequence",
+  "version": "0.0.0",
   "description": "Fractional indexing implementation for CRDT-based ordered lists",
   "keywords": [
+    "canvas",
+    "collaborative",
     "crdt",
     "fractional-indexing",
-    "order",
     "list",
-    "canvas",
-    "collaborative"
+    "order"
   ],
-  "version": "0.0.0",
   "homepage": "https://grida.co",
-  "repository": "https://github.com/gridaco/grida",
   "license": "CC0-1.0",
   "author": "softmarshmallow",
-  "scripts": {
-    "typecheck": "tsc --noEmit",
-    "dev": "tsup index.ts --format cjs,esm --dts --watch",
-    "build": "tsup index.ts --format cjs,esm --dts",
-    "test": "vitest run"
-  },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "repository": "https://github.com/gridaco/grida",
   "files": [
     "dist"
   ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     }
+  },
+  "scripts": {
+    "build": "tsup index.ts --format cjs,esm --dts",
+    "dev": "tsup index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   }
 }

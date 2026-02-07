@@ -1,11 +1,11 @@
 {
   "name": "@grida/io",
-  "description": "IO model for Grida Canvas",
   "version": "0.0.0",
   "private": true,
+  "description": "IO model for Grida Canvas",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@grida/cg": "workspace:*",

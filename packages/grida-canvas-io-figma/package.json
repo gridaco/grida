@@ -1,10 +1,10 @@
 {
   "name": "@grida/io-figma",
-  "description": "Figma I/O for Grida Canvas",
   "private": true,
+  "description": "Figma I/O for Grida Canvas",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@grida/cmath": "workspace:*",

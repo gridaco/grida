@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 6626",
     "build": "next build",
+    "dev": "next dev -p 6626",
     "lint": "next lint",
-    "start": "next start -p 6626",
+    "postbuild": "npm run sitemap",
     "sitemap": "next-sitemap && node ./.scripts/post-sitemap-mod.js",
-    "postbuild": "npm run sitemap"
+    "start": "next start -p 6626"
   },
   "dependencies": {
     "@base-sdk-fp/auth-components-react": "^0.1.4",

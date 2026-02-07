@@ -1,7 +1,7 @@
 {
   "name": "@crates/grida-canvas",
-  "description": "turbo ci rust wrapper",
   "private": true,
+  "description": "turbo ci rust wrapper",
   "scripts": {
     "build": "cargo build --release",
     "test": "cargo test"
