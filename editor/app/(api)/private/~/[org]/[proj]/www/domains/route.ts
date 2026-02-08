@@ -28,7 +28,8 @@ function errorMessage(e: unknown): string | null {
 }
 
 function errorBody(e: unknown): unknown | null {
-  if (isPlainObject(e) && "body" in e) return (e as { body?: unknown }).body ?? null;
+  if (isPlainObject(e) && "body" in e)
+    return (e as { body?: unknown }).body ?? null;
   return null;
 }
 
@@ -243,8 +244,9 @@ export async function POST(
 
     // 1) Attach to Vercel project
     let vercel_add: unknown = null;
-    let vercel_domain: Awaited<ReturnType<typeof projectsGetProjectDomain>> | null =
-      null;
+    let vercel_domain: Awaited<
+      ReturnType<typeof projectsGetProjectDomain>
+    > | null = null;
     let vercel_config: unknown = null;
     try {
       vercel_add = await projectsAddProjectDomain(hostname);

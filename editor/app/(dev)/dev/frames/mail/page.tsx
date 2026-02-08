@@ -18,9 +18,9 @@ export default function MailFramePage() {
         <EmailFrameBody className="prose prose-stone dark:prose-invert max-w-none">
           <p>Dear team,</p>
           <p>
-            Im excited to announce the release of our latest feature update. This
-            release includes several new capabilities that will help you work
-            more efficiently and effectively.
+            Im excited to announce the release of our latest feature update.
+            This release includes several new capabilities that will help you
+            work more efficiently and effectively.
           </p>
           <p>Some of the key highlights include:</p>
           <ul>

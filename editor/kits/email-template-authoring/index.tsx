@@ -57,8 +57,7 @@ function renderRow({
 }) {
   if (field.state === "off") return null;
 
-  const disabled =
-    field.state === "disabled" ? true : Boolean(field.disabled);
+  const disabled = field.state === "disabled" ? true : Boolean(field.disabled);
   const placeholder = field.state === "on" ? field.placeholder : undefined;
 
   return (
@@ -86,8 +85,7 @@ function renderRow({
 function renderBody({ field }: { field: ControlledField<string> }) {
   if (field.state === "off") return null;
 
-  const disabled =
-    field.state === "disabled" ? true : Boolean(field.disabled);
+  const disabled = field.state === "disabled" ? true : Boolean(field.disabled);
   const placeholder = field.state === "on" ? field.placeholder : undefined;
 
   return (
@@ -136,4 +134,3 @@ export function EmailTemplateAuthoringKit({
     </div>
   );
 }
-

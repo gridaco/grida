@@ -19,7 +19,8 @@ function errorMessage(e: unknown): string | null {
 }
 
 function errorBody(e: unknown): unknown | null {
-  if (isPlainObject(e) && "body" in e) return (e as { body?: unknown }).body ?? null;
+  if (isPlainObject(e) && "body" in e)
+    return (e as { body?: unknown }).body ?? null;
   return null;
 }
 

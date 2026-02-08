@@ -18,7 +18,9 @@ describe("sanitize_email_display_name", () => {
   });
 
   it("strips control characters", () => {
-    expect(sanitize_email_display_name("Acme\x00\x0d\x0aCorp")).toBe("AcmeCorp");
+    expect(sanitize_email_display_name("Acme\x00\x0d\x0aCorp")).toBe(
+      "AcmeCorp"
+    );
   });
 
   it("collapses whitespace", () => {
@@ -30,9 +32,9 @@ describe("sanitize_email_display_name", () => {
   });
 
   it("handles a combination of unsafe characters", () => {
-    expect(
-      sanitize_email_display_name('  "My" <Brand>  \\ \n Name  ')
-    ).toBe("My Brand Name");
+    expect(sanitize_email_display_name('  "My" <Brand>  \\ \n Name  ')).toBe(
+      "My Brand Name"
+    );
   });
 
   it("returns empty string for all-unsafe input", () => {

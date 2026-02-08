@@ -134,9 +134,4 @@ function EmailFrameBody({
   );
 }
 
-export {
-  EmailFrame,
-  EmailFrameSubject,
-  EmailFrameSender,
-  EmailFrameBody,
-};
+export { EmailFrame, EmailFrameSubject, EmailFrameSender, EmailFrameBody };

@@ -23,7 +23,8 @@ function errorMessage(e: unknown): string | null {
 }
 
 function errorBody(e: unknown): unknown | null {
-  if (isPlainObject(e) && "body" in e) return (e as { body?: unknown }).body ?? null;
+  if (isPlainObject(e) && "body" in e)
+    return (e as { body?: unknown }).body ?? null;
   return null;
 }
 
@@ -109,8 +110,9 @@ export async function refreshDomain(
   if (domain_err || !domain_row) return notFound();
 
   let vercel_verify: unknown = null;
-  let vercel_domain: Awaited<ReturnType<typeof projectsGetProjectDomain>> | null =
-    null;
+  let vercel_domain: Awaited<
+    ReturnType<typeof projectsGetProjectDomain>
+  > | null = null;
   let vercel_config: unknown = null;
   try {
     vercel_verify = await projectsVerifyProjectDomain(hostname);
@@ -182,7 +184,9 @@ export async function refreshDomain(
       last_error: null,
       last_error_code,
       vercel: (() => {
-        const prevObj = isPlainObject(domain_row.vercel) ? domain_row.vercel : {};
+        const prevObj = isPlainObject(domain_row.vercel)
+          ? domain_row.vercel
+          : {};
         return toJson({
           ...prevObj,
           verify: vercel_verify,

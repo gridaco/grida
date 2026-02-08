@@ -28,11 +28,7 @@ export async function POST(
   const wwwClient = await createWWWClient();
 
   const { data: project, error: project_err } = await client
-    .rpc(
-      "find_project",
-      { p_org_ref: org, p_proj_ref: proj },
-      { get: true }
-    )
+    .rpc("find_project", { p_org_ref: org, p_proj_ref: proj }, { get: true })
     .single();
   if (project_err) return notFound();
 
@@ -98,4 +94,3 @@ export async function POST(
     data: { www: { id: www.id, name: www.name }, domain: updated },
   });
 }
-

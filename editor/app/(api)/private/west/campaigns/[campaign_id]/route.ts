@@ -1,7 +1,4 @@
-import {
-  createWestReferralClient,
-  service_role,
-} from "@/lib/supabase/server";
+import { createWestReferralClient, service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -37,10 +34,7 @@ export async function DELETE(req: NextRequest, context: Context) {
     .single();
 
   if (fetchErr || !campaign) {
-    return NextResponse.json(
-      { error: "Campaign not found" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
   }
 
   // Delete the parent document — this cascades to the campaign row

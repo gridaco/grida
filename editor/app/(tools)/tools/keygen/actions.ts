@@ -31,4 +31,3 @@ export async function generateKeypairAction(algorithm: KeypairAlgorithm) {
 
   return { publicKeyPem: publicKey, privateKeyPem: privateKey };
 }
-

@@ -76,7 +76,9 @@ function ControlsPreviewLayout({
   return (
     <div className="grid grid-cols-[4fr_6fr] gap-0 min-h-0">
       <div className="py-10 pr-8">{controls}</div>
-      <div className="py-10 pl-8 pr-8 bg-muted/40 rounded-r-lg">{preview ?? null}</div>
+      <div className="py-10 pl-8 pr-8 bg-muted/40 rounded-r-lg">
+        {preview ?? null}
+      </div>
     </div>
   );
 }
@@ -89,20 +91,21 @@ export default function PortalPresetEditPage() {
 
   const key = `portal-preset-${params.id}`;
 
-  const { data: preset, isLoading, mutate } = useSWR<PortalPresetRow>(
-    key,
-    async () => {
-      const { data, error } = await client
-        .from("portal_preset")
-        .select("*")
-        .eq("id", params.id)
-        .eq("project_id", project.id)
-        .single();
+  const {
+    data: preset,
+    isLoading,
+    mutate,
+  } = useSWR<PortalPresetRow>(key, async () => {
+    const { data, error } = await client
+      .from("portal_preset")
+      .select("*")
+      .eq("id", params.id)
+      .eq("project_id", project.id)
+      .single();
 
-      if (error) throw error;
-      return data;
-    }
-  );
+    if (error) throw error;
+    return data;
+  });
 
   // --- Name form (isolated) ---
   const nameForm = useForm<{ name: string }>({
@@ -111,7 +114,10 @@ export default function PortalPresetEditPage() {
 
   const onNameSubmit = async (data: { name: string }) => {
     const req = Promise.resolve(
-      client.from("portal_preset").update({ name: data.name }).eq("id", params.id)
+      client
+        .from("portal_preset")
+        .update({ name: data.name })
+        .eq("id", params.id)
     ).then(({ error }) => {
       if (error) throw error;
     });
@@ -135,8 +141,10 @@ export default function PortalPresetEditPage() {
       ? {
           enabled: preset.verification_email_template?.enabled ?? false,
           from_name: preset.verification_email_template?.from_name ?? null,
-          subject_template: preset.verification_email_template?.subject_template ?? null,
-          body_html_template: preset.verification_email_template?.body_html_template ?? null,
+          subject_template:
+            preset.verification_email_template?.subject_template ?? null,
+          body_html_template:
+            preset.verification_email_template?.body_html_template ?? null,
           reply_to: preset.verification_email_template?.reply_to ?? null,
         }
       : undefined,
@@ -161,10 +169,13 @@ export default function PortalPresetEditPage() {
     values: preset
       ? {
           email_step_title: preset.portal_login_page?.email_step_title ?? "",
-          email_step_description: preset.portal_login_page?.email_step_description ?? "",
-          email_step_button_label: preset.portal_login_page?.email_step_button_label ?? "",
+          email_step_description:
+            preset.portal_login_page?.email_step_description ?? "",
+          email_step_button_label:
+            preset.portal_login_page?.email_step_button_label ?? "",
           otp_step_title: preset.portal_login_page?.otp_step_title ?? "",
-          otp_step_description: preset.portal_login_page?.otp_step_description ?? "",
+          otp_step_description:
+            preset.portal_login_page?.otp_step_description ?? "",
         }
       : undefined,
   });
@@ -172,17 +183,18 @@ export default function PortalPresetEditPage() {
   const loginPageOverrides = useWatch({
     control: loginPageForm.control,
   });
-  const loginPagePreviewOverrides: PortalPresetLoginPage | null = useMemo(() => {
-    const v = loginPageOverrides;
-    return {
-      template_id: "202602-default",
-      email_step_title: v?.email_step_title?.trim() || null,
-      email_step_description: v?.email_step_description?.trim() || null,
-      email_step_button_label: v?.email_step_button_label?.trim() || null,
-      otp_step_title: v?.otp_step_title?.trim() || null,
-      otp_step_description: v?.otp_step_description?.trim() || null,
-    };
-  }, [loginPageOverrides]);
+  const loginPagePreviewOverrides: PortalPresetLoginPage | null =
+    useMemo(() => {
+      const v = loginPageOverrides;
+      return {
+        template_id: "202602-default",
+        email_step_title: v?.email_step_title?.trim() || null,
+        email_step_description: v?.email_step_description?.trim() || null,
+        email_step_button_label: v?.email_step_button_label?.trim() || null,
+        otp_step_title: v?.otp_step_title?.trim() || null,
+        otp_step_description: v?.otp_step_description?.trim() || null,
+      };
+    }, [loginPageOverrides]);
 
   const onLoginPageSubmit = async (data: LoginPageFormValues) => {
     const loginPage: PortalPresetLoginPage = {
@@ -350,35 +362,37 @@ export default function PortalPresetEditPage() {
               <FieldSet className="space-y-4">
                 <FieldLegend variant="legend">Preset Name</FieldLegend>
                 <FieldGroup>
-                <Controller
-                  name="name"
-                  control={nameForm.control}
-                  render={({ field }) => (
-                    <FieldSet>
-                      <FieldLegend variant="label">Name</FieldLegend>
-                      <FieldGroup>
-                        <Field className="max-w-sm">
-                          <FieldLabel htmlFor="preset-name">Preset name</FieldLabel>
-                          <Input
-                            id="preset-name"
-                            {...field}
-                            value={field.value ?? ""}
-                            placeholder="Preset name"
-                          />
-                        </Field>
-                      </FieldGroup>
-                    </FieldSet>
-                  )}
-                />
-                <Button
-                  disabled={
-                    nameForm.formState.isSubmitting ||
-                    !nameForm.formState.isDirty
-                  }
-                  onClick={nameForm.handleSubmit(onNameSubmit)}
-                >
-                  {nameForm.formState.isSubmitting ? <Spinner /> : "Save"}
-                </Button>
+                  <Controller
+                    name="name"
+                    control={nameForm.control}
+                    render={({ field }) => (
+                      <FieldSet>
+                        <FieldLegend variant="label">Name</FieldLegend>
+                        <FieldGroup>
+                          <Field className="max-w-sm">
+                            <FieldLabel htmlFor="preset-name">
+                              Preset name
+                            </FieldLabel>
+                            <Input
+                              id="preset-name"
+                              {...field}
+                              value={field.value ?? ""}
+                              placeholder="Preset name"
+                            />
+                          </Field>
+                        </FieldGroup>
+                      </FieldSet>
+                    )}
+                  />
+                  <Button
+                    disabled={
+                      nameForm.formState.isSubmitting ||
+                      !nameForm.formState.isDirty
+                    }
+                    onClick={nameForm.handleSubmit(onNameSubmit)}
+                  >
+                    {nameForm.formState.isSubmitting ? <Spinner /> : "Save"}
+                  </Button>
                 </FieldGroup>
               </FieldSet>
             }
@@ -398,15 +412,17 @@ export default function PortalPresetEditPage() {
                   <FieldSet>
                     <FieldLegend>Login Page</FieldLegend>
                     <FieldDescription>
-                      Override the default text shown on the customer portal login
-                      page. Leave a field empty to use the default.
+                      Override the default text shown on the customer portal
+                      login page. Leave a field empty to use the default.
                     </FieldDescription>
                     <FieldGroup className="flex flex-col gap-6">
                       <FieldSet>
                         <FieldLegend>Email Step</FieldLegend>
                         <FieldGroup>
                           <Field>
-                            <FieldLabel htmlFor="lp-email-title">Title</FieldLabel>
+                            <FieldLabel htmlFor="lp-email-title">
+                              Title
+                            </FieldLabel>
                             <Controller
                               name="email_step_title"
                               control={loginPageForm.control}
@@ -421,7 +437,9 @@ export default function PortalPresetEditPage() {
                             />
                           </Field>
                           <Field>
-                            <FieldLabel htmlFor="lp-email-desc">Description</FieldLabel>
+                            <FieldLabel htmlFor="lp-email-desc">
+                              Description
+                            </FieldLabel>
                             <Controller
                               name="email_step_description"
                               control={loginPageForm.control}
@@ -436,7 +454,9 @@ export default function PortalPresetEditPage() {
                             />
                           </Field>
                           <Field>
-                            <FieldLabel htmlFor="lp-email-btn">Button Label</FieldLabel>
+                            <FieldLabel htmlFor="lp-email-btn">
+                              Button Label
+                            </FieldLabel>
                             <Controller
                               name="email_step_button_label"
                               control={loginPageForm.control}
@@ -456,7 +476,9 @@ export default function PortalPresetEditPage() {
                         <FieldLegend>OTP Step</FieldLegend>
                         <FieldGroup>
                           <Field>
-                            <FieldLabel htmlFor="lp-otp-title">Title</FieldLabel>
+                            <FieldLabel htmlFor="lp-otp-title">
+                              Title
+                            </FieldLabel>
                             <Controller
                               name="otp_step_title"
                               control={loginPageForm.control}
@@ -471,7 +493,9 @@ export default function PortalPresetEditPage() {
                             />
                           </Field>
                           <Field>
-                            <FieldLabel htmlFor="lp-otp-desc">Description</FieldLabel>
+                            <FieldLabel htmlFor="lp-otp-desc">
+                              Description
+                            </FieldLabel>
                             <Controller
                               name="otp_step_description"
                               control={loginPageForm.control}
@@ -497,7 +521,11 @@ export default function PortalPresetEditPage() {
                       !loginPageForm.formState.isDirty
                     }
                   >
-                    {loginPageForm.formState.isSubmitting ? <Spinner /> : "Save"}
+                    {loginPageForm.formState.isSubmitting ? (
+                      <Spinner />
+                    ) : (
+                      "Save"
+                    )}
                   </Button>
                 </form>
               </FieldSet>
@@ -523,8 +551,12 @@ export default function PortalPresetEditPage() {
                 </div>
                 <Tabs defaultValue="email" className="w-full">
                   <TabsList className="w-full">
-                    <TabsTrigger value="email" className="flex-1">Email Step</TabsTrigger>
-                    <TabsTrigger value="otp" className="flex-1">OTP Step</TabsTrigger>
+                    <TabsTrigger value="email" className="flex-1">
+                      Email Step
+                    </TabsTrigger>
+                    <TabsTrigger value="otp" className="flex-1">
+                      OTP Step
+                    </TabsTrigger>
                   </TabsList>
                   <TabsContent value="email" className="mt-4">
                     <Safari className="flex w-full flex-col aspect-video shadow-lg overflow-hidden rounded-lg border">
@@ -573,8 +605,13 @@ export default function PortalPresetEditPage() {
           <ControlsPreviewLayout
             controls={
               <FieldSet className="space-y-4">
-                <Field orientation="horizontal" className="flex-row items-center justify-between gap-4">
-                  <FieldLegend variant="legend">Verification Email Template</FieldLegend>
+                <Field
+                  orientation="horizontal"
+                  className="flex-row items-center justify-between gap-4"
+                >
+                  <FieldLegend variant="legend">
+                    Verification Email Template
+                  </FieldLegend>
                   <Controller
                     name="enabled"
                     control={control}
@@ -595,8 +632,7 @@ export default function PortalPresetEditPage() {
                     <EmailTemplateAuthoringKit
                       helper={
                         <FieldDescription>
-                          Supported variables:{" "}
-                          <code>{"{{email_otp}}"}</code>,{" "}
+                          Supported variables: <code>{"{{email_otp}}"}</code>,{" "}
                           <code>{"{{brand_name}}"}</code>,{" "}
                           <code>{"{{customer_name}}"}</code>,{" "}
                           <code>{"{{expires_in_minutes}}"}</code>,{" "}
@@ -664,8 +700,9 @@ export default function PortalPresetEditPage() {
                 ) : (
                   <FieldGroup className="space-y-4">
                     <FieldDescription>
-                      Enable the toggle above to customize the verification email.
-                      When disabled, the default Grida verification email is used.
+                      Enable the toggle above to customize the verification
+                      email. When disabled, the default Grida verification email
+                      is used.
                     </FieldDescription>
                     <Button
                       disabled={isSubmitting || !isDirty}

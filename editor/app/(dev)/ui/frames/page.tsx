@@ -193,19 +193,35 @@ export default function FramesPage() {
                     <EmailFrameSubject
                       actions={
                         <>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                          >
                             <ReplyIcon className="h-3.5 w-3.5" />
                             <span className="sr-only">Reply</span>
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                          >
                             <ForwardIcon className="h-3.5 w-3.5" />
                             <span className="sr-only">Forward</span>
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                          >
                             <ArchiveIcon className="h-3.5 w-3.5" />
                             <span className="sr-only">Archive</span>
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                          >
                             <TrashIcon className="h-3.5 w-3.5" />
                             <span className="sr-only">Delete</span>
                           </Button>
@@ -316,7 +332,9 @@ export default function FramesPage() {
               </p>
               <div className="h-96 overflow-hidden rounded-lg border">
                 <EmailFrame className="h-full flex flex-col">
-                  <EmailFrameSubject>Thanks for your submission</EmailFrameSubject>
+                  <EmailFrameSubject>
+                    Thanks for your submission
+                  </EmailFrameSubject>
                   <EmailFrameSender
                     name="Grida Forms"
                     email="no-reply@accounts.grida.co"
@@ -324,11 +342,15 @@ export default function FramesPage() {
                   />
                   <EmailFrameBody className="prose prose-stone dark:prose-invert max-w-none">
                     <h2>Thanks for registering!</h2>
-                    <p>We received your submission for the Annual Conference.</p>
+                    <p>
+                      We received your submission for the Annual Conference.
+                    </p>
                     <p>Your registration number: #042</p>
                     <h3>What happens next?</h3>
                     <ul>
-                      <li>You will receive a confirmation email within 24 hours</li>
+                      <li>
+                        You will receive a confirmation email within 24 hours
+                      </li>
                       <li>Our team will review your application</li>
                       <li>If approved, you will get your ticket via email</li>
                     </ul>
@@ -341,12 +363,13 @@ export default function FramesPage() {
                     </p>
                     <h3>Important notes</h3>
                     <p>
-                      Please bring a valid ID and your ticket (digital or printed)
-                      to the event. Doors open at 8:30 AM for registration.
+                      Please bring a valid ID and your ticket (digital or
+                      printed) to the event. Doors open at 8:30 AM for
+                      registration.
                     </p>
                     <p>
-                      If you have any dietary requirements, please let us know at
-                      least 48 hours before the event.
+                      If you have any dietary requirements, please let us know
+                      at least 48 hours before the event.
                     </p>
                     <p>We look forward to seeing you there!</p>
                     <hr />
