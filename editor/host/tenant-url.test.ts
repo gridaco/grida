@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { DEFAULT_PLATFORM_APEX_DOMAIN } from "./domains";
+import { DEFAULT_PLATFORM_APEX_DOMAIN } from "@/lib/domains";
 
 describe("lib/tenant-url", () => {
   const rpcMock = vi.hoisted(() => vi.fn());
@@ -74,7 +74,7 @@ describe("lib/tenant-url", () => {
       expect(fn).toBe("www_get_canonical_hostname");
 
       const tenant = (args as any)?.p_www_name as string | undefined;
-      const canonical = tenant ? canonicalByTenant[tenant] ?? null : null;
+      const canonical = tenant ? (canonicalByTenant[tenant] ?? null) : null;
 
       return {
         data: canonical ? [{ canonical_hostname: canonical }] : [],
@@ -152,4 +152,3 @@ describe("lib/tenant-url", () => {
     ).resolves.toBe(`https://acme.${DEFAULT_PLATFORM_APEX_DOMAIN}/west`);
   });
 });
-
