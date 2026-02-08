@@ -25,15 +25,15 @@ Practically, this means:
 ### How to enable respondent email notifications
 
 1. Open your **Form** in the Grida editor.
-2. In the left sidebar, click **Connect**.
-3. Click **Channels**.
+2. In the left sidebar, click [**Connect**](https://grida.co/_/connect).
+3. Click [**Channels**](https://grida.co/_/connect/channels).
 4. Under **Email Notifications**, find **Respondent email notifications**.
 5. Toggle **Enable** on.
 6. Click **Save**.
 
 ### How to customize the email
 
-1. Open **Connect → Channels → Email Notifications** (same as above).
+1. Open [**Connect → Channels**](https://grida.co/_/connect/channels) → **Email Notifications** (same as above).
 2. Configure the email fields:
    - **Reply-To** (optional): where replies should go (e.g. `support@yourdomain.com`)
    - **Subject**: the email subject template
