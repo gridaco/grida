@@ -153,6 +153,8 @@ CREATE TABLE grida_west_referral.campaign (
   metadata JSONB DEFAULT NULL,                                                        -- Flexible additional private data for the campaign / will NOT be public
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),                                      -- timestamp
 
+  ciam_invitee_on_claim_tag_names text[] NOT NULL DEFAULT '{}',                       -- Tag names auto-applied to invitee customer when invitation is claimed
+
   CONSTRAINT fk_campaign_layout_document_id FOREIGN KEY (layout_id, id) REFERENCES grida_www.layout(id, document_id) ON DELETE SET NULL,
   CONSTRAINT unique_campaign_id_project_id UNIQUE (id, project_id)
 );
@@ -843,3 +845,72 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 REVOKE EXECUTE ON FUNCTION grida_west_referral.analyze FROM anon, authenticated;
 GRANT EXECUTE ON FUNCTION grida_west_referral.analyze TO service_role;
+
+
+---------------------------------------------------------------------
+-- [CIAM Auto-Tagging] --
+---------------------------------------------------------------------
+
+-- Helper: add-only tag application (no removals, idempotent)
+CREATE OR REPLACE FUNCTION grida_west_referral.apply_customer_tags(
+  p_customer_uid uuid,
+  p_project_id bigint,
+  p_tag_names text[]
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, grida_ciam
+AS $$
+DECLARE
+  tag text;
+BEGIN
+  IF p_tag_names IS NULL OR array_length(p_tag_names, 1) IS NULL THEN
+    RETURN;
+  END IF;
+
+  FOREACH tag IN ARRAY p_tag_names LOOP
+    INSERT INTO public.tag (project_id, name)
+    VALUES (p_project_id, tag)
+    ON CONFLICT (project_id, name) DO NOTHING;
+
+    INSERT INTO grida_ciam.customer_tag (customer_uid, project_id, tag_name)
+    VALUES (p_customer_uid, p_project_id, tag)
+    ON CONFLICT DO NOTHING;
+  END LOOP;
+END;
+$$;
+
+-- Only callable by triggers / service_role; block direct RPC from anon/authenticated.
+REVOKE EXECUTE ON FUNCTION grida_west_referral.apply_customer_tags(uuid, bigint, text[]) FROM anon, authenticated;
+
+-- Trigger function: auto-tag invitee on claim
+CREATE OR REPLACE FUNCTION grida_west_referral.trg_auto_tag_invitee_on_claim()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_tag_names text[];
+  v_project_id bigint;
+BEGIN
+  IF OLD.is_claimed = false AND NEW.is_claimed = true AND NEW.customer_id IS NOT NULL THEN
+    SELECT c.ciam_invitee_on_claim_tag_names, c.project_id
+    INTO v_tag_names, v_project_id
+    FROM grida_west_referral.campaign c
+    WHERE c.id = NEW.campaign_id;
+
+    IF v_tag_names IS NOT NULL AND array_length(v_tag_names, 1) > 0 THEN
+      PERFORM grida_west_referral.apply_customer_tags(NEW.customer_id, v_project_id, v_tag_names);
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_auto_tag_invitee_on_claim
+AFTER UPDATE ON grida_west_referral.invitation
+FOR EACH ROW
+EXECUTE FUNCTION grida_west_referral.trg_auto_tag_invitee_on_claim();
+

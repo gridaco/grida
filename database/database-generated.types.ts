@@ -2762,6 +2762,7 @@ export type Database = {
     Tables: {
       campaign: {
         Row: {
+          ciam_invitee_on_claim_tag_names: string[]
           conversion_currency: string
           conversion_value: number | null
           created_at: string
@@ -2782,6 +2783,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          ciam_invitee_on_claim_tag_names?: string[]
           conversion_currency?: string
           conversion_value?: number | null
           created_at?: string
@@ -2802,6 +2804,7 @@ export type Database = {
           title: string
         }
         Update: {
+          ciam_invitee_on_claim_tag_names?: string[]
           conversion_currency?: string
           conversion_value?: number | null
           created_at?: string
@@ -3623,6 +3626,14 @@ export type Database = {
           count: number
           name: string
         }[]
+      }
+      apply_customer_tags: {
+        Args: {
+          p_customer_uid: string
+          p_project_id: number
+          p_tag_names: string[]
+        }
+        Returns: undefined
       }
       claim: {
         Args: { p_campaign_id: string; p_code: string; p_customer_id: string }

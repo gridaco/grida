@@ -73,9 +73,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import { DeleteConfirmationAlertDialog } from "@/components/dialogs/delete-confirmation-dialog";
-import { useProject } from "@/scaffolds/workspace";
+import { useProject, useTags } from "@/scaffolds/workspace";
 import { useRouter } from "next/navigation";
 import type { Database } from "@app/database";
+import { TagInput } from "@/components/tag";
 
 // Timezone options
 const timezones = [
@@ -102,6 +103,7 @@ const formSchema = z.object({
   scheduling_close_at: z.date().nullable(),
   scheduling_tz: z.string().nullable(),
   public: z.any().default({}),
+  ciam_invitee_on_claim_tag_names: z.array(z.string()).default([]),
 });
 
 type CampaignFormValues = z.infer<typeof formSchema>;
@@ -139,6 +141,7 @@ function useCampaignData(id: string) {
             data.is_referrer_profile_exposed_to_public_dangerously,
           max_invitations_per_referrer: data.max_invitations_per_referrer,
           public: data.public,
+          ciam_invitee_on_claim_tag_names: data.ciam_invitee_on_claim_tag_names,
         })
         .eq("id", id)
         .select("*");
@@ -266,6 +269,7 @@ function Body({
             <TabsTrigger value="rewards">Rewards</TabsTrigger>
             <TabsTrigger value="challenges">Challenges</TabsTrigger>
             <TabsTrigger value="events">Events</TabsTrigger>
+            <TabsTrigger value="tagging">Customer Tagging</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
             <TabsTrigger
@@ -485,6 +489,10 @@ function Body({
                   </div>
                 </div>
               </div>
+            )}
+
+            {activeTab === "tagging" && (
+              <CampaignTaggingSection control={form.control} />
             )}
 
             {activeTab === "milestone" && <ComingSoonCard />}
@@ -709,6 +717,67 @@ function Body({
         </form>
       </Form>
     </Card>
+  );
+}
+
+function CampaignTaggingSection({
+  control,
+}: {
+  control: Control<CampaignFormValues>;
+}) {
+  const { tags: projectTags } = useTags();
+
+  const autocompleteOptions = useMemo(
+    () => projectTags.map((t) => ({ id: t.name, text: t.name })),
+    [projectTags]
+  );
+
+  const [activeTagIndex, setActiveTagIndex] = useState<number | null>(null);
+
+  return (
+    <div>
+      <h3 className="text-lg font-medium">Customer Tagging</h3>
+      <p className="text-sm text-muted-foreground mb-4">
+        Automatically tag customers when they join this campaign. Tags are
+        applied once (add-only) and will not be removed if changed later.
+      </p>
+      <div className="space-y-8">
+        <FormField
+          control={control}
+          name="ciam_invitee_on_claim_tag_names"
+          render={({ field }) => {
+            const tags = field.value ?? [];
+            return (
+              <FormItem>
+                <FormLabel>Invitee tags (on claim)</FormLabel>
+                <FormControl>
+                  <TagInput
+                    tags={tags.map((t) => ({ id: t, text: t }))}
+                    setTags={(newTags) => {
+                      const resolved =
+                        typeof newTags === "function"
+                          ? newTags(tags.map((t) => ({ id: t, text: t })))
+                          : newTags;
+                      field.onChange(resolved.map((t) => t.text));
+                    }}
+                    activeTagIndex={activeTagIndex}
+                    setActiveTagIndex={setActiveTagIndex}
+                    enableAutocomplete={autocompleteOptions.length > 0}
+                    autocompleteOptions={autocompleteOptions}
+                    placeholder="Add tags"
+                  />
+                </FormControl>
+                <FormDescription>
+                  These tags will be automatically applied to the invitee&apos;s
+                  customer profile when they claim an invitation.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
