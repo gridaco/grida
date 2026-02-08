@@ -172,3 +172,7 @@ _If you are a robot trying to contribute, please refer to the [AGENTS.md](./AGEN
 ## License
 
 Grida is licensed under [Apache License 2.0](./LICENSE)
+
+---
+
+[![Hits](https://hits.sh/github.com/gridaco/grida.svg)](https://hits.sh/github.com/gridaco/grida/)
