@@ -52,6 +52,7 @@ const PROJECT_ROUTE_CONFIGS = {
   project: { scope: "project", path: "" },
   dash: { scope: "project" },
   ciam: { scope: "project" },
+  "ciam/portal": { scope: "project" },
   customers: { scope: "project" },
   "customers/policies": { scope: "project" },
   "customers/policies/new": { scope: "project" },
@@ -60,6 +61,8 @@ const PROJECT_ROUTE_CONFIGS = {
   integrations: { scope: "project" },
   analytics: { scope: "project" },
   campaigns: { scope: "project" },
+  "new/event": { scope: "project" },
+  "new/referral": { scope: "project" },
   www: { scope: "project" },
 } satisfies Record<string, UniversalRouteConfig>;
 
@@ -77,6 +80,9 @@ const DOCUMENT_ROUTE_CONFIGS = {
   // ── form ──────────────────────────────────────────────────
   form: { scope: "document", requiredDoctypes: ["v0_form"] },
   "form/edit": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "form/auth": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "form/start": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "form/end": { scope: "document", requiredDoctypes: ["v0_form"] },
 
   // ── general ───────────────────────────────────────────────
   settings: { scope: "document" },
@@ -86,6 +92,7 @@ const DOCUMENT_ROUTE_CONFIGS = {
   // ── data ──────────────────────────────────────────────────
   data: { scope: "document" },
   objects: { scope: "document" },
+  "data/customers": { scope: "document", requiredDoctypes: ["v0_form"] },
   "data/responses": { scope: "document", requiredDoctypes: ["v0_form"] },
   "data/responses/sessions": { scope: "document", requiredDoctypes: ["v0_form"] },
   "data/analytics": { scope: "document" },
@@ -98,9 +105,14 @@ const DOCUMENT_ROUTE_CONFIGS = {
   "connect/parameters": { scope: "document", requiredDoctypes: ["v0_form"] },
   "connect/customer": { scope: "document", requiredDoctypes: ["v0_form"] },
   "connect/channels": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "connect/import": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "connect/integrations": { scope: "document" },
+  "connect/webhooks": { scope: "document", requiredDoctypes: ["v0_form"] },
   "connect/store": { scope: "document", requiredDoctypes: ["v0_form"] },
   "connect/store/get-started": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "connect/store/orders": { scope: "document", requiredDoctypes: ["v0_form"] },
   "connect/store/products": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "connect/store/products/new": { scope: "document", requiredDoctypes: ["v0_form"] },
   "connect/database/supabase": { scope: "document", requiredDoctypes: ["v0_form", "v0_schema"] },
 } satisfies Record<string, UniversalRouteConfig>;
 
