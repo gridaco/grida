@@ -19,7 +19,7 @@
     "oxfmt": "^0.28.0",
     "prettier": "^3.5.3",
     "tsup": "^8.5.0",
-    "turbo": "^2.6.3",
+    "turbo": "^2.8.3",
     "typescript": "^5",
     "vitest": "^4"
   },
