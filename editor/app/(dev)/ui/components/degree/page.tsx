@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { TooltipProvider } from "@radix-ui/react-tooltip";
+import { Tooltip as TooltipPrimitive } from "radix-ui";
 import DegreeControl from "@/scaffolds/sidecontrol/controls/degree";
 import { ComponentDemo } from "../component-demo";
 
@@ -11,7 +11,7 @@ export default function DegreeControlPage() {
   const [disabledRotation, setDisabledRotation] = useState(45);
 
   return (
-    <TooltipProvider>
+    <TooltipPrimitive.Provider>
       <main className="container max-w-screen-lg mx-auto py-10">
         <div className="space-y-8">
           <div>
@@ -228,6 +228,6 @@ export default function DegreeControlPage() {
           </section>
         </div>
       </main>
-    </TooltipProvider>
+    </TooltipPrimitive.Provider>
   );
 }

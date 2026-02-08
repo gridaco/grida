@@ -20,7 +20,7 @@ import {
 } from "@radix-ui/react-icons";
 import { useHotkeys } from "react-hotkeys-hook";
 import { cn } from "@/components/lib/utils";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog as DialogPrimitive } from "radix-ui";
 
 /**
  * Hook to detect double shift key press (like IntelliJ)

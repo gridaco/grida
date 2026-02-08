@@ -2,7 +2,7 @@
 
 import React from "react";
 import { ScreenRoot } from "@/theme/templates/kit/components";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { Platform } from "@/lib/platform";
 import InvitationPageTemplate from "@/theme/templates/enterprise/west-referral/invitation/page";
 import InvitationCouponTemplate from "@/theme/templates/enterprise/west-referral/invitation/coupon";

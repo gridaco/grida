@@ -4,22 +4,14 @@ import React, {
   createContext,
   useContext,
   useState,
-  ReactNode,
   useEffect,
   useCallback,
 } from "react";
-import {
-  Dialog,
-  DialogPortal,
-  DialogContent,
-  DialogClose,
-  DialogOverlay,
-} from "@radix-ui/react-dialog";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import {
   Cross2Icon,
   DownloadIcon,
   ExitFullScreenIcon,
-  PlayIcon,
 } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -27,7 +19,6 @@ import { Menubar } from "@/components/ui/menubar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { PictureInPicture } from "@/components/pip";
-import { AudioLinesIcon } from "lucide-react";
 import { ContentAudio } from "./pip-audio-content";
 import { wellkown } from "@/utils/mimetype";
 
@@ -161,15 +152,15 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren) {
         </PictureInPicture>
       )}
       {!isPip && (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogPortal>
-            <DialogOverlay className="fixed inset-0 bg-black/75 z-50" />
-            <DialogContent className="fixed inset-0 flex items-center justify-center z-50">
-              <DialogClose className="absolute top-4 right-4">
+        <DialogPrimitive.Root open={isOpen} onOpenChange={setIsOpen}>
+          <DialogPrimitive.Portal>
+            <DialogPrimitive.Overlay className="fixed inset-0 bg-black/75 z-50" />
+            <DialogPrimitive.Content className="fixed inset-0 flex items-center justify-center z-50">
+              <DialogPrimitive.Close className="absolute top-4 right-4">
                 <Button variant="outline" size="icon">
                   <Cross2Icon />
                 </Button>
-              </DialogClose>
+              </DialogPrimitive.Close>
               <div className="w-full h-full p-10">
                 <StandaloneMediaView
                   mediaSrc={mediaSrc}
@@ -199,9 +190,9 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren) {
                   </Button>
                 </Menubar>
               </footer>
-            </DialogContent>
-          </DialogPortal>
-        </Dialog>
+            </DialogPrimitive.Content>
+          </DialogPrimitive.Portal>
+        </DialogPrimitive.Root>
       )}
       {children}
     </MediaViewerContext.Provider>

@@ -16,7 +16,7 @@ import { initialEditorState } from "./init";
 import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
-import { TooltipProvider } from "@radix-ui/react-tooltip";
+import { Tooltip as TooltipPrimitive } from "radix-ui";
 import { RowEditPanel } from "../panels/row-edit-panel";
 import { CustomerEditPanel } from "../panels/customer-panel";
 import { MediaViewerProvider } from "@/components/mediaviewer";
@@ -81,7 +81,7 @@ function DatabaseDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <Multiplayer>
-        <TooltipProvider>
+        <TooltipPrimitive.Provider>
           <AssetsBackgroundsResolver />
           <MediaViewerProvider>
             {/*  */}
@@ -89,7 +89,7 @@ function DatabaseDocumentEditorProvider({
             <RowEditPanelProvider />
             {children}
           </MediaViewerProvider>
-        </TooltipProvider>
+        </TooltipPrimitive.Provider>
       </Multiplayer>
     </StateProvider>
   );
@@ -106,10 +106,10 @@ function BucketDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <Multiplayer>
-        <TooltipProvider>
+        <TooltipPrimitive.Provider>
           <AssetsBackgroundsResolver />
           <MediaViewerProvider>{children}</MediaViewerProvider>
-        </TooltipProvider>
+        </TooltipPrimitive.Provider>
       </Multiplayer>
     </StateProvider>
   );
@@ -132,7 +132,7 @@ function CanvasDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <Multiplayer>
-        <TooltipProvider>
+        <TooltipPrimitive.Provider>
           <MediaViewerProvider>
             <HostedGridaCanvasDocumentProvider
               document_id={initial.document_id}
@@ -142,7 +142,7 @@ function CanvasDocumentEditorProvider({
               {children}
             </HostedGridaCanvasDocumentProvider>
           </MediaViewerProvider>
-        </TooltipProvider>
+        </TooltipPrimitive.Provider>
       </Multiplayer>
     </StateProvider>
   );
@@ -229,7 +229,7 @@ export function FormDocumentEditorProvider({
     <StateProvider state={state} dispatch={dispatch}>
       <FormAgentThemeSyncProvider>
         <Multiplayer>
-          <TooltipProvider>
+          <TooltipPrimitive.Provider>
             <AssetsBackgroundsResolver />
             <MediaViewerProvider>
               <FormFieldEditPanelProvider />
@@ -237,7 +237,7 @@ export function FormDocumentEditorProvider({
               <CustomerPanelProvider />
               {children}
             </MediaViewerProvider>
-          </TooltipProvider>
+          </TooltipPrimitive.Provider>
         </Multiplayer>
       </FormAgentThemeSyncProvider>
     </StateProvider>

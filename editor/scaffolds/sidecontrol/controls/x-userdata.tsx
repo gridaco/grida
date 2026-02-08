@@ -8,8 +8,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { Editor as MonacoEditor } from "@monaco-editor/react";
-import { DialogClose } from "@radix-ui/react-dialog";
 import assert from "assert";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -93,14 +93,14 @@ export function UserDataControl({
           }}
         />
         <DialogFooter>
-          <DialogClose asChild>
+          <DialogPrimitive.Close asChild>
             <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <DialogClose disabled={!valid} asChild>
+          </DialogPrimitive.Close>
+          <DialogPrimitive.Close disabled={!valid} asChild>
             <Button disabled={!valid} onClick={onSaveClick}>
               Save
             </Button>
-          </DialogClose>
+          </DialogPrimitive.Close>
         </DialogFooter>
       </DialogContent>
     </Dialog>
