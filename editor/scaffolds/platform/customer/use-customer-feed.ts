@@ -84,6 +84,42 @@ export async function fetchCustomers(
   return await q;
 }
 
+/**
+ * Lightweight query that fetches only customer UIDs matching the given
+ * predicates and text search. No pagination -- returns all matching rows.
+ * Intended for "Select All" across pages.
+ */
+export async function fetchCustomerIds(
+  client: SupabaseClient<Database, "grida_ciam_public">,
+  project_id: number,
+  query: Pick<Data.Relation.QueryState, "q_predicates" | "q_text_search">
+) {
+  const { q_predicates, q_text_search } = query;
+  const q = client
+    .from("customer_with_tags")
+    .select("uid")
+    .eq("project_id", project_id);
+
+  // predicates
+  const valid_predicates = q_predicates
+    ?.map(Data.Query.Predicate.Extension.encode)
+    ?.filter(Data.Query.Predicate.is_predicate_fulfilled);
+  valid_predicates?.forEach((predicate) => {
+    q.filter(predicate.column, predicate.op, predicate.value);
+  });
+
+  // text search (filter)
+  if (q_text_search && q_text_search.query) {
+    q.filter(
+      Platform.Customer.TABLE_SEARCH_TEXT,
+      "ilike",
+      `%${q_text_search.query}%`
+    );
+  }
+
+  return await q;
+}
+
 export function useCustomers(
   project_id: number,
   query: Data.Relation.QueryState
