@@ -91,11 +91,6 @@ export function ShareDrawerDialog({
   labels,
   payload,
   description,
-  /**
-   * Deprecated: prefer `description` (ReactNode) to avoid HTML strings.
-   * Kept for template convenience.
-   */
-  descriptionHtml,
   actions,
   toastOnCopy = true,
   closeOnCopy = true,
@@ -108,7 +103,6 @@ export function ShareDrawerDialog({
   labels?: Partial<ShareDialogStrings>;
   payload: WebSharePayload | null | undefined;
   description?: React.ReactNode;
-  descriptionHtml?: string;
   /**
    * Which share actions to show. Defaults to all.
    */
@@ -170,16 +164,7 @@ export function ShareDrawerDialog({
       <DrawerTitle className="sr-only">Share</DrawerTitle>
       <DrawerContent>
         <div className="mx-auto w-full">
-          {description ? (
-            <div className="p-4">{description}</div>
-          ) : (
-            descriptionHtml && (
-              <article
-                className="p-4 prose prose-sm dark:prose-invert"
-                dangerouslySetInnerHTML={{ __html: descriptionHtml }}
-              />
-            )
-          )}
+          {description && <div className="p-4">{description}</div>}
 
           <section className="p-4 space-y-4">
             <div className="text-sm font-medium">{t.share}</div>
