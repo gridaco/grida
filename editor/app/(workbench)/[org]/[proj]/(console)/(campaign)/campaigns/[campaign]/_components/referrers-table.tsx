@@ -13,11 +13,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
-import { ImportFromCustomersDialog } from "@/scaffolds/platform/customer/import-from-customers-dialog";
+import { CustomerPickerDialog } from "@/scaffolds/platform/customer/customer-picker-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { MoreHorizontal } from "lucide-react";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
@@ -34,7 +34,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 
@@ -312,16 +311,19 @@ export function ReferrersTable() {
         return res.ok;
       })
       .finally(() => {
-        // refresh the participants
         refresh();
       });
   };
 
   return (
     <div>
-      <ImportFromCustomersDialog
+      <CustomerPickerDialog
         key={importCustomersDialog.refreshkey}
         {...importCustomersDialog.props}
+        onOpenChange={(open) => {
+          importCustomersDialog.setOpen(open);
+          if (!open) refresh();
+        }}
         onImport={onImport}
       />
       <ExportDialog
