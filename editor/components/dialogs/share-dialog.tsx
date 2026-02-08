@@ -67,10 +67,12 @@ function buildMailtoHref({
   subject?: string;
   body: string;
 }): string {
-  const params = new URLSearchParams();
-  if (subject) params.set("subject", subject);
-  params.set("body", body);
-  return `mailto:?${params.toString()}`;
+  // Manually encode with encodeURIComponent so spaces become '%20' (not '+')
+  // per RFC 6068.
+  const pairs: string[] = [];
+  if (subject) pairs.push(`subject=${encodeURIComponent(subject)}`);
+  pairs.push(`body=${encodeURIComponent(body)}`);
+  return `mailto:?${pairs.join("&")}`;
 }
 
 async function copyToClipboard(text: string): Promise<boolean> {

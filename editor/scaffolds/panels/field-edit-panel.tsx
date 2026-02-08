@@ -102,6 +102,13 @@ const default_field_init: {
     placeholder: "alice@example.com",
     pattern: "[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$",
   },
+  challenge_email: {
+    type: "challenge_email",
+    name: "email",
+    label: "Email",
+    placeholder: "alice@example.com",
+    pattern: "[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$",
+  },
   select: {
     type: "select",
     options: [
