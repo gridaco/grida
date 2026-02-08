@@ -320,6 +320,10 @@ export function ReferrersTable() {
       <CustomerPickerDialog
         key={importCustomersDialog.refreshkey}
         {...importCustomersDialog.props}
+        onOpenChange={(open) => {
+          importCustomersDialog.setOpen(open);
+          if (!open) refresh();
+        }}
         onImport={onImport}
       />
       <ExportDialog
