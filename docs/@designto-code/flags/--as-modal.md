@@ -1,6 +1,6 @@
 ---
 title: As Modal flag
-id: "--as-mdi"
+id: "--as-modal"
 locale: en
 stage:
   - proposal
