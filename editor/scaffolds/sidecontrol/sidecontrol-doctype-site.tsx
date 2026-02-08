@@ -9,7 +9,7 @@ import {
   ThemeEditor,
 } from "@/grida-canvas-react-starter-kit/starterkit-theme-editor";
 import { Rnd } from "react-rnd";
-import { Portal } from "@radix-ui/react-portal";
+import { Portal as PortalPrimitive } from "radix-ui";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { PreviewButton } from "@/grida-canvas-react-starter-kit/starterkit-preview";
@@ -65,7 +65,7 @@ function ThemeEditorPortal({
   const editor = useCurrentEditor();
 
   return (
-    <Portal className="fixed inset-0 z-50 pointer-events-none">
+    <PortalPrimitive.Root className="fixed inset-0 z-50 pointer-events-none">
       <div
         id="rnd-bounds"
         className="fixed top-0 -bottom-56 -inset-x-56 pointer-events-none"
@@ -143,7 +143,7 @@ function ThemeEditorPortal({
           </div>
         </Rnd>
       </div>
-    </Portal>
+    </PortalPrimitive.Root>
   );
 }
 

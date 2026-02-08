@@ -57,7 +57,7 @@ import {
   SidebarHeader,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { saveAs } from "file-saver";
 import { v4 } from "uuid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";

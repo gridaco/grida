@@ -1,5 +1,7 @@
 {
   "$schema": "https://turborepo.com/schema.json",
+  "ui": "tui",
+  "concurrency": "32",
   "tasks": {
     "generate": {
       "outputs": []

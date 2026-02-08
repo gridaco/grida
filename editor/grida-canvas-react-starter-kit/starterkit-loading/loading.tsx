@@ -8,7 +8,7 @@ import {
   steps as motionSteps,
   animate,
 } from "motion/react";
-import * as ProgressPrimitive from "@radix-ui/react-progress";
+import { Progress as ProgressPrimitive } from "radix-ui";
 import { cn } from "@/components/lib/utils";
 import { useEffect, useState, useRef } from "react";
 

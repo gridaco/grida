@@ -90,14 +90,15 @@ function dnsInstructions(domain: DomainRow): DnsInstruction[] {
   // and does NOT replace the base A/CNAME routing record. So we append verification
   // records to the base instructions when present.
   const vercel = domain.vercel as unknown;
-  const vercelDomain = (vercel &&
-  typeof vercel === "object" &&
-  !Array.isArray(vercel) &&
-  "domain" in vercel)
-    ? ((vercel as { domain?: unknown }).domain as
-        | { name?: string; apexName?: string; verification?: unknown[] }
-        | undefined)
-    : undefined;
+  const vercelDomain =
+    vercel &&
+    typeof vercel === "object" &&
+    !Array.isArray(vercel) &&
+    "domain" in vercel
+      ? ((vercel as { domain?: unknown }).domain as
+          | { name?: string; apexName?: string; verification?: unknown[] }
+          | undefined)
+      : undefined;
 
   const fqdn = String(vercelDomain?.name ?? domain.hostname);
   const apexName = String(
@@ -137,7 +138,9 @@ function dnsInstructions(domain: DomainRow): DnsInstruction[] {
             value: String(value),
           } satisfies DnsInstruction;
         })
-        .filter((x): x is DnsInstruction => Boolean(x?.type && x?.name && x?.value))
+        .filter((x): x is DnsInstruction =>
+          Boolean(x?.type && x?.name && x?.value)
+        )
     : [];
 
   // Dedupe.

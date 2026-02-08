@@ -127,8 +127,10 @@ function handle_translations_dir(dir_path) {
 
   // remove translations dir after handled
   fse.removeSync(dir_path);
-  // log result
-  console.log(`translations dir ${dir_path} removed`);
+  // log result (quiet by default; set DEBUG=1 for debug)
+  if (process.env.DEBUG) {
+    console.log(`translations dir ${dir_path} removed`);
+  }
 }
 
 /**
@@ -194,16 +196,18 @@ function handle_translation_dir(dir_path, locale) {
             translation_dir_file_content_translated_path
           );
 
-          // log
-          console.log(
-            `[copy-translations] ${locale}: ${path.relative(
-              docs_site_docs_root,
-              translation_dir_file_path
-            )} -> ${path.relative(
-              docs_site_docs_root,
-              translation_dir_file_content_translated_path
-            )}`
-          );
+          // log (quiet by default; set DEBUG=1 for debug)
+          if (process.env.DEBUG) {
+            console.log(
+              `[copy-translations] ${locale}: ${path.relative(
+                docs_site_docs_root,
+                translation_dir_file_path
+              )} -> ${path.relative(
+                docs_site_docs_root,
+                translation_dir_file_content_translated_path
+              )}`
+            );
+          }
         }
       }
     }

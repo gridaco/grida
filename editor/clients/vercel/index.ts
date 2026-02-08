@@ -53,7 +53,10 @@ export async function vercelGetDomainConfig(domain: string) {
       "string"
         ? (json as { error: { message: string } }).error.message
         : `Vercel getDomainConfig failed (${res.status}).`;
-    const err = new Error(message) as Error & { status?: number; body?: unknown };
+    const err = new Error(message) as Error & {
+      status?: number;
+      body?: unknown;
+    };
     err.status = res.status;
     err.body = json;
     throw err;

@@ -33,7 +33,7 @@ const dictionary = {
     sending: "Sending...",
     verification: "Verification",
     verification_description:
-      'If you have an account, We have sent a code to <strong>{email}</strong>. Enter it below.',
+      "If you have an account, We have sent a code to <strong>{email}</strong>. Enter it below.",
     verifying: "Verifying...",
     back: "← Back",
   },
@@ -45,7 +45,7 @@ const dictionary = {
     sending: "전송중...",
     verification: "인증하기",
     verification_description:
-      '입력하신 <strong>{email}</strong>로 인증 코드를 발송하였습니다. 아래에 입력해 주세요. 코드를 수신하지 못한 경우, 정확한 이메일을 입력하였는지 다시 한 번 확인해 주세요.',
+      "입력하신 <strong>{email}</strong>로 인증 코드를 발송하였습니다. 아래에 입력해 주세요. 코드를 수신하지 못한 경우, 정확한 이메일을 입력하였는지 다시 한 번 확인해 주세요.",
     verifying: "인증중...",
     back: "← 뒤로",
   },
@@ -103,10 +103,19 @@ export function PortalLoginView({
   const t = dictionary[locale as keyof typeof dictionary];
 
   const emailStepTitle = ov(overrides?.email_step_title, t.title);
-  const emailStepDescription = ov(overrides?.email_step_description, t.description);
-  const emailStepButtonLabel = ov(overrides?.email_step_button_label, t.continue_with_email);
+  const emailStepDescription = ov(
+    overrides?.email_step_description,
+    t.description
+  );
+  const emailStepButtonLabel = ov(
+    overrides?.email_step_button_label,
+    t.continue_with_email
+  );
   const otpStepTitle = ov(overrides?.otp_step_title, t.verification);
-  const otpStepDescription = ov(overrides?.otp_step_description, t.verification_description);
+  const otpStepDescription = ov(
+    overrides?.otp_step_description,
+    t.verification_description
+  );
 
   const otpEmail = viewOnly ? sampleEmail : email;
 
@@ -117,7 +126,7 @@ export function PortalLoginView({
           onSubmit={
             viewOnly
               ? (e) => e.preventDefault()
-              : onEmailSubmit ?? ((e) => e.preventDefault())
+              : (onEmailSubmit ?? ((e) => e.preventDefault()))
           }
         >
           <div className="flex flex-col gap-6">
@@ -129,7 +138,9 @@ export function PortalLoginView({
               </div>
               <h1 className="text-xl font-bold">{emailStepTitle}</h1>
               <div className="text-center text-sm">
-                <span className="text-muted-foreground">{emailStepDescription}</span>
+                <span className="text-muted-foreground">
+                  {emailStepDescription}
+                </span>
               </div>
             </div>
             <div className="flex flex-col gap-6">
@@ -141,7 +152,9 @@ export function PortalLoginView({
                   placeholder="name@example.com"
                   value={viewOnly ? "" : email}
                   onChange={
-                    viewOnly ? undefined : (e) => onEmailChange?.(e.target.value)
+                    viewOnly
+                      ? undefined
+                      : (e) => onEmailChange?.(e.target.value)
                   }
                   disabled={viewOnly || isLoading}
                   readOnly={viewOnly}

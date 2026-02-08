@@ -10,15 +10,16 @@ export function useMonacoTheme(
   theme: "dark" | "light" | (string | {})
 ) {
   const [themeloaded, setThemeLoaded] = useState(false);
-  // load theme initially
+  // load theme initially (from public/monaco-themes/grida-dark.json)
   useEffect(() => {
     if (!monaco) return;
-    import("monaco-themes/themes/Blackboard.json").then((data) => {
-      data.colors["editor.background"] = "#0D0D0D";
-      monaco.editor.defineTheme("dark", data as any);
-      monaco.editor.setTheme(theme === "dark" ? "dark" : "light");
-      setThemeLoaded(true);
-    });
+    fetch("/monaco-themes/grida-dark.json")
+      .then((res) => res.json())
+      .then((data) => {
+        monaco.editor.defineTheme("dark", data as any);
+        monaco.editor.setTheme(theme === "dark" ? "dark" : "light");
+        setThemeLoaded(true);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monaco]);
 

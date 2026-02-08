@@ -50,7 +50,7 @@ export default function ScratchAnimation({
       pathLength: 1,
       opacity: 1,
       transition: {
-        pathLength: { duration, ease: "easeOut" },
+        pathLength: { duration, ease: "easeOut" as const },
         opacity: { duration: 0.2 },
       },
     },
@@ -62,7 +62,7 @@ export default function ScratchAnimation({
       opacity: 1,
       transition: {
         duration,
-        ease: "easeOut",
+        ease: "easeOut" as const,
       },
     },
   };

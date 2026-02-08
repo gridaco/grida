@@ -85,8 +85,9 @@ class BitmapRenderer {
     this.canvas.style.imageRendering = "pixelated";
     this.ctx = this.canvas.getContext("2d")!;
 
-    // Convert data to ImageData
-    this.imageData = new ImageData(data, width, height);
+    // Convert data to ImageData (create by dimensions then copy to satisfy ImageDataArray typing)
+    this.imageData = new ImageData(width, height);
+    this.imageData.data.set(data);
   }
 
   mount(container: HTMLElement) {

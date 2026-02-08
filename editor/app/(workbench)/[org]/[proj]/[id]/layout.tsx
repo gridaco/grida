@@ -236,16 +236,13 @@ export default async function Layout({
                   scheduling_tz: form.scheduling_tz || undefined,
                 },
                 notification_respondent_email: {
-                  enabled:
-                    notification_respondent_email.enabled ?? false,
-                  from_name:
-                    notification_respondent_email.from_name ?? null,
+                  enabled: notification_respondent_email.enabled ?? false,
+                  from_name: notification_respondent_email.from_name ?? null,
                   subject_template:
                     notification_respondent_email.subject_template ?? null,
                   body_html_template:
                     notification_respondent_email.body_html_template ?? null,
-                  reply_to:
-                    notification_respondent_email.reply_to ?? null,
+                  reply_to: notification_respondent_email.reply_to ?? null,
                 },
                 form_security: {
                   unknown_field_handling_strategy:

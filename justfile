@@ -12,7 +12,7 @@ test:
 
 # Dev setup
 dev packages:
-    pnpm dev:packages --concurrency 100
+    pnpm dev:packages
 
 # Build canvas WASM using the dedicated justfile in crates/grida-canvas-wasm
 build canvas wasm:

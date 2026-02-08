@@ -1,8 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  renderRespondentEmail,
-  stringifyFields,
-} from "./respondent-email";
+import { renderRespondentEmail, stringifyFields } from "./respondent-email";
 
 describe("respondent-email", () => {
   test("stringifyFields JSON-stringifies non-primitive values", () => {

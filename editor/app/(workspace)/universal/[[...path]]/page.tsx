@@ -70,9 +70,10 @@ export default async function UniversalRoutePicker({
 
     const projects: ProjectInfo[] = [];
     for (const membership of memberships ?? []) {
-      const organization = membership.organization as
-        | { name: string; projects: { name: string }[] }
-        | null;
+      const organization = membership.organization as {
+        name: string;
+        projects: { name: string }[];
+      } | null;
       if (!organization?.name) continue;
       for (const project of organization.projects ?? []) {
         if (!project?.name) continue;
@@ -128,7 +129,9 @@ export default async function UniversalRoutePicker({
                     </ItemMedia>
                     <ItemContent>
                       <ItemTitle>{project.projectName}</ItemTitle>
-                      <ItemDescription>{project.organizationName}</ItemDescription>
+                      <ItemDescription>
+                        {project.organizationName}
+                      </ItemDescription>
                     </ItemContent>
                     <ItemActions className="text-muted-foreground">
                       <span className="text-sm">Open</span>
@@ -168,9 +171,10 @@ export default async function UniversalRoutePicker({
 
   const docs: DocumentInfo[] = [];
   for (const doc of documents ?? []) {
-    const project = doc.project as
-      | { name: string; organization: { name: string } }
-      | null;
+    const project = doc.project as {
+      name: string;
+      organization: { name: string };
+    } | null;
     if (!project?.name || !project.organization?.name) continue;
     docs.push({
       id: doc.id as string,

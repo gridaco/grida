@@ -46,11 +46,11 @@ pnpm install
 pnpm turbo dev
 
 # run specific app
-pnpm turbo dev --filter=editor
+pnpm dev:editor
 
 # or simply..
 cd editor
-pnpm dev
+pnpm dev # (cwd:/editor)
 
 # -----
 # building

@@ -94,7 +94,10 @@ const DOCUMENT_ROUTE_CONFIGS = {
   objects: { scope: "document" },
   "data/customers": { scope: "document", requiredDoctypes: ["v0_form"] },
   "data/responses": { scope: "document", requiredDoctypes: ["v0_form"] },
-  "data/responses/sessions": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "data/responses/sessions": {
+    scope: "document",
+    requiredDoctypes: ["v0_form"],
+  },
   "data/analytics": { scope: "document" },
   "data/simulator": { scope: "document" },
   "data/table/~new": { scope: "document" },
@@ -109,11 +112,23 @@ const DOCUMENT_ROUTE_CONFIGS = {
   "connect/integrations": { scope: "document" },
   "connect/webhooks": { scope: "document", requiredDoctypes: ["v0_form"] },
   "connect/store": { scope: "document", requiredDoctypes: ["v0_form"] },
-  "connect/store/get-started": { scope: "document", requiredDoctypes: ["v0_form"] },
+  "connect/store/get-started": {
+    scope: "document",
+    requiredDoctypes: ["v0_form"],
+  },
   "connect/store/orders": { scope: "document", requiredDoctypes: ["v0_form"] },
-  "connect/store/products": { scope: "document", requiredDoctypes: ["v0_form"] },
-  "connect/store/products/new": { scope: "document", requiredDoctypes: ["v0_form"] },
-  "connect/database/supabase": { scope: "document", requiredDoctypes: ["v0_form", "v0_schema"] },
+  "connect/store/products": {
+    scope: "document",
+    requiredDoctypes: ["v0_form"],
+  },
+  "connect/store/products/new": {
+    scope: "document",
+    requiredDoctypes: ["v0_form"],
+  },
+  "connect/database/supabase": {
+    scope: "document",
+    requiredDoctypes: ["v0_form", "v0_schema"],
+  },
 } satisfies Record<string, UniversalRouteConfig>;
 
 /** Stable document route keys — derived directly from the config above. */
