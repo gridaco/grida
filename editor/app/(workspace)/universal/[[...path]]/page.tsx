@@ -6,6 +6,16 @@ import {
   matchUniversalRoute,
   normalizeUniversalPath,
 } from "@/host/url";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { ArrowRight, Folder, FileText } from "lucide-react";
 
 type Params = {
   path?: string[];
@@ -86,34 +96,49 @@ export default async function UniversalRoutePicker({
           </p>
         </header>
         {projects.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No projects available.
-          </p>
+          <Item variant="muted" size="sm" className="border">
+            <ItemMedia variant="icon">
+              <Folder className="size-4" />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>No projects available</ItemTitle>
+              <ItemDescription>
+                You don’t have access to any projects in this account.
+              </ItemDescription>
+            </ItemContent>
+          </Item>
         ) : (
-          <ul className="space-y-3">
+          <ItemGroup className="gap-2">
             {projects.map((project) => {
               const destination = buildUniversalDestination(route.id, {
                 org: project.organizationName,
                 proj: project.projectName,
               });
               return (
-                <li key={`${project.organizationName}/${project.projectName}`}>
-                  <Link
-                    href={destination}
-                    className="flex items-center justify-between rounded border px-4 py-3 hover:bg-muted"
-                  >
-                    <div>
-                      <div className="text-sm text-muted-foreground">
-                        {project.organizationName}
-                      </div>
-                      <div className="font-medium">{project.projectName}</div>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Open →</span>
+                <Item
+                  key={`${project.organizationName}/${project.projectName}`}
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="hover:bg-accent/50"
+                >
+                  <Link href={destination} prefetch={false}>
+                    <ItemMedia variant="icon">
+                      <Folder className="size-4" />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>{project.projectName}</ItemTitle>
+                      <ItemDescription>{project.organizationName}</ItemDescription>
+                    </ItemContent>
+                    <ItemActions className="text-muted-foreground">
+                      <span className="text-sm">Open</span>
+                      <ArrowRight className="size-4" />
+                    </ItemActions>
                   </Link>
-                </li>
+                </Item>
               );
             })}
-          </ul>
+          </ItemGroup>
         )}
       </main>
     );
@@ -169,11 +194,23 @@ export default async function UniversalRoutePicker({
         </p>
       </header>
       {docs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No matching documents available.
-        </p>
+        <Item variant="muted" size="sm" className="border">
+          <ItemMedia variant="icon">
+            <FileText className="size-4" />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>No matching documents</ItemTitle>
+            <ItemDescription>
+              You don’t have any documents that can open{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                {formatUniversalPath(route.path)}
+              </code>
+              .
+            </ItemDescription>
+          </ItemContent>
+        </Item>
       ) : (
-        <ul className="space-y-3">
+        <ItemGroup className="gap-2">
           {docs.map((doc) => {
             const destination = buildUniversalDestination(route.id, {
               org: doc.organizationName,
@@ -181,26 +218,32 @@ export default async function UniversalRoutePicker({
               docId: doc.id,
             });
             return (
-              <li key={doc.id}>
-                <Link
-                  href={destination}
-                  className="flex items-center justify-between rounded border px-4 py-3 hover:bg-muted"
-                >
-                  <div>
-                    <div className="text-sm text-muted-foreground">
-                      {doc.organizationName} / {doc.projectName}
-                    </div>
-                    <div className="font-medium">{doc.title}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {doc.doctype}
-                    </div>
-                  </div>
-                  <span className="text-sm text-muted-foreground">Open →</span>
+              <Item
+                key={doc.id}
+                asChild
+                variant="outline"
+                size="sm"
+                className="hover:bg-accent/50"
+              >
+                <Link href={destination} prefetch={false}>
+                  <ItemMedia variant="icon">
+                    <FileText className="size-4" />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>{doc.title}</ItemTitle>
+                    <ItemDescription>
+                      {doc.organizationName} / {doc.projectName} · {doc.doctype}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions className="text-muted-foreground">
+                    <span className="text-sm">Open</span>
+                    <ArrowRight className="size-4" />
+                  </ItemActions>
                 </Link>
-              </li>
+              </Item>
             );
           })}
-        </ul>
+        </ItemGroup>
       )}
     </main>
   );
