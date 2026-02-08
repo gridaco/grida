@@ -364,7 +364,9 @@ function Grid(
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <CustomerGrid
         loading={tablespace.loading}
-        tokens={tablespace.q_text_search ? [tablespace.q_text_search.query] : []}
+        tokens={
+          tablespace.q_text_search ? [tablespace.q_text_search.query] : []
+        }
         selectedRows={selection}
         onSelectedRowsChange={setSelection}
         rows={tablespace.stream || []}

@@ -52,11 +52,11 @@ export function TypeSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between capitalize"
+          className="w-full justify-between"
         >
           <div className="flex gap-2 items-center">
             {value && <FormFieldTypeIcon type={value} className="size-4" />}
-            {value ? value : "Select"}
+            {value ? (annotations[value]?.label ?? value) : "Select"}
           </div>
           <ChevronDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
