@@ -24,6 +24,15 @@ Other folders under `/docs` are **not actively managed**.
 - Unless you have a specific task, **avoid editing** content outside `docs/wg/**` and `docs/reference/**`.
 - Do not edit generated artifacts under `/apps/docs/docs/**`.
 
+## Universal routing (linking to editor pages)
+
+When writing or updating **user-facing docs**, prefer **universal routing** links for any “open this page in the editor” instruction.
+
+- **Use production URLs**: links should start with `https://grida.co`.
+- **Use the universal prefix**: use `https://grida.co/_/<path>` instead of tenant-specific canonical paths.
+  - Example: `https://grida.co/_/connect/channels`
+- **If you add a new user-facing page** that should be linkable from docs, make sure it’s registered in **universal routing** so the `/_/…` alias resolves correctly. See `docs/wg/platform/universal-docs-routing.md`.
+
 ## Conventions
 
 ### `_history/` directories (unlisted docs)
