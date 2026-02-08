@@ -6,6 +6,7 @@
     "build": "turbo run build",
     "build:packages": "turbo run build --filter=./packages/*",
     "dev": "turbo run dev",
+    "dev:editor": "turbo run dev --filter=./editor",
     "dev:packages": "turbo run dev --filter=./packages/*",
     "generate": "turbo run generate",
     "lint": "turbo run lint",

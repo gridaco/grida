@@ -129,7 +129,6 @@ Importance: **Very high**
 We use supabase for database, auth, and storage.
 
 - /supabase
-
   - ~~/functions~~ - we are not using supabase edge functions.
   - /migrations - applied migration sqls.
   - /schema - human friendly organized schema sqls.
@@ -183,7 +182,7 @@ turbo test --filter='./packages/*'
 turbo build --filter='./packages/*'
 
 # build packages in watch mode
-pnpm dev:packages --concurrency 100
+pnpm dev:packages
 
 # run tests except for rust crates
 turbo test --filter='!./crates/*'
