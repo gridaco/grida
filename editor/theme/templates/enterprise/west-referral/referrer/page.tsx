@@ -27,7 +27,6 @@ import { template } from "@/utils/template";
 import { TemplateData } from "../templates";
 import * as Standard from "../standard";
 import ShareDialog from "./share";
-import { toast } from "sonner";
 
 type WebSharePayload = {
   title?: string;
@@ -92,28 +91,6 @@ async function reshare({
     template: template,
     context: data.sharable,
   });
-}
-
-async function share_or_copy(
-  sharable: WebSharePayload
-): Promise<{ type: "clipboard" | "share" }> {
-  const normalized: WebSharePayload = {
-    // Some share targets add their own separators; keep our payload clean.
-    title: sharable.title?.trim(),
-    text: sharable.text?.trimEnd(),
-    url: sharable.url?.trim(),
-  };
-
-  if (navigator.share) {
-    await navigator.share(normalized);
-    return { type: "share" };
-  } else {
-    const shareContent = [normalized.title, normalized.text, normalized.url]
-      .filter((v): v is string => typeof v === "string" && v.length > 0)
-      .join("\n");
-    await navigator.clipboard.writeText(shareContent);
-    return { type: "clipboard" };
-  }
 }
 
 const dictionary = {
@@ -213,6 +190,9 @@ export default function ReferrerPageTemplate({
 }) {
   const t = dictionary[locale];
   const beforeShareDialog = useDialogState("before-share");
+  const [prepareShare, setPrepareShare] = React.useState<
+    null | (() => Promise<WebSharePayload>)
+  >(null);
   const {
     code,
     campaign,
@@ -228,27 +208,18 @@ export default function ReferrerPageTemplate({
   const is_available = available_count > 0;
 
   const triggerShare = async () => {
-    return mkshare({
+    const sharable = await mkshare({
       client: client,
       referrer_code: code!,
       template: design.share_message?.data?.message,
-    }).then((sharable) => {
-      share_or_copy(sharable)
-        .then(({ type }) => {
-          switch (type) {
-            case "share":
-              toast.success(t.invitation_shared);
-              break;
-            case "clipboard":
-              toast.success(t.invitation_copied_to_clipboard);
-              break;
-          }
-        })
-        .finally(() => {
-          mutate(code);
-          beforeShareDialog.closeDialog();
-        });
     });
+    mutate(code);
+    return sharable;
+  };
+
+  const openShareDialog = (prepare: () => Promise<WebSharePayload>) => {
+    setPrepareShare(() => prepare);
+    beforeShareDialog.openDialog();
   };
 
   return (
@@ -296,7 +267,7 @@ export default function ReferrerPageTemplate({
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
                 <div className="px-4 py-1.5 m-0.5 relative border border-background overflow-hidden flex items-center z-10">
                   {/* background */}
-                  <div className="absolute inset-0 bg-gradient-to-bl from-[#A07CFE] to-[#FFBE7B] opacity-30" />
+                  <div className="absolute inset-0 bg-linear-to-bl from-[#A07CFE] to-[#FFBE7B] opacity-30" />
                   <div className="z-10 flex items-center gap-2">
                     <TicketCheckIcon className="size-5" />
                     <span className="text-sm font-medium">
@@ -356,7 +327,7 @@ export default function ReferrerPageTemplate({
                   <CardFooter className="px-4 pb-4">
                     {/* CTA Button */}
                     <Button
-                      onClick={beforeShareDialog.openDialog}
+                      onClick={() => openShareDialog(triggerShare)}
                       className="w-full"
                       size="lg"
                     >
@@ -404,30 +375,16 @@ export default function ReferrerPageTemplate({
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      reshare({
-                                        client: client,
-                                        referrer_code: code!,
-                                        invitation_id: inv.id,
-                                        template:
-                                          design.share_message?.data?.message,
-                                      }).then((sharable) => {
-                                        share_or_copy(sharable).then(
-                                          ({ type }) => {
-                                            //
-                                            switch (type) {
-                                              case "share":
-                                                toast.success(
-                                                  t.invitation_shared_again
-                                                );
-                                                break;
-                                              case "clipboard":
-                                                toast.success(
-                                                  t.invitation_copied_to_clipboard
-                                                );
-                                                break;
-                                            }
-                                          }
-                                        );
+                                      openShareDialog(async () => {
+                                        const sharable = await reshare({
+                                          client: client,
+                                          referrer_code: code!,
+                                          invitation_id: inv.id,
+                                          template:
+                                            design.share_message?.data?.message,
+                                        });
+                                        mutate(code);
+                                        return sharable;
                                       });
                                     }}
                                   >
@@ -484,7 +441,11 @@ export default function ReferrerPageTemplate({
         </ScreenScrollable>
         <ShareDialog
           {...beforeShareDialog.props}
-          onConfirm={triggerShare}
+          onOpenChange={(next) => {
+            beforeShareDialog.props.onOpenChange?.(next);
+            if (!next) setPrepareShare(null);
+          }}
+          onPrepare={prepareShare ?? triggerShare}
           data={design.share?.data}
           locale={locale}
         />
