@@ -14,6 +14,8 @@ COMMENT ON COLUMN grida_west_referral.campaign.ciam_invitee_on_claim_tag_names
 
 ---------------------------------------------------------------------
 -- 2. Helper: add-only tag application (no removals)
+--    SECURITY DEFINER with minimal search_path.
+--    Validates customer belongs to the given project before tagging.
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.apply_customer_tags(
   p_customer_uid uuid,
@@ -23,12 +25,23 @@ CREATE OR REPLACE FUNCTION grida_west_referral.apply_customer_tags(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public, grida_ciam
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   tag text;
+  v_valid boolean;
 BEGIN
   IF p_tag_names IS NULL OR array_length(p_tag_names, 1) IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Tenant boundary: ensure customer belongs to the target project.
+  SELECT EXISTS(
+    SELECT 1 FROM public.customer
+    WHERE uid = p_customer_uid AND project_id = p_project_id
+  ) INTO v_valid;
+
+  IF NOT v_valid THEN
     RETURN;
   END IF;
 
@@ -44,8 +57,10 @@ BEGIN
 END;
 $$;
 
--- Only callable by triggers / service_role; block direct RPC from anon/authenticated.
+-- Lock down: only service_role (and SECURITY DEFINER triggers) may call this.
+REVOKE ALL ON FUNCTION grida_west_referral.apply_customer_tags(uuid, bigint, text[]) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION grida_west_referral.apply_customer_tags(uuid, bigint, text[]) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION grida_west_referral.apply_customer_tags(uuid, bigint, text[]) TO service_role;
 
 ---------------------------------------------------------------------
 -- 3. Trigger: auto-tag invitee on claim
