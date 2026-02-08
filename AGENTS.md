@@ -75,6 +75,7 @@ Documentation files are located in the `./docs` directory.
 This directory contains the docs as-is, the deployment of the docs are handled by [apps/docs](./apps/docs). A docusaurus project that syncs the docs content to its directory. When writing docs, the root `./docs` directory is the source of truth.
 
 See [`docs/AGENTS.md`](./docs/AGENTS.md) for the docs contribution scope (we only actively maintain `docs/wg/**` and `docs/reference/**`).
+When linking docs to editor pages, prefer **universal routing** (`https://grida.co/_/<path>`). See `docs/wg/platform/universal-docs-routing.md`.
 
 ## `/crates/*`
 

@@ -1,5 +1,5 @@
 import { service_role } from "@/lib/supabase/server";
-import { buildTenantSiteBaseUrl } from "@/lib/tenant-url";
+import { buildTenantSiteBaseUrl } from "@/host/tenant-url";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { Platform } from "@/lib/platform";

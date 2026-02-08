@@ -136,6 +136,12 @@ const nextConfig: NextConfig = {
   },
   rewrites: async () => {
     return [
+      // Universal docs routing — resolves /_/<path> to the context-aware
+      // canonical route. See docs/wg/platform/universal-docs-routing.md
+      {
+        source: "/_/:path*",
+        destination: "/universal/:path*",
+      },
       // docs
       {
         source: "/docs/:path*",
