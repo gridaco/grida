@@ -6,9 +6,9 @@ title: Curve Decorations (2D)
 
 > Renderer-agnostic model for attaching glyphs (arrowheads, markers, ticks) to 2D paths using the path's local frame.
 
-| feature id         | status  | description                                              |
-| ------------------ | ------- | -------------------------------------------------------- |
-| `curve-decoration` | draft   | Endpoint/mid-path markers, orientation, scale, offset   |
+| feature id         | status | description                                           | PRs                                               |
+| ------------------ | ------ | ----------------------------------------------------- | ------------------------------------------------- |
+| `curve-decoration` | draft  | Endpoint/mid-path markers, orientation, scale, offset | [#538](https://github.com/gridaco/grida/pull/538) |
 
 ---
 
@@ -110,7 +110,7 @@ This is conceptually similar to SVG `<marker>` (`refX`/`refY` as anchor, `orient
 
 ## Placement
 
-A **Placement** determines *where* decorations appear.
+A **Placement** determines _where_ decorations appear.
 
 ### Attachment domains
 
@@ -315,10 +315,10 @@ These can be layered later on top of the same "attach glyphs to a path" primitiv
 
 ## Terminology
 
-| Term                 | Meaning                                                                 |
-| -------------------- | ----------------------------------------------------------------------- |
-| **Path / contour**   | Piecewise curve, possibly multiple subpaths                             |
-| **Curve Decoration** | Glyph attached to a path via local frame evaluation                     |
-| **MarkerGlyph**      | Geometry in marker space with anchor + forward axis                    |
-| **Placement**        | Where to attach (endpoints, joins, arc-length positions, repeated)     |
-| **Orientation policy** | How to align glyph relative to tangent                              |
+| Term                   | Meaning                                                            |
+| ---------------------- | ------------------------------------------------------------------ |
+| **Path / contour**     | Piecewise curve, possibly multiple subpaths                        |
+| **Curve Decoration**   | Glyph attached to a path via local frame evaluation                |
+| **MarkerGlyph**        | Geometry in marker space with anchor + forward axis                |
+| **Placement**          | Where to attach (endpoints, joins, arc-length positions, repeated) |
+| **Orientation policy** | How to align glyph relative to tangent                             |
