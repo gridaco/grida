@@ -428,16 +428,18 @@ enum StrokeJoin : ubyte {
 enum StrokeDecoration : ubyte {
   /// No decoration (endpoint uses the node's stroke_cap as normal).
   None = 0,
-  /// Open arrow (two lines forming a ">" shape).
-  ArrowOpen = 1,
-  /// Filled triangular arrowhead.
-  ArrowFilled = 2,
-  /// Filled diamond shape.
-  DiamondFilled = 3,
-  /// Filled equilateral triangle.
-  TriangleFilled = 4,
+  /// Arrow lines — open chevron (">"), visually tuned. (Right Triangle)
+  ArrowLines = 1,
+  /// Filled equilateral triangle pointing forward.
+  TriangleFilled = 2,
   /// Filled circle.
-  CircleFilled = 5
+  CircleFilled = 3,
+  /// Filled axis-aligned square.
+  SquareFilled = 4,
+  /// Filled diamond (rotated square).
+  DiamondFilled = 5,
+  /// Filled vertical bar perpendicular to the stroke.
+  VerticalBarFilled = 6
 }
 
 enum TextAlign : ubyte {

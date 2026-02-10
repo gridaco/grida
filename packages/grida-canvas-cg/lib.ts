@@ -190,11 +190,12 @@ export namespace cg {
    */
   export type StrokeDecoration =
     | "none"
-    | "arrow_open"
-    | "arrow_filled"
+    | "arrow_lines"
     | "diamond_filled"
     | "triangle_filled"
-    | "circle_filled";
+    | "circle_filled"
+    | "vertical_bar_filled"
+    | "square_filled";
 
   /**
    * Supported stroke join modes

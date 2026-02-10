@@ -17,24 +17,28 @@ export function StrokeDecorationControl({
           value: "none" satisfies cg.StrokeDecoration,
         },
         {
-          label: "Arrow",
-          value: "arrow_filled" satisfies cg.StrokeDecoration,
+          label: "Arrow Lines",
+          value: "arrow_lines" satisfies cg.StrokeDecoration,
         },
         {
-          label: "Open Arrow",
-          value: "arrow_open" satisfies cg.StrokeDecoration,
+          label: "Triangle",
+          value: "triangle_filled" satisfies cg.StrokeDecoration,
         },
         {
           label: "Circle",
           value: "circle_filled" satisfies cg.StrokeDecoration,
         },
         {
+          label: "Square",
+          value: "square_filled" satisfies cg.StrokeDecoration,
+        },
+        {
           label: "Diamond",
           value: "diamond_filled" satisfies cg.StrokeDecoration,
         },
         {
-          label: "Triangle",
-          value: "triangle_filled" satisfies cg.StrokeDecoration,
+          label: "Bar",
+          value: "vertical_bar_filled" satisfies cg.StrokeDecoration,
         },
       ]}
       value={value}
