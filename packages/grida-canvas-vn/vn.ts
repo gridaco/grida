@@ -9,8 +9,35 @@ export namespace vn {
   export type Loop = number[];
   /**
    * Represents a vertex in the vector network.
+   *
+   * For basic vertices, this is a simple `[x, y]` tuple (Vector2).
+   * For vertices with decoration overrides, use {@link VectorNetworkVertexWithOverrides}.
    */
-  export type VectorNetworkVertex = Vector2;
+  export type VectorNetworkVertex = Vector2 | VectorNetworkVertexWithOverrides;
+
+  /**
+   * Marker decoration at stroke endpoints or vector vertices.
+   * Matches the definition in `@grida/canvas-cg`.
+   */
+  export type StrokeDecoration =
+    | "none"
+    | "arrow_open"
+    | "arrow_filled"
+    | "diamond_filled"
+    | "triangle_filled"
+    | "circle_filled";
+
+  /**
+   * A vertex with optional per-vertex property overrides.
+   *
+   * Follows the Figma VectorVertex pattern where each vertex can carry
+   * its own stroke decoration, stroke join, and corner radius overrides.
+   */
+  export interface VectorNetworkVertexWithOverrides {
+    x: number;
+    y: number;
+    stroke_decoration?: StrokeDecoration;
+  }
 
   /**
    * Represents a point on a specific segment of the vector network.

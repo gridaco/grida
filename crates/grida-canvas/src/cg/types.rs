@@ -411,6 +411,44 @@ impl Default for StrokeCap {
     }
 }
 
+/// Marker decoration placed at stroke endpoints or vector vertices.
+///
+/// Unlike [`StrokeCap`] (which maps to native backend caps like Skia `PaintCap`),
+/// `StrokeDecoration` represents explicit marker geometry drawn on top of the
+/// stroke path. When a decoration is present at an endpoint, the renderer
+/// uses `Butt` cap at that endpoint and draws the marker geometry instead.
+///
+/// See: `docs/wg/feat-2d/curve-decoration.md`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum StrokeDecoration {
+    /// No decoration (endpoint uses the node's stroke_cap as normal).
+    #[default]
+    #[serde(rename = "none")]
+    None,
+    /// Open arrow (two lines forming a ">" shape).
+    #[serde(rename = "arrow_open")]
+    ArrowOpen,
+    /// Filled triangular arrowhead.
+    #[serde(rename = "arrow_filled")]
+    ArrowFilled,
+    /// Filled diamond shape.
+    #[serde(rename = "diamond_filled")]
+    DiamondFilled,
+    /// Filled equilateral triangle.
+    #[serde(rename = "triangle_filled")]
+    TriangleFilled,
+    /// Filled circle.
+    #[serde(rename = "circle_filled")]
+    CircleFilled,
+}
+
+impl StrokeDecoration {
+    /// Returns `true` if this decoration has visible marker geometry.
+    pub fn has_marker(&self) -> bool {
+        !matches!(self, StrokeDecoration::None)
+    }
+}
+
 /// Defines how corners (path segment joins) are rendered when stroked.
 ///
 /// `StrokeJoin` determines the appearance of corners where two path segments meet.

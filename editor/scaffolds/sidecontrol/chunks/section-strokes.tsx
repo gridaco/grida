@@ -14,6 +14,7 @@ import {
 } from "../controls/stroke-width";
 import { StrokeAlignControl } from "../controls/stroke-align";
 import { StrokeCapControl } from "../controls/stroke-cap";
+import { StrokeDecorationControl } from "../controls/stroke-decoration";
 import { StrokeJoinControl } from "../controls/stroke-join";
 import { StrokeMiterLimitControl } from "../controls/stroke-miter-limit";
 import { StrokeClassControl, StrokeClass } from "../controls/stroke-class";
@@ -76,6 +77,8 @@ export function SectionStrokes({
     rectangular_stroke_width_left,
     stroke_align,
     stroke_cap,
+    stroke_decoration_start,
+    stroke_decoration_end,
     stroke_join,
     stroke_miter_limit,
     stroke_dash_array,
@@ -90,6 +93,8 @@ export function SectionStrokes({
     rectangular_stroke_width_left: node.rectangular_stroke_width_left,
     stroke_align: node.stroke_align,
     stroke_cap: node.stroke_cap,
+    stroke_decoration_start: node.stroke_decoration_start,
+    stroke_decoration_end: node.stroke_decoration_end,
     stroke_join: node.stroke_join,
     stroke_miter_limit: node.stroke_miter_limit,
     stroke_dash_array: node.stroke_dash_array,
@@ -295,6 +300,24 @@ export function SectionStrokes({
                     onValueChange={actions.strokeCap}
                   />
                 </PropertyRow>
+                {(type === "line" || type === "vector") && (
+                  <>
+                    <PropertyRow>
+                      <PropertyLineLabel>Start</PropertyLineLabel>
+                      <StrokeDecorationControl
+                        value={stroke_decoration_start ?? "none"}
+                        onValueChange={actions.strokeDecorationStart}
+                      />
+                    </PropertyRow>
+                    <PropertyRow>
+                      <PropertyLineLabel>End</PropertyLineLabel>
+                      <StrokeDecorationControl
+                        value={stroke_decoration_end ?? "none"}
+                        onValueChange={actions.strokeDecorationEnd}
+                      />
+                    </PropertyRow>
+                  </>
+                )}
                 <PropertyRow hidden={config.stroke_join === "off"}>
                   <PropertyLineLabel>Join</PropertyLineLabel>
                   <StrokeJoinControl

@@ -1262,6 +1262,11 @@ pub struct LineNodeRec {
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub _data_stroke_align: StrokeAlign,
 
+    /// Marker decoration at the start endpoint of the line.
+    pub stroke_decoration_start: StrokeDecoration,
+    /// Marker decoration at the end endpoint of the line.
+    pub stroke_decoration_end: StrokeDecoration,
+
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
 }
@@ -1556,6 +1561,14 @@ pub struct VectorNodeRec {
     pub stroke_join: StrokeJoin,
     pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_dash_array: Option<StrokeDashArray>,
+
+    /// Marker decoration at the start endpoint (first vertex).
+    pub stroke_decoration_start: StrokeDecoration,
+    /// Marker decoration at the end endpoint (last vertex).
+    pub stroke_decoration_end: StrokeDecoration,
+
+    /// Per-vertex stroke decoration overrides.
+    pub vertex_overrides: Vec<crate::vectornetwork::vn::VectorVertexOverride>,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,

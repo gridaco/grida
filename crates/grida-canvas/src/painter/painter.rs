@@ -717,6 +717,34 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Draw stroke decoration markers at the start/end endpoints of a path.
+    pub fn draw_stroke_decorations(
+        &self,
+        shape: &PainterShape,
+        strokes: &[Paint],
+        stroke_width: f32,
+        start: StrokeDecoration,
+        end: StrokeDecoration,
+    ) {
+        if !start.has_marker() && !end.has_marker() {
+            return;
+        }
+        if let Some(sk_paint) = paint::sk_paint_stack(
+            strokes,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            crate::shape::marker::draw_endpoint_decorations(
+                self.canvas,
+                &shape.to_path(),
+                start,
+                end,
+                stroke_width,
+                &sk_paint,
+            );
+        }
+    }
+
     /// Draw a shape applying all layer effects in the correct order.
     ///
     /// Effect ordering (as per specification):
@@ -940,6 +968,15 @@ impl<'a> Painter<'a> {
                                                 &shape_layer.strokes,
                                             );
                                         }
+
+                                        // 4. Stroke decorations (markers at endpoints)
+                                        self.draw_stroke_decorations(
+                                            shape,
+                                            &shape_layer.strokes,
+                                            shape_layer.stroke_width,
+                                            shape_layer.stroke_decoration_start,
+                                            shape_layer.stroke_decoration_end,
+                                        );
                                     }
                                 });
                             };
@@ -1122,6 +1159,31 @@ impl<'a> Painter<'a> {
                                                 &stroke_options,
                                                 vector_layer.corner_radius,
                                             );
+                                        }
+
+                                        // 4. Stroke decorations (markers at endpoints)
+                                        // For VectorNode, use to_paths() to get the raw open path
+                                        // (to_union_path()/shape.to_path() collapses open paths)
+                                        if vector_layer.stroke_decoration_start.has_marker()
+                                            || vector_layer.stroke_decoration_end.has_marker()
+                                        {
+                                            let paths = vector_layer.vector.to_paths();
+                                            if let Some(vn_path) = paths.first() {
+                                                if let Some(sk_paint) = paint::sk_paint_stack(
+                                                    &vector_layer.strokes,
+                                                    (shape.rect.width(), shape.rect.height()),
+                                                    self.images,
+                                                ) {
+                                                    crate::shape::marker::draw_endpoint_decorations(
+                                                        self.canvas,
+                                                        vn_path,
+                                                        vector_layer.stroke_decoration_start,
+                                                        vector_layer.stroke_decoration_end,
+                                                        vector_layer.stroke_width,
+                                                        &sk_paint,
+                                                    );
+                                                }
+                                            }
                                         }
                                     }
                                 });

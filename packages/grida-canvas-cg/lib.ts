@@ -179,6 +179,24 @@ export namespace cg {
   export type StrokeCap = "butt" | "round" | "square";
 
   /**
+   * Marker decoration placed at stroke endpoints or vector vertices.
+   *
+   * Unlike {@link StrokeCap} (which maps to native backend caps like Skia PaintCap),
+   * StrokeDecoration represents explicit marker geometry drawn on top of the
+   * stroke path. When a decoration is present at an endpoint, the renderer
+   * uses Butt cap at that endpoint and draws the marker geometry instead.
+   *
+   * @see docs/wg/feat-2d/curve-decoration.md
+   */
+  export type StrokeDecoration =
+    | "none"
+    | "arrow_open"
+    | "arrow_filled"
+    | "diamond_filled"
+    | "triangle_filled"
+    | "circle_filled";
+
+  /**
    * Supported stroke join modes
    *
    * - `miter`

@@ -417,6 +417,29 @@ enum StrokeJoin : ubyte {
   Bevel = 2
 }
 
+/// Marker decoration placed at stroke endpoints or vector vertices.
+///
+/// Unlike StrokeCap (which maps to native backend caps like Skia PaintCap),
+/// StrokeDecoration represents explicit marker geometry drawn on top of the
+/// stroke path. When a decoration is present at an endpoint, the renderer
+/// uses Butt cap at that endpoint and draws the marker geometry instead.
+///
+/// See: docs/wg/feat-2d/curve-decoration.md
+enum StrokeDecoration : ubyte {
+  /// No decoration (endpoint uses the node's stroke_cap as normal).
+  None = 0,
+  /// Open arrow (two lines forming a ">" shape).
+  ArrowOpen = 1,
+  /// Filled triangular arrowhead.
+  ArrowFilled = 2,
+  /// Filled diamond shape.
+  DiamondFilled = 3,
+  /// Filled equilateral triangle.
+  TriangleFilled = 4,
+  /// Filled circle.
+  CircleFilled = 5
+}
+
 enum TextAlign : ubyte {
   Left = 0,
   Right = 1,
@@ -812,11 +835,20 @@ table VectorNetworkRegion {
   region_fill_paints:[PaintStackItem] (id: 2);
 }
 
+/// Sparse per-vertex property override for vector networks.
+/// Allows individual vertices to have custom decorations.
+/// Indexed by vertex_index into VectorNetworkData.vertices.
+table VectorVertexOverride {
+  vertex_index:uint (id: 0);
+  stroke_decoration:StrokeDecoration = None (id: 1);
+}
+
 /// Rust: `VectorNetwork { vertices, segments, regions }`
 table VectorNetworkData {
   vertices:[CGPoint] (id: 0);
   segments:[VectorNetworkSegment] (id: 1);
   regions:[VectorNetworkRegion] (id: 2);
+  vertex_overrides:[VectorVertexOverride] (id: 3);
 }
 
 // -----------------------------------------------------------------------------
@@ -1366,6 +1398,8 @@ table LineNode {
   layer:LayerTrait (required);
   stroke_geometry:StrokeGeometryTrait;
   stroke_paints:[PaintStackItem];
+  stroke_decoration_start:StrokeDecoration = None;
+  stroke_decoration_end:StrokeDecoration = None;
 }
 
 /// Node variant: Vector.

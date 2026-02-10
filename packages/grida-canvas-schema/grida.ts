@@ -2406,6 +2406,19 @@ export namespace grida.program.nodes {
     fill_rule?: cg.FillRule;
 
     vector_network: vn.VectorNetwork;
+
+    /**
+     * Marker decoration at the start vertex (vertex[0]) of the vector network.
+     * Editor-side convenience; maps to vertex_overrides in the persistence model.
+     * @default "none"
+     */
+    stroke_decoration_start?: cg.StrokeDecoration;
+    /**
+     * Marker decoration at the end vertex (last vertex) of the vector network.
+     * Editor-side convenience; maps to vertex_overrides in the persistence model.
+     * @default "none"
+     */
+    stroke_decoration_end?: cg.StrokeDecoration;
   }
 
   export interface ComputedVectorNode
@@ -2434,6 +2447,16 @@ export namespace grida.program.nodes {
       i.ILayoutChildTrait,
       i.IStroke {
     readonly type: "line";
+    /**
+     * Marker decoration at the start endpoint of the line.
+     * @default "none"
+     */
+    stroke_decoration_start?: cg.StrokeDecoration;
+    /**
+     * Marker decoration at the end endpoint of the line.
+     * @default "none"
+     */
+    stroke_decoration_end?: cg.StrokeDecoration;
   }
 
   export interface ComputedLineNode extends LineNode {

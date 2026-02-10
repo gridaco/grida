@@ -3623,6 +3623,14 @@ export namespace editor.api {
       strokeDashArray: number[] | undefined
     ): void;
     changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodePropertyStrokeDecorationStart(
+      node_id: NodeID,
+      decoration: cg.StrokeDecoration
+    ): void;
+    changeNodePropertyStrokeDecorationEnd(
+      node_id: NodeID,
+      decoration: cg.StrokeDecoration
+    ): void;
     changeNodePropertyStrokeJoin(
       node_id: NodeID,
       strokeJoin: cg.StrokeJoin

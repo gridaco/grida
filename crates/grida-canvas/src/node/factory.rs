@@ -122,6 +122,8 @@ impl NodeFactory {
             stroke_miter_limit: StrokeMiterLimit::default(),
             _data_stroke_align: Self::DEFAULT_STROKE_ALIGN,
             stroke_dash_array: None,
+            stroke_decoration_start: StrokeDecoration::default(),
+            stroke_decoration_end: StrokeDecoration::default(),
             layout_child: None,
         }
     }

@@ -20,6 +20,8 @@ type NodeFeatureProperty =
   | "stroke_paints"
   | "feDropShadow"
   | "strokeCap"
+  | "strokeDecorationStart"
+  | "strokeDecorationEnd"
   | "strokeWidth"
   | "strokeWidth4"
   | "pointCount"
@@ -115,6 +117,8 @@ const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
    */
   strokeCap: ["vector", "line"],
+  strokeDecorationStart: ["line", "vector"],
+  strokeDecorationEnd: ["line", "vector"],
   pointCount: ["polygon", "star"],
   boolean: [],
 } as const;
@@ -246,6 +250,8 @@ const canvas_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
     "component",
     "boolean",
   ],
+  strokeDecorationStart: ["line", "vector"],
+  strokeDecorationEnd: ["line", "vector"],
   pointCount: ["polygon", "star"],
   boolean: ["boolean", "rectangle", "polygon", "star"],
 } as const;
@@ -349,6 +355,22 @@ export namespace supports {
         return dom_supports.strokeCap.includes(type);
       case "canvas":
         return canvas_supports.strokeCap.includes(type);
+    }
+  };
+  export const strokeDecorationStart = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.strokeDecorationStart.includes(type);
+      case "canvas":
+        return canvas_supports.strokeDecorationStart.includes(type);
+    }
+  };
+  export const strokeDecorationEnd = (type: NodeType, context: Context) => {
+    switch (context.backend) {
+      case "dom":
+        return dom_supports.strokeDecorationEnd.includes(type);
+      case "canvas":
+        return canvas_supports.strokeDecorationEnd.includes(type);
     }
   };
   export const feDropShadow = (type: NodeType, context: Context) => {

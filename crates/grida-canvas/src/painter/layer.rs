@@ -154,6 +154,12 @@ pub struct PainterPictureShapeLayer {
     pub strokes: Paints,
     pub fills: Paints,
     pub stroke_path: Option<skia_safe::Path>,
+    /// Stroke decoration at the start endpoint (line nodes).
+    pub stroke_decoration_start: StrokeDecoration,
+    /// Stroke decoration at the end endpoint (line nodes).
+    pub stroke_decoration_end: StrokeDecoration,
+    /// Stroke width needed for decoration sizing.
+    pub stroke_width: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -193,6 +199,10 @@ pub struct PainterPictureVectorLayer {
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub corner_radius: f32,
+    /// Stroke decoration at the start endpoint (first vertex).
+    pub stroke_decoration_start: StrokeDecoration,
+    /// Stroke decoration at the end endpoint (last vertex).
+    pub stroke_decoration_end: StrokeDecoration,
 }
 
 /// A layer with its associated node ID.
@@ -412,6 +422,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -472,6 +485,9 @@ impl LayerList {
                         strokes: Self::filter_visible_paints(&n.strokes),
                         fills: Self::filter_visible_paints(&n.fills),
                         stroke_path,
+                        stroke_decoration_start: StrokeDecoration::None,
+                        stroke_decoration_end: StrokeDecoration::None,
+                        stroke_width: 0.0,
                     });
                     out.push(LayerEntry {
                         id: id.clone(),
@@ -522,6 +538,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -566,6 +585,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -610,6 +632,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -654,6 +679,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -698,6 +726,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -741,6 +772,9 @@ impl LayerList {
                     strokes: n.strokes.clone(),
                     fills: Paints::default(),
                     stroke_path,
+                    stroke_decoration_start: n.stroke_decoration_start,
+                    stroke_decoration_end: n.stroke_decoration_end,
+                    stroke_width: n.stroke_width,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -849,6 +883,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -887,6 +924,8 @@ impl LayerList {
                     stroke_width_profile: n.stroke_width_profile.clone(),
                     stroke_dash_array: n.stroke_dash_array.clone(),
                     corner_radius: n.corner_radius,
+                    stroke_decoration_start: n.stroke_decoration_start,
+                    stroke_decoration_end: n.stroke_decoration_end,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -933,6 +972,9 @@ impl LayerList {
                         n.fill.clone(),
                     )])),
                     stroke_path,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -963,6 +1005,9 @@ impl LayerList {
                     strokes: Paints::default(),
                     fills: Paints::default(),
                     stroke_path: None,
+                    stroke_decoration_start: StrokeDecoration::None,
+                    stroke_decoration_end: StrokeDecoration::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),

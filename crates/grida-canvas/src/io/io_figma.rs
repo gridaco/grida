@@ -1604,6 +1604,8 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            stroke_decoration_start: StrokeDecoration::default(),
+            stroke_decoration_end: StrokeDecoration::default(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: origin
                     .layout_positioning
