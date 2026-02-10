@@ -418,6 +418,16 @@ impl Default for StrokeCap {
 /// stroke path. When a decoration is present at an endpoint, the renderer
 /// uses `Butt` cap at that endpoint and draws the marker geometry instead.
 ///
+/// All built-in presets are **terminal** (end-to-end aligned): the marker's
+/// forward edge or tip is anchored at the logical path endpoint.
+///
+/// ## Naming convention
+///
+/// `<shape>_<style>`
+///
+/// - **shape**: geometric description (e.g. `arrow`, `triangle`, `circle`, `diamond`, `square`, `vertical_bar`)
+/// - **style**: `filled`, `open`, etc.
+///
 /// See: `docs/wg/feat-2d/curve-decoration.md`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum StrokeDecoration {
@@ -425,27 +435,45 @@ pub enum StrokeDecoration {
     #[default]
     #[serde(rename = "none")]
     None,
-    /// Open arrow (two lines forming a ">" shape).
-    #[serde(rename = "arrow_open")]
-    ArrowOpen,
-    /// Filled triangular arrowhead.
-    #[serde(rename = "arrow_filled")]
-    ArrowFilled,
-    /// Filled diamond shape.
-    #[serde(rename = "diamond_filled")]
-    DiamondFilled,
-    /// Filled equilateral triangle.
+
+    /// Arrow lines — two lines forming a right-angle ">" chevron, not filled.
+    /// 90° opening at the tip. Anchor: tip (forward edge).
+    #[serde(rename = "arrow_lines")]
+    ArrowLines,
+    /// Filled vertical bar perpendicular to the stroke.
+    /// Anchor: center of the stroke-facing edge.
+    #[serde(rename = "vertical_bar_filled")]
+    VerticalBarFilled,
+    /// Filled equilateral triangle pointing forward.
+    /// Anchor: tip (forward vertex).
     #[serde(rename = "triangle_filled")]
     TriangleFilled,
     /// Filled circle.
+    /// Anchor: forward edge (not center).
     #[serde(rename = "circle_filled")]
     CircleFilled,
+    /// Filled axis-aligned square (no rotation).
+    /// Anchor: forward edge (not center).
+    #[serde(rename = "square_filled")]
+    SquareFilled,
+    /// Filled diamond (rotated square).
+    /// Anchor: forward vertex.
+    #[serde(rename = "diamond_filled")]
+    DiamondFilled,
 }
 
 impl StrokeDecoration {
     /// Returns `true` if this decoration has visible marker geometry.
     pub fn has_marker(&self) -> bool {
         !matches!(self, StrokeDecoration::None)
+    }
+
+    /// Returns `true` if this decoration is an open (stroked) shape rather than filled.
+    ///
+    /// Open decorations should be drawn with `PaintStyle::Stroke` using the
+    /// same stroke width as the path, rather than `PaintStyle::Fill`.
+    pub fn is_open(&self) -> bool {
+        matches!(self, StrokeDecoration::ArrowLines)
     }
 }
 

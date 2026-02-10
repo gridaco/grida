@@ -745,12 +745,36 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
+
+                // Compute cutback distances for endpoint decorations
+                let start_cutback =
+                    crate::shape::marker::cutback_depth(n.stroke_decoration_start, n.stroke_width);
+                let end_cutback =
+                    crate::shape::marker::cutback_depth(n.stroke_decoration_end, n.stroke_width);
+
+                // Force Butt cap when decorations are present so the native
+                // cap geometry doesn't leak out from under the marker.
+                let has_any_decoration = n.stroke_decoration_start.has_marker()
+                    || n.stroke_decoration_end.has_marker();
+                let effective_cap = if has_any_decoration {
+                    StrokeCap::Butt
+                } else {
+                    n.stroke_cap
+                };
+
                 let stroke_path = if n.stroke_width > 0.0 {
+                    // Trim the source path by cutback before computing stroke geometry
+                    let source_path = shape.to_path();
+                    let trimmed = if start_cutback > 0.0 || end_cutback > 0.0 {
+                        crate::shape::marker::trim_path(&source_path, start_cutback, end_cutback)
+                    } else {
+                        source_path
+                    };
                     Some(stroke_geometry(
-                        &shape.to_path(),
+                        &trimmed,
                         n.stroke_width,
                         n.get_stroke_align(),
-                        n.stroke_cap,
+                        effective_cap,
                         StrokeJoin::default(), // Join not applicable for single line
                         n.stroke_miter_limit,
                         n.stroke_dash_array.as_ref(),
