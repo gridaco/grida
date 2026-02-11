@@ -11,7 +11,7 @@
 //! See: `docs/wg/feat-2d/curve-decoration.md`
 
 use crate::cg::StrokeDecoration;
-use skia_safe::{Canvas, Paint, PaintStyle, Path, PathBuilder, PathMeasure, Point};
+use skia_safe::{Canvas, Paint, PaintStyle, Path, PathBuilder, PathMeasure};
 use std::f32::consts::PI;
 
 /// Default scale factor for marker size relative to stroke width.

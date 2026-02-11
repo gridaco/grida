@@ -133,7 +133,7 @@ impl LayoutTree {
             self.taffy.compute_layout_with_measure(
                 root,
                 available_space,
-                move |known_dimensions, available_space, _node_id, node_context, _style| {
+                move |known_dimensions, _available_space, _node_id, node_context, _style| {
                     if let Some(LayoutNodeContext::Text(ctx)) = node_context {
                         // For text:
                         // - If Taffy already resolved a definite width for this node, honor it.
