@@ -13,32 +13,7 @@ export namespace vn {
    * For basic vertices, this is a simple `[x, y]` tuple (Vector2).
    * For vertices with decoration overrides, use {@link VectorNetworkVertexWithOverrides}.
    */
-  export type VectorNetworkVertex = Vector2 | VectorNetworkVertexWithOverrides;
-
-  /**
-   * Marker decoration at stroke endpoints or vector vertices.
-   * Matches the definition in `@grida/canvas-cg`.
-   */
-  export type StrokeDecoration =
-    | "none"
-    | "arrow_lines"
-    | "diamond_filled"
-    | "triangle_filled"
-    | "circle_filled"
-    | "vertical_bar_filled"
-    | "square_filled";
-
-  /**
-   * A vertex with optional per-vertex property overrides.
-   *
-   * Follows the Figma VectorVertex pattern where each vertex can carry
-   * its own stroke decoration, stroke join, and corner radius overrides.
-   */
-  export interface VectorNetworkVertexWithOverrides {
-    x: number;
-    y: number;
-    stroke_decoration?: StrokeDecoration;
-  }
+  export type VectorNetworkVertex = Vector2;
 
   /**
    * Represents a point on a specific segment of the vector network.

@@ -255,7 +255,7 @@ export function SectionStrokes({
           />
           {has_stroke_paint && (
             <PropertySectionContent>
-              <PropertyRows>
+              <PropertyRows className="w-full">
                 <PropertyRow>
                   <PropertyLineLabel>Width</PropertyLineLabel>
                   {supportsStrokeWidth4 ? (
@@ -301,22 +301,25 @@ export function SectionStrokes({
                   />
                 </PropertyRow>
                 {(type === "line" || type === "vector") && (
-                  <>
-                    <PropertyRow>
-                      <PropertyLineLabel>Start</PropertyLineLabel>
-                      <StrokeDecorationControl
-                        value={stroke_decoration_start ?? "none"}
-                        onValueChange={actions.strokeDecorationStart}
-                      />
-                    </PropertyRow>
-                    <PropertyRow>
-                      <PropertyLineLabel>End</PropertyLineLabel>
-                      <StrokeDecorationControl
-                        value={stroke_decoration_end ?? "none"}
-                        onValueChange={actions.strokeDecorationEnd}
-                      />
-                    </PropertyRow>
-                  </>
+                  <PropertyRow>
+                    <PropertyLineLabel>Endpoint</PropertyLineLabel>
+                    <div className="flex flex-1 min-w-0 gap-1">
+                      <div className="min-w-0 flex-1">
+                        <StrokeDecorationControl
+                          variant="start"
+                          value={stroke_decoration_start ?? "none"}
+                          onValueChange={actions.strokeDecorationStart}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <StrokeDecorationControl
+                          variant="end"
+                          value={stroke_decoration_end ?? "none"}
+                          onValueChange={actions.strokeDecorationEnd}
+                        />
+                      </div>
+                    </div>
+                  </PropertyRow>
                 )}
                 <PropertyRow hidden={config.stroke_join === "off"}>
                   <PropertyLineLabel>Join</PropertyLineLabel>

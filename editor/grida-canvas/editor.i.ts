@@ -793,7 +793,7 @@ export namespace editor.state {
       }
     | {
         type: "draw";
-        tool: "line" | "pencil";
+        tool: "line" | "pencil" | "arrow";
       }
     | {
         type: "brush" | "eraser" | "flood-fill";
@@ -2056,7 +2056,7 @@ export namespace editor.gesture {
      * - draw points
      */
     readonly type: "draw";
-    readonly mode: "line" | "pencil";
+    readonly mode: "line" | "pencil" | "arrow";
 
     /**
      * origin point - relative to canvas space

@@ -304,6 +304,7 @@ export function PropertyEnum<T extends string>({
   value,
   tabIndex,
   className,
+  renderTriggerValue,
   ...props
 }: Omit<React.ComponentProps<typeof Select>, "value" | "onValueChange"> & {
   enum: EnumItem<T>[] | EnumItem<T>[][];
@@ -312,6 +313,8 @@ export function PropertyEnum<T extends string>({
   onValueChange?: (value: T) => void;
   tabIndex?: number;
   className?: string;
+  /** When set, renders only this in the trigger instead of label (e.g. icon only). */
+  renderTriggerValue?: (value: T, selectedItem: EnumItem<T> | undefined) => React.ReactNode;
 }) {
   const mixed = value === grida.mixed;
 
@@ -324,13 +327,22 @@ export function PropertyEnum<T extends string>({
     : (enums as EnumItem<T>[]);
   const hasIcon = allEnums.some((e) => typeof e !== "string" && e.icon);
 
+  const selectedItem =
+    !mixed && value !== undefined
+      ? allEnums.find((e) => enumValue(e) === value)
+      : undefined;
+
   return (
     <Select value={mixed ? undefined : value} {...props}>
       <SelectTrigger
         tabIndex={tabIndex}
         className={cn(WorkbenchUI.inputVariants({ size: "xs" }), className)}
       >
-        <SelectValue placeholder={mixed ? "mixed" : placeholder} />
+        {renderTriggerValue && !mixed && value !== undefined ? (
+          renderTriggerValue(value, selectedItem)
+        ) : (
+          <SelectValue placeholder={mixed ? "mixed" : placeholder} />
+        )}
       </SelectTrigger>
       <SelectContent>
         {isGrouped
