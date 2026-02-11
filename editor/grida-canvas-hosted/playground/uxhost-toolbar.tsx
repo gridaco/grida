@@ -139,6 +139,13 @@ export function PlaygroundToolbar() {
                 shortcut: keyboardShortcutText("workbench.surface.cursor.line"),
               },
               {
+                value: "arrow",
+                label: "Arrow",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.arrow"
+                ),
+              },
+              {
                 value: "polygon",
                 label: "Polygon",
                 shortcut: keyboardShortcutText(
