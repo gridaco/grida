@@ -47,6 +47,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 
@@ -83,6 +86,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 
@@ -120,6 +126,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 
@@ -153,6 +162,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 
@@ -189,6 +201,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 
@@ -234,6 +249,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 
@@ -268,6 +286,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 
@@ -312,6 +333,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 
@@ -351,6 +375,9 @@ async fn demo_vectors() -> Scene {
                 stroke_join: StrokeJoin::default(),
                 stroke_miter_limit: StrokeMiterLimit::default(),
                 stroke_dash_array: None,
+                stroke_decoration_start: StrokeDecoration::default(),
+                stroke_decoration_end: StrokeDecoration::default(),
+                vertex_overrides: vec![],
                 layout_child: None,
             };
 

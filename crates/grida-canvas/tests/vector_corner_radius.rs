@@ -1,4 +1,5 @@
 use cg::cg::prelude::*;
+use cg::cg::StrokeDecoration;
 use cg::node::schema::{LayerEffects, VectorNodeRec};
 use cg::vectornetwork::{
     VectorNetwork, VectorNetworkLoop, VectorNetworkRegion, VectorNetworkSegment,
@@ -65,6 +66,9 @@ fn make_node(corner_radius: f32) -> VectorNodeRec {
         stroke_join: StrokeJoin::default(),
         stroke_miter_limit: StrokeMiterLimit::default(),
         stroke_dash_array: None,
+        stroke_decoration_start: StrokeDecoration::default(),
+        stroke_decoration_end: StrokeDecoration::default(),
+        vertex_overrides: vec![],
     }
 }
 
