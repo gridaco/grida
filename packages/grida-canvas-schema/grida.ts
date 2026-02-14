@@ -2406,6 +2406,17 @@ export namespace grida.program.nodes {
     fill_rule?: cg.FillRule;
 
     vector_network: vn.VectorNetwork;
+
+    /**
+     * Marker shape at the start vertex (vertex[0]) of the vector network.
+     * @default "none"
+     */
+    marker_start_shape?: cg.StrokeMarkerPreset;
+    /**
+     * Marker shape at the end vertex (last vertex) of the vector network.
+     * @default "none"
+     */
+    marker_end_shape?: cg.StrokeMarkerPreset;
   }
 
   export interface ComputedVectorNode
@@ -2434,6 +2445,16 @@ export namespace grida.program.nodes {
       i.ILayoutChildTrait,
       i.IStroke {
     readonly type: "line";
+    /**
+     * Marker shape at the start endpoint of the line.
+     * @default "none"
+     */
+    marker_start_shape?: cg.StrokeMarkerPreset;
+    /**
+     * Marker shape at the end endpoint of the line.
+     * @default "none"
+     */
+    marker_end_shape?: cg.StrokeMarkerPreset;
   }
 
   export interface ComputedLineNode extends LineNode {

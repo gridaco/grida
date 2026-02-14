@@ -12,6 +12,7 @@ export type ToolbarToolType =
   | "container"
   | "image"
   | "line"
+  | "arrow"
   | "pencil"
   | "brush"
   | "eraser"
@@ -72,6 +73,7 @@ export function toolbar_value_to_cursormode(
     case "star":
       return { type: "insert", node: tt };
     case "line":
+    case "arrow":
     case "pencil":
       return { type: "draw", tool: tt };
     case "path":

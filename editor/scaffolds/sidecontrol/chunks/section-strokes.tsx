@@ -14,6 +14,7 @@ import {
 } from "../controls/stroke-width";
 import { StrokeAlignControl } from "../controls/stroke-align";
 import { StrokeCapControl } from "../controls/stroke-cap";
+import { StrokeDecorationControl } from "../controls/stroke-decoration";
 import { StrokeJoinControl } from "../controls/stroke-join";
 import { StrokeMiterLimitControl } from "../controls/stroke-miter-limit";
 import { StrokeClassControl, StrokeClass } from "../controls/stroke-class";
@@ -76,6 +77,8 @@ export function SectionStrokes({
     rectangular_stroke_width_left,
     stroke_align,
     stroke_cap,
+    marker_start_shape,
+    marker_end_shape,
     stroke_join,
     stroke_miter_limit,
     stroke_dash_array,
@@ -90,6 +93,8 @@ export function SectionStrokes({
     rectangular_stroke_width_left: node.rectangular_stroke_width_left,
     stroke_align: node.stroke_align,
     stroke_cap: node.stroke_cap,
+    marker_start_shape: node.marker_start_shape,
+    marker_end_shape: node.marker_end_shape,
     stroke_join: node.stroke_join,
     stroke_miter_limit: node.stroke_miter_limit,
     stroke_dash_array: node.stroke_dash_array,
@@ -250,7 +255,7 @@ export function SectionStrokes({
           />
           {has_stroke_paint && (
             <PropertySectionContent>
-              <PropertyRows>
+              <PropertyRows className="w-full">
                 <PropertyRow>
                   <PropertyLineLabel>Width</PropertyLineLabel>
                   {supportsStrokeWidth4 ? (
@@ -295,6 +300,27 @@ export function SectionStrokes({
                     onValueChange={actions.strokeCap}
                   />
                 </PropertyRow>
+                {(type === "line" || type === "vector") && (
+                  <PropertyRow>
+                    <PropertyLineLabel>Endpoint</PropertyLineLabel>
+                    <div className="flex flex-1 min-w-0 gap-1">
+                      <div className="min-w-0 flex-1">
+                        <StrokeDecorationControl
+                          variant="start"
+                          value={marker_start_shape ?? "none"}
+                          onValueChange={actions.strokeDecorationStart}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <StrokeDecorationControl
+                          variant="end"
+                          value={marker_end_shape ?? "none"}
+                          onValueChange={actions.strokeDecorationEnd}
+                        />
+                      </div>
+                    </div>
+                  </PropertyRow>
+                )}
                 <PropertyRow hidden={config.stroke_join === "off"}>
                   <PropertyLineLabel>Join</PropertyLineLabel>
                   <StrokeJoinControl

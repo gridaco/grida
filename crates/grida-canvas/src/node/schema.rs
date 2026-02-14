@@ -1262,6 +1262,11 @@ pub struct LineNodeRec {
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub _data_stroke_align: StrokeAlign,
 
+    /// Marker shape at the start endpoint of the line.
+    pub marker_start_shape: StrokeMarkerPreset,
+    /// Marker shape at the end endpoint of the line.
+    pub marker_end_shape: StrokeMarkerPreset,
+
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,
 }
@@ -1556,6 +1561,11 @@ pub struct VectorNodeRec {
     pub stroke_join: StrokeJoin,
     pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_dash_array: Option<StrokeDashArray>,
+
+    /// Marker shape at the start endpoint (first vertex).
+    pub marker_start_shape: StrokeMarkerPreset,
+    /// Marker shape at the end endpoint (last vertex).
+    pub marker_end_shape: StrokeMarkerPreset,
 
     /// Layout style for this node when it is a child of a layout container.
     pub layout_child: Option<LayoutChildStyle>,

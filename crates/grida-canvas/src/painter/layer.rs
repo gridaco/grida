@@ -154,6 +154,12 @@ pub struct PainterPictureShapeLayer {
     pub strokes: Paints,
     pub fills: Paints,
     pub stroke_path: Option<skia_safe::Path>,
+    /// Marker shape at the start endpoint (line nodes).
+    pub marker_start_shape: StrokeMarkerPreset,
+    /// Marker shape at the end endpoint (line nodes).
+    pub marker_end_shape: StrokeMarkerPreset,
+    /// Stroke width needed for decoration sizing.
+    pub stroke_width: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -193,6 +199,10 @@ pub struct PainterPictureVectorLayer {
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub corner_radius: f32,
+    /// Marker shape at the start endpoint (first vertex).
+    pub marker_start_shape: StrokeMarkerPreset,
+    /// Marker shape at the end endpoint (last vertex).
+    pub marker_end_shape: StrokeMarkerPreset,
 }
 
 /// A layer with its associated node ID.
@@ -412,6 +422,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -472,6 +485,9 @@ impl LayerList {
                         strokes: Self::filter_visible_paints(&n.strokes),
                         fills: Self::filter_visible_paints(&n.fills),
                         stroke_path,
+                        marker_start_shape: StrokeMarkerPreset::None,
+                        marker_end_shape: StrokeMarkerPreset::None,
+                        stroke_width: 0.0,
                     });
                     out.push(LayerEntry {
                         id: id.clone(),
@@ -522,6 +538,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -566,6 +585,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -610,6 +632,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -654,6 +679,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -698,6 +726,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -714,12 +745,36 @@ impl LayerList {
                     .get_world_bounds(id)
                     .expect("Geometry must exist");
                 let shape = build_shape(node, &bounds);
+
+                // Compute cutback distances for endpoint decorations
+                let start_cutback =
+                    crate::shape::marker::cutback_depth(n.marker_start_shape, n.stroke_width);
+                let end_cutback =
+                    crate::shape::marker::cutback_depth(n.marker_end_shape, n.stroke_width);
+
+                // Force Butt cap when decorations are present so the native
+                // cap geometry doesn't leak out from under the marker.
+                let has_any_decoration =
+                    n.marker_start_shape.has_marker() || n.marker_end_shape.has_marker();
+                let effective_cap = if has_any_decoration {
+                    StrokeCap::Butt
+                } else {
+                    n.stroke_cap
+                };
+
                 let stroke_path = if n.stroke_width > 0.0 {
+                    // Trim the source path by cutback before computing stroke geometry
+                    let source_path = shape.to_path();
+                    let trimmed = if start_cutback > 0.0 || end_cutback > 0.0 {
+                        crate::shape::marker::trim_path(&source_path, start_cutback, end_cutback)
+                    } else {
+                        source_path
+                    };
                     Some(stroke_geometry(
-                        &shape.to_path(),
+                        &trimmed,
                         n.stroke_width,
                         n.get_stroke_align(),
-                        n.stroke_cap,
+                        effective_cap,
                         StrokeJoin::default(), // Join not applicable for single line
                         n.stroke_miter_limit,
                         n.stroke_dash_array.as_ref(),
@@ -741,6 +796,9 @@ impl LayerList {
                     strokes: n.strokes.clone(),
                     fills: Paints::default(),
                     stroke_path,
+                    marker_start_shape: n.marker_start_shape,
+                    marker_end_shape: n.marker_end_shape,
+                    stroke_width: n.stroke_width,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -849,6 +907,9 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -887,6 +948,8 @@ impl LayerList {
                     stroke_width_profile: n.stroke_width_profile.clone(),
                     stroke_dash_array: n.stroke_dash_array.clone(),
                     corner_radius: n.corner_radius,
+                    marker_start_shape: n.marker_start_shape,
+                    marker_end_shape: n.marker_end_shape,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -933,6 +996,9 @@ impl LayerList {
                         n.fill.clone(),
                     )])),
                     stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -963,6 +1029,9 @@ impl LayerList {
                     strokes: Paints::default(),
                     fills: Paints::default(),
                     stroke_path: None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),

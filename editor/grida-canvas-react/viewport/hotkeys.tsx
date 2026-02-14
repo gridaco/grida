@@ -790,6 +790,10 @@ export function useEditorHotKeys() {
     editor.surface.surfaceSetTool({ type: "draw", tool: "line" });
   });
 
+  useHotkeys("shift+l", () => {
+    editor.surface.surfaceSetTool({ type: "draw", tool: "arrow" });
+  });
+
   useHotkeys(
     "p",
     () => {

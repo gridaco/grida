@@ -9,6 +9,9 @@ export namespace vn {
   export type Loop = number[];
   /**
    * Represents a vertex in the vector network.
+   *
+   * For basic vertices, this is a simple `[x, y]` tuple (Vector2).
+   * For vertices with decoration overrides, use {@link VectorNetworkVertexWithOverrides}.
    */
   export type VectorNetworkVertex = Vector2;
 

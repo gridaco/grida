@@ -717,6 +717,34 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Draw stroke decoration markers at the start/end endpoints of a path.
+    pub fn draw_stroke_decorations(
+        &self,
+        shape: &PainterShape,
+        strokes: &[Paint],
+        stroke_width: f32,
+        start: StrokeMarkerPreset,
+        end: StrokeMarkerPreset,
+    ) {
+        if !start.has_marker() && !end.has_marker() {
+            return;
+        }
+        if let Some(sk_paint) = paint::sk_paint_stack(
+            strokes,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            crate::shape::marker::draw_endpoint_decorations(
+                self.canvas,
+                &shape.to_path(),
+                start,
+                end,
+                stroke_width,
+                &sk_paint,
+            );
+        }
+    }
+
     /// Draw a shape applying all layer effects in the correct order.
     ///
     /// Effect ordering (as per specification):
@@ -940,6 +968,15 @@ impl<'a> Painter<'a> {
                                                 &shape_layer.strokes,
                                             );
                                         }
+
+                                        // 4. Stroke decorations (markers at endpoints)
+                                        self.draw_stroke_decorations(
+                                            shape,
+                                            &shape_layer.strokes,
+                                            shape_layer.stroke_width,
+                                            shape_layer.marker_start_shape,
+                                            shape_layer.marker_end_shape,
+                                        );
                                     }
                                 });
                             };
@@ -1100,28 +1137,107 @@ impl<'a> Painter<'a> {
                                     }
 
                                     if self.policy.render_strokes() {
-                                        // 3. Render strokes separately
+                                        let has_cutback =
+                                            vector_layer.marker_start_shape.has_marker()
+                                                || vector_layer.marker_end_shape.has_marker();
+
+                                        let start_cutback = crate::shape::marker::cutback_depth(
+                                            vector_layer.marker_start_shape,
+                                            vector_layer.stroke_width,
+                                        );
+                                        let end_cutback = crate::shape::marker::cutback_depth(
+                                            vector_layer.marker_end_shape,
+                                            vector_layer.stroke_width,
+                                        );
+                                        let needs_trim =
+                                            start_cutback > 0.0 || end_cutback > 0.0;
+
+                                        // Force Butt cap when decorations are present so the
+                                        // native cap doesn't leak out from under the marker.
+                                        let effective_cap = if has_cutback {
+                                            StrokeCap::Butt
+                                        } else {
+                                            vector_layer.stroke_cap
+                                        };
+
+                                        // 3. Render strokes (trimmed when cutback applies)
                                         if !vector_layer.strokes.is_empty() {
-                                            let stroke_options = StrokeOptions {
-                                                stroke_width: vector_layer.stroke_width,
-                                                stroke_align: vector_layer.stroke_align,
-                                                stroke_cap: vector_layer.stroke_cap,
-                                                stroke_join: vector_layer.stroke_join,
-                                                stroke_miter_limit: vector_layer.stroke_miter_limit,
-                                                paints: vector_layer.strokes.clone(),
-                                                width_profile: vector_layer
-                                                    .stroke_width_profile
-                                                    .clone(),
-                                                stroke_dash_array: vector_layer
-                                                    .stroke_dash_array
-                                                    .clone(),
-                                            };
-                                            self.draw_vector_strokes(
-                                                &vn_painter,
-                                                &vector_layer.vector,
-                                                &stroke_options,
-                                                vector_layer.corner_radius,
-                                            );
+                                            if needs_trim {
+                                                // When cutback is needed, get the VN path, trim it,
+                                                // and stroke via stroke_geometry instead of VNPainter.
+                                                let paths = vector_layer.vector.to_paths();
+                                                if let Some(vn_path) = paths.first() {
+                                                    let trimmed =
+                                                        crate::shape::marker::trim_path(
+                                                            vn_path,
+                                                            start_cutback,
+                                                            end_cutback,
+                                                        );
+                                                    let stroke_path =
+                                                        crate::shape::stroke::stroke_geometry(
+                                                            &trimmed,
+                                                            vector_layer.stroke_width,
+                                                            vector_layer.stroke_align,
+                                                            effective_cap,
+                                                            vector_layer.stroke_join,
+                                                            vector_layer.stroke_miter_limit,
+                                                            vector_layer
+                                                                .stroke_dash_array
+                                                                .as_ref(),
+                                                        );
+                                                    self.draw_stroke_path(
+                                                        shape,
+                                                        &stroke_path,
+                                                        &vector_layer.strokes,
+                                                    );
+                                                }
+                                            } else {
+                                                // No cutback: use VNPainter for full-fidelity rendering
+                                                let stroke_options = StrokeOptions {
+                                                    stroke_width: vector_layer.stroke_width,
+                                                    stroke_align: vector_layer.stroke_align,
+                                                    stroke_cap: effective_cap,
+                                                    stroke_join: vector_layer.stroke_join,
+                                                    stroke_miter_limit: vector_layer
+                                                        .stroke_miter_limit,
+                                                    paints: vector_layer.strokes.clone(),
+                                                    width_profile: vector_layer
+                                                        .stroke_width_profile
+                                                        .clone(),
+                                                    stroke_dash_array: vector_layer
+                                                        .stroke_dash_array
+                                                        .clone(),
+                                                };
+                                                self.draw_vector_strokes(
+                                                    &vn_painter,
+                                                    &vector_layer.vector,
+                                                    &stroke_options,
+                                                    vector_layer.corner_radius,
+                                                );
+                                            }
+                                        }
+
+                                        // 4. Stroke decorations (markers at endpoints)
+                                        // Place markers on the UNTRIMMED path so tips align
+                                        // with the logical endpoint.
+                                        if has_cutback {
+                                            let paths = vector_layer.vector.to_paths();
+                                            if let Some(vn_path) = paths.first() {
+                                                if let Some(sk_paint) = paint::sk_paint_stack(
+                                                    &vector_layer.strokes,
+                                                    (shape.rect.width(), shape.rect.height()),
+                                                    self.images,
+                                                ) {
+                                                    crate::shape::marker::draw_endpoint_decorations(
+                                                        self.canvas,
+                                                        vn_path,
+                                                        vector_layer.marker_start_shape,
+                                                        vector_layer.marker_end_shape,
+                                                        vector_layer.stroke_width,
+                                                        &sk_paint,
+                                                    );
+                                                }
+                                            }
                                         }
                                     }
                                 });

@@ -52,7 +52,7 @@ impl UIFontFaceOwned {
     }
 
     /// Convert to zero-copy version for internal processing
-    pub fn as_borrowed(&self) -> UIFontFace {
+    pub fn as_borrowed(&self) -> UIFontFace<'_> {
         UIFontFace {
             face_id: self.face_id.clone(),
             data: &self.data,

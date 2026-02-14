@@ -1440,6 +1440,8 @@ mod tests {
             stroke_join: StrokeJoin::default(),
             stroke_miter_limit: StrokeMiterLimit::default(),
             stroke_dash_array: None,
+            marker_start_shape: StrokeMarkerPreset::default(),
+            marker_end_shape: StrokeMarkerPreset::default(),
             layout_child: None,
         };
 

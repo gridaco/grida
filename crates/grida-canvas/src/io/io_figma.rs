@@ -1604,6 +1604,8 @@ impl FigmaConverter {
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            marker_start_shape: StrokeMarkerPreset::default(),
+            marker_end_shape: StrokeMarkerPreset::default(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: origin
                     .layout_positioning

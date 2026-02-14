@@ -14,17 +14,19 @@ Currently, we have below features / modules.
 
 ## Project Structure
 
-- [docs](./docs) - the docs directory
-- [format](./format) - grida file formats & schemas
-- [editor](./editor) - the editor directory
-- [crates](./crates) - the rust crates directory
-- [packages](./packages) - shared packages
-- [desktop](./desktop) - the electron desktop app
-- [supabase](./supabase) - the supabase project
-- [apps](./apps) - micro sites for Grida
-- [library](./library) - hosted library workers
-- [jobs](./jobs) - hosted jobs
-- [.legacy](./legacy) - will be removed (fully ignore this directory)
+| directory              | README                                       | AGENTS                                       | notes                                         |
+| ---------------------- | -------------------------------------------- | -------------------------------------------- | --------------------------------------------- |
+| [docs](./docs)         | -                                            | [`docs/AGENTS.md`](./docs/AGENTS.md)         | the docs directory                            |
+| [format](./format)     | [`format/README.md`](./format/README.md)     | [`format/AGENTS.md`](./format/AGENTS.md)     | grida file formats & schemas                  |
+| [editor](./editor)     | -                                            | [`editor/AGENTS.md`](./editor/AGENTS.md)     | the editor directory                          |
+| [crates](./crates)     | -                                            | -                                            | the rust crates directory                     |
+| [packages](./packages) | -                                            | -                                            | shared packages                               |
+| [desktop](./desktop)   | [`desktop/README.md`](./desktop/README.md)   | -                                            | the electron desktop app                      |
+| [supabase](./supabase) | [`supabase/README.md`](./supabase/README.md) | [`supabase/AGENTS.md`](./supabase/AGENTS.md) | the supabase project                          |
+| [apps](./apps)         | -                                            | -                                            | micro sites for Grida                         |
+| [library](./library)   | [`library/README.md`](./library/README.md)   | -                                            | hosted library workers                        |
+| [jobs](./jobs)         | [`jobs/README.md`](./jobs/README.md)         | -                                            | hosted jobs                                   |
+| [.legacy](./.legacy)   | -                                            | -                                            | will be removed (fully ignore this directory) |
 
 ## Languages, Frameworks, Tools, Infrastructures
 

@@ -831,6 +831,16 @@ pub struct JSONUnknownNodeProperties {
         alias = "strokeDasharray"
     )]
     pub stroke_dash_array: Option<Vec<f32>>,
+    #[serde(
+        rename = "marker_start_shape",
+        default
+    )]
+    pub marker_start_shape: Option<StrokeMarkerPreset>,
+    #[serde(
+        rename = "marker_end_shape",
+        default
+    )]
+    pub marker_end_shape: Option<StrokeMarkerPreset>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
     #[serde(rename = "stroke_paints")]
@@ -1813,6 +1823,8 @@ impl From<JSONLineNode> for Node {
             stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
             stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            marker_start_shape: node.base.marker_start_shape.unwrap_or_default(),
+            marker_end_shape: node.base.marker_end_shape.unwrap_or_default(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1869,6 +1881,8 @@ impl From<JSONVectorNode> for Node {
             stroke_join: node.base.stroke_join.unwrap_or_default(),
             stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
             stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            marker_start_shape: node.base.marker_start_shape.unwrap_or_default(),
+            marker_end_shape: node.base.marker_end_shape.unwrap_or_default(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base

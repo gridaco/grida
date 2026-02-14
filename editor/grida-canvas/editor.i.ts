@@ -793,7 +793,7 @@ export namespace editor.state {
       }
     | {
         type: "draw";
-        tool: "line" | "pencil";
+        tool: "line" | "pencil" | "arrow";
       }
     | {
         type: "brush" | "eraser" | "flood-fill";
@@ -2056,7 +2056,7 @@ export namespace editor.gesture {
      * - draw points
      */
     readonly type: "draw";
-    readonly mode: "line" | "pencil";
+    readonly mode: "line" | "pencil" | "arrow";
 
     /**
      * origin point - relative to canvas space
@@ -3623,6 +3623,14 @@ export namespace editor.api {
       strokeDashArray: number[] | undefined
     ): void;
     changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodePropertyStrokeDecorationStart(
+      node_id: NodeID,
+      decoration: cg.StrokeMarkerPreset
+    ): void;
+    changeNodePropertyStrokeDecorationEnd(
+      node_id: NodeID,
+      decoration: cg.StrokeMarkerPreset
+    ): void;
     changeNodePropertyStrokeJoin(
       node_id: NodeID,
       strokeJoin: cg.StrokeJoin

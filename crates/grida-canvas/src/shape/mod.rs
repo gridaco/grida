@@ -3,6 +3,7 @@ pub mod ellipse;
 pub mod ellipse_ring;
 pub mod ellipse_ring_sector;
 pub mod ellipse_sector;
+pub mod marker;
 pub mod polygon;
 pub mod rect;
 pub mod regular_polygon;

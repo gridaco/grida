@@ -417,6 +417,31 @@ enum StrokeJoin : ubyte {
   Bevel = 2
 }
 
+/// Marker decoration placed at stroke endpoints or vector vertices.
+///
+/// Unlike StrokeCap (which maps to native backend caps like Skia PaintCap),
+/// StrokeMarkerPreset represents explicit marker geometry drawn on top of the
+/// stroke path. When a decoration is present at an endpoint, the renderer
+/// uses Butt cap at that endpoint and draws the marker geometry instead.
+///
+/// See: docs/wg/feat-2d/curve-decoration.md
+enum StrokeMarkerPreset : ubyte {
+  /// No decoration (endpoint uses the node's stroke_cap as normal).
+  None = 0,
+  /// Right triangle (90° at tip), open stroked chevron — not filled.
+  RightTriangleOpen = 1,
+  /// Filled equilateral triangle pointing forward.
+  EquilateralTriangle = 2,
+  /// Filled circle.
+  Circle = 3,
+  /// Filled axis-aligned square.
+  Square = 4,
+  /// Filled diamond (square rotated 45°).
+  Diamond = 5,
+  /// Filled vertical bar (rectangle) perpendicular to the stroke.
+  VerticalBar = 6
+}
+
 enum TextAlign : ubyte {
   Left = 0,
   Right = 1,
@@ -1366,6 +1391,8 @@ table LineNode {
   layer:LayerTrait (required);
   stroke_geometry:StrokeGeometryTrait;
   stroke_paints:[PaintStackItem];
+  marker_start_shape:StrokeMarkerPreset = None;
+  marker_end_shape:StrokeMarkerPreset = None;
 }
 
 /// Node variant: Vector.
@@ -1374,6 +1401,8 @@ table VectorNode {
   layer:LayerTrait (required);
   stroke_geometry:StrokeGeometryTrait;
   stroke_paints:[PaintStackItem];
+  marker_start_shape:StrokeMarkerPreset = None;
+  marker_end_shape:StrokeMarkerPreset = None;
   corner_radius:CornerRadiusTrait;
   fill_paints:[PaintStackItem];
   vector_network_data:VectorNetworkData;

@@ -1957,6 +1957,28 @@ class EditorDocumentStore
     });
   }
 
+  changeNodePropertyStrokeDecorationStart(
+    node_id: string,
+    decoration: cg.StrokeMarkerPreset
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      marker_start_shape: decoration,
+    });
+  }
+
+  changeNodePropertyStrokeDecorationEnd(
+    node_id: string,
+    decoration: cg.StrokeMarkerPreset
+  ) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      marker_end_shape: decoration,
+    });
+  }
+
   changeNodePropertyStrokeJoin(node_id: string, strokeJoin: cg.StrokeJoin) {
     this.dispatch({
       type: "node/change/*",

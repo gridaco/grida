@@ -318,6 +318,13 @@ export const actions = {
     keybindings: kb(KeyCode.KeyL, 0),
   },
 
+  ["workbench.surface.cursor.arrow"]: {
+    name: "arrow",
+    description: "Arrow tool",
+    command: "editor.surface.action.setTool.arrow",
+    keybindings: kb(KeyCode.KeyL, M.Shift),
+  },
+
   ["workbench.surface.cursor.container"]: {
     name: "container",
     description: "Container tool",

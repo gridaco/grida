@@ -13,7 +13,13 @@ import {
   EraserIcon,
   StarIcon,
 } from "@radix-ui/react-icons";
-import { BrushIcon, LassoIcon, PenToolIcon, TriangleIcon } from "lucide-react";
+import {
+  BrushIcon,
+  LassoIcon,
+  MoveUpRightIcon,
+  PenToolIcon,
+  TriangleIcon,
+} from "lucide-react";
 import { UpscaleIcon } from "../starterkit-icons/upscale";
 import {
   DropdownMenu,
@@ -226,6 +232,13 @@ export default function Toolbar() {
               shortcut: keyboardShortcutText("workbench.surface.cursor.line"),
             },
             {
+              value: "arrow",
+              label: "Arrow",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.arrow"
+              ),
+            },
+            {
               value: "polygon",
               label: "Polygon",
               shortcut: keyboardShortcutText(
@@ -352,6 +365,8 @@ export function ToolIcon({
       return <StarIcon {...props} />;
     case "line":
       return <SlashIcon {...props} />;
+    case "arrow":
+      return <MoveUpRightIcon {...props} />;
     case "pencil":
       return <Pencil1Icon {...props} />;
     case "path":

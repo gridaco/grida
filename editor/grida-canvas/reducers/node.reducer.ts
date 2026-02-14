@@ -488,6 +488,16 @@ const safe_properties: Partial<
       (draft as UN).stroke_cap = value;
     },
   }),
+  marker_start_shape: defineNodeProperty<"marker_start_shape">({
+    apply: (draft, value) => {
+      (draft as UN).marker_start_shape = value;
+    },
+  }),
+  marker_end_shape: defineNodeProperty<"marker_end_shape">({
+    apply: (draft, value) => {
+      (draft as UN).marker_end_shape = value;
+    },
+  }),
   stroke_join: defineNodeProperty<"stroke_join">({
     apply: (draft, value, prev) => {
       (draft as UN).stroke_join = value;

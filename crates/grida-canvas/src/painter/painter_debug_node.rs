@@ -163,6 +163,15 @@ impl<'a> NodePainter<'a> {
                             node.stroke_miter_limit,
                             node.stroke_dash_array.as_ref(),
                         );
+
+                        // Draw stroke decorations (markers at endpoints)
+                        self.painter.draw_stroke_decorations(
+                            &shape,
+                            &node.strokes,
+                            node.stroke_width,
+                            node.marker_start_shape,
+                            node.marker_end_shape,
+                        );
                     },
                 );
             });
@@ -197,6 +206,15 @@ impl<'a> NodePainter<'a> {
                                     node.stroke_join,
                                     node.stroke_miter_limit,
                                     node.stroke_dash_array.as_ref(),
+                                );
+
+                                // Draw stroke decorations (markers at endpoints)
+                                self.painter.draw_stroke_decorations(
+                                    &shape,
+                                    &node.strokes,
+                                    node.stroke_width,
+                                    node.marker_start_shape,
+                                    node.marker_end_shape,
                                 );
                             },
                         );

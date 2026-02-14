@@ -39,6 +39,7 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 | Polygon tool    | `Y`            | `Y`            | Insert polygon                             |
 | Text tool       | `T`            | `T`            | Insert text                                |
 | Line tool       | `L`            | `L`            | Draw line                                  |
+| Arrow tool      | `⇧ + L`        | `⇧ + L`        | Draw arrow (line with arrowhead)           |
 | Container tool  | `A` or `F`     | `A` or `F`     | Insert container                           |
 | Path tool       | `P`            | `P`            | Draw path (Pen tool)                       |
 | Pencil tool     | `⇧ + P`        | `⇧ + P`        | Draw with pencil                           |

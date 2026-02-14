@@ -735,18 +735,24 @@ export function on_draw_pointer_down(
       break;
     }
     case "line": {
-      // vector = {
-      //   ...__base,
-      //   type: "line",
-      //   name: "line",
-      // } satisfies grida.program.nodes.LineNode;
-
       vector = {
         ...__base,
         type: "vector",
         name: "line",
         stroke_width: 1,
         stroke_join: "miter",
+        vector_network: vn.polyline([cmath.vector2.zero]),
+      } satisfies grida.program.nodes.VectorNode;
+      break;
+    }
+    case "arrow": {
+      vector = {
+        ...__base,
+        type: "vector",
+        name: "line",
+        stroke_width: 2, // intentional: arrows read better slightly thicker
+        stroke_join: "miter",
+        marker_end_shape: "right_triangle_open",
         vector_network: vn.polyline([cmath.vector2.zero]),
       } satisfies grida.program.nodes.VectorNode;
       break;
@@ -784,11 +790,10 @@ export function on_draw_pointer_down(
   // selection & hover state
   switch (tool) {
     case "line":
-      // self_selectNode(draft, "reset", vector.id);
+    case "arrow":
       self_clearSelection(draft);
       break;
     case "pencil":
-      // clear selection for pencil mode
       self_clearSelection(draft);
       break;
   }
@@ -830,6 +835,7 @@ export function on_drag_gesture_draw(
 
   switch (mode) {
     case "line":
+    case "arrow":
       vne.extendLine(point);
       break;
     case "pencil":
