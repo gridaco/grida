@@ -6,7 +6,7 @@
 //! painter → marker module) with `LineNodeRec` — the same code path as the
 //! production editor.
 //!
-//! Each built-in `StrokeDecoration` preset is shown at **10 px stroke width**
+//! Each built-in `StrokeMarkerPreset` preset is shown at **10 px stroke width**
 //! on a straight line with decoration at the **end** endpoint only.
 //! Red vertical guidelines mark the logical start and end.
 
@@ -28,14 +28,14 @@ fn build_scene() -> Scene {
     let nf = NodeFactory::new();
     let mut graph = SceneGraph::new();
 
-    let presets: Vec<(&str, StrokeDecoration)> = vec![
-        ("none", StrokeDecoration::None),
-        ("arrow_lines", StrokeDecoration::ArrowLines),
-        ("vertical_bar_filled", StrokeDecoration::VerticalBarFilled),
-        ("triangle_filled", StrokeDecoration::TriangleFilled),
-        ("circle_filled", StrokeDecoration::CircleFilled),
-        ("square_filled", StrokeDecoration::SquareFilled),
-        ("diamond_filled", StrokeDecoration::DiamondFilled),
+    let presets: Vec<(&str, StrokeMarkerPreset)> = vec![
+        ("none", StrokeMarkerPreset::None),
+        ("right_triangle_open", StrokeMarkerPreset::RightTriangleOpen),
+        ("equilateral_triangle", StrokeMarkerPreset::EquilateralTriangle),
+        ("circle", StrokeMarkerPreset::Circle),
+        ("square", StrokeMarkerPreset::Square),
+        ("diamond", StrokeMarkerPreset::Diamond),
+        ("vertical_bar", StrokeMarkerPreset::VerticalBar),
     ];
 
     for (i, (_label, decoration)) in presets.iter().enumerate() {
@@ -50,8 +50,8 @@ fn build_scene() -> Scene {
         line.stroke_width = STROKE_W;
         line.strokes = Paints::new([Paint::from(CGColor::from_rgba(40, 40, 40, 255))]);
         line.stroke_cap = StrokeCap::Butt;
-        line.stroke_decoration_start = StrokeDecoration::None;
-        line.stroke_decoration_end = *decoration;
+        line.marker_start_shape = StrokeMarkerPreset::None;
+        line.marker_end_shape = *decoration;
 
         graph.append_child(Node::Line(line), Parent::Root);
     }
@@ -122,12 +122,12 @@ async fn main() {
 
     let labels = [
         "none",
-        "arrow_lines",
-        "vertical_bar_filled",
-        "triangle_filled",
-        "circle_filled",
-        "square_filled",
-        "diamond_filled",
+        "right_triangle_open",
+        "equilateral_triangle",
+        "circle",
+        "square",
+        "diamond",
+        "vertical_bar",
     ];
 
     for (i, label) in labels.iter().enumerate() {

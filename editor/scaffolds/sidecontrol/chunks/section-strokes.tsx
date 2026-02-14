@@ -77,8 +77,8 @@ export function SectionStrokes({
     rectangular_stroke_width_left,
     stroke_align,
     stroke_cap,
-    stroke_decoration_start,
-    stroke_decoration_end,
+    marker_start_shape,
+    marker_end_shape,
     stroke_join,
     stroke_miter_limit,
     stroke_dash_array,
@@ -93,8 +93,8 @@ export function SectionStrokes({
     rectangular_stroke_width_left: node.rectangular_stroke_width_left,
     stroke_align: node.stroke_align,
     stroke_cap: node.stroke_cap,
-    stroke_decoration_start: node.stroke_decoration_start,
-    stroke_decoration_end: node.stroke_decoration_end,
+    marker_start_shape: node.marker_start_shape,
+    marker_end_shape: node.marker_end_shape,
     stroke_join: node.stroke_join,
     stroke_miter_limit: node.stroke_miter_limit,
     stroke_dash_array: node.stroke_dash_array,
@@ -307,14 +307,14 @@ export function SectionStrokes({
                       <div className="min-w-0 flex-1">
                         <StrokeDecorationControl
                           variant="start"
-                          value={stroke_decoration_start ?? "none"}
+                          value={marker_start_shape ?? "none"}
                           onValueChange={actions.strokeDecorationStart}
                         />
                       </div>
                       <div className="min-w-0 flex-1">
                         <StrokeDecorationControl
                           variant="end"
-                          value={stroke_decoration_end ?? "none"}
+                          value={marker_end_shape ?? "none"}
                           onValueChange={actions.strokeDecorationEnd}
                         />
                       </div>

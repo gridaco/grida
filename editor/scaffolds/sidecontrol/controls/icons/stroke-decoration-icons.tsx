@@ -335,26 +335,26 @@ function MarkerVerticalBarFilled() {
   );
 }
 
-const markerByValue: Record<cg.StrokeDecoration, React.ReactNode | null> = {
+const markerByValue: Record<cg.StrokeMarkerPreset, React.ReactNode | null> = {
   none: null,
-  arrow_lines: <MarkerArrowLines />,
-  triangle_filled: <MarkerTriangleFilled />,
-  circle_filled: <MarkerCircleFilled />,
-  square_filled: <MarkerSquareFilled />,
-  diamond_filled: <MarkerDiamondFilled />,
-  vertical_bar_filled: <MarkerVerticalBarFilled />,
+  right_triangle_open: <MarkerArrowLines />,
+  equilateral_triangle: <MarkerTriangleFilled />,
+  circle: <MarkerCircleFilled />,
+  square: <MarkerSquareFilled />,
+  diamond: <MarkerDiamondFilled />,
+  vertical_bar: <MarkerVerticalBarFilled />,
 };
 
 // ── Lookup tables ────────────────────────────────────────────────────────────
 
-const iconByValue: Record<cg.StrokeDecoration, React.ReactNode> = {
+const iconByValue: Record<cg.StrokeMarkerPreset, React.ReactNode> = {
   none: <StrokeDecorationNoneIcon />,
-  arrow_lines: <StrokeDecorationArrowLinesIcon />,
-  triangle_filled: <StrokeDecorationTriangleFilledIcon />,
-  circle_filled: <StrokeDecorationCircleFilledIcon />,
-  square_filled: <StrokeDecorationSquareFilledIcon />,
-  diamond_filled: <StrokeDecorationDiamondFilledIcon />,
-  vertical_bar_filled: <StrokeDecorationVerticalBarFilledIcon />,
+  right_triangle_open: <StrokeDecorationArrowLinesIcon />,
+  equilateral_triangle: <StrokeDecorationTriangleFilledIcon />,
+  circle: <StrokeDecorationCircleFilledIcon />,
+  square: <StrokeDecorationSquareFilledIcon />,
+  diamond: <StrokeDecorationDiamondFilledIcon />,
+  vertical_bar: <StrokeDecorationVerticalBarFilledIcon />,
 };
 
 // ── Composite components ─────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ export function StrokeDecorationIcon({
   variant = "end",
   className,
 }: {
-  value: cg.StrokeDecoration;
+  value: cg.StrokeMarkerPreset;
   variant?: "start" | "end";
   className?: string;
 }) {
@@ -405,7 +405,7 @@ export function StrokeDecorationIconResponsive({
   variant = "end",
   className,
 }: {
-  value: cg.StrokeDecoration;
+  value: cg.StrokeMarkerPreset;
   variant?: "start" | "end";
   className?: string;
 }) {

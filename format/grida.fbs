@@ -420,26 +420,26 @@ enum StrokeJoin : ubyte {
 /// Marker decoration placed at stroke endpoints or vector vertices.
 ///
 /// Unlike StrokeCap (which maps to native backend caps like Skia PaintCap),
-/// StrokeDecoration represents explicit marker geometry drawn on top of the
+/// StrokeMarkerPreset represents explicit marker geometry drawn on top of the
 /// stroke path. When a decoration is present at an endpoint, the renderer
 /// uses Butt cap at that endpoint and draws the marker geometry instead.
 ///
 /// See: docs/wg/feat-2d/curve-decoration.md
-enum StrokeDecoration : ubyte {
+enum StrokeMarkerPreset : ubyte {
   /// No decoration (endpoint uses the node's stroke_cap as normal).
   None = 0,
-  /// Arrow lines — open chevron (">"), visually tuned. (Right Triangle)
-  ArrowLines = 1,
+  /// Right triangle (90° at tip), open stroked chevron — not filled.
+  RightTriangleOpen = 1,
   /// Filled equilateral triangle pointing forward.
-  TriangleFilled = 2,
+  EquilateralTriangle = 2,
   /// Filled circle.
-  CircleFilled = 3,
+  Circle = 3,
   /// Filled axis-aligned square.
-  SquareFilled = 4,
-  /// Filled diamond (rotated square).
-  DiamondFilled = 5,
-  /// Filled vertical bar perpendicular to the stroke.
-  VerticalBarFilled = 6
+  Square = 4,
+  /// Filled diamond (square rotated 45°).
+  Diamond = 5,
+  /// Filled vertical bar (rectangle) perpendicular to the stroke.
+  VerticalBar = 6
 }
 
 enum TextAlign : ubyte {
@@ -837,20 +837,11 @@ table VectorNetworkRegion {
   region_fill_paints:[PaintStackItem] (id: 2);
 }
 
-/// Sparse per-vertex property override for vector networks.
-/// Allows individual vertices to have custom decorations.
-/// Indexed by vertex_index into VectorNetworkData.vertices.
-table VectorVertexOverride {
-  vertex_index:uint (id: 0);
-  stroke_decoration:StrokeDecoration = None (id: 1);
-}
-
 /// Rust: `VectorNetwork { vertices, segments, regions }`
 table VectorNetworkData {
   vertices:[CGPoint] (id: 0);
   segments:[VectorNetworkSegment] (id: 1);
   regions:[VectorNetworkRegion] (id: 2);
-  vertex_overrides:[VectorVertexOverride] (id: 3);
 }
 
 // -----------------------------------------------------------------------------
@@ -1400,8 +1391,8 @@ table LineNode {
   layer:LayerTrait (required);
   stroke_geometry:StrokeGeometryTrait;
   stroke_paints:[PaintStackItem];
-  stroke_decoration_start:StrokeDecoration = None;
-  stroke_decoration_end:StrokeDecoration = None;
+  marker_start_shape:StrokeMarkerPreset = None;
+  marker_end_shape:StrokeMarkerPreset = None;
 }
 
 /// Node variant: Vector.
@@ -1410,6 +1401,8 @@ table VectorNode {
   layer:LayerTrait (required);
   stroke_geometry:StrokeGeometryTrait;
   stroke_paints:[PaintStackItem];
+  marker_start_shape:StrokeMarkerPreset = None;
+  marker_end_shape:StrokeMarkerPreset = None;
   corner_radius:CornerRadiusTrait;
   fill_paints:[PaintStackItem];
   vector_network_data:VectorNetworkData;

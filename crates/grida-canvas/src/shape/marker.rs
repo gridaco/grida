@@ -10,7 +10,7 @@
 //!
 //! See: `docs/wg/feat-2d/curve-decoration.md`
 
-use crate::cg::StrokeDecoration;
+use crate::cg::StrokeMarkerPreset;
 use skia_safe::{Canvas, Paint, PaintStyle, Path, PathBuilder, PathMeasure};
 use std::f32::consts::PI;
 
@@ -77,12 +77,12 @@ pub enum MarkerAnchor {
 /// raw `Path` instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinMarker {
-    ArrowLines,
-    TriangleFilled,
-    CircleFilled,
-    SquareFilled,
-    DiamondFilled,
-    VerticalBarFilled,
+    RightTriangleOpen,
+    EquilateralTriangle,
+    Circle,
+    Square,
+    Diamond,
+    VerticalBar,
 }
 
 /// A fully resolved marker shape: geometry + cutback, ready to draw.
@@ -124,12 +124,12 @@ pub fn marker_shape(
     };
 
     match preset {
-        BuiltinMarker::ArrowLines => {
+        BuiltinMarker::RightTriangleOpen => {
             let depth = size;
             let path = shift_path(&build_arrow_lines(size), t * depth);
             MarkerShape { path, cutback: stroke_width * 0.5 }
         }
-        BuiltinMarker::TriangleFilled => {
+        BuiltinMarker::EquilateralTriangle => {
             let s = size * 0.8;
             let depth = s * 1.5;
             let half_h = s * 0.866;
@@ -137,26 +137,26 @@ pub fn marker_shape(
             let terminal_cutback = solve_cutback_triangle(depth, half_h, half_sw);
             MarkerShape { path, cutback: lerp_cutback(terminal_cutback, depth, t) }
         }
-        BuiltinMarker::CircleFilled => {
+        BuiltinMarker::Circle => {
             let r = size * 0.6;
             let depth = r * 2.0;
             let path = shift_path(&build_circle_terminal(size), t * depth);
             let terminal_cutback = solve_cutback_circle(r, half_sw);
             MarkerShape { path, cutback: lerp_cutback(terminal_cutback, depth, t) }
         }
-        BuiltinMarker::SquareFilled => {
+        BuiltinMarker::Square => {
             let depth = size * 1.2;
             let path = shift_path(&build_square_terminal(size), t * depth);
             MarkerShape { path, cutback: lerp_cutback(depth, depth, t) }
         }
-        BuiltinMarker::DiamondFilled => {
+        BuiltinMarker::Diamond => {
             let s = size * 0.85;
             let depth = s * 2.0;
             let path = shift_path(&build_diamond_terminal(size), t * depth);
             let terminal_cutback = solve_cutback_triangle(s, s, half_sw);
             MarkerShape { path, cutback: lerp_cutback(terminal_cutback, depth, t) }
         }
-        BuiltinMarker::VerticalBarFilled => {
+        BuiltinMarker::VerticalBar => {
             let depth = stroke_width;
             let path = shift_path(&build_vertical_bar(stroke_width), t * depth);
             MarkerShape { path, cutback: lerp_cutback(depth, depth, t) }
@@ -218,15 +218,15 @@ pub fn draw_marker_shape_at(
 /// - Origin `(0, 0)` = forward edge / tip (placed at the path endpoint).
 /// - Body extends in the -X direction.
 /// - `size` = `stroke_width * MARKER_SCALE`.
-pub fn marker_path(decoration: StrokeDecoration, size: f32, stroke_width: f32) -> Option<Path> {
+pub fn marker_path(decoration: StrokeMarkerPreset, size: f32, stroke_width: f32) -> Option<Path> {
     match decoration {
-        StrokeDecoration::None => None,
-        StrokeDecoration::ArrowLines => Some(build_arrow_lines(size)),
-        StrokeDecoration::VerticalBarFilled => Some(build_vertical_bar(stroke_width)),
-        StrokeDecoration::TriangleFilled => Some(build_triangle_terminal(size)),
-        StrokeDecoration::CircleFilled => Some(build_circle_terminal(size)),
-        StrokeDecoration::SquareFilled => Some(build_square_terminal(size)),
-        StrokeDecoration::DiamondFilled => Some(build_diamond_terminal(size)),
+        StrokeMarkerPreset::None => None,
+        StrokeMarkerPreset::RightTriangleOpen => Some(build_arrow_lines(size)),
+        StrokeMarkerPreset::EquilateralTriangle => Some(build_triangle_terminal(size)),
+        StrokeMarkerPreset::Circle => Some(build_circle_terminal(size)),
+        StrokeMarkerPreset::Square => Some(build_square_terminal(size)),
+        StrokeMarkerPreset::Diamond => Some(build_diamond_terminal(size)),
+        StrokeMarkerPreset::VerticalBar => Some(build_vertical_bar(stroke_width)),
     }
 }
 
@@ -245,36 +245,36 @@ pub fn marker_size(stroke_width: f32) -> f32 {
 /// half-width. For open/unfilled shapes, cutback is zero.
 ///
 /// Units: absolute pixels.
-pub fn cutback_depth(decoration: StrokeDecoration, stroke_width: f32) -> f32 {
+pub fn cutback_depth(decoration: StrokeMarkerPreset, stroke_width: f32) -> f32 {
     let size = marker_size(stroke_width);
     let half_sw = stroke_width * 0.5;
     match decoration {
-        StrokeDecoration::None => 0.0,
+        StrokeMarkerPreset::None => 0.0,
         // Arrow lines: open stroked chevron. Cutback by half stroke width
         // so the main stroke butt-joins cleanly with the chevron arms at the tip.
-        StrokeDecoration::ArrowLines => stroke_width * 0.5,
+        StrokeMarkerPreset::RightTriangleOpen => stroke_width * 0.5,
 
         // Triangular shapes: solve via edge slope
-        StrokeDecoration::TriangleFilled => {
+        StrokeMarkerPreset::EquilateralTriangle => {
             let s = size * 0.8;
             solve_cutback_triangle(s * 1.5, s * 0.866, half_sw)
         }
 
         // Circle: forward edge at origin, radius r
-        StrokeDecoration::CircleFilled => {
+        StrokeMarkerPreset::Circle => {
             let r = size * 0.6;
             solve_cutback_circle(r, half_sw)
         }
 
         // Diamond: forward vertex at origin, side edges go to (-s, ±s)
-        StrokeDecoration::DiamondFilled => {
+        StrokeMarkerPreset::Diamond => {
             let s = size * 0.85;
             solve_cutback_triangle(s, s, half_sw)
         }
 
         // Rectangular shapes: full depth
-        StrokeDecoration::SquareFilled => size * 1.2,
-        StrokeDecoration::VerticalBarFilled => stroke_width,
+        StrokeMarkerPreset::Square => size * 1.2,
+        StrokeMarkerPreset::VerticalBar => stroke_width,
     }
 }
 
@@ -348,7 +348,7 @@ pub fn trim_path(path: &Path, start_trim: f32, end_trim: f32) -> Path {
 ///   same stroke width as the path, producing visible line strokes.
 fn decoration_paint(
     base_paint: &Paint,
-    decoration: StrokeDecoration,
+    decoration: StrokeMarkerPreset,
     stroke_width: f32,
 ) -> Paint {
     let mut paint = base_paint.clone();
@@ -368,7 +368,7 @@ pub fn draw_decoration_at(
     canvas: &Canvas,
     path_measure: &mut PathMeasure,
     distance: f32,
-    decoration: StrokeDecoration,
+    decoration: StrokeMarkerPreset,
     stroke_width: f32,
     paint: &Paint,
     reverse: bool,
@@ -392,8 +392,8 @@ pub fn draw_decoration_at(
 pub fn draw_endpoint_decorations(
     canvas: &Canvas,
     path: &Path,
-    start: StrokeDecoration,
-    end: StrokeDecoration,
+    start: StrokeMarkerPreset,
+    end: StrokeMarkerPreset,
     stroke_width: f32,
     stroke_paint: &Paint,
 ) {

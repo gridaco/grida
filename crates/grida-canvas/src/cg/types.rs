@@ -411,11 +411,11 @@ impl Default for StrokeCap {
     }
 }
 
-/// Marker decoration placed at stroke endpoints or vector vertices.
+/// Built-in marker presets placed at stroke endpoints or vector vertices.
 ///
 /// Unlike [`StrokeCap`] (which maps to native backend caps like Skia `PaintCap`),
-/// `StrokeDecoration` represents explicit marker geometry drawn on top of the
-/// stroke path. When a decoration is present at an endpoint, the renderer
+/// `StrokeMarkerPreset` represents explicit marker geometry drawn on top of the
+/// stroke path. When a preset is present at an endpoint, the renderer
 /// uses `Butt` cap at that endpoint and draws the marker geometry instead.
 ///
 /// All built-in presets are **terminal** (end-to-end aligned): the marker's
@@ -430,50 +430,50 @@ impl Default for StrokeCap {
 ///
 /// See: `docs/wg/feat-2d/curve-decoration.md`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub enum StrokeDecoration {
+pub enum StrokeMarkerPreset {
     /// No decoration (endpoint uses the node's stroke_cap as normal).
     #[default]
     #[serde(rename = "none")]
     None,
 
-    /// Arrow lines — two lines forming a right-angle ">" chevron, not filled.
-    /// 90° opening at the tip. Anchor: tip (forward edge).
-    #[serde(rename = "arrow_lines")]
-    ArrowLines,
-    /// Filled vertical bar perpendicular to the stroke.
-    /// Anchor: center of the stroke-facing edge.
-    #[serde(rename = "vertical_bar_filled")]
-    VerticalBarFilled,
+    /// Right triangle (90° at tip), open stroked chevron — not filled.
+    /// Anchor: tip (forward edge).
+    #[serde(rename = "right_triangle_open")]
+    RightTriangleOpen,
     /// Filled equilateral triangle pointing forward.
     /// Anchor: tip (forward vertex).
-    #[serde(rename = "triangle_filled")]
-    TriangleFilled,
+    #[serde(rename = "equilateral_triangle")]
+    EquilateralTriangle,
     /// Filled circle.
     /// Anchor: forward edge (not center).
-    #[serde(rename = "circle_filled")]
-    CircleFilled,
+    #[serde(rename = "circle")]
+    Circle,
     /// Filled axis-aligned square (no rotation).
     /// Anchor: forward edge (not center).
-    #[serde(rename = "square_filled")]
-    SquareFilled,
-    /// Filled diamond (rotated square).
+    #[serde(rename = "square")]
+    Square,
+    /// Filled diamond (square rotated 45°).
     /// Anchor: forward vertex.
-    #[serde(rename = "diamond_filled")]
-    DiamondFilled,
+    #[serde(rename = "diamond")]
+    Diamond,
+    /// Filled vertical bar (rectangle) perpendicular to the stroke.
+    /// Anchor: center of the stroke-facing edge.
+    #[serde(rename = "vertical_bar")]
+    VerticalBar,
 }
 
-impl StrokeDecoration {
-    /// Returns `true` if this decoration has visible marker geometry.
+impl StrokeMarkerPreset {
+    /// Returns `true` if this preset has visible marker geometry.
     pub fn has_marker(&self) -> bool {
-        !matches!(self, StrokeDecoration::None)
+        !matches!(self, StrokeMarkerPreset::None)
     }
 
-    /// Returns `true` if this decoration is an open (stroked) shape rather than filled.
+    /// Returns `true` if this preset is an open (stroked) shape rather than filled.
     ///
-    /// Open decorations should be drawn with `PaintStyle::Stroke` using the
+    /// Open presets should be drawn with `PaintStyle::Stroke` using the
     /// same stroke width as the path, rather than `PaintStyle::Fill`.
     pub fn is_open(&self) -> bool {
-        matches!(self, StrokeDecoration::ArrowLines)
+        matches!(self, StrokeMarkerPreset::RightTriangleOpen)
     }
 }
 

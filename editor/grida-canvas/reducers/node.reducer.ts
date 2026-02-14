@@ -488,14 +488,14 @@ const safe_properties: Partial<
       (draft as UN).stroke_cap = value;
     },
   }),
-  stroke_decoration_start: defineNodeProperty<"stroke_decoration_start">({
+  marker_start_shape: defineNodeProperty<"marker_start_shape">({
     apply: (draft, value) => {
-      (draft as UN).stroke_decoration_start = value;
+      (draft as UN).marker_start_shape = value;
     },
   }),
-  stroke_decoration_end: defineNodeProperty<"stroke_decoration_end">({
+  marker_end_shape: defineNodeProperty<"marker_end_shape">({
     apply: (draft, value) => {
-      (draft as UN).stroke_decoration_end = value;
+      (draft as UN).marker_end_shape = value;
     },
   }),
   stroke_join: defineNodeProperty<"stroke_join">({

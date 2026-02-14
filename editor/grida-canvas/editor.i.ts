@@ -3625,11 +3625,11 @@ export namespace editor.api {
     changeNodePropertyStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
     changeNodePropertyStrokeDecorationStart(
       node_id: NodeID,
-      decoration: cg.StrokeDecoration
+      decoration: cg.StrokeMarkerPreset
     ): void;
     changeNodePropertyStrokeDecorationEnd(
       node_id: NodeID,
-      decoration: cg.StrokeDecoration
+      decoration: cg.StrokeMarkerPreset
     ): void;
     changeNodePropertyStrokeJoin(
       node_id: NodeID,

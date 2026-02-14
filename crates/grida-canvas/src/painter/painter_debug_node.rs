@@ -169,8 +169,8 @@ impl<'a> NodePainter<'a> {
                             &shape,
                             &node.strokes,
                             node.stroke_width,
-                            node.stroke_decoration_start,
-                            node.stroke_decoration_end,
+                            node.marker_start_shape,
+                            node.marker_end_shape,
                         );
                     },
                 );
@@ -213,8 +213,8 @@ impl<'a> NodePainter<'a> {
                                     &shape,
                                     &node.strokes,
                                     node.stroke_width,
-                                    node.stroke_decoration_start,
-                                    node.stroke_decoration_end,
+                                    node.marker_start_shape,
+                                    node.marker_end_shape,
                                 );
                             },
                         );

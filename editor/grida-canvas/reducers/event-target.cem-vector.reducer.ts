@@ -752,7 +752,7 @@ export function on_draw_pointer_down(
         name: "line",
         stroke_width: 2, // intentional: arrows read better slightly thicker
         stroke_join: "miter",
-        stroke_decoration_end: "arrow_lines",
+        marker_end_shape: "right_triangle_open",
         vector_network: vn.polyline([cmath.vector2.zero]),
       } satisfies grida.program.nodes.VectorNode;
       break;

@@ -832,17 +832,15 @@ pub struct JSONUnknownNodeProperties {
     )]
     pub stroke_dash_array: Option<Vec<f32>>,
     #[serde(
-        rename = "stroke_decoration_start",
-        alias = "strokeDecorationStart",
+        rename = "marker_start_shape",
         default
     )]
-    pub stroke_decoration_start: Option<StrokeDecoration>,
+    pub marker_start_shape: Option<StrokeMarkerPreset>,
     #[serde(
-        rename = "stroke_decoration_end",
-        alias = "strokeDecorationEnd",
+        rename = "marker_end_shape",
         default
     )]
-    pub stroke_decoration_end: Option<StrokeDecoration>,
+    pub marker_end_shape: Option<StrokeMarkerPreset>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
     #[serde(rename = "stroke_paints")]
@@ -1825,8 +1823,8 @@ impl From<JSONLineNode> for Node {
             stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
             _data_stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Center),
             stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
-            stroke_decoration_start: node.base.stroke_decoration_start.unwrap_or_default(),
-            stroke_decoration_end: node.base.stroke_decoration_end.unwrap_or_default(),
+            marker_start_shape: node.base.marker_start_shape.unwrap_or_default(),
+            marker_end_shape: node.base.marker_end_shape.unwrap_or_default(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base
@@ -1883,9 +1881,8 @@ impl From<JSONVectorNode> for Node {
             stroke_join: node.base.stroke_join.unwrap_or_default(),
             stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
             stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
-            stroke_decoration_start: node.base.stroke_decoration_start.unwrap_or_default(),
-            stroke_decoration_end: node.base.stroke_decoration_end.unwrap_or_default(),
-            vertex_overrides: Vec::new(),
+            marker_start_shape: node.base.marker_start_shape.unwrap_or_default(),
+            marker_end_shape: node.base.marker_end_shape.unwrap_or_default(),
             layout_child: Some(LayoutChildStyle {
                 layout_positioning: node
                     .base

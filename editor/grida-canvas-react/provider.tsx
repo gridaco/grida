@@ -163,12 +163,12 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyStrokeAlign(node_id, value),
       strokeCap: (value: cg.StrokeCap) =>
         instance.commands.changeNodePropertyStrokeCap(node_id, value),
-      strokeDecorationStart: (value: cg.StrokeDecoration) =>
+      strokeDecorationStart: (value: cg.StrokeMarkerPreset) =>
         instance.commands.changeNodePropertyStrokeDecorationStart(
           node_id,
           value
         ),
-      strokeDecorationEnd: (value: cg.StrokeDecoration) =>
+      strokeDecorationEnd: (value: cg.StrokeMarkerPreset) =>
         instance.commands.changeNodePropertyStrokeDecorationEnd(
           node_id,
           value

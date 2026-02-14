@@ -7,14 +7,14 @@ import {
 } from "./icons/stroke-decoration-icons";
 import { cn } from "@/components/lib/utils";
 
-const DECORATION_OPTIONS: { label: string; value: cg.StrokeDecoration }[] = [
+const DECORATION_OPTIONS: { label: string; value: cg.StrokeMarkerPreset }[] = [
   { label: "None", value: "none" },
-  { label: "Arrow Lines", value: "arrow_lines" },
-  { label: "Triangle", value: "triangle_filled" },
-  { label: "Circle", value: "circle_filled" },
-  { label: "Square", value: "square_filled" },
-  { label: "Diamond", value: "diamond_filled" },
-  { label: "Bar", value: "vertical_bar_filled" },
+  { label: "Right Triangle", value: "right_triangle_open" },
+  { label: "Equilateral Triangle", value: "equilateral_triangle" },
+  { label: "Circle", value: "circle" },
+  { label: "Square", value: "square" },
+  { label: "Diamond", value: "diamond" },
+  { label: "Bar", value: "vertical_bar" },
 ];
 
 export function StrokeDecorationControl({
@@ -23,8 +23,8 @@ export function StrokeDecorationControl({
   variant = "end",
   className,
 }: {
-  value?: TMixed<cg.StrokeDecoration>;
-  onValueChange?: (value: cg.StrokeDecoration) => void;
+  value?: TMixed<cg.StrokeMarkerPreset>;
+  onValueChange?: (value: cg.StrokeMarkerPreset) => void;
   /** "start" flips icons so the marker appears on the left (for Start endpoint). */
   variant?: "start" | "end";
   className?: string;
@@ -45,7 +45,7 @@ export function StrokeDecorationControl({
   }));
 
   return (
-    <PropertyEnum<cg.StrokeDecoration>
+    <PropertyEnum<cg.StrokeMarkerPreset>
       className={cn("w-full !gap-0.5 !px-1", className)}
       enum={enumWithIcons}
       value={value}

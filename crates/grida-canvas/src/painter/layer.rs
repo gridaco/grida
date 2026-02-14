@@ -154,10 +154,10 @@ pub struct PainterPictureShapeLayer {
     pub strokes: Paints,
     pub fills: Paints,
     pub stroke_path: Option<skia_safe::Path>,
-    /// Stroke decoration at the start endpoint (line nodes).
-    pub stroke_decoration_start: StrokeDecoration,
-    /// Stroke decoration at the end endpoint (line nodes).
-    pub stroke_decoration_end: StrokeDecoration,
+    /// Marker shape at the start endpoint (line nodes).
+    pub marker_start_shape: StrokeMarkerPreset,
+    /// Marker shape at the end endpoint (line nodes).
+    pub marker_end_shape: StrokeMarkerPreset,
     /// Stroke width needed for decoration sizing.
     pub stroke_width: f32,
 }
@@ -199,10 +199,10 @@ pub struct PainterPictureVectorLayer {
     pub stroke_width_profile: Option<crate::cg::varwidth::VarWidthProfile>,
     pub stroke_dash_array: Option<StrokeDashArray>,
     pub corner_radius: f32,
-    /// Stroke decoration at the start endpoint (first vertex).
-    pub stroke_decoration_start: StrokeDecoration,
-    /// Stroke decoration at the end endpoint (last vertex).
-    pub stroke_decoration_end: StrokeDecoration,
+    /// Marker shape at the start endpoint (first vertex).
+    pub marker_start_shape: StrokeMarkerPreset,
+    /// Marker shape at the end endpoint (last vertex).
+    pub marker_end_shape: StrokeMarkerPreset,
 }
 
 /// A layer with its associated node ID.
@@ -422,8 +422,8 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
@@ -485,8 +485,8 @@ impl LayerList {
                         strokes: Self::filter_visible_paints(&n.strokes),
                         fills: Self::filter_visible_paints(&n.fills),
                         stroke_path,
-                        stroke_decoration_start: StrokeDecoration::None,
-                        stroke_decoration_end: StrokeDecoration::None,
+                        marker_start_shape: StrokeMarkerPreset::None,
+                        marker_end_shape: StrokeMarkerPreset::None,
                         stroke_width: 0.0,
                     });
                     out.push(LayerEntry {
@@ -538,8 +538,8 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
@@ -585,8 +585,8 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
@@ -632,8 +632,8 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
@@ -679,8 +679,8 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
@@ -726,8 +726,8 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
@@ -748,14 +748,14 @@ impl LayerList {
 
                 // Compute cutback distances for endpoint decorations
                 let start_cutback =
-                    crate::shape::marker::cutback_depth(n.stroke_decoration_start, n.stroke_width);
+                    crate::shape::marker::cutback_depth(n.marker_start_shape, n.stroke_width);
                 let end_cutback =
-                    crate::shape::marker::cutback_depth(n.stroke_decoration_end, n.stroke_width);
+                    crate::shape::marker::cutback_depth(n.marker_end_shape, n.stroke_width);
 
                 // Force Butt cap when decorations are present so the native
                 // cap geometry doesn't leak out from under the marker.
-                let has_any_decoration = n.stroke_decoration_start.has_marker()
-                    || n.stroke_decoration_end.has_marker();
+                let has_any_decoration =
+                    n.marker_start_shape.has_marker() || n.marker_end_shape.has_marker();
                 let effective_cap = if has_any_decoration {
                     StrokeCap::Butt
                 } else {
@@ -796,8 +796,8 @@ impl LayerList {
                     strokes: n.strokes.clone(),
                     fills: Paints::default(),
                     stroke_path,
-                    stroke_decoration_start: n.stroke_decoration_start,
-                    stroke_decoration_end: n.stroke_decoration_end,
+                    marker_start_shape: n.marker_start_shape,
+                    marker_end_shape: n.marker_end_shape,
                     stroke_width: n.stroke_width,
                 });
                 out.push(LayerEntry {
@@ -907,8 +907,8 @@ impl LayerList {
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
@@ -948,8 +948,8 @@ impl LayerList {
                     stroke_width_profile: n.stroke_width_profile.clone(),
                     stroke_dash_array: n.stroke_dash_array.clone(),
                     corner_radius: n.corner_radius,
-                    stroke_decoration_start: n.stroke_decoration_start,
-                    stroke_decoration_end: n.stroke_decoration_end,
+                    marker_start_shape: n.marker_start_shape,
+                    marker_end_shape: n.marker_end_shape,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -996,8 +996,8 @@ impl LayerList {
                         n.fill.clone(),
                     )])),
                     stroke_path,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {
@@ -1029,8 +1029,8 @@ impl LayerList {
                     strokes: Paints::default(),
                     fills: Paints::default(),
                     stroke_path: None,
-                    stroke_decoration_start: StrokeDecoration::None,
-                    stroke_decoration_end: StrokeDecoration::None,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
                 });
                 out.push(LayerEntry {

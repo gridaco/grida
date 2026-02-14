@@ -17,8 +17,10 @@ This document tracks **design flaws and improvement candidates** in the current 
 
 ## TODO items
 
-### 1. `VectorNetworkData.vertices` struct-only array + `vertex_overrides`
+### 1. `VectorNetworkData.vertices` should be table-based, not struct-based
 
-`vertices` is `[CGPoint]` (struct array), so we can’t attach optional per-vertex data. We added `vertex_overrides: [VectorVertexOverride]` keyed by vertex index, giving two parallel structures. The better shape is `vertices: [VectorNetworkVertex]` with `VectorNetworkVertex` as a table (position + optional fields), and drop `vertex_overrides`. **Breaking.**
+`vertices` is currently encoded as `[CGPoint]` (struct array). This is compact but rigid: structs cannot evolve, cannot express per-item optional semantics, and always imply all-zero defaults.
+
+We should migrate to a table-backed vertex model (e.g. `[VectorNetworkVertex]`) where each vertex can evolve safely over time while preserving explicit intent. **Breaking.**
 
 ---

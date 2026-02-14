@@ -147,6 +147,33 @@ export namespace format {
       [fbs.StrokeJoin.Miter, "miter"],
     ]);
 
+    export const STROKE_MARKER_PRESET_ENCODE = new Map<
+      cg.StrokeMarkerPreset | undefined,
+      fbs.StrokeMarkerPreset
+    >([
+      ["right_triangle_open", fbs.StrokeMarkerPreset.RightTriangleOpen],
+      ["equilateral_triangle", fbs.StrokeMarkerPreset.EquilateralTriangle],
+      ["circle", fbs.StrokeMarkerPreset.Circle],
+      ["square", fbs.StrokeMarkerPreset.Square],
+      ["diamond", fbs.StrokeMarkerPreset.Diamond],
+      ["vertical_bar", fbs.StrokeMarkerPreset.VerticalBar],
+      ["none", fbs.StrokeMarkerPreset.None],
+      [undefined, fbs.StrokeMarkerPreset.None],
+    ]);
+
+    export const STROKE_MARKER_PRESET_DECODE = new Map<
+      fbs.StrokeMarkerPreset,
+      cg.StrokeMarkerPreset
+    >([
+      [fbs.StrokeMarkerPreset.RightTriangleOpen, "right_triangle_open"],
+      [fbs.StrokeMarkerPreset.EquilateralTriangle, "equilateral_triangle"],
+      [fbs.StrokeMarkerPreset.Circle, "circle"],
+      [fbs.StrokeMarkerPreset.Square, "square"],
+      [fbs.StrokeMarkerPreset.Diamond, "diamond"],
+      [fbs.StrokeMarkerPreset.VerticalBar, "vertical_bar"],
+      [fbs.StrokeMarkerPreset.None, "none"],
+    ]);
+
     export const TEXT_DECORATION_LINE_ENCODE = new Map<
       cg.TextDecorationLine | undefined,
       fbs.TextDecorationLine
@@ -1516,6 +1543,17 @@ export namespace format {
             fbs.LineNode.addLayer(builder, layerOffset);
             fbs.LineNode.addStrokeGeometry(builder, strokeGeometryOffset);
             fbs.LineNode.addStrokePaints(builder, strokePaintsOffset);
+            fbs.LineNode.addMarkerStartShape(
+              builder,
+              enums.STROKE_MARKER_PRESET_ENCODE.get(
+                lineNode.marker_start_shape
+              ) ?? fbs.StrokeMarkerPreset.None
+            );
+            fbs.LineNode.addMarkerEndShape(
+              builder,
+              enums.STROKE_MARKER_PRESET_ENCODE.get(lineNode.marker_end_shape) ??
+                fbs.StrokeMarkerPreset.None
+            );
             nodeOffset = fbs.LineNode.endLineNode(builder);
             nodeType = fbs.Node.LineNode;
             break;
@@ -1580,6 +1618,18 @@ export namespace format {
             fbs.VectorNode.addLayer(builder, layerOffset);
             fbs.VectorNode.addStrokeGeometry(builder, strokeGeometryOffset);
             fbs.VectorNode.addStrokePaints(builder, strokePaintsOffset);
+            fbs.VectorNode.addMarkerStartShape(
+              builder,
+              enums.STROKE_MARKER_PRESET_ENCODE.get(
+                vectorNode.marker_start_shape
+              ) ?? fbs.StrokeMarkerPreset.None
+            );
+            fbs.VectorNode.addMarkerEndShape(
+              builder,
+              enums.STROKE_MARKER_PRESET_ENCODE.get(
+                vectorNode.marker_end_shape
+              ) ?? fbs.StrokeMarkerPreset.None
+            );
             fbs.VectorNode.addCornerRadius(builder, cornerRadiusOffset);
             fbs.VectorNode.addFillPaints(builder, fillPaintsOffset);
             fbs.VectorNode.addVectorNetworkData(builder, vectorNetworkOffset);
@@ -5175,6 +5225,12 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            marker_start_shape:
+              enums.STROKE_MARKER_PRESET_DECODE.get(n.markerStartShape()) ??
+              "none",
+            marker_end_shape:
+              enums.STROKE_MARKER_PRESET_DECODE.get(n.markerEndShape()) ??
+              "none",
             ...(effects || {}),
           } satisfies grida.program.nodes.LineNode;
         }
@@ -5246,6 +5302,12 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            marker_start_shape:
+              enums.STROKE_MARKER_PRESET_DECODE.get(n.markerStartShape()) ??
+              "none",
+            marker_end_shape:
+              enums.STROKE_MARKER_PRESET_DECODE.get(n.markerEndShape()) ??
+              "none",
             vector_network: vectorNetwork,
             ...(effects || {}),
           } satisfies grida.program.nodes.VectorNode;

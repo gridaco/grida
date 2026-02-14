@@ -1959,23 +1959,23 @@ class EditorDocumentStore
 
   changeNodePropertyStrokeDecorationStart(
     node_id: string,
-    decoration: cg.StrokeDecoration
+    decoration: cg.StrokeMarkerPreset
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      stroke_decoration_start: decoration,
+      marker_start_shape: decoration,
     });
   }
 
   changeNodePropertyStrokeDecorationEnd(
     node_id: string,
-    decoration: cg.StrokeDecoration
+    decoration: cg.StrokeMarkerPreset
   ) {
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      stroke_decoration_end: decoration,
+      marker_end_shape: decoration,
     });
   }
 

@@ -16,6 +16,65 @@ title: Curve Decorations (2D)
 
 This working group defines **curve decorations**: how arbitrary glyphs (arrowheads, dots, diamonds, dimension ticks) are attached to a 2D path and oriented by the path's local tangent/normal. Raster backends such as Skia only provide three native stroke caps (butt/round/square); custom endpoint styles are implemented as explicit marker geometry. The model unifies endpoint markers, mid-path markers, and repeated directional symbols under a single, arc-length-based placement and local-frame semantics, and is intended to be compatible with SVG markers, Skia, PDF, and CAD-style pipelines.
 
+## Proposed direction (SVG-aligned, 2026 profile)
+
+This proposal sets the normative direction for Grida markers:
+
+- We **adopt the SVG marker mental model** as the compatibility baseline (`marker`, `marker-start`, `marker-mid`, `marker-end`; `orient=auto|auto-start-reverse`).
+- We **extend** the baseline where modern authoring requirements are not met by SVG 1.1 era behavior.
+
+The Working Group therefore adopts the following profile.
+
+### 1) Endpoint cutback is first-class (not an authoring workaround)
+
+SVG implementations traditionally rely on marker-space translation (`refX`-style tuning) to reduce overlap with the stroked path. That approach is useful but insufficient for professional editing workflows where marker attachment must remain terminal-accurate while stroke overlap is removed deterministically.
+
+Grida therefore defines endpoint **cutback** as a core rendering semantic:
+
+- start and end may each trim the stroked path independently
+- marker placement remains anchored to the logical endpoint on the untrimmed path
+- visual overlap behind the marker is eliminated by construction, not by manual offset guessing
+
+### 2) Arc-length placement is normative (animation-grade placement)
+
+Placement by segment parameter alone is not distance-stable and is not suitable as a primary model for motion or distribution semantics. This is especially visible when trying to emulate "slide along curve" behavior using marker translation controls.
+
+Grida therefore makes **arc-length-based placement normative** for curve decorations:
+
+- endpoint, explicit-position, and repeated placement semantics are defined on contour length
+- animation and interpolation use distance-consistent placement
+- curve-parameter placement may exist only as an explicit alternate mode
+
+Reference demonstration of why `refX` translation does not provide arc-length-aware behavior:
+
+- [Demonstration of SVG marker `refX` is not arc-length aware](https://gist.github.com/softmarshmallow/07a72ac90a5328e70dd860b790d506b1)
+
+### 3) Orientation remains SVG-compatible
+
+To preserve interoperability and author expectations, orientation semantics remain aligned with SVG:
+
+- `auto`
+- `auto-start-reverse`
+
+Any additional orientation policy in Grida is additive and must not redefine the behavior of these two modes.
+
+### 4) Two-level semantics: renderer-level parity, editor-level ergonomics
+
+At the renderer/spec layer, Grida recognizes the SVG 2 annotation semantics:
+
+- `marker` (all applicable points)
+- `marker-start`
+- `marker-mid`
+- `marker-end`
+
+At the Grida document layer (editor-first model), we expose:
+
+- `marker`
+- `marker_start`
+- `marker_end`
+
+`marker_mid` is intentionally omitted from the high-level document schema. If authors want mid-only behavior, they set `marker` and override start/end to none. This preserves expressiveness while keeping the authoring surface compact and predictable.
+
 ---
 
 ## Motivation
@@ -312,6 +371,11 @@ SVG is a specific instance of this model:
 
 Curve Decorations are intended to be **at least as expressive**, while remaining backend-agnostic.
 
+Grida's explicit extensions over the historical SVG marker baseline are:
+
+- endpoint cutback as a normative rendering behavior
+- arc-length-first placement semantics for stable animation and distribution
+
 ### Stroke caps (backend caps vs decorations)
 
 Classic stroke caps (butt/round/square) are natively supported by many renderers (including Skia) and should usually remain a **paint/stroke style property** for performance and fidelity.
@@ -353,10 +417,18 @@ This decomposition covers common 2D editor needs without introducing overlapping
 
 The current document model exposes **built-in presets only** (no arbitrary glyph geometry in the wire format):
 
-- **LineNode**: `stroke_decoration_start`, `stroke_decoration_end` (enum per endpoint).
-- **VectorNode**: same for logical start/end of the vector path; per-vertex overrides via `vertex_overrides` (vertex index + `stroke_decoration`).
+- **LineNode**: `marker_start_shape`, `marker_end_shape` (enum per endpoint).
+- **VectorNode**: same endpoint model (`marker_start_shape`, `marker_end_shape`) on the logical start/end of the vector path.
 
-All built-in presets are **terminal-aligned** and **stroke-relative** in scale. The schema enum includes: None, ArrowLines (open stroked chevron), TriangleFilled, CircleFilled, SquareFilled, DiamondFilled, VerticalBarFilled. The engine supports the full anchor and cutback model internally (including Centroid and parametric Offset) for tests and future extensibility; see `shape/marker.rs` and golden examples.
+All built-in presets are **terminal-aligned** and **stroke-relative** in scale. The schema enum includes: None, RightTriangleOpen (open stroked chevron), EquilateralTriangle, Circle, Square, Diamond, VerticalBar. The engine supports the full anchor and cutback model internally (including Centroid and parametric Offset) for tests and future extensibility; see `shape/marker.rs` and golden examples.
+
+When exposed as generalized marker fields in the Grida document format, the intended high-level API remains:
+
+- `marker`
+- `marker_start`
+- `marker_end`
+
+No `marker_mid` key is required at the editor-facing schema level.
 
 ---
 

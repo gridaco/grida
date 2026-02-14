@@ -2408,17 +2408,15 @@ export namespace grida.program.nodes {
     vector_network: vn.VectorNetwork;
 
     /**
-     * Marker decoration at the start vertex (vertex[0]) of the vector network.
-     * Editor-side convenience; maps to vertex_overrides in the persistence model.
+     * Marker shape at the start vertex (vertex[0]) of the vector network.
      * @default "none"
      */
-    stroke_decoration_start?: cg.StrokeDecoration;
+    marker_start_shape?: cg.StrokeMarkerPreset;
     /**
-     * Marker decoration at the end vertex (last vertex) of the vector network.
-     * Editor-side convenience; maps to vertex_overrides in the persistence model.
+     * Marker shape at the end vertex (last vertex) of the vector network.
      * @default "none"
      */
-    stroke_decoration_end?: cg.StrokeDecoration;
+    marker_end_shape?: cg.StrokeMarkerPreset;
   }
 
   export interface ComputedVectorNode
@@ -2448,15 +2446,15 @@ export namespace grida.program.nodes {
       i.IStroke {
     readonly type: "line";
     /**
-     * Marker decoration at the start endpoint of the line.
+     * Marker shape at the start endpoint of the line.
      * @default "none"
      */
-    stroke_decoration_start?: cg.StrokeDecoration;
+    marker_start_shape?: cg.StrokeMarkerPreset;
     /**
-     * Marker decoration at the end endpoint of the line.
+     * Marker shape at the end endpoint of the line.
      * @default "none"
      */
-    stroke_decoration_end?: cg.StrokeDecoration;
+    marker_end_shape?: cg.StrokeMarkerPreset;
   }
 
   export interface ComputedLineNode extends LineNode {

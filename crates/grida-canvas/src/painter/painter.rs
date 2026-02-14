@@ -723,8 +723,8 @@ impl<'a> Painter<'a> {
         shape: &PainterShape,
         strokes: &[Paint],
         stroke_width: f32,
-        start: StrokeDecoration,
-        end: StrokeDecoration,
+        start: StrokeMarkerPreset,
+        end: StrokeMarkerPreset,
     ) {
         if !start.has_marker() && !end.has_marker() {
             return;
@@ -974,8 +974,8 @@ impl<'a> Painter<'a> {
                                             shape,
                                             &shape_layer.strokes,
                                             shape_layer.stroke_width,
-                                            shape_layer.stroke_decoration_start,
-                                            shape_layer.stroke_decoration_end,
+                                            shape_layer.marker_start_shape,
+                                            shape_layer.marker_end_shape,
                                         );
                                     }
                                 });
@@ -1138,15 +1138,15 @@ impl<'a> Painter<'a> {
 
                                     if self.policy.render_strokes() {
                                         let has_cutback =
-                                            vector_layer.stroke_decoration_start.has_marker()
-                                                || vector_layer.stroke_decoration_end.has_marker();
+                                            vector_layer.marker_start_shape.has_marker()
+                                                || vector_layer.marker_end_shape.has_marker();
 
                                         let start_cutback = crate::shape::marker::cutback_depth(
-                                            vector_layer.stroke_decoration_start,
+                                            vector_layer.marker_start_shape,
                                             vector_layer.stroke_width,
                                         );
                                         let end_cutback = crate::shape::marker::cutback_depth(
-                                            vector_layer.stroke_decoration_end,
+                                            vector_layer.marker_end_shape,
                                             vector_layer.stroke_width,
                                         );
                                         let needs_trim =
@@ -1231,8 +1231,8 @@ impl<'a> Painter<'a> {
                                                     crate::shape::marker::draw_endpoint_decorations(
                                                         self.canvas,
                                                         vn_path,
-                                                        vector_layer.stroke_decoration_start,
-                                                        vector_layer.stroke_decoration_end,
+                                                        vector_layer.marker_start_shape,
+                                                        vector_layer.marker_end_shape,
                                                         vector_layer.stroke_width,
                                                         &sk_paint,
                                                     );

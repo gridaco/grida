@@ -1,7 +1,7 @@
 //! # Stroke Decoration — Low-level SDK demonstration
 //!
 //! **Purpose**: Demonstrate what is possible with the low-level marker API,
-//! beyond the built-in `StrokeDecoration` presets.
+//! beyond the built-in `StrokeMarkerPreset` presets.
 //!
 //! Uses raw Skia + `shape::marker` low-level API directly (not the renderer
 //! pipeline). Shows:
@@ -13,7 +13,7 @@
 //!
 //! Red vertical guidelines mark logical endpoints throughout.
 
-use cg::cg::StrokeDecoration;
+use cg::cg::StrokeMarkerPreset;
 use cg::shape::marker::{self, BuiltinMarker, MarkerAnchor};
 use skia_safe::{
     surfaces, Canvas, Color, EncodedImageFormat, Paint, PaintCap, PaintStyle, Path, PathBuilder,
@@ -57,11 +57,11 @@ fn main() {
     y += 22.0;
 
     let shapes: Vec<(&str, BuiltinMarker)> = vec![
-        ("arrow_lines", BuiltinMarker::ArrowLines),
-        ("triangle_filled", BuiltinMarker::TriangleFilled),
-        ("circle_filled", BuiltinMarker::CircleFilled),
-        ("square_filled", BuiltinMarker::SquareFilled),
-        ("diamond_filled", BuiltinMarker::DiamondFilled),
+        ("right_triangle_open", BuiltinMarker::RightTriangleOpen),
+        ("equilateral_triangle", BuiltinMarker::EquilateralTriangle),
+        ("circle", BuiltinMarker::Circle),
+        ("square", BuiltinMarker::Square),
+        ("diamond", BuiltinMarker::Diamond),
     ];
 
     for (label, shape) in &shapes {
@@ -114,10 +114,10 @@ fn main() {
 
     // Place different shapes at u=0, 0.33, 0.66, 1.0
     let placements: Vec<(f32, BuiltinMarker, Color, bool)> = vec![
-        (0.0, BuiltinMarker::TriangleFilled, Color::from_rgb(220, 60, 60), true),
-        (0.33, BuiltinMarker::CircleFilled, Color::from_rgb(60, 180, 60), false),
-        (0.66, BuiltinMarker::DiamondFilled, Color::from_rgb(140, 80, 200), false),
-        (1.0, BuiltinMarker::TriangleFilled, Color::from_rgb(60, 60, 220), false),
+        (0.0, BuiltinMarker::EquilateralTriangle, Color::from_rgb(220, 60, 60), true),
+        (0.33, BuiltinMarker::Circle, Color::from_rgb(60, 180, 60), false),
+        (0.66, BuiltinMarker::Diamond, Color::from_rgb(140, 80, 200), false),
+        (1.0, BuiltinMarker::EquilateralTriangle, Color::from_rgb(60, 60, 220), false),
     ];
 
     let mut measure = PathMeasure::new(&curve, false, None);
@@ -179,13 +179,13 @@ fn main() {
         &sp,
         LEFT,
         y,
-        "── Cutback solver: triangle_filled at sw=2, 6, 14 ──",
+        "── Cutback solver: equilateral_triangle at sw=2, 6, 14 ──",
     );
     y += 22.0;
 
     for sw in [2.0_f32, 6.0, 14.0] {
         let sz = marker::marker_size(sw);
-        let cutback = marker::cutback_depth(StrokeDecoration::TriangleFilled, sw);
+        let cutback = marker::cutback_depth(StrokeMarkerPreset::EquilateralTriangle, sw);
 
         // Guides
         draw_guides(canvas, &gp, LEFT, y);
@@ -215,7 +215,7 @@ fn main() {
         }
 
         // Marker on untrimmed path
-        let ms = marker::marker_shape(BuiltinMarker::TriangleFilled, MarkerAnchor::Terminal, sz, sw);
+        let ms = marker::marker_shape(BuiltinMarker::EquilateralTriangle, MarkerAnchor::Terminal, sz, sw);
         let fp = fill_paint();
         let mut measure = PathMeasure::new(&path, false, None);
         let length = measure.length();
@@ -240,7 +240,7 @@ fn main() {
         &sp,
         LEFT,
         y,
-        "── Path types: straight, zigzag, curve (triangle_filled) ──",
+        "── Path types: straight, zigzag, curve (equilateral_triangle) ──",
     );
     y += 22.0;
 
@@ -276,8 +276,8 @@ fn main() {
         marker::draw_endpoint_decorations(
             canvas,
             path,
-            StrokeDecoration::TriangleFilled,
-            StrokeDecoration::TriangleFilled,
+            StrokeMarkerPreset::EquilateralTriangle,
+            StrokeMarkerPreset::EquilateralTriangle,
             STROKE_W,
             &fp,
         );

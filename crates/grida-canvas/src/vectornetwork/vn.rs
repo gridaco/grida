@@ -2,16 +2,6 @@ use crate::cg::prelude::*;
 use math2::Rectangle;
 use skia_safe;
 
-/// Sparse per-vertex property override for vector networks.
-///
-/// Allows individual vertices to have custom stroke decorations.
-/// Indexed by `vertex_index` into `VectorNetwork.vertices`.
-#[derive(Debug, Clone)]
-pub struct VectorVertexOverride {
-    pub vertex_index: usize,
-    pub stroke_decoration: StrokeDecoration,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct VectorNetworkSegment {
     pub a: usize,
