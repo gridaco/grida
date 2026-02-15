@@ -206,3 +206,9 @@ node-compile-cache/
 
 # Test artifacts
 **/__tests__/artifacts/
+
+### Python ###
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class

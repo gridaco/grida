@@ -6,9 +6,10 @@ This directory contains miscellaneous, trivial scripts that are useful for inter
 
 ## Available Tools
 
-| Tool           | Description                                   | Usage                |
-| -------------- | --------------------------------------------- | -------------------- |
-| `pbdump.swift` | Dump macOS clipboard contents (all UTI types) | `swift pbdump.swift` |
+| Tool               | Description                                                 | Usage                                                                |
+| ------------------ | ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| `pbdump.swift`     | Dump macOS clipboard contents (all UTI types)               | `swift pbdump.swift`                                                 |
+| `figma_archive.py` | Archive a Figma file via REST API (document.json + images/) | `python .tools/figma_archive.py --filekey <key> --archive-dir <dir>` |
 
 ## Contributing
 
