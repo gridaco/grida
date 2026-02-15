@@ -1,0 +1,43 @@
+{
+  "name": "@grida/refig",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG",
+  "bin": {
+    "refig": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.mts",
+      "import": "./dist/browser.mjs",
+      "default": "./dist/browser.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@grida/canvas-wasm": "workspace:*",
+    "@grida/io-figma": "workspace:*",
+    "@grida/schema": "workspace:*",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@figma/rest-api-spec": "0.35.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.21.0"
+  }
+}
