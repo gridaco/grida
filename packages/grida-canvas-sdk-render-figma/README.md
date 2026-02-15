@@ -108,6 +108,7 @@ FigmaDocument.fromFile("path/to/doc.json")   // REST API JSON
 ```ts
 const renderer = new FigmaRenderer(document: FigmaDocument, options?: {
   useEmbeddedFonts?: boolean;  // default: true
+  images?: Record<string, string>;  // image ref → URL or path; not yet used during render
 });
 
 const result = await renderer.render(nodeId: string, {
@@ -150,9 +151,24 @@ pnpm add -g @grida/refig
 
 ### Usage
 
+**`<input>`** can be:
+
+- A **file**: path to a `.fig` file or a JSON file (Figma REST API response).
+- A **directory**: path to a folder that contains:
+  - **`document.json`** — the REST API response (required),
+  - **`images/`** — directory of image assets (optional; used when image support is implemented).
+
+Using a directory avoids passing the document and images separately.
+
 ```sh
 # Single node (default)
 refig <input> --node <node-id> --out <path> [options]
+
+# With images directory (REST JSON only; images not yet resolved in render)
+refig <input> --images <dir> --node <node-id> --out <path>
+
+# Directory input: document.json + images/ under one folder
+refig ./my-figma-export --node "1:23" --out ./out.png
 
 # Export all nodes that have exportSettings (REST JSON only)
 refig <input> --export-all --out <output-dir>
@@ -166,6 +182,13 @@ refig ./design.fig --node "1:23" --out ./out.png
 
 # Render from REST API JSON
 refig ./figma-response.json --node "1:23" --out ./out.svg
+
+# Directory with document.json (and optionally images/): one path instead of response + --images
+refig ./my-figma-export --node "1:23" --out ./out.png
+# (my-figma-export/document.json, my-figma-export/images/)
+
+# Explicit images directory (when not using a project directory)
+refig ./figma-response.json --images ./downloaded-images --node "1:23" --out ./out.png
 
 # Export all: render every node that has export settings (see below)
 refig ./figma-response.json --export-all --out ./exports
@@ -187,7 +210,8 @@ With **`--export-all`**, refig walks the document and renders every node that ha
 
 | Flag             | Required | Default                         | Description                                                                   |
 | ---------------- | -------- | ------------------------------- | ----------------------------------------------------------------------------- |
-| `<input>`        | yes      |                                 | Path to `.fig` file or JSON file                                              |
+| `<input>`        | yes      |                                 | Path to `.fig`, JSON file, or directory containing `document.json` (and optionally `images/`) |
+| `--images <dir>` | no       |                                 | Directory of image assets for REST document (ignored if `<input>` is a dir with `images/`)       |
 | `--node <id>`    | yes\*    |                                 | Figma node ID to render (\*omit when using `--export-all`)                    |
 | `--out <path>`   | yes      |                                 | Output file path (single node) or output directory (`--export-all`)           |
 | `--export-all`   | no       |                                 | Export every node with exportSettings; REST JSON only; `--out` is a directory |
@@ -209,6 +233,28 @@ REST JSON ───┘
 - **`@grida/io-figma`** converts Figma data (`.fig` Kiwi binary or REST API JSON) into Grida's intermediate representation
 - **`@grida/canvas-wasm`** renders the IR via Skia (raster backend for headless, WebGL for browser)
 - **`@grida/refig`** ties them together behind a simple `render(nodeId, options)` call
+
+## Images
+
+**`.fig` input** — Image fills used in the design are stored inside the `.fig` file. No extra step is required; refig uses them when rendering.
+
+**REST API input** — The file JSON does not contain image bytes; it references image fills by hash. To render with correct bitmaps you must supply the image assets:
+
+1. **Fetch image fills** — Call `GET /v1/files/:key/images` (Figma REST API). This returns the list of **image fills** used in the file (i.e. which bitmap images are used as fills), not “export node as image.” The response includes a mapping of image hash → URL (signed) for each fill.
+
+2. **Download and pass an images directory (recommended)** — Download each image from the returned URLs and save them under a directory using the `<hash>.<ext>` naming (e.g. `a1b2c3d4....png`). Pass that directory to refig as the **images directory**. We recommend this because the URLs from the API are **signed and expire**; downloading once and reusing the files avoids expiry and keeps rendering repeatable (e.g. in CI or offline).
+
+**API** — `FigmaRenderer` accepts an optional **`images`** option: `Record<string, string>` (image ref → URL or file path). This is the intended input for supplying image assets when using REST document input. Resolution of IMAGE paints using this map is not yet implemented.
+
+**CLI** — You can pass images in two ways:
+
+- **`--images <dir>`** — Explicit images directory. Use when the document is a separate file:  
+  `refig ./figma-response.json --images ./downloaded-images --node "1:23" --out ./out.png`
+- **Directory input** — Pass a single directory that contains **`document.json`** (REST response) and optionally **`images/`**. No need to pass `--images` separately:  
+  `refig ./my-figma-export --node "1:23" --out ./out.png`  
+  (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/`.)
+
+Image resolution (reading from the directory and applying fills during render) is not yet implemented; the API and CLI surfaces above are in place for when it lands.
 
 ## Features
 
@@ -235,6 +281,8 @@ If you have API access, the Images API is usually simplest. This package is for 
 - Deterministic output in CI without network calls
 - Custom viewport sizes or scale factors
 - Rendering from `.fig` files without API access
+- High-throughput or random access where the API is too slow or rate-limited (e.g. low Figma tier)
+- Avoiding Figma access token lifecycle (refresh, storage, rotation)
 
 ### Does this work in the browser?
 

@@ -22,6 +22,11 @@ import {
 
 const FORMAT_SET = new Set<string>(["png", "jpeg", "webp", "pdf", "svg"]);
 
+/** Conventional name for REST API response when using a project directory. */
+const DOCUMENT_JSON = "document.json";
+/** Subdirectory name for images when using a project directory. */
+const IMAGES_SUBDIR = "images";
+
 function formatFromOutFile(outPath: string): string {
   const ext = path.extname(outPath).replace(/^\./, "").toLowerCase();
   if (ext === "jpg") return "jpeg";
@@ -45,6 +50,48 @@ function sanitizeForFilename(s: string): string {
   );
 }
 
+/**
+ * Resolve CLI input to document path and optional images directory.
+ * - If input is a directory: document must be at <input>/document.json; images at <input>/images/ if present.
+ * - If input is a file: document is that file; images only if --images <dir> is provided.
+ */
+function resolveInput(
+  inputPath: string,
+  explicitImagesDir: string | undefined
+): {
+  documentPath: string;
+  imagesDir: string | undefined;
+  /** True when document is REST API JSON (file path ending in .json or directory with document.json). */
+  isRestJson: boolean;
+} {
+  const resolved = path.resolve(inputPath);
+  const stat = statSync(resolved);
+
+  if (stat.isDirectory()) {
+    const documentPath = path.join(resolved, DOCUMENT_JSON);
+    if (!existsSync(documentPath)) {
+      throw new Error(
+        `Input directory must contain ${DOCUMENT_JSON}; not found: ${documentPath}`
+      );
+    }
+    const imagesDir = path.join(resolved, IMAGES_SUBDIR);
+    const useImagesDir = existsSync(imagesDir) && statSync(imagesDir).isDirectory()
+      ? imagesDir
+      : undefined;
+    return {
+      documentPath,
+      imagesDir: explicitImagesDir ? path.resolve(explicitImagesDir) : useImagesDir,
+      isRestJson: true,
+    };
+  }
+
+  return {
+    documentPath: resolved,
+    imagesDir: explicitImagesDir ? path.resolve(explicitImagesDir) : undefined,
+    isRestJson: resolved.toLowerCase().endsWith(".json"),
+  };
+}
+
 function exportAllOutputBasename(
   nodeId: string,
   suffix: string,
@@ -57,8 +104,12 @@ function exportAllOutputBasename(
   return `${name}.${ext}`;
 }
 
-async function runExportAll(inputPath: string, outDir: string): Promise<void> {
-  const json = JSON.parse(readFileSync(inputPath, "utf8"));
+async function runExportAll(
+  documentPath: string,
+  outDir: string,
+  imagesDir?: string
+): Promise<void> {
+  const json = JSON.parse(readFileSync(documentPath, "utf8"));
   const document = new FigmaDocument(json);
   const items = collectExportsFromDocument(
     document.payload as Record<string, unknown>
@@ -68,7 +119,8 @@ async function runExportAll(inputPath: string, outDir: string): Promise<void> {
     return;
   }
 
-  const renderer = new FigmaRenderer(document);
+  const rendererOptions = imagesDir ? { images: {} } : {};
+  const renderer = new FigmaRenderer(document, rendererOptions);
   try {
     for (const { nodeId: nid, node, setting } of items) {
       const options = exportSettingToRenderOptions(node, setting);
@@ -91,22 +143,29 @@ async function runExportAll(inputPath: string, outDir: string): Promise<void> {
 }
 
 async function runSingleNode(
-  inputPath: string,
+  documentPath: string,
   nodeId: string,
   outPath: string,
-  opts: { format?: string; width: number; height: number; scale: number }
+  opts: {
+    format?: string;
+    width: number;
+    height: number;
+    scale: number;
+    imagesDir?: string;
+  }
 ): Promise<void> {
   const format = (opts.format ?? formatFromOutFile(outPath)).toLowerCase();
   if (!FORMAT_SET.has(format)) {
     throw new Error(`Unsupported --format "${format}"`);
   }
 
-  const isJson = inputPath.toLowerCase().endsWith(".json");
+  const isJson = documentPath.toLowerCase().endsWith(".json");
   const document = isJson
-    ? new FigmaDocument(JSON.parse(readFileSync(inputPath, "utf8")))
-    : new FigmaDocument(new Uint8Array(readFileSync(inputPath)));
+    ? new FigmaDocument(JSON.parse(readFileSync(documentPath, "utf8")))
+    : new FigmaDocument(new Uint8Array(readFileSync(documentPath)));
 
-  const renderer = new FigmaRenderer(document);
+  const rendererOptions = opts.imagesDir ? { images: {} } : {};
+  const renderer = new FigmaRenderer(document, rendererOptions);
   try {
     const result = await renderer.render(nodeId, {
       format: format as RefigRenderFormat,
@@ -130,10 +189,17 @@ async function main(): Promise<void> {
     .description(
       "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG"
     )
-    .argument("<input>", "Path to .fig file or JSON file (REST API response)")
+    .argument(
+      "<input>",
+      "Path to .fig, JSON file (REST API response), or directory containing document.json (and optionally images/)"
+    )
     .requiredOption(
       "--out <path>",
       "Output file path (single node) or output directory (--export-all)"
+    )
+    .option(
+      "--images <dir>",
+      "Directory of image files for REST API document (optional; not used if <input> is a dir with images/)"
     )
     .option(
       "--node <id>",
@@ -155,23 +221,28 @@ async function main(): Promise<void> {
         input: string,
         options: Record<string, string | boolean | undefined>
       ) => {
-        const inputPath = path.resolve(input);
         const outPath = String(options.out ?? "").trim();
         const exportAll = options.exportAll === true;
         const nodeId = String(options.node ?? "").trim();
+        const explicitImagesDir =
+          typeof options.images === "string" ? options.images : undefined;
 
         if (!outPath) {
           program.error("--out is required");
         }
 
+        const { documentPath, imagesDir, isRestJson } = resolveInput(
+          input.trim(),
+          explicitImagesDir
+        );
+
         if (exportAll) {
           if (nodeId) {
             program.error("--node must not be used with --export-all");
           }
-          const isJson = inputPath.toLowerCase().endsWith(".json");
-          if (!isJson) {
+          if (!isRestJson) {
             program.error(
-              "--export-all is only supported for REST API JSON input"
+              "--export-all is only supported for REST API JSON input (or a directory containing document.json)"
             );
           }
           const outDir = path.resolve(outPath);
@@ -185,7 +256,7 @@ async function main(): Promise<void> {
           } else {
             mkdirSync(outDir, { recursive: true });
           }
-          await runExportAll(inputPath, outDir);
+          await runExportAll(documentPath, outDir, imagesDir);
           return;
         }
 
@@ -196,12 +267,13 @@ async function main(): Promise<void> {
         const width = Number(options.width ?? 1024);
         const height = Number(options.height ?? 1024);
         const scale = Number(options.scale ?? 1);
-        await runSingleNode(inputPath, nodeId, path.resolve(outPath), {
+        await runSingleNode(documentPath, nodeId, path.resolve(outPath), {
           format:
             typeof options.format === "string" ? options.format : undefined,
           width,
           height,
           scale,
+          imagesDir,
         });
       }
     );

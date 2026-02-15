@@ -22,6 +22,13 @@ export interface RefigRendererOptions {
    * @default true
    */
   useEmbeddedFonts?: boolean;
+
+  /**
+   * Map of image ref (Figma image fill ref) to URL or file path.
+   * Used when converting REST API document so IMAGE paints can be resolved.
+   * Not yet implemented: this option is accepted but not used during render.
+   */
+  images?: Record<string, string>;
 }
 
 export interface RefigRenderOptions {
