@@ -16,7 +16,7 @@
     "yjs": "^13.6.27"
   },
   "devDependencies": {
-    "typescript": "^5.5.2",
+    "typescript": "^5",
     "wrangler": "^4.40.1"
   }
 }
