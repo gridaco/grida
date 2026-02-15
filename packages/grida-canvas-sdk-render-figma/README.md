@@ -8,7 +8,7 @@ NOTE: This README is for a planned module. Treat APIs and names as subject to ch
 
 Headless Figma renderer for **pixel-perfect exports** without Figma Desktop and without a browser.
 
-This package takes a Figma document file (`.fig`), converts it into **Grida IR**, then renders via the Grida Canvas runtime while preserving core properties (layout, constraints, images, etc.). The goal is to make “render this Figma node at this viewport size” deterministic and CI-friendly.
+This package takes Figma document data (for example, an exported `.fig` file or a Figma REST API document JSON response), converts it into **Grida IR**, then renders via the Grida Canvas runtime while preserving core properties (layout, constraints, images, etc.). The goal is to make “render this Figma node at this viewport size” deterministic and CI-friendly.
 
 ## Status
 
@@ -18,6 +18,7 @@ This package takes a Figma document file (`.fig`), converts it into **Grida IR**
 
 - **Multiple output formats**: `png`, `jpeg`, `webp`, `pdf`, `svg`
 - **`.fig` file input**: render from an exported `.fig` without waiting on API calls
+- **REST API JSON input**: render from Figma document JSON you already have (without bundling fetch logic)
 - **CI-friendly**: runs headlessly (no browser / no Figma Desktop)
 - **Layout-aware rendering**: render responsive designs at arbitrary viewport sizes (within supported Figma semantics)
 
@@ -31,12 +32,13 @@ This package takes a Figma document file (`.fig`), converts it into **Grida IR**
 
 - People who want **rendered output** (images / PDFs / SVGs) from Figma sources in a headless environment
 - Teams who need **repeatable rendering in CI** (snapshot tests, design regression tests, batch export)
+- Teams that already have Figma document JSON and need deterministic rendering without browser runtime dependencies
 
 ## Who is this NOT for?
 
 - **Design-to-code conversion**: if you want HTML/CSS, Flutter widgets, etc., this is not the right tool
 - **Authoring / editing Figma**: this module is intended for **reading + rendering**, not programmatically creating or modifying designs
-- **“Just export images from the Figma API”**: if you already have Figma API access, the Images API is usually the simplest solution. `.fig`-based rendering is intended for headless, reproducible exports when you don’t want to depend on the API at render time.
+- **“Just export images from the Figma API”**: if you already have Figma API access, the Images API is usually the simplest solution.
 
 ## Getting started
 
@@ -78,6 +80,34 @@ const { data } = await renderer.render("<node-id>", {
 
 writeFileSync("out.png", data);
 ```
+
+### Render from Figma REST API document JSON
+
+```ts
+import { readFileSync, writeFileSync } from "node:fs";
+import { FigmaRenderer } from "@grida/refig";
+
+// Example: JSON payload from GET /v1/files/:key fetched by your own client
+const documentJson = JSON.parse(
+  readFileSync("path/to/figma-rest-api-response.json", "utf-8")
+);
+
+const renderer = new FigmaRenderer(documentJson, {
+  useGoogleFonts: true,
+});
+
+const { data } = await renderer.render("<node-id>", {
+  format: "png",
+  width: 1024,
+  height: 1024,
+  layout: true,
+  images: true,
+});
+
+writeFileSync("out.png", data);
+```
+
+> Fetching/authentication is intentionally out of scope; provide the JSON from your own API layer.
 
 ## CLI
 
@@ -136,7 +166,7 @@ pnpm dlx @grida/refig ./path/to/file.fig \
 
 ## Not planned
 
-- **Figma API response ingestion**: if you have API access, you can typically use Figma’s Images API directly. This project focuses on `.fig` inputs and headless rendering.
+- **Built-in Figma API fetching/auth**: this package does not manage tokens, call Figma endpoints, or orchestrate API pagination/rate limits. You can fetch upstream however you want, then pass the document data to this renderer.
 
 ## FAQ
 
