@@ -1,6 +1,6 @@
+#!/usr/bin/env node
 /**
  * refig CLI — headless Figma renderer
- * Shebang is added by the build (tsup banner).
  */
 
 import {
