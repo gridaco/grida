@@ -32,7 +32,7 @@ describe("iofigma.restful.factory.document", () => {
       const context: iofigma.restful.factory.FactoryContext = {
         gradient_id_generator: () => `gradient_${Math.random()}`,
       };
-      const gridaDocument = iofigma.restful.factory.document(
+      const { document: gridaDocument } = iofigma.restful.factory.document(
         frameNode,
         {},
         context
@@ -44,7 +44,7 @@ describe("iofigma.restful.factory.document", () => {
 
       // Find the frame node (frames are converted to container nodes)
       const frameGridaNode = Object.values(gridaDocument.nodes).find(
-        (n): n is grida.program.nodes.ContainerNode =>
+        (n: grida.program.nodes.Node): n is grida.program.nodes.ContainerNode =>
           n.type === "container" && n.name === "vector-frame"
       );
       expect(frameGridaNode).toBeDefined();
@@ -66,28 +66,32 @@ describe("iofigma.restful.factory.document", () => {
 
       // Verify child nodes are VectorNodes
       const childNodes = groupChildren!
-        .map((id) => gridaDocument.nodes[id])
+        .map((id: string) => gridaDocument.nodes[id])
         .filter(
-          (n): n is grida.program.nodes.VectorNode => n.type === "vector"
+          (
+            n: grida.program.nodes.Node | undefined
+          ): n is grida.program.nodes.VectorNode => n?.type === "vector"
         );
       expect(childNodes.length).toBeGreaterThan(0);
 
       // Verify we have both fill and stroke children
-      const fillChildren = childNodes.filter((n) => n.name.includes("Fill"));
-      const strokeChildren = childNodes.filter((n) =>
-        n.name.includes("Stroke")
+      const fillChildren = childNodes.filter(
+        (n: grida.program.nodes.VectorNode) => n.name.includes("Fill")
+      );
+      const strokeChildren = childNodes.filter(
+        (n: grida.program.nodes.VectorNode) => n.name.includes("Stroke")
       );
       expect(fillChildren.length).toBeGreaterThan(0);
       expect(strokeChildren.length).toBeGreaterThan(0);
 
       // Verify fill children have fills
-      fillChildren.forEach((child) => {
+      fillChildren.forEach((child: grida.program.nodes.VectorNode) => {
         expect(child.type).toBe("vector");
         expect(child.fill || child.fill_paints?.length).toBeTruthy();
       });
 
       // Verify stroke children have strokes
-      strokeChildren.forEach((child) => {
+      strokeChildren.forEach((child: grida.program.nodes.VectorNode) => {
         expect(child.type).toBe("vector");
         expect(child.stroke || child.stroke_paints?.length).toBeTruthy();
         expect(child.stroke_width).toBeGreaterThan(0);
@@ -111,7 +115,7 @@ describe("iofigma.restful.factory.document", () => {
       const context: iofigma.restful.factory.FactoryContext = {
         gradient_id_generator: () => `gradient_${Math.random()}`,
       };
-      const gridaDocument = iofigma.restful.factory.document(
+      const { document: gridaDocument } = iofigma.restful.factory.document(
         frameNode,
         {},
         context
@@ -119,7 +123,7 @@ describe("iofigma.restful.factory.document", () => {
 
       // Find the vector group node
       const vectorGroupNode = Object.values(gridaDocument.nodes).find(
-        (n): n is grida.program.nodes.GroupNode =>
+        (n: grida.program.nodes.Node): n is grida.program.nodes.GroupNode =>
           n.type === "group" && n.name === "Vector 1"
       );
 
@@ -142,9 +146,11 @@ describe("iofigma.restful.factory.document", () => {
       expect(childIds!.length).toBeGreaterThan(0);
 
       const childNodes = childIds!
-        .map((id) => gridaDocument.nodes[id])
+        .map((id: string) => gridaDocument.nodes[id])
         .filter(
-          (n): n is grida.program.nodes.VectorNode => n.type === "vector"
+          (
+            n: grida.program.nodes.Node | undefined
+          ): n is grida.program.nodes.VectorNode => n?.type === "vector"
         );
 
       expect(childNodes.length).toBeGreaterThan(0);
@@ -154,7 +160,7 @@ describe("iofigma.restful.factory.document", () => {
       // at their bbox origin to maintain correct spatial relationships
       // Note: In test environment with mocked svg-pathdata, vector networks may be empty,
       // but we can still verify the positioning logic is correct
-      childNodes.forEach((child) => {
+      childNodes.forEach((child: grida.program.nodes.VectorNode) => {
         expect(child.type).toBe("vector");
         // Child nodes should be positioned at their bbox origin relative to parent
         // (not at 0,0, which would cause misalignment)
@@ -167,6 +173,108 @@ describe("iofigma.restful.factory.document", () => {
         // This ensures fill and stroke geometries align correctly
         // (In mocked environment, bbox may be 0,0, but the logic is correct)
       });
+    });
+  });
+
+  describe("resolve_image_src and imageRefsUsed", () => {
+    it("should use resolve_image_src when provided and collect imageRefsUsed", () => {
+      const rectWithImage: figrest.RectangleNode = {
+        id: "rect-img",
+        name: "Image Rect",
+        type: "RECTANGLE",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        scrollBehavior: "FIXED",
+        fills: [
+          {
+            type: "IMAGE",
+            imageRef: "figma-image-ref-abc123",
+            scaleMode: "FILL",
+          } as figrest.ImagePaint,
+        ],
+        strokes: [],
+        strokeWeight: 0,
+        strokeAlign: "INSIDE",
+        effects: [],
+        cornerRadius: 0,
+      };
+
+      const images: Record<string, string> = {
+        "figma-image-ref-abc123": "https://example.com/image.png",
+      };
+
+      const context: iofigma.restful.factory.FactoryContext = {
+        gradient_id_generator: () => `gradient_${Math.random()}`,
+        resolve_image_src: (ref) =>
+          ref in images ? `res://images/${ref}` : null,
+      };
+
+      const { document: gridaDoc, imageRefsUsed } =
+        iofigma.restful.factory.document(rectWithImage, images, context);
+
+      expect(imageRefsUsed).toContain("figma-image-ref-abc123");
+      expect(imageRefsUsed).toHaveLength(1);
+
+      const rectNode = Object.values(gridaDoc.nodes).find(
+        (n): n is grida.program.nodes.RectangleNode => n.type === "rectangle"
+      );
+      expect(rectNode).toBeDefined();
+      const imagePaint = rectNode!.fill_paints?.find(
+        (p) => p && typeof p === "object" && "type" in p && p.type === "image"
+      );
+      expect(imagePaint).toBeDefined();
+      expect((imagePaint as { src?: string })!.src).toBe(
+        "res://images/figma-image-ref-abc123"
+      );
+    });
+
+    it("should use placeholder when resolve_image_src returns null and not add to imageRefsUsed", () => {
+      const rectWithImage: figrest.RectangleNode = {
+        id: "rect-img",
+        name: "Image Rect",
+        type: "RECTANGLE",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        scrollBehavior: "FIXED",
+        fills: [
+          {
+            type: "IMAGE",
+            imageRef: "missing-ref",
+            scaleMode: "FILL",
+          } as figrest.ImagePaint,
+        ],
+        strokes: [],
+        strokeWeight: 0,
+        strokeAlign: "INSIDE",
+        effects: [],
+        cornerRadius: 0,
+      };
+
+      const context: iofigma.restful.factory.FactoryContext = {
+        gradient_id_generator: () => `gradient_${Math.random()}`,
+        resolve_image_src: () => null,
+      };
+
+      const { document: gridaDoc, imageRefsUsed } =
+        iofigma.restful.factory.document(rectWithImage, {}, context);
+
+      expect(imageRefsUsed).toHaveLength(0);
+
+      const rectNode = Object.values(gridaDoc.nodes).find(
+        (n): n is grida.program.nodes.RectangleNode => n.type === "rectangle"
+      );
+      expect(rectNode).toBeDefined();
+      const imagePaint = rectNode!.fill_paints?.find(
+        (p) => p && typeof p === "object" && "type" in p && p.type === "image"
+      );
+      expect(imagePaint).toBeDefined();
+      expect((imagePaint as { src?: string })!.src).toBe(
+        "system://images/checker-16-strip-L98L92.png"
+      );
     });
   });
 });

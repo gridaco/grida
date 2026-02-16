@@ -203,7 +203,7 @@ async function tryInsertFromFigmaClipboardPayload(
 
     // Convert each root node to Grida document (will recursively process children)
     const payloads: editor.api.InsertPayload[] = rootNodes.map((figmaNode) => {
-      const gridaDoc = iofigma.restful.factory.document(
+      const { document: gridaDoc } = iofigma.restful.factory.document(
         figmaNode,
         {}, // images map (empty for clipboard paste)
         context

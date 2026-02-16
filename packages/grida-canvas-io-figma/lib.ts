@@ -211,6 +211,41 @@ export namespace iofigma {
     }
 
     export namespace factory {
+      /**
+       * Result of converting Figma REST document to Grida format.
+       *
+       * - **document**: The packed scene document for insert.
+       * - **imageRefsUsed**: Figma image refs that appear in the document and need registration.
+       *   Caller should only download/register refs in this set to avoid bloat.
+       */
+      export interface FigmaImportResult {
+        document: grida.program.document.IPackedSceneDocument;
+        imageRefsUsed: string[];
+      }
+
+      /**
+       * Context for the REST document factory.
+       *
+       * @property node_id_generator - Optional ID generator for Grida node IDs.
+       * @property gradient_id_generator - ID generator for gradient definitions.
+       * @property resolve_image_src - Resolves a Figma image ref to a runtime src (e.g. res://images/&lt;ref&gt;).
+       *   Caller owns resource availability; io-figma does not fetch or validate.
+       *   @param imageRef - Figma image reference (hash string from API or Kiwi).
+       *   @returns Runtime src string, or null to use placeholder.
+       */
+      export type FactoryContext = {
+        node_id_generator?: () => string;
+        gradient_id_generator: () => string;
+        /**
+         * Resolves a Figma image ref to a runtime src (e.g. res://images/&lt;ref&gt;).
+         * Caller owns resource availability; io-figma does not fetch or validate.
+         *
+         * @param imageRef - Figma image reference (hash string from API or Kiwi).
+         * @returns Runtime src string, or null to use placeholder.
+         */
+        resolve_image_src?: (imageRef: string) => string | null;
+      };
+
       function toGradientPaint(paint: figrest.GradientPaint) {
         const type_map = {
           GRADIENT_LINEAR: "linear_gradient",
@@ -263,54 +298,64 @@ export namespace iofigma {
         };
       }
 
-      function paint(paint: figrest.Paint): cg.Paint | undefined {
-        switch (paint.type) {
+      function convertPaint(
+        p: figrest.Paint,
+        ctx: FactoryContext,
+        imageRefsUsed: Set<string>
+      ): cg.Paint | undefined {
+        switch (p.type) {
           case "SOLID": {
-            return toSolidPaint(paint);
+            return toSolidPaint(p);
           }
           case "GRADIENT_LINEAR":
           case "GRADIENT_RADIAL":
           case "GRADIENT_ANGULAR":
           case "GRADIENT_DIAMOND": {
-            return toGradientPaint(paint);
+            return toGradientPaint(p);
           }
-          case "IMAGE":
-            // Return image paint with empty src - renderer will use placeholder
+          case "IMAGE": {
+            const imageRef = (p as figrest.ImagePaint).imageRef ?? "";
+            const src =
+              ctx.resolve_image_src?.(imageRef) ??
+              _GRIDA_SYSTEM_EMBEDDED_CHECKER;
+            if (src !== _GRIDA_SYSTEM_EMBEDDED_CHECKER && imageRef) {
+              imageRefsUsed.add(imageRef);
+            }
             return {
               type: "image",
-              src: _GRIDA_SYSTEM_EMBEDDED_CHECKER,
-              fit: paint.scaleMode
-                ? paint.scaleMode === "FILL"
+              src,
+              fit: p.scaleMode
+                ? p.scaleMode === "FILL"
                   ? "cover"
-                  : paint.scaleMode === "FIT"
+                  : p.scaleMode === "FIT"
                     ? "contain"
-                    : paint.scaleMode === "TILE"
+                    : p.scaleMode === "TILE"
                       ? "tile"
                       : "fill"
                 : "cover",
-              transform: paint.imageTransform
+              transform: p.imageTransform
                 ? [
                     [
-                      paint.imageTransform[0][0],
-                      paint.imageTransform[0][1],
-                      paint.imageTransform[0][2],
+                      p.imageTransform[0][0],
+                      p.imageTransform[0][1],
+                      p.imageTransform[0][2],
                     ],
                     [
-                      paint.imageTransform[1][0],
-                      paint.imageTransform[1][1],
-                      paint.imageTransform[1][2],
+                      p.imageTransform[1][0],
+                      p.imageTransform[1][1],
+                      p.imageTransform[1][2],
                     ],
                   ]
                 : cmath.transform.identity,
-              filters: paint.filters
+              filters: p.filters
                 ? {
-                    exposure: paint.filters.exposure ?? 0,
-                    contrast: paint.filters.contrast ?? 0,
-                    saturation: paint.filters.saturation ?? 0,
-                    temperature: paint.filters.temperature ?? 0,
-                    tint: paint.filters.tint ?? 0,
-                    highlights: paint.filters.highlights ?? 0,
-                    shadows: paint.filters.shadows ?? 0,
+                    exposure: p.filters.exposure ?? 0,
+                    contrast: p.filters.contrast ?? 0,
+                    saturation: p.filters.saturation ?? 0,
+                    temperature: p.filters.temperature ?? 0,
+                    tint: p.filters.tint ?? 0,
+                    highlights: p.filters.highlights ?? 0,
+                    shadows: p.filters.shadows ?? 0,
                   }
                 : {
                     exposure: 0,
@@ -321,10 +366,13 @@ export namespace iofigma {
                     highlights: 0,
                     shadows: 0,
                   },
-              blend_mode: map.blendModeMap[paint.blendMode],
-              opacity: paint.opacity ?? 1,
-              active: paint.visible ?? true,
+              blend_mode: map.blendModeMap[p.blendMode],
+              opacity: p.opacity ?? 1,
+              active: p.visible ?? true,
             } satisfies cg.ImagePaint;
+          }
+          default:
+            return undefined;
         }
       }
 
@@ -419,9 +467,13 @@ export namespace iofigma {
       /**
        * Fill properties - IFill
        */
-      function fills_trait(fills: figrest.Paint[]) {
+      function fills_trait(
+        fills: figrest.Paint[],
+        context: FactoryContext,
+        imageRefsUsed: Set<string>
+      ) {
         const fills_paints = fills
-          .map(paint)
+          .map((p) => convertPaint(p, context, imageRefsUsed))
           .filter((p): p is cg.Paint => p !== undefined);
         return {
           fill_paints: fills_paints.length > 0 ? fills_paints : undefined,
@@ -431,17 +483,21 @@ export namespace iofigma {
       /**
        * Stroke properties - IStroke
        */
-      function stroke_trait(node: {
-        strokes?: figrest.Paint[];
-        strokeWeight?: number;
-        strokeCap?: figrest.LineNode["strokeCap"];
-        strokeJoin?: figrest.LineNode["strokeJoin"];
-        strokeDashes?: number[];
-        strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
-        strokeMiterAngle?: number;
-      }) {
+      function stroke_trait(
+        node: {
+          strokes?: figrest.Paint[];
+          strokeWeight?: number;
+          strokeCap?: figrest.LineNode["strokeCap"];
+          strokeJoin?: figrest.LineNode["strokeJoin"];
+          strokeDashes?: number[];
+          strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
+          strokeMiterAngle?: number;
+        },
+        context: FactoryContext,
+        imageRefsUsed: Set<string>
+      ) {
         const strokes_paints = (node.strokes ?? [])
-          .map(paint)
+          .map((p) => convertPaint(p, context, imageRefsUsed))
           .filter((p): p is cg.Paint => p !== undefined);
         return {
           stroke_paints: strokes_paints.length > 0 ? strokes_paints : undefined,
@@ -463,13 +519,17 @@ export namespace iofigma {
       /**
        * Text stroke properties - ITextStroke (simpler than IStroke)
        */
-      function text_stroke_trait(node: {
-        strokes?: figrest.Paint[];
-        strokeWeight?: number;
-        strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
-      }) {
+      function text_stroke_trait(
+        node: {
+          strokes?: figrest.Paint[];
+          strokeWeight?: number;
+          strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
+        },
+        context: FactoryContext,
+        imageRefsUsed: Set<string>
+      ) {
         const strokes_paints = (node.strokes ?? [])
-          .map(paint)
+          .map((p) => convertPaint(p, context, imageRefsUsed))
           .filter((p): p is cg.Paint => p !== undefined);
         return {
           stroke_paints: strokes_paints.length > 0 ? strokes_paints : undefined,
@@ -659,11 +719,6 @@ export namespace iofigma {
         | figrest.FrameNode
         | figrest.GroupNode;
 
-      export type FactoryContext = {
-        node_id_generator?: () => string;
-        gradient_id_generator: () => string;
-      };
-
       type InputNode =
         | (figrest.SubcanvasNode & Partial<__ir.HasLayoutTraitIR>)
         | __ir.VectorNodeWithVectorNetworkDataPresent
@@ -674,9 +729,10 @@ export namespace iofigma {
         node: InputNode,
         images: { [key: string]: string },
         context: FactoryContext
-      ): grida.program.document.IPackedSceneDocument {
+      ): FigmaImportResult {
         const nodes: Record<string, grida.program.nodes.Node> = {};
         const graph: Record<string, string[]> = {};
+        const imageRefsUsed = new Set<string>();
 
         // Map from Figma ID (ephemeral) to Grida ID (final)
         const figma_id_to_grida_id = new Map<string, string>();
@@ -760,13 +816,16 @@ export namespace iofigma {
                 ],
                 size: { x: bbox.width, y: bbox.height },
               }),
-              ...(options.useFill ? fills_trait(parentNode.fills) : {}),
+              ...(options.useFill
+                ? fills_trait(parentNode.fills, context, imageRefsUsed)
+                : {}),
               ...(options.useStroke
-                ? stroke_trait(parentNode)
-                : stroke_trait({
-                    strokes: [],
-                    strokeWeight: 0,
-                  })),
+                ? stroke_trait(parentNode, context, imageRefsUsed)
+                : stroke_trait(
+                    { strokes: [], strokeWeight: 0 },
+                    context,
+                    imageRefsUsed
+                  )),
               ...("effects" in parentNode && parentNode.effects
                 ? effects_trait(parentNode.effects)
                 : effects_trait(undefined)),
@@ -914,7 +973,8 @@ export namespace iofigma {
             gridaId,
             images,
             parent,
-            context
+            context,
+            imageRefsUsed
           );
 
           if (!processedNode) {
@@ -952,7 +1012,7 @@ export namespace iofigma {
         // Generate a new scene ID
         const sceneId = generateId();
 
-        return {
+        const packed: grida.program.document.IPackedSceneDocument = {
           nodes,
           links: graph,
           scene: {
@@ -971,6 +1031,11 @@ export namespace iofigma {
           images: {},
           properties: {},
         };
+
+        return {
+          document: packed,
+          imageRefsUsed: Array.from(imageRefsUsed),
+        };
       }
 
       /**
@@ -983,6 +1048,7 @@ export namespace iofigma {
        * @param images
        * @param parent
        * @param context
+       * @param imageRefsUsed - Mutable set to collect image refs that need registration
        * @returns
        */
       function node_without_children(
@@ -990,7 +1056,8 @@ export namespace iofigma {
         gridaId: string,
         images: { [key: string]: string },
         parent: FigmaParentNode | undefined,
-        context: FactoryContext
+        context: FactoryContext,
+        imageRefsUsed: Set<string>
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
@@ -1005,8 +1072,8 @@ export namespace iofigma {
                 blendMode: "PASS_THROUGH",
               }),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...style_trait({}),
               ...corner_radius_trait({ cornerRadius: 0 }),
               ...container_layout_trait({}, false),
@@ -1022,8 +1089,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...style_trait({
                 overflow: node.clipsContent ? "clip" : undefined,
               }),
@@ -1082,8 +1149,8 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...fills_trait(node.fills),
-              ...text_stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...text_stroke_trait(node, context, imageRefsUsed),
               ...style_trait({}),
               ...effects_trait(node.effects),
               type: "tspan",
@@ -1127,8 +1194,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...corner_radius_trait(node),
               ...effects_trait(node.effects),
               type: "rectangle",
@@ -1139,8 +1206,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...arc_data_trait(node),
               ...effects_trait(node.effects),
               type: "ellipse",
@@ -1151,8 +1218,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "boolean",
               op: mapBooleanOperation(node.booleanOperation),
@@ -1162,7 +1229,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...stroke_trait(node),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "line",
               layout_positioning: "absolute",
@@ -1206,8 +1273,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...corner_radius_trait(node),
               ...effects_trait(node.effects),
               type: "vector",
@@ -1219,8 +1286,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "star",
               point_count: node.pointCount,
@@ -1232,8 +1299,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "polygon",
               point_count: node.pointCount,
@@ -2748,12 +2815,13 @@ export namespace iofigma {
     }
 
     /**
-     * Convert page to single packed document (bulk insert to avoid reducer nesting)
+     * Convert page to single packed document (bulk insert to avoid reducer nesting).
+     * Returns {@link restful.factory.FigmaImportResult} with merged document and imageRefsUsed.
      */
     export function convertPageToScene(
       page: FigPage,
-      context: restful.factory.FactoryContext
-    ): grida.program.document.IPackedSceneDocument {
+      context: iofigma.restful.factory.FactoryContext
+    ): iofigma.restful.factory.FigmaImportResult {
       // IMPORTANT:
       // When converting multiple root nodes, each `restful.factory.document()` call maintains its
       // own local ID mapping. If the caller doesn't provide a `node_id_generator`, the fallback
@@ -2765,18 +2833,19 @@ export namespace iofigma {
       const sharedNodeIdGenerator =
         context.node_id_generator ??
         (() => `figma-import-${Date.now()}-${++counter}`);
-      const sharedContext: restful.factory.FactoryContext = {
+      const sharedContext: iofigma.restful.factory.FactoryContext = {
         ...context,
         node_id_generator: sharedNodeIdGenerator,
       };
 
-      const individualDocs = page.rootNodes.map((rootNode) =>
-        restful.factory.document(rootNode, {}, sharedContext)
+      const individualResults = page.rootNodes.map((rootNode) =>
+        iofigma.restful.factory.document(rootNode, {}, sharedContext)
       );
 
-      if (individualDocs.length === 1) return individualDocs[0];
+      if (individualResults.length === 1) return individualResults[0];
 
       // Merge multiple roots into single document
+      const imageRefsUsed = new Set<string>();
       const merged: grida.program.document.IPackedSceneDocument = {
         bitmaps: {},
         images: {},
@@ -2796,16 +2865,21 @@ export namespace iofigma {
         },
       };
 
-      individualDocs.forEach((doc) => {
+      individualResults.forEach((result) => {
+        const doc = result.document;
         Object.assign(merged.nodes, doc.nodes);
         Object.assign(merged.links, doc.links);
         Object.assign(merged.images, doc.images);
         Object.assign(merged.bitmaps, doc.bitmaps);
         Object.assign(merged.properties, doc.properties);
         merged.scene.children_refs.push(...doc.scene.children_refs);
+        result.imageRefsUsed.forEach((ref: string) => imageRefsUsed.add(ref));
       });
 
-      return merged;
+      return {
+        document: merged,
+        imageRefsUsed: Array.from(imageRefsUsed),
+      };
     }
 
     /**
@@ -2822,8 +2896,8 @@ export namespace iofigma {
 
       static convertPageToScene(
         page: FigPage,
-        context: restful.factory.FactoryContext
-      ): grida.program.document.IPackedSceneDocument {
+        context: iofigma.restful.factory.FactoryContext
+      ): iofigma.restful.factory.FigmaImportResult {
         return convertPageToScene(page, context);
       }
     }

@@ -175,9 +175,12 @@ describe("FigImporter", () => {
     it("should merge all roots into single packed document", () => {
       const data = readFileSync(testFixture);
       const figFile = FigImporter.parseFile(data);
-      const packedDoc = FigImporter.convertPageToScene(figFile.pages[0], {
-        gradient_id_generator: () => "test-id",
-      });
+      const { document: packedDoc } = FigImporter.convertPageToScene(
+        figFile.pages[0],
+        {
+          gradient_id_generator: () => "test-id",
+        }
+      );
 
       expect(packedDoc.nodes).toBeDefined();
       expect(packedDoc.links).toBeDefined();
@@ -185,7 +188,7 @@ describe("FigImporter", () => {
       expect(Array.isArray(packedDoc.scene.children_refs)).toBe(true);
 
       // All root IDs must exist in nodes
-      packedDoc.scene.children_refs.forEach((rootId) => {
+      packedDoc.scene.children_refs.forEach((rootId: string) => {
         expect(packedDoc.nodes[rootId]).toBeDefined();
       });
     });
@@ -263,14 +266,14 @@ describe("FigImporter", () => {
         ],
       };
 
-      const packedDoc = FigImporter.convertPageToScene(mockPage, {
+      const { document: packedDoc } = FigImporter.convertPageToScene(mockPage, {
         gradient_id_generator: () => "test-id",
         // Intentionally omit node_id_generator to exercise the internal shared generator.
       });
 
       const uniqueRoots = new Set(packedDoc.scene.children_refs);
       expect(uniqueRoots.size).toBe(2);
-      packedDoc.scene.children_refs.forEach((rootId) => {
+      packedDoc.scene.children_refs.forEach((rootId: string) => {
         expect(packedDoc.nodes[rootId]).toBeDefined();
       });
     });

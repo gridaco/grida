@@ -328,7 +328,11 @@ function restJsonToSceneJson(
       },
       gradient_id_generator: baseGradientGen,
     };
-    const packed = iofigma.restful.factory.document(node as any, {}, context);
+    const { document: packed } = iofigma.restful.factory.document(
+      node as any,
+      {},
+      context
+    );
     const fullDoc =
       grida.program.nodes.factory.packed_scene_document_to_full_document(
         packed
@@ -344,13 +348,13 @@ function restJsonToSceneJson(
     gradient_id_generator: baseGradientGen,
   };
 
-  const individualDocs = rootNodes.map((rootNode) =>
+  const individualResults = rootNodes.map((rootNode) =>
     iofigma.restful.factory.document(rootNode as any, {}, context)
   );
 
   let packed: grida.program.document.IPackedSceneDocument;
-  if (individualDocs.length === 1) {
-    packed = individualDocs[0];
+  if (individualResults.length === 1) {
+    packed = individualResults[0].document;
   } else {
     packed = {
       bitmaps: {},
@@ -368,7 +372,8 @@ function restJsonToSceneJson(
         constraints: { children: "multiple" },
       },
     };
-    for (const d of individualDocs) {
+    for (const result of individualResults) {
+      const d = result.document;
       Object.assign(packed.nodes, d.nodes);
       Object.assign(packed.links, d.links);
       Object.assign(packed.images, d.images);
@@ -408,7 +413,7 @@ function figBytesToSceneJson(figBytes: Uint8Array): string {
     gradient_id_generator: () => `grad-${++counter}`,
   };
 
-  const packed = iofigma.kiwi.convertPageToScene(page, context);
+  const { document: packed } = iofigma.kiwi.convertPageToScene(page, context);
   const fullDoc =
     grida.program.nodes.factory.packed_scene_document_to_full_document(packed);
 

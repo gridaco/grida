@@ -468,16 +468,14 @@ export default function CanvasPlayground({
             if (bytes && !cancelled) {
               const loadedDocument = io.GRID.decode(bytes);
 
-              // Load images from OPFS (images/<hash>.<ext>)
               const images: Record<string, Uint8Array> = {};
               const names = await opfs.listImages();
               for (const name of names) {
                 const base = name.split("/").pop() ?? name;
-                const hash = base.includes(".") ? base.split(".")[0]! : base;
+                const ref = base.includes(".") ? base.split(".")[0]! : base;
                 try {
-                  const img = await opfs.readImage(name);
-                  images[hash] = img;
-                } catch (e) {
+                  images[ref] = await opfs.readImage(name);
+                } catch {
                   // Ignore per-file errors; we still load the document.
                 }
               }
@@ -490,11 +488,8 @@ export default function CanvasPlayground({
                 "opfs"
               );
 
-              // Load image assets into the WASM runtime.
-              // This is safe to call before mount; the editor will defer and apply after mount.
-              const imageCount = Object.keys(images).length;
-              if (imageCount > 0) {
-                instance.loadImagesToWasmSurface(images);
+              if (Object.keys(images).length > 0) {
+                instance.loadImages(images);
               }
 
               setDocumentReady(true);
