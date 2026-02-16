@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# https://gist.github.com/softmarshmallow/27ad65dfa5babc2c67b41740f1f05791
 """
 Archive a Figma file via REST API: document.json (with geometry) and images/*.
 
@@ -77,7 +78,9 @@ def download_image(url: str) -> tuple[bytes, str]:
     req = Request(url, method="GET")
     with urlopen(req, timeout=120) as resp:
         data = resp.read()
-        content_type = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        content_type = (
+            (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        )
         ext = MIME_EXT.get(content_type) or "png"
         return data, ext
 

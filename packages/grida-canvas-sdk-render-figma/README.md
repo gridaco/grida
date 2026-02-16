@@ -251,6 +251,36 @@ npx @grida/refig ./design.fig --node "1:23" --out ./out.png
 pnpm dlx @grida/refig ./design.fig --node "1:23" --out ./out.png
 ```
 
+### Quick test via `figma_archive.py` (REST API → `document.json` + `images/`)
+
+If you want an end-to-end test from a real Figma file using the REST API, you can generate a local “project directory” that refig can consume directly.
+
+1) Archive a Figma file (stdlib-only Python script):
+
+- Script: [`figma_archive.py` (gist)](https://gist.github.com/softmarshmallow/27ad65dfa5babc2c67b41740f1f05791)
+- (For repo contributors, it’s also in this monorepo at `.tools/figma_archive.py`.)
+- Save the script locally as `figma_archive.py`, then run:
+
+```sh
+# File key is the "<key>" part of `https://www.figma.com/file/<key>/...`
+python3 figma_archive.py --x-figma-token "<token>" --filekey "<key>" --archive-dir ./my-figma-export
+```
+
+This writes:
+
+- `./my-figma-export/document.json` (with `geometry=paths`)
+- `./my-figma-export/images/<ref>.<ext>` (image fills downloaded from `/v1/files/:key/images`)
+
+2) Render using the directory as `<input>`:
+
+```sh
+# Single node
+refig ./my-figma-export --node "1:23" --out ./out.png
+
+# Or export everything with Figma export presets
+refig ./my-figma-export --export-all --out ./exports
+```
+
 ### Export all (`--export-all`)
 
 With **`--export-all`**, refig walks the document and renders every node that has [Figma export settings](https://www.figma.com/developers/api#exportsetting-type) — one file per (node, setting), using that setting’s format, suffix, and constraint. Both **REST API JSON** (e.g. `GET /v1/files/:key`) and **`.fig` files** are supported when the file includes export settings.
