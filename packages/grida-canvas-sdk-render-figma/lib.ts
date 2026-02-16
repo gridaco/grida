@@ -282,6 +282,41 @@ function findNodeInRestDocument(
   return undefined;
 }
 
+/**
+ * Find the FigPage that contains a node by id (for page-scoped scene loading).
+ */
+function findPageContainingNode(
+  figFile: { pages?: Array<{ rootNodes?: unknown[] }> },
+  nodeId: string
+):
+  | { name: string; canvas: unknown; rootNodes: unknown[]; sortkey: string }
+  | undefined {
+  const pages = figFile.pages;
+  if (!pages?.length) return undefined;
+
+  function walk(nodes: RestNode[]): boolean {
+    for (const node of nodes) {
+      if (String(node.id) === nodeId) return true;
+      const children = node.children as RestNode[] | undefined;
+      if (children?.length && walk(children)) return true;
+    }
+    return false;
+  }
+
+  for (const page of pages) {
+    const rootNodes = (page.rootNodes ?? []) as RestNode[];
+    if (rootNodes.length && walk(rootNodes)) {
+      return page as {
+        name: string;
+        canvas: unknown;
+        rootNodes: unknown[];
+        sortkey: string;
+      };
+    }
+  }
+  return undefined;
+}
+
 /** Result of REST JSON conversion with optional image refs used. */
 interface RestConversionResult {
   sceneJson: string;
@@ -426,9 +461,66 @@ interface FigConversionResult {
 }
 
 /**
- * Convert .fig file bytes -> Grida snapshot JSON string.
+ * Build a REST-like document structure from .fig bytes for export collection.
+ * Wraps page.rootNodes in document/children so collectExportsFromDocument can walk it.
  */
-function figBytesToSceneJson(figBytes: Uint8Array): FigConversionResult {
+export function figBytesToRestLikeDocument(
+  figBytes: Uint8Array
+): FigmaJsonDocument {
+  const figFile = iofigma.kiwi.parseFile(figBytes);
+  return figFileToRestLikeDocument(figFile);
+}
+
+/**
+ * Build REST-like document from a parsed FigFileDocument.
+ * Use when you already have the parse result (e.g. to avoid parsing twice for images).
+ */
+export function figFileToRestLikeDocument(figFile: {
+  pages?: Array<{
+    name?: string;
+    sortkey: string;
+    canvas?: { guid?: unknown };
+    rootNodes: unknown[];
+  }>;
+}): FigmaJsonDocument {
+  const pages = figFile.pages;
+  if (!pages || pages.length === 0) {
+    throw new Error("FigmaDocument: .fig file has no pages");
+  }
+
+  const sortedPages = [...pages].sort((a, b) =>
+    a.sortkey.localeCompare(b.sortkey)
+  );
+
+  const canvasNodes = sortedPages.map((p) => ({
+    type: "CANVAS" as const,
+    id: p.canvas?.guid
+      ? iofigma.kiwi.guid(
+          p.canvas.guid as { sessionID: number; localID: number }
+        )
+      : `canvas-${String(p.name ?? "")}`,
+    name: p.name ?? "Page",
+    children: p.rootNodes,
+  }));
+
+  return {
+    document: {
+      id: "0:0",
+      type: "DOCUMENT",
+      name: "Document",
+      children: canvasNodes,
+    },
+  };
+}
+
+/**
+ * Convert .fig file bytes -> Grida snapshot JSON string.
+ * When rootNodeId is provided, loads only the page containing that node (enables export from any page).
+ */
+function figBytesToSceneJson(
+  figBytes: Uint8Array,
+  rootNodeId?: string
+): FigConversionResult {
   const figFile = iofigma.kiwi.parseFile(figBytes);
   const pages = figFile.pages;
   if (!pages || pages.length === 0) {
@@ -438,7 +530,19 @@ function figBytesToSceneJson(figBytes: Uint8Array): FigConversionResult {
   const sortedPages = [...pages].sort((a, b) =>
     a.sortkey.localeCompare(b.sortkey)
   );
-  const page = sortedPages[0];
+
+  let page: (typeof sortedPages)[0];
+  if (rootNodeId != null && rootNodeId !== "") {
+    const pageWithNode = findPageContainingNode(figFile, rootNodeId);
+    if (!pageWithNode) {
+      throw new Error(
+        `FigmaDocument: node with id "${rootNodeId}" not found in .fig`
+      );
+    }
+    page = pageWithNode as (typeof sortedPages)[0];
+  } else {
+    page = sortedPages[0]!;
+  }
 
   const imagesMap = iofigma.kiwi.extractImages(figFile.zip_files);
   const images: Record<string, Uint8Array> = {};
@@ -455,6 +559,7 @@ function figBytesToSceneJson(figBytes: Uint8Array): FigConversionResult {
   const context: iofigma.restful.factory.FactoryContext = {
     node_id_generator: () => `refig-${++counter}`,
     gradient_id_generator: () => `grad-${++counter}`,
+    preserve_figma_ids: true,
     ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
   };
 
@@ -515,12 +620,10 @@ export class FigmaRenderer {
     let imagesToRegister: Record<string, Uint8Array> = {};
 
     if (this.document.sourceType === "fig-file") {
-      if (nodeId) {
-        throw new Error(
-          "FigmaRenderer: --node (render specific node) is not yet supported for .fig files; use REST API JSON input"
-        );
-      }
-      const figResult = figBytesToSceneJson(this.document.payload as Uint8Array);
+      const figResult = figBytesToSceneJson(
+        this.document.payload as Uint8Array,
+        nodeId || undefined
+      );
       sceneJson = figResult.sceneJson;
       imagesToRegister = figResult.images;
     } else {

@@ -1,6 +1,12 @@
 // @vitest-environment node
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { unzipSync } from "fflate";
 import { join } from "node:path";
 import { describe, expect, it, beforeAll } from "vitest";
@@ -10,6 +16,7 @@ import {
   collectExportsFromDocument,
   exportSettingToRenderOptions,
 } from "../index";
+import { figBytesToRestLikeDocument } from "../lib";
 
 // ---------------------------------------------------------------------------
 // Binary signatures for output validation
@@ -172,6 +179,25 @@ describe("collectExportsFromDocument", () => {
     expect(items[1].setting.format).toBe("SVG");
     expect(items[1].setting.constraint.type).toBe("WIDTH");
     expect(items[1].setting.constraint.value).toBe(200);
+  });
+
+  it("collects exportSettings from REST doc built from .fig via figBytesToRestLikeDocument", () => {
+    const figPath = join(
+      process.cwd(),
+      "../../fixtures/test-fig/community/784448220678228461-figma-auto-layout-playground.fig"
+    );
+    if (!existsSync(figPath)) {
+      console.warn(`Skipping: fixture not found at ${figPath}`);
+      return;
+    }
+    const bytes = new Uint8Array(readFileSync(figPath));
+    const restDoc = figBytesToRestLikeDocument(bytes);
+    const items = collectExportsFromDocument(restDoc as any);
+    expect(items.length).toBeGreaterThan(0);
+    expect(items[0]).toHaveProperty("nodeId");
+    expect(items[0]).toHaveProperty("setting");
+    expect(items[0].setting).toHaveProperty("format");
+    expect(items[0].setting).toHaveProperty("constraint");
   });
 });
 

@@ -242,4 +242,36 @@ describe("refig CLI", () => {
     expect(pngBytes[2]).toBe(0x4e);
     expect(pngBytes[3]).toBe(0x47);
   }, 120_000);
+
+  it("--export-all on .fig file exports all nodes with exportSettings", () => {
+    resetOutputDir();
+    const figPath = join(
+      process.cwd(),
+      "../../fixtures/test-fig/community/784448220678228461-figma-auto-layout-playground.fig"
+    );
+    if (!existsSync(figPath)) {
+      console.warn(`Skipping: fixture not found at ${figPath}`);
+      return;
+    }
+    const outDir = join(TEST_OUTPUT_DIR, "export-all-fig-out");
+
+    execFileSync(
+      process.execPath,
+      ["--import", "tsx", BIN, figPath, "--export-all", "--out", outDir],
+      { stdio: "pipe", timeout: 300_000 }
+    );
+
+    expect(existsSync(outDir)).toBe(true);
+    const files = readdirSync(outDir);
+    expect(files.length).toBeGreaterThan(1);
+
+    const pngFiles = files.filter((f) => f.endsWith(".png"));
+    expect(pngFiles.length).toBeGreaterThan(0);
+    const samplePng = join(outDir, pngFiles[0]!);
+    const pngBytes = readFileSync(samplePng);
+    expect(pngBytes[0]).toBe(0x89);
+    expect(pngBytes[1]).toBe(0x50);
+    expect(pngBytes[2]).toBe(0x4e);
+    expect(pngBytes[3]).toBe(0x47);
+  }, 300_000);
 });

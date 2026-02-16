@@ -245,6 +245,11 @@ export namespace iofigma {
          * @returns Runtime src string, or null to use placeholder.
          */
         resolve_image_src?: (imageRef: string) => string | null;
+        /**
+         * When true, use Figma node IDs as Grida node IDs instead of generating new ones.
+         * Required for export-by-nodeId from .fig files.
+         */
+        preserve_figma_ids?: boolean;
       };
 
       function toGradientPaint(paint: figrest.GradientPaint) {
@@ -748,7 +753,7 @@ export namespace iofigma {
         const getOrCreateGridaId = (figmaId: string): string => {
           const existing = figma_id_to_grida_id.get(figmaId);
           if (existing) return existing;
-          const gridaId = generateId();
+          const gridaId = context.preserve_figma_ids ? figmaId : generateId();
           figma_id_to_grida_id.set(figmaId, gridaId);
           return gridaId;
         };
@@ -1743,6 +1748,37 @@ export namespace iofigma {
       }
 
       /**
+       * HasExportSettingsTrait
+       * Maps Kiwi exportSettings → REST. Skips MP4 (refig unsupported).
+       */
+      function kiwi_has_export_settings_trait(nc: figkiwi.NodeChange) {
+        const settings = nc.exportSettings;
+        if (!settings?.length) return {};
+        const FMT = ["PNG", "JPG", "SVG", "PDF"] as const;
+        const FMT_STR: Record<string, (typeof FMT)[number] | null> = {
+          PNG: "PNG", JPEG: "JPG", JPG: "JPG", SVG: "SVG", PDF: "PDF",
+        };
+        const CSTR = ["SCALE", "WIDTH", "HEIGHT"] as const;
+        const CSTR_STR: Record<string, (typeof CSTR)[number]> = {
+          CONTENT_SCALE: "SCALE", CONTENT_WIDTH: "WIDTH", CONTENT_HEIGHT: "HEIGHT",
+        };
+        const fmt = (t: string | number | undefined) =>
+          typeof t === "string" ? FMT_STR[t] ?? null : typeof t === "number" && t < 4 ? FMT[t] : null;
+        const cstr = (t: string | number | undefined) =>
+          typeof t === "string" ? CSTR_STR[t] ?? "SCALE" : typeof t === "number" && t < 3 ? CSTR[t] : "SCALE";
+
+        const exportSettings = settings
+          .map((s) => {
+            const f = fmt(s.imageType);
+            if (!f) return null;
+            const c = s.constraint;
+            return { format: f, suffix: s.suffix ?? "", constraint: { type: cstr(c?.type), value: c?.value ?? 1 } };
+          })
+          .filter((x): x is figrest.ExportSetting => x !== null);
+        return exportSettings.length ? { exportSettings } : {};
+      }
+
+      /**
        * HasChildrenTrait
        */
       function kiwi_children_trait() {
@@ -1982,6 +2018,7 @@ export namespace iofigma {
           ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.FrameNode;
       }
 
@@ -1999,6 +2036,7 @@ export namespace iofigma {
           ...kiwi_geometry_trait(nc),
           sectionContentsHidden: nc.sectionContentsHidden ?? false,
           ...kiwi_children_trait(),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.SectionNode;
       }
 
@@ -2019,6 +2057,7 @@ export namespace iofigma {
           ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.ComponentNode;
       }
 

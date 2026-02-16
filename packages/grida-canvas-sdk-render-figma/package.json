@@ -3,10 +3,39 @@
   "version": "0.0.0",
   "private": false,
   "description": "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG",
+  "keywords": [
+    "canvas",
+    "cli",
+    "fig",
+    "fig-file",
+    "figma",
+    "figma-renderer",
+    "grida",
+    "headless",
+    "jpeg",
+    "pdf",
+    "png",
+    "refig",
+    "skia",
+    "svg",
+    "wasm",
+    "webp"
+  ],
+  "homepage": "https://github.com/gridaco/grida/tree/main/packages/grida-canvas-sdk-render-figma",
+  "bugs": "https://github.com/gridaco/grida/issues",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gridaco/grida.git",
+    "directory": "packages/grida-canvas-sdk-render-figma"
+  },
   "bin": {
     "refig": "./dist/cli.mjs"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -21,6 +50,9 @@
       "import": "./dist/browser.mjs",
       "default": "./dist/browser.mjs"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",

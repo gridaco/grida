@@ -193,7 +193,7 @@ refig <input> --images <dir> --node <node-id> --out <path>
 # Directory input: document.json + images/ under one folder
 refig ./my-figma-export --node "1:23" --out ./out.png
 
-# Export all nodes that have exportSettings (REST JSON only)
+# Export all nodes that have exportSettings (REST JSON or .fig)
 refig <input> --export-all --out <output-dir>
 ```
 
@@ -215,6 +215,7 @@ refig ./figma-response.json --images ./downloaded-images --node "1:23" --out ./o
 
 # Export all: render every node that has export settings (see below)
 refig ./figma-response.json --export-all --out ./exports
+refig ./design.fig --export-all --out ./exports
 
 # Scale 2x, custom dimensions
 refig ./design.fig --node "1:23" --out ./out.png --width 512 --height 512 --scale 2
@@ -225,23 +226,25 @@ pnpm dlx @grida/refig ./design.fig --node "1:23" --out ./out.png
 
 ### Export all (`--export-all`)
 
-With **`--export-all`**, refig walks the document and renders every node that has [Figma export settings](https://www.figma.com/developers/api#exportsetting-type) — one file per (node, setting), using that setting’s format, suffix, and constraint. **REST API JSON only** (e.g. `GET /v1/files/:key`); `.fig` does not include export settings.
+With **`--export-all`**, refig walks the document and renders every node that has [Figma export settings](https://www.figma.com/developers/api#exportsetting-type) — one file per (node, setting), using that setting’s format, suffix, and constraint. Both **REST API JSON** (e.g. `GET /v1/files/:key`) and **`.fig` files** are supported when the file includes export settings.
 
 **When it’s useful:** You choose in Figma exactly what to export: select a node, click **Export +** in the right panel, add one or more presets (e.g. PNG @2x, SVG). Add exports on as many nodes as you want. Then run the CLI with `--export-all` and the path to your REST JSON; refig renders all of those with the same config, without long or repeated `--node` / `--format` / `--scale` options. Same idea for testing the renderer: add export presets on the nodes you care about in Figma, run `refig … --export-all --out ./out`, and compare outputs.
 
+**REST API note:** The Figma REST API (`GET /v1/files/:key`) does not include `exportSettings` for SECTION nodes, even when those sections have export presets in Figma. FRAME, COMPONENT, INSTANCE, etc. correctly include them. As a result, `--export-all` on REST JSON will not discover SECTION exports; use a `.fig` file input if you need to export nodes that are sections. See [figma/rest-api-spec#87](https://github.com/figma/rest-api-spec/issues/87).
+
 ### Flags
 
-| Flag             | Required | Default                         | Description                                                                   |
-| ---------------- | -------- | ------------------------------- | ----------------------------------------------------------------------------- |
+| Flag             | Required | Default                         | Description                                                                                   |
+| ---------------- | -------- | ------------------------------- | --------------------------------------------------------------------------------------------- |
 | `<input>`        | yes      |                                 | Path to `.fig`, JSON file, or directory containing `document.json` (and optionally `images/`) |
-| `--images <dir>` | no       |                                 | Directory of image assets for REST document (ignored if `<input>` is a dir with `images/`)       |
-| `--node <id>`    | yes\*    |                                 | Figma node ID to render (\*omit when using `--export-all`)                    |
-| `--out <path>`   | yes      |                                 | Output file path (single node) or output directory (`--export-all`)           |
-| `--export-all`   | no       |                                 | Export every node with exportSettings; REST JSON only; `--out` is a directory |
-| `--format <fmt>` | no       | inferred from `--out` extension | `png`, `jpeg`, `webp`, `pdf`, `svg` (single-node only)                        |
-| `--width <px>`   | no       | `1024`                          | Viewport width (single-node only)                                             |
-| `--height <px>`  | no       | `1024`                          | Viewport height (single-node only)                                            |
-| `--scale <n>`    | no       | `1`                             | Raster scale factor (single-node only)                                        |
+| `--images <dir>` | no       |                                 | Directory of image assets for REST document (ignored if `<input>` is a dir with `images/`)    |
+| `--node <id>`    | yes\*    |                                 | Figma node ID to render (\*omit when using `--export-all`)                                    |
+| `--out <path>`   | yes      |                                 | Output file path (single node) or output directory (`--export-all`)                           |
+| `--export-all`   | no       |                                 | Export every node with exportSettings (REST JSON or .fig); `--out` is a directory             |
+| `--format <fmt>` | no       | inferred from `--out` extension | `png`, `jpeg`, `webp`, `pdf`, `svg` (single-node only)                                        |
+| `--width <px>`   | no       | `1024`                          | Viewport width (single-node only)                                                             |
+| `--height <px>`  | no       | `1024`                          | Viewport height (single-node only)                                                            |
+| `--scale <n>`    | no       | `1`                             | Raster scale factor (single-node only)                                                        |
 
 ## Architecture
 

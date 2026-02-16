@@ -18,8 +18,11 @@ import {
   FigmaRenderer,
   collectExportsFromDocument,
   exportSettingToRenderOptions,
+  figFileToRestLikeDocument,
+  type ExportItem,
   type RefigRenderFormat,
 } from "./lib";
+import { iofigma } from "@grida/io-figma";
 
 const FORMAT_SET = new Set<string>(["png", "jpeg", "webp", "pdf", "svg"]);
 
@@ -128,19 +131,41 @@ async function runExportAll(
   outDir: string,
   imagesDir?: string
 ): Promise<void> {
-  const json = JSON.parse(readFileSync(documentPath, "utf8"));
-  const document = new FigmaDocument(json);
-  const items = collectExportsFromDocument(
-    document.payload as Record<string, unknown>
-  );
+  const isFig = documentPath.toLowerCase().endsWith(".fig");
+  let document: FigmaDocument;
+  let items: ExportItem[];
+  let rendererOptions: { images?: Record<string, Uint8Array> } = {};
+
+  if (isFig) {
+    const bytes = new Uint8Array(readFileSync(documentPath));
+    const figFile = iofigma.kiwi.parseFile(bytes);
+    const restDoc = figFileToRestLikeDocument(figFile);
+    items = collectExportsFromDocument(restDoc as Record<string, unknown>);
+    document = new FigmaDocument(bytes);
+    const imagesMap = iofigma.kiwi.extractImages(figFile.zip_files);
+    const images: Record<string, Uint8Array> = {};
+    imagesMap.forEach((imgBytes, ref) => {
+      images[ref] = imgBytes;
+    });
+    if (Object.keys(images).length > 0) {
+      rendererOptions = { images };
+    }
+  } else {
+    const json = JSON.parse(readFileSync(documentPath, "utf8"));
+    document = new FigmaDocument(json);
+    items = collectExportsFromDocument(
+      document.payload as Record<string, unknown>
+    );
+    if (imagesDir) {
+      rendererOptions = { images: readImagesFromDir(imagesDir) };
+    }
+  }
+
   if (items.length === 0) {
     process.stdout.write("No nodes with export settings found.\n");
     return;
   }
 
-  const rendererOptions = imagesDir
-    ? { images: readImagesFromDir(imagesDir) }
-    : {};
   const renderer = new FigmaRenderer(document, rendererOptions);
   try {
     for (const { nodeId: nid, node, setting } of items) {
@@ -263,11 +288,6 @@ async function main(): Promise<void> {
         if (exportAll) {
           if (nodeId) {
             program.error("--node must not be used with --export-all");
-          }
-          if (!isRestJson) {
-            program.error(
-              "--export-all is only supported for REST API JSON input (or a directory containing document.json)"
-            );
           }
           const outDir = path.resolve(outPath);
           if (existsSync(outDir)) {
