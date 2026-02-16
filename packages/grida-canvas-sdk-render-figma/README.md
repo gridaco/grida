@@ -1,10 +1,28 @@
 # `@grida/refig`
 
-> **re**nder **fig**ma — headless Figma renderer in the spirit of [`resvg`](https://github.com/nicolo-ribaudo/resvg-js)
+> **re**nder **fig**ma — headless Figma renderer (Node.js + browser) in the spirit of [`resvg-js`](https://github.com/nicolo-ribaudo/resvg-js)
 
-Render Figma documents to **PNG, JPEG, WebP, PDF, and SVG** without Figma Desktop and without a browser.
+Render Figma documents to **PNG, JPEG, WebP, PDF, and SVG** in **Node.js (no browser required)** or directly in the **browser**.
 
-Pass a `.fig` file or a Figma REST API JSON response, pick a node, get pixels.
+Use a `.fig` export (offline) or a Figma REST API file JSON response (`GET /v1/files/:key`), pick a node ID, and get pixels.
+
+## Features (checklist)
+
+- [x] Render from **`.fig` files** (offline / no API calls)
+- [x] Render from **Figma REST API JSON** (bring your own auth + HTTP client)
+- [x] Output formats: **PNG, JPEG, WebP, PDF, SVG**
+- [x] **CLI** (`refig`) and **library API** (`FigmaDocument`, `FigmaRenderer`)
+- [x] **Node.js** + **browser** entrypoints (`@grida/refig`, `@grida/refig/browser`)
+- [x] IMAGE fills supported via **embedded `.fig` images** or a **local `images/` directory** for REST JSON
+- [x] Batch export with **`--export-all`** (renders nodes with Figma export presets)
+- [x] WASM + Skia-backed renderer via `@grida/canvas-wasm`
+
+## Use cases
+
+- Export assets in CI (deterministic, no network calls required)
+- Generate thumbnails / previews from `.fig` or REST JSON
+- Offline / air-gapped rendering from `.fig` exports
+- In-browser previews with `@grida/refig/browser`
 
 ## Install
 
@@ -26,7 +44,7 @@ Both entrypoints export the same core API (`FigmaDocument`, `FigmaRenderer`, typ
 ### Render from a `.fig` file
 
 ```ts
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { FigmaDocument, FigmaRenderer } from "@grida/refig";
 
 const doc = FigmaDocument.fromFile("path/to/file.fig");
@@ -92,6 +110,7 @@ renderer.dispose();
 ```ts
 import { FigmaDocument, FigmaRenderer } from "@grida/refig/browser";
 
+// `file` is a File from <input type="file">, drag-and-drop, etc.
 // Uint8Array from a File input, fetch(), or drag-and-drop
 const figBytes: Uint8Array = await file
   .arrayBuffer()
@@ -172,6 +191,13 @@ interface RefigRenderResult {
 pnpm add -g @grida/refig
 ```
 
+Or run without installing:
+
+```sh
+npx @grida/refig <input> --node <node-id> --out <path>
+pnpm dlx @grida/refig <input> --node <node-id> --out <path>
+```
+
 ### Usage
 
 **`<input>`** can be:
@@ -220,7 +246,8 @@ refig ./design.fig --export-all --out ./exports
 # Scale 2x, custom dimensions
 refig ./design.fig --node "1:23" --out ./out.png --width 512 --height 512 --scale 2
 
-# No-install (CI one-liner)
+# No-install (run without installing)
+npx @grida/refig ./design.fig --node "1:23" --out ./out.png
 pnpm dlx @grida/refig ./design.fig --node "1:23" --out ./out.png
 ```
 
@@ -281,15 +308,6 @@ REST JSON ───┘
   (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/`.)
 
 For **`.fig`** input, images are embedded in the file; no extra images directory is needed. For **REST** input, use `--images` or a project directory with `images/` to render IMAGE fills correctly.
-
-## Features
-
-- **Multiple output formats** — `png`, `jpeg`, `webp`, `pdf`, `svg`
-- **`.fig` file input** — render from exported `.fig` without API calls
-- **REST API JSON input** — render from document JSON you already have
-- **CI-friendly** — headless, deterministic, no browser required
-- **Browser-compatible** — `@grida/refig/browser` works in any modern browser
-- **WASM-powered** — Skia-backed rendering for pixel-accurate output
 
 ## Not planned
 

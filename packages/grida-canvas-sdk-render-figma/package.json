@@ -56,6 +56,8 @@
   },
   "scripts": {
     "build": "tsup",
+    "postpack": "node scripts/postpack-publish.cjs",
+    "prepack": "node scripts/prepack-publish.cjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
