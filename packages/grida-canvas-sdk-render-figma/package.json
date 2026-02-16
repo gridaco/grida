@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@figma/rest-api-spec": "0.35.0",
-    "tsup": "^8.5.0",
-    "tsx": "^4.21.0"
+    "fflate": "^0.8.2",
+    "tsup": "^8.5.0"
   }
 }

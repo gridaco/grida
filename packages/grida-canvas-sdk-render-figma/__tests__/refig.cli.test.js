@@ -8,6 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { unzipSync } from "fflate";
 
 const TEST_OUTPUT_DIR = join(process.cwd(), "__tests__", ".tmp", "cli");
 const BIN = join(process.cwd(), "cli.ts");
@@ -107,6 +108,28 @@ function writeFixture(content = MINIMAL_REST_FIXTURE) {
   return fixturePath;
 }
 
+/** Extract REST archive zip to a directory. Returns path to dir with document.json. */
+function extractArchiveFixture(zipPath) {
+  const zipBytes = readFileSync(zipPath);
+  const unzipped = unzipSync(new Uint8Array(zipBytes));
+  const extractDir = join(TEST_OUTPUT_DIR, "archive-fixture");
+  rmSync(extractDir, { recursive: true, force: true });
+  mkdirSync(extractDir, { recursive: true });
+
+  for (const [path, data] of Object.entries(unzipped)) {
+    if (path.startsWith("__MACOSX/") || path.endsWith("/")) continue;
+    const fullPath = join(extractDir, path);
+    mkdirSync(join(fullPath, ".."), { recursive: true });
+    writeFileSync(fullPath, data);
+  }
+
+  const innerDir = Object.keys(unzipped)
+    .find((k) => k.endsWith("/document.json"))
+    ?.replace("/document.json", "");
+  if (!innerDir) throw new Error("No document.json in archive");
+  return join(extractDir, innerDir);
+}
+
 describe("refig CLI", () => {
   it("writes a valid PNG output file", () => {
     resetOutputDir();
@@ -185,4 +208,37 @@ describe("refig CLI", () => {
     const svgContent = readFileSync(join(outDir, svgFile), "utf8");
     expect(svgContent).toContain("<svg");
   }, 90_000);
+
+  it("--export-all on fixture archive exports all nodes with exportSettings", () => {
+    resetOutputDir();
+    const zipPath = join(
+      process.cwd(),
+      "../../fixtures/test-figma/community/784448220678228461-figma-auto-layout-playground.zip"
+    );
+    if (!existsSync(zipPath)) {
+      console.warn(`Skipping: fixture not found at ${zipPath}`);
+      return;
+    }
+    const archiveDir = extractArchiveFixture(zipPath);
+    const outDir = join(TEST_OUTPUT_DIR, "export-all-archive-out");
+
+    execFileSync(
+      process.execPath,
+      ["--import", "tsx", BIN, archiveDir, "--export-all", "--out", outDir],
+      { stdio: "pipe", timeout: 120_000 }
+    );
+
+    expect(existsSync(outDir)).toBe(true);
+    const files = readdirSync(outDir);
+    expect(files.length).toBeGreaterThan(10);
+
+    const pngFiles = files.filter((f) => f.endsWith(".png"));
+    expect(pngFiles.length).toBeGreaterThan(0);
+    const samplePng = join(outDir, pngFiles[0]);
+    const pngBytes = readFileSync(samplePng);
+    expect(pngBytes[0]).toBe(0x89);
+    expect(pngBytes[1]).toBe(0x50);
+    expect(pngBytes[2]).toBe(0x4e);
+    expect(pngBytes[3]).toBe(0x47);
+  }, 120_000);
 });

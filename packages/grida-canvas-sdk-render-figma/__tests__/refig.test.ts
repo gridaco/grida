@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { unzipSync } from "fflate";
 import { join } from "node:path";
 import { describe, expect, it, beforeAll } from "vitest";
 import {
@@ -335,71 +336,53 @@ describe("@grida/refig (real render)", () => {
     }
   }, 30_000);
 
-  it("renders REST document with custom IMAGE fill when images provided", async () => {
-    const fixtureDir = join(__dirname, "../../../fixtures/images");
-    const stripesPath = join(fixtureDir, "stripes.png");
-    const imageBytes = new Uint8Array(readFileSync(stripesPath));
+  it("renders REST document with custom IMAGE fill from fixture archive", async () => {
+    const zipPath = join(
+      __dirname,
+      "../../../fixtures/test-figma/community/784448220678228461-figma-auto-layout-playground.zip"
+    );
+    const zipBytes = readFileSync(zipPath);
+    const unzipped = unzipSync(new Uint8Array(zipBytes));
 
-    const REST_WITH_IMAGE_FILL = {
-      document: {
-        id: "0:0",
-        type: "DOCUMENT",
-        name: "Image Test",
-        children: [
-          {
-            id: "0:1",
-            type: "CANVAS",
-            name: "Page 1",
-            children: [
-              {
-                id: "1:1",
-                type: "FRAME",
-                name: "Image Frame",
-                absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
-                absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
-                relativeTransform: [
-                  [1, 0, 0],
-                  [0, 1, 0],
-                ],
-                size: { x: 100, y: 100 },
-                clipsContent: false,
-                fills: [
-                  {
-                    type: "IMAGE",
-                    imageRef: "refig-test-stripes",
-                    scaleMode: "FILL",
-                  },
-                ],
-                strokes: [],
-                strokeWeight: 0,
-                effects: [],
-                children: [],
-              },
-            ],
-          },
-        ],
-      },
-    };
+    const docEntry = Object.keys(unzipped).find((k) =>
+      k.endsWith("/document.json")
+    );
+    if (!docEntry) throw new Error("No document.json in archive");
+    const document = JSON.parse(
+      new TextDecoder().decode(unzipped[docEntry])
+    ) as Record<string, unknown>;
 
-    const renderer = new FigmaRenderer(REST_WITH_IMAGE_FILL, {
-      images: { "refig-test-stripes": imageBytes },
-    });
+    const images: Record<string, Uint8Array> = {};
+    for (const path of Object.keys(unzipped)) {
+      const match = path.match(/\/images\/([^/]+)$/);
+      if (!match) continue;
+      const filename = match[1];
+      const ref = filename.replace(/\.[^.]+$/, "");
+      if (!ref) continue;
+      images[ref] = unzipped[path];
+    }
+
+    const items = collectExportsFromDocument(document);
+    const nodeId = items.length > 0 ? items[0].nodeId : null;
+    if (!nodeId) throw new Error("Fixture has no nodes with exportSettings");
+
+    const renderer = new FigmaRenderer(document, { images });
 
     try {
-      const result = await renderer.render("1:1", {
+      const result = await renderer.render(nodeId, {
         format: "png",
-        width: 256,
-        height: 256,
+        width: 512,
+        height: 512,
       });
 
       expectPng(result.data);
-      expect(result.width).toBe(256);
-      expect(result.height).toBe(256);
+      expect(result.width).toBe(512);
+      expect(result.height).toBe(512);
 
-      const outPath = join(TEST_OUTPUT_DIR, "rest-image-fill.png");
+      const outPath = join(TEST_OUTPUT_DIR, "rest-image-fill-from-archive.png");
       writeFileSync(outPath, Buffer.from(result.data));
     } finally {
       renderer.dispose();
     }
-  }, 30_000);
+  }, 60_000);
 });
