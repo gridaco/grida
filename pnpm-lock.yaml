@@ -1180,14 +1180,8 @@ importers:
   packages/grida-canvas-sdk-render-figma:
     dependencies:
       '@grida/canvas-wasm':
-        specifier: workspace:*
-        version: link:../../crates/grida-canvas-wasm
-      '@grida/io-figma':
-        specifier: workspace:*
-        version: link:../grida-canvas-io-figma
-      '@grida/schema':
-        specifier: workspace:*
-        version: link:../grida-canvas-schema
+        specifier: 0.90.0-canary.6
+        version: 0.90.0-canary.6
       commander:
         specifier: ^12.1.0
         version: 12.1.0
@@ -1195,6 +1189,12 @@ importers:
       '@figma/rest-api-spec':
         specifier: 0.35.0
         version: 0.35.0
+      '@grida/io-figma':
+        specifier: workspace:*
+        version: link:../grida-canvas-io-figma
+      '@grida/schema':
+        specifier: workspace:*
+        version: link:../grida-canvas-schema
       fflate:
         specifier: ^0.8.2
         version: 0.8.2
@@ -3304,6 +3304,9 @@ packages:
 
   '@formatjs/intl-localematcher@0.6.2':
     resolution: {integrity: sha512-XOMO2Hupl0wdd172Y06h6kLpBz6Dv+J4okPLl4LPtzbr8f66WbIoy4ev98EBuZ6ZK4h5ydTN6XneT4QVpD7cdA==}
+
+  '@grida/canvas-wasm@0.90.0-canary.6':
+    resolution: {integrity: sha512-nr7SViSacmupmacwuBCI8IVdWY+ltm5M69p+GzR+QLHn+pDx9hAI2Sc0Rwb4R6TZoXuOzRMpS6UIKATnOnhuZw==}
 
   '@grida/tailwindcss-colors@4.0.1':
     resolution: {integrity: sha512-lRJ1YO3MVSoabbH+xU00IlE49zevUD2NiEjrclsPBNMRLbDSmG+6jdvEOVQHqBo5kXN9x5jomFQrjy/5hzebGQ==}
@@ -17061,7 +17064,7 @@ snapshots:
 
   '@emotion/core@10.3.1(react@19.2.3)':
     dependencies:
-      '@babel/runtime': 7.28.4
+      '@babel/runtime': 7.28.6
       '@emotion/cache': 10.0.29
       '@emotion/css': 10.0.27
       '@emotion/serialize': 0.11.16
@@ -17412,6 +17415,8 @@ snapshots:
   '@formatjs/intl-localematcher@0.6.2':
     dependencies:
       tslib: 2.8.1
+
+  '@grida/canvas-wasm@0.90.0-canary.6': {}
 
   '@grida/tailwindcss-colors@4.0.1': {}
 
@@ -23352,7 +23357,7 @@ snapshots:
 
   emotion-theming@10.3.0(@emotion/core@10.3.1(react@19.2.3))(react@19.2.3):
     dependencies:
-      '@babel/runtime': 7.28.4
+      '@babel/runtime': 7.28.6
       '@emotion/core': 10.3.1(react@19.2.3)
       '@emotion/weak-memoize': 0.2.5
       hoist-non-react-statics: 3.3.2
@@ -28081,7 +28086,7 @@ snapshots:
 
   react-inspector@5.1.1(react@19.2.3):
     dependencies:
-      '@babel/runtime': 7.28.4
+      '@babel/runtime': 7.28.6
       is-dom: 1.1.0
       prop-types: 15.8.1
       react: 19.2.3

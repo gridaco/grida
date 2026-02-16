@@ -6,6 +6,6 @@ export default defineConfig({
   outDir: "dist",
   dts: true,
   external: ["@grida/canvas-wasm", "commander"],
-  noExternal: ["@grida/io-figma", "@grida/schema"],
+  noExternal: [/^@grida\/(?!canvas-wasm$)/],
   clean: true,
 });

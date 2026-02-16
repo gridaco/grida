@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { unzipSync } from "fflate";
+import { describe, expect, it } from "vitest";
 
 const TEST_OUTPUT_DIR = join(process.cwd(), "__tests__", ".tmp", "cli");
 const BIN = join(process.cwd(), "cli.ts");
@@ -102,23 +103,23 @@ function resetOutputDir() {
   mkdirSync(TEST_OUTPUT_DIR, { recursive: true });
 }
 
-function writeFixture(content = MINIMAL_REST_FIXTURE) {
+function writeFixture(content: object = MINIMAL_REST_FIXTURE) {
   const fixturePath = join(TEST_OUTPUT_DIR, "fixture.json");
   writeFileSync(fixturePath, JSON.stringify(content));
   return fixturePath;
 }
 
 /** Extract REST archive zip to a directory. Returns path to dir with document.json. */
-function extractArchiveFixture(zipPath) {
+function extractArchiveFixture(zipPath: string): string {
   const zipBytes = readFileSync(zipPath);
   const unzipped = unzipSync(new Uint8Array(zipBytes));
   const extractDir = join(TEST_OUTPUT_DIR, "archive-fixture");
   rmSync(extractDir, { recursive: true, force: true });
   mkdirSync(extractDir, { recursive: true });
 
-  for (const [path, data] of Object.entries(unzipped)) {
-    if (path.startsWith("__MACOSX/") || path.endsWith("/")) continue;
-    const fullPath = join(extractDir, path);
+  for (const [entryPath, data] of Object.entries(unzipped)) {
+    if (entryPath.startsWith("__MACOSX/") || entryPath.endsWith("/")) continue;
+    const fullPath = join(extractDir, entryPath);
     mkdirSync(join(fullPath, ".."), { recursive: true });
     writeFileSync(fullPath, data);
   }
@@ -199,13 +200,13 @@ describe("refig CLI", () => {
     expect(pngFile).toBeTruthy();
     expect(svgFile).toBeTruthy();
 
-    const pngBytes = readFileSync(join(outDir, pngFile));
+    const pngBytes = readFileSync(join(outDir, pngFile!));
     expect(pngBytes[0]).toBe(0x89);
     expect(pngBytes[1]).toBe(0x50);
     expect(pngBytes[2]).toBe(0x4e);
     expect(pngBytes[3]).toBe(0x47);
 
-    const svgContent = readFileSync(join(outDir, svgFile), "utf8");
+    const svgContent = readFileSync(join(outDir, svgFile!), "utf8");
     expect(svgContent).toContain("<svg");
   }, 90_000);
 
@@ -234,7 +235,7 @@ describe("refig CLI", () => {
 
     const pngFiles = files.filter((f) => f.endsWith(".png"));
     expect(pngFiles.length).toBeGreaterThan(0);
-    const samplePng = join(outDir, pngFiles[0]);
+    const samplePng = join(outDir, pngFiles[0]!);
     const pngBytes = readFileSync(samplePng);
     expect(pngBytes[0]).toBe(0x89);
     expect(pngBytes[1]).toBe(0x50);

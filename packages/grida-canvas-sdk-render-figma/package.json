@@ -6,9 +6,7 @@
   "bin": {
     "refig": "./dist/cli.mjs"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -30,13 +28,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@grida/canvas-wasm": "workspace:*",
-    "@grida/io-figma": "workspace:*",
-    "@grida/schema": "workspace:*",
+    "@grida/canvas-wasm": "0.90.0-canary.6",
     "commander": "^12.1.0"
   },
   "devDependencies": {
     "@figma/rest-api-spec": "0.35.0",
+    "@grida/io-figma": "workspace:*",
+    "@grida/schema": "workspace:*",
     "fflate": "^0.8.2",
     "tsup": "^8.5.0"
   }
