@@ -1085,7 +1085,10 @@ export namespace iofigma {
           //
           case "COMPONENT":
           case "INSTANCE":
-          case "FRAME": {
+          case "FRAME":
+          // Fallback: treat COMPONENT_SET as FRAME for rendering. Grida does not yet
+          // support component semantics; proper variant/swap support to be added later.
+          case "COMPONENT_SET": {
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -1306,11 +1309,6 @@ export namespace iofigma {
               type: "polygon",
               point_count: node.pointCount,
             } satisfies grida.program.nodes.RegularPolygonNode;
-          }
-
-          // components
-          case "COMPONENT_SET": {
-            throw new Error(`Unsupported node type: ${node.type}`);
           }
 
           // figjam
