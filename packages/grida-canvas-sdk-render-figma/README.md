@@ -64,6 +64,29 @@ renderer.dispose();
 
 > Fetching / authentication is intentionally out of scope. Provide the document data from your own API layer.
 
+### Render from REST JSON with custom images
+
+When your document has IMAGE fills, pass image bytes keyed by the Figma image ref (hash):
+
+```ts
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+import { FigmaDocument, FigmaRenderer } from "@grida/refig";
+
+const json = JSON.parse(readFileSync("figma-response.json", "utf-8"));
+const imagesDir = "./downloaded-images";
+const images: Record<string, Uint8Array> = {};
+for (const file of readdirSync(imagesDir)) {
+  const ref = path.basename(file).replace(/\.[^.]+$/, "");
+  images[ref] = new Uint8Array(readFileSync(path.join(imagesDir, file)));
+}
+
+const renderer = new FigmaRenderer(new FigmaDocument(json), { images });
+const { data } = await renderer.render("<node-id>", { format: "png" });
+// ...
+renderer.dispose();
+```
+
 ## Quick start (Browser)
 
 ```ts
@@ -108,7 +131,7 @@ FigmaDocument.fromFile("path/to/doc.json")   // REST API JSON
 ```ts
 const renderer = new FigmaRenderer(document: FigmaDocument, options?: {
   useEmbeddedFonts?: boolean;  // default: true
-  images?: Record<string, string>;  // image ref → URL or path; not yet used during render
+  images?: Record<string, Uint8Array>;  // image ref → bytes; used for REST API IMAGE fills
 });
 
 const result = await renderer.render(nodeId: string, {
@@ -156,7 +179,7 @@ pnpm add -g @grida/refig
 - A **file**: path to a `.fig` file or a JSON file (Figma REST API response).
 - A **directory**: path to a folder that contains:
   - **`document.json`** — the REST API response (required),
-  - **`images/`** — directory of image assets (optional; used when image support is implemented).
+  - **`images/`** — directory of image assets (optional; used for REST API IMAGE fills).
 
 Using a directory avoids passing the document and images separately.
 
@@ -164,7 +187,7 @@ Using a directory avoids passing the document and images separately.
 # Single node (default)
 refig <input> --node <node-id> --out <path> [options]
 
-# With images directory (REST JSON only; images not yet resolved in render)
+# With images directory (REST JSON only; IMAGE fills rendered from local files)
 refig <input> --images <dir> --node <node-id> --out <path>
 
 # Directory input: document.json + images/ under one folder
@@ -244,17 +267,17 @@ REST JSON ───┘
 
 2. **Download and pass an images directory (recommended)** — Download each image from the returned URLs and save them under a directory using the `<hash>.<ext>` naming (e.g. `a1b2c3d4....png`). Pass that directory to refig as the **images directory**. We recommend this because the URLs from the API are **signed and expire**; downloading once and reusing the files avoids expiry and keeps rendering repeatable (e.g. in CI or offline).
 
-**API** — `FigmaRenderer` accepts an optional **`images`** option: `Record<string, string>` (image ref → URL or file path). This is the intended input for supplying image assets when using REST document input. Resolution of IMAGE paints using this map is not yet implemented.
+**API** — `FigmaRenderer` accepts an optional **`images`** option: `Record<string, Uint8Array>` (image ref → bytes). Supply image assets when using REST document input; IMAGE fills will render using these bytes. Refs must match the Figma image fill hashes in the document.
 
 **CLI** — You can pass images in two ways:
 
-- **`--images <dir>`** — Explicit images directory. Use when the document is a separate file:  
+- **`--images <dir>`** — Explicit images directory. Files are keyed by filename without extension (e.g. `a1b2c3d4.png` → ref `a1b2c3d4`). Use when the document is a separate file:  
   `refig ./figma-response.json --images ./downloaded-images --node "1:23" --out ./out.png`
 - **Directory input** — Pass a single directory that contains **`document.json`** (REST response) and optionally **`images/`**. No need to pass `--images` separately:  
   `refig ./my-figma-export --node "1:23" --out ./out.png`  
   (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/`.)
 
-Image resolution (reading from the directory and applying fills during render) is not yet implemented; the API and CLI surfaces above are in place for when it lands.
+For **`.fig`** input, images are embedded in the file; no extra images directory is needed. For **REST** input, use `--images` or a project directory with `images/` to render IMAGE fills correctly.
 
 ## Features
 

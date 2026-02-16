@@ -5,6 +5,7 @@
 
 import {
   readFileSync,
+  readdirSync,
   mkdirSync,
   writeFileSync,
   existsSync,
@@ -92,6 +93,24 @@ function resolveInput(
   };
 }
 
+/**
+ * Read image files from a directory.
+ * Uses filename (without extension) as ref for lookup.
+ * @returns Record of ref -> image bytes
+ */
+function readImagesFromDir(dirPath: string): Record<string, Uint8Array> {
+  const out: Record<string, Uint8Array> = {};
+  for (const file of readdirSync(dirPath)) {
+    const fullPath = path.join(dirPath, file);
+    if (!statSync(fullPath).isFile()) continue;
+    const ref = path.basename(file).replace(/\.[^.]+$/, "");
+    if (!ref) continue;
+    const buf = readFileSync(fullPath);
+    out[ref] = new Uint8Array(buf);
+  }
+  return out;
+}
+
 function exportAllOutputBasename(
   nodeId: string,
   suffix: string,
@@ -119,7 +138,9 @@ async function runExportAll(
     return;
   }
 
-  const rendererOptions = imagesDir ? { images: {} } : {};
+  const rendererOptions = imagesDir
+    ? { images: readImagesFromDir(imagesDir) }
+    : {};
   const renderer = new FigmaRenderer(document, rendererOptions);
   try {
     for (const { nodeId: nid, node, setting } of items) {
@@ -164,7 +185,10 @@ async function runSingleNode(
     ? new FigmaDocument(JSON.parse(readFileSync(documentPath, "utf8")))
     : new FigmaDocument(new Uint8Array(readFileSync(documentPath)));
 
-  const rendererOptions = opts.imagesDir ? { images: {} } : {};
+  const rendererOptions =
+    isJson && opts.imagesDir
+      ? { images: readImagesFromDir(opts.imagesDir) }
+      : {};
   const renderer = new FigmaRenderer(document, rendererOptions);
   try {
     const result = await renderer.render(nodeId, {

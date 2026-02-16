@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, beforeAll } from "vitest";
 import {
@@ -329,6 +329,74 @@ describe("@grida/refig (real render)", () => {
       expectPng(result.data);
 
       const outPath = join(TEST_OUTPUT_DIR, "scaled-2x.png");
+      writeFileSync(outPath, Buffer.from(result.data));
+    } finally {
+      renderer.dispose();
+    }
+  }, 30_000);
+
+  it("renders REST document with custom IMAGE fill when images provided", async () => {
+    const fixtureDir = join(__dirname, "../../../fixtures/images");
+    const stripesPath = join(fixtureDir, "stripes.png");
+    const imageBytes = new Uint8Array(readFileSync(stripesPath));
+
+    const REST_WITH_IMAGE_FILL = {
+      document: {
+        id: "0:0",
+        type: "DOCUMENT",
+        name: "Image Test",
+        children: [
+          {
+            id: "0:1",
+            type: "CANVAS",
+            name: "Page 1",
+            children: [
+              {
+                id: "1:1",
+                type: "FRAME",
+                name: "Image Frame",
+                absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+                absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
+                relativeTransform: [
+                  [1, 0, 0],
+                  [0, 1, 0],
+                ],
+                size: { x: 100, y: 100 },
+                clipsContent: false,
+                fills: [
+                  {
+                    type: "IMAGE",
+                    imageRef: "refig-test-stripes",
+                    scaleMode: "FILL",
+                  },
+                ],
+                strokes: [],
+                strokeWeight: 0,
+                effects: [],
+                children: [],
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const renderer = new FigmaRenderer(REST_WITH_IMAGE_FILL, {
+      images: { "refig-test-stripes": imageBytes },
+    });
+
+    try {
+      const result = await renderer.render("1:1", {
+        format: "png",
+        width: 256,
+        height: 256,
+      });
+
+      expectPng(result.data);
+      expect(result.width).toBe(256);
+      expect(result.height).toBe(256);
+
+      const outPath = join(TEST_OUTPUT_DIR, "rest-image-fill.png");
       writeFileSync(outPath, Buffer.from(result.data));
     } finally {
       renderer.dispose();

@@ -6,6 +6,7 @@ import type * as figkiwi from "./fig-kiwi/schema";
 import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import {
+  extractImages as extractImagesFromFigKiwi,
   getBlobBytes,
   parseVectorNetworkBlob,
   readFigFile,
@@ -2726,6 +2727,8 @@ export namespace iofigma {
       metadata: {
         version: number;
       };
+      /** ZIP contents from the .fig archive (for extractImages etc.). */
+      zip_files?: { [key: string]: Uint8Array };
     }
 
     export interface FigPage {
@@ -2758,7 +2761,19 @@ export namespace iofigma {
         metadata: {
           version: figData.header.version,
         },
+        zip_files: figData.zip_files,
       };
+    }
+
+    /**
+     * Extract images from .fig ZIP archive.
+     * @param zipFiles - Raw ZIP contents from FigFileDocument.zip_files or ParsedFigmaArchive.zip_files
+     * @returns Map of hash (hex string) to image bytes
+     */
+    export function extractImages(
+      zipFiles: { [key: string]: Uint8Array } | undefined
+    ): Map<string, Uint8Array> {
+      return extractImagesFromFigKiwi(zipFiles);
     }
 
     /**

@@ -24,11 +24,11 @@ export interface RefigRendererOptions {
   useEmbeddedFonts?: boolean;
 
   /**
-   * Map of image ref (Figma image fill ref) to URL or file path.
-   * Used when converting REST API document so IMAGE paints can be resolved.
-   * Not yet implemented: this option is accepted but not used during render.
+   * Map of Figma image ref (hash) to image bytes.
+   * Used for REST API and .fig input so IMAGE fills render correctly.
+   * Ref must match document references (e.g. 40-char hex for .fig, Figma image fill hash for REST).
    */
-  images?: Record<string, string>;
+  images?: Record<string, Uint8Array>;
 }
 
 export interface RefigRenderOptions {
@@ -282,14 +282,21 @@ function findNodeInRestDocument(
   return undefined;
 }
 
+/** Result of REST JSON conversion with optional image refs used. */
+interface RestConversionResult {
+  sceneJson: string;
+  imageRefsUsed: string[];
+}
+
 /**
  * Convert a Figma REST API document JSON -> Grida snapshot JSON string.
  * When rootNodeId is provided, that node is used as the single root (and keeps that id).
  */
 function restJsonToSceneJson(
   json: FigmaJsonDocument,
-  rootNodeId?: string
-): string {
+  rootNodeId?: string,
+  images?: Record<string, Uint8Array>
+): RestConversionResult {
   const doc = json as {
     document?: { children?: Array<Record<string, unknown>> };
   };
@@ -310,6 +317,20 @@ function restJsonToSceneJson(
   let counter = 0;
   const baseGradientGen = () => `grad-${++counter}`;
 
+  const resolveImageSrc =
+    images &&
+    (Object.keys(images).length > 0
+      ? (ref: string) => (ref in images ? `res://images/${ref}` : null)
+      : undefined);
+
+  const buildContext = (
+    overrides: Partial<iofigma.restful.factory.FactoryContext>
+  ): iofigma.restful.factory.FactoryContext => ({
+    gradient_id_generator: baseGradientGen,
+    ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
+    ...overrides,
+  });
+
   if (rootNodeId != null && rootNodeId !== "") {
     const node = findNodeInRestDocument(json, rootNodeId);
     if (!node) {
@@ -318,7 +339,7 @@ function restJsonToSceneJson(
       );
     }
     let rootIdUsed = false;
-    const context: iofigma.restful.factory.FactoryContext = {
+    const context = buildContext({
       node_id_generator: () => {
         if (!rootIdUsed) {
           rootIdUsed = true;
@@ -326,31 +347,34 @@ function restJsonToSceneJson(
         }
         return `refig-${++counter}`;
       },
-      gradient_id_generator: baseGradientGen,
-    };
-    const { document: packed } = iofigma.restful.factory.document(
-      node as any,
-      {},
-      context
-    );
+    });
+    const { document: packed, imageRefsUsed } =
+      iofigma.restful.factory.document(node as any, {}, context);
     const fullDoc =
       grida.program.nodes.factory.packed_scene_document_to_full_document(
         packed
       );
-    return JSON.stringify({
-      version: grida.program.document.SCHEMA_VERSION,
-      document: fullDoc,
-    });
+    return {
+      sceneJson: JSON.stringify({
+        version: grida.program.document.SCHEMA_VERSION,
+        document: fullDoc,
+      }),
+      imageRefsUsed,
+    };
   }
 
-  const context: iofigma.restful.factory.FactoryContext = {
+  const context = buildContext({
     node_id_generator: () => `refig-${++counter}`,
-    gradient_id_generator: baseGradientGen,
-  };
+  });
 
   const individualResults = rootNodes.map((rootNode) =>
     iofigma.restful.factory.document(rootNode as any, {}, context)
   );
+
+  const imageRefsUsed = new Set<string>();
+  for (const r of individualResults) {
+    r.imageRefsUsed.forEach((ref: string) => imageRefsUsed.add(ref));
+  }
 
   let packed: grida.program.document.IPackedSceneDocument;
   if (individualResults.length === 1) {
@@ -386,16 +410,25 @@ function restJsonToSceneJson(
   const fullDoc =
     grida.program.nodes.factory.packed_scene_document_to_full_document(packed);
 
-  return JSON.stringify({
-    version: grida.program.document.SCHEMA_VERSION,
-    document: fullDoc,
-  });
+  return {
+    sceneJson: JSON.stringify({
+      version: grida.program.document.SCHEMA_VERSION,
+      document: fullDoc,
+    }),
+    imageRefsUsed: Array.from(imageRefsUsed),
+  };
+}
+
+/** Result of .fig conversion with images to register. */
+interface FigConversionResult {
+  sceneJson: string;
+  images: Record<string, Uint8Array>;
 }
 
 /**
  * Convert .fig file bytes -> Grida snapshot JSON string.
  */
-function figBytesToSceneJson(figBytes: Uint8Array): string {
+function figBytesToSceneJson(figBytes: Uint8Array): FigConversionResult {
   const figFile = iofigma.kiwi.parseFile(figBytes);
   const pages = figFile.pages;
   if (!pages || pages.length === 0) {
@@ -407,20 +440,35 @@ function figBytesToSceneJson(figBytes: Uint8Array): string {
   );
   const page = sortedPages[0];
 
+  const imagesMap = iofigma.kiwi.extractImages(figFile.zip_files);
+  const images: Record<string, Uint8Array> = {};
+  imagesMap.forEach((bytes, ref) => {
+    images[ref] = bytes;
+  });
+
+  const resolveImageSrc =
+    imagesMap.size > 0
+      ? (ref: string) => (imagesMap.has(ref) ? `res://images/${ref}` : null)
+      : undefined;
+
   let counter = 0;
   const context: iofigma.restful.factory.FactoryContext = {
     node_id_generator: () => `refig-${++counter}`,
     gradient_id_generator: () => `grad-${++counter}`,
+    ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
   };
 
   const { document: packed } = iofigma.kiwi.convertPageToScene(page, context);
   const fullDoc =
     grida.program.nodes.factory.packed_scene_document_to_full_document(packed);
 
-  return JSON.stringify({
-    version: grida.program.document.SCHEMA_VERSION,
-    document: fullDoc,
-  });
+  return {
+    sceneJson: JSON.stringify({
+      version: grida.program.document.SCHEMA_VERSION,
+      document: fullDoc,
+    }),
+    images,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -464,20 +512,36 @@ export class FigmaRenderer {
     if (this._sceneLoaded && this._requestedNodeId === nodeId) return;
 
     let sceneJson: string;
+    let imagesToRegister: Record<string, Uint8Array> = {};
+
     if (this.document.sourceType === "fig-file") {
       if (nodeId) {
         throw new Error(
           "FigmaRenderer: --node (render specific node) is not yet supported for .fig files; use REST API JSON input"
         );
       }
-      sceneJson = figBytesToSceneJson(this.document.payload as Uint8Array);
+      const figResult = figBytesToSceneJson(this.document.payload as Uint8Array);
+      sceneJson = figResult.sceneJson;
+      imagesToRegister = figResult.images;
     } else {
-      sceneJson = restJsonToSceneJson(
+      const restResult = restJsonToSceneJson(
         this.document.payload as FigmaJsonDocument,
-        nodeId || undefined
+        nodeId || undefined,
+        this.options.images
       );
+      sceneJson = restResult.sceneJson;
+      const used = new Set(restResult.imageRefsUsed);
+      const provided = this.options.images ?? {};
+      for (const ref of used) {
+        if (ref in provided) {
+          imagesToRegister[ref] = provided[ref];
+        }
+      }
     }
 
+    for (const [ref, bytes] of Object.entries(imagesToRegister)) {
+      canvas.addImageWithId(bytes, `res://images/${ref}`);
+    }
     canvas.loadScene(sceneJson);
     this._requestedNodeId = nodeId;
     this._sceneLoaded = true;
