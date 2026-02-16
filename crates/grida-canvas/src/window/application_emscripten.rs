@@ -388,6 +388,11 @@ impl EmscriptenApplication {
         self.base.renderer.add_image(data)
     }
 
+    /// Register image bytes under a caller-specified RID (res:// or system://).
+    pub fn add_image_with_rid(&mut self, data: &[u8], rid: &str) -> Option<(u32, u32, String)> {
+        self.base.renderer.add_image_with_rid(data, rid)
+    }
+
     pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {
         self.base.get_image_bytes(id)
     }

@@ -61,6 +61,7 @@ const EXPECTED_FUNCTIONS = [
 
   // images
   { name: "_add_image", paramCount: 3 },
+  { name: "_add_image_with_rid", paramCount: 5 },
   { name: "_get_image_bytes", paramCount: 3 },
   { name: "_get_image_size", paramCount: 3 },
 

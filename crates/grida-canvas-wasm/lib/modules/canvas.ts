@@ -20,6 +20,12 @@ export interface CreateImageResourceResult {
   type: string;
 }
 
+export interface AddImageWithIdResult {
+  width: number;
+  height: number;
+  type: string;
+}
+
 export interface TransactionApplyReport {
   success: boolean;
   applied: number;
@@ -151,6 +157,31 @@ export class Scene {
     const txt = ffi.readLenPrefixedString(this.module, out);
     try {
       return JSON.parse(txt) as CreateImageResourceResult;
+    } catch {
+      return false;
+    }
+  }
+
+  addImageWithId(
+    data: Uint8Array,
+    rid: string
+  ): AddImageWithIdResult | false {
+    this._assertAlive();
+    const [dataPtr, dataLen] = ffi.allocBytes(this.module, data);
+    const [ridPtr, ridLen] = this._alloc_string(rid);
+    const out = this.module._add_image_with_rid(
+      this.appptr,
+      dataPtr,
+      dataLen,
+      ridPtr,
+      ridLen - 1
+    );
+    ffi.free(this.module, dataPtr, dataLen);
+    this._free_string(ridPtr, ridLen);
+    if (out === 0) return false;
+    const txt = ffi.readLenPrefixedString(this.module, out);
+    try {
+      return JSON.parse(txt) as AddImageWithIdResult;
     } catch {
       return false;
     }

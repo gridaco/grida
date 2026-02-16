@@ -40,29 +40,49 @@ This document proposes a high-level architecture for resource management.
 
 Designed for quick delivery. May use more memory than needed, with limited eviction, and occasional instability under heavy load is acceptable.
 
-- **Identity & Resolution:**
+#### 1.1 Formal Definitions
 
+**RID syntax:**
+
+- `res://<path>` — logical identifier; path is an opaque string (e.g. `images/logo.png`, `images/<hex16>`)
+- `mem://<hex16>` — content-addressed; hex16 = 16 lowercase hex digits (SeaHash)
+- `system://<path>` — built-in resources; reserved namespace
+
+**Image resolution rules:**
+
+- If `id` starts with `res://` or `system://` → use as-is for lookup
+- Otherwise → treat as bare suffix and resolve as `res://images/<id>`
+
+**Registration modes:**
+
+| API                              | RID assignment                  | Use case                                                                           |
+| -------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- |
+| `add_image(bytes)`               | `res://images/<SeaHash(bytes)>` | Content-addressed; caller receives assigned RID                                    |
+| `add_image_with_rid(bytes, rid)` | `rid` (caller-specified)        | Logical; external document mapping (e.g. images/logo.png -> res://images/logo.png) |
+
+**Preconditions for `add_image_with_rid`:**
+
+- `rid` must start with `res://` or `system://`
+- Overwriting an existing RID replaces the mapping (document behavior)
+
+- **Identity & Resolution:**
   - Support `res://` (simple table) and `mem://` (content hash).
   - `data:` MAY be supported for testing.
 
 - **ByteStore:**
-
   - Store blobs by content hash (see [Fast Hashing - `hash-nch`](../feat-hash-nch/index.md)).
   - Fixed memory budget is RECOMMENDED, but eviction MAY be skipped.
 
 - **Fonts:**
-
   - Create a `Typeface` directly from bytes.
   - Caller’s bytes can be dropped after creation.
 
 - **Images:**
-
   - Keep encoded bytes.
   - Decode lazily via renderer.
   - Placeholder required on decode failure.
 
 - **Eviction:**
-
   - Manual removal APIs (`remove(id)`) are sufficient.
   - Automatic eviction is optional.
 
@@ -76,37 +96,31 @@ Designed for quick delivery. May use more memory than needed, with limited evict
 A production-grade design, with proper caching, eviction, and memory pressure handling.
 
 - **Identity & Resolution:**
-
   - Support `res://`, `mem://`, `data:`; MAY add `pack://` and `https://`.
   - Maintain a `ResourceIndex` (RID ↔ blob).
   - Content-addressed dedupe across documents.
 
 - **ByteStore:**
-
   - Use content hashes (see [Fast Hashing - `hash-nch`](../feat-hash-nch/index.md)).
   - Implement LRU (or similar) with configurable budget.
   - Support pin/unpin.
   - Provide `createUrl(bytes) → mem://...` and `revokeUrl(url)` APIs.
 
 - **Decoders & Realizers:**
-
   - Separate decoding (bytes → decoded asset) from realization (decoded → renderer object).
   - Maintain independent budgets for decoded and realized layers.
   - Use composite cache keys (e.g., blob hash + scale bucket).
 
 - **Fonts:**
-
   - Cache typefaces by blob hash and parameters.
   - Bytes MAY be dropped after creating the typeface, unless zero-copy mode is used (in which case bytes MUST be pinned).
 
 - **Images:**
-
   - Prefer lazy decode (keep encoded bytes).
   - Manage decoded pixels (CPU) separately from realized GPU textures.
   - Evict decoded and realized objects under pressure.
 
 - **Eviction & Pressure:**
-
   - Eviction order: Realized → Decoded → Bytes.
   - Respond to memory pressure signals.
   - Expose `onEvicted` events with reason (`memory-pressure`, `manual`, etc.).
