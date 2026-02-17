@@ -1,3 +1,7 @@
+---
+title: refig
+---
+
 ### `@grida/refig` (refig)
 
 **refig** is a headless Figma renderer: render Figma documents to **PNG, JPEG, WebP, PDF, or SVG** in **Node.js (no browser required)** or directly in the **browser**.
