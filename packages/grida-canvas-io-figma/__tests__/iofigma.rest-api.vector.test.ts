@@ -6,6 +6,37 @@ import type grida from "@grida/schema";
 const FIXTURES_BASE = __dirname + "/../../../fixtures/test-figma/rest-api/L0";
 const VECTOR_FRAME_FIXTURE = FIXTURES_BASE + "/vector-frame.response.json";
 
+/** Minimal valid REST volatile vectorNetwork (triangle: 3 vertices, 3 segments, 1 region). */
+const minimalVectorNetwork: iofigma.__ir.VectorNetwork_restapi_volatile20260217 =
+  {
+    vertices: [
+      { position: { x: 0, y: 0 } },
+      { position: { x: 10, y: 0 } },
+      { position: { x: 5, y: 10 } },
+    ],
+    segments: [
+      {
+        start: 0,
+        startTangent: { x: 0, y: 0 },
+        end: 1,
+        endTangent: { x: 0, y: 0 },
+      },
+      {
+        start: 1,
+        startTangent: { x: 0, y: 0 },
+        end: 2,
+        endTangent: { x: 0, y: 0 },
+      },
+      {
+        start: 2,
+        startTangent: { x: 0, y: 0 },
+        end: 0,
+        endTangent: { x: 0, y: 0 },
+      },
+    ],
+    regions: [{ loops: [[0, 1, 2]], windingRule: "NONZERO" }],
+  };
+
 describe("iofigma.restful.factory.document", () => {
   describe("HasGeometryTrait conversion (geometry=paths)", () => {
     it("should convert VECTOR node with fillGeometry and strokeGeometry to GroupNode with child VectorNodes", () => {
@@ -90,11 +121,17 @@ describe("iofigma.restful.factory.document", () => {
         expect(child.fill || child.fill_paints?.length).toBeTruthy();
       });
 
-      // Verify stroke children have strokes
+      // Verify stroke children have paints (stroke geometry is rendered as fill, so fill_paints or stroke_paints)
       strokeChildren.forEach((child: grida.program.nodes.VectorNode) => {
         expect(child.type).toBe("vector");
-        expect(child.stroke || child.stroke_paints?.length).toBeTruthy();
-        expect(child.stroke_width).toBeGreaterThan(0);
+        expect(
+          child.stroke ||
+            (child.stroke_paints?.length ?? 0) > 0 ||
+            (child.fill_paints?.length ?? 0) > 0
+        ).toBeTruthy();
+        if ((child.stroke_paints?.length ?? 0) > 0) {
+          expect(child.stroke_width).toBeGreaterThan(0);
+        }
       });
     });
 
@@ -173,6 +210,125 @@ describe("iofigma.restful.factory.document", () => {
         // This ensures fill and stroke geometries align correctly
         // (In mocked environment, bbox may be 0,0, but the logic is correct)
       });
+    });
+
+    it("should convert VECTOR node with vectorNetwork (volatile API) to single VectorNode with vector_network", () => {
+      const vectorNodeWithNetwork: iofigma.__ir.VectorNodeRestInput = {
+        id: "vector-with-vn",
+        name: "Vector with vectorNetwork",
+        type: "VECTOR",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 10, height: 10 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        scrollBehavior: "FIXED",
+        size: { x: 10, y: 10 },
+        relativeTransform: [
+          [1, 0, 0],
+          [0, 1, 0],
+        ],
+        fills: [
+          {
+            type: "SOLID",
+            color: { r: 1, g: 0, b: 0, a: 1 },
+            visible: true,
+            blendMode: "NORMAL",
+          },
+        ],
+        strokes: [],
+        strokeWeight: 0,
+        strokeAlign: "INSIDE",
+        effects: [],
+        cornerRadius: 0,
+        vectorNetwork: minimalVectorNetwork,
+      };
+
+      const context: iofigma.restful.factory.FactoryContext = {
+        gradient_id_generator: () => `gradient_${Math.random()}`,
+      };
+      const { document: gridaDocument } = iofigma.restful.factory.document(
+        vectorNodeWithNetwork,
+        {},
+        context
+      );
+
+      const vectorGridaNode = Object.values(gridaDocument.nodes).find(
+        (n): n is grida.program.nodes.VectorNode =>
+          n.type === "vector" && n.name === "Vector with vectorNetwork"
+      );
+      expect(vectorGridaNode).toBeDefined();
+      expect(vectorGridaNode!.type).toBe("vector");
+      expect(vectorGridaNode!.vector_network).toBeDefined();
+      expect(vectorGridaNode!.vector_network!.vertices).toHaveLength(3);
+      expect(vectorGridaNode!.vector_network!.segments).toHaveLength(3);
+
+      // Should not be a group with children
+      const groupNode = Object.values(gridaDocument.nodes).find(
+        (n): n is grida.program.nodes.GroupNode =>
+          n.type === "group" && n.name === "Vector with vectorNetwork"
+      );
+      expect(groupNode).toBeUndefined();
+
+      const childIds = gridaDocument.links[vectorGridaNode!.id];
+      expect(childIds).toBeUndefined();
+    });
+
+    it("should fall back to GroupNode when vectorNetwork is present but invalid", () => {
+      const invalidVectorNetwork = {
+        vertices: [{ position: { x: 0, y: 0 } }],
+        segments: [
+          { start: 0, end: 99, startTangent: { x: 0, y: 0 }, endTangent: { x: 0, y: 0 } },
+        ],
+        regions: [{ loops: [[0]], windingRule: "NONZERO" as const }],
+      };
+
+      const vectorNodeInvalidVn: iofigma.__ir.VectorNodeRestInput = {
+        id: "vector-invalid-vn",
+        name: "Vector invalid vectorNetwork",
+        type: "VECTOR",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 10, height: 10 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        scrollBehavior: "FIXED",
+        size: { x: 10, y: 10 },
+        relativeTransform: [
+          [1, 0, 0],
+          [0, 1, 0],
+        ],
+        fills: [
+          {
+            type: "SOLID",
+            color: { r: 0, g: 1, b: 0, a: 1 },
+            visible: true,
+            blendMode: "NORMAL",
+          },
+        ],
+        strokes: [],
+        strokeWeight: 0,
+        strokeAlign: "INSIDE",
+        effects: [],
+        cornerRadius: 0,
+        fillGeometry: [{ path: "M0 0 L10 0 L5 10 Z", windingRule: "NONZERO" as const }],
+        strokeGeometry: [],
+        vectorNetwork: invalidVectorNetwork as iofigma.__ir.VectorNetwork_restapi_volatile20260217,
+      };
+
+      const context: iofigma.restful.factory.FactoryContext = {
+        gradient_id_generator: () => `gradient_${Math.random()}`,
+      };
+      const { document: gridaDocument } = iofigma.restful.factory.document(
+        vectorNodeInvalidVn,
+        {},
+        context
+      );
+
+      const groupNode = Object.values(gridaDocument.nodes).find(
+        (n): n is grida.program.nodes.GroupNode =>
+          n.type === "group" && n.name === "Vector invalid vectorNetwork"
+      );
+      expect(groupNode).toBeDefined();
+      expect(groupNode!.type).toBe("group");
     });
   });
 
