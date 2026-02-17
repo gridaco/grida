@@ -19,6 +19,8 @@ Teams start with “click Export” and end up needing **thumbnails**, **asset p
 
 **refig** is built for that gap.
 
+<div style="padding:64.67% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1165652748?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479&amp;autoplay=1&amp;muted=1&amp;loop=1" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" referrerpolicy="strict-origin-when-cross-origin" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="refig (headless figma renderer) demo"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
+
 <!-- truncate -->
 
 ## What is refig?
