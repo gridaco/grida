@@ -234,6 +234,7 @@ export function exportSettingToRenderOptions(
     PNG: "png",
     SVG: "svg",
     PDF: "pdf",
+    WEBP: "webp",
   };
   const format = formatMap[setting.format] ?? "png";
 

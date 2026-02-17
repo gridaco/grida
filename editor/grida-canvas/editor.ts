@@ -3313,7 +3313,10 @@ export class Editor
     if (!images || Object.keys(images).length === 0) return;
 
     if (this.backend === "canvas" && !this._m_wasm_canvas_scene) {
-      this._pending_images = images;
+      if (!this._pending_images) {
+        this._pending_images = {};
+      }
+      Object.assign(this._pending_images, images);
       return;
     }
 

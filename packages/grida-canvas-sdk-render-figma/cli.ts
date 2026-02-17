@@ -41,6 +41,7 @@ const EXT_BY_FORMAT: Record<string, string> = {
   png: "png",
   jpeg: "jpeg",
   jpg: "jpeg",
+  webp: "webp",
   svg: "svg",
   pdf: "pdf",
 };
