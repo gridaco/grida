@@ -79,12 +79,15 @@ function resolveInput(
       );
     }
     const imagesDir = path.join(resolved, IMAGES_SUBDIR);
-    const useImagesDir = existsSync(imagesDir) && statSync(imagesDir).isDirectory()
-      ? imagesDir
-      : undefined;
+    const useImagesDir =
+      existsSync(imagesDir) && statSync(imagesDir).isDirectory()
+        ? imagesDir
+        : undefined;
     return {
       documentPath,
-      imagesDir: explicitImagesDir ? path.resolve(explicitImagesDir) : useImagesDir,
+      imagesDir: explicitImagesDir
+        ? path.resolve(explicitImagesDir)
+        : useImagesDir,
       isRestJson: true,
     };
   }
@@ -129,7 +132,8 @@ function exportAllOutputBasename(
 async function runExportAll(
   documentPath: string,
   outDir: string,
-  imagesDir?: string
+  imagesDir?: string,
+  skipDefaultFonts?: boolean
 ): Promise<void> {
   const isFig = documentPath.toLowerCase().endsWith(".fig");
   let document: FigmaDocument;
@@ -163,7 +167,7 @@ async function runExportAll(
       rendererOptions = { images: readImagesFromDir(imagesDir) };
     }
   }
-  if (process.env.REFIG_SKIP_DEFAULT_FONTS === "1") {
+  if (skipDefaultFonts || process.env.REFIG_SKIP_DEFAULT_FONTS === "1") {
     rendererOptions = { ...rendererOptions, loadFigmaDefaultFonts: false };
   }
 
@@ -204,6 +208,7 @@ async function runSingleNode(
     height: number;
     scale: number;
     imagesDir?: string;
+    skipDefaultFonts?: boolean;
   }
 ): Promise<void> {
   const format = (opts.format ?? formatFromOutFile(outPath)).toLowerCase();
@@ -216,11 +221,14 @@ async function runSingleNode(
     ? new FigmaDocument(JSON.parse(readFileSync(documentPath, "utf8")))
     : new FigmaDocument(new Uint8Array(readFileSync(documentPath)));
 
-  const rendererOptions: { images?: Record<string, Uint8Array>; loadFigmaDefaultFonts?: boolean } =
+  const rendererOptions: {
+    images?: Record<string, Uint8Array>;
+    loadFigmaDefaultFonts?: boolean;
+  } =
     isJson && opts.imagesDir
       ? { images: readImagesFromDir(opts.imagesDir) }
       : {};
-  if (process.env.REFIG_SKIP_DEFAULT_FONTS === "1") {
+  if (opts.skipDefaultFonts || process.env.REFIG_SKIP_DEFAULT_FONTS === "1") {
     rendererOptions.loadFigmaDefaultFonts = false;
   }
   const renderer = new FigmaRenderer(document, rendererOptions);
@@ -274,6 +282,10 @@ async function main(): Promise<void> {
     .option("--width <px>", "Viewport width (single-node only)", "1024")
     .option("--height <px>", "Viewport height (single-node only)", "1024")
     .option("--scale <n>", "Raster scale factor (single-node only)", "1")
+    .option(
+      "--skip-default-fonts",
+      "Do not load Figma default fonts (same as REFIG_SKIP_DEFAULT_FONTS=1)"
+    )
     .action(
       async (
         input: string,
@@ -309,7 +321,12 @@ async function main(): Promise<void> {
           } else {
             mkdirSync(outDir, { recursive: true });
           }
-          await runExportAll(documentPath, outDir, imagesDir);
+          await runExportAll(
+            documentPath,
+            outDir,
+            imagesDir,
+            options.skipDefaultFonts === true
+          );
           return;
         }
 
@@ -327,6 +344,7 @@ async function main(): Promise<void> {
           height,
           scale,
           imagesDir,
+          skipDefaultFonts: options.skipDefaultFonts === true,
         });
       }
     );
