@@ -870,6 +870,8 @@ pub enum JSONNode {
     Container(JSONContainerNode),
     #[serde(rename = "vector")]
     Vector(JSONVectorNode),
+    #[serde(rename = "path")]
+    Path(JSONPathNode),
     #[serde(rename = "ellipse")]
     Ellipse(JSONEllipseNode),
     #[serde(rename = "rectangle")]
@@ -1156,6 +1158,15 @@ pub struct JSONVectorNode {
 
     #[serde(rename = "vector_network", alias = "vectorNetwork")]
     pub vector_network: Option<JSONVectorNetwork>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONPathNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(rename = "data")]
+    pub data: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1837,6 +1848,54 @@ impl From<JSONLineNode> for Node {
     }
 }
 
+impl From<JSONPathNode> for Node {
+    fn from(node: JSONPathNode) -> Self {
+        let stroke_width: SingularStrokeWidth = build_unknown_stroke_width(&node.base).into();
+
+        let transform = AffineTransform::from_box_center(
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
+            node.base.rotation,
+        );
+
+        Node::Path(PathNodeRec {
+            active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+                node.base.fe_liquid_glass,
+                node.base.fe_noises,
+            ),
+            transform,
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            data: node.data,
+            strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
+            stroke_style: StrokeStyle {
+                stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
+                stroke_cap: node.base.stroke_cap.unwrap_or_default(),
+                stroke_join: node.base.stroke_join.unwrap_or_default(),
+                stroke_miter_limit: node.base.stroke_miter_limit.unwrap_or_default(),
+                stroke_dash_array: node.base.stroke_dash_array.map(StrokeDashArray::from),
+            },
+            stroke_width,
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .layout_positioning
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
+        })
+    }
+}
+
 impl From<JSONVectorNode> for Node {
     fn from(node: JSONVectorNode) -> Self {
         let transform = AffineTransform::from_box_center(
@@ -1949,6 +2008,7 @@ impl From<JSONNode> for Node {
             JSONNode::Container(container) => Node::Container(container.into()),
             JSONNode::TextSpan(text) => Node::TextSpan(text.into()),
             JSONNode::Vector(vector) => vector.into(),
+            JSONNode::Path(path) => path.into(),
             JSONNode::Ellipse(ellipse) => ellipse.into(),
             JSONNode::Rectangle(rectangle) => rectangle.into(),
             JSONNode::RegularPolygon(rpolygon) => rpolygon.into(),
@@ -2409,6 +2469,41 @@ mod tests {
                 assert_eq!(boolean_node.base.height, CSSDimension::LengthPX(200.0));
             }
             _ => panic!("Expected BooleanOperation node"),
+        }
+    }
+
+    #[test]
+    fn deserialize_path_node() {
+        let json = r#"{
+            "id": "path-1",
+            "name": "Path node",
+            "type": "path",
+            "data": "M0 0 L100 0 L100 100 L0 100 Z",
+            "layout_inset_left": 10.0,
+            "layout_inset_top": 20.0,
+            "layout_target_width": 100.0,
+            "layout_target_height": 100.0,
+            "fill": {"type": "solid", "color": {"r": 1, "g": 0, "b": 0, "a": 1.0}}
+        }"#;
+
+        let json_node: JSONNode =
+            serde_json::from_str(json).expect("failed to deserialize PathNode");
+
+        match &json_node {
+            JSONNode::Path(path_node) => {
+                assert_eq!(path_node.base.id, "path-1");
+                assert_eq!(path_node.base.name, Some("Path node".to_string()));
+                assert_eq!(path_node.data, "M0 0 L100 0 L100 100 L0 100 Z");
+            }
+            _ => panic!("Expected Path node"),
+        }
+
+        let grid_node = Node::from(json_node);
+        match &grid_node {
+            Node::Path(path_rec) => {
+                assert_eq!(path_rec.data, "M0 0 L100 0 L100 100 L0 100 Z");
+            }
+            _ => panic!("Expected Node::Path"),
         }
     }
 
