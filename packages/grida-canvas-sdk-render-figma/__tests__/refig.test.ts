@@ -261,7 +261,9 @@ describe("@grida/refig (real render)", () => {
   });
 
   it("renders a REST JSON document as PNG with valid signature", async () => {
-    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE);
+    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE, {
+      loadFigmaDefaultFonts: false,
+    });
 
     try {
       const result = await renderer.render("1:1", {
@@ -283,7 +285,9 @@ describe("@grida/refig (real render)", () => {
   }, 30_000);
 
   it("renders a REST JSON document as SVG", async () => {
-    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE);
+    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE, {
+      loadFigmaDefaultFonts: false,
+    });
 
     try {
       const result = await renderer.render("1:1", {
@@ -303,7 +307,9 @@ describe("@grida/refig (real render)", () => {
   }, 30_000);
 
   it("renders a REST JSON document as PDF", async () => {
-    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE);
+    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE, {
+      loadFigmaDefaultFonts: false,
+    });
 
     try {
       const result = await renderer.render("1:1", {
@@ -323,7 +329,9 @@ describe("@grida/refig (real render)", () => {
   }, 30_000);
 
   it("renders a REST JSON document as JPEG", async () => {
-    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE);
+    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE, {
+      loadFigmaDefaultFonts: false,
+    });
 
     try {
       const result = await renderer.render("1:1", {
@@ -343,7 +351,9 @@ describe("@grida/refig (real render)", () => {
   }, 30_000);
 
   it("renders with scale option", async () => {
-    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE);
+    const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE, {
+      loadFigmaDefaultFonts: false,
+    });
 
     try {
       const result = await renderer.render("1:1", {
@@ -392,7 +402,10 @@ describe("@grida/refig (real render)", () => {
     const nodeId = items.length > 0 ? items[0].nodeId : null;
     if (!nodeId) throw new Error("Fixture has no nodes with exportSettings");
 
-    const renderer = new FigmaRenderer(document, { images });
+    const renderer = new FigmaRenderer(document, {
+      images,
+      loadFigmaDefaultFonts: false,
+    });
 
     try {
       const result = await renderer.render(nodeId, {

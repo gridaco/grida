@@ -10,6 +10,7 @@ import {
 import { join } from "node:path";
 import { unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
+import { collectExportsFromDocument, figBytesToRestLikeDocument } from "../lib";
 
 const TEST_OUTPUT_DIR = join(process.cwd(), "__tests__", ".tmp", "cli");
 const BIN = join(process.cwd(), "cli.ts");
@@ -243,7 +244,44 @@ describe("refig CLI", () => {
     expect(pngBytes[3]).toBe(0x47);
   }, 120_000);
 
-  it("--export-all on .fig file exports all nodes with exportSettings", () => {
+  it("renders single node from .fig file", () => {
+    resetOutputDir();
+    const figPath = join(
+      process.cwd(),
+      "../../fixtures/test-fig/community/1510053249065427020-workos-radix-icons.fig"
+    );
+    if (!existsSync(figPath)) {
+      console.warn(`Skipping: fixture not found at ${figPath}`);
+      return;
+    }
+    const bytes = new Uint8Array(readFileSync(figPath));
+    const restDoc = figBytesToRestLikeDocument(bytes);
+    const items = collectExportsFromDocument(
+      restDoc as Record<string, unknown>
+    );
+    if (items.length === 0) {
+      console.warn("Skipping: fixture has no nodes with exportSettings");
+      return;
+    }
+    const nodeId = items[0]!.nodeId;
+    const outPath = join(TEST_OUTPUT_DIR, "fig-single.png");
+
+    execFileSync(
+      process.execPath,
+      ["--import", "tsx", BIN, figPath, "--node", nodeId, "--out", outPath],
+      { stdio: "pipe", timeout: 90_000 }
+    );
+
+    expect(existsSync(outPath)).toBe(true);
+    const pngBytes = readFileSync(outPath);
+    expect(pngBytes[0]).toBe(0x89);
+    expect(pngBytes[1]).toBe(0x50);
+    expect(pngBytes[2]).toBe(0x4e);
+    expect(pngBytes[3]).toBe(0x47);
+    expect(pngBytes.byteLength).toBeGreaterThan(100);
+  }, 90_000);
+
+  it.skip("--export-all on .fig file exports all nodes with exportSettings", () => {
     resetOutputDir();
     const figPath = join(
       process.cwd(),

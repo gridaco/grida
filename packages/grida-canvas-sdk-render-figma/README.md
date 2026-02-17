@@ -255,7 +255,7 @@ pnpm dlx @grida/refig ./design.fig --node "1:23" --out ./out.png
 
 If you want an end-to-end test from a real Figma file using the REST API, you can generate a local “project directory” that refig can consume directly.
 
-1) Archive a Figma file (stdlib-only Python script):
+1. Archive a Figma file (stdlib-only Python script):
 
 - Script: [`figma_archive.py` (gist)](https://gist.github.com/softmarshmallow/27ad65dfa5babc2c67b41740f1f05791)
 - (For repo contributors, it’s also in this monorepo at `.tools/figma_archive.py`.)
@@ -271,7 +271,7 @@ This writes:
 - `./my-figma-export/document.json` (with `geometry=paths`)
 - `./my-figma-export/images/<ref>.<ext>` (image fills downloaded from `/v1/files/:key/images`)
 
-2) Render using the directory as `<input>`:
+2. Render using the directory as `<input>`:
 
 ```sh
 # Single node

@@ -7,5 +7,7 @@ export default defineConfig({
     // output directory (__tests__/.tmp/).
     fileParallelism: false,
     testTimeout: 60000,
+    // Disable Figma default font loading in tests (avoids slow CDN fetches).
+    env: { REFIG_SKIP_DEFAULT_FONTS: "1" },
   },
 });

@@ -134,7 +134,10 @@ async function runExportAll(
   const isFig = documentPath.toLowerCase().endsWith(".fig");
   let document: FigmaDocument;
   let items: ExportItem[];
-  let rendererOptions: { images?: Record<string, Uint8Array> } = {};
+  let rendererOptions: {
+    images?: Record<string, Uint8Array>;
+    loadFigmaDefaultFonts?: boolean;
+  } = {};
 
   if (isFig) {
     const bytes = new Uint8Array(readFileSync(documentPath));
@@ -159,6 +162,9 @@ async function runExportAll(
     if (imagesDir) {
       rendererOptions = { images: readImagesFromDir(imagesDir) };
     }
+  }
+  if (process.env.REFIG_SKIP_DEFAULT_FONTS === "1") {
+    rendererOptions = { ...rendererOptions, loadFigmaDefaultFonts: false };
   }
 
   if (items.length === 0) {
@@ -210,10 +216,13 @@ async function runSingleNode(
     ? new FigmaDocument(JSON.parse(readFileSync(documentPath, "utf8")))
     : new FigmaDocument(new Uint8Array(readFileSync(documentPath)));
 
-  const rendererOptions =
+  const rendererOptions: { images?: Record<string, Uint8Array>; loadFigmaDefaultFonts?: boolean } =
     isJson && opts.imagesDir
       ? { images: readImagesFromDir(opts.imagesDir) }
       : {};
+  if (process.env.REFIG_SKIP_DEFAULT_FONTS === "1") {
+    rendererOptions.loadFigmaDefaultFonts = false;
+  }
   const renderer = new FigmaRenderer(document, rendererOptions);
   try {
     const result = await renderer.render(nodeId, {
