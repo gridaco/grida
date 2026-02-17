@@ -1,5 +1,19 @@
 export const packages = [
   {
+    name: "@grida/refig",
+    description:
+      "Headless Figma renderer — render Figma documents to PNG, JPEG, WebP, PDF, or SVG in Node.js (no browser) or in the browser. Deterministic exports, offline rendering from .fig, CLI and library API.",
+    demoPath: "/packages/@grida/refig",
+    npm: true,
+    features: [
+      "Node.js and browser entrypoints",
+      "CLI and library API",
+      "Offline rendering from .fig files",
+      "REST API JSON input",
+      "Deterministic, CI-friendly exports",
+    ],
+  },
+  {
     name: "@grida/ruler",
     description:
       "Zero-Dependency Canvas Ruler Component for Infinite Canvas. A lightweight, performant ruler component that supports zooming, panning, and custom markers.",
