@@ -13,7 +13,12 @@ import {
 import { GridaLogo } from "@/components/grida-logo";
 import { GitHubLogoIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { sitemap } from "./data/sitemap";
 import { cn } from "@/components/lib/utils";
 import {
@@ -107,13 +112,17 @@ export default function Header({ className }: { className?: string }) {
                   </NavigationMenuContent>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <Link href={sitemap.links.pricing} legacyBehavior passHref>
-                    <NavigationMenuLink
-                      className={`${navigationMenuTriggerStyle()} bg-transparent`}
-                    >
+                  <NavigationMenuLink
+                    asChild
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "bg-transparent"
+                    )}
+                  >
+                    <Link href={sitemap.links.pricing}>
                       <p className="font-normal">Pricing </p>
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link
@@ -144,6 +153,7 @@ export default function Header({ className }: { className?: string }) {
               </Button>
             </DrawerTrigger>
             <DrawerContent className="min-h-96 flex flex-col justify-between">
+              <DrawerTitle className="sr-only">Navigation menu</DrawerTitle>
               <div className="w-full px-4 space-y-8 mb-10">
                 <section className="grid gap-2">
                   <Link href="/home">Home</Link>
