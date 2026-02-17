@@ -123,7 +123,7 @@ export default function BrandPage() {
             </p>
           </div>
 
-          {/* Not a download target — present for crawlers/SEO */}
+          {/* Not a download target — present for crawlers/SEO. unoptimized so HTML has direct PNG URLs for Google Image index. */}
           <div className="relative rounded-2xl border bg-background overflow-hidden p-10 md:p-12">
             <div className="relative w-full aspect-square">
               {/* Light/Dark aware wordmark */}
@@ -132,6 +132,7 @@ export default function BrandPage() {
                 alt="Grida wordmark logo"
                 fill
                 priority
+                unoptimized
                 sizes="(max-width: 1024px) 100vw, 40vw"
                 className="object-contain dark:hidden"
               />
@@ -140,6 +141,7 @@ export default function BrandPage() {
                 alt="Grida wordmark logo"
                 fill
                 priority
+                unoptimized
                 sizes="(max-width: 1024px) 100vw, 40vw"
                 className="object-contain hidden dark:block"
               />
@@ -286,6 +288,7 @@ function BrandAssetCard({
               alt={alt}
               fill
               priority
+              unoptimized
               sizes="(max-width: 640px) 100vw, 40vw"
               className="object-contain"
             />
