@@ -9,6 +9,10 @@ import type { ExportSetting } from "@figma/rest-api-spec";
 import { createCanvas, type Canvas, type types } from "@grida/canvas-wasm";
 import { iofigma } from "@grida/io-figma";
 import grida from "@grida/schema";
+import {
+  ensureFigmaDefaultFonts,
+  type FigmaDefaultFontsCanvas,
+} from "./figma-default-fonts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,6 +26,15 @@ export interface RefigRendererOptions {
    * @default true
    */
   useEmbeddedFonts?: boolean;
+
+  /**
+   * When true (default), the renderer ensures Figma default fonts (Inter, Noto Sans KR/JP/SC, etc.)
+   * are loaded from CDN and registered with the canvas before any scene is loaded.
+   * Reduces tofu for mixed-script and CJK text. Set to false to skip (e.g. to avoid network or use only embedded fonts).
+   * Custom fonts remain the user's responsibility.
+   * @default true
+   */
+  loadFigmaDefaultFonts?: boolean;
 
   /**
    * Map of Figma image ref (hash) to image bytes.
@@ -609,6 +622,12 @@ export class FigmaRenderer {
       height,
       useEmbeddedFonts: this.options.useEmbeddedFonts ?? true,
     });
+
+    if (this.options.loadFigmaDefaultFonts !== false) {
+      await ensureFigmaDefaultFonts(
+        this._canvas as unknown as FigmaDefaultFontsCanvas
+      );
+    }
 
     return this._canvas;
   }

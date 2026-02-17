@@ -184,7 +184,7 @@ describe("collectExportsFromDocument", () => {
   it("collects exportSettings from REST doc built from .fig via figBytesToRestLikeDocument", () => {
     const figPath = join(
       process.cwd(),
-      "../../fixtures/test-fig/community/784448220678228461-figma-auto-layout-playground.fig"
+      "../../fixtures/test-fig/community/1510053249065427020-workos-radix-icons.fig"
     );
     if (!existsSync(figPath)) {
       console.warn(`Skipping: fixture not found at ${figPath}`);
@@ -365,7 +365,7 @@ describe("@grida/refig (real render)", () => {
   it("renders REST document with custom IMAGE fill from fixture archive", async () => {
     const zipPath = join(
       __dirname,
-      "../../../fixtures/test-figma/community/784448220678228461-figma-auto-layout-playground.zip"
+      "../../../fixtures/test-figma/community/1510053249065427020-workos-radix-icons.zip"
     );
     const zipBytes = readFileSync(zipPath);
     const unzipped = unzipSync(new Uint8Array(zipBytes));

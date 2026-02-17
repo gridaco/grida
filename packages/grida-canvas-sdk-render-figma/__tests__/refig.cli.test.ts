@@ -214,7 +214,7 @@ describe("refig CLI", () => {
     resetOutputDir();
     const zipPath = join(
       process.cwd(),
-      "../../fixtures/test-figma/community/784448220678228461-figma-auto-layout-playground.zip"
+      "../../fixtures/test-figma/community/1510053249065427020-workos-radix-icons.zip"
     );
     if (!existsSync(zipPath)) {
       console.warn(`Skipping: fixture not found at ${zipPath}`);
@@ -231,7 +231,7 @@ describe("refig CLI", () => {
 
     expect(existsSync(outDir)).toBe(true);
     const files = readdirSync(outDir);
-    expect(files.length).toBeGreaterThan(10);
+    expect(files.length).toBeGreaterThan(1);
 
     const pngFiles = files.filter((f) => f.endsWith(".png"));
     expect(pngFiles.length).toBeGreaterThan(0);
@@ -247,7 +247,7 @@ describe("refig CLI", () => {
     resetOutputDir();
     const figPath = join(
       process.cwd(),
-      "../../fixtures/test-fig/community/784448220678228461-figma-auto-layout-playground.fig"
+      "../../fixtures/test-fig/community/1510053249065427020-workos-radix-icons.fig"
     );
     if (!existsSync(figPath)) {
       console.warn(`Skipping: fixture not found at ${figPath}`);

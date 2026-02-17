@@ -364,7 +364,7 @@ Yes. Import from `@grida/refig/browser`. The core renderer uses `@grida/canvas-w
 
 ### What about fonts?
 
-The WASM runtime ships with embedded fallback fonts. Custom font loading (Google Fonts, local directories) is planned but not yet available.
+The WASM runtime ships with embedded fallback fonts (Geist / Geist Mono). **`loadFigmaDefaultFonts`** is enabled by default: the renderer loads the Figma default font set (Inter, Noto Sans KR/JP/SC, and optionally Noto Sans TC/HK and Noto Color Emoji) from CDN and registers them as fallbacks before the first render, so mixed-script and CJK text avoid tofu. Set **`loadFigmaDefaultFonts: false`** to disable (e.g. to avoid network or use only embedded fonts). Custom or other Google Fonts are **not** loaded by the renderer; the user is responsible for fetching font bytes and registering them with the canvas if needed.
 
 ## Contributing
 
