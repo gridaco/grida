@@ -1,6 +1,6 @@
 {
   "name": "@grida/refig",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": false,
   "description": "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG",
   "keywords": [
@@ -21,7 +21,7 @@
     "wasm",
     "webp"
   ],
-  "homepage": "https://github.com/gridaco/grida/tree/main/packages/grida-canvas-sdk-render-figma",
+  "homepage": "https://grida.co/docs/packages/@grida/refig",
   "bugs": "https://github.com/gridaco/grida/issues",
   "license": "MIT",
   "author": "softmarshmallow",
