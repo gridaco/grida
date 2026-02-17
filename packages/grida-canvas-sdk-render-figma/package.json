@@ -66,7 +66,7 @@
     "commander": "^12.1.0"
   },
   "devDependencies": {
-    "@figma/rest-api-spec": "0.35.0",
+    "@figma/rest-api-spec": "0.36.0",
     "@grida/io-figma": "workspace:*",
     "@grida/schema": "workspace:*",
     "fflate": "^0.8.2",
