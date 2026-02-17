@@ -338,6 +338,21 @@ impl Renderer {
         (hash_str, rid, width, height, r#type)
     }
 
+    /// Register image bytes under a caller-specified RID (res:// or system://).
+    /// Implements the res:// logical-identifier path per feat-resources Level 1.
+    /// Returns metadata or None if rid is invalid (must start with res:// or system://).
+    pub fn add_image_with_rid(&mut self, bytes: &[u8], rid: &str) -> Option<(u32, u32, String)> {
+        let rid = rid.trim();
+        if !rid.starts_with("res://") && !rid.starts_with("system://") {
+            return None;
+        }
+        let hash = resources::hash_bytes(bytes);
+        self.resources.insert(rid, bytes.to_vec());
+        let (width, height) = self.images.insert(rid.to_string(), hash)?;
+        let r#type = detect_image_mime(bytes).to_string();
+        Some((width, height, r#type))
+    }
+
     pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {
         let rid = normalize_image_id(id);
         self.resources.get(&rid)

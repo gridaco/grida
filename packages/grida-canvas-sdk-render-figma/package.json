@@ -1,0 +1,75 @@
+{
+  "name": "@grida/refig",
+  "version": "0.0.3",
+  "private": false,
+  "description": "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG",
+  "keywords": [
+    "canvas",
+    "cli",
+    "fig",
+    "fig-file",
+    "figma",
+    "figma-renderer",
+    "grida",
+    "headless",
+    "jpeg",
+    "pdf",
+    "png",
+    "refig",
+    "skia",
+    "svg",
+    "wasm",
+    "webp"
+  ],
+  "homepage": "https://grida.co/docs/packages/@grida/refig",
+  "bugs": "https://github.com/gridaco/grida/issues",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gridaco/grida.git",
+    "directory": "packages/grida-canvas-sdk-render-figma"
+  },
+  "bin": {
+    "refig": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.mts",
+      "import": "./dist/browser.mjs",
+      "default": "./dist/browser.mjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "postpack": "node scripts/postpack-publish.cjs",
+    "prepack": "node scripts/prepack-publish.cjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@grida/canvas-wasm": "0.90.0-canary.8",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@figma/rest-api-spec": "0.36.0",
+    "@grida/io-figma": "workspace:*",
+    "@grida/schema": "workspace:*",
+    "fflate": "^0.8.2",
+    "tsup": "^8.5.0"
+  }
+}

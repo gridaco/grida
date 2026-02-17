@@ -16,7 +16,7 @@
     "kiwi-schema": "^0.5.0"
   },
   "devDependencies": {
-    "@figma/rest-api-spec": "0.35.0",
+    "@figma/rest-api-spec": "0.36.0",
     "@grida/cg": "workspace:*",
     "@grida/schema": "workspace:*"
   }

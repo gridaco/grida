@@ -871,7 +871,7 @@ describe("format roundtrip", () => {
             fill_paints: [
               {
                 type: "image",
-                src: "0123456789abcdef",
+                src: "res://images/0123456789abcdef",
                 fit,
                 opacity: 1,
                 blend_mode: "normal",
@@ -2054,7 +2054,8 @@ describe("format roundtrip", () => {
   });
 
   describe("ImagePaint with fill_paints", () => {
-    it("roundtrips ImagePaint fill_paints on ContainerNode", () => {
+    it("roundtrips ImagePaint with ResourceRefRID (custom RID, e.g. Figma 40-char)", () => {
+      const customRid = "res://images/b4bdc286e0d6b4ee51263b01f94aaa2c8a60595a";
       const sceneId = "0-1";
       const nodeId = "0-2";
       const doc = createDocument(sceneId, {
@@ -2063,7 +2064,50 @@ describe("format roundtrip", () => {
           fill_paints: [
             {
               type: "image",
-              src: "0123456789abcdef",
+              src: customRid,
+              fit: "cover",
+              blend_mode: "normal",
+              opacity: 1,
+              active: true,
+              filters: {
+                exposure: 0,
+                contrast: 0,
+                saturation: 0,
+                temperature: 0,
+                tint: 0,
+                highlights: 0,
+                shadows: 0,
+              },
+            } satisfies cg.ImagePaint,
+          ],
+        },
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (containerNode) => {
+          expect(containerNode.fill_paints?.length).toBe(1);
+          const paint = containerNode.fill_paints?.[0];
+          expect(paint?.type).toBe("image");
+          if (paint && paint.type === "image") {
+            expect(paint.src).toBe(customRid);
+          }
+        }
+      );
+    });
+
+    it("roundtrips ImagePaint fill_paints on ContainerNode (hex16 via ResourceRefRID)", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const hex16Src = "res://images/0123456789abcdef";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          fill_paints: [
+            {
+              type: "image",
+              src: hex16Src,
               fit: "cover",
               blend_mode: "normal",
               opacity: 1,
@@ -2092,6 +2136,7 @@ describe("format roundtrip", () => {
           const paint = containerNode.fill_paints?.[0];
           expect(paint?.type).toBe("image");
           if (paint && paint.type === "image") {
+            expect(paint.src).toBe(hex16Src);
             expect(paint.fit).toBe("cover");
             expect(paint.blend_mode).toBe("normal");
             expect(paint.opacity).toBe(1);
@@ -2386,7 +2431,7 @@ describe("format roundtrip", () => {
           stroke_paints: [
             {
               type: "image",
-              src: "fedcba9876543210",
+              src: "res://images/fedcba9876543210",
               fit: "cover",
               blend_mode: "normal",
               opacity: 1,

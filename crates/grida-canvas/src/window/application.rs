@@ -874,6 +874,11 @@ impl UnknownTargetApplication {
         self.renderer.add_image(data)
     }
 
+    /// Register image bytes under a caller-specified RID (res:// or system://).
+    pub fn add_image_with_rid(&mut self, data: &[u8], rid: &str) -> Option<(u32, u32, String)> {
+        self.renderer.add_image_with_rid(data, rid)
+    }
+
     /// Perform a redraw and print diagnostic information.
     pub fn redraw(&mut self) {
         let now = self.clock.now() + self.last_frame_time.elapsed().as_secs_f64() * 1000.0;

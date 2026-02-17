@@ -602,7 +602,7 @@ export namespace io {
     /**
      * Optional raw assets extracted from an archive.
      *
-     * Keys are canonical image hash ids (hex16), values are encoded image bytes.
+     * Keys are image refs (filename sans extension), values are bytes.
      */
     assets?: {
       images: Record<string, Uint8Array>;
@@ -779,7 +779,7 @@ export namespace io {
 
       for (const [key, imageData] of Object.entries(_x_images)) {
         const base = key.split("/").pop() ?? key;
-        const hashHex = base.includes(".") ? base.split(".")[0]! : base;
+        const ref = base.includes(".") ? base.split(".")[0]! : base;
 
         const dimensions = imageSize(new Uint8Array(imageData));
         if (!dimensions || !dimensions.width || !dimensions.height) {
@@ -788,9 +788,9 @@ export namespace io {
         const { width, height, type } = dimensions;
         const mimeType = IMAGE_TYPE_TO_MIME_TYPE[type || "png"] || "image/png";
 
-        assets[hashHex] = imageData;
-        imagesRepo[hashHex] = {
-          url: hashHex,
+        assets[ref] = imageData;
+        imagesRepo[ref] = {
+          url: `res://images/${ref}`,
           width,
           height,
           bytes: imageData.byteLength,

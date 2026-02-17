@@ -156,6 +156,12 @@ export function PlaygroundMenuContent({
         key={importFromJson.refreshkey}
         {...importFromJson.props}
         onImport={(file) => {
+          if (
+            file.assets?.images &&
+            Object.keys(file.assets.images).length > 0
+          ) {
+            instance.loadImages(file.assets.images);
+          }
           instance.commands.reset(
             editor.state.init({
               editable: true,
@@ -168,16 +174,41 @@ export function PlaygroundMenuContent({
 
       <ImportFromFigmaDialog
         {...importFromFigmaDialog.props}
-        onImport={(res) => {
-          instance.surface.insert({
-            document: iofigma.restful.factory.document(
+        onImport={async (res) => {
+          const images = res.images ?? {};
+          const context: iofigma.restful.factory.FactoryContext = {
+            gradient_id_generator: () => v4(),
+            resolve_image_src: (ref) =>
+              ref in images ? `res://images/${ref}` : null,
+          };
+          const { document: gridaDoc, imageRefsUsed } =
+            iofigma.restful.factory.document(
               res.document as any,
-              res.images,
-              {
-                gradient_id_generator: () => v4(),
+              images,
+              context
+            );
+
+          const refToBytes: Record<string, Uint8Array> = {};
+          for (const ref of imageRefsUsed) {
+            if (!(ref in images)) continue;
+            const url = images[ref];
+            if (!url) continue;
+            try {
+              const resp = await fetch(url);
+              if (resp.ok) {
+                const buf = await resp.arrayBuffer();
+                refToBytes[ref] = new Uint8Array(buf);
               }
-            ),
-          });
+            } catch (e) {
+              console.warn(`Failed to fetch image for ref ${ref}`, e);
+            }
+          }
+
+          if (Object.keys(refToBytes).length > 0) {
+            instance.loadImages(refToBytes);
+          }
+
+          instance.surface.insert({ document: gridaDoc });
         }}
         onImportFig={async (result) => {
           const iofigma = await import("@grida/io-figma");
@@ -199,9 +230,12 @@ export function PlaygroundMenuContent({
             });
 
             if (page.rootNodes.length > 0) {
-              const packedDoc = FigImporter.convertPageToScene(page, {
-                gradient_id_generator: () => v4(),
-              });
+              const { document: packedDoc } = FigImporter.convertPageToScene(
+                page,
+                {
+                  gradient_id_generator: () => v4(),
+                }
+              );
               instance.surface.insert({ document: packedDoc });
             }
           }

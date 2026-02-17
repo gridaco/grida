@@ -184,6 +184,85 @@ describe("archive (.grida zip)", () => {
     expect(unpacked.images).toEqual({});
   });
 
+  it("should pack/unpack archive with custom RID images (e.g. Figma 40-char ref)", () => {
+    const customRid = "b4bdc286e0d6b4ee51263b01f94aaa2c8a60595a";
+    const document: grida.program.document.Document = {
+      nodes: {
+        scene: {
+          type: "scene",
+          id: "scene",
+          name: "Scene",
+          active: true,
+          locked: false,
+          guides: [],
+          edges: [],
+          constraints: { children: "multiple" },
+        },
+        rect: {
+          type: "rectangle",
+          id: "rect",
+          name: "Rect",
+          active: true,
+          locked: false,
+          opacity: 1,
+          z_index: 0,
+          layout_positioning: "absolute",
+          layout_inset_left: 0,
+          layout_inset_top: 0,
+          layout_target_width: 100,
+          layout_target_height: 100,
+          rotation: 0,
+          stroke_width: 0,
+          stroke_cap: "butt",
+          stroke_join: "miter",
+          fill_paints: [
+            {
+              type: "image",
+              src: `res://images/${customRid}`,
+              fit: "cover",
+              blend_mode: "normal",
+              opacity: 1,
+              active: true,
+              filters: {
+                exposure: 0,
+                contrast: 0,
+                saturation: 0,
+                temperature: 0,
+                tint: 0,
+                highlights: 0,
+                shadows: 0,
+              },
+            },
+          ],
+        },
+      },
+      links: { scene: ["rect"] },
+      scenes_ref: ["scene"],
+      entry_scene_id: "scene",
+      images: {},
+      bitmaps: {},
+      properties: {},
+    };
+    const images: Record<string, Uint8Array> = {
+      [`${customRid}.png`]: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]),
+    };
+    const packed = io.archive.pack(document, images, schemaVersion);
+    const unpacked = io.archive.unpack(packed);
+    expect(unpacked.images[`${customRid}.png`]).toBeDefined();
+    expect(
+      bytesEqual(
+        unpacked.images[`${customRid}.png`],
+        images[`${customRid}.png`]
+      )
+    ).toBe(true);
+    const decoded = io.GRID.decode(unpacked.document);
+    const rect = decoded.nodes["rect"] as grida.program.nodes.RectangleNode;
+    expect(rect.fill_paints?.[0]?.type).toBe("image");
+    if (rect.fill_paints?.[0]?.type === "image") {
+      expect(rect.fill_paints[0].src).toBe(`res://images/${customRid}`);
+    }
+  });
+
   it("should handle special characters in image filenames", () => {
     const document = createTestDocument();
     const specialImages: Record<string, Uint8Array> = {

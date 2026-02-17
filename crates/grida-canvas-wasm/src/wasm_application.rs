@@ -223,6 +223,42 @@ pub unsafe extern "C" fn add_image(
     std::ptr::null()
 }
 
+#[derive(Serialize)]
+pub struct AddImageWithRidResult {
+    pub width: u32,
+    pub height: u32,
+    #[serde(rename = "type")]
+    pub r#type: String,
+}
+
+#[no_mangle]
+/// js::_add_image_with_rid
+pub unsafe extern "C" fn add_image_with_rid(
+    app: *mut UnknownTargetApplication,
+    data_ptr: *const u8,
+    data_len: usize,
+    rid_ptr: *const u8,
+    rid_len: usize,
+) -> *const u8 {
+    if let (Some(app), Some(rid)) = (
+        app.as_mut(),
+        __str_from_ptr_len(rid_ptr, rid_len),
+    ) {
+        let data = std::slice::from_raw_parts(data_ptr, data_len);
+        if let Some((width, height, r#type)) = app.add_image_with_rid(data, &rid) {
+            let result = AddImageWithRidResult {
+                width,
+                height,
+                r#type,
+            };
+            if let Ok(json) = serde_json::to_string(&result) {
+                return alloc_len_prefixed(json.as_bytes());
+            }
+        }
+    }
+    std::ptr::null()
+}
+
 #[no_mangle]
 /// js::_get_image_bytes
 pub unsafe extern "C" fn get_image_bytes(

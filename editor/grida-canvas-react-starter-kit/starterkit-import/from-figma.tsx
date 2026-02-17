@@ -95,7 +95,7 @@ export function ImportFromFigmaDialog({
   onImportFig,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  onImport?: (node: FetchNodeResult) => void;
+  onImport?: (node: FetchNodeResult) => void | Promise<void>;
   onImportFig?: (result: FigFileImportResult) => Promise<void>;
 }) {
   return (
@@ -414,7 +414,7 @@ function FigmaApiImportTab({
   onImport,
   onClose,
 }: {
-  onImport?: (node: FetchNodeResult) => void;
+  onImport?: (node: FetchNodeResult) => void | Promise<void>;
   onClose: () => void;
 }) {
   const form = useRef<HTMLFormElement>(null);
@@ -433,8 +433,8 @@ function FigmaApiImportTab({
       id: nodeid,
       personalAccessToken: token,
     })
-      .then((r) => {
-        onImport?.(r);
+      .then(async (r) => {
+        await onImport?.(r);
       })
       .catch((e) => {
         console.error(e);

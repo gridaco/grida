@@ -1,0 +1,82 @@
+---
+title: Introducing refig — a headless Figma renderer for real-world pipelines
+description: Export Figma designs to PNG/SVG/PDF without a browser. Deterministic, CI-friendly rendering from .fig or REST JSON—built for tooling, previews, and automation.
+slug: refig
+authors: universe
+date: 2026-02-17
+tags: [figma, rendering, ci, wasm, skia, tooling]
+hide_table_of_contents: false
+---
+
+Figma exports are easy—until exporting becomes **infrastructure**.
+
+Teams start with “click Export” and end up needing **thumbnails**, **asset pipelines**, **visual diffs**, and **repeatable builds**. That’s where the usual options start to hurt:
+
+- A headless browser is slow and flaky in CI.
+- The Figma Images API is great, but it’s still **a network dependency** (tokens, rate limits, availability).
+- Signed image URLs expire, which makes “render later” workflows fragile.
+- Offline or air‑gapped environments simply can’t rely on API calls.
+
+**refig** is built for that gap.
+
+<!-- truncate -->
+
+## What is refig?
+
+**`@grida/refig`** (“render figma”) is a **headless Figma renderer**. It turns a Figma document + node id into **PNG, JPEG, WebP, PDF, or SVG**—without opening Figma and without driving a browser UI.
+
+It works with:
+
+- **`.fig` files** (offline, reproducible)
+- **Figma REST API file JSON** (`GET /v1/files/:key`) when you already have your own ingestion layer
+
+You can use it as a **CLI** (`refig`) or as a **library** in Node.js and the browser.
+
+- Technical reference and usage: [`@grida/refig` on npm](https://www.npmjs.com/package/@grida/refig)
+
+## The idea: deterministic rendering you can build on
+
+When rendering is deterministic and programmable, a bunch of workflows become straightforward:
+
+- **Preview services**: generate thumbnails for files, pages, frames, components.
+- **Asset pipelines**: treat “Export presets” as build artifacts (commit, cache, publish).
+- **Visual regression tests**: render the same node on every PR and diff outputs.
+- **Offline archives**: store `.fig` snapshots and reproduce outputs later—no tokens, no network.
+- **In-app previews**: render inside your product (browser entrypoint) to show design snapshots.
+
+In other words: refig is less about “export an image” and more about making Figma rendering a reliable building block.
+
+## What refig intentionally doesn’t do
+
+refig is opinionated about scope so it stays composable:
+
+- **No auth / fetching**: you bring your own token storage, HTTP client, and caching.
+- **No design-to-code**: this is rendering (pixels / SVG / PDF), not HTML/CSS/Flutter generation.
+- **No editor**: read + render only.
+
+## A tiny taste (CLI)
+
+If you just want to feel what it’s like:
+
+```sh
+# Render a node from a .fig export
+npx @grida/refig ./design.fig --node "1:23" --out ./out.png
+
+# Or render from REST API JSON you fetched elsewhere
+npx @grida/refig ./document.json --node "1:23" --out ./out.svg
+```
+
+From there, most teams graduate quickly to: “render N nodes”, “render on every commit”, or “render on demand”.
+
+## Where this is headed
+
+We’re treating refig as a foundation for “design → build” automation:
+
+- render outputs that are **repeatable**
+- workflows that can run **in CI**
+- tooling that can work **offline**
+
+If that sounds like your problem, start with the docs (high-level) and the npm page (full API/CLI reference), then wire it into the pipeline you already have:
+
+- [`@grida/refig` docs](https://grida.co/docs/packages/@grida/refig)
+- [`@grida/refig` on npm](https://www.npmjs.com/package/@grida/refig)

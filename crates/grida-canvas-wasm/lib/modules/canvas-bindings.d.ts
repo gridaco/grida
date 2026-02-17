@@ -63,6 +63,13 @@ declare namespace canvas {
       data_ptr: number,
       data_len: number
     ): Ptr;
+    _add_image_with_rid(
+      state: GridaCanvasApplicationPtr,
+      data_ptr: number,
+      data_len: number,
+      rid_ptr: number,
+      rid_len: number
+    ): Ptr;
     _get_image_bytes(
       state: GridaCanvasApplicationPtr,
       ref_ptr: number,

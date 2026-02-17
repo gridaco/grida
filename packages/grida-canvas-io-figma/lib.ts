@@ -6,6 +6,7 @@ import type * as figkiwi from "./fig-kiwi/schema";
 import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import {
+  extractImages as extractImagesFromFigKiwi,
   getBlobBytes,
   parseVectorNetworkBlob,
   readFigFile,
@@ -47,6 +48,48 @@ export namespace iofigma {
     };
 
     /**
+     * Vector network shape returned by the Figma REST API as an **undocumented, volatile** field
+     * on VECTOR nodes when the file is requested with `geometry=paths`.
+     *
+     * Alongside the well-known `fillGeometry` and `strokeGeometry` (SVG path strings), the API
+     * may also include a `vectorNetwork` object with vertices, segments, and regions. This type
+     * describes that object. It is not part of the official `@figma/rest-api-spec` and may change
+     * or be removed at any time without notice.
+     *
+     * Use this type only when volatile APIs are enabled (see `disable_volatile_apis`); normalize
+     * it to `__ir.VectorNetwork` before using in the import pipeline.
+     *
+     * @remarks
+     * - First observed present in REST responses on **2026-02-17**. The type name is dated so that
+     *   future changes to the API can be tracked with a new type if the shape diverges.
+     * - As an undocumented volatile API, the response may have minor inconsistencies (e.g.
+     *   `windingRule` may be `"EVENODD"` | `"NONZERO"` | `"nonzero"` | `"odd"`). Normalizers should handle all casings.
+     *
+     * @deprecated Volatile, versioned shape; the type name includes the snapshot date (2026-02-17)
+     * so that future API changes can introduce a new type (e.g. 20260301) without breaking callers.
+     * Search for "volatile" to locate related code (e.g. disable_volatile_apis) for removal.
+     */
+    export type VectorNetwork_restapi_volatile20260217 = {
+      vertices: Array<{
+        position: { x: number; y: number };
+        meta?: 0 | unknown;
+      }>;
+      segments: Array<{
+        start: number;
+        startTangent: { x: number; y: number };
+        end: number;
+        endTangent: { x: number; y: number };
+        meta?: 0 | unknown;
+      }>;
+      regions: Array<{
+        loops: number[][];
+        /** Volatile API may return inconsistent casing: EVENODD | NONZERO | nonzero | odd */
+        windingRule: "EVENODD" | "NONZERO" | "nonzero" | "odd";
+        meta?: 0 | unknown;
+      }>;
+    };
+
+    /**
      * Vector network structure (vertices, segments, regions)
      * Matches the output of parseVectorNetworkBlob from blob-parser
      */
@@ -62,6 +105,14 @@ export namespace iofigma {
         windingRule: "NONZERO" | "ODD";
         loops: Array<{ segments: number[] }>;
       }>;
+    };
+
+    /**
+     * REST API VECTOR when using geometry=paths. Volatile API may also return vectorNetwork.
+     * Use this type when passing REST response nodes that may include the undocumented vectorNetwork field.
+     */
+    export type VectorNodeRestInput = figrest.VectorNode & {
+      vectorNetwork?: VectorNetwork_restapi_volatile20260217;
     };
 
     /**
@@ -208,9 +259,147 @@ export namespace iofigma {
         ...blendModeMap,
         PASS_THROUGH: "pass-through",
       };
+
+      /**
+       * Normalizes REST API volatile vector network shape to __ir.VectorNetwork.
+       * Returns null if the payload is missing, not an array, or has invalid indices.
+       */
+      export function normalizeRestVectorNetworkToIR(
+        rest: __ir.VectorNetwork_restapi_volatile20260217
+      ): __ir.VectorNetwork | null {
+        if (
+          !Array.isArray(rest.vertices) ||
+          !Array.isArray(rest.segments) ||
+          !Array.isArray(rest.regions)
+        ) {
+          return null;
+        }
+        const vertexCount = rest.vertices.length;
+        const segmentCount = rest.segments.length;
+
+        for (const seg of rest.segments) {
+          if (
+            typeof seg.start !== "number" ||
+            typeof seg.end !== "number" ||
+            seg.start < 0 ||
+            seg.start >= vertexCount ||
+            seg.end < 0 ||
+            seg.end >= vertexCount ||
+            !seg.startTangent ||
+            !seg.endTangent
+          ) {
+            return null;
+          }
+        }
+
+        for (const region of rest.regions) {
+          if (!Array.isArray(region.loops)) return null;
+          for (const loop of region.loops) {
+            if (!Array.isArray(loop)) return null;
+            for (const segIdx of loop) {
+              if (
+                typeof segIdx !== "number" ||
+                segIdx < 0 ||
+                segIdx >= segmentCount
+              ) {
+                return null;
+              }
+            }
+          }
+        }
+
+        const vertices: __ir.VectorNetwork["vertices"] = rest.vertices.map(
+          (v) => ({
+            x: v.position?.x ?? 0,
+            y: v.position?.y ?? 0,
+            styleID: 0,
+          })
+        );
+
+        const segments: __ir.VectorNetwork["segments"] = rest.segments.map(
+          (seg) => ({
+            styleID: 0,
+            start: {
+              vertex: seg.start,
+              dx: seg.startTangent.x,
+              dy: seg.startTangent.y,
+            },
+            end: {
+              vertex: seg.end,
+              dx: seg.endTangent.x,
+              dy: seg.endTangent.y,
+            },
+          })
+        );
+
+        const regions: __ir.VectorNetwork["regions"] = rest.regions.map(
+          (region) => {
+            const wr = region.windingRule?.toUpperCase?.();
+            const windingRule: "NONZERO" | "ODD" =
+              wr === "EVENODD" || wr === "ODD" ? "ODD" : "NONZERO";
+            const loops = region.loops.map((loop) => ({ segments: loop }));
+            return { styleID: 0, windingRule, loops };
+          }
+        );
+
+        return { vertices, segments, regions };
+      }
     }
 
     export namespace factory {
+      /**
+       * Result of converting Figma REST document to Grida format.
+       *
+       * - **document**: The packed scene document for insert.
+       * - **imageRefsUsed**: Figma image refs that appear in the document and need registration.
+       *   Caller should only download/register refs in this set to avoid bloat.
+       */
+      export interface FigmaImportResult {
+        document: grida.program.document.IPackedSceneDocument;
+        imageRefsUsed: string[];
+      }
+
+      /**
+       * Context for the REST document factory.
+       *
+       * @property node_id_generator - Optional ID generator for Grida node IDs.
+       * @property gradient_id_generator - ID generator for gradient definitions.
+       * @property resolve_image_src - Resolves a Figma image ref to a runtime src (e.g. res://images/&lt;ref&gt;).
+       *   Caller owns resource availability; io-figma does not fetch or validate.
+       *   @param imageRef - Figma image reference (hash string from API or Kiwi).
+       *   @returns Runtime src string, or null to use placeholder.
+       */
+      export type FactoryContext = {
+        node_id_generator?: () => string;
+        gradient_id_generator: () => string;
+        /**
+         * Resolves a Figma image ref to a runtime src (e.g. res://images/&lt;ref&gt;).
+         * Caller owns resource availability; io-figma does not fetch or validate.
+         *
+         * @param imageRef - Figma image reference (hash string from API or Kiwi).
+         * @returns Runtime src string, or null to use placeholder.
+         */
+        resolve_image_src?: (imageRef: string) => string | null;
+        /**
+         * When true, use Figma node IDs as Grida node IDs instead of generating new ones.
+         * Required for export-by-nodeId from .fig files.
+         */
+        preserve_figma_ids?: boolean;
+        /**
+         * When true, disable volatile/undocumented APIs (e.g. REST vectorNetwork on VECTOR nodes).
+         * Default false: volatile APIs are enabled; vectorNetwork is used when present.
+         * Set to true to always use fillGeometry/strokeGeometry (GroupNode + children) for VECTORs.
+         */
+        disable_volatile_apis?: boolean;
+        /**
+         * When true, convert fillGeometry/strokeGeometry to Path nodes (raw SVG path data)
+         * instead of Vector nodes (vector network). Use for render-only pipelines (e.g. refig)
+         * to avoid vn.fromSVGPathData conversions. Path nodes are not editable in the editor.
+         * @default false
+         */
+        prefer_path_for_geometry?: boolean;
+      };
+
       function toGradientPaint(paint: figrest.GradientPaint) {
         const type_map = {
           GRADIENT_LINEAR: "linear_gradient",
@@ -263,54 +452,64 @@ export namespace iofigma {
         };
       }
 
-      function paint(paint: figrest.Paint): cg.Paint | undefined {
-        switch (paint.type) {
+      function convertPaint(
+        p: figrest.Paint,
+        ctx: FactoryContext,
+        imageRefsUsed: Set<string>
+      ): cg.Paint | undefined {
+        switch (p.type) {
           case "SOLID": {
-            return toSolidPaint(paint);
+            return toSolidPaint(p);
           }
           case "GRADIENT_LINEAR":
           case "GRADIENT_RADIAL":
           case "GRADIENT_ANGULAR":
           case "GRADIENT_DIAMOND": {
-            return toGradientPaint(paint);
+            return toGradientPaint(p);
           }
-          case "IMAGE":
-            // Return image paint with empty src - renderer will use placeholder
+          case "IMAGE": {
+            const imageRef = (p as figrest.ImagePaint).imageRef ?? "";
+            const src =
+              ctx.resolve_image_src?.(imageRef) ??
+              _GRIDA_SYSTEM_EMBEDDED_CHECKER;
+            if (src !== _GRIDA_SYSTEM_EMBEDDED_CHECKER && imageRef) {
+              imageRefsUsed.add(imageRef);
+            }
             return {
               type: "image",
-              src: _GRIDA_SYSTEM_EMBEDDED_CHECKER,
-              fit: paint.scaleMode
-                ? paint.scaleMode === "FILL"
+              src,
+              fit: p.scaleMode
+                ? p.scaleMode === "FILL"
                   ? "cover"
-                  : paint.scaleMode === "FIT"
+                  : p.scaleMode === "FIT"
                     ? "contain"
-                    : paint.scaleMode === "TILE"
+                    : p.scaleMode === "TILE"
                       ? "tile"
                       : "fill"
                 : "cover",
-              transform: paint.imageTransform
+              transform: p.imageTransform
                 ? [
                     [
-                      paint.imageTransform[0][0],
-                      paint.imageTransform[0][1],
-                      paint.imageTransform[0][2],
+                      p.imageTransform[0][0],
+                      p.imageTransform[0][1],
+                      p.imageTransform[0][2],
                     ],
                     [
-                      paint.imageTransform[1][0],
-                      paint.imageTransform[1][1],
-                      paint.imageTransform[1][2],
+                      p.imageTransform[1][0],
+                      p.imageTransform[1][1],
+                      p.imageTransform[1][2],
                     ],
                   ]
                 : cmath.transform.identity,
-              filters: paint.filters
+              filters: p.filters
                 ? {
-                    exposure: paint.filters.exposure ?? 0,
-                    contrast: paint.filters.contrast ?? 0,
-                    saturation: paint.filters.saturation ?? 0,
-                    temperature: paint.filters.temperature ?? 0,
-                    tint: paint.filters.tint ?? 0,
-                    highlights: paint.filters.highlights ?? 0,
-                    shadows: paint.filters.shadows ?? 0,
+                    exposure: p.filters.exposure ?? 0,
+                    contrast: p.filters.contrast ?? 0,
+                    saturation: p.filters.saturation ?? 0,
+                    temperature: p.filters.temperature ?? 0,
+                    tint: p.filters.tint ?? 0,
+                    highlights: p.filters.highlights ?? 0,
+                    shadows: p.filters.shadows ?? 0,
                   }
                 : {
                     exposure: 0,
@@ -321,10 +520,13 @@ export namespace iofigma {
                     highlights: 0,
                     shadows: 0,
                   },
-              blend_mode: map.blendModeMap[paint.blendMode],
-              opacity: paint.opacity ?? 1,
-              active: paint.visible ?? true,
+              blend_mode: map.blendModeMap[p.blendMode],
+              opacity: p.opacity ?? 1,
+              active: p.visible ?? true,
             } satisfies cg.ImagePaint;
+          }
+          default:
+            return undefined;
         }
       }
 
@@ -419,9 +621,13 @@ export namespace iofigma {
       /**
        * Fill properties - IFill
        */
-      function fills_trait(fills: figrest.Paint[]) {
+      function fills_trait(
+        fills: figrest.Paint[],
+        context: FactoryContext,
+        imageRefsUsed: Set<string>
+      ) {
         const fills_paints = fills
-          .map(paint)
+          .map((p) => convertPaint(p, context, imageRefsUsed))
           .filter((p): p is cg.Paint => p !== undefined);
         return {
           fill_paints: fills_paints.length > 0 ? fills_paints : undefined,
@@ -431,17 +637,21 @@ export namespace iofigma {
       /**
        * Stroke properties - IStroke
        */
-      function stroke_trait(node: {
-        strokes?: figrest.Paint[];
-        strokeWeight?: number;
-        strokeCap?: figrest.LineNode["strokeCap"];
-        strokeJoin?: figrest.LineNode["strokeJoin"];
-        strokeDashes?: number[];
-        strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
-        strokeMiterAngle?: number;
-      }) {
+      function stroke_trait(
+        node: {
+          strokes?: figrest.Paint[];
+          strokeWeight?: number;
+          strokeCap?: figrest.LineNode["strokeCap"];
+          strokeJoin?: figrest.LineNode["strokeJoin"];
+          strokeDashes?: number[];
+          strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
+          strokeMiterAngle?: number;
+        },
+        context: FactoryContext,
+        imageRefsUsed: Set<string>
+      ) {
         const strokes_paints = (node.strokes ?? [])
-          .map(paint)
+          .map((p) => convertPaint(p, context, imageRefsUsed))
           .filter((p): p is cg.Paint => p !== undefined);
         return {
           stroke_paints: strokes_paints.length > 0 ? strokes_paints : undefined,
@@ -463,13 +673,17 @@ export namespace iofigma {
       /**
        * Text stroke properties - ITextStroke (simpler than IStroke)
        */
-      function text_stroke_trait(node: {
-        strokes?: figrest.Paint[];
-        strokeWeight?: number;
-        strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
-      }) {
+      function text_stroke_trait(
+        node: {
+          strokes?: figrest.Paint[];
+          strokeWeight?: number;
+          strokeAlign?: "INSIDE" | "OUTSIDE" | "CENTER";
+        },
+        context: FactoryContext,
+        imageRefsUsed: Set<string>
+      ) {
         const strokes_paints = (node.strokes ?? [])
-          .map(paint)
+          .map((p) => convertPaint(p, context, imageRefsUsed))
           .filter((p): p is cg.Paint => p !== undefined);
         return {
           stroke_paints: strokes_paints.length > 0 ? strokes_paints : undefined,
@@ -659,13 +873,9 @@ export namespace iofigma {
         | figrest.FrameNode
         | figrest.GroupNode;
 
-      export type FactoryContext = {
-        node_id_generator?: () => string;
-        gradient_id_generator: () => string;
-      };
-
       type InputNode =
         | (figrest.SubcanvasNode & Partial<__ir.HasLayoutTraitIR>)
+        | __ir.VectorNodeRestInput
         | __ir.VectorNodeWithVectorNetworkDataPresent
         | __ir.StarNodeWithPointsDataPresent
         | __ir.RegularPolygonNodeWithPointsDataPresent;
@@ -674,9 +884,10 @@ export namespace iofigma {
         node: InputNode,
         images: { [key: string]: string },
         context: FactoryContext
-      ): grida.program.document.IPackedSceneDocument {
+      ): FigmaImportResult {
         const nodes: Record<string, grida.program.nodes.Node> = {};
         const graph: Record<string, string[]> = {};
+        const imageRefsUsed = new Set<string>();
 
         // Map from Figma ID (ephemeral) to Grida ID (final)
         const figma_id_to_grida_id = new Map<string, string>();
@@ -691,7 +902,7 @@ export namespace iofigma {
         const getOrCreateGridaId = (figmaId: string): string => {
           const existing = figma_id_to_grida_id.get(figmaId);
           if (existing) return existing;
-          const gridaId = generateId();
+          const gridaId = context.preserve_figma_ids ? figmaId : generateId();
           figma_id_to_grida_id.set(figmaId, gridaId);
           return gridaId;
         };
@@ -707,9 +918,32 @@ export namespace iofigma {
         }
 
         /**
+         * Extracts width/height from a node with layout traits (Figma REST API).
+         * Uses absoluteBoundingBox or size; avoids parsing path data.
+         */
+        function getParentBounds(node: InputNode & figrest.HasGeometryTrait): {
+          width: number;
+          height: number;
+        } {
+          const box =
+            "absoluteBoundingBox" in node
+              ? node.absoluteBoundingBox
+              : undefined;
+          const sz = "size" in node ? node.size : undefined;
+          return {
+            width: box?.width ?? sz?.x ?? 0,
+            height: box?.height ?? sz?.y ?? 0,
+          };
+        }
+
+        /**
          * Creates a VectorNode from SVG path data.
          * Used for converting nodes with HasGeometryTrait (REST API with geometry=paths).
          * Applies to VECTOR, STAR, REGULAR_POLYGON, and other shape nodes.
+         */
+        /**
+         * When true, the path is stroke geometry from REST API (outlined stroke shape).
+         * Stroke color must be applied as fill; the child should have no stroke.
          */
         function createVectorNodeFromPath(
           pathData: string,
@@ -722,21 +956,18 @@ export namespace iofigma {
           options: {
             useFill: boolean;
             useStroke: boolean;
+            /** Stroke geometry is an outlined path: apply stroke color as fill, no stroke. */
+            strokeAsFill?: boolean;
           }
         ): grida.program.nodes.VectorNode | null {
           if (!pathData) return null;
 
           try {
             const vectorNetwork = vn.fromSVGPathData(pathData);
-            const bbox = vn.getBBox(vectorNetwork);
+            const { width, height } = getParentBounds(parentNode);
 
-            // Note: In test environment with mocked svg-pathdata, vector networks may be empty.
-            // This is expected and the positioning logic will still work correctly.
-
-            // The SVG path coordinates are already in the parent VECTOR node's coordinate space.
-            // We keep the vector network coordinates as-is and position the child at its bbox origin
-            // relative to the parent GroupNode. This preserves the correct spatial relationships
-            // between fill and stroke geometries.
+            // Use parent node bounds instead of computing bbox from path; Figma path data aligns with node coordinate space.
+            const strokeAsFill = options.strokeAsFill === true;
             return {
               id: childId,
               ...base_node_trait({
@@ -755,25 +986,43 @@ export namespace iofigma {
               }),
               ...positioning_trait({
                 relativeTransform: [
-                  [1, 0, bbox.x],
-                  [0, 1, bbox.y],
+                  [1, 0, 0],
+                  [0, 1, 0],
                 ],
-                size: { x: bbox.width, y: bbox.height },
+                size: { x: width, y: height },
               }),
-              ...(options.useFill ? fills_trait(parentNode.fills) : {}),
-              ...(options.useStroke
-                ? stroke_trait(parentNode)
-                : stroke_trait({
-                    strokes: [],
-                    strokeWeight: 0,
-                  })),
+              ...(strokeAsFill
+                ? {
+                    ...fills_trait(
+                      parentNode.strokes ?? [],
+                      context,
+                      imageRefsUsed
+                    ),
+                    ...stroke_trait(
+                      { strokes: [], strokeWeight: 0 },
+                      context,
+                      imageRefsUsed
+                    ),
+                  }
+                : {
+                    ...(options.useFill
+                      ? fills_trait(parentNode.fills, context, imageRefsUsed)
+                      : {}),
+                    ...(options.useStroke
+                      ? stroke_trait(parentNode, context, imageRefsUsed)
+                      : stroke_trait(
+                          { strokes: [], strokeWeight: 0 },
+                          context,
+                          imageRefsUsed
+                        )),
+                  }),
               ...("effects" in parentNode && parentNode.effects
                 ? effects_trait(parentNode.effects)
                 : effects_trait(undefined)),
               type: "vector",
               vector_network: vectorNetwork,
-              layout_target_width: bbox.width,
-              layout_target_height: bbox.height,
+              layout_target_width: width,
+              layout_target_height: height,
               fill_rule: map.windingRuleMap[geometry.windingRule] ?? "nonzero",
             };
           } catch (e) {
@@ -781,6 +1030,92 @@ export namespace iofigma {
               `Failed to convert path to vector network (${name}):`,
               e
             );
+            return null;
+          }
+        }
+
+        /**
+         * Creates a PathNode from SVG path data.
+         * Used when prefer_path_for_geometry is true for render-only pipelines.
+         */
+        function createPathNodeFromPath(
+          pathData: string,
+          geometry: {
+            windingRule: figrest.Path["windingRule"];
+          },
+          parentNode: InputNode & figrest.HasGeometryTrait,
+          childId: string,
+          name: string,
+          options: {
+            useFill: boolean;
+            useStroke: boolean;
+            strokeAsFill?: boolean;
+          }
+        ): grida.program.nodes.PathNode | null {
+          if (!pathData) return null;
+
+          try {
+            const { width, height } = getParentBounds(parentNode);
+            const strokeAsFill = options.strokeAsFill === true;
+            return {
+              id: childId,
+              ...base_node_trait({
+                name,
+                visible: "visible" in parentNode ? parentNode.visible : true,
+                locked: "locked" in parentNode ? parentNode.locked : false,
+                rotation: 0,
+                opacity:
+                  "opacity" in parentNode && parentNode.opacity !== undefined
+                    ? parentNode.opacity
+                    : 1,
+                blendMode:
+                  "blendMode" in parentNode && parentNode.blendMode
+                    ? parentNode.blendMode
+                    : "NORMAL",
+              }),
+              ...positioning_trait({
+                relativeTransform: [
+                  [1, 0, 0],
+                  [0, 1, 0],
+                ],
+                size: { x: width, y: height },
+              }),
+              ...(strokeAsFill
+                ? {
+                    ...fills_trait(
+                      parentNode.strokes ?? [],
+                      context,
+                      imageRefsUsed
+                    ),
+                    ...stroke_trait(
+                      { strokes: [], strokeWeight: 0 },
+                      context,
+                      imageRefsUsed
+                    ),
+                  }
+                : {
+                    ...(options.useFill
+                      ? fills_trait(parentNode.fills, context, imageRefsUsed)
+                      : {}),
+                    ...(options.useStroke
+                      ? stroke_trait(parentNode, context, imageRefsUsed)
+                      : stroke_trait(
+                          { strokes: [], strokeWeight: 0 },
+                          context,
+                          imageRefsUsed
+                        )),
+                  }),
+              ...("effects" in parentNode && parentNode.effects
+                ? effects_trait(parentNode.effects)
+                : effects_trait(undefined)),
+              type: "path",
+              data: pathData,
+              layout_target_width: width,
+              layout_target_height: height,
+              fill_rule: map.windingRuleMap[geometry.windingRule] ?? "nonzero",
+            };
+          } catch (e) {
+            console.warn(`Failed to create path node (${name}):`, e);
             return null;
           }
         }
@@ -802,14 +1137,23 @@ export namespace iofigma {
             const childId = `${parentGridaId}_fill_${idx}`;
             const name = `${node.name || nodeTypeName} Fill ${idx + 1}`;
 
-            const childNode = createVectorNodeFromPath(
-              geometry.path ?? "",
-              geometry,
-              node,
-              childId,
-              name,
-              { useFill: true, useStroke: false }
-            );
+            const childNode = context.prefer_path_for_geometry
+              ? createPathNodeFromPath(
+                  geometry.path ?? "",
+                  geometry,
+                  node,
+                  childId,
+                  name,
+                  { useFill: true, useStroke: false }
+                )
+              : createVectorNodeFromPath(
+                  geometry.path ?? "",
+                  geometry,
+                  node,
+                  childId,
+                  name,
+                  { useFill: true, useStroke: false }
+                );
 
             if (childNode) {
               nodes[childId] = childNode;
@@ -837,14 +1181,23 @@ export namespace iofigma {
             const childId = `${parentGridaId}_stroke_${idx}`;
             const name = `${node.name || nodeTypeName} Stroke ${idx + 1}`;
 
-            const childNode = createVectorNodeFromPath(
-              geometry.path ?? "",
-              geometry,
-              node,
-              childId,
-              name,
-              { useFill: false, useStroke: true }
-            );
+            const childNode = context.prefer_path_for_geometry
+              ? createPathNodeFromPath(
+                  geometry.path ?? "",
+                  geometry,
+                  node,
+                  childId,
+                  name,
+                  { useFill: false, useStroke: false, strokeAsFill: true }
+                )
+              : createVectorNodeFromPath(
+                  geometry.path ?? "",
+                  geometry,
+                  node,
+                  childId,
+                  name,
+                  { useFill: false, useStroke: false, strokeAsFill: true }
+                );
 
             if (childNode) {
               nodes[childId] = childNode;
@@ -914,7 +1267,8 @@ export namespace iofigma {
             gridaId,
             images,
             parent,
-            context
+            context,
+            imageRefsUsed
           );
 
           if (!processedNode) {
@@ -952,7 +1306,7 @@ export namespace iofigma {
         // Generate a new scene ID
         const sceneId = generateId();
 
-        return {
+        const packed: grida.program.document.IPackedSceneDocument = {
           nodes,
           links: graph,
           scene: {
@@ -971,6 +1325,11 @@ export namespace iofigma {
           images: {},
           properties: {},
         };
+
+        return {
+          document: packed,
+          imageRefsUsed: Array.from(imageRefsUsed),
+        };
       }
 
       /**
@@ -983,6 +1342,7 @@ export namespace iofigma {
        * @param images
        * @param parent
        * @param context
+       * @param imageRefsUsed - Mutable set to collect image refs that need registration
        * @returns
        */
       function node_without_children(
@@ -990,7 +1350,8 @@ export namespace iofigma {
         gridaId: string,
         images: { [key: string]: string },
         parent: FigmaParentNode | undefined,
-        context: FactoryContext
+        context: FactoryContext,
+        imageRefsUsed: Set<string>
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
@@ -1005,8 +1366,8 @@ export namespace iofigma {
                 blendMode: "PASS_THROUGH",
               }),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...style_trait({}),
               ...corner_radius_trait({ cornerRadius: 0 }),
               ...container_layout_trait({}, false),
@@ -1017,13 +1378,16 @@ export namespace iofigma {
           //
           case "COMPONENT":
           case "INSTANCE":
-          case "FRAME": {
+          case "FRAME":
+          // Fallback: treat COMPONENT_SET as FRAME for rendering. Grida does not yet
+          // support component semantics; proper variant/swap support to be added later.
+          case "COMPONENT_SET": {
             return {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...style_trait({
                 overflow: node.clipsContent ? "clip" : undefined,
               }),
@@ -1082,8 +1446,8 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...fills_trait(node.fills),
-              ...text_stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...text_stroke_trait(node, context, imageRefsUsed),
               ...style_trait({}),
               ...effects_trait(node.effects),
               type: "tspan",
@@ -1127,8 +1491,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...corner_radius_trait(node),
               ...effects_trait(node.effects),
               type: "rectangle",
@@ -1139,8 +1503,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...arc_data_trait(node),
               ...effects_trait(node.effects),
               type: "ellipse",
@@ -1151,8 +1515,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "boolean",
               op: mapBooleanOperation(node.booleanOperation),
@@ -1162,7 +1526,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...stroke_trait(node),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "line",
               layout_positioning: "absolute",
@@ -1178,9 +1542,46 @@ export namespace iofigma {
           case "REGULAR_POLYGON":
           case "STAR":
           case "VECTOR": {
-            // Nodes with HasGeometryTrait (REST API with geometry=paths) don't have
-            // vector network data, only fillGeometry and strokeGeometry (SVG path strings).
-            // We'll create a GroupNode with child VectorNodes in processNode.
+            // When REST API returns prerelease vectorNetwork, use it for a single VectorNode; otherwise GroupNode + fill/stroke children.
+            // prefer_path_for_geometry takes priority: when true, always use fillGeometry/strokeGeometry (Path nodes) even if vectorNetwork is available.
+            const useRestVectorNetwork =
+              context.prefer_path_for_geometry !== true &&
+              context.disable_volatile_apis !== true &&
+              "vectorNetwork" in node &&
+              node.vectorNetwork != null;
+            if (useRestVectorNetwork) {
+              try {
+                const ir = restful.map.normalizeRestVectorNetworkToIR(
+                  node.vectorNetwork as __ir.VectorNetwork_restapi_volatile20260217
+                );
+                if (ir) {
+                  const gridaVectorNetwork: vn.VectorNetwork = {
+                    vertices: ir.vertices.map((v) => [v.x, v.y]),
+                    segments: ir.segments.map((seg) => ({
+                      a: seg.start.vertex,
+                      b: seg.end.vertex,
+                      ta: [seg.start.dx, seg.start.dy],
+                      tb: [seg.end.dx, seg.end.dy],
+                    })),
+                  };
+                  return {
+                    id: gridaId,
+                    ...base_node_trait(node),
+                    ...positioning_trait(node),
+                    ...fills_trait(node.fills, context, imageRefsUsed),
+                    ...stroke_trait(node, context, imageRefsUsed),
+                    ...corner_radius_trait(node),
+                    ...effects_trait(node.effects),
+                    type: "vector",
+                    vector_network: gridaVectorNetwork,
+                  } satisfies grida.program.nodes.VectorNode;
+                }
+              } catch {
+                // Fall through to GroupNode + fillGeometry/strokeGeometry path
+              }
+            }
+            // Nodes with HasGeometryTrait (REST API with geometry=paths) without vectorNetwork
+            // or with invalid vectorNetwork: create GroupNode with child VectorNodes in processNode.
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -1206,8 +1607,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...corner_radius_trait(node),
               ...effects_trait(node.effects),
               type: "vector",
@@ -1219,8 +1620,8 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "star",
               point_count: node.pointCount,
@@ -1232,17 +1633,12 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node),
-              ...fills_trait(node.fills),
-              ...stroke_trait(node),
+              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "polygon",
               point_count: node.pointCount,
             } satisfies grida.program.nodes.RegularPolygonNode;
-          }
-
-          // components
-          case "COMPONENT_SET": {
-            throw new Error(`Unsupported node type: ${node.type}`);
           }
 
           // figjam
@@ -1677,6 +2073,55 @@ export namespace iofigma {
       }
 
       /**
+       * HasExportSettingsTrait
+       * Maps Kiwi exportSettings → REST. Skips MP4 (refig unsupported).
+       */
+      function kiwi_has_export_settings_trait(nc: figkiwi.NodeChange) {
+        const settings = nc.exportSettings;
+        if (!settings?.length) return {};
+        const FMT = ["PNG", "JPG", "SVG", "PDF"] as const;
+        const FMT_STR: Record<string, (typeof FMT)[number] | null> = {
+          PNG: "PNG",
+          JPEG: "JPG",
+          JPG: "JPG",
+          SVG: "SVG",
+          PDF: "PDF",
+        };
+        const CSTR = ["SCALE", "WIDTH", "HEIGHT"] as const;
+        const CSTR_STR: Record<string, (typeof CSTR)[number]> = {
+          CONTENT_SCALE: "SCALE",
+          CONTENT_WIDTH: "WIDTH",
+          CONTENT_HEIGHT: "HEIGHT",
+        };
+        const fmt = (t: string | number | undefined) =>
+          typeof t === "string"
+            ? (FMT_STR[t] ?? null)
+            : typeof t === "number" && t < 4
+              ? FMT[t]
+              : null;
+        const cstr = (t: string | number | undefined) =>
+          typeof t === "string"
+            ? (CSTR_STR[t] ?? "SCALE")
+            : typeof t === "number" && t < 3
+              ? CSTR[t]
+              : "SCALE";
+
+        const exportSettings = settings
+          .map((s) => {
+            const f = fmt(s.imageType);
+            if (!f) return null;
+            const c = s.constraint;
+            return {
+              format: f,
+              suffix: s.suffix ?? "",
+              constraint: { type: cstr(c?.type), value: c?.value ?? 1 },
+            };
+          })
+          .filter((x): x is figrest.ExportSetting => x !== null);
+        return exportSettings.length ? { exportSettings } : {};
+      }
+
+      /**
        * HasChildrenTrait
        */
       function kiwi_children_trait() {
@@ -1916,6 +2361,7 @@ export namespace iofigma {
           ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.FrameNode;
       }
 
@@ -1933,6 +2379,7 @@ export namespace iofigma {
           ...kiwi_geometry_trait(nc),
           sectionContentsHidden: nc.sectionContentsHidden ?? false,
           ...kiwi_children_trait(),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.SectionNode;
       }
 
@@ -1953,6 +2400,7 @@ export namespace iofigma {
           ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.ComponentNode;
       }
 
@@ -2659,6 +3107,8 @@ export namespace iofigma {
       metadata: {
         version: number;
       };
+      /** ZIP contents from the .fig archive (for extractImages etc.). */
+      zip_files?: { [key: string]: Uint8Array };
     }
 
     export interface FigPage {
@@ -2691,7 +3141,19 @@ export namespace iofigma {
         metadata: {
           version: figData.header.version,
         },
+        zip_files: figData.zip_files,
       };
+    }
+
+    /**
+     * Extract images from .fig ZIP archive.
+     * @param zipFiles - Raw ZIP contents from FigFileDocument.zip_files or ParsedFigmaArchive.zip_files
+     * @returns Map of hash (hex string) to image bytes
+     */
+    export function extractImages(
+      zipFiles: { [key: string]: Uint8Array } | undefined
+    ): Map<string, Uint8Array> {
+      return extractImagesFromFigKiwi(zipFiles);
     }
 
     /**
@@ -2748,12 +3210,13 @@ export namespace iofigma {
     }
 
     /**
-     * Convert page to single packed document (bulk insert to avoid reducer nesting)
+     * Convert page to single packed document (bulk insert to avoid reducer nesting).
+     * Returns {@link restful.factory.FigmaImportResult} with merged document and imageRefsUsed.
      */
     export function convertPageToScene(
       page: FigPage,
-      context: restful.factory.FactoryContext
-    ): grida.program.document.IPackedSceneDocument {
+      context: iofigma.restful.factory.FactoryContext
+    ): iofigma.restful.factory.FigmaImportResult {
       // IMPORTANT:
       // When converting multiple root nodes, each `restful.factory.document()` call maintains its
       // own local ID mapping. If the caller doesn't provide a `node_id_generator`, the fallback
@@ -2765,18 +3228,19 @@ export namespace iofigma {
       const sharedNodeIdGenerator =
         context.node_id_generator ??
         (() => `figma-import-${Date.now()}-${++counter}`);
-      const sharedContext: restful.factory.FactoryContext = {
+      const sharedContext: iofigma.restful.factory.FactoryContext = {
         ...context,
         node_id_generator: sharedNodeIdGenerator,
       };
 
-      const individualDocs = page.rootNodes.map((rootNode) =>
-        restful.factory.document(rootNode, {}, sharedContext)
+      const individualResults = page.rootNodes.map((rootNode) =>
+        iofigma.restful.factory.document(rootNode, {}, sharedContext)
       );
 
-      if (individualDocs.length === 1) return individualDocs[0];
+      if (individualResults.length === 1) return individualResults[0];
 
       // Merge multiple roots into single document
+      const imageRefsUsed = new Set<string>();
       const merged: grida.program.document.IPackedSceneDocument = {
         bitmaps: {},
         images: {},
@@ -2796,16 +3260,21 @@ export namespace iofigma {
         },
       };
 
-      individualDocs.forEach((doc) => {
+      individualResults.forEach((result) => {
+        const doc = result.document;
         Object.assign(merged.nodes, doc.nodes);
         Object.assign(merged.links, doc.links);
         Object.assign(merged.images, doc.images);
         Object.assign(merged.bitmaps, doc.bitmaps);
         Object.assign(merged.properties, doc.properties);
         merged.scene.children_refs.push(...doc.scene.children_refs);
+        result.imageRefsUsed.forEach((ref: string) => imageRefsUsed.add(ref));
       });
 
-      return merged;
+      return {
+        document: merged,
+        imageRefsUsed: Array.from(imageRefsUsed),
+      };
     }
 
     /**
@@ -2822,8 +3291,8 @@ export namespace iofigma {
 
       static convertPageToScene(
         page: FigPage,
-        context: restful.factory.FactoryContext
-      ): grida.program.document.IPackedSceneDocument {
+        context: iofigma.restful.factory.FactoryContext
+      ): iofigma.restful.factory.FigmaImportResult {
         return convertPageToScene(page, context);
       }
     }

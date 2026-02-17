@@ -1551,8 +1551,9 @@ export namespace format {
             );
             fbs.LineNode.addMarkerEndShape(
               builder,
-              enums.STROKE_MARKER_PRESET_ENCODE.get(lineNode.marker_end_shape) ??
-                fbs.StrokeMarkerPreset.None
+              enums.STROKE_MARKER_PRESET_ENCODE.get(
+                lineNode.marker_end_shape
+              ) ?? fbs.StrokeMarkerPreset.None
             );
             nodeOffset = fbs.LineNode.endLineNode(builder);
             nodeType = fbs.Node.LineNode;
@@ -1945,40 +1946,28 @@ export namespace format {
 
         /**
          * Encodes ImagePaint.
+         * Uses ResourceRefRID only: src must be res:// or system://.
          */
         export function image(
           builder: Builder,
           paint: cg.ImagePaint
         ): { type: fbs.Paint; offset: flatbuffers.Offset } {
-          // Hash-only persistence for image paints.
-          // Accepted src forms:
-          // - "<hex16>" (canonical persisted identifier)
-          // - "res://images/<hex16>" (engine runtime URL)
-          // - "mem://<hex16>" (legacy/alternate runtime URL)
-          //
-          // NOTE: We intentionally do NOT encode RID/external URLs into FlatBuffers here.
-          //
-          // TODO(resources): once `res://` is the only cross-boundary identifier, restrict
-          // accepted runtime forms here to `res://<dir>/<id>` (and drop `mem://` entirely).
-          // Also, `res://` should map to a general-purpose archive directory path, not a
-          // hardcoded `images/` folder.
-          const rawSrc = (paint.src || "").trim().toLowerCase();
-          const src = rawSrc.startsWith("res://images/")
-            ? rawSrc.slice("res://images/".length)
-            : rawSrc.startsWith("mem://")
-              ? rawSrc.slice(6)
-              : rawSrc;
-          if (!/^[0-9a-f]{16}$/.test(src)) {
+          const rawSrc = (paint.src || "").trim();
+
+          let resourceRefOffset: flatbuffers.Offset;
+          let imageType: fbs.ResourceRef;
+
+          if (rawSrc.startsWith("res://") || rawSrc.startsWith("system://")) {
+            const ridOffset = builder.createString(rawSrc);
+            fbs.ResourceRefRID.startResourceRefRID(builder);
+            fbs.ResourceRefRID.addRid(builder, ridOffset);
+            resourceRefOffset = fbs.ResourceRefRID.endResourceRefRID(builder);
+            imageType = fbs.ResourceRef.ResourceRefRID;
+          } else {
             throw new Error(
-              `ImagePaint.src must be hex16 (or res://images/<hex16>, mem://<hex16>) for persistence. Got: "${paint.src}"`
+              `ImagePaint.src must be res:// or system:// resource ref. Got: "${paint.src}"`
             );
           }
-
-          const hashOffset = builder.createString(src);
-          fbs.ResourceRefHASH.startResourceRefHASH(builder);
-          fbs.ResourceRefHASH.addHash(builder, hashOffset);
-          const resourceRefOffset =
-            fbs.ResourceRefHASH.endResourceRefHASH(builder);
 
           // Create ImagePaintFit based on fit type
           let fitType: fbs.ImagePaintFit;
@@ -2019,7 +2008,7 @@ export namespace format {
           // Structs must be created inline within table context
           fbs.ImagePaint.startImagePaint(builder);
           fbs.ImagePaint.addActive(builder, paint.active ?? true);
-          fbs.ImagePaint.addImageType(builder, fbs.ResourceRef.ResourceRefHASH);
+          fbs.ImagePaint.addImageType(builder, imageType);
           fbs.ImagePaint.addImage(builder, resourceRefOffset);
           fbs.ImagePaint.addQuarterTurns(
             builder,
@@ -2315,9 +2304,9 @@ export namespace format {
 
         /**
          * Decodes ImagePaint.
+         * Supports both ResourceRefHASH (hex16) and ResourceRefRID (logical RID).
          */
         export function image(paintValue: unknown): cg.ImagePaint {
-          // NOTE: hash-only decode for image resource reference.
           const imagePaint = paintValue as fbs.ImagePaint;
 
           // Decode src from ResourceRef
@@ -2328,12 +2317,15 @@ export namespace format {
               new fbs.ResourceRefHASH()
             ) as fbs.ResourceRefHASH | null;
             if (resourceRef) {
-              // NOTE: WASM renderer currently uses `res://images/<hex16>` as the cross-boundary image id.
-              // Persisted form remains plain hex16; decode returns the runtime identifier.
-              //
-              // TODO(resources): once `res://<dir>/<id>` is fully generalized, avoid hardcoding `images/`.
               const hash = resourceRef.hash() ?? "";
               src = hash ? `res://images/${hash}` : "";
+            }
+          } else if (imageType === fbs.ResourceRef.ResourceRefRID) {
+            const resourceRef = imagePaint.image(
+              new fbs.ResourceRefRID()
+            ) as fbs.ResourceRefRID | null;
+            if (resourceRef) {
+              src = resourceRef.rid() ?? "";
             }
           }
 

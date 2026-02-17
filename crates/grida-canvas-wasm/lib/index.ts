@@ -1,8 +1,17 @@
 import createGridaCanvas from "./grida-canvas-wasm";
 import { version as _version } from "../package.json";
-import { Scene } from "./modules/canvas";
+import {
+  Scene,
+  type CreateImageResourceResult,
+  type AddImageWithIdResult,
+} from "./modules/canvas";
 import { svgtypes } from "./modules/svg-bindings";
-export { type Scene, type svgtypes };
+export {
+  type Scene,
+  type svgtypes,
+  type CreateImageResourceResult,
+  type AddImageWithIdResult,
+};
 export const version = _version;
 
 export interface GridaCanvasModuleInitOptions {
@@ -225,6 +234,39 @@ export class Canvas {
 
   addFont(family: string, bytes: Uint8Array) {
     this._scene.addFont(family, bytes);
+  }
+
+  /**
+   * Set the default fallback font families. Order matters for script fallback (e.g. CJK).
+   */
+  setFallbackFonts(fonts: string[]) {
+    this._scene.setFallbackFonts(fonts);
+  }
+
+  /**
+   * Get the current default fallback font families.
+   */
+  getFallbackFonts(): string[] {
+    return this._scene.getFallbackFonts();
+  }
+
+  /**
+   * Register image bytes with content-addressed RID (e.g. mem://&lt;hash&gt;).
+   * Use when you do not need a stable logical identifier.
+   */
+  addImage(data: Uint8Array): CreateImageResourceResult | false {
+    return this._scene.addImage(data);
+  }
+
+  /**
+   * Register image bytes with an explicit logical RID (e.g. res://images/logo.png).
+   * Use when you need stable, document-mapped identifiers.
+   */
+  addImageWithId(
+    data: Uint8Array,
+    rid: string
+  ): AddImageWithIdResult | false {
+    return this._scene.addImageWithId(data, rid);
   }
 
   exportNodeAs(id: string, format: types.ExportAs): { data: Uint8Array } {
