@@ -2,23 +2,25 @@
 title: refig
 ---
 
+import { VimeoEmbed } from '@site/src/components/VimeoEmbed';
+
 ### `@grida/refig` (refig)
 
 **refig** is a headless Figma renderer: render Figma documents to **PNG, JPEG, WebP, PDF, or SVG** in **Node.js (no browser required)** or directly in the **browser**.
 
-It’s built for **deterministic exports** (CI-friendly), **offline rendering** (from `.fig`), and **high-throughput previews** (thumbnails, snapshots, asset pipelines).
+It's built for **deterministic exports** (CI-friendly), **offline rendering** (from `.fig`), and **high-throughput previews** (thumbnails, snapshots, asset pipelines).
 
 - **npm package**: [`@grida/refig`](https://www.npmjs.com/package/@grida/refig) (technical reference, API, and CLI usage)
 
 ---
 
-### Demo
+### Demo video
 
-<div style="padding:64.67% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1165652748?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479&amp;autoplay=1&amp;muted=1&amp;loop=1" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" referrerpolicy="strict-origin-when-cross-origin" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="refig (headless figma renderer) demo"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
+<VimeoEmbed videoId="1165652748" title="refig (headless figma renderer) demo" />
 
 ---
 
-### What it does (and doesn’t)
+### What it does (and doesn't)
 
 - **Renders pixels (and vector outputs)** from a Figma document + a target node id
 - **Does not** fetch from the Figma API for you (bring your own auth + HTTP client)
@@ -78,7 +80,7 @@ npx @grida/refig ./design.fig --export-all --out ./exports
 
 - **Deterministic exports** in CI (avoid flaky UI automation)
 - **Offline rendering** from `.fig` archives
-- **Faster previews** than API-driven “export images” workflows in high-volume pipelines
+- **Faster previews** than API-driven "export images" workflows in high-volume pipelines
 - **One renderer** for Node and browser (use the browser entrypoint for in-app previews)
 
 ---
