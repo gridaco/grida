@@ -10,8 +10,10 @@ import {
   writeFileSync,
   existsSync,
   statSync,
+  mkdtempSync,
 } from "node:fs";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { program } from "commander";
 import {
   FigmaDocument,
@@ -260,9 +262,9 @@ async function main(): Promise<void> {
       "<input>",
       "Path to .fig, JSON file (REST API response), or directory containing document.json (and optionally images/)"
     )
-    .requiredOption(
+    .option(
       "--out <path>",
-      "Output file path (single node) or output directory (--export-all)"
+      "Output file path (single node) or output directory (--export-all); when omitted, uses OS temp directory (valid with --export-all or with both --format and --node)"
     )
     .option(
       "--images <dir>",
@@ -298,10 +300,6 @@ async function main(): Promise<void> {
         const explicitImagesDir =
           typeof options.images === "string" ? options.images : undefined;
 
-        if (!outPath) {
-          program.error("--out is required");
-        }
-
         const { documentPath, imagesDir, isRestJson } = resolveInput(
           input.trim(),
           explicitImagesDir
@@ -311,17 +309,22 @@ async function main(): Promise<void> {
           if (nodeId) {
             program.error("--node must not be used with --export-all");
           }
-          const outDir = path.resolve(outPath);
-          if (existsSync(outDir)) {
-            const stat = statSync(outDir);
-            if (!stat.isDirectory()) {
-              program.error(
-                "--out must be a directory when using --export-all"
-              );
-            }
-          } else {
-            mkdirSync(outDir, { recursive: true });
-          }
+          const outDir = outPath
+            ? (() => {
+                const resolved = path.resolve(outPath);
+                if (existsSync(resolved)) {
+                  const stat = statSync(resolved);
+                  if (!stat.isDirectory()) {
+                    program.error(
+                      "--out must be a directory when using --export-all"
+                    );
+                  }
+                } else {
+                  mkdirSync(resolved, { recursive: true });
+                }
+                return resolved;
+              })()
+            : mkdtempSync(path.join(tmpdir(), "refig-export-"));
           await runExportAll(
             documentPath,
             outDir,
@@ -338,9 +341,31 @@ async function main(): Promise<void> {
         const width = Number(options.width ?? 1024);
         const height = Number(options.height ?? 1024);
         const scale = Number(options.scale ?? 1);
-        await runSingleNode(documentPath, nodeId, path.resolve(outPath), {
-          format:
-            typeof options.format === "string" ? options.format : undefined,
+        const formatOption =
+          typeof options.format === "string" ? options.format : undefined;
+
+        let singleOutPath: string;
+        if (outPath) {
+          singleOutPath = path.resolve(outPath);
+        } else {
+          if (!formatOption) {
+            program.error(
+              "When --out is omitted, both --node and --format are required"
+            );
+          }
+          const format = formatOption.toLowerCase();
+          if (!FORMAT_SET.has(format)) {
+            program.error(`Unsupported --format "${format}"`);
+          }
+          const ext = EXT_BY_FORMAT[format] ?? "png";
+          singleOutPath = path.join(
+            tmpdir(),
+            `refig-${sanitizeForFilename(nodeId)}.${ext}`
+          );
+        }
+
+        await runSingleNode(documentPath, nodeId, singleOutPath, {
+          format: formatOption,
           width,
           height,
           scale,

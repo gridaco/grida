@@ -194,8 +194,9 @@ pnpm add -g @grida/refig
 Or run without installing:
 
 ```sh
-npx @grida/refig <input> --node <node-id> --out <path>
-pnpm dlx @grida/refig <input> --node <node-id> --out <path>
+# Instant usage (writes to OS temp dir; output path printed)
+npx @grida/refig <input> --node <node-id> --format png
+pnpm dlx @grida/refig <input> --export-all
 ```
 
 ### Usage
@@ -211,44 +212,50 @@ Using a directory avoids passing the document and images separately.
 
 ```sh
 # Single node (default)
-refig <input> --node <node-id> --out <path> [options]
+# - Without --out: writes to OS temp dir (requires --format)
+# - With --out: format inferred from file extension unless --format is provided
+refig <input> --node <node-id> --format <fmt> [options]
+refig <input> --node <node-id> --out <path> [--format <fmt>] [options]
 
 # With images directory (REST JSON only; IMAGE fills rendered from local files)
-refig <input> --images <dir> --node <node-id> --out <path>
+refig <input> --images <dir> --node <node-id> --format <fmt> [options]
+refig <input> --images <dir> --node <node-id> --out <path> [--format <fmt>] [options]
 
 # Directory input: document.json + images/ under one folder
-refig ./my-figma-export --node "1:23" --out ./out.png
+refig ./my-figma-export --node "1:23" --format png
 
 # Export all nodes that have exportSettings (REST JSON or .fig)
-refig <input> --export-all --out <output-dir>
+refig <input> --export-all [--out <output-dir>]
 ```
 
 ### Examples
 
 ```sh
-# Render a node from a .fig file
-refig ./design.fig --node "1:23" --out ./out.png
-
-# Render from REST API JSON
-refig ./figma-response.json --node "1:23" --out ./out.svg
+# Instant usage: omit --out to write to OS temp directory (output path printed)
+refig ./design.fig --node "1:23" --format png
+refig ./figma-response.json --node "1:23" --format svg
 
 # Directory with document.json (and optionally images/): one path instead of response + --images
-refig ./my-figma-export --node "1:23" --out ./out.png
+refig ./my-figma-export --node "1:23" --format png
 # (my-figma-export/document.json, my-figma-export/images/)
 
 # Explicit images directory (when not using a project directory)
-refig ./figma-response.json --images ./downloaded-images --node "1:23" --out ./out.png
+refig ./figma-response.json --images ./downloaded-images --node "1:23" --format png
 
 # Export all: render every node that has export settings (see below)
-refig ./figma-response.json --export-all --out ./exports
-refig ./design.fig --export-all --out ./exports
+refig ./figma-response.json --export-all
+refig ./design.fig --export-all
 
 # Scale 2x, custom dimensions
-refig ./design.fig --node "1:23" --out ./out.png --width 512 --height 512 --scale 2
+refig ./design.fig --node "1:23" --format png --width 512 --height 512 --scale 2
+
+# Deterministic output: provide --out (useful for CI or saving into a known path)
+refig ./design.fig --node "1:23" --out ./out.png
+refig ./figma-response.json --export-all --out ./exports
 
 # No-install (run without installing)
-npx @grida/refig ./design.fig --node "1:23" --out ./out.png
-pnpm dlx @grida/refig ./design.fig --node "1:23" --out ./out.png
+npx @grida/refig ./design.fig --node "1:23" --format png
+pnpm dlx @grida/refig ./design.fig --export-all
 ```
 
 ### Quick test via `figma_archive.py` (REST API → `document.json` + `images/`)
@@ -275,10 +282,10 @@ This writes:
 
 ```sh
 # Single node
-refig ./my-figma-export --node "1:23" --out ./out.png
+refig ./my-figma-export --node "1:23" --format png
 
 # Or export everything with Figma export presets
-refig ./my-figma-export --export-all --out ./exports
+refig ./my-figma-export --export-all
 ```
 
 ### Export all (`--export-all`)
@@ -291,17 +298,17 @@ With **`--export-all`**, refig walks the document and renders every node that ha
 
 ### Flags
 
-| Flag             | Required | Default                         | Description                                                                                   |
-| ---------------- | -------- | ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `<input>`        | yes      |                                 | Path to `.fig`, JSON file, or directory containing `document.json` (and optionally `images/`) |
-| `--images <dir>` | no       |                                 | Directory of image assets for REST document (ignored if `<input>` is a dir with `images/`)    |
-| `--node <id>`    | yes\*    |                                 | Figma node ID to render (\*omit when using `--export-all`)                                    |
-| `--out <path>`   | yes      |                                 | Output file path (single node) or output directory (`--export-all`)                           |
-| `--export-all`   | no       |                                 | Export every node with exportSettings (REST JSON or .fig); `--out` is a directory             |
-| `--format <fmt>` | no       | inferred from `--out` extension | `png`, `jpeg`, `webp`, `pdf`, `svg` (single-node only)                                        |
-| `--width <px>`   | no       | `1024`                          | Viewport width (single-node only)                                                             |
-| `--height <px>`  | no       | `1024`                          | Viewport height (single-node only)                                                            |
-| `--scale <n>`    | no       | `1`                             | Raster scale factor (single-node only)                                                        |
+| Flag             | Required | Default                         | Description                                                                                                                                                                          |
+| ---------------- | -------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<input>`        | yes      |                                 | Path to `.fig`, JSON file, or directory containing `document.json` (and optionally `images/`)                                                                                        |
+| `--images <dir>` | no       |                                 | Directory of image assets for REST document (ignored if `<input>` is a dir with `images/`)                                                                                           |
+| `--node <id>`    | yes\*    |                                 | Figma node ID to render (\*omit when using `--export-all`)                                                                                                                           |
+| `--out <path>`   | no       | OS temp dir when omitted        | Output file path (single node) or output directory (`--export-all`). When omitted, writes to the OS temp directory (valid with `--export-all` or with both `--format` and `--node`). |
+| `--export-all`   | no       |                                 | Export every node with exportSettings (REST JSON or .fig); `--out` is a directory                                                                                                    |
+| `--format <fmt>` | no       | inferred from `--out` extension | `png`, `jpeg`, `webp`, `pdf`, `svg` (single-node only; required when `--out` is omitted)                                                                                             |
+| `--width <px>`   | no       | `1024`                          | Viewport width (single-node only)                                                                                                                                                    |
+| `--height <px>`  | no       | `1024`                          | Viewport height (single-node only)                                                                                                                                                   |
+| `--scale <n>`    | no       | `1`                             | Raster scale factor (single-node only)                                                                                                                                               |
 
 ## Architecture
 
@@ -332,9 +339,9 @@ REST JSON ───┘
 **CLI** — You can pass images in two ways:
 
 - **`--images <dir>`** — Explicit images directory. Files are keyed by filename without extension (e.g. `a1b2c3d4.png` → ref `a1b2c3d4`). Use when the document is a separate file:  
-  `refig ./figma-response.json --images ./downloaded-images --node "1:23" --out ./out.png`
+  `refig ./figma-response.json --images ./downloaded-images --node "1:23" --format png`
 - **Directory input** — Pass a single directory that contains **`document.json`** (REST response) and optionally **`images/`**. No need to pass `--images` separately:  
-  `refig ./my-figma-export --node "1:23" --out ./out.png`  
+  `refig ./my-figma-export --node "1:23" --format png`  
   (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/`.)
 
 For **`.fig`** input, images are embedded in the file; no extra images directory is needed. For **REST** input, use `--images` or a project directory with `images/` to render IMAGE fills correctly.
@@ -372,7 +379,7 @@ From the package root:
 
 1. Install dependencies and build: `pnpm install && pnpm build`
 2. Link the package so the `refig` CLI is available: `pnpm link --global`
-3. Run the `refig` command from anywhere to test (e.g. `refig ./fixture.json --node "1:1" --out ./out.png`)
+3. Run the `refig` command from anywhere to test (e.g. `refig ./fixture.json --node "1:1" --format png`)
 
 To unlink: `pnpm unlink --global`.
 
