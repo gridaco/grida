@@ -1,6 +1,6 @@
 # `@grida/refig`
 
-> **re**nder **fig**ma — headless Figma renderer (Node.js + browser) in the spirit of [`resvg-js`](https://github.com/nicolo-ribaudo/resvg-js)
+> **re**nder **fig**ma — headless Figma renderer (Node.js + browser) in the spirit of [`resvg`](https://github.com/linebender/resvg)
 
 Render Figma documents to **PNG, JPEG, WebP, PDF, and SVG** in **Node.js (no browser required)** or directly in the **browser**.
 
