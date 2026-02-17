@@ -1062,7 +1062,6 @@ export namespace iofigma {
 
           const childIds: string[] = [];
 
-          console.log("node.strokeGeometry", node.strokeGeometry);
           node.strokeGeometry.forEach((geometry, idx) => {
             const childId = `${parentGridaId}_stroke_${idx}`;
             const name = `${node.name || nodeTypeName} Stroke ${idx + 1}`;
