@@ -391,6 +391,13 @@ export namespace iofigma {
          * Set to true to always use fillGeometry/strokeGeometry (GroupNode + children) for VECTORs.
          */
         disable_volatile_apis?: boolean;
+        /**
+         * When true, convert fillGeometry/strokeGeometry to Path nodes (raw SVG path data)
+         * instead of Vector nodes (vector network). Use for render-only pipelines (e.g. refig)
+         * to avoid vn.fromSVGPathData conversions. Path nodes are not editable in the editor.
+         * @default false
+         */
+        prefer_path_for_geometry?: boolean;
       };
 
       function toGradientPaint(paint: figrest.GradientPaint) {
@@ -911,6 +918,25 @@ export namespace iofigma {
         }
 
         /**
+         * Extracts width/height from a node with layout traits (Figma REST API).
+         * Uses absoluteBoundingBox or size; avoids parsing path data.
+         */
+        function getParentBounds(node: InputNode & figrest.HasGeometryTrait): {
+          width: number;
+          height: number;
+        } {
+          const box =
+            "absoluteBoundingBox" in node
+              ? node.absoluteBoundingBox
+              : undefined;
+          const sz = "size" in node ? node.size : undefined;
+          return {
+            width: box?.width ?? sz?.x ?? 0,
+            height: box?.height ?? sz?.y ?? 0,
+          };
+        }
+
+        /**
          * Creates a VectorNode from SVG path data.
          * Used for converting nodes with HasGeometryTrait (REST API with geometry=paths).
          * Applies to VECTOR, STAR, REGULAR_POLYGON, and other shape nodes.
@@ -938,15 +964,9 @@ export namespace iofigma {
 
           try {
             const vectorNetwork = vn.fromSVGPathData(pathData);
-            const bbox = vn.getBBox(vectorNetwork);
+            const { width, height } = getParentBounds(parentNode);
 
-            // Note: In test environment with mocked svg-pathdata, vector networks may be empty.
-            // This is expected and the positioning logic will still work correctly.
-
-            // The SVG path coordinates are already in the parent VECTOR node's coordinate space.
-            // We keep the vector network coordinates as-is and position the child at its bbox origin
-            // relative to the parent GroupNode. This preserves the correct spatial relationships
-            // between fill and stroke geometries.
+            // Use parent node bounds instead of computing bbox from path; Figma path data aligns with node coordinate space.
             const strokeAsFill = options.strokeAsFill === true;
             return {
               id: childId,
@@ -966,10 +986,10 @@ export namespace iofigma {
               }),
               ...positioning_trait({
                 relativeTransform: [
-                  [1, 0, bbox.x],
-                  [0, 1, bbox.y],
+                  [1, 0, 0],
+                  [0, 1, 0],
                 ],
-                size: { x: bbox.width, y: bbox.height },
+                size: { x: width, y: height },
               }),
               ...(strokeAsFill
                 ? {
@@ -1001,8 +1021,8 @@ export namespace iofigma {
                 : effects_trait(undefined)),
               type: "vector",
               vector_network: vectorNetwork,
-              layout_target_width: bbox.width,
-              layout_target_height: bbox.height,
+              layout_target_width: width,
+              layout_target_height: height,
               fill_rule: map.windingRuleMap[geometry.windingRule] ?? "nonzero",
             };
           } catch (e) {
@@ -1010,6 +1030,92 @@ export namespace iofigma {
               `Failed to convert path to vector network (${name}):`,
               e
             );
+            return null;
+          }
+        }
+
+        /**
+         * Creates a PathNode from SVG path data.
+         * Used when prefer_path_for_geometry is true for render-only pipelines.
+         */
+        function createPathNodeFromPath(
+          pathData: string,
+          geometry: {
+            windingRule: figrest.Path["windingRule"];
+          },
+          parentNode: InputNode & figrest.HasGeometryTrait,
+          childId: string,
+          name: string,
+          options: {
+            useFill: boolean;
+            useStroke: boolean;
+            strokeAsFill?: boolean;
+          }
+        ): grida.program.nodes.PathNode | null {
+          if (!pathData) return null;
+
+          try {
+            const { width, height } = getParentBounds(parentNode);
+            const strokeAsFill = options.strokeAsFill === true;
+            return {
+              id: childId,
+              ...base_node_trait({
+                name,
+                visible: "visible" in parentNode ? parentNode.visible : true,
+                locked: "locked" in parentNode ? parentNode.locked : false,
+                rotation: 0,
+                opacity:
+                  "opacity" in parentNode && parentNode.opacity !== undefined
+                    ? parentNode.opacity
+                    : 1,
+                blendMode:
+                  "blendMode" in parentNode && parentNode.blendMode
+                    ? parentNode.blendMode
+                    : "NORMAL",
+              }),
+              ...positioning_trait({
+                relativeTransform: [
+                  [1, 0, 0],
+                  [0, 1, 0],
+                ],
+                size: { x: width, y: height },
+              }),
+              ...(strokeAsFill
+                ? {
+                    ...fills_trait(
+                      parentNode.strokes ?? [],
+                      context,
+                      imageRefsUsed
+                    ),
+                    ...stroke_trait(
+                      { strokes: [], strokeWeight: 0 },
+                      context,
+                      imageRefsUsed
+                    ),
+                  }
+                : {
+                    ...(options.useFill
+                      ? fills_trait(parentNode.fills, context, imageRefsUsed)
+                      : {}),
+                    ...(options.useStroke
+                      ? stroke_trait(parentNode, context, imageRefsUsed)
+                      : stroke_trait(
+                          { strokes: [], strokeWeight: 0 },
+                          context,
+                          imageRefsUsed
+                        )),
+                  }),
+              ...("effects" in parentNode && parentNode.effects
+                ? effects_trait(parentNode.effects)
+                : effects_trait(undefined)),
+              type: "path",
+              data: pathData,
+              layout_target_width: width,
+              layout_target_height: height,
+              fill_rule: map.windingRuleMap[geometry.windingRule] ?? "nonzero",
+            };
+          } catch (e) {
+            console.warn(`Failed to create path node (${name}):`, e);
             return null;
           }
         }
@@ -1031,14 +1137,23 @@ export namespace iofigma {
             const childId = `${parentGridaId}_fill_${idx}`;
             const name = `${node.name || nodeTypeName} Fill ${idx + 1}`;
 
-            const childNode = createVectorNodeFromPath(
-              geometry.path ?? "",
-              geometry,
-              node,
-              childId,
-              name,
-              { useFill: true, useStroke: false }
-            );
+            const childNode = context.prefer_path_for_geometry
+              ? createPathNodeFromPath(
+                  geometry.path ?? "",
+                  geometry,
+                  node,
+                  childId,
+                  name,
+                  { useFill: true, useStroke: false }
+                )
+              : createVectorNodeFromPath(
+                  geometry.path ?? "",
+                  geometry,
+                  node,
+                  childId,
+                  name,
+                  { useFill: true, useStroke: false }
+                );
 
             if (childNode) {
               nodes[childId] = childNode;
@@ -1066,14 +1181,23 @@ export namespace iofigma {
             const childId = `${parentGridaId}_stroke_${idx}`;
             const name = `${node.name || nodeTypeName} Stroke ${idx + 1}`;
 
-            const childNode = createVectorNodeFromPath(
-              geometry.path ?? "",
-              geometry,
-              node,
-              childId,
-              name,
-              { useFill: false, useStroke: false, strokeAsFill: true }
-            );
+            const childNode = context.prefer_path_for_geometry
+              ? createPathNodeFromPath(
+                  geometry.path ?? "",
+                  geometry,
+                  node,
+                  childId,
+                  name,
+                  { useFill: false, useStroke: false, strokeAsFill: true }
+                )
+              : createVectorNodeFromPath(
+                  geometry.path ?? "",
+                  geometry,
+                  node,
+                  childId,
+                  name,
+                  { useFill: false, useStroke: false, strokeAsFill: true }
+                );
 
             if (childNode) {
               nodes[childId] = childNode;
@@ -1419,7 +1543,9 @@ export namespace iofigma {
           case "STAR":
           case "VECTOR": {
             // When REST API returns prerelease vectorNetwork, use it for a single VectorNode; otherwise GroupNode + fill/stroke children.
+            // prefer_path_for_geometry takes priority: when true, always use fillGeometry/strokeGeometry (Path nodes) even if vectorNetwork is available.
             const useRestVectorNetwork =
+              context.prefer_path_for_geometry !== true &&
               context.disable_volatile_apis !== true &&
               "vectorNetwork" in node &&
               node.vectorNetwork != null;

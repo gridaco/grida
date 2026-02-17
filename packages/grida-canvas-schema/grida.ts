@@ -1194,6 +1194,7 @@ export namespace grida.program.nodes {
     | HTMLRichTextNode
     | BitmapNode
     | VectorNode
+    | PathNode
     | LineNode
     | RectangleNode
     | EllipseNode
@@ -1212,6 +1213,7 @@ export namespace grida.program.nodes {
     | ComputedHTMLIFrameNode
     | ComputedHTMLRichTextNode
     | ComputedVectorNode
+    | ComputedPathNode
     | ComputedLineNode
     | ComputedRectangleNode
     | ComputedEllipseNode
@@ -1231,6 +1233,7 @@ export namespace grida.program.nodes {
       Partial<ComputedHTMLIFrameNode> &
       Partial<ComputedHTMLRichTextNode> &
       Partial<ComputedVectorNode> &
+      Partial<ComputedPathNode> &
       Partial<ComputedLineNode> &
       Partial<ComputedRectangleNode> &
       Partial<ComputedEllipseNode> &
@@ -1257,6 +1260,7 @@ export namespace grida.program.nodes {
       Partial<HTMLIFrameNode> &
       Partial<HTMLRichTextNode> &
       Partial<VectorNode> &
+      Partial<PathNode> &
       Partial<LineNode> &
       Partial<RectangleNode> &
       Partial<EllipseNode> &
@@ -1302,6 +1306,9 @@ export namespace grida.program.nodes {
       __IPrototypeNodeChildren
   >;
   export type PathNodePrototype = __TPrototypeNode<
+    Omit<Partial<PathNode>, __base_scene_node_properties>
+  >;
+  export type VectorNodePrototype = __TPrototypeNode<
     Omit<Partial<VectorNode>, __base_scene_node_properties>
   >;
   export type LineNodePrototype = __TPrototypeNode<
@@ -1340,6 +1347,7 @@ export namespace grida.program.nodes {
       >
     | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
     | PathNodePrototype
+    | VectorNodePrototype
     | LineNodePrototype
     | RectangleNodePrototype
     | EllipseNodePrototype
@@ -2422,6 +2430,34 @@ export namespace grida.program.nodes {
   export interface ComputedVectorNode
     extends __ReplaceSubset<VectorNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
     readonly type: "vector";
+  }
+
+  /**
+   * Path Node
+   *
+   * SVG path compatible node that stores raw SVG path data. Use for render-only
+   * pipelines where editing is not needed. Avoids vector network conversion.
+   *
+   * - [Env:WASM] Renders via Path::from_svg and Skia path
+   * - [Env:HTML/SVG] Not yet supported in DOM renderer
+   *
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path}
+   */
+  export interface PathNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IBasicShapeTrait,
+      i.IHotspotTrait {
+    readonly type: "path";
+    data: string;
+    fill_rule?: cg.FillRule;
+  }
+
+  export interface ComputedPathNode
+    extends __ReplaceSubset<PathNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
+    readonly type: "path";
   }
 
   /**

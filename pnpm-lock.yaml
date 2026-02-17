@@ -1180,8 +1180,8 @@ importers:
   packages/grida-canvas-sdk-render-figma:
     dependencies:
       '@grida/canvas-wasm':
-        specifier: 0.90.0-canary.7
-        version: 0.90.0-canary.7
+        specifier: 0.90.0-canary.8
+        version: 0.90.0-canary.8
       commander:
         specifier: ^12.1.0
         version: 12.1.0
@@ -3305,8 +3305,8 @@ packages:
   '@formatjs/intl-localematcher@0.6.2':
     resolution: {integrity: sha512-XOMO2Hupl0wdd172Y06h6kLpBz6Dv+J4okPLl4LPtzbr8f66WbIoy4ev98EBuZ6ZK4h5ydTN6XneT4QVpD7cdA==}
 
-  '@grida/canvas-wasm@0.90.0-canary.7':
-    resolution: {integrity: sha512-Ot6mRE+b8ZnqLEFjvQddZ7p0XyASlQmcQcub+iSmzrpJ4JamOrF9jGgpe7peRJlHFnniTvBqEB0DGX/5tMNrZA==}
+  '@grida/canvas-wasm@0.90.0-canary.8':
+    resolution: {integrity: sha512-Sd6v3Vmbogjx0iQgkMduGwTHpZaWR1XLHP1D+KSn1WnHB8S68MSV2Ta4hkhueEtsuFdLdvE71oovypo2iHwDMA==}
 
   '@grida/tailwindcss-colors@4.0.1':
     resolution: {integrity: sha512-lRJ1YO3MVSoabbH+xU00IlE49zevUD2NiEjrclsPBNMRLbDSmG+6jdvEOVQHqBo5kXN9x5jomFQrjy/5hzebGQ==}
@@ -17416,7 +17416,7 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@grida/canvas-wasm@0.90.0-canary.7': {}
+  '@grida/canvas-wasm@0.90.0-canary.8': {}
 
   '@grida/tailwindcss-colors@4.0.1': {}
 

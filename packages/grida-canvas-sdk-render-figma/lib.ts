@@ -376,6 +376,7 @@ function restJsonToSceneJson(
     overrides: Partial<iofigma.restful.factory.FactoryContext>
   ): iofigma.restful.factory.FactoryContext => ({
     gradient_id_generator: baseGradientGen,
+    prefer_path_for_geometry: true,
     ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
     ...overrides,
   });
@@ -574,6 +575,7 @@ function figBytesToSceneJson(
     node_id_generator: () => `refig-${++counter}`,
     gradient_id_generator: () => `grad-${++counter}`,
     preserve_figma_ids: true,
+    prefer_path_for_geometry: true,
     ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
   };
 

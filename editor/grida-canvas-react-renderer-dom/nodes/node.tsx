@@ -225,6 +225,7 @@ const fillings = {
   instance: "none",
   line: "none",
   vector: "none",
+  path: "none",
   polyline: "none",
   bitmap: "background",
 } as const;

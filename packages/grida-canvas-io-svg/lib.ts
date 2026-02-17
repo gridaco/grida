@@ -181,6 +181,7 @@ export namespace iosvg {
   type SVGIOCompatibleNodePrototype =
     | grida.program.nodes.ContainerNodePrototype
     | grida.program.nodes.GroupNodePrototype
+    | grida.program.nodes.VectorNodePrototype
     | grida.program.nodes.PathNodePrototype
     | grida.program.nodes.RectangleNodePrototype
     | grida.program.nodes.EllipseNodePrototype;
@@ -253,7 +254,7 @@ export namespace iosvg {
           layout_inset_top: position.top,
           fill_rule: fill_rule,
           opacity: fillOpacity,
-        } satisfies grida.program.nodes.PathNodePrototype;
+        } satisfies grida.program.nodes.VectorNodePrototype;
       }
 
       case "text": {

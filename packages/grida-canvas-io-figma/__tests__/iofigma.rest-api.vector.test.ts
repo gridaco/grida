@@ -330,6 +330,85 @@ describe("iofigma.restful.factory.document", () => {
       expect(groupNode).toBeDefined();
       expect(groupNode!.type).toBe("group");
     });
+
+    it("should convert fillGeometry/strokeGeometry to Path nodes when prefer_path_for_geometry is true", () => {
+      const vectorNodeWithGeometry: figrest.VectorNode & figrest.HasGeometryTrait =
+        {
+          id: "vec-path-pref",
+          name: "Vector path prefer",
+          type: "VECTOR",
+          blendMode: "PASS_THROUGH",
+          absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+          absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
+          constraints: { vertical: "TOP", horizontal: "LEFT" },
+          scrollBehavior: "FIXED",
+          fills: [
+            {
+              type: "SOLID",
+              color: { r: 1, g: 0, b: 0, a: 1 },
+              visible: true,
+              blendMode: "NORMAL",
+            },
+          ],
+          strokes: [
+            {
+              type: "SOLID",
+              color: { r: 0, g: 0, b: 1, a: 1 },
+              visible: true,
+              blendMode: "NORMAL",
+            },
+          ],
+          strokeWeight: 2,
+          strokeAlign: "INSIDE",
+          effects: [],
+          cornerRadius: 0,
+          fillGeometry: [
+            { path: "M0 0 L100 0 L100 100 L0 100 Z", windingRule: "NONZERO" },
+          ],
+          strokeGeometry: [
+            { path: "M10 10 L90 10 L90 90 L10 90 Z", windingRule: "NONZERO" },
+          ],
+        };
+
+      const context: iofigma.restful.factory.FactoryContext = {
+        gradient_id_generator: () => `gradient_${Math.random()}`,
+        prefer_path_for_geometry: true,
+      };
+
+      const { document: gridaDocument } = iofigma.restful.factory.document(
+        vectorNodeWithGeometry,
+        {},
+        context
+      );
+
+      const groupNode = Object.values(gridaDocument.nodes).find(
+        (n): n is grida.program.nodes.GroupNode =>
+          n.type === "group" && n.name === "Vector path prefer"
+      );
+      expect(groupNode).toBeDefined();
+      expect(groupNode!.type).toBe("group");
+
+      const groupChildren = gridaDocument.links[groupNode!.id];
+      expect(groupChildren).toBeDefined();
+      expect(groupChildren!.length).toBeGreaterThan(0);
+
+      const childNodes = groupChildren!
+        .map((id: string) => gridaDocument.nodes[id])
+        .filter(Boolean) as grida.program.nodes.Node[];
+
+      const pathChildren = childNodes.filter(
+        (n): n is grida.program.nodes.PathNode => n.type === "path"
+      );
+      expect(pathChildren.length).toBeGreaterThan(0);
+      expect(pathChildren.length).toBe(childNodes.length);
+
+      pathChildren.forEach((child) => {
+        expect(child.type).toBe("path");
+        expect("data" in child && typeof child.data === "string").toBe(true);
+        expect(child.data.length).toBeGreaterThan(0);
+        expect("vector_network" in child).toBe(false);
+      });
+    });
   });
 
   describe("resolve_image_src and imageRefsUsed", () => {
