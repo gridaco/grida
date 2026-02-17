@@ -237,6 +237,20 @@ export class Canvas {
   }
 
   /**
+   * Set the default fallback font families. Order matters for script fallback (e.g. CJK).
+   */
+  setFallbackFonts(fonts: string[]) {
+    this._scene.setFallbackFonts(fonts);
+  }
+
+  /**
+   * Get the current default fallback font families.
+   */
+  getFallbackFonts(): string[] {
+    return this._scene.getFallbackFonts();
+  }
+
+  /**
    * Register image bytes with content-addressed RID (e.g. mem://&lt;hash&gt;).
    * Use when you do not need a stable logical identifier.
    */
