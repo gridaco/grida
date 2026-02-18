@@ -1,0 +1,29 @@
+name: typos
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Check for typos
+        uses: crate-ci/typos@master
+        with:
+          files: |
+            .
+          exclude: |
+            **/*.lock
+            **/node_modules/**
+            **/target/**
+            **/.git/**
+            **/dist/**
+            **/build/**
+            **/.next/**
