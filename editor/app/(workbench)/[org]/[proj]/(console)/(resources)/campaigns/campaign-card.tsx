@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -17,7 +18,6 @@ export function CampaignCard({
 }: {
   data: Platform.WEST.Referral.Campaign;
 }) {
-  // This would normally be passed as props
   const campaign = {
     id: data.id,
     title: data.title,
@@ -28,39 +28,29 @@ export function CampaignCard({
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="p-4 pb-0 flex flex-row items-start justify-between space-y-0">
-        <div>
-          <Badge variant={"outline"}>
+    <Card size="sm" className="overflow-hidden">
+      <CardHeader>
+        <CardAction>
+          <Badge variant="outline">
             {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
           </Badge>
-          <CardTitle className="text-lg mt-2">{campaign.title}</CardTitle>
-          <CardDescription className="line-clamp-1 mt-1">
-            {campaign.description?.substring(0, 100) ?? "(No description)"}
-          </CardDescription>
-        </div>
+        </CardAction>
+        <CardTitle>{campaign.title}</CardTitle>
+        <CardDescription className="line-clamp-1">
+          {campaign.description?.substring(0, 100) ?? "(No description)"}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="p-4">
-        <div className="space-y-4">
-          <div className="flex justify-between text-sm">
-            {/* <div className="flex items-center gap-1">
-              <Users className="size-4 text-muted-foreground" />
-              <span>{campaign.referrals} referrals</span>
-            </div> */}
+      <CardContent>
+        {campaign.open_at && (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Clock className="size-3" />
+            <span>
+              Started {new Date(campaign.open_at).toLocaleDateString()}
+            </span>
           </div>
-          <div className="flex justify-between text-sm text-muted-foreground">
-            {campaign.open_at && (
-              <div className="flex items-center gap-1">
-                <Clock className="size-3" />
-                <span>
-                  Started {new Date(campaign.open_at).toLocaleDateString()}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </CardContent>
-      <CardFooter className="p-4 pt-0 flex justify-between">
+      <CardFooter>
         <Button size="sm">View Details</Button>
       </CardFooter>
     </Card>

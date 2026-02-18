@@ -1,8 +1,9 @@
 import {
   Card,
-  CardContent,
+  CardDescription,
   CardFooter,
   CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -21,17 +22,16 @@ export default async function BadRequestPage({
 
   return (
     <main className="container mx-auto flex items-center justify-center w-dvw min-h-dvh">
-      <Card className="w-full max-w-md p-4">
-        <CardHeader className="flex flex-col items-center">
-          <h2 className="text-lg text-center font-bold tracking-tight">
+      <Card className="w-full max-w-md">
+        <CardHeader className="flex flex-col items-center text-center">
+          <CardTitle className="text-lg font-bold tracking-tight">
             {i18next.t("badrequest.default.title")}
-          </h2>
-          <p className="text-sm text-center text-gray-500">
+          </CardTitle>
+          <CardDescription>
             {i18next.t("badrequest.default.description")}
-          </p>
+          </CardDescription>
         </CardHeader>
-        <CardContent className="p-0" />
-        <CardFooter className="flex w-full p-0">
+        <CardFooter className="flex w-full">
           <Link className="w-full" href="#">
             <Button className="w-full">{i18next.t("home")}</Button>
           </Link>

@@ -6,13 +6,6 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
@@ -95,11 +88,11 @@ export default function Page() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       {step === "email" && (
-        <Card className="w-full max-w-md border-none bg-transparent shadow-none">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="w-full max-w-md flex flex-col gap-4">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold">Sign in</h2>
+          </div>
+          <div className="px-0">
             <form onSubmit={handleEmail} className="space-y-4">
               <div className="space-y-2">
                 <Input
@@ -124,21 +117,19 @@ export default function Page() {
                 ← Other Login options
               </Link>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
       {step === "otp" && (
-        <Card className="w-full max-w-md border-none bg-transparent shadow-none">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Verification</CardTitle>
-            <CardDescription className="max-w-xs">
-              <span className="text-sm text-muted-foreground">
-                If you have an account, We have sent a code to{" "}
-                <strong>{email}</strong>. Enter it below.
-              </span>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="w-full max-w-md flex flex-col gap-4">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold">Verification</h2>
+            <p className="max-w-xs text-sm text-muted-foreground">
+              If you have an account, We have sent a code to{" "}
+              <strong>{email}</strong>. Enter it below.
+            </p>
+          </div>
+          <div className="px-0">
             <OTP onComplete={handleOtp} disabled={isLoading} />
 
             {error && (
@@ -164,8 +155,8 @@ export default function Page() {
                 )}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );
