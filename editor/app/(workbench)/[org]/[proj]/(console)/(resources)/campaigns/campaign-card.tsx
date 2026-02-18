@@ -28,7 +28,7 @@ export function CampaignCard({
   };
 
   return (
-    <Card size="sm" className="overflow-hidden">
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardAction>
           <Badge variant="outline">

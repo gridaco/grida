@@ -38,10 +38,7 @@ export default async function CampaignLayout({
       <SidebarProvider>
         <div className="flex flex-1 h-full overflow-hidden">
           <div className="h-full flex flex-1 w-full">
-            <CampaignSidebar
-              baseUrl={baseUrl}
-              campaignsUrl={campaignsUrl}
-            />
+            <CampaignSidebar baseUrl={baseUrl} campaignsUrl={campaignsUrl} />
             <div className="flex flex-col h-full w-full">{children}</div>
           </div>
         </div>

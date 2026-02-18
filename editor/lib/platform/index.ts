@@ -752,8 +752,7 @@ export namespace Platform.WEST.Referral {
       code: string,
       owner_id: string
     ): Promise<
-      | { ok: true }
-      | { ok: false; error?: { message?: string; code?: string } }
+      { ok: true } | { ok: false; error?: { message?: string; code?: string } }
     > {
       const res = await fetch(`${this.BASE_URL}/t/claim`, {
         method: "POST",

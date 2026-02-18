@@ -46,4 +46,3 @@ Google Images indexes the asset more reliably when the rendered `img src` is a *
 OG/Twitter images must resolve to **absolute public URLs** that return **200** without auth.
 
 If `openGraph.images` uses relative paths in Next.js metadata, `metadataBase` is required so crawlers see correct absolute URLs.
-

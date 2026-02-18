@@ -94,8 +94,7 @@ const CountrySelect = ({
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="h-8 gap-1 rounded-e-none rounded-s-lg border-r-0 px-2 py-1 focus:z-10 [&_svg]:size-3.5"
+          className="gap-1 rounded-e-none rounded-s-lg border-r-0 px-2 py-1 focus:z-10"
           disabled={disabled}
         >
           <FlagComponent

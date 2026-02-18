@@ -57,13 +57,13 @@ const formErrorMessages: Record<
   Record<FormSubmitErrorCode | "default", string>
 > = {
   ko: {
-    FORM_SCHEDULE_NOT_IN_RANGE: "이벤트 접수가 마감되었거나 아직 시작 전입니다.",
+    FORM_SCHEDULE_NOT_IN_RANGE:
+      "이벤트 접수가 마감되었거나 아직 시작 전입니다.",
     FORM_FORCE_CLOSED: "이벤트가 종료되어 참여 신청을 받지 않습니다.",
     FORM_CLOSED_WHILE_RESPONDING:
       "제출 중에 이벤트가 마감되었습니다. 다시 시도해 주세요.",
     FORM_RESPONSE_LIMIT_REACHED: "참여 인원이 마감되었습니다.",
-    FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED:
-      "이미 참여 신청을 완료하셨습니다.",
+    FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED: "이미 참여 신청을 완료하셨습니다.",
     FORM_SOLD_OUT: "재고가 소진되었습니다.",
     FORM_OPTION_UNAVAILABLE: "선택한 옵션이 더 이상 제공되지 않습니다.",
     CHALLENGE_EMAIL_NOT_VERIFIED: "이메일 인증을 먼저 완료해 주세요.",
@@ -71,7 +71,8 @@ const formErrorMessages: Record<
       "필수 정보가 누락되었습니다. 페이지를 새로고침 후 다시 시도해 주세요.",
     UNKNOWN_FIELDS_NOT_ALLOWED:
       "요청을 처리할 수 없습니다. 페이지를 새로고침 후 다시 시도해 주세요.",
-    INTERNAL_SERVER_ERROR: "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+    INTERNAL_SERVER_ERROR:
+      "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
     default: "이벤트 참여에 실패했습니다. 잠시 후 다시 시도해 주세요.",
   },
   en: {
@@ -80,7 +81,8 @@ const formErrorMessages: Record<
     FORM_FORCE_CLOSED: "This event is closed and no longer accepting sign-ups.",
     FORM_CLOSED_WHILE_RESPONDING:
       "The event closed while you were submitting. Please try again.",
-    FORM_RESPONSE_LIMIT_REACHED: "This event has reached the maximum number of participants.",
+    FORM_RESPONSE_LIMIT_REACHED:
+      "This event has reached the maximum number of participants.",
     FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED:
       "You have already signed up for this event.",
     FORM_SOLD_OUT: "This item is sold out.",

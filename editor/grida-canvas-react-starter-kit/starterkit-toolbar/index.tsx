@@ -234,9 +234,7 @@ export default function Toolbar() {
             {
               value: "arrow",
               label: "Arrow",
-              shortcut: keyboardShortcutText(
-                "workbench.surface.cursor.arrow"
-              ),
+              shortcut: keyboardShortcutText("workbench.surface.cursor.arrow"),
             },
             {
               value: "polygon",
