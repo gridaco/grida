@@ -17,7 +17,7 @@ corepack enable pnpm
 brew install just
 
 # install typos (typo checker)
-cargo install typos-cli --locked
+brew install typos
 ```
 
 ## Rust / Canvas (Skia) prerequisites
