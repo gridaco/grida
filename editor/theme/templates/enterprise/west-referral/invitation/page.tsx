@@ -36,12 +36,85 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { submitFormToDefaultEndpoint } from "@/grida-forms-hosted/internal-sdk/submit";
 
+/** Form submit error codes returned by POST /v1/submit/:id (when Accept: application/json). */
+type FormSubmitErrorCode =
+  | "INTERNAL_SERVER_ERROR"
+  | "MISSING_REQUIRED_HIDDEN_FIELDS"
+  | "UNKNOWN_FIELDS_NOT_ALLOWED"
+  | "FORM_FORCE_CLOSED"
+  | "FORM_CLOSED_WHILE_RESPONDING"
+  | "FORM_RESPONSE_LIMIT_REACHED"
+  | "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED"
+  | "FORM_SCHEDULE_NOT_IN_RANGE"
+  | "FORM_SOLD_OUT"
+  | "FORM_OPTION_UNAVAILABLE"
+  | "CHALLENGE_EMAIL_NOT_VERIFIED";
+
+type InvitationLocale = "en" | "ko";
+
+const formErrorMessages: Record<
+  InvitationLocale,
+  Record<FormSubmitErrorCode | "default", string>
+> = {
+  ko: {
+    FORM_SCHEDULE_NOT_IN_RANGE: "이벤트 접수가 마감되었거나 아직 시작 전입니다.",
+    FORM_FORCE_CLOSED: "이벤트가 종료되어 참여 신청을 받지 않습니다.",
+    FORM_CLOSED_WHILE_RESPONDING:
+      "제출 중에 이벤트가 마감되었습니다. 다시 시도해 주세요.",
+    FORM_RESPONSE_LIMIT_REACHED: "참여 인원이 마감되었습니다.",
+    FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED:
+      "이미 참여 신청을 완료하셨습니다.",
+    FORM_SOLD_OUT: "재고가 소진되었습니다.",
+    FORM_OPTION_UNAVAILABLE: "선택한 옵션이 더 이상 제공되지 않습니다.",
+    CHALLENGE_EMAIL_NOT_VERIFIED: "이메일 인증을 먼저 완료해 주세요.",
+    MISSING_REQUIRED_HIDDEN_FIELDS:
+      "필수 정보가 누락되었습니다. 페이지를 새로고침 후 다시 시도해 주세요.",
+    UNKNOWN_FIELDS_NOT_ALLOWED:
+      "요청을 처리할 수 없습니다. 페이지를 새로고침 후 다시 시도해 주세요.",
+    INTERNAL_SERVER_ERROR: "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+    default: "이벤트 참여에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+  },
+  en: {
+    FORM_SCHEDULE_NOT_IN_RANGE:
+      "This event is not open yet or has already ended.",
+    FORM_FORCE_CLOSED: "This event is closed and no longer accepting sign-ups.",
+    FORM_CLOSED_WHILE_RESPONDING:
+      "The event closed while you were submitting. Please try again.",
+    FORM_RESPONSE_LIMIT_REACHED: "This event has reached the maximum number of participants.",
+    FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED:
+      "You have already signed up for this event.",
+    FORM_SOLD_OUT: "This item is sold out.",
+    FORM_OPTION_UNAVAILABLE: "The selected option is no longer available.",
+    CHALLENGE_EMAIL_NOT_VERIFIED: "Please verify your email before submitting.",
+    MISSING_REQUIRED_HIDDEN_FIELDS:
+      "Required information is missing. Please refresh and try again.",
+    UNKNOWN_FIELDS_NOT_ALLOWED:
+      "Your request could not be processed. Please refresh and try again.",
+    INTERNAL_SERVER_ERROR:
+      "Something went wrong. Please try again in a moment.",
+    default: "Event participation failed. Please try again.",
+  },
+};
+
+function getFormErrorMessage(
+  locale: InvitationLocale,
+  code?: string | null,
+  apiMessage?: string | null
+): string {
+  const messages = formErrorMessages[locale] ?? formErrorMessages.en;
+  const key = (code ?? "default") as FormSubmitErrorCode | "default";
+  if (key in messages) return messages[key as keyof typeof messages];
+  return apiMessage?.trim() || messages.default;
+}
+
 const dictionary = {
   ko: {
     an_anonymous: "익명의 사용자",
     about_event: "이벤트 안내",
     event_signup_success: "이벤트 참여신청이 완료되었습니다.",
     event_signup_fail: "이벤트 참여에 실패했습니다.",
+    claim_fail: "참여 등록을 완료하지 못했습니다. 다시 시도해 주세요.",
+    claim_already_claimed: "이미 사용된 초대입니다.",
     claimed_title: "참여가 접수되었습니다.",
     claimed_description:
       "이벤트 참여 신청이 완료되었습니다. 확인 후 안내드리겠습니다.",
@@ -54,6 +127,8 @@ const dictionary = {
     about_event: "Event Information",
     event_signup_success: "Event participation request completed.",
     event_signup_fail: "Event participation failed.",
+    claim_fail: "We couldn't complete your sign-up. Please try again.",
+    claim_already_claimed: "This invitation has already been used.",
     claimed_title: "You're all set.",
     claimed_description:
       "Your event participation has been received. We'll contact you with the next steps.",
@@ -86,6 +161,8 @@ type Props = {
     html: string;
   };
   cta: string;
+  /** When set, CTA is hidden and this system message is shown instead. */
+  schedule_message?: string | null;
   footer?: {
     link_privacy: string;
     link_instagram: string;
@@ -206,18 +283,25 @@ export default function InvitationPageTemplate({
                   </p>
                 )}
               </CardContent>
-              {!claimed && (
-                <CardFooter className="px-4 pb-4">
-                  {/* CTA Button */}
-                  <Button
-                    onClick={signupformDialog.openDialog}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {design.cta}
-                  </Button>
-                </CardFooter>
-              )}
+              {!claimed &&
+                (design.schedule_message ? (
+                  <CardFooter className="px-4 pb-4">
+                    <p className="text-sm text-muted-foreground text-center w-full">
+                      {design.schedule_message}
+                    </p>
+                  </CardFooter>
+                ) : (
+                  <CardFooter className="px-4 pb-4">
+                    {/* CTA Button */}
+                    <Button
+                      onClick={signupformDialog.openDialog}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {design.cta}
+                    </Button>
+                  </CardFooter>
+                ))}
             </Card>
 
             {/* FIXME: use challenges */}
@@ -314,6 +398,19 @@ function SignUpForm({
       customer_id?: string | null;
     }>(form_id, formdata);
 
+    const resError = submit_json && (submit_json as { error?: string }).error;
+    const resMessage =
+      submit_json && (submit_json as { message?: string }).message;
+    if (resError != null || (submit_json && submit_json.data == null)) {
+      const msg = getFormErrorMessage(
+        locale as InvitationLocale,
+        resError ?? undefined,
+        resMessage ?? undefined
+      );
+      toast.error(msg);
+      return;
+    }
+
     const customer_id =
       submit_json?.data?.customer_id &&
       typeof submit_json.data.customer_id === "string"
@@ -330,9 +427,14 @@ function SignUpForm({
       return;
     }
 
-    const ok = await client.claim(invitation_code, customer_id);
-    if (!ok) {
-      toast.error(copy.event_signup_fail);
+    const claimResult = await client.claim(invitation_code, customer_id);
+    if (!claimResult.ok) {
+      const errMsg = claimResult.error?.message?.toLowerCase() ?? "";
+      const isAlreadyClaimed =
+        errMsg.includes("already claimed") || errMsg.includes("already used");
+      toast.error(
+        isAlreadyClaimed ? copy.claim_already_claimed : copy.claim_fail
+      );
       return;
     }
 

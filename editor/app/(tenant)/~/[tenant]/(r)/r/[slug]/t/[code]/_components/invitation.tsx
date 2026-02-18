@@ -7,6 +7,7 @@ import { Platform } from "@/lib/platform";
 import InvitationPageTemplate from "@/theme/templates/enterprise/west-referral/invitation/page";
 import InvitationCouponTemplate from "@/theme/templates/enterprise/west-referral/invitation/coupon";
 import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
+import { getCampaignScheduleMessage } from "@/theme/templates/enterprise/west-referral/copy";
 import {
   campaignShadcnThemeToCssText,
   resolveCampaignShadcnTheme,
@@ -77,6 +78,10 @@ export default function InvitationPage({
           article: _i?.article,
           cta: _i?.cta ?? "Join Now",
           image: _i?.image,
+          schedule_message: getCampaignScheduleMessage(
+            context.campaign,
+            template.locale
+          ),
         }}
         locale={template.locale}
         data={{

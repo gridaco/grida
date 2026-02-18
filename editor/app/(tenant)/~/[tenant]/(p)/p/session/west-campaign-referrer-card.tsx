@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -9,16 +8,21 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { format, differenceInDays } from "date-fns";
 import { Platform } from "@/lib/platform";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import {
+  getCampaignScheduleMessage,
+  isCampaignInSchedule,
+  type CampaignCopyLocale,
+} from "@/theme/templates/enterprise/west-referral/copy";
 
 interface CardProps {
   campaign: Platform.WEST.Referral.CampaignPublic;
   referrer: {
     invitation_count: number;
   };
+  locale?: CampaignCopyLocale;
 }
 
 const dictionary = {
@@ -49,24 +53,17 @@ const status_map = {
 export default function CampaignReferrerCard({
   campaign,
   referrer,
+  locale = "en",
 }: CardProps) {
-  const [timeLeft, setTimeLeft] = useState<string>("");
-
   const { max_invitations_per_referrer: max_invitation } = campaign;
   const { invitation_count } = referrer;
 
   const progress = max_invitation ? invitation_count / max_invitation : null;
-
-  const startDate = new Date(campaign.scheduling_open_at ?? "");
-  const endDate = new Date(campaign.scheduling_close_at ?? "");
   const now = new Date();
+  const { isActive, hasEnded } = isCampaignInSchedule(campaign, now);
+  const scheduleMessage = getCampaignScheduleMessage(campaign, locale, now);
 
-  const isActive = campaign.enabled && now >= startDate && now <= endDate;
-  const hasStarted = now >= startDate;
-  const hasEnded = now > endDate;
-
-  const t = dictionary["ko"];
-
+  const t = dictionary[locale] ?? dictionary.en;
   const status: keyof typeof status_map = isActive
     ? "active"
     : hasEnded
@@ -90,13 +87,6 @@ export default function CampaignReferrerCard({
             height={120}
             className="aspect-square rounded-md object-cover"
           />
-          {/* <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
-            {formatCurrency(
-              campaign.conversion_value ?? 0,
-              campaign.reward_currency
-            )}{" "}
-            per referral
-          </div> */}
         </div>
       </CardHeader>
 
@@ -113,18 +103,17 @@ export default function CampaignReferrerCard({
                 </div>
                 <Progress value={progress * 100} className="h-2" />
               </div>
-            ) : (
-              <></>
-            )}
-            <div className="flex justify-between text-xs mt-1.5 text-muted-foreground">
-              {/* <span>{format(startDate, "MMM d")}</span> */}
-              {/* <span>{format(endDate, "MMM d, yyyy")}</span> */}
-            </div>
+            ) : null}
           </div>
         </div>
       </CardContent>
 
-      <CardFooter className="p-6 pt-0">
+      <CardFooter className="p-6 pt-0 flex flex-col gap-2">
+        {scheduleMessage ? (
+          <p className="text-sm text-muted-foreground text-center">
+            {scheduleMessage}
+          </p>
+        ) : null}
         <Button
           className="w-full"
           variant={isActive ? "default" : "outline"}

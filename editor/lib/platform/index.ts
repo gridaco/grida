@@ -748,8 +748,14 @@ export namespace Platform.WEST.Referral {
       }).then((res) => res.json());
     }
 
-    claim(code: string, owner_id: string) {
-      return fetch(`${this.BASE_URL}/t/claim`, {
+    async claim(
+      code: string,
+      owner_id: string
+    ): Promise<
+      | { ok: true }
+      | { ok: false; error?: { message?: string; code?: string } }
+    > {
+      const res = await fetch(`${this.BASE_URL}/t/claim`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -757,9 +763,10 @@ export namespace Platform.WEST.Referral {
           [Platform.headers["x-grida-customer-id"]]: owner_id,
           [Platform.headers["x-grida-west-token-code"]]: code,
         },
-      }).then((res) => {
-        return res.ok;
       });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) return { ok: true };
+      return { ok: false, error: body?.error };
     }
 
     track(code: string, name: string, data?: Record<string, string>) {
