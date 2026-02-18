@@ -41,7 +41,6 @@ export default async function CampaignLayout({
             <CampaignSidebar
               baseUrl={baseUrl}
               campaignsUrl={campaignsUrl}
-              campaignTitle={data.title}
             />
             <div className="flex flex-col h-full w-full">{children}</div>
           </div>

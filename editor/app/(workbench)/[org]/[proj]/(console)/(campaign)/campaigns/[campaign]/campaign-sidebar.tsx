@@ -31,7 +31,6 @@ import { AboutGridaWestCard } from "./about-west-card";
 type CampaignSidebarProps = {
   baseUrl: string;
   campaignsUrl: string;
-  campaignTitle: string;
 };
 
 type SidebarMenuLinkProps = {
@@ -64,7 +63,6 @@ function SidebarMenuLink({
 export function CampaignSidebar({
   baseUrl,
   campaignsUrl,
-  campaignTitle,
 }: CampaignSidebarProps) {
   return (
     <Sidebar>
@@ -75,7 +73,7 @@ export function CampaignSidebar({
             <SidebarMenuButton asChild>
               <Link href={campaignsUrl}>
                 <ArrowLeftIcon />
-                <span className="truncate">{campaignTitle}</span>
+                <span className="truncate">Campaigns</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -97,10 +95,12 @@ export function CampaignSidebar({
                 <TrophyIcon className="size-3" />
                 Quests
               </SidebarMenuLink>
-              <SidebarMenuLink href={`${baseUrl}/rewards`}>
-                <GiftIcon className="size-3" />
-                Rewards
-              </SidebarMenuLink>
+              <SidebarMenuItem>
+                <SidebarMenuButton size="sm" disabled title="Coming soon">
+                  <GiftIcon className="size-3" />
+                  Rewards
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuLink href={`${baseUrl}/observability`}>
                 <HistoryIcon className="size-3" />
                 Observability

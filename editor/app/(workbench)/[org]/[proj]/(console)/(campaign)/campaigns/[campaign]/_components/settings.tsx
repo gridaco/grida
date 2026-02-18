@@ -57,6 +57,8 @@ import {
   FieldGroup,
   FieldLabel,
   FieldSeparator,
+  FieldSet,
+  FieldLegend,
 } from "@/components/ui/field";
 import {
   Collapsible,
@@ -163,6 +165,32 @@ function useCampaignData(id: string) {
   return { campaign, update };
 }
 
+/** Normalize campaign from API (dates as strings) into form default values (dates as Date). */
+function toFormDefaultValues(
+  campaign: Platform.WEST.Referral.Campaign
+): Partial<CampaignFormValues> {
+  const toDate = (v: string | Date | null): Date | null =>
+    v == null ? null : v instanceof Date ? v : new Date(v);
+  const c = campaign as Platform.WEST.Referral.Campaign & {
+    ciam_invitee_on_claim_tag_names?: string[] | null;
+  };
+  return {
+    title: c.title,
+    description: c.description ?? undefined,
+    is_invitee_profile_exposed_to_public_dangerously:
+      c.is_invitee_profile_exposed_to_public_dangerously,
+    is_referrer_profile_exposed_to_public_dangerously:
+      c.is_referrer_profile_exposed_to_public_dangerously,
+    max_invitations_per_referrer: c.max_invitations_per_referrer,
+    enabled: c.enabled,
+    scheduling_open_at: toDate(c.scheduling_open_at ?? null),
+    scheduling_close_at: toDate(c.scheduling_close_at ?? null),
+    scheduling_tz: c.scheduling_tz,
+    public: c.public,
+    ciam_invitee_on_claim_tag_names: c.ciam_invitee_on_claim_tag_names ?? [],
+  };
+}
+
 export default function CampaignSettings() {
   const { id } = useCampaign();
   const { campaign, update } = useCampaignData(id);
@@ -179,7 +207,7 @@ export default function CampaignSettings() {
     <Body
       campaign_id={id}
       project_id={campaign.project_id}
-      defaultValues={campaign as Partial<CampaignFormValues>}
+      defaultValues={toFormDefaultValues(campaign)}
       onSubmit={update}
     />
   );
@@ -265,13 +293,21 @@ function Body({
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="milestone">Quest Milestone</TabsTrigger>
-            <TabsTrigger value="rewards">Rewards</TabsTrigger>
-            <TabsTrigger value="challenges">Challenges</TabsTrigger>
-            <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="tagging">Customer Tagging</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="milestone" disabled>
+              Quest Milestone
+            </TabsTrigger>
+            <TabsTrigger value="rewards" disabled>
+              Rewards
+            </TabsTrigger>
+            <TabsTrigger value="challenges" disabled>
+              Challenges
+            </TabsTrigger>
+            <TabsTrigger value="events" disabled>
+              Events
+            </TabsTrigger>
             <TabsTrigger
               value="danger"
               className="text-destructive data-[state=active]:text-destructive"
@@ -828,16 +864,23 @@ function CampaignPublicDataFields({
     };
   }, [formsClient, projectId]);
 
+  const signupFormIdFieldId = "campaign-public-signup-form-id";
+  const publicJsonToggleId = "campaign-public-json-toggle";
+
   return (
     <FormField
       control={control}
       name="public"
       render={({ field, fieldState }) => (
-        <div>
+        <FieldSet>
+          <FieldLegend variant="label">Public data</FieldLegend>
           <FieldGroup>
-            <Field>
-              <FieldLabel>Signup Form ID</FieldLabel>
+            <Field data-invalid={!!fieldState.error}>
+              <FieldLabel htmlFor={signupFormIdFieldId}>
+                Signup Form ID
+              </FieldLabel>
               <SignupFormIdSelect
+                id={signupFormIdFieldId}
                 value={getSignupFormIdFromPublic(field.value)}
                 forms={forms}
                 loading={formsLoading}
@@ -863,9 +906,16 @@ function CampaignPublicDataFields({
                 onOpenChange={setPublicJsonOpen}
               >
                 <div className="flex items-center justify-between">
-                  <FieldLabel>Public JSON Data (read-only)</FieldLabel>
+                  <FieldLabel htmlFor={publicJsonToggleId}>
+                    Public JSON Data (read-only)
+                  </FieldLabel>
                   <CollapsibleTrigger asChild>
-                    <Button type="button" variant="ghost" size="sm">
+                    <Button
+                      id={publicJsonToggleId}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                    >
                       {publicJsonOpen ? "Hide" : "Show"}
                     </Button>
                   </CollapsibleTrigger>
@@ -886,7 +936,7 @@ function CampaignPublicDataFields({
               </Collapsible>
             </Field>
           </FieldGroup>
-        </div>
+        </FieldSet>
       )}
     />
   );
@@ -914,7 +964,8 @@ function setSignupFormIdInPublic(
       : {};
 
   if (!signupFormId) {
-    const { ["signup-form-id"]: _, ...rest } = base;
+    const rest = { ...base };
+    delete rest["signup-form-id"];
     return rest;
   }
 
@@ -922,11 +973,13 @@ function setSignupFormIdInPublic(
 }
 
 function SignupFormIdSelect({
+  id,
   value,
   forms,
   loading,
   onChange,
 }: {
+  id?: string;
   value?: string;
   forms: FormOption[];
   loading: boolean;
@@ -941,7 +994,7 @@ function SignupFormIdSelect({
       onValueChange={(v) => onChange(v === NONE ? undefined : v)}
       disabled={loading}
     >
-      <SelectTrigger className="w-full">
+      <SelectTrigger id={id} className="w-full">
         {/* TODO(west-referral): Consider a searchable combobox UX */}
         <SelectValue
           placeholder={loading ? "Loading forms..." : "Select a form"}

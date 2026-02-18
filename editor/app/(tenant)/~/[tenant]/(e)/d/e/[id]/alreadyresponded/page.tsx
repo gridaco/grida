@@ -1,4 +1,11 @@
-import { Card, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import i18next from "i18next";
@@ -19,16 +26,18 @@ export default async function AlreadyRespondedPage(props: {
 
   return (
     <main className="container mx-auto flex items-center justify-center w-dvw min-h-dvh">
-      <Card className="w-full max-w-md p-4">
-        <CardHeader className="flex flex-col items-center">
-          <h2 className="text-lg text-center font-bold tracking-tight">
+      <Card className="w-full max-w-md">
+        <CardHeader className="flex flex-col items-center text-center">
+          <CardTitle className="text-lg font-bold tracking-tight">
             {i18next.t("alreadyresponded.default.title")}
-          </h2>
-          <p className="text-sm text-center text-gray-500">
+          </CardTitle>
+          <CardDescription>
             {i18next.t("alreadyresponded.default.description")}
-          </p>
-          <details className="text-center text-gray-500">
-            <summary className="list-none flex items-center justify-center">
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <details className="text-center text-muted-foreground">
+            <summary className="list-none flex items-center justify-center cursor-pointer">
               <InfoCircledIcon className="" />
             </summary>
             <div className="mt-2 border border-dashed rounded-sm p-2">
@@ -56,8 +65,8 @@ export default async function AlreadyRespondedPage(props: {
               </article>
             </div>
           </details>
-        </CardHeader>
-        <CardFooter className="flex w-full p-0">
+        </CardContent>
+        <CardFooter className="flex w-full">
           <Link className="w-full" href="#">
             <Button className="w-full">{i18next.t("home")}</Button>
           </Link>

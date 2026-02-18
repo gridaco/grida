@@ -12,7 +12,6 @@ import Head from "next/head";
 import Link from "next/link";
 import {
   AppWindowMacIcon,
-  BarChart2Icon,
   MegaphoneIcon,
   ShieldCheckIcon,
   TagsIcon,
@@ -38,12 +37,12 @@ const menus = [
     link: "./www",
     icon: AppWindowMacIcon,
   },
-  {
-    title: "Analytics",
-    description: "Track page views, traffic sources, and user behavior.",
-    link: "./analytics",
-    icon: BarChart2Icon,
-  },
+  // {
+  //   title: "Analytics",
+  //   description: "Track page views, traffic sources, and user behavior.",
+  //   link: "./analytics",
+  //   icon: BarChart2Icon,
+  // },
   {
     title: "Campaigns",
     description: "Launch and manage marketing or referral campaigns.",

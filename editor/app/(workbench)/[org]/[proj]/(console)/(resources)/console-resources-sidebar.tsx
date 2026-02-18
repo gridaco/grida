@@ -66,7 +66,7 @@ export function ConsoleResourcesSidebar({
             <SidebarMenuButton asChild>
               <Link href={basePath}>
                 <ArrowLeftIcon />
-                Console
+                <span className="truncate">Project</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -118,10 +118,12 @@ export function ConsoleResourcesSidebar({
                 <ResourceTypeIcon type="domain" className="size-4" />
                 Domains
               </SidebarMenuLink>
-              <SidebarMenuLink href={`${basePath}/analytics`}>
-                <ResourceTypeIcon type="chart" className="size-4" />
-                Analytics
-              </SidebarMenuLink>
+              <SidebarMenuItem>
+                <SidebarMenuButton size="sm" disabled title="Coming soon">
+                  <ResourceTypeIcon type="chart" className="size-4" />
+                  Analytics
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

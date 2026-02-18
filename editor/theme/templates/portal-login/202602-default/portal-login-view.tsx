@@ -6,13 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
@@ -179,20 +172,18 @@ export function PortalLoginView({
   // OTP step
   return (
     <div className="flex flex-col gap-6">
-      <Card className="w-full max-w-md border-none bg-transparent shadow-none">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">{otpStepTitle}</CardTitle>
-          <CardDescription className="max-w-xs">
-            <span className="text-sm text-muted-foreground">
-              <span
-                dangerouslySetInnerHTML={{
-                  __html: template(otpStepDescription, { email: otpEmail }),
-                }}
-              />
-            </span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="w-full max-w-md flex flex-col gap-4">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold">{otpStepTitle}</h2>
+          <p className="max-w-xs text-sm text-muted-foreground">
+            <span
+              dangerouslySetInnerHTML={{
+                __html: template(otpStepDescription, { email: otpEmail }),
+              }}
+            />
+          </p>
+        </div>
+        <div className="px-0">
           <InputOTP
             maxLength={6}
             disabled={viewOnly || isLoading}
@@ -242,8 +233,8 @@ export function PortalLoginView({
               )}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
