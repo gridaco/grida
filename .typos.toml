@@ -18,22 +18,3 @@ skia = "skia"
 oxfmt = "oxfmt"
 oxc = "oxc"
 docusaurus = "docusaurus"
-
-[files]
-extend-exclude = [
-  "**/*.lock",
-  "**/node_modules/**",
-  "**/target/**",
-  "**/.git/**",
-  "**/dist/**",
-  "**/build/**",
-  "**/.next/**",
-  "**/.turbo/**",
-  "**/.cache/**",
-  "**/coverage/**",
-  "**/.nyc_output/**",
-  "**/__pycache__/**",
-  "**/*.pyc",
-  "**/.DS_Store",
-  "**/Thumbs.db",
-]
