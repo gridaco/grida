@@ -1,0 +1,39 @@
+[default]
+extend-ignore-identifiers-re = [
+  "cargo",
+  "clippy",
+  "deno",
+  "pnpm",
+  "turbo",
+  "vite",
+]
+
+[default.extend-words]
+# Project-specific terms
+grida = "grida"
+gridaco = "gridaco"
+workbench = "workbench"
+insiders = "insiders"
+skia = "skia"
+oxfmt = "oxfmt"
+oxc = "oxc"
+docusaurus = "docusaurus"
+
+[files]
+extend-exclude = [
+  "**/*.lock",
+  "**/node_modules/**",
+  "**/target/**",
+  "**/.git/**",
+  "**/dist/**",
+  "**/build/**",
+  "**/.next/**",
+  "**/.turbo/**",
+  "**/.cache/**",
+  "**/coverage/**",
+  "**/.nyc_output/**",
+  "**/__pycache__/**",
+  "**/*.pyc",
+  "**/.DS_Store",
+  "**/Thumbs.db",
+]

@@ -16,14 +16,3 @@ jobs:
           lfs: true
       - name: Check for typos
         uses: crate-ci/typos@master
-        with:
-          files: |
-            .
-          exclude: |
-            **/*.lock
-            **/node_modules/**
-            **/target/**
-            **/.git/**
-            **/dist/**
-            **/build/**
-            **/.next/**
