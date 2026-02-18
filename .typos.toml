@@ -18,3 +18,75 @@ skia = "skia"
 oxfmt = "oxfmt"
 oxc = "oxc"
 docusaurus = "docusaurus"
+
+# OpenType script tags (4-letter ISO 15924 codes)
+beng = "beng"
+guru = "guru"
+taml = "taml"
+ethi = "ethi"
+hani = "hani"
+kana = "kana"
+hira = "hira"
+thai = "thai"
+latn = "latn"
+cyrl = "cyrl"
+arab = "arab"
+deva = "deva"
+
+# CSS variable font axis tags
+wdth = "wdth"
+wght = "wght"
+slnt = "slnt"
+ital = "ital"
+opsz = "opsz"
+GRAD = "GRAD"
+YTLC = "YTLC"
+YTUC = "YTUC"
+YTAS = "YTAS"
+YTDE = "YTDE"
+YTFI = "YTFI"
+
+# CSS property abbreviations
+IZ = "IZ"
+
+# Technical abbreviations
+DBE = "DBE"
+
+# Place names and data (common in data files)
+Savin = "Savin"
+Mena = "Mena"
+Generalife = "Generalife"
+Arguin = "Arguin"
+Buda = "Buda"
+Mata = "Mata"
+Pont = "Pont"
+Ba = "Ba"
+Pilar = "Pilar"
+Locle = "Locle"
+Tak = "Tak"
+Gard = "Gard"
+Arica = "Arica"
+originary = "originary"
+
+# Programming terms (sometimes used in code)
+Seeked = "Seeked"
+colinear = "colinear"
+Colinear = "Colinear"
+
+[files]
+# Exclude data files that contain proper nouns, place names, etc.
+# Exclude i18n translation files (contain valid words in other languages)
+# Exclude generated/minified files
+# Exclude example files (may contain intentional content)
+extend-exclude = [
+  "**/data/figma-archives/**",
+  "**/library/class/*.txt",
+  "**/data/fake/**",
+  "**/editor/i18n/**",
+  "**/editor/theme/**/messages.json",
+  "**/*.min.js",
+  "**/bin/*.js",
+  "**/apps/backgrounds/data/**",
+  "**/*.grida1",
+  "**/public/examples/**",
+]
