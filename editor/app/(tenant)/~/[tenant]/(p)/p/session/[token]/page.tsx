@@ -189,6 +189,7 @@ export default async function CustomerPortalSessionPage({
                   referrer={{
                     invitation_count: 1,
                   }}
+                  locale={locale}
                 />
               </Link>
             );

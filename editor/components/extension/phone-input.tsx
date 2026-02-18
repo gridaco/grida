@@ -94,7 +94,7 @@ const CountrySelect = ({
         <Button
           type="button"
           variant="outline"
-          className="flex gap-1 rounded-e-none rounded-s-lg border-r-0 px-3 focus:z-10"
+          className="gap-1 rounded-e-none rounded-s-lg border-r-0 px-2 py-1 focus:z-10"
           disabled={disabled}
         >
           <FlagComponent
@@ -103,7 +103,7 @@ const CountrySelect = ({
           />
           <ChevronsUpDown
             className={cn(
-              "-mr-2 size-4 opacity-50",
+              "-mr-0.5 opacity-50",
               disabled ? "hidden" : "opacity-100"
             )}
           />
@@ -163,7 +163,7 @@ const FlagComponent = ({ country, countryName }: RPNInput.FlagProps) => {
   const Flag = flags[country];
 
   return (
-    <span className="flex h-4 w-6 overflow-hidden rounded-sm bg-foreground/20 [&_svg]:size-full">
+    <span className="flex h-3.5 w-5 overflow-hidden rounded-sm bg-foreground/20 [&_svg]:size-full">
       {Flag && (
         <Flag
           title={countryName}

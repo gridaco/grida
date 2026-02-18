@@ -314,7 +314,10 @@ export function PropertyEnum<T extends string>({
   tabIndex?: number;
   className?: string;
   /** When set, renders only this in the trigger instead of label (e.g. icon only). */
-  renderTriggerValue?: (value: T, selectedItem: EnumItem<T> | undefined) => React.ReactNode;
+  renderTriggerValue?: (
+    value: T,
+    selectedItem: EnumItem<T> | undefined
+  ) => React.ReactNode;
 }) {
   const mixed = value === grida.mixed;
 

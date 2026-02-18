@@ -4,6 +4,7 @@ import React from "react";
 import { Platform } from "@/lib/platform";
 import ReferrerPageTemplate from "@/theme/templates/enterprise/west-referral/referrer/page";
 import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
+import { getCampaignScheduleMessage } from "@/theme/templates/enterprise/west-referral/copy";
 import {
   campaignShadcnThemeToCssText,
   resolveCampaignShadcnTheme,
@@ -21,6 +22,10 @@ export default function ReferrerPage({
   const _t = template.theme;
   const _r = template.components.referrer;
   const shadcnTheme = resolveCampaignShadcnTheme(_t?.styles);
+  const schedule_message = getCampaignScheduleMessage(
+    context.campaign,
+    template.locale
+  );
 
   return (
     <>
@@ -43,6 +48,7 @@ export default function ReferrerPage({
           article: _r?.article,
           cta: _r?.cta ?? "Invite",
           image: _r?.image ?? { src: "" },
+          schedule_message,
           share: {
             data: template.components["referrer-share"],
           },

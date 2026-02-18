@@ -169,10 +169,7 @@ export function useNodeActions(node_id: string | undefined) {
           value
         ),
       strokeDecorationEnd: (value: cg.StrokeMarkerPreset) =>
-        instance.commands.changeNodePropertyStrokeDecorationEnd(
-          node_id,
-          value
-        ),
+        instance.commands.changeNodePropertyStrokeDecorationEnd(node_id, value),
       strokeJoin: (value: cg.StrokeJoin) =>
         instance.commands.changeNodePropertyStrokeJoin(node_id, value),
       strokeMiterLimit: (value: number) =>

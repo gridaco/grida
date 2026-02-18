@@ -18,6 +18,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import { Label } from "@/components/ui/label";
 
 export type EmailChallengeI18n = {
   verify: string;
@@ -285,12 +286,12 @@ function _EmailChallenge({
   return (
     <div data-slot="email-challenge" data-state={state} className="space-y-3">
       {label && (
-        <label className="text-sm font-medium leading-none">
+        <Label>
           {label}{" "}
           {required && requiredAsterisk && (
             <span className="text-red-500/80">*</span>
           )}
-        </label>
+        </Label>
       )}
 
       <InputGroup data-disabled={disabled ? "true" : undefined}>

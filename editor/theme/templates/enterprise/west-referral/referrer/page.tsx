@@ -175,6 +175,8 @@ export interface Props {
   share_message?: {
     data: TemplateData.West_Referrral__Duo_001["components"]["referrer-share-message"];
   };
+  /** When set, CTA is hidden and this system message is shown instead. */
+  schedule_message?: string | null;
 }
 
 export default function ReferrerPageTemplate({
@@ -323,17 +325,25 @@ export default function ReferrerPageTemplate({
                     </p>
                   )}
                 </CardContent>
-                {is_available && (
+                {design.schedule_message ? (
                   <CardFooter className="px-4 pb-4">
-                    {/* CTA Button */}
-                    <Button
-                      onClick={() => openShareDialog(triggerShare)}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {design.cta}
-                    </Button>
+                    <p className="text-sm text-muted-foreground text-center w-full">
+                      {design.schedule_message}
+                    </p>
                   </CardFooter>
+                ) : (
+                  is_available && (
+                    <CardFooter className="px-4 pb-4">
+                      {/* CTA Button */}
+                      <Button
+                        onClick={() => openShareDialog(triggerShare)}
+                        className="w-full"
+                        size="lg"
+                      >
+                        {design.cta}
+                      </Button>
+                    </CardFooter>
+                  )
                 )}
               </Card>
             </Standard.Section>
