@@ -9,13 +9,30 @@ This package is the Next.js app that powers **`grida.co`** and tenant domains (e
 - **Auth is special**: `app/(auth)` is security-critical. **Do not modify** routes/flows there.
 - **Public API is versioned**: treat `app/(api)/(public)/v1` as **backwards-compatible** (additive changes only unless you’re intentionally breaking/v2-ing).
 - **Layouts are per route group**: there isn’t a single shared root layout across the whole `app/` tree — top-level route groups own their root `layout.tsx`/metadata.
-- **Edge entrypoint is `proxy.ts`**: on Next.js 16 this replaces `middleware.ts` (same runtime + semantics). Don’t add a new `middleware.ts`.
+- **Edge entrypoint is `proxy.ts`**: on Next.js 16 this replaces `middleware.ts` (same runtime + semantics). Don’t add a new `middleware.ts`. In this repo it’s also where maintenance mode, Supabase session refresh, and host-based tenant routing are wired together (see “Multi-tenancy” below).
 - **Tenant pages are tenant-aware**: follow [`app/(tenant)/README.md`](<app/(tenant)/README.md>) for host-prefixed fetches (`server.HOST` / `web.HOST`) and tenant-friendly `href="/path"` patterns.
 - **Shared UI boundaries matter**:
   - `components/` should remain route-agnostic and override-friendly (see [`components/AGENTS.md`](components/AGENTS.md))
   - `kits/` are stateful “drop-in widgets” that must not couple to global editor/workbench state (see [`kits/AGENTS.md`](kits/AGENTS.md))
   - `scaffolds/` are feature assemblies and may bind to global/editor state
 - **Stable public asset URLs**: put canonical assets under `public/` (e.g. `/brand/...png`) when you need a durable, crawlable, cache-friendly path. (If you care about image search quirks, see [`app/(www)/SEO.md`](<app/(www)/SEO.md>).)
+
+## Multi-tenancy (host-based tenant routing)
+
+Tenant sites are primarily accessed via **tenant domains** (e.g. `xyz.grida.site`, `xyz.grida.app`, or a custom domain like `xyz.com`). Internally, tenant routes live under the **tenant root**: `/~/<www_name>/*` (see `app/(tenant)`).
+
+- **Entrypoint**: `proxy.ts`
+  - refreshes Supabase auth cookies via `lib/supabase/proxy.ts` (`updateSession`)
+  - then calls `lib/tenant/middleware.ts` (`TanantMiddleware.routeProxyRequest`) to perform host-based routing
+- **Host classes** (see `lib/domains/index.ts`)
+  - **reserved app hosts** (`grida.co`, `bridged.xyz` + subdomains): never tenant identities; direct `/~/...` access is blocked on these hosts
+  - **platform tenant hosts**: `*.grida.site` and `*.grida.app` (default canonical suffix is `grida.site`)
+  - **custom domains**: any other hostname (hosted: resolved via DB mapping)
+- **What routing does**
+  - **rewrite** tenant requests under `/~/<www_name>/*` (prefix the path with `/~/<www_name>`) so the `(tenant)` route group serves the request
+  - **canonicalize (hosted)** hostnames via **301 redirects** (one canonical hostname per tenant)
+- **Resolvers (hosted)**: prefers cached internal resolution (`app/(api)/internal/resolve-host/route.ts`), then falls back to DB RPCs (`www_resolve_hostname`, `www_get_canonical_hostname`)
+- **Local dev**: `tenant.localhost:<port>` is rewritten to `/~/<tenant>/*` (no DB)
 
 ## Directory map
 
