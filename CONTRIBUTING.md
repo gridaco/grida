@@ -15,6 +15,9 @@ corepack enable pnpm
 
 # install just
 brew install just
+
+# install typos (typo checker)
+brew install typos
 ```
 
 ## Rust / Canvas (Skia) prerequisites
