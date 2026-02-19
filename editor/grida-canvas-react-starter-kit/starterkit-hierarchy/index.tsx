@@ -54,7 +54,7 @@ export function DocumentHierarchy() {
   const editor = useCurrentEditor();
 
   return (
-    <ResizablePanelGroup direction="vertical" className="h-full">
+    <ResizablePanelGroup orientation="vertical" className="h-full">
       <ResizablePanel defaultSize={15} minSize={10} maxSize={40}>
         <SidebarGroup
           onContextMenu={(e) => e.preventDefault()}
