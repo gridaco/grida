@@ -96,7 +96,7 @@ use winit::{
     dpi::{LogicalPosition, LogicalSize, PhysicalSize},
     event::{ElementState, Ime, MouseButton, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
-    keyboard::{Key, ModifiersState, NamedKey},
+    keyboard::{Key, KeyCode, ModifiersState, NamedKey, PhysicalKey},
     window::{Window, WindowAttributes, WindowId},
 };
 
@@ -1357,20 +1357,18 @@ impl ApplicationHandler for TextEditorApp {
                         }
                         inner.window.request_redraw();
                     }
-                    Key::Named(NamedKey::Enter)
-                        if inner.editor.preedit.is_none() =>
-                    {
+                    Key::Named(NamedKey::Enter) => {
                         inner.editor.insert_text("\n");
                         inner.window.request_redraw();
                     }
 
-                    Key::Character(c) if cmd => {
-                        match c.to_lowercase().as_str() {
-                            "a" => {
+                    _ if cmd => {
+                        match ke.physical_key {
+                            PhysicalKey::Code(KeyCode::KeyA) => {
                                 inner.editor.select_all();
                                 inner.window.request_redraw();
                             }
-                            "z" => {
+                            PhysicalKey::Code(KeyCode::KeyZ) => {
                                 if shift {
                                     if inner.editor.redo() {
                                         inner.window.request_redraw();
@@ -1379,12 +1377,12 @@ impl ApplicationHandler for TextEditorApp {
                                     inner.window.request_redraw();
                                 }
                             }
-                            "c" => {
+                            PhysicalKey::Code(KeyCode::KeyC) => {
                                 if let Some(sel) = inner.editor.selected_text() {
                                     let _ = self.clipboard.set_text(sel.to_string());
                                 }
                             }
-                            "x" => {
+                            PhysicalKey::Code(KeyCode::KeyX) => {
                                 if let Some(sel) = inner.editor.selected_text() {
                                     let _ = self.clipboard.set_text(sel.to_string());
                                 }
@@ -1393,7 +1391,7 @@ impl ApplicationHandler for TextEditorApp {
                                     inner.window.request_redraw();
                                 }
                             }
-                            "v" => {
+                            PhysicalKey::Code(KeyCode::KeyV) => {
                                 if let Ok(text) = self.clipboard.get_text() {
                                     inner.editor.insert_text(&text);
                                     inner.window.request_redraw();
