@@ -231,11 +231,11 @@ const docs = [
       },
       {
         type: "doc",
-        id: "platform/customers",
+        id: "platform/customers/index",
       },
       {
         type: "doc",
-        id: "platform/tags",
+        id: "platform/tags/index",
       },
     ],
   },
