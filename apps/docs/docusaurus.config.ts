@@ -92,12 +92,14 @@ const config: Config = {
           docId: "platform/intro",
           position: "left",
           label: "Platform",
+          activeBasePath: "platform",
         },
         {
           type: "doc",
           docId: "packages/intro",
           position: "left",
           label: "Packages",
+          activeBasePath: "packages",
         },
         {
           href: "https://grida.co/sign-in",
