@@ -423,11 +423,13 @@ pub fn apply_command(
                 s.cursor = delete_selection_in_place(&mut s);
             } else {
                 let metrics = layout.line_metrics(&s.text);
-                let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
-                let line_start = metrics[line_idx].start_index;
-                if line_start < s.cursor {
-                    s.text.drain(line_start..s.cursor);
-                    s.cursor = line_start;
+                if !metrics.is_empty() {
+                    let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
+                    let line_start = metrics[line_idx].start_index;
+                    if line_start < s.cursor {
+                        s.text.drain(line_start..s.cursor);
+                        s.cursor = line_start;
+                    }
                 }
             }
             s.anchor = None;
@@ -438,14 +440,16 @@ pub fn apply_command(
                 s.cursor = delete_selection_in_place(&mut s);
             } else {
                 let metrics = layout.line_metrics(&s.text);
-                let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
-                let lm = &metrics[line_idx];
-                let mut line_end = lm.end_index.min(s.text.len());
-                if line_end > 0 && s.text[..line_end].ends_with('\n') {
-                    line_end = prev_grapheme_boundary(&s.text, line_end);
-                }
-                if s.cursor < line_end {
-                    s.text.drain(s.cursor..line_end);
+                if !metrics.is_empty() {
+                    let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
+                    let lm = &metrics[line_idx];
+                    let mut line_end = lm.end_index.min(s.text.len());
+                    if line_end > 0 && s.text[..line_end].ends_with('\n') {
+                        line_end = prev_grapheme_boundary(&s.text, line_end);
+                    }
+                    if s.cursor < line_end {
+                        s.text.drain(s.cursor..line_end);
+                    }
                 }
             }
             s.anchor = None;
