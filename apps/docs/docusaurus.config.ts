@@ -94,6 +94,12 @@ const config: Config = {
           label: "Platform",
         },
         {
+          type: "doc",
+          docId: "packages/intro",
+          position: "left",
+          label: "Packages",
+        },
+        {
           href: "https://grida.co/sign-in",
           position: "left",
           label: "Sign In",
