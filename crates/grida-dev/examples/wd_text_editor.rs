@@ -736,7 +736,7 @@ impl TextEditor {
     // -----------------------------------------------------------------------
 
     fn update_preedit(&mut self, text: String) {
-        self.preedit = if text.is_empty() { None } else { Some(text) };
+        self.preedit = Some(text);
         self.reset_blink();
     }
 
@@ -1259,7 +1259,6 @@ impl ApplicationHandler for TextEditorApp {
                 inner.window.request_redraw();
             }
             WindowEvent::Ime(Ime::Commit(s)) => {
-                inner.editor.cancel_preedit();
                 inner.editor.apply_with_kind(
                     EditingCommand::Insert(s),
                     EditKind::ImeCommit,
@@ -1358,7 +1357,9 @@ impl ApplicationHandler for TextEditorApp {
                         }
                         inner.window.request_redraw();
                     }
-                    Key::Named(NamedKey::Enter) => {
+                    Key::Named(NamedKey::Enter)
+                        if inner.editor.preedit.is_none() =>
+                    {
                         inner.editor.insert_text("\n");
                         inner.window.request_redraw();
                     }
@@ -1409,16 +1410,28 @@ impl ApplicationHandler for TextEditorApp {
                         inner.window.request_redraw();
                     }
 
-                    Key::Named(NamedKey::Space) => {
+                    Key::Named(NamedKey::Space)
+                        if inner.editor.preedit.is_none() =>
+                    {
                         inner.editor.insert_text(" ");
                         inner.window.request_redraw();
                     }
-                    Key::Named(NamedKey::Tab) => {
+                    Key::Named(NamedKey::Tab)
+                        if inner.editor.preedit.is_none() =>
+                    {
                         inner.editor.insert_text("    ");
                         inner.window.request_redraw();
                     }
 
                     _ => {}
+                }
+
+                // Drain the empty-preedit sentinel left by Ime::Preedit("").
+                // It blocked the text-insertion arms above for exactly this
+                // one KeyboardInput event; now reset so the next key works
+                // normally.
+                if inner.editor.preedit.as_deref() == Some("") {
+                    inner.editor.preedit = None;
                 }
             }
 
