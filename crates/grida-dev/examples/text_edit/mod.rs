@@ -13,7 +13,8 @@ use unicode_segmentation::UnicodeSegmentation;
 // ---------------------------------------------------------------------------
 
 pub fn utf8_to_utf16_offset(text: &str, utf8: usize) -> usize {
-    text[..utf8.min(text.len())].encode_utf16().count()
+    let safe = floor_char_boundary(text, utf8);
+    text[..safe].encode_utf16().count()
 }
 
 pub fn utf16_to_utf8_offset(text: &str, utf16: usize) -> usize {
@@ -85,6 +86,35 @@ pub fn next_grapheme_boundary(text: &str, pos: usize) -> usize {
 }
 
 // ---------------------------------------------------------------------------
+// Char-boundary safety helpers
+//
+// These are the ONLY functions that should be used to adjust a raw byte
+// offset when there is any possibility it does not fall on a char boundary
+// (e.g. after `pos + 1` / `pos - 1` arithmetic on multi-byte text).
+// They mirror the nightly `str::floor_char_boundary` / `str::ceil_char_boundary`.
+// ---------------------------------------------------------------------------
+
+/// Snap `pos` backward to the nearest char boundary at or before `pos`.
+pub fn floor_char_boundary(text: &str, pos: usize) -> usize {
+    let pos = pos.min(text.len());
+    let mut p = pos;
+    while p > 0 && !text.is_char_boundary(p) {
+        p -= 1;
+    }
+    p
+}
+
+/// Snap `pos` forward to the nearest char boundary at or after `pos`.
+pub fn ceil_char_boundary(text: &str, pos: usize) -> usize {
+    let pos = pos.min(text.len());
+    let mut p = pos;
+    while p < text.len() && !text.is_char_boundary(p) {
+        p += 1;
+    }
+    p
+}
+
+// ---------------------------------------------------------------------------
 // Word segment boundary (UAX #29)
 // ---------------------------------------------------------------------------
 
@@ -121,7 +151,8 @@ fn prev_word_segment_start(text: &str, pos: usize) -> usize {
     }
     // pos is exactly at a segment boundary — step back into the previous one
     if pos > 0 {
-        let (prev_start, _) = word_segment_at(text, pos - 1);
+        let safe = floor_char_boundary(text, pos.saturating_sub(1));
+        let (prev_start, _) = word_segment_at(text, safe);
         return prev_start;
     }
     0
@@ -141,7 +172,8 @@ fn next_word_segment_end(text: &str, pos: usize) -> usize {
     }
     // pos is exactly at a segment boundary — step into the next one
     if pos < text.len() {
-        let (_, next_end) = word_segment_at(text, pos + 1);
+        let safe = ceil_char_boundary(text, pos + 1);
+        let (_, next_end) = word_segment_at(text, safe);
         return next_end;
     }
     text.len()
@@ -525,25 +557,51 @@ pub fn apply_command(
 
         EditingCommand::MoveWordLeft { extend } => {
             set_anchor_if_extending(&mut s, extend);
-            let (start, _) = layout.word_boundary_at(&s.text, s.cursor);
-            if start < s.cursor {
-                s.cursor = start;
-            } else if s.cursor > 0 {
-                let (start2, _) = layout.word_boundary_at(&s.text, s.cursor - 1);
-                s.cursor = start2;
+            let mut pos = s.cursor;
+            loop {
+                let old = pos;
+                let (seg_start, _) = layout.word_boundary_at(&s.text, pos);
+                pos = if seg_start < old {
+                    seg_start
+                } else if old > 0 {
+                    let prev = prev_grapheme_boundary(&s.text, old);
+                    layout.word_boundary_at(&s.text, prev).0
+                } else {
+                    break;
+                };
+                if pos == old {
+                    break;
+                }
+                if !s.text[pos..old].chars().all(|c| c.is_whitespace()) {
+                    break;
+                }
             }
+            s.cursor = pos;
             clear_anchor_if_not_extending(&mut s, extend);
         }
 
         EditingCommand::MoveWordRight { extend } => {
             set_anchor_if_extending(&mut s, extend);
-            let (_, end) = layout.word_boundary_at(&s.text, s.cursor);
-            if end > s.cursor {
-                s.cursor = end;
-            } else if s.cursor < s.text.len() {
-                let (_, end2) = layout.word_boundary_at(&s.text, s.cursor + 1);
-                s.cursor = end2;
+            let mut pos = s.cursor;
+            loop {
+                let old = pos;
+                let (_, seg_end) = layout.word_boundary_at(&s.text, pos);
+                pos = if seg_end > old {
+                    seg_end
+                } else if old < s.text.len() {
+                    let next = next_grapheme_boundary(&s.text, old);
+                    layout.word_boundary_at(&s.text, next).1
+                } else {
+                    break;
+                };
+                if pos == old {
+                    break;
+                }
+                if !s.text[old..pos].chars().all(|c| c.is_whitespace()) {
+                    break;
+                }
             }
+            s.cursor = pos.min(s.text.len());
             clear_anchor_if_not_extending(&mut s, extend);
         }
 
@@ -581,6 +639,19 @@ pub fn apply_command(
             }
         }
     }
+
+    debug_assert!(
+        s.cursor <= s.text.len() && s.text.is_char_boundary(s.cursor),
+        "apply_command produced invalid cursor {} for text len {}",
+        s.cursor,
+        s.text.len(),
+    );
+    debug_assert!(
+        s.anchor.map_or(true, |a| a <= s.text.len() && s.text.is_char_boundary(a)),
+        "apply_command produced invalid anchor {:?} for text len {}",
+        s.anchor,
+        s.text.len(),
+    );
 
     s
 }

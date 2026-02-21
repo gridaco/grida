@@ -3,7 +3,7 @@
 //! All tests use `SimpleLayoutEngine` — no Skia, no winit.  The layout is
 //! monospace / no-wrap, so every assertion is exact.
 
-use super::{apply_command, layout::TextLayoutEngine, snap_grapheme_boundary, word_segment_at, EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
+use super::{apply_command, floor_char_boundary, ceil_char_boundary, layout::TextLayoutEngine, snap_grapheme_boundary, word_segment_at, EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
 
 fn layout() -> SimpleLayoutEngine {
     SimpleLayoutEngine::default_test()
@@ -1302,8 +1302,19 @@ fn delete_word_repeated() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn move_word_right_walks_all_segments() {
-    // "(abc) d efg h?" — cursor should stop at every UAX#29 segment boundary.
+fn move_word_right_skips_whitespace() {
+    // "(abc) d efg h?" — whitespace is skipped, cursor lands at word ends.
+    //
+    // Segments: ( | abc | ) | _ | d | _ | efg | _ | h | ?
+    //
+    // Option+Right from each stop:
+    //   0 → 1   skip "("   (punctuation, non-ws → stop)
+    //   1 → 4   skip "abc" (word, non-ws → stop)
+    //   4 → 5   skip ")"   (punctuation, non-ws → stop)
+    //   5 → 7   skip " " (ws → continue) then "d" (non-ws → stop)
+    //   7 → 11  skip " " (ws → continue) then "efg" (non-ws → stop)
+    //  11 → 13  skip " " (ws → continue) then "h" (non-ws → stop)
+    //  13 → 14  skip "?"  (punctuation, non-ws → stop)
     let text = "(abc) d efg h?";
     let mut s = TextEditorState::with_cursor(text, 0);
     let mut stops = vec![0usize];
@@ -1314,12 +1325,20 @@ fn move_word_right_walks_all_segments() {
         s = apply(&s, EditingCommand::MoveWordRight { extend: false });
         stops.push(s.cursor);
     }
-    // Expected: ( | abc | ) | _ | d | _ | efg | _ | h | ?
-    assert_eq!(stops, vec![0, 1, 4, 5, 6, 7, 8, 11, 12, 13, 14]);
+    assert_eq!(stops, vec![0, 1, 4, 5, 7, 11, 13, 14]);
 }
 
 #[test]
-fn move_word_left_walks_all_segments() {
+fn move_word_left_skips_whitespace() {
+    // Symmetric: Option+Left skips whitespace, lands at word starts.
+    //
+    //  14 → 13  back over "?" → stop
+    //  13 → 12  back over "h" → stop
+    //  12 → 8   back over " " (ws → continue) then "efg" start → stop
+    //   8 → 6   back over " " (ws → continue) then "d" start → stop
+    //   6 → 4   back over " " (ws → continue) then ")" start → stop
+    //   4 → 1   back over "abc" → stop
+    //   1 → 0   back over "(" → stop
     let text = "(abc) d efg h?";
     let mut s = TextEditorState::new(text); // cursor at end (14)
     let mut stops = vec![14usize];
@@ -1330,7 +1349,27 @@ fn move_word_left_walks_all_segments() {
         s = apply(&s, EditingCommand::MoveWordLeft { extend: false });
         stops.push(s.cursor);
     }
-    assert_eq!(stops, vec![14, 13, 12, 11, 8, 7, 6, 5, 4, 1, 0]);
+    assert_eq!(stops, vec![14, 13, 12, 8, 6, 4, 1, 0]);
+}
+
+#[test]
+fn move_word_right_simple() {
+    // "A B" — cursor should skip space, land at end of B.
+    let s = TextEditorState::with_cursor("A B", 0);
+    let s = apply(&s, EditingCommand::MoveWordRight { extend: false });
+    assert_eq!(s.cursor, 1, "end of A");
+    let s = apply(&s, EditingCommand::MoveWordRight { extend: false });
+    assert_eq!(s.cursor, 3, "end of B — space skipped");
+}
+
+#[test]
+fn move_word_left_simple() {
+    // "A B" — cursor should skip space, land at start of A.
+    let s = TextEditorState::new("A B"); // cursor at 3
+    let s = apply(&s, EditingCommand::MoveWordLeft { extend: false });
+    assert_eq!(s.cursor, 2, "start of B");
+    let s = apply(&s, EditingCommand::MoveWordLeft { extend: false });
+    assert_eq!(s.cursor, 0, "start of A — space skipped");
 }
 
 // ---------------------------------------------------------------------------
@@ -1404,4 +1443,260 @@ fn delete_line_from_start_of_line() {
     let s = apply(&s, EditingCommand::DeleteLine);
     assert_eq!(s.text, "\nWorld");
     assert_eq!(s.cursor, 0);
+}
+
+// ===========================================================================
+// Char-boundary safety: floor / ceil helpers
+// ===========================================================================
+
+#[test]
+fn floor_char_boundary_on_ascii() {
+    let t = "hello";
+    for i in 0..=t.len() {
+        assert_eq!(floor_char_boundary(t, i), i);
+    }
+}
+
+#[test]
+fn floor_char_boundary_mid_multibyte() {
+    let t = "A\u{2026}B"; // A + … (3 bytes) + B = 5 bytes
+    assert_eq!(floor_char_boundary(t, 0), 0); // A
+    assert_eq!(floor_char_boundary(t, 1), 1); // start of …
+    assert_eq!(floor_char_boundary(t, 2), 1); // mid … → snap back to 1
+    assert_eq!(floor_char_boundary(t, 3), 1); // mid … → snap back to 1
+    assert_eq!(floor_char_boundary(t, 4), 4); // B
+    assert_eq!(floor_char_boundary(t, 5), 5); // end
+}
+
+#[test]
+fn ceil_char_boundary_mid_multibyte() {
+    let t = "A\u{2026}B"; // A(1) + …(3) + B(1) = 5 bytes
+    assert_eq!(ceil_char_boundary(t, 0), 0);
+    assert_eq!(ceil_char_boundary(t, 1), 1);
+    assert_eq!(ceil_char_boundary(t, 2), 4); // mid … → snap forward to B
+    assert_eq!(ceil_char_boundary(t, 3), 4);
+    assert_eq!(ceil_char_boundary(t, 4), 4);
+    assert_eq!(ceil_char_boundary(t, 5), 5);
+}
+
+#[test]
+fn floor_ceil_on_emoji() {
+    let t = "\u{1F600}!"; // 😀(4 bytes) + !(1) = 5 bytes
+    assert_eq!(floor_char_boundary(t, 2), 0); // mid emoji → 0
+    assert_eq!(ceil_char_boundary(t, 2), 4);  // mid emoji → 4
+}
+
+// ===========================================================================
+// Offset safety: exhaustive command sweep on multi-byte text
+//
+// For each test string, place the cursor at every grapheme boundary and
+// apply every movement / deletion command.  The debug_assert inside
+// apply_command will catch any invalid cursor or anchor produced.
+// ===========================================================================
+
+fn grapheme_boundaries(text: &str) -> Vec<usize> {
+    use unicode_segmentation::UnicodeSegmentation;
+    let mut v: Vec<usize> = text.grapheme_indices(true).map(|(i, _)| i).collect();
+    v.push(text.len());
+    v
+}
+
+fn assert_valid_state(s: &TextEditorState) {
+    assert!(
+        s.cursor <= s.text.len() && s.text.is_char_boundary(s.cursor),
+        "invalid cursor {} in text of len {} ({:?})",
+        s.cursor, s.text.len(), &s.text[..s.text.len().min(40)]
+    );
+    if let Some(a) = s.anchor {
+        assert!(
+            a <= s.text.len() && s.text.is_char_boundary(a),
+            "invalid anchor {} in text of len {}", a, s.text.len()
+        );
+    }
+}
+
+/// Movement commands that do not mutate text.
+fn movement_commands() -> Vec<EditingCommand> {
+    vec![
+        EditingCommand::MoveLeft { extend: false },
+        EditingCommand::MoveLeft { extend: true },
+        EditingCommand::MoveRight { extend: false },
+        EditingCommand::MoveRight { extend: true },
+        EditingCommand::MoveUp { extend: false },
+        EditingCommand::MoveDown { extend: false },
+        EditingCommand::MoveHome { extend: false },
+        EditingCommand::MoveEnd { extend: false },
+        EditingCommand::MoveDocStart { extend: false },
+        EditingCommand::MoveDocEnd { extend: false },
+        EditingCommand::MoveWordLeft { extend: false },
+        EditingCommand::MoveWordLeft { extend: true },
+        EditingCommand::MoveWordRight { extend: false },
+        EditingCommand::MoveWordRight { extend: true },
+        EditingCommand::MovePageUp { extend: false },
+        EditingCommand::MovePageDown { extend: false },
+        EditingCommand::SelectAll,
+    ]
+}
+
+/// Deletion commands that mutate text.
+fn deletion_commands() -> Vec<EditingCommand> {
+    vec![
+        EditingCommand::Backspace,
+        EditingCommand::BackspaceWord,
+        EditingCommand::BackspaceLine,
+        EditingCommand::Delete,
+        EditingCommand::DeleteWord,
+        EditingCommand::DeleteLine,
+    ]
+}
+
+const SAFETY_TEXTS: &[&str] = &[
+    "hello world",
+    "caf\u{00E9} na\u{00EF}ve",
+    "cafe\u{0301} (combining)",
+    "\u{D55C}\u{AD6D}\u{C5B4} \u{D14C}\u{C2A4}\u{D2B8}",
+    "A\u{2026}B (test) \u{65E5}\u{672C}\u{8A9E}!",
+    "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466} family \u{1F600}",
+    "\u{1F44D}\u{1F3FD} thumbs",
+    "a\nb\n\nc\n",
+    "(abc) d efg h?",
+    "\u{0928}\u{092E}\u{0938}\u{094D}\u{0924}\u{0947} \u{0926}\u{0941}\u{0928}\u{093F}\u{092F}\u{093E}",
+    "\u{0E2A}\u{0E27}\u{0E31}\u{0E2A}\u{0E14}\u{0E35}\u{0E42}\u{0E25}\u{0E01}",
+    "state\u{2014}of\u{2014}the\u{2013}art \u{2026} end",
+    "",
+    "x",
+];
+
+#[test]
+fn all_movement_commands_produce_valid_offsets() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let boundaries = grapheme_boundaries(text);
+        for &pos in &boundaries {
+            for cmd in movement_commands() {
+                let s = TextEditorState::with_cursor(text, pos);
+                let result = apply_command(&s, cmd.clone(), &mut lay);
+                assert_valid_state(&result);
+            }
+        }
+    }
+}
+
+#[test]
+fn all_movement_commands_with_selection_produce_valid_offsets() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let boundaries = grapheme_boundaries(text);
+        if boundaries.len() < 2 {
+            continue;
+        }
+        let anchor = boundaries[0];
+        let cursor = boundaries[boundaries.len() / 2];
+        for cmd in movement_commands() {
+            let mut s = TextEditorState::with_cursor(text, cursor);
+            s.anchor = Some(anchor);
+            let result = apply_command(&s, cmd.clone(), &mut lay);
+            assert_valid_state(&result);
+        }
+    }
+}
+
+#[test]
+fn all_deletion_commands_produce_valid_offsets() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let boundaries = grapheme_boundaries(text);
+        for &pos in &boundaries {
+            for cmd in deletion_commands() {
+                let s = TextEditorState::with_cursor(text, pos);
+                let result = apply_command(&s, cmd.clone(), &mut lay);
+                assert_valid_state(&result);
+            }
+        }
+    }
+}
+
+#[test]
+fn all_deletion_commands_with_selection_produce_valid_offsets() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let boundaries = grapheme_boundaries(text);
+        if boundaries.len() < 2 {
+            continue;
+        }
+        for i in 0..boundaries.len() {
+            for j in (i + 1)..boundaries.len() {
+                let anchor = boundaries[i];
+                let cursor = boundaries[j];
+                for cmd in deletion_commands() {
+                    let mut s = TextEditorState::with_cursor(text, cursor);
+                    s.anchor = Some(anchor);
+                    let result = apply_command(&s, cmd.clone(), &mut lay);
+                    assert_valid_state(&result);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn insert_at_every_position_produces_valid_offsets() {
+    let mut lay = layout();
+    let inserts = &["x", "\n", "hello world", "\u{1F600}", "\u{D55C}"];
+    for &text in SAFETY_TEXTS {
+        let boundaries = grapheme_boundaries(text);
+        for &pos in &boundaries {
+            for &ins in inserts {
+                let s = TextEditorState::with_cursor(text, pos);
+                let result = apply_command(
+                    &s,
+                    EditingCommand::Insert(ins.to_string()),
+                    &mut lay,
+                );
+                assert_valid_state(&result);
+            }
+        }
+    }
+}
+
+#[test]
+fn repeated_word_movement_never_panics() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let mut s = TextEditorState::with_cursor(text, 0);
+        for _ in 0..100 {
+            if s.cursor >= text.len() { break; }
+            s = apply_command(&s, EditingCommand::MoveWordRight { extend: false }, &mut lay);
+            assert_valid_state(&s);
+        }
+
+        s = TextEditorState::new(text);
+        for _ in 0..100 {
+            if s.cursor == 0 { break; }
+            s = apply_command(&s, EditingCommand::MoveWordLeft { extend: false }, &mut lay);
+            assert_valid_state(&s);
+        }
+    }
+}
+
+#[test]
+fn repeated_word_deletion_never_panics() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let mut s = TextEditorState::new(text);
+        for _ in 0..100 {
+            if s.text.is_empty() { break; }
+            s = apply_command(&s, EditingCommand::BackspaceWord, &mut lay);
+            assert_valid_state(&s);
+        }
+        assert!(s.text.is_empty(), "BackspaceWord loop did not empty: {:?}", s.text);
+
+        let mut s = TextEditorState::with_cursor(text, 0);
+        for _ in 0..100 {
+            if s.text.is_empty() { break; }
+            s = apply_command(&s, EditingCommand::DeleteWord, &mut lay);
+            assert_valid_state(&s);
+        }
+        assert!(s.text.is_empty(), "DeleteWord loop did not empty: {:?}", s.text);
+    }
 }
