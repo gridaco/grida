@@ -754,7 +754,10 @@ impl TextEditor {
     }
 
     /// Baseline y of the cursor line, in layout-local space.
-    /// Handles the Skia phantom-line case for trailing newlines.
+    ///
+    /// Skia's `get_line_metrics()` emits an entry for the phantom empty line
+    /// that follows a trailing `\n`, so `skia_line_index_for_u16_offset`
+    /// already maps the cursor to that line. No extrapolation is needed.
     fn cursor_baseline_y(&mut self) -> f32 {
         self.layout.ensure_layout(&self.state.text);
         let metrics = self.layout.paragraph.as_ref().unwrap().get_line_metrics();
@@ -763,23 +766,7 @@ impl TextEditor {
         }
         let cur_u16 = utf8_to_utf16_offset(&self.state.text, self.state.cursor);
         let idx = skia_line_index_for_u16_offset(&metrics, cur_u16);
-        let baseline = metrics[idx].baseline as f32;
-
-        // Skia does NOT emit line metrics for a trailing '\n'. Extrapolate.
-        let after_trailing_newline = self.state.cursor > 0
-            && self.state.text[..self.state.cursor].ends_with('\n')
-            && idx == metrics.len() - 1;
-        if after_trailing_newline {
-            let line_height = if metrics.len() >= 2 {
-                (metrics[metrics.len() - 1].baseline
-                    - metrics[metrics.len() - 2].baseline) as f32
-            } else {
-                FONT_SIZE * 1.3
-            };
-            return baseline + line_height;
-        }
-
-        baseline
+        metrics[idx].baseline as f32
     }
 
     // -----------------------------------------------------------------------
