@@ -88,6 +88,12 @@ const config: Config = {
           label: "Working Group",
         },
         {
+          type: "doc",
+          docId: "platform/intro",
+          position: "left",
+          label: "Platform",
+        },
+        {
           href: "https://grida.co/sign-in",
           position: "left",
           label: "Sign In",
