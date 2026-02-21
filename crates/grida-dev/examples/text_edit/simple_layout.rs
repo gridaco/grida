@@ -10,10 +10,7 @@
 //! and wrong for real rendering — its only purpose is to produce deterministic,
 //! inspectable results for unit tests.
 
-use super::{
-    layout::{LineMetrics, TextLayoutEngine},
-    line_index_for_offset_utf8,
-};
+use super::layout::{CaretRect, LineMetrics, TextLayoutEngine};
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -103,29 +100,43 @@ impl TextLayoutEngine for SimpleLayoutEngine {
             return lm.start_index;
         }
 
-        // Map x → column (character index within the line).
-        // Do NOT apply prev_grapheme_boundary here: column-based offsets are
-        // already on character boundaries and the function would shift them back
-        // one position when pos happens to equal a grapheme-end.
         let content_end = Self::content_end(lm, text);
-        let line_char_len = content_end - lm.start_index;
-        let column = ((x / self.char_width).round() as usize).min(line_char_len);
-        (lm.start_index + column).min(text.len())
+        let line_content = &text[lm.start_index..content_end];
+        let graphemes: Vec<(usize, &str)> = line_content.grapheme_indices(true).collect();
+        let column = ((x / self.char_width).round() as usize).min(graphemes.len());
+        if column >= graphemes.len() {
+            content_end.min(text.len())
+        } else {
+            (lm.start_index + graphemes[column].0).min(text.len())
+        }
     }
 
-    fn caret_x_at(&mut self, text: &str, offset: usize) -> f32 {
-        // Cursor right after \n → x = 0 on new line.
-        if offset > 0 && text[..offset].ends_with('\n') {
-            return 0.0;
-        }
+    fn caret_rect_at(&mut self, text: &str, offset: usize) -> CaretRect {
         let metrics = self.compute_metrics(text);
         if metrics.is_empty() {
-            return 0.0;
+            return CaretRect { x: 0.0, y: 0.0, height: self.line_height };
         }
-        let line_idx = line_index_for_offset_utf8(&metrics, offset);
-        let lm = &metrics[line_idx];
-        let column = offset - lm.start_index;
-        column as f32 * self.char_width
+
+        // Forward-scan: first line where offset < end_index.
+        let idx = metrics
+            .iter()
+            .position(|lm| offset < lm.end_index)
+            .unwrap_or(metrics.len() - 1);
+        let lm = &metrics[idx];
+
+        let x = if offset <= lm.start_index {
+            0.0
+        } else {
+            let before_cursor = &text[lm.start_index..offset];
+            let grapheme_count = before_cursor.graphemes(true).count();
+            grapheme_count as f32 * self.char_width
+        };
+
+        CaretRect {
+            x,
+            y: lm.baseline - lm.ascent,
+            height: lm.ascent + lm.descent,
+        }
     }
 
     fn word_boundary_at(&mut self, text: &str, offset: usize) -> (usize, usize) {

@@ -3,7 +3,7 @@
 //! All tests use `SimpleLayoutEngine` — no Skia, no winit.  The layout is
 //! monospace / no-wrap, so every assertion is exact.
 
-use super::{apply_command, floor_char_boundary, ceil_char_boundary, layout::TextLayoutEngine, snap_grapheme_boundary, word_segment_at, EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
+use super::{apply_command, floor_char_boundary, ceil_char_boundary, layout::{CaretRect, TextLayoutEngine}, line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
 
 fn layout() -> SimpleLayoutEngine {
     SimpleLayoutEngine::default_test()
@@ -1386,11 +1386,13 @@ fn backspace_line_deletes_to_line_start() {
 }
 
 #[test]
-fn backspace_line_at_line_start_is_noop() {
+fn backspace_line_at_line_start_deletes_newline() {
+    // Cursor at start of "World" (pos 6) — nothing to delete on this line,
+    // so fall back to grapheme backspace: delete the \n and merge lines.
     let s = TextEditorState::with_cursor("Hello\nWorld", 6);
     let s = apply(&s, EditingCommand::BackspaceLine);
-    assert_eq!(s.text, "Hello\nWorld");
-    assert_eq!(s.cursor, 6);
+    assert_eq!(s.text, "HelloWorld");
+    assert_eq!(s.cursor, 5);
 }
 
 #[test]
@@ -1699,4 +1701,335 @@ fn repeated_word_deletion_never_panics() {
         }
         assert!(s.text.is_empty(), "DeleteWord loop did not empty: {:?}", s.text);
     }
+}
+
+// ===========================================================================
+// Caret rect invariants: geometry is valid for every cursor position
+// ===========================================================================
+
+fn assert_valid_caret_rect(cr: &CaretRect, text: &str, offset: usize) {
+    assert!(
+        cr.x >= 0.0,
+        "caret_rect_at({}).x = {} is negative for {:?}",
+        offset, cr.x, &text[..text.len().min(40)]
+    );
+    assert!(
+        cr.y >= 0.0,
+        "caret_rect_at({}).y = {} is negative", offset, cr.y
+    );
+    assert!(
+        cr.height > 0.0,
+        "caret_rect_at({}).height = {} is non-positive", offset, cr.height
+    );
+    assert!(
+        cr.x.is_finite() && cr.y.is_finite() && cr.height.is_finite(),
+        "caret_rect_at({}) contains non-finite value: {:?}", offset, cr
+    );
+}
+
+#[test]
+fn caret_rect_valid_at_every_position() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let boundaries = grapheme_boundaries(text);
+        for &pos in &boundaries {
+            let cr = lay.caret_rect_at(text, pos);
+            assert_valid_caret_rect(&cr, text, pos);
+        }
+    }
+}
+
+#[test]
+fn caret_rect_y_monotonic_with_lines() {
+    let mut lay = layout();
+    let texts = &[
+        "hello\nworld\n\nfoo",
+        "A\nB\nC\nD\nE",
+        "\n\n\n",
+        "single line",
+    ];
+    for &text in texts {
+        let boundaries = grapheme_boundaries(text);
+        let mut prev_y: Option<f32> = None;
+        for &pos in &boundaries {
+            let cr = lay.caret_rect_at(text, pos);
+            if let Some(py) = prev_y {
+                assert!(
+                    cr.y >= py,
+                    "caret y went backwards at offset {}: {} < {} in {:?}",
+                    pos, cr.y, py, text
+                );
+            }
+            prev_y = Some(cr.y);
+        }
+    }
+}
+
+#[test]
+fn caret_rect_x_zero_at_line_start() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let metrics = lay.line_metrics(text);
+        for lm in &metrics {
+            let cr = lay.caret_rect_at(text, lm.start_index);
+            assert_eq!(
+                cr.x, 0.0,
+                "caret at line start (offset {}) must have x=0, got {} in {:?}",
+                lm.start_index, cr.x, &text[..text.len().min(40)]
+            );
+        }
+    }
+}
+
+#[test]
+fn caret_rect_valid_after_every_command() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let boundaries = grapheme_boundaries(text);
+        for &pos in &boundaries {
+            for cmd in movement_commands() {
+                let s = TextEditorState::with_cursor(text, pos);
+                let result = apply_command(&s, cmd, &mut lay);
+                let cr = lay.caret_rect_at(&result.text, result.cursor);
+                assert_valid_caret_rect(&cr, &result.text, result.cursor);
+            }
+        }
+    }
+}
+
+// ===========================================================================
+// Navigation consistency: editing commands and caret geometry must agree
+// on which line the cursor is on.
+// ===========================================================================
+
+/// For every cursor position, verify that `line_index_for_offset_utf8`
+/// and `caret_rect_at` agree on the line.
+#[test]
+fn line_index_and_caret_rect_agree() {
+    let mut lay = layout();
+    for &text in SAFETY_TEXTS {
+        let metrics = lay.line_metrics(text);
+        if metrics.is_empty() { continue; }
+        let boundaries = grapheme_boundaries(text);
+        for &pos in &boundaries {
+            let idx = line_index_for_offset_utf8(&metrics, pos);
+            let cr = lay.caret_rect_at(text, pos);
+            let lm = &metrics[idx];
+            assert!(
+                (cr.y - (lm.baseline - lm.ascent)).abs() < 0.01,
+                "line_index says line {} (y={}) but caret_rect_at({}) gives y={} in {:?}",
+                idx, lm.baseline - lm.ascent, pos, cr.y, &text[..text.len().min(40)]
+            );
+        }
+    }
+}
+
+#[test]
+fn move_end_stays_on_same_line() {
+    let mut lay = layout();
+    let text = "Hello, World!\nType here\n\n=== Controls ===\n";
+    let metrics = lay.line_metrics(text);
+    let boundaries = grapheme_boundaries(text);
+    for &pos in &boundaries {
+        let before_line = line_index_for_offset_utf8(&metrics, pos);
+        let s = TextEditorState::with_cursor(text, pos);
+        let result = apply_command(&s, EditingCommand::MoveEnd { extend: false }, &mut lay);
+        let after_line = line_index_for_offset_utf8(&metrics, result.cursor);
+        assert_eq!(
+            before_line, after_line,
+            "MoveEnd moved from line {} to line {} (cursor {}→{}) in {:?}",
+            before_line, after_line, pos, result.cursor, text
+        );
+    }
+}
+
+#[test]
+fn move_home_stays_on_same_line() {
+    let mut lay = layout();
+    let text = "Hello, World!\nType here\n\n=== Controls ===\n";
+    let metrics = lay.line_metrics(text);
+    let boundaries = grapheme_boundaries(text);
+    for &pos in &boundaries {
+        let before_line = line_index_for_offset_utf8(&metrics, pos);
+        let s = TextEditorState::with_cursor(text, pos);
+        let result = apply_command(&s, EditingCommand::MoveHome { extend: false }, &mut lay);
+        let after_line = line_index_for_offset_utf8(&metrics, result.cursor);
+        assert_eq!(
+            before_line, after_line,
+            "MoveHome moved from line {} to line {} (cursor {}→{}) in {:?}",
+            before_line, after_line, pos, result.cursor, text
+        );
+    }
+}
+
+// ===========================================================================
+// Loop navigation tests: from EVERY position, walk in each direction.
+// Assert the cursor always makes progress and never gets stuck.
+// ===========================================================================
+
+const NAV_TEXTS: &[&str] = &[
+    "Hello, World!\nType here to edit text.\n\n=== Controls ===\n",
+    "A\nB\n\nC\n\nD",
+    "Hello\n\n===",
+    "(abc) d efg h?\n\nmore text\n",
+    "\n\n\n",
+    "single line no newline",
+    "trailing newline\n",
+    "\u{D55C}\u{AD6D}\u{C5B4}\n\u{65E5}\u{672C}\u{8A9E}\n\nend",
+    "",
+    "x",
+];
+
+fn assert_walk_right(text: &str, start: usize, lay: &mut dyn TextLayoutEngine) {
+    let mut s = TextEditorState::with_cursor(text, start);
+    let max = text.len() + 10;
+    for step in 0..max {
+        if s.cursor >= text.len() { return; }
+        let before = s.cursor;
+        s = apply_command(&s, EditingCommand::MoveRight { extend: false }, lay);
+        assert!(s.cursor > before,
+            "MoveRight stuck at offset {} (step {}) in {:?}",
+            before, step, &text[..text.len().min(60)]);
+    }
+    panic!("MoveRight did not reach end from offset {} in {:?}", start, &text[..text.len().min(60)]);
+}
+
+fn assert_walk_left(text: &str, start: usize, lay: &mut dyn TextLayoutEngine) {
+    let mut s = TextEditorState::with_cursor(text, start);
+    let max = text.len() + 10;
+    for step in 0..max {
+        if s.cursor == 0 { return; }
+        let before = s.cursor;
+        s = apply_command(&s, EditingCommand::MoveLeft { extend: false }, lay);
+        assert!(s.cursor < before,
+            "MoveLeft stuck at offset {} (step {}) in {:?}",
+            before, step, &text[..text.len().min(60)]);
+    }
+    panic!("MoveLeft did not reach 0 from offset {} in {:?}", start, &text[..text.len().min(60)]);
+}
+
+fn assert_walk_down(text: &str, start: usize, lay: &mut dyn TextLayoutEngine) {
+    let mut s = TextEditorState::with_cursor(text, start);
+    let max = text.len() + 10;
+    for step in 0..max {
+        if s.cursor >= text.len() { return; }
+        let before = s.cursor;
+        s = apply_command(&s, EditingCommand::MoveDown { extend: false }, lay);
+        assert!(s.cursor > before || s.cursor == text.len(),
+            "MoveDown stuck at offset {} (step {}) in {:?}",
+            before, step, &text[..text.len().min(60)]);
+    }
+    panic!("MoveDown did not reach end from offset {} in {:?}", start, &text[..text.len().min(60)]);
+}
+
+fn assert_walk_up(text: &str, start: usize, lay: &mut dyn TextLayoutEngine) {
+    let mut s = TextEditorState::with_cursor(text, start);
+    let max = text.len() + 10;
+    for step in 0..max {
+        if s.cursor == 0 { return; }
+        let before = s.cursor;
+        s = apply_command(&s, EditingCommand::MoveUp { extend: false }, lay);
+        assert!(s.cursor < before || s.cursor == 0,
+            "MoveUp stuck at offset {} (step {}) in {:?}",
+            before, step, &text[..text.len().min(60)]);
+    }
+    panic!("MoveUp did not reach 0 from offset {} in {:?}", start, &text[..text.len().min(60)]);
+}
+
+fn run_nav_tests(lay: &mut dyn TextLayoutEngine) {
+    for &text in NAV_TEXTS {
+        let boundaries = grapheme_boundaries(text);
+        for &pos in &boundaries {
+            assert_walk_right(text, pos, lay);
+            assert_walk_left(text, pos, lay);
+            assert_walk_down(text, pos, lay);
+            assert_walk_up(text, pos, lay);
+        }
+    }
+}
+
+// --- SimpleLayoutEngine ---
+
+#[test]
+fn nav_never_locks_simple() {
+    run_nav_tests(&mut layout());
+}
+
+// --- SkiaLayoutEngine (real Skia paragraph layout, no GPU needed) ---
+
+use super::skia_layout::SkiaLayoutEngine;
+
+fn skia_layout() -> SkiaLayoutEngine {
+    SkiaLayoutEngine::new(752.0, 576.0)
+}
+
+#[test]
+fn nav_never_locks_skia() {
+    run_nav_tests(&mut skia_layout());
+}
+
+// ===========================================================================
+// Hit-testing: position_at_point returns valid, correct offsets
+// ===========================================================================
+
+fn run_hit_test_invariants(lay: &mut dyn TextLayoutEngine, label: &str) {
+    for &text in NAV_TEXTS {
+        if text.is_empty() { continue; }
+        let metrics = lay.line_metrics(text);
+        if metrics.is_empty() { continue; }
+
+        // For each non-phantom line, clicking at x=0 must return start_index.
+        for (line_idx, lm) in metrics.iter().enumerate() {
+            if lm.start_index == lm.end_index { continue; }
+            let mid_y = lm.baseline - lm.ascent * 0.5;
+
+            let pos = lay.position_at_point(text, 0.0, mid_y);
+            assert!(
+                text.is_char_boundary(pos) && pos <= text.len(),
+                "[{}] position_at_point(0, {}) returned invalid offset {} for {:?}",
+                label, mid_y, pos, &text[..text.len().min(40)]
+            );
+            assert_eq!(
+                pos, lm.start_index,
+                "[{}] click at x=0 on line {} should give start_index {}, got {} in {:?}",
+                label, line_idx, lm.start_index, pos, &text[..text.len().min(40)]
+            );
+        }
+
+        // Sweep: for every non-phantom line, sample x positions and verify
+        // offsets are valid char boundaries and monotonically non-decreasing.
+        for (line_idx, lm) in metrics.iter().enumerate() {
+            if lm.start_index == lm.end_index { continue; }
+            let mid_y = lm.baseline - lm.ascent * 0.5;
+            let mut prev_pos: Option<usize> = None;
+
+            for x_step in 0..=20 {
+                let x = x_step as f32 * 40.0;
+                let pos = lay.position_at_point(text, x, mid_y);
+                assert!(
+                    text.is_char_boundary(pos) && pos <= text.len(),
+                    "[{}] position_at_point({}, {}) invalid offset {} on line {}",
+                    label, x, mid_y, pos, line_idx
+                );
+                if let Some(pp) = prev_pos {
+                    assert!(
+                        pos >= pp,
+                        "[{}] position_at_point not monotonic: x={} gave {}, x={} gave {} on line {} in {:?}",
+                        label, (x_step - 1) as f32 * 40.0, pp, x, pos, line_idx, &text[..text.len().min(40)]
+                    );
+                }
+                prev_pos = Some(pos);
+            }
+        }
+    }
+}
+
+#[test]
+fn hit_test_invariants_simple() {
+    run_hit_test_invariants(&mut layout(), "simple");
+}
+
+#[test]
+fn hit_test_invariants_skia() {
+    run_hit_test_invariants(&mut skia_layout(), "skia");
 }

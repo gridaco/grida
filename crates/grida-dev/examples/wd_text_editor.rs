@@ -86,10 +86,10 @@ use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{
     gpu::{self, backend_render_targets, gl::FramebufferInfo, surfaces::wrap_backend_render_target},
     textlayout::{
-        FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, RectHeightStyle,
+        Paragraph, ParagraphBuilder, ParagraphStyle, RectHeightStyle,
         RectWidthStyle, TextDecoration, TextStyle,
     },
-    Color, ColorType, FontMgr, Paint, Point, Rect, Surface,
+    Color, ColorType, Paint, Point, Rect, Surface,
 };
 use winit::{
     application::ApplicationHandler,
@@ -101,10 +101,11 @@ use winit::{
 };
 
 use crate::text_edit::{
-    apply_command, prev_grapheme_boundary, snap_grapheme_boundary, utf16_to_utf8_offset,
-    utf8_to_utf16_offset, EditHistory, EditKind, EditingCommand, LineMetrics, TextEditorState,
-    TextLayoutEngine,
+    apply_command, utf16_to_utf8_offset, utf8_to_utf16_offset,
+    EditHistory, EditKind, EditingCommand, LineMetrics, TextEditorState, TextLayoutEngine,
 };
+use crate::text_edit::layout::CaretRect;
+use crate::text_edit::skia_layout::SkiaLayoutEngine;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -288,166 +289,7 @@ impl Default for TextEditorConfig {
     }
 }
 
-// ---------------------------------------------------------------------------
-// SkiaLayoutEngine  — implements TextLayoutEngine using Skia Paragraph
-// ---------------------------------------------------------------------------
-
-/// Skia-backed `TextLayoutEngine`.
-///
-/// Rebuilds the `Paragraph` lazily when text or layout_width changes.
-struct SkiaLayoutEngine {
-    font_collection: FontCollection,
-    paragraph: Option<Paragraph>,
-    layout_width: f32,
-    layout_height: f32,
-    /// Text at the time of the last paragraph build.
-    cached_text: String,
-}
-
-impl SkiaLayoutEngine {
-    fn new(layout_width: f32, layout_height: f32) -> Self {
-        let mut fc = FontCollection::new();
-        fc.set_default_font_manager(FontMgr::new(), None);
-        Self {
-            font_collection: fc,
-            paragraph: None,
-            layout_width,
-            layout_height,
-            cached_text: String::new(),
-        }
-    }
-
-    fn ensure_layout(&mut self, text: &str) {
-        if self.paragraph.is_none() || self.cached_text != text {
-            self.rebuild(text);
-        }
-    }
-
-    fn rebuild(&mut self, text: &str) {
-        let mut style = ParagraphStyle::new();
-        style.set_apply_rounding_hack(false);
-        let mut ts = TextStyle::new();
-        ts.set_font_size(FONT_SIZE);
-        ts.set_color(Color::BLACK);
-        ts.set_font_families(&["Menlo", "Courier New", "monospace"]);
-        let mut builder = ParagraphBuilder::new(&style, &self.font_collection);
-        builder.push_style(&ts);
-        builder.add_text(text);
-        let mut para = builder.build();
-        para.layout(self.layout_width);
-        self.paragraph = Some(para);
-        self.cached_text = text.to_owned();
-    }
-
-    fn set_layout_width(&mut self, w: f32) {
-        let new_w = (w - PADDING * 2.0).max(1.0);
-        if (new_w - self.layout_width).abs() > 0.5 {
-            self.layout_width = new_w;
-            self.paragraph = None; // invalidate
-        }
-    }
-
-    fn set_layout_height(&mut self, h: f32) {
-        let new_h = (h - PADDING * 2.0).max(1.0);
-        if (new_h - self.layout_height).abs() > 0.5 {
-            self.layout_height = new_h;
-        }
-    }
-
-    /// Return a reference to the paragraph, ensuring it's built for `text`.
-    fn para(&mut self, text: &str) -> &Paragraph {
-        self.ensure_layout(text);
-        self.paragraph.as_ref().unwrap()
-    }
-}
-
-impl TextLayoutEngine for SkiaLayoutEngine {
-    fn line_metrics(&mut self, text: &str) -> Vec<LineMetrics> {
-        let skia = self.para(text).get_line_metrics();
-        skia.iter()
-            .map(|lm| LineMetrics {
-                start_index: utf16_to_utf8_offset(text, lm.start_index),
-                end_index: utf16_to_utf8_offset(text, lm.end_index).min(text.len()),
-                baseline: lm.baseline as f32,
-                ascent: lm.ascent as f32,
-                descent: lm.descent as f32,
-            })
-            .collect()
-    }
-
-    fn position_at_point(&mut self, text: &str, x: f32, y: f32) -> usize {
-        self.ensure_layout(text);
-        let para = self.paragraph.as_ref().unwrap();
-        let metrics = para.get_line_metrics();
-
-        // Empty-line check: if the target y falls within an empty line's band,
-        // return that line's start offset directly.  Skia's hit-test returns
-        // the previous line's position for empty lines → cursor gets locked.
-        for lm in &metrics {
-            let top = lm.baseline as f32 - lm.ascent as f32;
-            let bot = lm.baseline as f32 + lm.descent as f32;
-            if y >= top - 0.5 && y <= bot + 0.5 {
-                if lm.end_index.saturating_sub(lm.start_index) <= 1 {
-                    return utf16_to_utf8_offset(text, lm.start_index).min(text.len());
-                }
-                break;
-            }
-        }
-
-        let pwa = para.get_glyph_position_at_coordinate(Point::new(x, y));
-        let raw = utf16_to_utf8_offset(text, pwa.position.max(0) as usize).min(text.len());
-        // Use snap_grapheme_boundary rather than prev_grapheme_boundary:
-        // Skia often returns the exact start of a grapheme; prev_grapheme_boundary
-        // would step back one cluster in that case, locking the cursor on the
-        // previous line (the empty-line lock bug).
-        snap_grapheme_boundary(text, raw)
-    }
-
-    fn caret_x_at(&mut self, text: &str, offset: usize) -> f32 {
-        if offset == 0 {
-            return 0.0;
-        }
-        if text[..offset].ends_with('\n') {
-            return 0.0;
-        }
-        self.ensure_layout(text);
-        let u16_end = utf8_to_utf16_offset(text, offset);
-
-        // Query the rect for the ENTIRE grapheme cluster that ends at `offset`,
-        // not just the last UTF-16 code unit.
-        //
-        // Without this, complex-script combining marks (Devanagari virama/vowel
-        // signs, Thai sara) produce a rect positioned at the base consonant
-        // rather than the visual end of the cluster, causing the caret to jump
-        // leftward after stepping through the cluster — visually incorrect for
-        // LTR scripts.
-        let cluster_start = prev_grapheme_boundary(text, offset);
-        let u16_start = utf8_to_utf16_offset(text, cluster_start);
-
-        let rects = self.paragraph.as_ref().unwrap().get_rects_for_range(
-            u16_start..u16_end,
-            RectHeightStyle::Max,
-            RectWidthStyle::Tight,
-        );
-        // Use the rightmost right edge across all returned rects (handles bidi
-        // runs where the cluster may span more than one rect).
-        rects.iter().map(|tb| tb.rect.right()).fold(0.0_f32, f32::max)
-    }
-
-    fn word_boundary_at(&mut self, text: &str, offset: usize) -> (usize, usize) {
-        self.ensure_layout(text);
-        let u16_pos = utf8_to_utf16_offset(text, offset) as u32;
-        let para = self.paragraph.as_ref().unwrap();
-        let range = para.get_word_boundary(u16_pos);
-        let start = utf16_to_utf8_offset(text, range.start as usize);
-        let end = utf16_to_utf8_offset(text, range.end as usize);
-        (start, end)
-    }
-
-    fn viewport_height(&self) -> f32 {
-        self.layout_height
-    }
-}
+// SkiaLayoutEngine lives in text_edit::skia_layout (shared with tests).
 
 // ---------------------------------------------------------------------------
 // Utility: find line index from Skia UTF-16 offset (for selection_rects only)
@@ -701,11 +543,11 @@ impl TextEditor {
     // -----------------------------------------------------------------------
 
     fn set_layout_width(&mut self, w: f32) {
-        self.layout.set_layout_width(w);
+        self.layout.set_layout_width((w - PADDING * 2.0).max(1.0));
     }
 
     fn set_layout_height(&mut self, h: f32) {
-        self.layout.set_layout_height(h);
+        self.layout.set_layout_height((h - PADDING * 2.0).max(1.0));
     }
 
     // -----------------------------------------------------------------------
@@ -743,30 +585,6 @@ impl TextEditor {
     fn cancel_preedit(&mut self) {
         self.preedit = None;
         self.reset_blink();
-    }
-
-    // -----------------------------------------------------------------------
-    // Caret geometry helpers (for cursor rendering and IME popup placement)
-    // -----------------------------------------------------------------------
-
-    fn cursor_x(&mut self) -> f32 {
-        self.layout.caret_x_at(&self.state.text, self.state.cursor)
-    }
-
-    /// Baseline y of the cursor line, in layout-local space.
-    ///
-    /// Skia's `get_line_metrics()` emits an entry for the phantom empty line
-    /// that follows a trailing `\n`, so `skia_line_index_for_u16_offset`
-    /// already maps the cursor to that line. No extrapolation is needed.
-    fn cursor_baseline_y(&mut self) -> f32 {
-        self.layout.ensure_layout(&self.state.text);
-        let metrics = self.layout.paragraph.as_ref().unwrap().get_line_metrics();
-        if metrics.is_empty() {
-            return FONT_SIZE;
-        }
-        let cur_u16 = utf8_to_utf16_offset(&self.state.text, self.state.cursor);
-        let idx = skia_line_index_for_u16_offset(&metrics, cur_u16);
-        metrics[idx].baseline as f32
     }
 
     // -----------------------------------------------------------------------
@@ -922,13 +740,12 @@ impl TextEditor {
 
             // Cursor
             if self.cursor_visible && !self.has_selection() {
-                let cx = self.cursor_x();
-                let cy = self.cursor_baseline_y();
+                let cr = self.layout.caret_rect_at(&self.state.text, self.state.cursor);
                 let cursor_rect = Rect::from_xywh(
-                    cx + origin.x - CURSOR_WIDTH / 2.0,
-                    cy - FONT_SIZE + origin.y,
+                    cr.x + origin.x - CURSOR_WIDTH / 2.0,
+                    cr.y + origin.y,
                     CURSOR_WIDTH,
-                    FONT_SIZE * 1.2,
+                    cr.height,
                 );
                 let mut cp = Paint::default();
                 cp.set_color(Color::BLACK);
@@ -1496,11 +1313,16 @@ impl ApplicationHandler for TextEditorApp {
                 }
                 inner.gl_skia.flush_and_present();
 
-                let cx = inner.editor.cursor_x() + PADDING;
-                let cy = inner.editor.cursor_baseline_y() - FONT_SIZE + PADDING;
+                let cr = inner.editor.layout.caret_rect_at(
+                    &inner.editor.state.text,
+                    inner.editor.state.cursor,
+                );
                 inner.window.set_ime_cursor_area(
-                    LogicalPosition::new(cx as f64, cy as f64),
-                    LogicalSize::new(1.0f64, FONT_SIZE as f64),
+                    LogicalPosition::new(
+                        (cr.x + PADDING) as f64,
+                        (cr.y + PADDING) as f64,
+                    ),
+                    LogicalSize::new(1.0f64, cr.height as f64),
                 );
 
                 let deadline = inner.editor.next_blink_deadline();

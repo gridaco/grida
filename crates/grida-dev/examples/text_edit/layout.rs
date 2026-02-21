@@ -33,6 +33,20 @@ impl LineMetrics {
     }
 }
 
+/// Caret geometry returned by [`TextLayoutEngine::caret_rect_at`].
+///
+/// All coordinates are in **layout-local space** (origin at top-left of the
+/// text layout box).
+#[derive(Clone, Debug, PartialEq)]
+pub struct CaretRect {
+    /// X coordinate of the caret (left edge).
+    pub x: f32,
+    /// Y coordinate of the top of the caret.
+    pub y: f32,
+    /// Height of the caret (covers one line).
+    pub height: f32,
+}
+
 /// Abstract geometry provider.
 ///
 /// Implementations include:
@@ -51,8 +65,19 @@ pub trait TextLayoutEngine {
     /// within an empty line's y-band should return the start of that line.
     fn position_at_point(&mut self, text: &str, x: f32, y: f32) -> usize;
 
+    /// Return the full caret rectangle for the cursor at `offset`.
+    ///
+    /// The line that owns the cursor is determined by the forward-scan rule:
+    /// the first line where `offset < end_index`, falling back to the last
+    /// line when `offset >= all end indices` (e.g. cursor at text end).
+    fn caret_rect_at(&mut self, text: &str, offset: usize) -> CaretRect;
+
     /// Return the x coordinate (layout-local) of the caret at `offset`.
-    fn caret_x_at(&mut self, text: &str, offset: usize) -> f32;
+    ///
+    /// Default implementation delegates to `caret_rect_at`.
+    fn caret_x_at(&mut self, text: &str, offset: usize) -> f32 {
+        self.caret_rect_at(text, offset).x
+    }
 
     /// Return `(word_start, word_end)` for the word that contains `offset`.
     /// Both bounds are UTF-8 byte offsets.
@@ -66,15 +91,14 @@ pub trait TextLayoutEngine {
 // Utility: find the line index for a UTF-8 offset
 // ---------------------------------------------------------------------------
 
-/// Find which line index contains `utf8_offset`.
+/// Find which line contains `utf8_offset`.
 ///
-/// Scans from the last line backwards: `start_index <= offset` correctly maps
-/// a cursor at the start of line N to line N (not N-1).
+/// Forward-scan: first line where `offset < end_index`.
+/// Falls back to the last line when offset is past all end indices.
+/// This is the same rule used by `caret_rect_at`.
 pub fn line_index_for_offset(metrics: &[LineMetrics], utf8_offset: usize) -> usize {
-    for (i, lm) in metrics.iter().enumerate().rev() {
-        if lm.start_index <= utf8_offset {
-            return i;
-        }
-    }
-    0
+    metrics
+        .iter()
+        .position(|lm| utf8_offset < lm.end_index)
+        .unwrap_or(metrics.len().saturating_sub(1))
 }

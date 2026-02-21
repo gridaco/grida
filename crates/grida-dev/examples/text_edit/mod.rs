@@ -1,9 +1,10 @@
 pub mod history;
 pub mod layout;
 pub mod simple_layout;
+pub mod skia_layout;
 
 pub use history::{EditHistory, EditKind};
-pub use layout::{line_index_for_offset, LineMetrics, TextLayoutEngine};
+pub use layout::{line_index_for_offset, CaretRect, LineMetrics, TextLayoutEngine};
 pub use simple_layout::SimpleLayoutEngine;
 
 use unicode_segmentation::UnicodeSegmentation;
@@ -372,28 +373,26 @@ pub fn apply_command(
 
         EditingCommand::MoveLeft { extend } => {
             if !extend && s.has_selection() {
-                if let Some((lo, _)) = s.selection_range() {
-                    s.cursor = lo;
-                    s.anchor = None;
-                    return s;
-                }
+                let lo = s.selection_range().map_or(s.cursor, |(lo, _)| lo);
+                s.cursor = lo;
+                s.anchor = None;
+            } else {
+                set_anchor_if_extending(&mut s, extend);
+                s.cursor = prev_grapheme_boundary(&s.text, s.cursor);
+                clear_anchor_if_not_extending(&mut s, extend);
             }
-            set_anchor_if_extending(&mut s, extend);
-            s.cursor = prev_grapheme_boundary(&s.text, s.cursor);
-            clear_anchor_if_not_extending(&mut s, extend);
         }
 
         EditingCommand::MoveRight { extend } => {
             if !extend && s.has_selection() {
-                if let Some((_, hi)) = s.selection_range() {
-                    s.cursor = hi;
-                    s.anchor = None;
-                    return s;
-                }
+                let hi = s.selection_range().map_or(s.cursor, |(_, hi)| hi);
+                s.cursor = hi;
+                s.anchor = None;
+            } else {
+                set_anchor_if_extending(&mut s, extend);
+                s.cursor = next_grapheme_boundary(&s.text, s.cursor);
+                clear_anchor_if_not_extending(&mut s, extend);
             }
-            set_anchor_if_extending(&mut s, extend);
-            s.cursor = next_grapheme_boundary(&s.text, s.cursor);
-            clear_anchor_if_not_extending(&mut s, extend);
         }
 
         EditingCommand::MoveDocStart { extend } => {
@@ -414,8 +413,8 @@ pub fn apply_command(
         }
 
         EditingCommand::SetCursorPos { pos, anchor } => {
-            s.cursor = pos.min(s.text.len());
-            s.anchor = anchor;
+            s.cursor = snap_grapheme_boundary(&s.text, pos);
+            s.anchor = anchor.map(|a| snap_grapheme_boundary(&s.text, a));
         }
 
         EditingCommand::BackspaceLine => {
@@ -429,7 +428,15 @@ pub fn apply_command(
                     if line_start < s.cursor {
                         s.text.drain(line_start..s.cursor);
                         s.cursor = line_start;
+                    } else if s.cursor > 0 {
+                        let prev = prev_grapheme_boundary(&s.text, s.cursor);
+                        s.text.drain(prev..s.cursor);
+                        s.cursor = prev;
                     }
+                } else if s.cursor > 0 {
+                    let prev = prev_grapheme_boundary(&s.text, s.cursor);
+                    s.text.drain(prev..s.cursor);
+                    s.cursor = prev;
                 }
             }
             s.anchor = None;
@@ -457,31 +464,46 @@ pub fn apply_command(
 
         EditingCommand::MoveUp { extend } => {
             set_anchor_if_extending(&mut s, extend);
-            let x = layout.caret_x_at(&s.text, s.cursor);
             let metrics = layout.line_metrics(&s.text);
-            let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
-            if line_idx > 0 {
-                let prev = &metrics[line_idx - 1];
-                let target_y = prev.baseline - prev.ascent * 0.5;
-                s.cursor = layout.position_at_point(&s.text, x, target_y.max(0.0));
-            } else {
+            if metrics.is_empty() {
                 s.cursor = 0;
+            } else {
+                let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
+                if line_idx > 0 {
+                    let target = &metrics[line_idx - 1];
+                    if target.is_empty_line() {
+                        s.cursor = target.start_index;
+                    } else {
+                        let x = layout.caret_x_at(&s.text, s.cursor);
+                        let target_y = target.baseline - target.ascent * 0.5;
+                        s.cursor = layout.position_at_point(&s.text, x, target_y.max(0.0));
+                    }
+                } else {
+                    s.cursor = 0;
+                }
             }
             clear_anchor_if_not_extending(&mut s, extend);
         }
 
         EditingCommand::MoveDown { extend } => {
             set_anchor_if_extending(&mut s, extend);
-            let x = layout.caret_x_at(&s.text, s.cursor);
             let metrics = layout.line_metrics(&s.text);
-            let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
-            if line_idx + 1 < metrics.len() {
-                let next = &metrics[line_idx + 1];
-                let target_y = next.baseline - next.ascent * 0.5;
-                // Delegate to position_at_point; implementations handle empty lines.
-                s.cursor = layout.position_at_point(&s.text, x, target_y.max(0.0));
-            } else {
+            if metrics.is_empty() {
                 s.cursor = s.text.len();
+            } else {
+                let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
+                if line_idx + 1 < metrics.len() {
+                    let target = &metrics[line_idx + 1];
+                    if target.is_empty_line() {
+                        s.cursor = target.start_index;
+                    } else {
+                        let x = layout.caret_x_at(&s.text, s.cursor);
+                        let target_y = target.baseline - target.ascent * 0.5;
+                        s.cursor = layout.position_at_point(&s.text, x, target_y.max(0.0));
+                    }
+                } else {
+                    s.cursor = s.text.len();
+                }
             }
             clear_anchor_if_not_extending(&mut s, extend);
         }
@@ -489,22 +511,29 @@ pub fn apply_command(
         EditingCommand::MoveHome { extend } => {
             set_anchor_if_extending(&mut s, extend);
             let metrics = layout.line_metrics(&s.text);
-            let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
-            s.cursor = metrics[line_idx].start_index;
+            if !metrics.is_empty() {
+                let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
+                s.cursor = metrics[line_idx].start_index;
+            } else {
+                s.cursor = 0;
+            }
             clear_anchor_if_not_extending(&mut s, extend);
         }
 
         EditingCommand::MoveEnd { extend } => {
             set_anchor_if_extending(&mut s, extend);
             let metrics = layout.line_metrics(&s.text);
-            let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
-            let lm = &metrics[line_idx];
-            let mut end = lm.end_index.min(s.text.len());
-            // Step back over trailing newline so caret sits before it visually.
-            if end > 0 && s.text[..end].ends_with('\n') {
-                end = prev_grapheme_boundary(&s.text, end);
+            if !metrics.is_empty() {
+                let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
+                let lm = &metrics[line_idx];
+                let mut end = lm.end_index.min(s.text.len());
+                if end > lm.start_index && s.text[..end].ends_with('\n') {
+                    end = prev_grapheme_boundary(&s.text, end).max(lm.start_index);
+                }
+                s.cursor = end;
+            } else {
+                s.cursor = s.text.len();
             }
-            s.cursor = end;
             clear_anchor_if_not_extending(&mut s, extend);
         }
 
@@ -686,14 +715,18 @@ fn clear_anchor_if_not_extending(s: &mut TextEditorState, extend: bool) {
     }
 }
 
-/// line_index_for_offset using UTF-8 metrics (mirrors the Skia-agnostic version).
+/// Find which line contains `utf8_offset`.
+///
+/// Uses the forward-scan rule: the first line where `offset < end_index`.
+/// Falls back to the last line when `offset >= all end indices` (cursor at
+/// text end or on a trailing phantom line).  This is the same rule used by
+/// `caret_rect_at`, ensuring editing commands and caret rendering always
+/// agree on which line the cursor belongs to.
 pub fn line_index_for_offset_utf8(metrics: &[LineMetrics], utf8_offset: usize) -> usize {
-    for (i, lm) in metrics.iter().enumerate().rev() {
-        if lm.start_index <= utf8_offset {
-            return i;
-        }
-    }
-    0
+    metrics
+        .iter()
+        .position(|lm| utf8_offset < lm.end_index)
+        .unwrap_or(metrics.len().saturating_sub(1))
 }
 
 #[cfg(test)]
