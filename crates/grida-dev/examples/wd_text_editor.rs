@@ -4,60 +4,68 @@
 //! This file wires it up to Skia paragraph layout (`SkiaLayoutEngine`) and
 //! the winit event loop.
 
+#![allow(clippy::single_match)]
+
 #[path = "text_edit/mod.rs"]
 mod text_edit;
-//!
-//! Feature checklist
-//! -----------------
-//! Editing
-//!   [x] Text insertion – IME commit (Ime::Commit) + Key::Character fallback
-//!   [x] Backspace – delete grapheme before cursor (or selected range)
-//!   [x] Delete    – delete grapheme after cursor (or selected range)
-//!   [x] Enter     – insert newline
-//!   [x] Tab       – insert 4 spaces
-//!
-//! Cursor movement
-//!   [x] ← / →                grapheme-cluster navigation
-//!   [x] ↑ / ↓                line-aware navigation (Skia line-metrics + position_at_point)
-//!   [x] Home / End            line start / end
-//!   [x] PageUp / PageDown     move by ~visible lines (manifesto viewport boundaries)
-//!   [x] Cmd+← / →            line start / end  (macOS)
-//!   [x] Cmd+↑ / ↓            document start / end  (macOS)
-//!   [x] Option+← / →         word jump  (macOS)
-//!   [x] Ctrl+← / →           word jump  (Windows / Linux)
-//!
-//! Selection
-//!   [x] Shift+arrow           extend selection in any direction
-//!   [x] Shift+Cmd/Opt/Ctrl    extend selection with the same jumps as above
-//!   [x] Mouse click           place cursor
-//!   [x] Mouse drag            drag-to-select range
-//!   [x] Shift+click           extend selection from current cursor to click position
-//!   [x] k=2 double-click      select word  (Skia get_word_boundary)
-//!   [x] k=3 triple-click      select visual line  (Skia get_line_metrics)
-//!   [x] k=4 quad-click        select entire document
-//!   [x] Cmd+A                 select all
-//!
-//! Clipboard
-//!   [x] Cmd/Ctrl+C            copy selection
-//!   [x] Cmd/Ctrl+X            cut selection
-//!   [x] Cmd/Ctrl+V            paste
-//!
-//! Rendering
-//!   [x] Multiline text with wrapping
-//!   [x] Cursor blink (500 ms, resets on any input)
-//!   [x] Selection highlight (Skia get_rects_for_range)
-//!   [x] Empty-line selection invariant (configurable: GlyphRect vs LineBox)
-//!   [x] Resize – paragraph relaid out on window resize
-//!
-//!   [x] IME composition (set_ime_allowed + Preedit → underlined inline segment;
-//!                        Key::Character suppressed during active composition)
-//!
-//! Not yet implemented
-//!   [ ] Undo / redo
-//!   [ ] Scroll (vertical)
-//!   [ ] Visual-order bidi cursor movement
-
-#![allow(clippy::single_match)]
+//
+// Feature checklist
+// -----------------
+// Editing
+//   [x] Text insertion – IME commit (Ime::Commit) + Key::Character fallback
+//   [x] Backspace – delete grapheme before cursor (or selected range)
+//   [x] Delete    – delete grapheme after cursor (or selected range)
+//   [x] Option/Ctrl+Backspace – delete word segment backward (UAX #29)
+//   [x] Option/Ctrl+Delete   – delete word segment forward  (UAX #29)
+//   [x] Cmd+Backspace         – delete to line start
+//   [x] Cmd+Delete            – delete to line end
+//   [x] Enter     – insert newline
+//   [x] Tab       – insert 4 spaces
+//
+// Cursor movement
+//   [x] ← / →                grapheme-cluster navigation
+//   [x] ↑ / ↓                line-aware navigation (Skia line-metrics + position_at_point)
+//   [x] Home / End            line start / end
+//   [x] PageUp / PageDown     move by ~visible lines (manifesto viewport boundaries)
+//   [x] Cmd+← / →            line start / end  (macOS)
+//   [x] Cmd+↑ / ↓            document start / end  (macOS)
+//   [x] Option+← / →         word jump  (macOS)
+//   [x] Ctrl+← / →           word jump  (Windows / Linux)
+//
+// Selection
+//   [x] Shift+arrow           extend selection in any direction
+//   [x] Shift+Cmd/Opt/Ctrl    extend selection with the same jumps as above
+//   [x] Mouse click           place cursor
+//   [x] Mouse drag            drag-to-select range
+//   [x] Shift+click           extend selection from current cursor to click position
+//   [x] k=2 double-click      select word  (Skia get_word_boundary)
+//   [x] k=3 triple-click      select visual line  (Skia get_line_metrics)
+//   [x] k=4 quad-click        select entire document
+//   [x] Cmd+A                 select all
+//
+// Clipboard
+//   [x] Cmd/Ctrl+C            copy selection
+//   [x] Cmd/Ctrl+X            cut selection
+//   [x] Cmd/Ctrl+V            paste
+//
+// Rendering
+//   [x] Multiline text with wrapping
+//   [x] Cursor blink (500 ms, resets on any input)
+//   [x] Selection highlight (Skia get_rects_for_range)
+//   [x] Empty-line selection invariant (configurable: GlyphRect vs LineBox)
+//   [x] Resize – paragraph relaid out on window resize
+//
+//   [x] IME composition (set_ime_allowed + Preedit → underlined inline segment;
+//                        Key::Character suppressed during active composition)
+//
+// History
+//   [x] Undo / redo (Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z)
+//       Snapshot-based history with merge: consecutive typing, backspace, or
+//       delete are grouped; paste, newline, and IME commit are discrete steps.
+//
+// Not yet implemented
+//   [ ] Scroll (vertical)
+//   [ ] Visual-order bidi cursor movement
 
 use std::ffi::CString;
 use std::num::NonZeroU32;
@@ -94,7 +102,8 @@ use winit::{
 
 use crate::text_edit::{
     apply_command, prev_grapheme_boundary, snap_grapheme_boundary, utf16_to_utf8_offset,
-    utf8_to_utf16_offset, EditingCommand, LineMetrics, TextEditorState, TextLayoutEngine,
+    utf8_to_utf16_offset, EditHistory, EditKind, EditingCommand, LineMetrics, TextEditorState,
+    TextLayoutEngine,
 };
 
 // ---------------------------------------------------------------------------
@@ -476,6 +485,9 @@ struct TextEditor {
     preedit: Option<String>,
 
     empty_line_policy: EmptyLineSelectionPolicy,
+
+    /// Undo / redo history (snapshot-based).
+    history: EditHistory,
 }
 
 impl TextEditor {
@@ -492,6 +504,7 @@ impl TextEditor {
             drag_anchor_utf8: None,
             preedit: None,
             empty_line_policy: config.empty_line_policy,
+            history: EditHistory::new(),
         }
     }
 
@@ -500,8 +513,37 @@ impl TextEditor {
     // -----------------------------------------------------------------------
 
     fn apply(&mut self, cmd: EditingCommand) {
+        if let Some(kind) = cmd.edit_kind() {
+            self.history.push(&self.state, kind);
+        }
         self.state = apply_command(&self.state, cmd, &mut self.layout);
         self.reset_blink();
+    }
+
+    fn apply_with_kind(&mut self, cmd: EditingCommand, kind: EditKind) {
+        self.history.push(&self.state, kind);
+        self.state = apply_command(&self.state, cmd, &mut self.layout);
+        self.reset_blink();
+    }
+
+    fn undo(&mut self) -> bool {
+        if let Some(prev) = self.history.undo(&self.state) {
+            self.state = prev;
+            self.reset_blink();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn redo(&mut self) -> bool {
+        if let Some(next) = self.history.redo(&self.state) {
+            self.state = next;
+            self.reset_blink();
+            true
+        } else {
+            false
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -516,8 +558,24 @@ impl TextEditor {
         self.apply(EditingCommand::Backspace);
     }
 
+    fn backspace_word(&mut self) {
+        self.apply(EditingCommand::BackspaceWord);
+    }
+
+    fn backspace_line(&mut self) {
+        self.apply(EditingCommand::BackspaceLine);
+    }
+
     fn delete_forward(&mut self) {
         self.apply(EditingCommand::Delete);
+    }
+
+    fn delete_word_forward(&mut self) {
+        self.apply(EditingCommand::DeleteWord);
+    }
+
+    fn delete_line_forward(&mut self) {
+        self.apply(EditingCommand::DeleteLine);
     }
 
     fn move_left(&mut self, extend: bool) {
@@ -1103,6 +1161,9 @@ impl ApplicationHandler for TextEditorApp {
             "Home / End  line start/end    PageUp / PageDown  move by ~visible lines\n",
             "Double-click  select word     Mouse drag  select range\n",
             "Cmd+A  select all             Cmd+C / X / V  clipboard\n",
+            "Cmd+Z  undo                   Cmd+Shift+Z  redo\n",
+            "Option+Backspace  delete word backward    Option+Delete  delete word forward\n",
+            "Cmd+Backspace  delete to line start     Cmd+Delete  delete to line end\n",
             "\n",
             "=== Writing Systems / Shaping / Selection Tests ===\n",
             "\n",
@@ -1212,7 +1273,10 @@ impl ApplicationHandler for TextEditorApp {
             }
             WindowEvent::Ime(Ime::Commit(s)) => {
                 inner.editor.cancel_preedit();
-                inner.editor.insert_text(&s);
+                inner.editor.apply_with_kind(
+                    EditingCommand::Insert(s),
+                    EditKind::ImeCommit,
+                );
                 inner.window.request_redraw();
             }
             WindowEvent::Ime(Ime::Enabled) => {
@@ -1288,11 +1352,23 @@ impl ApplicationHandler for TextEditorApp {
                     }
 
                     Key::Named(NamedKey::Backspace) => {
-                        inner.editor.backspace();
+                        if meta {
+                            inner.editor.backspace_line();
+                        } else if word {
+                            inner.editor.backspace_word();
+                        } else {
+                            inner.editor.backspace();
+                        }
                         inner.window.request_redraw();
                     }
                     Key::Named(NamedKey::Delete) => {
-                        inner.editor.delete_forward();
+                        if meta {
+                            inner.editor.delete_line_forward();
+                        } else if word {
+                            inner.editor.delete_word_forward();
+                        } else {
+                            inner.editor.delete_forward();
+                        }
                         inner.window.request_redraw();
                     }
                     Key::Named(NamedKey::Enter) => {
@@ -1305,6 +1381,15 @@ impl ApplicationHandler for TextEditorApp {
                             "a" => {
                                 inner.editor.select_all();
                                 inner.window.request_redraw();
+                            }
+                            "z" => {
+                                if shift {
+                                    if inner.editor.redo() {
+                                        inner.window.request_redraw();
+                                    }
+                                } else if inner.editor.undo() {
+                                    inner.window.request_redraw();
+                                }
                             }
                             "c" => {
                                 if let Some(sel) = inner.editor.selected_text() {

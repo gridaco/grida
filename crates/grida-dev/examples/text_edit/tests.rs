@@ -3,7 +3,7 @@
 //! All tests use `SimpleLayoutEngine` — no Skia, no winit.  The layout is
 //! monospace / no-wrap, so every assertion is exact.
 
-use super::{apply_command, layout::TextLayoutEngine, snap_grapheme_boundary, EditingCommand, SimpleLayoutEngine, TextEditorState};
+use super::{apply_command, layout::TextLayoutEngine, snap_grapheme_boundary, word_segment_at, EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
 
 fn layout() -> SimpleLayoutEngine {
     SimpleLayoutEngine::default_test()
@@ -944,4 +944,464 @@ fn page_down_moves_by_visible_lines() {
     let s2 = apply_command(&s, EditingCommand::MovePageDown { extend: false }, &mut lay);
     // target_line = 0 + 2 = 2, start = index of "L2"
     assert_eq!(s2.cursor, 6, "should jump to line 2");
+}
+
+// ---------------------------------------------------------------------------
+// Undo / redo
+// ---------------------------------------------------------------------------
+
+#[test]
+fn undo_restores_previous_state() {
+    let mut h = EditHistory::new();
+    let s0 = TextEditorState::with_cursor("Hello", 5);
+    h.push(&s0, EditKind::Typing);
+    let s1 = apply(&s0, EditingCommand::Insert(" W".into()));
+
+    let restored = h.undo(&s1).expect("should undo");
+    assert_eq!(restored, s0);
+}
+
+#[test]
+fn redo_after_undo() {
+    let mut h = EditHistory::new();
+    let s0 = TextEditorState::with_cursor("Hello", 5);
+    h.push(&s0, EditKind::Typing);
+    let s1 = apply(&s0, EditingCommand::Insert("!".into()));
+
+    let restored = h.undo(&s1).expect("undo");
+    assert_eq!(restored, s0);
+
+    let redone = h.redo(&restored).expect("redo");
+    assert_eq!(redone, s1);
+}
+
+#[test]
+fn redo_cleared_by_new_edit() {
+    let mut h = EditHistory::new();
+    let s0 = TextEditorState::with_cursor("Hello", 5);
+    h.push(&s0, EditKind::Typing);
+    let s1 = apply(&s0, EditingCommand::Insert("!".into()));
+
+    h.undo(&s1).expect("undo");
+
+    h.push(&s0, EditKind::Typing);
+    assert!(!h.can_redo(), "redo stack should be cleared after new edit");
+}
+
+#[test]
+fn consecutive_typing_merges_into_one_undo_step() {
+    let mut h = EditHistory::new();
+    let s0 = TextEditorState::with_cursor("", 0);
+
+    h.push(&s0, EditKind::Typing);
+    let s1 = apply(&s0, EditingCommand::Insert("H".into()));
+    h.push(&s1, EditKind::Typing);
+    let s2 = apply(&s1, EditingCommand::Insert("i".into()));
+    h.push(&s2, EditKind::Typing);
+    let s3 = apply(&s2, EditingCommand::Insert("!".into()));
+
+    assert_eq!(h.undo_len(), 1, "consecutive typing should merge");
+
+    let restored = h.undo(&s3).expect("undo");
+    assert_eq!(restored, s0, "should jump back to state before entire typing run");
+}
+
+#[test]
+fn different_kinds_do_not_merge() {
+    let mut h = EditHistory::new();
+    let s0 = TextEditorState::with_cursor("abc", 3);
+
+    h.push(&s0, EditKind::Typing);
+    let s1 = apply(&s0, EditingCommand::Insert("d".into()));
+
+    h.push(&s1, EditKind::Backspace);
+    let s2 = apply(&s1, EditingCommand::Backspace);
+
+    assert_eq!(h.undo_len(), 2, "Typing then Backspace should be 2 entries");
+
+    let after_first_undo = h.undo(&s2).expect("undo backspace");
+    assert_eq!(after_first_undo, s1);
+
+    let after_second_undo = h.undo(&after_first_undo).expect("undo typing");
+    assert_eq!(after_second_undo, s0);
+}
+
+#[test]
+fn timeout_breaks_merge() {
+    use std::time::Duration;
+
+    let mut h = EditHistory::with_merge_timeout(Duration::from_secs(2));
+    let s0 = TextEditorState::with_cursor("", 0);
+
+    h.push(&s0, EditKind::Typing);
+    let s1 = apply(&s0, EditingCommand::Insert("a".into()));
+
+    h.expire_top();
+
+    h.push(&s1, EditKind::Typing);
+    let s2 = apply(&s1, EditingCommand::Insert("b".into()));
+
+    assert_eq!(h.undo_len(), 2, "expired timeout should break merge");
+
+    let restored = h.undo(&s2).expect("undo second group");
+    assert_eq!(restored, s1);
+}
+
+#[test]
+fn ime_commit_never_merges() {
+    let mut h = EditHistory::new();
+    let s0 = TextEditorState::with_cursor("", 0);
+
+    h.push(&s0, EditKind::ImeCommit);
+    let s1 = apply(&s0, EditingCommand::Insert("가".into()));
+
+    h.push(&s1, EditKind::ImeCommit);
+    let s2 = apply(&s1, EditingCommand::Insert("나".into()));
+
+    assert_eq!(h.undo_len(), 2, "IME commits should never merge");
+}
+
+#[test]
+fn newline_never_merges() {
+    let mut h = EditHistory::new();
+    let s0 = TextEditorState::with_cursor("a", 1);
+
+    h.push(&s0, EditKind::Newline);
+    let s1 = apply(&s0, EditingCommand::Insert("\n".into()));
+
+    h.push(&s1, EditKind::Newline);
+    let s2 = apply(&s1, EditingCommand::Insert("\n".into()));
+
+    assert_eq!(h.undo_len(), 2, "newlines should never merge");
+    let _ = s2;
+}
+
+#[test]
+fn paste_never_merges() {
+    let mut h = EditHistory::new();
+    let s0 = TextEditorState::with_cursor("", 0);
+
+    h.push(&s0, EditKind::Paste);
+    let s1 = apply(&s0, EditingCommand::Insert("hello world".into()));
+
+    h.push(&s1, EditKind::Paste);
+    let _s2 = apply(&s1, EditingCommand::Insert("foo bar".into()));
+
+    assert_eq!(h.undo_len(), 2, "pastes should never merge");
+}
+
+#[test]
+fn undo_on_empty_stack_returns_none() {
+    let mut h = EditHistory::new();
+    let s = TextEditorState::with_cursor("x", 1);
+    assert!(h.undo(&s).is_none());
+}
+
+#[test]
+fn redo_on_empty_stack_returns_none() {
+    let mut h = EditHistory::new();
+    let s = TextEditorState::with_cursor("x", 1);
+    assert!(h.redo(&s).is_none());
+}
+
+#[test]
+fn max_entries_evicts_oldest() {
+    let mut h = EditHistory::with_max_entries(3);
+
+    let s0 = TextEditorState::with_cursor("", 0);
+    h.push(&s0, EditKind::Newline);
+    let s1 = apply(&s0, EditingCommand::Insert("\n".into()));
+
+    h.push(&s1, EditKind::Newline);
+    let s2 = apply(&s1, EditingCommand::Insert("\n".into()));
+
+    h.push(&s2, EditKind::Newline);
+    let s3 = apply(&s2, EditingCommand::Insert("\n".into()));
+
+    assert_eq!(h.undo_len(), 3);
+
+    h.push(&s3, EditKind::Newline);
+    let s4 = apply(&s3, EditingCommand::Insert("\n".into()));
+
+    assert_eq!(h.undo_len(), 3, "oldest entry should be evicted");
+
+    let r = h.undo(&s4).expect("undo");
+    assert_eq!(r, s3, "most recent entry is s3");
+}
+
+#[test]
+fn edit_kind_classification() {
+    assert_eq!(EditingCommand::Insert("a".into()).edit_kind(), Some(EditKind::Typing));
+    assert_eq!(EditingCommand::Insert("\n".into()).edit_kind(), Some(EditKind::Newline));
+    assert_eq!(EditingCommand::Insert("hello world".into()).edit_kind(), Some(EditKind::Paste));
+    assert_eq!(EditingCommand::Backspace.edit_kind(), Some(EditKind::Backspace));
+    assert_eq!(EditingCommand::BackspaceWord.edit_kind(), Some(EditKind::Backspace));
+    assert_eq!(EditingCommand::Delete.edit_kind(), Some(EditKind::Delete));
+    assert_eq!(EditingCommand::DeleteWord.edit_kind(), Some(EditKind::Delete));
+    assert_eq!(EditingCommand::MoveLeft { extend: false }.edit_kind(), None);
+    assert_eq!(EditingCommand::SelectAll.edit_kind(), None);
+}
+
+// ---------------------------------------------------------------------------
+// Word segment boundary (UAX #29)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn word_segment_at_returns_correct_segments() {
+    //                   0123456789...
+    let text = "(abc) d efg h?";
+    // UAX#29 segments: ( | abc | ) | _ | d | _ | efg | _ | h | ?
+    assert_eq!(word_segment_at(text, 0), (0, 1));   // (
+    assert_eq!(word_segment_at(text, 1), (1, 4));   // abc
+    assert_eq!(word_segment_at(text, 3), (1, 4));   // still inside abc
+    assert_eq!(word_segment_at(text, 4), (4, 5));   // )
+    assert_eq!(word_segment_at(text, 5), (5, 6));   // space
+    assert_eq!(word_segment_at(text, 6), (6, 7));   // d
+    assert_eq!(word_segment_at(text, 8), (8, 11));  // efg
+    assert_eq!(word_segment_at(text, 12), (12, 13)); // h
+    assert_eq!(word_segment_at(text, 13), (13, 14)); // ?
+}
+
+// ---------------------------------------------------------------------------
+// Word deletion: BackspaceWord
+// ---------------------------------------------------------------------------
+
+#[test]
+fn backspace_word_deletes_word() {
+    // "hello world" cursor at 11 (end) → delete "world"
+    let s = TextEditorState::with_cursor("hello world", 11);
+    let s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "hello ");
+    assert_eq!(s.cursor, 6);
+}
+
+#[test]
+fn backspace_word_deletes_space() {
+    // "hello world" cursor at 6 (after space, before 'w') → delete space
+    let s = TextEditorState::with_cursor("hello world", 6);
+    let s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "helloworld");
+    assert_eq!(s.cursor, 5);
+}
+
+#[test]
+fn backspace_word_deletes_punctuation() {
+    let s = TextEditorState::with_cursor("(abc)", 5);
+    let s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "(abc");
+    assert_eq!(s.cursor, 4);
+}
+
+#[test]
+fn backspace_word_at_start_is_noop() {
+    let s = TextEditorState::with_cursor("hello", 0);
+    let s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "hello");
+    assert_eq!(s.cursor, 0);
+}
+
+#[test]
+fn backspace_word_deletes_selection_first() {
+    let mut s = TextEditorState::with_cursor("hello world", 5);
+    s.anchor = Some(11);
+    let s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "hello");
+    assert_eq!(s.cursor, 5);
+}
+
+#[test]
+fn backspace_word_repeated() {
+    // "(abc) d" cursor at end (7)
+    // Step 1: delete "d" → "(abc) "
+    // Step 2: delete " " → "(abc)"
+    // Step 3: delete ")" → "(abc"
+    // Step 4: delete "abc" → "("
+    // Step 5: delete "(" → ""
+    let mut s = TextEditorState::with_cursor("(abc) d", 7);
+    s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "(abc) ", "step 1: delete 'd'");
+
+    s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "(abc)", "step 2: delete space");
+
+    s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "(abc", "step 3: delete ')'");
+
+    s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "(", "step 4: delete 'abc'");
+
+    s = apply(&s, EditingCommand::BackspaceWord);
+    assert_eq!(s.text, "", "step 5: delete '('");
+}
+
+// ---------------------------------------------------------------------------
+// Word deletion: DeleteWord
+// ---------------------------------------------------------------------------
+
+#[test]
+fn delete_word_deletes_word() {
+    // "hello world" cursor at 0 → delete "hello"
+    let s = TextEditorState::with_cursor("hello world", 0);
+    let s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, " world");
+    assert_eq!(s.cursor, 0);
+}
+
+#[test]
+fn delete_word_deletes_space() {
+    // "hello world" cursor at 5 (on space) → delete " "
+    let s = TextEditorState::with_cursor("hello world", 5);
+    let s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, "helloworld");
+    assert_eq!(s.cursor, 5);
+}
+
+#[test]
+fn delete_word_deletes_punctuation() {
+    let s = TextEditorState::with_cursor("(abc)", 0);
+    let s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, "abc)");
+    assert_eq!(s.cursor, 0);
+}
+
+#[test]
+fn delete_word_at_end_is_noop() {
+    let s = TextEditorState::with_cursor("hello", 5);
+    let s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, "hello");
+    assert_eq!(s.cursor, 5);
+}
+
+#[test]
+fn delete_word_repeated() {
+    // "(abc) d" cursor at 0
+    // Step 1: delete "(" → "abc) d"
+    // Step 2: delete "abc" → ") d"
+    // Step 3: delete ")" → " d"
+    // Step 4: delete " " → "d"
+    // Step 5: delete "d" → ""
+    let mut s = TextEditorState::with_cursor("(abc) d", 0);
+    s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, "abc) d", "step 1: delete '('");
+
+    s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, ") d", "step 2: delete 'abc'");
+
+    s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, " d", "step 3: delete ')'");
+
+    s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, "d", "step 4: delete space");
+
+    s = apply(&s, EditingCommand::DeleteWord);
+    assert_eq!(s.text, "", "step 5: delete 'd'");
+}
+
+// ---------------------------------------------------------------------------
+// Word navigation: full walk through user's example
+// ---------------------------------------------------------------------------
+
+#[test]
+fn move_word_right_walks_all_segments() {
+    // "(abc) d efg h?" — cursor should stop at every UAX#29 segment boundary.
+    let text = "(abc) d efg h?";
+    let mut s = TextEditorState::with_cursor(text, 0);
+    let mut stops = vec![0usize];
+    for _ in 0..20 {
+        if s.cursor >= text.len() {
+            break;
+        }
+        s = apply(&s, EditingCommand::MoveWordRight { extend: false });
+        stops.push(s.cursor);
+    }
+    // Expected: ( | abc | ) | _ | d | _ | efg | _ | h | ?
+    assert_eq!(stops, vec![0, 1, 4, 5, 6, 7, 8, 11, 12, 13, 14]);
+}
+
+#[test]
+fn move_word_left_walks_all_segments() {
+    let text = "(abc) d efg h?";
+    let mut s = TextEditorState::new(text); // cursor at end (14)
+    let mut stops = vec![14usize];
+    for _ in 0..20 {
+        if s.cursor == 0 {
+            break;
+        }
+        s = apply(&s, EditingCommand::MoveWordLeft { extend: false });
+        stops.push(s.cursor);
+    }
+    assert_eq!(stops, vec![14, 13, 12, 11, 8, 7, 6, 5, 4, 1, 0]);
+}
+
+// ---------------------------------------------------------------------------
+// Line deletion: BackspaceLine / DeleteLine
+// ---------------------------------------------------------------------------
+
+#[test]
+fn backspace_line_deletes_to_line_start() {
+    // "Hello\nWorld" cursor at 8 (middle of "World") → delete "Wo"
+    let s = TextEditorState::with_cursor("Hello\nWorld", 8);
+    let s = apply(&s, EditingCommand::BackspaceLine);
+    assert_eq!(s.text, "Hello\nrld");
+    assert_eq!(s.cursor, 6);
+}
+
+#[test]
+fn backspace_line_at_line_start_is_noop() {
+    let s = TextEditorState::with_cursor("Hello\nWorld", 6);
+    let s = apply(&s, EditingCommand::BackspaceLine);
+    assert_eq!(s.text, "Hello\nWorld");
+    assert_eq!(s.cursor, 6);
+}
+
+#[test]
+fn backspace_line_on_first_line() {
+    let s = TextEditorState::with_cursor("Hello World", 5);
+    let s = apply(&s, EditingCommand::BackspaceLine);
+    assert_eq!(s.text, " World");
+    assert_eq!(s.cursor, 0);
+}
+
+#[test]
+fn backspace_line_with_selection_deletes_selection() {
+    let mut s = TextEditorState::with_cursor("Hello\nWorld", 8);
+    s.anchor = Some(6);
+    let s = apply(&s, EditingCommand::BackspaceLine);
+    assert_eq!(s.text, "Hello\nrld");
+    assert_eq!(s.cursor, 6);
+}
+
+#[test]
+fn delete_line_deletes_to_line_end() {
+    // "Hello\nWorld" cursor at 8 → delete "rld"
+    let s = TextEditorState::with_cursor("Hello\nWorld", 8);
+    let s = apply(&s, EditingCommand::DeleteLine);
+    assert_eq!(s.text, "Hello\nWo");
+    assert_eq!(s.cursor, 8);
+}
+
+#[test]
+fn delete_line_at_line_end_is_noop() {
+    // cursor at 5 (end of "Hello", before \n) — line content ends at 5
+    let s = TextEditorState::with_cursor("Hello\nWorld", 5);
+    let s = apply(&s, EditingCommand::DeleteLine);
+    assert_eq!(s.text, "Hello\nWorld");
+    assert_eq!(s.cursor, 5);
+}
+
+#[test]
+fn delete_line_on_last_line() {
+    let s = TextEditorState::with_cursor("Hello\nWorld", 8);
+    let s = apply(&s, EditingCommand::DeleteLine);
+    assert_eq!(s.text, "Hello\nWo");
+    assert_eq!(s.cursor, 8);
+}
+
+#[test]
+fn delete_line_from_start_of_line() {
+    // cursor at 0 → delete entire "Hello" (but not the \n)
+    let s = TextEditorState::with_cursor("Hello\nWorld", 0);
+    let s = apply(&s, EditingCommand::DeleteLine);
+    assert_eq!(s.text, "\nWorld");
+    assert_eq!(s.cursor, 0);
 }

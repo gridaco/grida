@@ -1,6 +1,8 @@
+pub mod history;
 pub mod layout;
 pub mod simple_layout;
 
+pub use history::{EditHistory, EditKind};
 pub use layout::{line_index_for_offset, LineMetrics, TextLayoutEngine};
 pub use simple_layout::SimpleLayoutEngine;
 
@@ -83,6 +85,69 @@ pub fn next_grapheme_boundary(text: &str, pos: usize) -> usize {
 }
 
 // ---------------------------------------------------------------------------
+// Word segment boundary (UAX #29)
+// ---------------------------------------------------------------------------
+
+/// Find the UAX #29 word segment containing `offset`.
+///
+/// Returns `(start, end)` — the byte range of the segment. This is the
+/// standalone equivalent of `TextLayoutEngine::word_boundary_at` so that
+/// pure editing commands (`BackspaceWord`, `DeleteWord`) can resolve word
+/// boundaries without requiring a layout engine.
+pub fn word_segment_at(text: &str, offset: usize) -> (usize, usize) {
+    let offset = offset.min(text.len());
+    let mut last_start = 0usize;
+    for (byte_idx, segment) in text.split_word_bound_indices() {
+        let end = byte_idx + segment.len();
+        if byte_idx <= offset && offset < end {
+            return (byte_idx, end);
+        }
+        last_start = byte_idx;
+    }
+    (last_start, text.len())
+}
+
+/// Find the start of the previous word segment from `pos`.
+///
+/// If `pos` is at the start of a segment, returns the start of the
+/// preceding segment. Used by `BackspaceWord` to determine delete range.
+fn prev_word_segment_start(text: &str, pos: usize) -> usize {
+    if pos == 0 {
+        return 0;
+    }
+    let (seg_start, _) = word_segment_at(text, pos);
+    if seg_start < pos {
+        return seg_start;
+    }
+    // pos is exactly at a segment boundary — step back into the previous one
+    if pos > 0 {
+        let (prev_start, _) = word_segment_at(text, pos - 1);
+        return prev_start;
+    }
+    0
+}
+
+/// Find the end of the current word segment from `pos`.
+///
+/// If `pos` is at the end of a segment, returns the end of the next
+/// segment. Used by `DeleteWord` to determine delete range.
+fn next_word_segment_end(text: &str, pos: usize) -> usize {
+    if pos >= text.len() {
+        return text.len();
+    }
+    let (_, seg_end) = word_segment_at(text, pos);
+    if seg_end > pos {
+        return seg_end;
+    }
+    // pos is exactly at a segment boundary — step into the next one
+    if pos < text.len() {
+        let (_, next_end) = word_segment_at(text, pos + 1);
+        return next_end;
+    }
+    text.len()
+}
+
+// ---------------------------------------------------------------------------
 // Core state
 // ---------------------------------------------------------------------------
 
@@ -142,7 +207,9 @@ pub enum EditingCommand {
     // --- pure (no layout needed) ---
     Insert(String),
     Backspace,
+    BackspaceWord,
     Delete,
+    DeleteWord,
     MoveLeft { extend: bool },
     MoveRight { extend: bool },
     MoveDocStart { extend: bool },
@@ -153,6 +220,8 @@ pub enum EditingCommand {
     SetCursorPos { pos: usize, anchor: Option<usize> },
 
     // --- need layout ---
+    BackspaceLine,
+    DeleteLine,
     MoveUp { extend: bool },
     MoveDown { extend: bool },
     MoveHome { extend: bool },
@@ -171,6 +240,36 @@ pub enum EditingCommand {
     SelectWordAt { x: f32, y: f32 },
     /// Select the visual line at (x, y).
     SelectLineAt { x: f32, y: f32 },
+}
+
+impl EditingCommand {
+    /// Classify this command for undo/redo grouping.
+    ///
+    /// Returns `Some(kind)` for text-mutating commands (insert, delete) and
+    /// `None` for cursor-only commands (movement, selection).
+    pub fn edit_kind(&self) -> Option<EditKind> {
+        match self {
+            Self::Insert(s) => {
+                let clusters: Vec<&str> = s.graphemes(true).collect();
+                if clusters.len() == 1 {
+                    if clusters[0] == "\n" {
+                        Some(EditKind::Newline)
+                    } else {
+                        Some(EditKind::Typing)
+                    }
+                } else {
+                    Some(EditKind::Paste)
+                }
+            }
+            Self::Backspace | Self::BackspaceWord | Self::BackspaceLine => {
+                Some(EditKind::Backspace)
+            }
+            Self::Delete | Self::DeleteWord | Self::DeleteLine => {
+                Some(EditKind::Delete)
+            }
+            _ => None,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -208,12 +307,33 @@ pub fn apply_command(
             s.anchor = None;
         }
 
+        EditingCommand::BackspaceWord => {
+            if s.has_selection() {
+                s.cursor = delete_selection_in_place(&mut s);
+            } else if s.cursor > 0 {
+                let target = prev_word_segment_start(&s.text, s.cursor);
+                s.text.drain(target..s.cursor);
+                s.cursor = target;
+            }
+            s.anchor = None;
+        }
+
         EditingCommand::Delete => {
             if s.has_selection() {
                 s.cursor = delete_selection_in_place(&mut s);
             } else if s.cursor < s.text.len() {
                 let next = next_grapheme_boundary(&s.text, s.cursor);
                 s.text.drain(s.cursor..next);
+            }
+            s.anchor = None;
+        }
+
+        EditingCommand::DeleteWord => {
+            if s.has_selection() {
+                s.cursor = delete_selection_in_place(&mut s);
+            } else if s.cursor < s.text.len() {
+                let target = next_word_segment_end(&s.text, s.cursor);
+                s.text.drain(s.cursor..target);
             }
             s.anchor = None;
         }
@@ -264,6 +384,39 @@ pub fn apply_command(
         EditingCommand::SetCursorPos { pos, anchor } => {
             s.cursor = pos.min(s.text.len());
             s.anchor = anchor;
+        }
+
+        EditingCommand::BackspaceLine => {
+            if s.has_selection() {
+                s.cursor = delete_selection_in_place(&mut s);
+            } else {
+                let metrics = layout.line_metrics(&s.text);
+                let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
+                let line_start = metrics[line_idx].start_index;
+                if line_start < s.cursor {
+                    s.text.drain(line_start..s.cursor);
+                    s.cursor = line_start;
+                }
+            }
+            s.anchor = None;
+        }
+
+        EditingCommand::DeleteLine => {
+            if s.has_selection() {
+                s.cursor = delete_selection_in_place(&mut s);
+            } else {
+                let metrics = layout.line_metrics(&s.text);
+                let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
+                let lm = &metrics[line_idx];
+                let mut line_end = lm.end_index.min(s.text.len());
+                if line_end > 0 && s.text[..line_end].ends_with('\n') {
+                    line_end = prev_grapheme_boundary(&s.text, line_end);
+                }
+                if s.cursor < line_end {
+                    s.text.drain(s.cursor..line_end);
+                }
+            }
+            s.anchor = None;
         }
 
         EditingCommand::MoveUp { extend } => {
