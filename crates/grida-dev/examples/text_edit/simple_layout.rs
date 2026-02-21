@@ -154,4 +154,3 @@ impl SimpleLayoutEngine {
         Self::new(600.0, 24.0, 10.0)
     }
 }
-

@@ -1,8 +1,11 @@
 //! Minimal plain-text editor built directly on winit + Skia.
 //!
-//! Editing logic lives in `grida_dev::text_edit` (no Skia dependency).
+//! Editing logic lives in the local `text_edit` example module (no Skia dependency).
 //! This file wires it up to Skia paragraph layout (`SkiaLayoutEngine`) and
 //! the winit event loop.
+
+#[path = "text_edit/mod.rs"]
+mod text_edit;
 //!
 //! Feature checklist
 //! -----------------
@@ -89,7 +92,7 @@ use winit::{
     window::{Window, WindowAttributes, WindowId},
 };
 
-use grida_dev::text_edit::{
+use crate::text_edit::{
     apply_command, prev_grapheme_boundary, snap_grapheme_boundary, utf16_to_utf8_offset,
     utf8_to_utf16_offset, EditingCommand, LineMetrics, TextEditorState, TextLayoutEngine,
 };
