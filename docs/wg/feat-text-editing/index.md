@@ -31,7 +31,7 @@ This document proposes a **minimal but extensible** text editing model and geome
 
 - **Model vs view separation**: input state is pure data; geometry is queried; rendering is host-defined.
 - **Text positions are contracts**: cursoring and selection operate on _valid cursor stops_, not arbitrary integers.
-- **Determinism (scoped)**: given the same font set, shaping engine, and layout constraints, the same state yields the same geometry.
+- **Determinism (scoped)**: for fixed font set, shaping engine, and layout constraints, the mapping (state) → geometry is a function (same input ⇒ same output).
 - **Incremental computation**: queries should be cheap, cacheable, and invalidated predictably.
 - **Accessibility compatibility**: expose enough structure to bridge to platform accessibility layers.
 
@@ -49,17 +49,17 @@ These contracts exist to prevent subtly-wrong implementations that “mostly wor
 
 ## Minimal input state model
 
-The minimal state that a plain text input exposes can be represented as:
+The minimal state that a plain text input exposes can be represented as a tuple:
 
-- **value**: the full plain text string
-- **selectionStart**: one selection endpoint (**TextPosition**)
-- **selectionEnd**: the other endpoint (**TextPosition**)
+- **value** ∈ Σ\*: the full plain text string
+- **selection_start** ∈ P: one selection endpoint
+- **selection_end** ∈ P: the other endpoint
 
-When `selectionStart == selectionEnd`, the caret is at that position (no selection).
+where P denotes the set of valid `text_position` values. When `selection_start = selection_end`, the caret is at that position (no selection).
 
 ### Indexing: UTF-16 code units (host interop)
 
-For compatibility with common platform APIs, `selectionStart`/`selectionEnd` are often expressed in **UTF-16 code unit offsets** (not bytes, not Unicode scalar indices). This is primarily a host-interop decision.
+For compatibility with common platform APIs, `selection_start` / `selection_end` are often expressed in **UTF-16 code unit offsets** (not bytes, not Unicode scalar indices). This is primarily a host-interop decision.
 
 If UTF-16 offsets are used, the system must explicitly handle these pitfalls:
 
@@ -69,13 +69,13 @@ If UTF-16 offsets are used, the system must explicitly handle these pitfalls:
 
 ### A real position type (do not use “just numbers” conceptually)
 
-Even if you serialize/interoperate via UTF-16 offsets, editing should be defined in terms of a **TextPosition**:
+Even if you serialize/interoperate via UTF-16 offsets, editing should be defined in terms of a **text_position**:
 
-- `TextPosition = { offset: number, affinity?: "upstream" | "downstream" }`
+- `text_position = { offset: number, affinity?: "upstream" | "downstream" }`
 
 An alternative design is to make positions **opaque** (engine-owned tokens) for maximal correctness, and only convert to/from UTF-16 at the host boundary. This improves correctness but reduces direct interop with APIs that require numeric offsets.
 
-`affinity` matters at:
+`affinity` (optional) matters at:
 
 - soft wraps (visual line breaks)
 - bidi boundaries (visual/logical discontinuities)
@@ -91,14 +91,14 @@ An alternative design is to make positions **opaque** (engine-owned tokens) for 
 To support modern input correctly, the following are often necessary (but can be optional fields):
 
 - **composition** (IME):
-  - `compositionRange?: { start: TextPosition; end: TextPosition }`
+  - `composition_range?: { start: text_position; end: text_position }`
   - Define whether composition is **in-band** (part of `value`) or **overlay** (not yet committed into `value`).
 
 ## Layout options (minimum)
 
 Correctness requires layout options that affect bidi and line breaking:
 
-- **paragraphDirection**: `"ltr" | "rtl" | "auto"`
+- **paragraph_direction**: `"ltr" | "rtl" | "auto"`
   - `"auto"` resolves base direction from the text (per Unicode BiDi rules / UAX#9).
 - width/line wrap constraints (implementation-defined)
 - newline policy (see below)
@@ -107,20 +107,20 @@ Correctness requires layout options that affect bidi and line breaking:
 
 To render the caret and selection in a custom canvas, the engine should provide:
 
-- **Position from point**:
-  - `positionAtPoint(x, y) -> TextPosition`
-- **Caret geometry**:
-  - `caretRectAtPosition(position: TextPosition) -> Rect`
-- **Selection geometry**:
-  - `selectionRectsForRange(start: TextPosition, end: TextPosition, options?) -> RectWithDirection[]`
-- **Boundaries / granularity**:
-  - `boundaryAt(position: TextPosition, granularity: "grapheme" | "word" | "line" | "paragraph") -> { start: TextPosition, end: TextPosition }`
-  - `nextPosition(position: TextPosition, granularity) -> TextPosition`
-  - `prevPosition(position: TextPosition, granularity) -> TextPosition`
+- **position from point**:
+  - `position_at_point(x, y) → text_position`
+- **caret geometry**:
+  - `caret_rect_at_position(position: text_position) → rect`
+- **selection geometry**:
+  - `selection_rects_for_range(start: text_position, end: text_position, options?) → rect_with_direction[]`
+- **boundaries / granularity**:
+  - `boundary_at(position: text_position, granularity: "grapheme" | "word" | "line" | "paragraph") → { start: text_position, end: text_position }`
+  - `next_position(position: text_position, granularity) → text_position`
+  - `prev_position(position: text_position, granularity) → text_position`
 - **Line metrics** (optional early, essential later):
   - baselines, line boxes, ascent/descent, wrapped line breaks
 
-### RectWithDirection (bidi awareness)
+### rect_with_direction (bidi awareness)
 
 Selection is not always a single rectangle. For bidi text and wrapped lines, selection geometry is naturally a list of rectangles. Including the **direction per rect** enables correct visual treatment and future features (handles, highlights, navigation).
 
@@ -128,9 +128,32 @@ Selection is not always a single rectangle. For bidi text and wrapped lines, sel
 
 Selection rectangles depend on policy. Even a minimal API should include:
 
-- **rectMode**: `"tight" | "lineBox"` (glyph-tight bounds vs line-height boxes)
-- **includeTrailingNewline**: boolean
-- **endOfLineAffinityPolicy**: `"upstream" | "downstream" | "preserve"`
+- **rect_mode**: `"none" | "tight" | "linebox"`
+  - `"none"`: pass raw engine output through unchanged; empty lines produce zero-width (invisible) rects. Keeps the host fully engine-agnostic and is the correct choice when the host intends to apply its own synthesis or test the raw output.
+  - `"tight"`: expand zero-width rects for empty lines to a minimum visible width; non-empty lines keep glyph-tight bounds.
+  - `"linebox"`: expand every selected line's rect to the full layout width; both empty and non-empty lines become uniform full-row blocks.
+- **include_trailing_newline**: boolean
+- **end_of_line_affinity_policy**: `"upstream" | "downstream" | "preserve"`
+
+**Empty-line selection invariant**:
+
+If a logical line is fully or partially covered by the selection range, the engine MUST return at least one visible selection rectangle for that line, even when the line contains no glyphs (e.g. an empty line or a line consisting only of a line terminator). The exact rectangle shape follows the active selection painting policy (e.g. glyph‑tight vs line‑box), but the absence of glyphs MUST NOT result in a visually missing highlight.
+
+**Implementation note (shaping engines):**
+
+A typical paragraph engine's `get_rects_for_range` (e.g. Skia, ICU Layout, or equivalent) satisfies the invariant at the data level but violates it visually: it returns a rect for every line in the range, but lines with no glyph content (empty lines, lines consisting only of a line terminator) receive a **zero-width rect** (`left == right`), which renders as invisible. Additionally, a trailing newline at the very end of the text is a special case: its rect is placed at the y-coordinates of the preceding content line rather than the phantom empty line that follows it; and when the selection range covers the full text, that phantom line may receive no rect at all.
+
+When `rect_mode` is `"none"` the raw output is forwarded unchanged and no post-processing is applied. For `"tight"` and `"linebox"`, two post-processing steps are required:
+
+1. **Expand zero-width rects.** For any rect where `left ≈ right`, expand the right edge to a minimum visible width according to `rect_mode`:
+   - `"tight"` (glyph-tight): expand by a small fixed amount (e.g. approximately half the font size), anchored at `left`.
+   - `"linebox"`: expand all rects — including non-empty lines — so that `right` equals the layout width. This produces a full-row highlight for every selected line.
+
+   The expansion strategy should distinguish two sub-cases for zero-width rects:
+   - `left ≈ 0`: the line is entirely empty; apply the full `rect_mode` expansion.
+   - `left > 0`: the rect represents a line-terminator character at the end of a content line; always apply a small fixed bump regardless of `rect_mode`, to avoid painting the entire row background when only the terminator is selected.
+
+2. **Inject a rect for the trailing phantom line.** When the selection extends to the last code unit of a text that ends with a line terminator, check whether the paragraph's line metrics contain a final entry (the phantom empty line) whose y-band is not represented by any existing rect. If so, inject a synthetic rect for that band using the `rect_mode` expansion width.
 
 Future extensions often needed:
 
@@ -151,20 +174,39 @@ Two acceptable contracts:
 
 ## Interaction model (host responsibilities)
 
-The host (DOM, native, custom shell) captures input events and updates `TextInputState`. The engine provides geometry to make those updates accurate.
+The host (DOM, native, custom shell) captures input events and updates `text_input_state`. The engine provides geometry to make those updates accurate.
 
 ### Pointer-driven selection (gesture)
 
 A minimal gesture model:
 
 - **PointerDown**:
-  - `anchor = positionAtPoint(x, y)`
+  - `anchor = position_at_point(x, y)`
   - If modifier for “extend selection” is active, keep existing anchor and update focus.
 - **PointerMove (drag)**:
-  - `focus = positionAtPoint(x, y)`
+  - `focus = position_at_point(x, y)`
   - `selection = (anchor, focus)`
 - **PointerUp**:
   - Commit selection state.
+
+### Multi-click selection (sequential clicks)
+
+Text editors commonly treat rapid sequential clicks as an escalating selection gesture. The host is responsible for counting clicks and deciding whether two clicks are part of the same sequence (a platform-defined time/space threshold).
+
+Let $p \in P$ be the text position under the pointer at click time (via `position_at_point`). For granularity $g \in \{\text{grapheme}, \text{word}, \text{line}, \text{paragraph}\}$, let $R_g(p) = [a, b)$ be the closed-open logical range returned by `boundary_at(p, g)`.
+
+Let click count $k \in \{1, 2, 3, 4\}$ within the same sequence:
+
+- **k = 1 (single click)**: place the caret at `p` (a collapsed selection).
+- **k = 2 (double click)**: select the **word** containing `p`, i.e. the range `R_word(p)`.
+- **k = 3 (triple click)**: select the **line** containing `p`, i.e. the range `R_line(p)`.
+- **k = 4 (quadruple click)**: select the entire editable value (document range).
+
+Notes:
+
+- These selections are **logical ranges**; visual highlighting is produced via the selection-rectangle queries and may be split across multiple rectangles (wraps, bidi).
+- “Line” refers to the host’s chosen line granularity. If the engine exposes a `line` boundary tied to layout, triple-click should map to the **visual line in the current layout** (including soft wraps). If the host wants “hard line” (paragraph line breaks only), it must use `paragraph` boundaries or an explicit policy.
+- The definition above is intentionally deterministic: given the same `position_at_point` mapping and the same boundary rules, the same click sequence produces the same logical selection.
 
 ### Keyboard navigation (minimal baseline)
 
@@ -180,16 +222,16 @@ The “what is a word” rule should come from engine word-boundary queries or a
 
 To avoid every host re-implementing subtly different editing behavior, define a minimal, shared operation surface:
 
-- `applyEdit(state, command) -> newState`
+- `apply_edit(state, command) → new_state`
 
 Where `command` includes at least:
 
-- `insertText(text)`
-- `replaceRange(start: TextPosition, end: TextPosition, text)`
+- `insert_text(text)`
+- `replace_range(start: text_position, end: text_position, text)`
 - `backspace(granularity?: "grapheme" | "word")`
 - `delete(granularity?: "grapheme" | "word")`
-- `setSelection(start: TextPosition, end: TextPosition)`
-- `setComposition(range, text?)` / `commitComposition()` / `cancelComposition()`
+- `set_selection(start: text_position, end: text_position)`
+- `set_composition(range, text?)` / `commit_composition()` / `cancel_composition()`
 
 The core guarantee: these operations **never create invalid positions** (never split surrogates or clusters) and always return a valid state.
 
@@ -213,7 +255,7 @@ Cursor movement and deletion should respect **grapheme clusters** (e.g. emoji se
 
 CJK text stresses boundary and navigation rules:
 
-- **Word boundaries are not whitespace-delimited**: “word” selection/navigation typically relies on language-aware segmentation (and may be user-configurable). A naive whitespace-based `wordBoundaryAt` will behave incorrectly.
+- **Word boundaries are not whitespace-delimited**: “word” selection/navigation typically relies on language-aware segmentation (and may be user-configurable). A naive whitespace-based `word_boundary_at` will behave incorrectly.
 - **IME-first workflows**: composition ranges and candidate selection are core, not edge cases. Composition must interact correctly with selection, deletion, and undo grouping.
 - **Line breaking and punctuation**: wrapping behavior and caret movement are influenced by language-specific line-breaking rules and full-width punctuation. If line granularity is provided, it must reflect the layout’s actual break opportunities.
 
@@ -257,15 +299,55 @@ This affects Home/End, line-boundary selection, and end-of-line affinity behavio
 Two viable strategies exist:
 
 - **Host-rendered overlays**: host queries geometry and renders caret/selection as overlay primitives.
-
   - Pros: simplest composition with existing UI layers, easy cursor blink timing.
   - Cons: requires consistent coordinate transforms and synchronization.
 
-- **Engine-rendered overlays**: host passes `TextInputState` into the engine; the engine renders caret/selection.
+- **Engine-rendered overlays**: host passes `text_input_state` into the engine; the engine renders caret/selection.
   - Pros: single source of truth for transforms and pixel-perfect alignment with text rendering.
   - Cons: needs an animation clock (cursor blink) and careful invalidation/redraw policy.
 
 Either is valid; choosing should be guided by performance goals, platform constraints, and correctness needs.
+
+## Text diagnostics and spellcheck indication (UX layer)
+
+This manifesto does **not** define how spelling or grammar analysis is performed, since dictionaries, language models, and platform services vary widely across environments (native OS, browser, WASM, custom dictionaries, etc.).
+
+Instead, the engine defines the **visual indication contract** for text diagnostics such as spelling errors, grammar warnings, or similar annotations.
+
+### Diagnostic ranges (logical)
+
+Diagnostics are expressed as logical text ranges over the same **text_position** model used for selection. Each diagnostic has:
+
+- a logical `[start, end)` range
+- a diagnostic **kind** (e.g. spelling, grammar, suggestion, informational)
+- optional metadata owned by the host (suggestions, language, severity, etc.)
+
+The engine does **not** interpret diagnostic meaning; it only guarantees correct geometry and rendering alignment.
+
+### Geometry for diagnostic underlines (visual)
+
+For any diagnostic range, the engine MUST provide geometry consistent with shaped layout runs, wrapping, and bidi resolution—identical correctness requirements as selection rectangles.
+
+The most common UX form is a **wavy underline** (e.g. red squiggle for spelling). The exact drawing style is host‑defined, but the engine MUST ensure:
+
+- Underline geometry follows **glyph shaping and line breaks**, not codepoint boxes.
+- Geometry splits naturally across **wrapped lines and bidi runs**.
+- Empty visual lines inside the diagnostic range still produce a visible underline segment consistent with line‑box policy.
+
+### Interaction with selection and composition
+
+- Diagnostics MUST NOT visually interfere with caret or selection rendering priority.
+- By default, diagnostics **should not appear inside an active IME composition range**, unless explicitly requested by the host.
+- Diagnostic geometry must remain stable under incremental edits using the same invalidation rules as selection geometry.
+
+### Rendering responsibility
+
+As with caret and selection, two strategies are valid:
+
+- **Host‑rendered diagnostics** using engine‑provided geometry.
+- **Engine‑rendered diagnostics** as part of the text overlay pipeline.
+
+The contract of this manifesto is limited to **correct geometry and layering**, not linguistic correctness.
 
 ## Undo/redo boundaries (even if host-owned)
 
@@ -274,7 +356,7 @@ Even if history is not implemented in the engine, specify:
 - What constitutes an **atomic edit**
 - How IME composition edits are **grouped** (composition typically needs special grouping)
 
-One approach: have `applyEdit` optionally emit an **edit grouping key** or “transaction id” so hosts can build consistent undo stacks.
+One approach: have `apply_edit` optionally emit an **edit grouping key** or “transaction id” so hosts can build consistent undo stacks.
 
 ## Phased roadmap
 
@@ -315,3 +397,40 @@ One approach: have `applyEdit` optionally emit an **edit grouping key** or “tr
   - full-width punctuation and brackets (caret/selection around punctuation)
   - mixed Arabic/Hebrew with numbers and punctuation (classic bidi cases)
   - ligatures and font fallback across scripts
+
+## References
+
+This manifesto aligns with established text-editing models and platform behaviors. The following references are useful for deeper study and cross‑validation of concepts such as editing intents, keybinding actions, shaping, and IME handling.
+
+### Web platform
+
+- W3C Input Events Level 2 — standardized editing intent vocabulary (`beforeinput`, `inputType`):
+  https://www.w3.org/TR/input-events-2/
+- HTML Editing APIs and selection behavior (WHATWG HTML):
+  https://html.spec.whatwg.org/
+
+### Native platforms
+
+- Apple `NSStandardKeyBindingResponding` — canonical macOS text‑editing command/action set:
+  https://developer.apple.com/documentation/appkit/nsstandardkeybindingresponding
+- Cocoa Text System key bindings and customization:
+  https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/EventOverview/TextDefaultsBindings/TextDefaultsBindings.html
+
+### Framework references
+
+- Flutter text editing shortcuts and intents:
+  https://api.flutter.dev/flutter/widgets/DefaultTextEditingShortcuts-class.html
+- Flutter `Shortcuts` / `Actions` system:
+  https://api.flutter.dev/flutter/widgets/Shortcuts-class.html
+
+### Text shaping and layout engines
+
+- HarfBuzz text shaping engine:
+  https://harfbuzz.github.io/
+- Unicode Text Segmentation (UAX #29 — grapheme/word boundaries):
+  https://www.unicode.org/reports/tr29/
+- Unicode Bidirectional Algorithm (UAX #9):
+  https://www.unicode.org/reports/tr9/
+
+These documents are not normative for this manifesto but serve as widely accepted
+reference points across web, native, and cross‑platform text systems.
