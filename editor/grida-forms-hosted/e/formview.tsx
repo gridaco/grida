@@ -25,7 +25,6 @@ import {
 } from "@/components/tosspayments";
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
 import {
-  ChallengeEmailField,
   EmailChallengeProvider,
   createHttpEmailChallengeProvider,
 } from "@/components/formfield/email-challenge";
@@ -597,18 +596,29 @@ function BlockRenderer({
       switch (type) {
         case "challenge_email": {
           return (
-            <ChallengeEmailField
-              sessionId={session_id}
-              fieldId={field.id}
-              stateKey={field.name}
-              name={field.name}
-              label={field.label ?? field.name}
-              placeholder={field.placeholder ?? "alice@example.com"}
-              required={field.required}
-              requiredAsterisk
-              disabled={is_not_in_current_section_nor_root || hidden}
-              i18n={emailChallengeTranslation}
-            />
+            <div {...__shared_root_attr}>
+              {!hidden ? (
+                <FormField
+                  key={field.id}
+                  id={field.id}
+                  name={field.name}
+                  label={field.label}
+                  placeholder={field.placeholder ?? "alice@example.com"}
+                  type="challenge_email"
+                  required={field.required}
+                  requiredAsterisk
+                  helpText={field.help_text}
+                  disabled={is_not_in_current_section_nor_root || hidden}
+                  novalidate={is_not_in_current_section_nor_root || hidden}
+                  locked={is_not_in_current_section_nor_root || hidden}
+                  sessionId={session_id}
+                  fieldId={field.id}
+                  emailChallengeI18n={emailChallengeTranslation}
+                />
+              ) : (
+                <></>
+              )}
+            </div>
           );
         }
         case "payment": {
