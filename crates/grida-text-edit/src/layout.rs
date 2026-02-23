@@ -47,6 +47,18 @@ pub struct CaretRect {
     pub height: f32,
 }
 
+/// A single rectangle in the selection highlight geometry.
+///
+/// All coordinates are in **layout-local space**.
+/// A selection may span multiple rects when it crosses line breaks.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SelectionRect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
 /// Abstract geometry provider.
 ///
 /// Implementations include:
@@ -71,6 +83,15 @@ pub trait TextLayoutEngine {
     /// the first line where `offset < end_index`, falling back to the last
     /// line when `offset >= all end indices` (e.g. cursor at text end).
     fn caret_rect_at(&mut self, text: &str, offset: usize) -> CaretRect;
+
+    /// Return selection highlight rectangles for the range `[start, end)`.
+    ///
+    /// A selection spanning multiple lines produces multiple rects (one per
+    /// visual line or line fragment). Empty-line invariant: every selected
+    /// line produces at least one visible rect even if it has no glyphs.
+    fn selection_rects_for_range(
+        &mut self, text: &str, start: usize, end: usize
+    ) -> Vec<SelectionRect>;
 
     /// Return the x coordinate (layout-local) of the caret at `offset`.
     ///

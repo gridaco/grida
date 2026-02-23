@@ -10,7 +10,7 @@
 //! and wrong for real rendering — its only purpose is to produce deterministic,
 //! inspectable results for unit tests.
 
-use super::layout::{CaretRect, LineMetrics, TextLayoutEngine};
+use crate::layout::{CaretRect, LineMetrics, SelectionRect, TextLayoutEngine};
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -152,6 +152,67 @@ impl TextLayoutEngine for SimpleLayoutEngine {
         }
         // Fallback: return (start_of_last_segment, text.len()).
         (start, text.len())
+    }
+
+    fn selection_rects_for_range(
+        &mut self, text: &str, start: usize, end: usize
+    ) -> Vec<SelectionRect> {
+        if start >= end {
+            return Vec::new();
+        }
+        let metrics = self.compute_metrics(text);
+        let mut rects = Vec::new();
+
+        for lm in &metrics {
+            // Does this line overlap [start, end)?
+            let line_lo = lm.start_index;
+            let line_hi = lm.end_index;
+            let overlap_lo = start.max(line_lo);
+            let overlap_hi = end.min(line_hi);
+            if overlap_lo >= overlap_hi {
+                continue;
+            }
+
+            let line_y = lm.baseline - lm.ascent;
+            let line_h = lm.ascent + lm.descent;
+
+            if lm.is_empty_line() {
+                // Empty line: produce a small visible rect at x=0.
+                rects.push(SelectionRect {
+                    x: 0.0,
+                    y: line_y,
+                    width: self.char_width * 0.5,
+                    height: line_h,
+                });
+                continue;
+            }
+
+            let content_end = Self::content_end(lm, text);
+            let line_content = &text[lm.start_index..content_end];
+
+            let x_lo = if overlap_lo <= lm.start_index {
+                0.0
+            } else {
+                let before = &text[lm.start_index..overlap_lo];
+                before.chars().count() as f32 * self.char_width
+            };
+
+            let x_hi = if overlap_hi >= content_end {
+                line_content.chars().count() as f32 * self.char_width
+            } else {
+                let before = &text[lm.start_index..overlap_hi];
+                before.chars().count() as f32 * self.char_width
+            };
+
+            rects.push(SelectionRect {
+                x: x_lo,
+                y: line_y,
+                width: (x_hi - x_lo).max(self.char_width * 0.5),
+                height: line_h,
+            });
+        }
+
+        rects
     }
 
     fn viewport_height(&self) -> f32 {

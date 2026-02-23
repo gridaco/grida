@@ -1550,6 +1550,21 @@ dependencies = [
  "skia-safe",
  "tokio",
  "toml 0.9.8",
+ "winit",
+]
+
+[[package]]
+name = "grida-text-edit"
+version = "0.0.0"
+dependencies = [
+ "arboard",
+ "gl",
+ "glutin",
+ "glutin-winit",
+ "raw-window-handle",
+ "serde",
+ "serde_json",
+ "skia-safe",
  "unicode-segmentation",
  "winit",
 ]

@@ -1,0 +1,35 @@
+[package]
+name = "grida-text-edit"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+description = "Platform-agnostic text editing engine."
+
+[features]
+default = ["skia"]
+skia = ["dep:skia-safe"]
+
+[dependencies]
+unicode-segmentation = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dependencies.skia-safe]
+version = "0.91.0"
+features = ["textlayout"]
+optional = true
+
+[dev-dependencies]
+arboard = "3"
+gl = "0.14.0"
+glutin = "0.32.0"
+glutin-winit = "0.5.0"
+raw-window-handle = "0.6.0"
+winit = "0.30.0"
+skia-safe = { version = "0.91.0", features = ["gpu", "gl", "textlayout"] }
+
+[[example]]
+name = "wd_text_editor"
+path = "examples/wd_text_editor.rs"
+required-features = ["skia"]

@@ -1,13 +1,9 @@
 //! Minimal plain-text editor built directly on winit + Skia.
 //!
-//! Editing logic lives in the local `text_edit` example module (no Skia dependency).
-//! This file wires it up to Skia paragraph layout (`SkiaLayoutEngine`) and
-//! the winit event loop.
+//! Uses the grida-text-edit crate for editing logic and Skia paragraph layout.
 
 #![allow(clippy::single_match)]
 
-#[path = "text_edit/mod.rs"]
-mod text_edit;
 //
 // Feature checklist
 // -----------------
@@ -100,12 +96,11 @@ use winit::{
     window::{Window, WindowAttributes, WindowId},
 };
 
-use crate::text_edit::{
-    apply_command, utf16_to_utf8_offset, utf8_to_utf16_offset,
-    EditHistory, EditKind, EditingCommand, LineMetrics, TextEditorState, TextLayoutEngine,
+use grida_text_edit::{
+    apply_command, utf8_to_utf16_offset,
+    EditHistory, EditKind, EditingCommand,
+    SkiaLayoutEngine, TextEditorState, TextLayoutEngine,
 };
-use crate::text_edit::layout::CaretRect;
-use crate::text_edit::skia_layout::SkiaLayoutEngine;
 
 // ---------------------------------------------------------------------------
 // Constants

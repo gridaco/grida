@@ -1,11 +1,17 @@
 pub mod history;
 pub mod layout;
 pub mod simple_layout;
+#[cfg(feature = "skia")]
 pub mod skia_layout;
 
+#[cfg(test)]
+mod tests;
+
 pub use history::{EditHistory, EditKind};
-pub use layout::{line_index_for_offset, CaretRect, LineMetrics, TextLayoutEngine};
+pub use layout::{line_index_for_offset, CaretRect, LineMetrics, SelectionRect, TextLayoutEngine};
 pub use simple_layout::SimpleLayoutEngine;
+#[cfg(feature = "skia")]
+pub use skia_layout::SkiaLayoutEngine;
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -729,5 +735,3 @@ pub fn line_index_for_offset_utf8(metrics: &[LineMetrics], utf8_offset: usize) -
         .unwrap_or(metrics.len().saturating_sub(1))
 }
 
-#[cfg(test)]
-mod tests;

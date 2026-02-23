@@ -3,7 +3,7 @@
 //! All tests use `SimpleLayoutEngine` — no Skia, no winit.  The layout is
 //! monospace / no-wrap, so every assertion is exact.
 
-use super::{apply_command, floor_char_boundary, ceil_char_boundary, layout::{CaretRect, TextLayoutEngine}, line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
+use crate::{apply_command, floor_char_boundary, ceil_char_boundary, layout::{CaretRect, TextLayoutEngine}, line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
 
 fn layout() -> SimpleLayoutEngine {
     SimpleLayoutEngine::default_test()
@@ -1056,7 +1056,7 @@ fn ime_commit_never_merges() {
     let s1 = apply(&s0, EditingCommand::Insert("가".into()));
 
     h.push(&s1, EditKind::ImeCommit);
-    let s2 = apply(&s1, EditingCommand::Insert("나".into()));
+    let _s2 = apply(&s1, EditingCommand::Insert("나".into()));
 
     assert_eq!(h.undo_len(), 2, "IME commits should never merge");
 }
@@ -1957,12 +1957,15 @@ fn nav_never_locks_simple() {
 
 // --- SkiaLayoutEngine (real Skia paragraph layout, no GPU needed) ---
 
-use super::skia_layout::SkiaLayoutEngine;
+#[cfg(feature = "skia")]
+use crate::skia_layout::SkiaLayoutEngine;
 
+#[cfg(feature = "skia")]
 fn skia_layout() -> SkiaLayoutEngine {
     SkiaLayoutEngine::new(752.0, 576.0)
 }
 
+#[cfg(feature = "skia")]
 #[test]
 fn nav_never_locks_skia() {
     run_nav_tests(&mut skia_layout());
@@ -2029,6 +2032,7 @@ fn hit_test_invariants_simple() {
     run_hit_test_invariants(&mut layout(), "simple");
 }
 
+#[cfg(feature = "skia")]
 #[test]
 fn hit_test_invariants_skia() {
     run_hit_test_invariants(&mut skia_layout(), "skia");
