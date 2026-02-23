@@ -1,0 +1,7 @@
+/* Restore horizontal cell padding for the CSV preview grid.
+ * The main grid (scaffolds/grid/grid.css) sets .rdg-cell { padding: 0 } for
+ * compact layout; we want readable padding in the import preview. */
+.rdg-csv-preview.rdg .rdg-cell {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
