@@ -117,18 +117,17 @@ export function ImportCSVDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs
-          value={mode}
-          onValueChange={(v) => setMode(v as "insert" | "update")}
-        >
-          <TabsList>
-            <TabsTrigger value="insert">Insert</TabsTrigger>
-            <TabsTrigger value="update">Update</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {step === "upload" && (
-          <div className="space-y-6 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <Tabs
+            value={mode}
+            onValueChange={(v) => setMode(v as "insert" | "update")}
+          >
+            <TabsList>
+              <TabsTrigger value="insert">Insert</TabsTrigger>
+              <TabsTrigger value="update">Update</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {step === "upload" && (
             <Link
               href="/objects/template-grida-customer-upload-csv-example.zip"
               download
@@ -138,7 +137,11 @@ export function ImportCSVDialog({
                 Download Template
               </Button>
             </Link>
+          )}
+        </div>
 
+        {step === "upload" && (
+          <div className="space-y-6 py-4">
             <FileUploader onFileSelected={handleFileSelected} />
           </div>
         )}
