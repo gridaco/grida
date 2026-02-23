@@ -225,15 +225,21 @@ export function ImportCSVDialog({
               </div>
               <h3 className="text-lg font-medium mb-2">Import Failed</h3>
               <p className="text-sm text-muted-foreground">
-                There was an error importing your customers. Please try again.
+                {error != null && typeof error === "object"
+                  ? ("message" in error
+                      ? (error as { message: string }).message
+                      : "hint" in error
+                        ? (error as { hint: string }).hint
+                        : null) ?? "There was an error importing your customers. Please try again."
+                  : "There was an error importing your customers. Please try again."}
               </p>
-              <div className="max-h-[400px] rounded-md border mt-4 overflow-scroll p-4">
-                <p className="text-xs text-start text-destructive font-mono">
-                  <pre>
-                    {error ? JSON.stringify(error, null, 2) : "Unknown error"}
-                  </pre>
-                </p>
-              </div>
+              {error != null && (
+                <div className="max-h-[400px] rounded-md border mt-4 overflow-scroll p-4">
+                  <p className="text-xs text-start text-muted-foreground font-mono">
+                    <pre>{JSON.stringify(error, null, 2)}</pre>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           )}
