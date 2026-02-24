@@ -1,11 +1,9 @@
 "use client";
 
 import React from "react";
-import {
-  EmailChallenge,
-  EmailChallengePreview,
-} from "@/components/formfield/email-challenge";
+import { EmailChallengePreview } from "@/components/formfield/email-challenge";
 import { ComponentDemo } from "../component-demo";
+import { Label } from "@/components/ui/label";
 
 export default function EmailChallengePage() {
   return (
@@ -37,12 +35,15 @@ export default function EmailChallengePage() {
               </>
             }
           >
-            <EmailChallengePreview
-              name="email"
-              label="Email Address"
-              placeholder="alice@example.com"
-              required
-            />
+            <div className="grid gap-2">
+              <Label htmlFor="email-demo">Email Address *</Label>
+              <EmailChallengePreview
+                id="email-demo"
+                name="email"
+                placeholder="alice@example.com"
+                required
+              />
+            </div>
           </ComponentDemo>
         </section>
 
@@ -56,12 +57,15 @@ export default function EmailChallengePage() {
             </p>
           </div>
           <ComponentDemo>
-            <EmailChallengePreview
-              name="optional_email"
-              label="Optional Email"
-              placeholder="Enter your email (optional)"
-              required={false}
-            />
+            <div className="grid gap-2">
+              <Label htmlFor="optional_email-demo">Optional Email</Label>
+              <EmailChallengePreview
+                id="optional_email-demo"
+                name="optional_email"
+                placeholder="Enter your email (optional)"
+                required={false}
+              />
+            </div>
           </ComponentDemo>
         </section>
 
@@ -75,13 +79,16 @@ export default function EmailChallengePage() {
             </p>
           </div>
           <ComponentDemo>
-            <EmailChallengePreview
-              name="disabled_email"
-              label="Disabled Email"
-              placeholder="alice@example.com"
-              required
-              disabled
-            />
+            <div className="grid gap-2">
+              <Label htmlFor="disabled_email-demo">Disabled Email *</Label>
+              <EmailChallengePreview
+                id="disabled_email-demo"
+                name="disabled_email"
+                placeholder="alice@example.com"
+                required
+                disabled
+              />
+            </div>
           </ComponentDemo>
         </section>
 
@@ -104,12 +111,15 @@ export default function EmailChallengePage() {
                   placeholder="Enter your name"
                 />
               </div>
-              <EmailChallengePreview
-                name="email"
-                label="Email Address"
-                placeholder="alice@example.com"
-                required
-              />
+              <div className="space-y-2">
+                <Label htmlFor="form-email-demo">Email Address *</Label>
+                <EmailChallengePreview
+                  id="form-email-demo"
+                  name="email"
+                  placeholder="alice@example.com"
+                  required
+                />
+              </div>
               <button
                 type="submit"
                 className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"

@@ -18,7 +18,6 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { Label } from "@/components/ui/label";
 
 export type EmailChallengeI18n = {
   verify: string;
@@ -227,11 +226,10 @@ export function createDemoEmailChallengeProvider(): EmailChallengeProvider {
  */
 function _EmailChallenge({
   state,
+  id,
   name,
-  label,
   placeholder,
   required,
-  requiredAsterisk = true,
   disabled,
   sendPending,
   i18n,
@@ -248,11 +246,10 @@ function _EmailChallenge({
   onResendClick,
 }: {
   state: EmailChallengeState;
+  id?: string;
   name?: string;
-  label?: string;
   placeholder?: string;
   required?: boolean;
-  requiredAsterisk?: boolean;
   disabled?: boolean;
   sendPending?: boolean;
   i18n?: EmailChallengeI18n;
@@ -285,15 +282,6 @@ function _EmailChallenge({
   const autoVerifyEnabled = otpLength !== undefined;
   return (
     <div data-slot="email-challenge" data-state={state} className="space-y-3">
-      {label && (
-        <Label>
-          {label}{" "}
-          {required && requiredAsterisk && (
-            <span className="text-red-500/80">*</span>
-          )}
-        </Label>
-      )}
-
       <InputGroup data-disabled={disabled ? "true" : undefined}>
         {/* Browser-side submit gating (hidden inputs do not validate).
             This blocks native HTML form submission until the verification succeeds. */}
@@ -312,6 +300,7 @@ function _EmailChallenge({
           />
         ) : null}
         <InputGroupInput
+          id={id}
           // NOTE: `name` makes this the "real" field value submitted with the form.
           name={name}
           type="email"
@@ -558,11 +547,10 @@ export function EmailChallenge({
   return (
     <_EmailChallenge
       state={state}
+      id={undefined}
       name={name}
-      label={label}
       placeholder={placeholder}
       required={required}
-      requiredAsterisk={requiredAsterisk}
       disabled={disabled}
       sendPending={false}
       i18n={defaultEmailChallengeI18nEn}
@@ -591,8 +579,8 @@ export function ChallengeEmailField({
   sessionId,
   fieldId,
   stateKey,
+  id,
   name,
-  label,
   placeholder,
   required,
   requiredAsterisk = true,
@@ -607,8 +595,9 @@ export function ChallengeEmailField({
    * Optional stable session key for demo usage when fieldId is not available.
    */
   stateKey?: string;
+  /** Associate with parent label via htmlFor when rendered inside FormField. */
+  id?: string;
   name?: string;
-  label?: string;
   placeholder?: string;
   required?: boolean;
   requiredAsterisk?: boolean;
@@ -739,11 +728,10 @@ export function ChallengeEmailField({
   return (
     <_EmailChallenge
       state={widgetState}
+      id={id}
       name={name}
-      label={label}
       placeholder={placeholder}
       required={required}
-      requiredAsterisk={requiredAsterisk}
       disabled={disabled}
       sendPending={sendPending}
       verifyPending={verifyPending}
@@ -770,8 +758,8 @@ export function ChallengeEmailField({
  * - Internally manages state for demo purposes
  */
 export function EmailChallengePreview({
+  id,
   name,
-  label,
   placeholder,
   required,
   requiredAsterisk = true,
@@ -781,8 +769,9 @@ export function EmailChallengePreview({
   onResendClick,
   onVerify,
 }: {
+  /** Associate with parent label via htmlFor when used inside FormField. */
+  id?: string;
   name?: string;
-  label?: string;
   placeholder?: string;
   required?: boolean;
   requiredAsterisk?: boolean;
@@ -823,11 +812,10 @@ export function EmailChallengePreview({
   return (
     <_EmailChallenge
       state={internalState}
+      id={id}
       name={name}
-      label={label}
       placeholder={placeholder}
       required={required}
-      requiredAsterisk={requiredAsterisk}
       disabled={disabled}
       sendPending={false}
       i18n={defaultEmailChallengeI18nEn}

@@ -23,7 +23,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useProject } from "@/scaffolds/workspace";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Platform } from "@/lib/platform";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Field, FieldLabel } from "@/components/ui/field";
 
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
@@ -41,7 +40,6 @@ export function ImportCSVDialog({
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<unknown | null>(null);
   const [csv, setCsv] = useState<any[]>([]);
-  const [sample, setSample] = useState<any[]>([]);
 
   const handleFileSelected = (selectedFile: File) => {
     setFile(selectedFile);
@@ -49,7 +47,6 @@ export function ImportCSVDialog({
       ...Platform.CSV.parser_config,
       complete: (results) => {
         setCsv(results.data);
-        setSample(results.data.slice(0, Math.min(results.data.length, 100)));
         setStep("preview");
       },
       error: (err) => {
@@ -88,7 +85,7 @@ export function ImportCSVDialog({
 
   const resetImport = () => {
     setFile(null);
-    setSample([]);
+    setCsv([]);
     setStep("upload");
   };
 
@@ -100,8 +97,8 @@ export function ImportCSVDialog({
 
   return (
     <Dialog {...props}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
+      <DialogContent className="flex h-[85vh] flex-col overflow-hidden sm:max-w-[90vw]">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Import Customers from CSV</DialogTitle>
           <DialogDescription>
             Upload a CSV file to import customers into your CRM.
@@ -117,18 +114,17 @@ export function ImportCSVDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs
-          value={mode}
-          onValueChange={(v) => setMode(v as "insert" | "update")}
-        >
-          <TabsList>
-            <TabsTrigger value="insert">Insert</TabsTrigger>
-            <TabsTrigger value="update">Update</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {step === "upload" && (
-          <div className="space-y-6 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-4">
+          <Tabs
+            value={mode}
+            onValueChange={(v) => setMode(v as "insert" | "update")}
+          >
+            <TabsList>
+              <TabsTrigger value="insert">Insert</TabsTrigger>
+              <TabsTrigger value="update">Update</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {step === "upload" && (
             <Link
               href="/objects/template-grida-customer-upload-csv-example.zip"
               download
@@ -138,25 +134,34 @@ export function ImportCSVDialog({
                 Download Template
               </Button>
             </Link>
+          )}
+        </div>
 
-            <FileUploader onFileSelected={handleFileSelected} />
-          </div>
-        )}
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+          {step === "upload" && (
+            <div className="flex min-h-0 flex-1 flex-col justify-center py-4">
+              <FileUploader onFileSelected={handleFileSelected} />
+            </div>
+          )}
 
-        {step === "preview" && (
-          <div className="flex flex-col space-y-6 py-4 max-w-full overflow-hidden">
-            <div className="flex items-center justify-between">
+          {step === "preview" && (
+          <div className="flex flex-1 min-h-0 flex-col space-y-4 py-4 max-w-full overflow-hidden">
+            <div className="flex shrink-0 items-center justify-between">
               <h3 className="text-lg font-medium">Preview Import Data</h3>
               <div className="text-sm text-muted-foreground">
-                {file?.name} (first {sample.length} records of {csv.length})
+                {file?.name} ({csv.length} records)
               </div>
             </div>
 
-            <ScrollArea className="max-h-[400px] rounded-md border overflow-scroll">
-              <SimpleCSVTable data={sample} count={csv.length} />
-            </ScrollArea>
+            <div className="flex-1 min-h-0 overflow-hidden rounded-md border">
+              <SimpleCSVTable
+                data={csv}
+                count={csv.length}
+                className="h-full rounded-none border-0"
+              />
+            </div>
 
-            <Alert>
+            <Alert className="shrink-0">
               <AlertCircle className="size-4" />
               <AlertTitle>Review your data</AlertTitle>
               <AlertDescription>
@@ -181,9 +186,9 @@ export function ImportCSVDialog({
               <span></span>
             </label>
           </div>
-        )}
+          )}
 
-        {step === "importing" && (
+          {step === "importing" && (
           <div className="space-y-6 py-8">
             <div className="text-center">
               <h3 className="text-lg font-medium mb-2">Importing Customers</h3>
@@ -196,9 +201,9 @@ export function ImportCSVDialog({
               </p>
             </div>
           </div>
-        )}
+          )}
 
-        {step === "complete" && (
+          {step === "complete" && (
           <div className="space-y-6 py-8">
             <div className="text-center">
               <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-green-100 mb-4">
@@ -210,9 +215,9 @@ export function ImportCSVDialog({
               </p>
             </div>
           </div>
-        )}
+          )}
 
-        {step === "error" && (
+          {step === "error" && (
           <div className="space-y-6 py-8">
             <div className="text-center">
               <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-red-100 mb-4">
@@ -220,20 +225,27 @@ export function ImportCSVDialog({
               </div>
               <h3 className="text-lg font-medium mb-2">Import Failed</h3>
               <p className="text-sm text-muted-foreground">
-                There was an error importing your customers. Please try again.
+                {error != null && typeof error === "object"
+                  ? ("message" in error
+                      ? (error as { message: string }).message
+                      : "hint" in error
+                        ? (error as { hint: string }).hint
+                        : null) ?? "There was an error importing your customers. Please try again."
+                  : "There was an error importing your customers. Please try again."}
               </p>
-              <div className="max-h-[400px] rounded-md border mt-4 overflow-scroll p-4">
-                <p className="text-xs text-start text-destructive font-mono">
-                  <pre>
-                    {error ? JSON.stringify(error, null, 2) : "Unknown error"}
-                  </pre>
-                </p>
-              </div>
+              {error != null && (
+                <div className="max-h-[400px] rounded-md border mt-4 overflow-scroll p-4">
+                  <p className="text-xs text-start text-muted-foreground font-mono">
+                    <pre>{JSON.stringify(error, null, 2)}</pre>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-        )}
+          )}
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t pt-4">
           {step === "upload" && (
             <Button variant="outline" onClick={handleClose}>
               Cancel

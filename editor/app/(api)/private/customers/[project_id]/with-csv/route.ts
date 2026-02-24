@@ -12,6 +12,10 @@ type Params = {
   project_id: string;
 };
 
+/** CSV import context: append to platform InsertError message for this route. */
+const CSV_IMPORT_HINT =
+  " Use Update mode to update existing customers, or remove or change duplicates in your CSV.";
+
 async function parse_customers_csv(
   csvf: File,
   project_id: number,
@@ -133,8 +137,10 @@ export async function POST(
 
     if (error) {
       console.error("error while inserting customers", error);
+      const base = Platform.Customer.InsertError.messageFromDbError(error);
+      const message = base + CSV_IMPORT_HINT;
       return NextResponse.json(
-        { error: "Failed to insert customers", details: error },
+        { error: { message }, details: error },
         { status: 400 }
       );
     }
@@ -204,8 +210,10 @@ export async function PATCH(
 
     if (error) {
       console.error("error while upserting customers", error);
+      const base = Platform.Customer.InsertError.messageFromDbError(error);
+      const message = base + CSV_IMPORT_HINT;
       return NextResponse.json(
-        { error: "Failed to insert customers", details: error },
+        { error: { message }, details: error },
         { status: 400 }
       );
     }

@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import Link from "next/link";
 import DataGrid, {
   Column,
   RenderCellProps,
@@ -601,7 +602,21 @@ export function CustomerGrid({
           onSelectedRowsChange?.(rows as Set<string>);
         }}
         rows={rows}
-        renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
+        renderers={{
+          noRowsFallback: (
+            <EmptyRowsRenderer loading={loading}>
+              <Button variant="link" size="sm" asChild>
+                <Link
+                  href="https://grida.co/docs/platform/customers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Learn about customers
+                </Link>
+              </Button>
+            </EmptyRowsRenderer>
+          ),
+        }}
         rowKeyGetter={(row) => (row as DGCustomerRow)["uid"]}
         onCellDoubleClick={({ row, column }) => {
           onCellDoubleClick?.(row, column.key);

@@ -559,6 +559,64 @@ export namespace Platform.Customer {
     email: properties.email,
     phone: properties.phone,
   } as const;
+
+  /**
+   * Error codes and user-facing messages for customer insert/update.
+   * Messages are generic and context-agnostic; routes can append context (e.g. CSV hints).
+   */
+  export namespace InsertError {
+    /** Postgres unique violation (duplicate key). */
+    export const CODE_UNIQUE_VIOLATION = "23505";
+
+    /** Unique constraints on customer (public.customer) that can be hit on insert. */
+    export const CONSTRAINT = {
+      UNIQUE_UUID_PROJECT_ID: "unique_uuid_project_id",
+      UNIQUE_PROJECT_ID_FP_VISITOR_ID: "unique_project_id_fp_visitor_id",
+      CUSTOMER_UNIQUE_VERIFIED_EMAIL_PER_PROJECT:
+        "customer_unique_verified_email_per_project",
+    } as const;
+
+    /** Generic user-facing messages (no CSV or UI context). */
+    export const MESSAGE = {
+      [CONSTRAINT.UNIQUE_UUID_PROJECT_ID]:
+        "A customer with this UUID already exists in this project.",
+      [CONSTRAINT.UNIQUE_PROJECT_ID_FP_VISITOR_ID]:
+        "A customer with this visitor ID already exists in this project.",
+      [CONSTRAINT.CUSTOMER_UNIQUE_VERIFIED_EMAIL_PER_PROJECT]:
+        "A customer with this verified email already exists in this project.",
+      DEFAULT_UNIQUE: "Duplicate value: a record with this value already exists.",
+      GENERIC: "Failed to insert customers.",
+    } as const;
+
+    const CONSTRAINT_MESSAGE: Record<string, string> = {
+      [CONSTRAINT.UNIQUE_UUID_PROJECT_ID]:
+        MESSAGE[CONSTRAINT.UNIQUE_UUID_PROJECT_ID],
+      [CONSTRAINT.UNIQUE_PROJECT_ID_FP_VISITOR_ID]:
+        MESSAGE[CONSTRAINT.UNIQUE_PROJECT_ID_FP_VISITOR_ID],
+      [CONSTRAINT.CUSTOMER_UNIQUE_VERIFIED_EMAIL_PER_PROJECT]:
+        MESSAGE[CONSTRAINT.CUSTOMER_UNIQUE_VERIFIED_EMAIL_PER_PROJECT],
+    };
+
+    /**
+     * Returns a user-facing message for a Postgres/Supabase error from customer insert/update.
+     * Use in API routes and return { error: { message } } so the client can display it.
+     */
+    export function messageFromDbError(dbError: {
+      code?: string;
+      message?: string;
+    }): string {
+      const code = dbError?.code;
+      const raw = dbError?.message ?? "";
+
+      if (code === CODE_UNIQUE_VIOLATION) {
+        const constraintMatch = raw.match(/unique constraint "([^"]+)"/i);
+        const constraint = constraintMatch?.[1] ?? "";
+        return CONSTRAINT_MESSAGE[constraint] ?? MESSAGE.DEFAULT_UNIQUE;
+      }
+
+      return MESSAGE.GENERIC;
+    }
+  }
 }
 
 export namespace Platform.CustomerAuthPolicy {

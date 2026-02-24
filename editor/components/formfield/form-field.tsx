@@ -55,7 +55,11 @@ import {
 } from "./reference-search-field";
 import { PhoneField } from "./phone-field";
 import { RichTextEditorField } from "./richtext-field";
-import { ChallengeEmailField, EmailChallengePreview } from "./email-challenge";
+import {
+  ChallengeEmailField,
+  EmailChallengePreview,
+  type EmailChallengeI18n,
+} from "./email-challenge";
 import { FieldProperties } from "@/k/supported_field_types";
 import type { tokens } from "@grida/tokens";
 import { useValue } from "@/lib/spock";
@@ -107,6 +111,12 @@ interface IFormField extends IInputField {
    * by default, the input values are only modified by user input, thus, there is a exception for select input for extra validation (e.g. useSafeSelectValue)
    */
   locked?: boolean;
+  /** Used when type is challenge_email in FormView (session-scoped verification). */
+  sessionId?: string;
+  /** Used when type is challenge_email in FormView. */
+  fieldId?: string;
+  /** i18n for challenge_email when rendered in FormView. */
+  emailChallengeI18n?: EmailChallengeI18n;
 }
 
 interface IMonoFormFieldRenderingProps extends IFormField {
@@ -187,11 +197,15 @@ function MonoFormField({
   locked,
   preview,
   v_value,
+  sessionId,
+  fieldId,
+  emailChallengeI18n,
   onValueChange,
   onRangeChange,
   onCheckedChange,
   onFilesChange,
 }: IMonoFormFieldRenderingProps) {
+  const inputId = id ?? name;
   const __onchange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -206,7 +220,7 @@ function MonoFormField({
     | React.ComponentProps<"textarea">
   ) &
     OnValueChange = {
-    id: name,
+    id: inputId,
     name: name,
     readOnly: readonly,
     disabled: disabled,
@@ -318,8 +332,8 @@ function MonoFormField({
         if (preview) {
           return (
             <EmailChallengePreview
+              id={inputId}
               name={name}
-              label={label}
               placeholder={placeholder}
               required={required}
               requiredAsterisk={requiredAsterisk}
@@ -331,13 +345,16 @@ function MonoFormField({
           <ChallengeEmailField
             // This renderer may be used outside of a session-based FormView.
             // When no provider/session is available, ChallengeEmailField falls back to demo behavior.
-            stateKey={id ?? name}
+            sessionId={sessionId}
+            fieldId={fieldId}
+            stateKey={inputId}
+            id={inputId}
             name={name}
-            label={label}
             placeholder={placeholder}
             required={required}
             requiredAsterisk={requiredAsterisk}
             disabled={disabled}
+            i18n={emailChallengeI18n}
           />
         );
       }
@@ -600,7 +617,7 @@ function MonoFormField({
     return <PaymentField data={data as PaymentFieldData} disabled={disabled} />;
   }
 
-  const LabelText = ({ htmlFor = name }: { htmlFor?: "none" | {} }) => (
+  const LabelText = ({ htmlFor = inputId }: { htmlFor?: "none" | {} }) => (
     <Label
       htmlFor={htmlFor as string}
       data-capitalize={labelCapitalize}

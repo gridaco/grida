@@ -2,6 +2,7 @@ import { Table2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -11,9 +12,12 @@ import {
 export function EmptyRowsRenderer({
   loading,
   hasPredicates,
+  children,
 }: {
   loading?: boolean;
   hasPredicates?: boolean;
+  /** Optional content rendered below the description (e.g. a docs link) */
+  children?: React.ReactNode;
 }) {
   if (loading)
     return (
@@ -40,6 +44,7 @@ export function EmptyRowsRenderer({
               ? "No records match the criteria. Try changing the filters or search query."
               : "Create a new record to get started"}
           </EmptyDescription>
+          {children != null ? <EmptyContent>{children}</EmptyContent> : null}
         </EmptyHeader>
       </Empty>
     </div>
