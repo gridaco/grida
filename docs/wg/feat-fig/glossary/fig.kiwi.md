@@ -60,20 +60,22 @@ The schema defines over 50 node types, including:
 
 Properties we've analyzed and documented from the Kiwi schema:
 
-| Property                        | Type                              | Location                                   | Purpose                                | Usage                                                                                                                                                                                                   |
-| ------------------------------- | --------------------------------- | ------------------------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `parentIndex`                   | `ParentIndex`                     | `NodeChange.parentIndex`                   | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering)                                                                                                                       |
-| `parentIndex.position`          | `string`                          | `ParentIndex.position`                     | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                                                                                                                                       |
-| `sortPosition`                  | `string?`                         | `NodeChange.sortPosition`                  | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types                                                                                                                                |
-| `frameMaskDisabled`             | `boolean?`                        | `NodeChange.frameMaskDisabled`             | Frame clipping mask setting            | `true` = clipping disabled (no clip), `false` = clipping enabled (with clip), `undefined` = default (clipping enabled). `false` for GROUP-originated FRAMEs, `true` for regular FRAMEs without clipping |
-| `resizeToFit`                   | `boolean?`                        | `NodeChange.resizeToFit`                   | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                                                                                                                                         |
-| `fillPaints`                    | `Paint[]?`                        | `NodeChange.fillPaints`                    | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
-| `strokePaints`                  | `Paint[]?`                        | `NodeChange.strokePaints`                  | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
-| `backgroundPaints`              | `Paint[]?`                        | `NodeChange.backgroundPaints`              | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
-| `isStateGroup`                  | `boolean?`                        | `NodeChange.isStateGroup`                  | Indicates state group/component set    | `true` for component set FRAMEs, `undefined` for regular FRAMEs                                                                                                                                         |
-| `componentPropDefs`             | `ComponentPropDef[]?`             | `NodeChange.componentPropDefs`             | Component property definitions         | Present on component set FRAMEs, defines variant properties                                                                                                                                             |
-| `stateGroupPropertyValueOrders` | `StateGroupPropertyValueOrder[]?` | `NodeChange.stateGroupPropertyValueOrders` | Variant property value orders          | Present on component set FRAMEs, defines order of variant values                                                                                                                                        |
-| `variantPropSpecs`              | `VariantPropSpec[]?`              | `NodeChange.variantPropSpecs`              | Variant property specifications        | Present on SYMBOL nodes that are part of component sets, absent on standalone SYMBOLs                                                                                                                   |
+| Property                        | Type                              | Location                                                | Purpose                                | Usage                                                                                                                                                                                                   |
+| ------------------------------- | --------------------------------- | ------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parentIndex`                   | `ParentIndex`                     | `NodeChange.parentIndex`                                | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering)                                                                                                                       |
+| `parentIndex.position`          | `string`                          | `ParentIndex.position`                                  | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                                                                                                                                       |
+| `sortPosition`                  | `string?`                         | `NodeChange.sortPosition`                               | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types                                                                                                                                |
+| `frameMaskDisabled`             | `boolean?`                        | `NodeChange.frameMaskDisabled`                          | Frame clipping mask setting            | `true` = clipping disabled (no clip), `false` = clipping enabled (with clip), `undefined` = default (clipping enabled). `false` for GROUP-originated FRAMEs, `true` for regular FRAMEs without clipping |
+| `resizeToFit`                   | `boolean?`                        | `NodeChange.resizeToFit`                                | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                                                                                                                                         |
+| `fillPaints`                    | `Paint[]?`                        | `NodeChange.fillPaints`                                 | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
+| `strokePaints`                  | `Paint[]?`                        | `NodeChange.strokePaints`                               | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
+| `backgroundPaints`              | `Paint[]?`                        | `NodeChange.backgroundPaints`                           | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
+| `isStateGroup`                  | `boolean?`                        | `NodeChange.isStateGroup`                               | Indicates state group/component set    | `true` for component set FRAMEs, `undefined` for regular FRAMEs                                                                                                                                         |
+| `componentPropDefs`             | `ComponentPropDef[]?`             | `NodeChange.componentPropDefs`                          | Component property definitions         | Present on component set FRAMEs, defines variant properties                                                                                                                                             |
+| `stateGroupPropertyValueOrders` | `StateGroupPropertyValueOrder[]?` | `NodeChange.stateGroupPropertyValueOrders`              | Variant property value orders          | Present on component set FRAMEs, defines order of variant values                                                                                                                                        |
+| `variantPropSpecs`              | `VariantPropSpec[]?`              | `NodeChange.variantPropSpecs`                           | Variant property specifications        | Present on SYMBOL nodes that are part of component sets, absent on standalone SYMBOLs                                                                                                                   |
+| `fontName`                      | `FontName?`                       | `NodeChange.fontName`                                   | Primary font reference                 | Contains `family`, `style`, `postscript`. See [Text & Font](#text--font): `style` is human-readable (e.g. "Regular", "Bold Italic"), not CSS. Prefer `fontMetaData` for import.                         |
+| `fontMetaData`                  | `FontMetaData[]?`                 | `TextData.fontMetaData`, `DerivedTextData.fontMetaData` | Canonical font style per text run      | **Authoritative** for `fontWeight` and `fontStyle` (NORMAL/ITALIC). Aligns with Figma REST API. See [Text & Font](#text--font).                                                                         |
 
 ### parentIndex
 
@@ -283,12 +285,10 @@ Both formats show the same pattern: component sets are FRAME nodes containing SY
 Clipboard payloads add some practical patterns around where the component-set `FRAME` and variant `SYMBOL` nodes appear:
 
 - **Copying the component set container** (see `fixtures/test-fig/clipboard/component-component-set.clipboard.html`):
-
   - The user-facing canvas contains the component-set `FRAME` (`isStateGroup === true`) with variant `SYMBOL` children.
   - An `"Internal Only Canvas"` (`CANVAS.internalOnly === true`) may still be present.
 
 - **Copying a variant component itself** (see `fixtures/test-fig/clipboard/component-component-set-component-*.clipboard.html`):
-
   - The user-facing canvas contains the copied variant as a `SYMBOL`.
   - The internal-only canvas contains the component-set `FRAME` and its variant `SYMBOL` children.
 
@@ -457,6 +457,72 @@ const vectorNetwork = parseVectorNetworkBlob(blobBytes);
 - Winding rules determine fill behavior: `NONZERO` or `ODD` (even-odd)
 - Style IDs reference styles from the style system for fills, strokes, and effects
 - The `normalizedSize` field provides the coordinate space dimensions for the vector
+
+### Text & Font
+
+TEXT nodes carry font information in two places: **`NodeChange.fontName`** and **`DerivedTextData.fontMetaData`** (or `TextData.fontMetaData`). For Kiwi → REST import, **FontMetaData is the authoritative source** for font weight and italic; `fontName` alone is not sufficient.
+
+#### FontName (limited for import)
+
+```text
+struct FontName {
+  string family;   // e.g. "Inter", "Roboto"
+  string style;   // Human-readable style name from the font's name table (likely Name ID 2 or 17)
+  string postscript;  // PostScript name; may be empty
+}
+```
+
+**Limitations when mapping to REST / CSS:**
+
+- **`style`** holds values like `"Regular"`, `"Bold"`, `"Bold Italic"` — the font's internal style name, **not** CSS `font-style` (normal/italic) or `font-weight`. Without the original font file, you cannot reliably derive CSS semantics from `style` alone.
+- **`postscript`** may be empty (e.g. Inter Regular often has `postscript: ""`), so it is not a reliable fallback for resolving the exact font face.
+
+**Use `fontName`** for `fontFamily` (and optionally `fontPostScriptName` when non-empty). For `fontWeight` and italic, use **FontMetaData**.
+
+#### FontMetaData (authoritative for weight and italic)
+
+```text
+message FontMetaData {
+  FontName key = 1;
+  float fontLineHeight = 2;
+  byte[] fontDigest = 3;
+  FontStyle fontStyle = 4;  // NORMAL | ITALIC
+  int fontWeight = 5;
+}
+
+enum FontStyle {
+  NORMAL = 0;
+  ITALIC = 1;
+}
+```
+
+**FontMetaData** provides strict, sanitized values that align with Figma's internal model and with the Figma REST API:
+
+| FontMetaData field | Type        | REST API equivalent  | Notes                             |
+| ------------------ | ----------- | -------------------- | --------------------------------- |
+| `fontStyle`        | `FontStyle` | `italic: boolean`    | `NORMAL` → false, `ITALIC` → true |
+| `fontWeight`       | `int`       | `fontWeight: number` | 400, 700, etc.                    |
+
+**Location:** `DerivedTextData.fontMetaData` (or `TextData.fontMetaData`). The array is keyed by `FontName` — each entry has `key: FontName` and you find the matching entry by comparing `key` to the font in use. For single-style text, `fontMetaData[0]` typically applies; otherwise use the entry whose `key` matches the run's font.
+
+**Observed examples (Inter):**
+
+| Variant     | fontName.style | fontName.postscript | fontMetaData.fontStyle | fontMetaData.fontWeight |
+| ----------- | -------------- | ------------------- | ---------------------- | ----------------------- |
+| Regular     | "Regular"      | `""`                | NORMAL                 | 400                     |
+| Bold        | "Bold"         | "Inter-Bold"        | NORMAL                 | 700                     |
+| Bold Italic | "Bold Italic"  | "Inter-BoldItalic"  | ITALIC                 | 700                     |
+
+#### Kiwi → REST mapping
+
+When importing Kiwi TEXT nodes to a REST-like or Grida schema:
+
+1. **fontFamily** — from `NodeChange.fontName.family` (or `FontMetaData.key.family`).
+2. **fontPostScriptName** — from `fontName.postscript` when non-empty; otherwise `null` or omit.
+3. **fontWeight** — from the matching `fontMetaData` entry (by `key` or `fontMetaData[n]`). Do **not** infer from `fontName.style`.
+4. **italic** — from that same entry's `fontStyle === ITALIC`.
+
+Figma internally merges and returns these values in the REST API; using FontMetaData ensures the import matches that behavior.
 
 ## External Resources
 
