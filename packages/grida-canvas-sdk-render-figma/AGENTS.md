@@ -49,3 +49,13 @@ pnpm typecheck
 ```
 
 From monorepo root: `pnpm turbo build --filter=@grida/refig`, `pnpm turbo test --filter=@grida/refig`.
+
+## Custom fonts (`listFontFamilies`)
+
+**Current API:** Returns a unique set of **font family** names only. Users load all font files that match each family (variable or static); the renderer selects the exact font per text style at render time.
+
+**Rationale:** A fully detailed API (family + style, postscript name, used axes, unicode ranges — similar to CSS typeface) would give precise data for font resolution, but makes it harder for users to locate font files. Family-only keeps the API simple and discoverable: users find fonts by family name (e.g. from Google Fonts, local filesystem, asset service). For accurate rendering, they should supply all matching files (VF + static) per family so the renderer can pick the right instance.
+
+**Future:** The API may evolve to include postscript name, axes, unicode ranges, or other metadata for more precise font resolution — similar to CSS `@font-face` / typeface descriptors. Until then, family-only is the stable surface.
+
+**Implementation:** Export `FIGMA_DEFAULT_FALLBACK_ORDER` (from `figma-default-fonts.ts`) for users who need to filter Figma defaults from `listFontFamilies()` before loading.

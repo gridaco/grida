@@ -6,6 +6,8 @@ Render Figma documents to **PNG, JPEG, WebP, PDF, and SVG** in **Node.js (no bro
 
 Use a `.fig` export (offline) or a Figma REST API file JSON response (`GET /v1/files/:key`), pick a node ID, and get pixels.
 
+Refig aims to render designs as faithfully as possible to the original. See [Known limitations](#known-limitations) for current exceptions.
+
 ## Features (checklist)
 
 - [x] Render from **`.fig` files** (offline / no API calls)
@@ -14,6 +16,7 @@ Use a `.fig` export (offline) or a Figma REST API file JSON response (`GET /v1/f
 - [x] **CLI** (`refig`) and **library API** (`FigmaDocument`, `FigmaRenderer`)
 - [x] **Node.js** + **browser** entrypoints (`@grida/refig`, `@grida/refig/browser`)
 - [x] IMAGE fills supported via **embedded `.fig` images** or a **local `images/` directory** for REST JSON
+- [x] **Bring-your-own-font** — supply custom font files for designs that use non-default typefaces
 - [x] Batch export with **`--export-all`** (renders nodes with Figma export presets)
 - [x] WASM + Skia-backed renderer via `@grida/canvas-wasm`
 
@@ -105,6 +108,38 @@ const { data } = await renderer.render("<node-id>", { format: "png" });
 renderer.dispose();
 ```
 
+### Render with custom fonts
+
+Unlike images, fonts do not have a Figma API. Use **`listFontFamilies()`** to see which font families are used in your file (or a scoped node), then load those fonts and pass them to the renderer:
+
+```ts
+import { readFileSync, writeFileSync } from "node:fs";
+import { FigmaDocument, FigmaRenderer } from "@grida/refig";
+
+const doc = FigmaDocument.fromFile("path/to/file.fig");
+
+// 1. Discover font families used (omit rootNodeId for full document)
+const fontFamilies = doc.listFontFamilies("<node-id>");  // e.g. ["Inter", "Caveat", "Roboto"]
+
+// 2. Load your custom fonts (local FS, CDN, asset service, etc.)
+// Skip Figma defaults (Inter, Noto Sans KR/JP/SC, etc.) — the renderer loads those.
+const fonts: Record<string, Uint8Array> = {};
+for (const family of fontFamilies) {
+  if (family === "Inter" || family.startsWith("Noto Sans") || family === "Noto Color Emoji") continue;
+  fonts[family] = new Uint8Array(readFileSync(`./fonts/${family}.ttf`));  // adjust path to your font file structure
+}
+
+// 3. Render
+const renderer = new FigmaRenderer(doc, { fonts });
+const { data } = await renderer.render("<node-id>", { format: "png" });
+writeFileSync("out.png", data);
+renderer.dispose();
+```
+
+Load **all** font files that match each family (variable or static) so the renderer can pick the right one for each text style, just like the original design.
+
+If the design uses **locally-installed fonts** (fonts the designer had on their machine), loading those from your OS may require extra scripts or tooling to locate and extract the font files. We do not provide such tooling.
+
 ## Quick start (Browser)
 
 ```ts
@@ -143,14 +178,22 @@ new FigmaDocument(json: Record<string, unknown>)
 // From a file path (Node only — @grida/refig)
 FigmaDocument.fromFile("path/to/file.fig")   // .fig binary
 FigmaDocument.fromFile("path/to/doc.json")   // REST API JSON
+
+// Font families used in the document (for bring-your-own-font)
+document.listFontFamilies(rootNodeId?: string): string[]
+// — rootNodeId: optional; scope to that node's subtree, or omit for full document
+// — returns unique family names; load all font files that match each family (VF or static)
 ```
+
 
 ### `FigmaRenderer`
 
 ```ts
 const renderer = new FigmaRenderer(document: FigmaDocument, options?: {
-  useEmbeddedFonts?: boolean;  // default: true
+  useEmbeddedFonts?: boolean;       // default: true
+  loadFigmaDefaultFonts?: boolean;  // default: true — Inter, Noto Sans KR/JP/SC, etc.
   images?: Record<string, Uint8Array>;  // image ref → bytes; used for REST API IMAGE fills
+  fonts?: Record<string, Uint8Array>;   // font family → bytes (TTF/OTF); bring-your-own-font
 });
 
 const result = await renderer.render(nodeId: string, {
@@ -346,6 +389,12 @@ REST JSON ───┘
 
 For **`.fig`** input, images are embedded in the file; no extra images directory is needed. For **REST** input, use `--images` or a project directory with `images/` to render IMAGE fills correctly.
 
+## Known limitations
+
+- **Rich text** — Text with mixed styles (e.g. bold and italic in the same paragraph) is not yet supported.
+- **Image transformation** — Complex image transforms from Figma designs are not yet properly aligned. Known issue; will fix.
+- **Emoji** — Rendered with Noto Color Emoji instead of Figma's platform emoji (Apple Color Emoji / Segoe UI Emoji). Output differs by design.
+
 ## Not planned
 
 - **Figma API fetching / auth** — bring your own tokens and HTTP client
@@ -371,7 +420,9 @@ Yes. Import from `@grida/refig/browser`. The core renderer uses `@grida/canvas-w
 
 ### What about fonts?
 
-The WASM runtime ships with embedded fallback fonts (Geist / Geist Mono). **`loadFigmaDefaultFonts`** is enabled by default: the renderer loads the Figma default font set (Inter, Noto Sans KR/JP/SC, and optionally Noto Sans TC/HK and Noto Color Emoji) from CDN and registers them as fallbacks before the first render, so mixed-script and CJK text avoid tofu. Set **`loadFigmaDefaultFonts: false`** to disable (e.g. to avoid network or use only embedded fonts). Custom or other Google Fonts are **not** loaded by the renderer; the user is responsible for fetching font bytes and registering them with the canvas if needed.
+The WASM runtime ships with embedded fallback fonts (Geist / Geist Mono). **`loadFigmaDefaultFonts`** is enabled by default: the renderer loads the Figma default font set (Inter, Noto Sans KR/JP/SC, and optionally Noto Sans TC/HK and Noto Color Emoji) from CDN and registers them as fallbacks before the first render, so mixed-script and CJK text avoid tofu. Set **`loadFigmaDefaultFonts: false`** to disable (e.g. to avoid network or use only embedded fonts).
+
+**Custom fonts** (e.g. Caveat, Roboto, brand typefaces) use the bring-your-own-font flow: call **`document.listFontFamilies(rootNodeId?)`** to see which families are used, load those fonts yourself, then pass **`fonts: Record<string, Uint8Array>`** to `FigmaRenderer`. See [Render with custom fonts](#render-with-custom-fonts).
 
 ## Contributing
 

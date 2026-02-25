@@ -46,6 +46,20 @@ The built-in implementation uses CDN URLs defined in the package (see `figma-def
 
 ---
 
+## Custom / primary fonts (bring-your-own-font)
+
+**Primary fonts** — those the designer explicitly sets (e.g. Caveat, Roboto, brand typefaces) — are **not** part of the default set. Figma has no font API; the document only stores family names. The renderer cannot fetch these automatically.
+
+**Flow**:
+
+1. **Discover** — `document.listFontFamilies(rootNodeId?)` returns a unique set of font family names used in the document (or a scoped subtree).
+2. **Load** — The user loads TTF/OTF bytes for each family from their own source (local FS, CDN, asset service). Skip families in the default fallback set; the renderer loads those.
+3. **Register** — Pass `fonts: Record<string, Uint8Array>` to `FigmaRenderer`.
+
+**Current API:** Family names only. The user supplies all font files that match each family (variable or static); the renderer selects the correct instance per text style at render time. For future refinements (postscript name, axes, unicode ranges), see `AGENTS.md`.
+
+---
+
 ## Emoji
 
 |            | Figma                                                                                | This renderer (@grida/refig)                                     |
@@ -62,4 +76,4 @@ This is the only documented, intentional deviation from Figma’s default behavi
 
 ## Last updated
 
-**2025-02-17** — Figma’s default font set and fallback behavior are unlikely to change often but can change without notice. Re‑check Figma’s behavior and docs when doing font-related work.
+**2025-02-25** — Added bring-your-own-font flow. Figma’s default font set and fallback behavior are unlikely to change often but can change without notice. Re‑check Figma’s behavior and docs when doing font-related work.
