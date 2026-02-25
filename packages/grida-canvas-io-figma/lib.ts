@@ -5,6 +5,16 @@
  * Converts Figma clipboard (Kiwi) and REST API formats into the Grida Canvas schema.
  *
  * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Fig.kiwi format glossary
+ *
+ * ## TODO — Kiwi → REST (not yet fully mapped)
+ *
+ * - **Rich text**: `characterStyleOverrides` and `styleOverrideTable` are always empty.
+ *   Kiwi has `textData.characterStyleIDs` and `textData.styleOverrideTable` (NodeChange[]).
+ *   Full support would require per-run font resolution and building the REST override map.
+ * - **lineTypes / lineIndentations**: Always `[]`. Should derive from `textData.lines`
+ *   (lineType: PLAIN→NONE, ORDERED, UNORDERED; indentationLevel).
+ * - **fontVariant***: `fontVariantCommonLigatures`, etc. are not mapped.
+ * - **textTracking vs letterSpacing**: Only letterSpacing is used; clarify canonical source.
  */
 import cg from "@grida/cg";
 import type grida from "@grida/schema";
@@ -1491,6 +1501,11 @@ export namespace iofigma {
               font_family: node.style.fontFamily,
               font_weight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
+              font_postscript_name:
+                (node.style as { fontPostScriptName?: string })
+                  .fontPostScriptName || undefined,
+              font_style_italic:
+                (node.style as { italic?: boolean }).italic ?? false,
               font_kerning: true,
             };
           }
@@ -2180,10 +2195,38 @@ export namespace iofigma {
       }
 
       /**
+       * Find FontMetaData entry matching the given FontName.
+       *
+       * FontMetaData is the authoritative source for fontWeight and italic; fontName.style
+       * alone cannot reliably derive CSS semantics. Match by key (family + style); for
+       * single-style text, fontMetaData[0] typically applies.
+       *
+       * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Text & Font section
+       */
+      function findFontMetaDataEntry(
+        fontMetaData: figkiwi.FontMetaData[] | undefined,
+        fontName: figkiwi.FontName | undefined
+      ): figkiwi.FontMetaData | undefined {
+        if (!fontMetaData?.length || !fontName) return undefined;
+        const match =
+          fontMetaData.find(
+            (m) =>
+              m.key?.family === fontName.family &&
+              m.key?.style === fontName.style
+          ) ?? fontMetaData[0];
+        return match;
+      }
+
+      /**
        * TypePropertiesTrait - Text-specific properties
        */
       function kiwi_text_style_trait(nc: figkiwi.NodeChange) {
         const characters = nc.textData?.characters ?? "";
+        const fontMetaData =
+          nc.derivedTextData?.fontMetaData ?? nc.textData?.fontMetaData;
+        const fontMeta = findFontMetaDataEntry(fontMetaData, nc.fontName);
+        const fontWeight = (fontMeta?.fontWeight ?? 400) as cg.NFontWeight;
+        const italic = fontMeta?.fontStyle === "ITALIC";
         return {
           characters,
           fills: nc.fillPaints ? paints(nc.fillPaints) : [],
@@ -2194,8 +2237,11 @@ export namespace iofigma {
             : "INSIDE",
           style: {
             fontFamily: nc.fontName?.family ?? "Inter",
-            fontPostScriptName: nc.fontName?.postscript,
-            fontWeight: 400,
+            fontPostScriptName: nc.fontName?.postscript
+              ? nc.fontName.postscript
+              : undefined,
+            fontWeight,
+            italic,
             fontSize: nc.fontSize ?? 12,
             textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
             textAlignVertical: nc.textAlignVertical ?? "TOP",
