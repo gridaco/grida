@@ -364,7 +364,7 @@ impl TextLayoutEngine for SkiaLayoutEngine {
 
         for idx in first_line..=last_line {
             let lm = &metrics[idx];
-            if !lm.is_empty_line() { continue; }
+            if !lm.is_empty_line(text) { continue; }
             let mid_y = lm.baseline - lm.ascent * 0.5;
             let already = rects.iter().any(|r| {
                 r.y <= mid_y && mid_y <= r.y + r.height

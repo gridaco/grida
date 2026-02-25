@@ -95,7 +95,7 @@ impl TextLayoutEngine for SimpleLayoutEngine {
         let line_idx = ((y / self.line_height).floor() as usize).min(metrics.len() - 1);
         let lm = &metrics[line_idx];
 
-        if lm.is_empty_line() {
+        if lm.is_empty_line(text) {
             // Empty line: place cursor at start.
             return lm.start_index;
         }
@@ -176,7 +176,7 @@ impl TextLayoutEngine for SimpleLayoutEngine {
             let line_y = lm.baseline - lm.ascent;
             let line_h = lm.ascent + lm.descent;
 
-            if lm.is_empty_line() {
+            if lm.is_empty_line(text) {
                 // Empty line: produce a small visible rect at x=0.
                 rects.push(SelectionRect {
                     x: 0.0,

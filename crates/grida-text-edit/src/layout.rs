@@ -17,9 +17,13 @@ pub struct LineMetrics {
 }
 
 impl LineMetrics {
-    /// Returns `true` when the line contains no glyph content (only a newline terminator).
-    pub fn is_empty_line(&self) -> bool {
-        self.end_index.saturating_sub(self.start_index) <= 1
+    /// Returns `true` when the line contains no glyph content (only a newline terminator,
+    /// or a zero-length phantom line after a trailing newline).
+    pub fn is_empty_line(&self, text: &str) -> bool {
+        if self.start_index >= self.end_index {
+            return true;
+        }
+        text.get(self.start_index..self.end_index) == Some("\n")
     }
 
     /// Top of this line's band (layout-local y).

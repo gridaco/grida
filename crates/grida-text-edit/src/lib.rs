@@ -212,7 +212,9 @@ impl TextEditorState {
     }
 
     pub fn with_cursor(text: impl Into<String>, cursor: usize) -> Self {
-        Self { text: text.into(), cursor, anchor: None }
+        let text = text.into();
+        let cursor = snap_grapheme_boundary(&text, cursor);
+        Self { text, cursor, anchor: None }
     }
 
     pub fn has_selection(&self) -> bool {
@@ -477,7 +479,7 @@ pub fn apply_command(
                 let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
                 if line_idx > 0 {
                     let target = &metrics[line_idx - 1];
-                    if target.is_empty_line() {
+                    if target.is_empty_line(&s.text) {
                         s.cursor = target.start_index;
                     } else {
                         let x = layout.caret_x_at(&s.text, s.cursor);
@@ -500,7 +502,7 @@ pub fn apply_command(
                 let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
                 if line_idx + 1 < metrics.len() {
                     let target = &metrics[line_idx + 1];
-                    if target.is_empty_line() {
+                    if target.is_empty_line(&s.text) {
                         s.cursor = target.start_index;
                     } else {
                         let x = layout.caret_x_at(&s.text, s.cursor);
