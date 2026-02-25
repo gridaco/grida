@@ -1501,11 +1501,8 @@ export namespace iofigma {
               font_family: node.style.fontFamily,
               font_weight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
-              font_postscript_name:
-                (node.style as { fontPostScriptName?: string })
-                  .fontPostScriptName || undefined,
-              font_style_italic:
-                (node.style as { italic?: boolean }).italic ?? false,
+              font_postscript_name: node.style.fontPostScriptName || undefined,
+              font_style_italic: node.style.italic ?? false,
               font_kerning: true,
             };
           }
