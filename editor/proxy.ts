@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
-import { TanantMiddleware } from "./lib/tenant/middleware";
+import { TenantMiddleware } from "./lib/tenant/middleware";
 import { updateSession } from "./lib/supabase/proxy";
 import { Env } from "./env";
 
@@ -75,7 +75,7 @@ export async function proxy(req: NextRequest) {
   }
   // ------------------------------------------------------------
 
-  const routed = await TanantMiddleware.routeProxyRequest(req, res);
+  const routed = await TenantMiddleware.routeProxyRequest(req, res);
   if (routed) return routed;
 
   return res;

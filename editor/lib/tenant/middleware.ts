@@ -9,7 +9,7 @@ import {
   platformSiteTenantFromHostname,
 } from "@/lib/domains";
 
-export namespace TanantMiddleware {
+export namespace TenantMiddleware {
   const IS_DEV = process.env.NODE_ENV === "development";
 
   export const analyze = function (

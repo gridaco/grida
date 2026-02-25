@@ -23,7 +23,7 @@ Tenant sites are primarily accessed via **tenant domains** (e.g. `xyz.grida.site
 
 - **Entrypoint**: `proxy.ts`
   - refreshes Supabase auth cookies via `lib/supabase/proxy.ts` (`updateSession`)
-  - then calls `lib/tenant/middleware.ts` (`TanantMiddleware.routeProxyRequest`) to perform host-based routing
+  - then calls `lib/tenant/middleware.ts` (`TenantMiddleware.routeProxyRequest`) to perform host-based routing
 - **Host classes** (see `lib/domains/index.ts`)
   - **reserved app hosts** (`grida.co`, `bridged.xyz` + subdomains): never tenant identities; direct `/~/...` access is blocked on these hosts
   - **platform tenant hosts**: `*.grida.site` and `*.grida.app` (default canonical suffix is `grida.site`)
