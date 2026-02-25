@@ -136,7 +136,10 @@ export class Scene {
    * The wasm module cannot fetch font files directly from the network, so the
    * host environment must fetch the font bytes and pass them here.
    *
-   * @param family - CSS font-family name for the typeface.
+   * Multiple calls with the same `family` and different font files are
+   * supported (e.g. Regular, Bold, Italic per family).
+   *
+   * @param family - Font family name for lookup (overrides the font file's built-in name).
    * @param data - Raw font file bytes (e.g. TTF/OTF).
    */
   addFont(family: string, data: Uint8Array) {

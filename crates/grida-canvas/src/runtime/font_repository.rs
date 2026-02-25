@@ -61,6 +61,13 @@ impl FontRepository {
     }
 
     /// Insert a font for the given family referenced by `hash`.
+    ///
+    /// Multiple typefaces can be registered under the same family. Call this
+    /// (or [`add`]) once per font file when a family has multiple files
+    /// (e.g. Regular, Bold, Italic, or variable font axes). The provider
+    /// stores typefaces in a `Vec` per family and uses the explicit `family`
+    /// string as the lookup key for font resolution (overriding the font
+    /// file's built-in name table).
     pub fn insert(&mut self, family: String, hash: u64) {
         if let Some(bytes) = self.store.lock().unwrap().get(hash) {
             if let Some(tf) = self.loader.new_from_data(bytes, None) {
@@ -74,7 +81,13 @@ impl FontRepository {
         self.font_collection.clear_caches();
     }
 
-    /// Add a font to an existing family.
+    /// Add a font to a family (creates the family if needed).
+    ///
+    /// Multiple calls with the same `family` and different font files are
+    /// supported. Each call appends a typeface to that family; the font
+    /// provider uses the explicit `family` string as the lookup key for
+    /// text layout. Use the family name that appears in the scene/document
+    /// (e.g. from Figma's `style.font_family`).
     pub fn add(&mut self, hash: u64, family: &str) {
         if let Some(bytes) = self.store.lock().unwrap().get(hash) {
             if let Some(tf) = self.loader.new_from_data(bytes, None) {

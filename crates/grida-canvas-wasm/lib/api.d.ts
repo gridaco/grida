@@ -172,8 +172,13 @@ export interface Grida2DScene extends Grida2DRuntime {
   addImage(data: Uint8Array): CreateImageResourceResult | false;
   /**
    * Register a font with the renderer.
-   * @param family - CSS font-family name.
-   * @param data - Raw font bytes.
+   *
+   * Multiple calls with the same `family` and different font files are
+   * supported (e.g. Regular, Bold, Italic per family). Use the family name
+   * that appears in the scene (e.g. from Figma's `style.font_family`).
+   *
+   * @param family - Font family name used for lookup (overrides the font file's built-in name).
+   * @param data - Raw font bytes (TTF/OTF).
    */
   addFont(family: string, data: Uint8Array): void;
 

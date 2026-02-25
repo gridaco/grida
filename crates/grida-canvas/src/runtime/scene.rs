@@ -318,6 +318,12 @@ impl Renderer {
         surface.canvas()
     }
 
+    /// Register a font for the given family.
+    ///
+    /// Multiple calls with the same `family` and different font files are
+    /// supported. Each call adds a typeface to that family (e.g. Regular,
+    /// Bold, Italic, or variable font axes). Use the family name that
+    /// appears in the scene (e.g. `style.font_family` from Figma).
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
         let hash = resources::hash_bytes(bytes);
         let rid = format!("res://fonts/{}", family);
