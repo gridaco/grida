@@ -1,3 +1,11 @@
+/**
+ * @fileoverview
+ * @grida/io-figma — Figma data conversion utilities
+ *
+ * Converts Figma clipboard (Kiwi) and REST API formats into the Grida Canvas schema.
+ *
+ * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Fig.kiwi format glossary
+ */
 import cg from "@grida/cg";
 import type grida from "@grida/schema";
 import vn from "@grida/vn";
