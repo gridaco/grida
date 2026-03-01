@@ -244,6 +244,78 @@ describe("refig CLI", () => {
     expect(pngBytes[3]).toBe(0x47);
   }, 120_000);
 
+  it("renders with --fonts directory", () => {
+    const caveatDir = join(
+      __dirname,
+      "../../../fixtures/fonts/Caveat"
+    );
+    if (!existsSync(caveatDir)) {
+      console.warn(`Skipping: Caveat font not found at ${caveatDir}`);
+      return;
+    }
+    resetOutputDir();
+    const docWithCaveat = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE));
+    const frame = docWithCaveat.document.children[0].children[0];
+    frame.children = [
+      {
+        id: "1:2",
+        type: "TEXT",
+        name: "Label",
+        characters: "Hello",
+        style: {
+          fontFamily: "Caveat",
+          fontSize: 16,
+          fontWeight: 400,
+          textAlignHorizontal: "LEFT",
+          textAlignVertical: "TOP",
+          textDecoration: "NONE",
+          lineHeightPercentFontSize: 100,
+        },
+        absoluteBoundingBox: { x: 0, y: 0, width: 40, height: 20 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 40, height: 20 },
+        relativeTransform: [
+          [1, 0, 0],
+          [0, 1, 0],
+        ],
+        size: { x: 40, y: 20 },
+        fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+        strokes: [],
+        strokeWeight: 0,
+        effects: [],
+      },
+    ];
+    const fixturePath = writeFixture(docWithCaveat);
+    const out = join(TEST_OUTPUT_DIR, "cli-fonts-out.png");
+
+    execFileSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        BIN,
+        fixturePath,
+        "--fonts",
+        caveatDir,
+        "--node",
+        "1:1",
+        "--out",
+        out,
+        "--format",
+        "png",
+        "--skip-default-fonts",
+      ],
+      { stdio: "pipe", timeout: 60_000 }
+    );
+
+    expect(existsSync(out)).toBe(true);
+    const bytes = readFileSync(out);
+    expect(bytes[0]).toBe(0x89);
+    expect(bytes[1]).toBe(0x50);
+    expect(bytes[2]).toBe(0x4e);
+    expect(bytes[3]).toBe(0x47);
+    expect(bytes.byteLength).toBeGreaterThan(100);
+  }, 60_000);
+
   it("renders single node from .fig file", () => {
     resetOutputDir();
     const figPath = join(

@@ -119,14 +119,19 @@ import { FigmaDocument, FigmaRenderer } from "@grida/refig";
 const doc = FigmaDocument.fromFile("path/to/file.fig");
 
 // 1. Discover font families used (omit rootNodeId for full document)
-const fontFamilies = doc.listFontFamilies("<node-id>");  // e.g. ["Inter", "Caveat", "Roboto"]
+const fontFamilies = doc.listFontFamilies("<node-id>"); // e.g. ["Inter", "Caveat", "Roboto"]
 
 // 2. Load your custom fonts (local FS, CDN, asset service, etc.)
 // Skip Figma defaults (Inter, Noto Sans KR/JP/SC, etc.) — the renderer loads those.
 const fonts: Record<string, Uint8Array> = {};
 for (const family of fontFamilies) {
-  if (family === "Inter" || family.startsWith("Noto Sans") || family === "Noto Color Emoji") continue;
-  fonts[family] = new Uint8Array(readFileSync(`./fonts/${family}.ttf`));  // adjust path to your font file structure
+  if (
+    family === "Inter" ||
+    family.startsWith("Noto Sans") ||
+    family === "Noto Color Emoji"
+  )
+    continue;
+  fonts[family] = new Uint8Array(readFileSync(`./fonts/${family}.ttf`)); // adjust path to your font file structure
 }
 
 // 3. Render
@@ -134,6 +139,19 @@ const renderer = new FigmaRenderer(doc, { fonts });
 const { data } = await renderer.render("<node-id>", { format: "png" });
 writeFileSync("out.png", data);
 renderer.dispose();
+```
+
+**CLI:** Use `--fonts <dir>` to pass a directory of TTF/OTF files. Fonts are inferred from the name table; multiple files per family are grouped automatically:
+
+```sh
+refig ./figma-response.json --fonts ./my-fonts --node "1:23" --out out.png
+```
+
+With a project directory, place fonts in `fonts/` next to `document.json` (and optionally `images/`); refig auto-discovers them:
+
+```sh
+refig ./my-figma-export --node "1:23" --format png
+# Expects my-figma-export/document.json and, if present, my-figma-export/fonts/
 ```
 
 Load **all** font files that match each family (variable or static) so the renderer can pick the right one for each text style, just like the original design. For multiple files per family (e.g. Regular, Bold, Italic), pass an array: `fonts: { "MyFamily": [regularBytes, boldBytes, italicBytes] }`.
@@ -184,7 +202,6 @@ document.listFontFamilies(rootNodeId?: string): string[]
 // — rootNodeId: optional; scope to that node's subtree, or omit for full document
 // — returns unique family names; load all font files that match each family (VF or static)
 ```
-
 
 ### `FigmaRenderer`
 
@@ -343,8 +360,9 @@ With **`--export-all`**, refig walks the document and renders every node that ha
 
 | Flag             | Required | Default                         | Description                                                                                                                                                                          |
 | ---------------- | -------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `<input>`        | yes      |                                 | Path to `.fig`, JSON file, or directory containing `document.json` (and optionally `images/`)                                                                                        |
+| `<input>`        | yes      |                                 | Path to `.fig`, JSON file, or directory containing `document.json` (and optionally `images/`, `fonts/`)                                                                              |
 | `--images <dir>` | no       |                                 | Directory of image assets for REST document (ignored if `<input>` is a dir with `images/`)                                                                                           |
+| `--fonts <dir>`  | no       |                                 | Directory of font files (TTF/OTF) for custom fonts (ignored if `<input>` is a dir with `fonts/`)                                                                                     |
 | `--node <id>`    | yes\*    |                                 | Figma node ID to render (\*omit when using `--export-all`)                                                                                                                           |
 | `--out <path>`   | no       | OS temp dir when omitted        | Output file path (single node) or output directory (`--export-all`). When omitted, writes to the OS temp directory (valid with `--export-all` or with both `--format` and `--node`). |
 | `--export-all`   | no       |                                 | Export every node with exportSettings (REST JSON or .fig); `--out` is a directory                                                                                                    |
@@ -383,9 +401,9 @@ REST JSON ───┘
 
 - **`--images <dir>`** — Explicit images directory. Files are keyed by filename without extension (e.g. `a1b2c3d4.png` → ref `a1b2c3d4`). Use when the document is a separate file:  
   `refig ./figma-response.json --images ./downloaded-images --node "1:23" --format png`
-- **Directory input** — Pass a single directory that contains **`document.json`** (REST response) and optionally **`images/`**. No need to pass `--images` separately:  
+- **Directory input** — Pass a single directory that contains **`document.json`** (REST response) and optionally **`images/`** and **`fonts/`**. No need to pass `--images` or `--fonts` separately:  
   `refig ./my-figma-export --node "1:23" --format png`  
-  (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/`.)
+  (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/` and `my-figma-export/fonts/`.)
 
 For **`.fig`** input, images are embedded in the file; no extra images directory is needed. For **REST** input, use `--images` or a project directory with `images/` to render IMAGE fills correctly.
 
