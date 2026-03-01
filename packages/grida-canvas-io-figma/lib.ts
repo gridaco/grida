@@ -2287,6 +2287,7 @@ export namespace iofigma {
           ...kiwi_geometry_trait(nc),
           ...kiwi_corner_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.RectangleNode;
       }
 
@@ -2305,6 +2306,7 @@ export namespace iofigma {
           ...kiwi_geometry_trait(nc),
           ...kiwi_arc_data_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.EllipseNode;
       }
 
@@ -2327,6 +2329,7 @@ export namespace iofigma {
           strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
           strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
           strokeMiterAngle: nc.miterLimit,
+          ...kiwi_has_export_settings_trait(nc),
           ...kiwi_effects_trait(nc),
         } satisfies figrest.LineNode;
       }
@@ -2343,6 +2346,7 @@ export namespace iofigma {
           ...kiwi_layout_trait(nc),
           ...kiwi_text_style_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.TextNode;
       }
 
@@ -2399,6 +2403,7 @@ export namespace iofigma {
             clipsContent: false,
             fills: [],
             ...kiwi_effects_trait(nc),
+            ...kiwi_has_export_settings_trait(nc),
           } satisfies figrest.GroupNode;
         }
 
@@ -2476,6 +2481,7 @@ export namespace iofigma {
           ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.InstanceNode;
 
         // Minimal override support (fixtures-based):
@@ -2555,6 +2561,7 @@ export namespace iofigma {
           clipsContent: false,
           fills: [],
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.GroupNode;
       }
 
@@ -2601,6 +2608,7 @@ export namespace iofigma {
                 ...kiwi_layout_trait(nc),
                 ...kiwi_geometry_trait(nc),
                 ...kiwi_effects_trait(nc),
+                ...kiwi_has_export_settings_trait(nc),
                 cornerRadius: nc.cornerRadius ?? 0,
                 vectorNetwork,
               } as __ir.VectorNodeWithVectorNetworkDataPresent;
@@ -2627,6 +2635,7 @@ export namespace iofigma {
               : "NONZERO",
           })),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.VectorNode;
       }
 
@@ -2644,6 +2653,7 @@ export namespace iofigma {
           ...kiwi_layout_trait(nc),
           ...kiwi_geometry_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
           cornerRadius: nc.cornerRadius ?? 0,
           pointCount: nc.count ?? 5,
           innerRadius: nc.starInnerScale ?? 0.5,
@@ -2732,6 +2742,7 @@ export namespace iofigma {
           ...kiwi_geometry_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.BooleanOperationNode;
       }
 
@@ -2749,6 +2760,7 @@ export namespace iofigma {
           ...kiwi_layout_trait(nc),
           ...kiwi_geometry_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
           cornerRadius: nc.cornerRadius ?? 0,
           pointCount: nc.count ?? 3,
         } as __ir.RegularPolygonNodeWithPointsDataPresent;
