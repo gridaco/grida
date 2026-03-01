@@ -103,9 +103,7 @@ function resolveInput(
       imagesDir: explicitImagesDir
         ? path.resolve(explicitImagesDir)
         : useImagesDir,
-      fontsDir: explicitFontsDir
-        ? path.resolve(explicitFontsDir)
-        : useFontsDir,
+      fontsDir: explicitFontsDir ? path.resolve(explicitFontsDir) : useFontsDir,
       isRestJson: true,
     };
   }
@@ -137,7 +135,24 @@ function readImagesFromDir(dirPath: string): Record<string, Uint8Array> {
 }
 
 /**
- * Read font files from a directory.
+ * Recursively walk directory for .ttf and .otf files.
+ */
+function* walkFontFiles(dirPath: string): Generator<string> {
+  for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+    const fullPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      yield* walkFontFiles(fullPath);
+    } else if (entry.isFile()) {
+      const ext = path.extname(entry.name).toLowerCase();
+      if (FONT_EXTENSIONS.has(ext)) {
+        yield fullPath;
+      }
+    }
+  }
+}
+
+/**
+ * Read font files from a directory (recursively).
  * Parses each .ttf/.otf to get family from name table; groups multiple files per family.
  * Fallback: basename without extension if parse fails.
  * @returns Record of family -> bytes or bytes[]
@@ -146,14 +161,11 @@ function readFontsFromDir(
   dirPath: string
 ): Record<string, Uint8Array | Uint8Array[]> {
   const out: Record<string, Uint8Array | Uint8Array[]> = {};
-  for (const file of readdirSync(dirPath)) {
-    const ext = path.extname(file).toLowerCase();
-    if (!FONT_EXTENSIONS.has(ext)) continue;
-    const fullPath = path.join(dirPath, file);
-    if (!statSync(fullPath).isFile()) continue;
+  for (const fullPath of walkFontFiles(dirPath)) {
+    const file = path.basename(fullPath);
     const buf = readFileSync(fullPath);
     const bytes = new Uint8Array(buf);
-    const basenameNoExt = path.basename(file).replace(/\.[^.]+$/, "") || file;
+    const basenameNoExt = file.replace(/\.[^.]+$/, "") || file;
     let family: string;
     try {
       const [font] = Typr.parse(bytes);
@@ -225,7 +237,10 @@ async function runExportAll(
       document.payload as Record<string, unknown>
     );
     if (imagesDir) {
-      rendererOptions = { ...rendererOptions, images: readImagesFromDir(imagesDir) };
+      rendererOptions = {
+        ...rendererOptions,
+        images: readImagesFromDir(imagesDir),
+      };
     }
   }
   if (fontsDir) {
@@ -329,7 +344,7 @@ async function main(): Promise<void> {
     )
     .argument(
       "<input>",
-      "Path to .fig, JSON file (REST API response), or directory containing document.json (and optionally images/)"
+      "Path to .fig, JSON file (REST API response), or directory containing document.json (and optionally images/, fonts/)"
     )
     .option(
       "--out <path>",
@@ -349,7 +364,7 @@ async function main(): Promise<void> {
     )
     .option(
       "--export-all",
-      "Export every node that has exportSettings (REST JSON only)"
+      "Export every node that has exportSettings (REST JSON or .fig)"
     )
     .option(
       "--format <fmt>",
