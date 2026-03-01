@@ -136,7 +136,7 @@ writeFileSync("out.png", data);
 renderer.dispose();
 ```
 
-Load **all** font files that match each family (variable or static) so the renderer can pick the right one for each text style, just like the original design.
+Load **all** font files that match each family (variable or static) so the renderer can pick the right one for each text style, just like the original design. For multiple files per family (e.g. Regular, Bold, Italic), pass an array: `fonts: { "MyFamily": [regularBytes, boldBytes, italicBytes] }`.
 
 If the design uses **locally-installed fonts** (fonts the designer had on their machine), loading those from your OS may require extra scripts or tooling to locate and extract the font files. We do not provide such tooling.
 
@@ -193,7 +193,7 @@ const renderer = new FigmaRenderer(document: FigmaDocument, options?: {
   useEmbeddedFonts?: boolean;       // default: true
   loadFigmaDefaultFonts?: boolean;  // default: true — Inter, Noto Sans KR/JP/SC, etc.
   images?: Record<string, Uint8Array>;  // image ref → bytes; used for REST API IMAGE fills
-  fonts?: Record<string, Uint8Array>;   // font family → bytes (TTF/OTF); bring-your-own-font
+  fonts?: Record<string, Uint8Array | Uint8Array[]>;  // font family → bytes (TTF/OTF); one or more files per family
 });
 
 const result = await renderer.render(nodeId: string, {

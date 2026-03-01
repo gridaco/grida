@@ -42,6 +42,15 @@ export interface RefigRendererOptions {
    * Ref must match document references (e.g. 40-char hex for .fig, Figma image fill hash for REST).
    */
   images?: Record<string, Uint8Array>;
+
+  /**
+   * Custom fonts keyed by family name. Use the family name returned by
+   * `listFontFamilies()` (e.g. from Figma's `style.font_family`). Pass one or
+   * more font files per family; the canvas resolves the correct face per
+   * text style. Skip Figma defaults (Inter, Noto Sans KR/JP/SC, etc.) —
+   * those are loaded by `loadFigmaDefaultFonts`.
+   */
+  fonts?: Record<string, Uint8Array | Uint8Array[]>;
 }
 
 export interface RefigRenderOptions {
@@ -738,6 +747,15 @@ export class FigmaRenderer {
       await ensureFigmaDefaultFonts(
         this._canvas as unknown as FigmaDefaultFontsCanvas
       );
+    }
+
+    if (this.options.fonts) {
+      for (const [family, data] of Object.entries(this.options.fonts)) {
+        const entries = Array.isArray(data) ? data : [data];
+        for (const bytes of entries) {
+          this._canvas.addFont(family, bytes);
+        }
+      }
     }
 
     return this._canvas;

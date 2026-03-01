@@ -370,6 +370,48 @@ describe("@grida/refig (real render)", () => {
     }
   }, 30_000);
 
+  it("renders with custom fonts option", async () => {
+    const caveatPath = join(
+      __dirname,
+      "../../../fixtures/fonts/Caveat/Caveat-VariableFont_wght.ttf"
+    );
+    if (!existsSync(caveatPath)) {
+      console.warn(`Skipping: Caveat font not found at ${caveatPath}`);
+      return;
+    }
+
+    const docWithCaveat = JSON.parse(
+      JSON.stringify(MINIMAL_REST_FIXTURE)
+    ) as typeof MINIMAL_REST_FIXTURE;
+    const textNode = docWithCaveat.document.children[0].children[0]
+      .children[0] as { style?: { fontFamily?: string } };
+    if (textNode?.style) textNode.style.fontFamily = "Caveat";
+
+    const fonts = {
+      Caveat: new Uint8Array(readFileSync(caveatPath)),
+    };
+
+    const renderer = new FigmaRenderer(docWithCaveat, {
+      fonts,
+      loadFigmaDefaultFonts: false,
+    });
+
+    try {
+      const result = await renderer.render("1:1", {
+        format: "png",
+        width: 256,
+        height: 256,
+      });
+
+      expectPng(result.data);
+
+      const outPath = join(TEST_OUTPUT_DIR, "rest-custom-font.png");
+      writeFileSync(outPath, Buffer.from(result.data));
+    } finally {
+      renderer.dispose();
+    }
+  }, 30_000);
+
   it("renders REST document with custom IMAGE fill from fixture archive", async () => {
     const zipPath = join(
       __dirname,
