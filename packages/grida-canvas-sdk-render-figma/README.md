@@ -6,6 +6,8 @@ Render Figma documents to **PNG, JPEG, WebP, PDF, and SVG** in **Node.js (no bro
 
 Use a `.fig` export (offline) or a Figma REST API file JSON response (`GET /v1/files/:key`), pick a node ID, and get pixels.
 
+Refig aims to render designs as faithfully as possible to the original. See [Known limitations](#known-limitations) for current exceptions.
+
 ## Features (checklist)
 
 - [x] Render from **`.fig` files** (offline / no API calls)
@@ -14,6 +16,7 @@ Use a `.fig` export (offline) or a Figma REST API file JSON response (`GET /v1/f
 - [x] **CLI** (`refig`) and **library API** (`FigmaDocument`, `FigmaRenderer`)
 - [x] **Node.js** + **browser** entrypoints (`@grida/refig`, `@grida/refig/browser`)
 - [x] IMAGE fills supported via **embedded `.fig` images** or a **local `images/` directory** for REST JSON
+- [x] **Bring-your-own-font** — supply custom font files for designs that use non-default typefaces
 - [x] Batch export with **`--export-all`** (renders nodes with Figma export presets)
 - [x] WASM + Skia-backed renderer via `@grida/canvas-wasm`
 
@@ -105,6 +108,57 @@ const { data } = await renderer.render("<node-id>", { format: "png" });
 renderer.dispose();
 ```
 
+### Render with custom fonts
+
+Unlike images, fonts do not have a Figma API. Use **`listFontFamilies()`** to see which font families are used in your file (or a scoped node), then load those fonts and pass them to the renderer:
+
+```ts
+import { readFileSync, writeFileSync } from "node:fs";
+import { FigmaDocument, FigmaRenderer } from "@grida/refig";
+
+const doc = FigmaDocument.fromFile("path/to/file.fig");
+
+// 1. Discover font families used (omit rootNodeId for full document)
+const fontFamilies = doc.listFontFamilies("<node-id>"); // e.g. ["Inter", "Caveat", "Roboto"]
+
+// 2. Load your custom fonts (local FS, CDN, asset service, etc.)
+// Skip Figma defaults (Inter, Noto Sans KR/JP/SC, etc.) — the renderer loads those.
+const fonts: Record<string, Uint8Array> = {};
+for (const family of fontFamilies) {
+  if (
+    family === "Inter" ||
+    family.startsWith("Noto Sans") ||
+    family === "Noto Color Emoji"
+  )
+    continue;
+  fonts[family] = new Uint8Array(readFileSync(`./fonts/${family}.ttf`)); // adjust path to your font file structure
+}
+
+// 3. Render
+const renderer = new FigmaRenderer(doc, { fonts });
+const { data } = await renderer.render("<node-id>", { format: "png" });
+writeFileSync("out.png", data);
+renderer.dispose();
+```
+
+**CLI:** Use `--fonts <dir>` to pass a directory of TTF/OTF files (scanned recursively). Fonts are inferred from the name table; multiple files per family are grouped automatically. Use `--skip-default-fonts` to avoid loading Figma defaults (useful to verify custom font rendering):
+
+```sh
+refig ./figma-response.json --fonts ./my-fonts --node "1:23" --out out.png
+refig ./doc.json --fonts ./my-fonts --node "1:23" --out out.png --skip-default-fonts
+```
+
+With a project directory, place fonts in `fonts/` next to `document.json` (and optionally `images/`); refig auto-discovers them:
+
+```sh
+refig ./my-figma-export --node "1:23" --format png
+# Expects my-figma-export/document.json and, if present, my-figma-export/fonts/
+```
+
+Load **all** font files that match each family (variable or static) so the renderer can pick the right one for each text style, just like the original design. For multiple files per family (e.g. Regular, Bold, Italic), pass an array: `fonts: { "MyFamily": [regularBytes, boldBytes, italicBytes] }`.
+
+If the design uses **locally-installed fonts** (fonts the designer had on their machine), loading those from your OS may require extra scripts or tooling to locate and extract the font files. We do not provide such tooling.
+
 ## Quick start (Browser)
 
 ```ts
@@ -143,14 +197,21 @@ new FigmaDocument(json: Record<string, unknown>)
 // From a file path (Node only — @grida/refig)
 FigmaDocument.fromFile("path/to/file.fig")   // .fig binary
 FigmaDocument.fromFile("path/to/doc.json")   // REST API JSON
+
+// Font families used in the document (for bring-your-own-font)
+document.listFontFamilies(rootNodeId?: string): string[]
+// — rootNodeId: optional; scope to that node's subtree, or omit for full document
+// — returns unique family names; load all font files that match each family (VF or static)
 ```
 
 ### `FigmaRenderer`
 
 ```ts
 const renderer = new FigmaRenderer(document: FigmaDocument, options?: {
-  useEmbeddedFonts?: boolean;  // default: true
+  useEmbeddedFonts?: boolean;       // default: true
+  loadFigmaDefaultFonts?: boolean;  // default: true — Inter, Noto Sans KR/JP/SC, etc.
   images?: Record<string, Uint8Array>;  // image ref → bytes; used for REST API IMAGE fills
+  fonts?: Record<string, Uint8Array | Uint8Array[]>;  // font family → bytes (TTF/OTF); one or more files per family
 });
 
 const result = await renderer.render(nodeId: string, {
@@ -206,9 +267,10 @@ pnpm dlx @grida/refig <input> --export-all
 - A **file**: path to a `.fig` file or a JSON file (Figma REST API response).
 - A **directory**: path to a folder that contains:
   - **`document.json`** — the REST API response (required),
-  - **`images/`** — directory of image assets (optional; used for REST API IMAGE fills).
+  - **`images/`** — directory of image assets (optional; used for REST API IMAGE fills),
+  - **`fonts/`** — directory of font files TTF/OTF (optional; scanned recursively).
 
-Using a directory avoids passing the document and images separately.
+Using a directory avoids passing the document, images, and fonts separately.
 
 ```sh
 # Single node (default)
@@ -241,6 +303,10 @@ refig ./my-figma-export --node "1:23" --format png
 
 # Explicit images directory (when not using a project directory)
 refig ./figma-response.json --images ./downloaded-images --node "1:23" --format png
+
+# Custom fonts (when design uses non-default typefaces)
+refig ./figma-response.json --fonts ./my-fonts --node "1:23" --out out.png
+refig ./doc.json --fonts ./fonts --node "1:23" --out out.png --skip-default-fonts
 
 # Export all: render every node that has export settings (see below)
 refig ./figma-response.json --export-all
@@ -298,17 +364,19 @@ With **`--export-all`**, refig walks the document and renders every node that ha
 
 ### Flags
 
-| Flag             | Required | Default                         | Description                                                                                                                                                                          |
-| ---------------- | -------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `<input>`        | yes      |                                 | Path to `.fig`, JSON file, or directory containing `document.json` (and optionally `images/`)                                                                                        |
-| `--images <dir>` | no       |                                 | Directory of image assets for REST document (ignored if `<input>` is a dir with `images/`)                                                                                           |
-| `--node <id>`    | yes\*    |                                 | Figma node ID to render (\*omit when using `--export-all`)                                                                                                                           |
-| `--out <path>`   | no       | OS temp dir when omitted        | Output file path (single node) or output directory (`--export-all`). When omitted, writes to the OS temp directory (valid with `--export-all` or with both `--format` and `--node`). |
-| `--export-all`   | no       |                                 | Export every node with exportSettings (REST JSON or .fig); `--out` is a directory                                                                                                    |
-| `--format <fmt>` | no       | inferred from `--out` extension | `png`, `jpeg`, `webp`, `pdf`, `svg` (single-node only; required when `--out` is omitted)                                                                                             |
-| `--width <px>`   | no       | `1024`                          | Viewport width (single-node only)                                                                                                                                                    |
-| `--height <px>`  | no       | `1024`                          | Viewport height (single-node only)                                                                                                                                                   |
-| `--scale <n>`    | no       | `1`                             | Raster scale factor (single-node only)                                                                                                                                               |
+| Flag                   | Required | Default                         | Description                                                                                                                                                                          |
+| ---------------------- | -------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<input>`              | yes      |                                 | Path to `.fig`, JSON file, or directory containing `document.json` (and optionally `images/`, `fonts/`)                                                                              |
+| `--images <dir>`       | no       |                                 | Directory of image assets for REST document (ignored if `<input>` is a dir with `images/`)                                                                                           |
+| `--fonts <dir>`        | no       |                                 | Directory of font files (TTF/OTF) for custom fonts (ignored if `<input>` is a dir with `fonts/`)                                                                                     |
+| `--node <id>`          | yes\*    |                                 | Figma node ID to render (\*omit when using `--export-all`)                                                                                                                           |
+| `--out <path>`         | no       | OS temp dir when omitted        | Output file path (single node) or output directory (`--export-all`). When omitted, writes to the OS temp directory (valid with `--export-all` or with both `--format` and `--node`). |
+| `--export-all`         | no       |                                 | Export every node with exportSettings (REST JSON or .fig); `--out` is a directory                                                                                                    |
+| `--format <fmt>`       | no       | inferred from `--out` extension | `png`, `jpeg`, `webp`, `pdf`, `svg` (single-node only; required when `--out` is omitted)                                                                                             |
+| `--width <px>`         | no       | `1024`                          | Viewport width (single-node only)                                                                                                                                                    |
+| `--height <px>`        | no       | `1024`                          | Viewport height (single-node only)                                                                                                                                                   |
+| `--scale <n>`          | no       | `1`                             | Raster scale factor (single-node only)                                                                                                                                               |
+| `--skip-default-fonts` | no       |                                 | Do not load Figma default fonts (Inter, Noto Sans, etc.); use only custom fonts from `--fonts` or `fonts/`                                                                           |
 
 ## Architecture
 
@@ -340,11 +408,17 @@ REST JSON ───┘
 
 - **`--images <dir>`** — Explicit images directory. Files are keyed by filename without extension (e.g. `a1b2c3d4.png` → ref `a1b2c3d4`). Use when the document is a separate file:  
   `refig ./figma-response.json --images ./downloaded-images --node "1:23" --format png`
-- **Directory input** — Pass a single directory that contains **`document.json`** (REST response) and optionally **`images/`**. No need to pass `--images` separately:  
+- **Directory input** — Pass a single directory that contains **`document.json`** (REST response) and optionally **`images/`** and **`fonts/`**. No need to pass `--images` or `--fonts` separately:  
   `refig ./my-figma-export --node "1:23" --format png`  
-  (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/`.)
+  (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/` and `my-figma-export/fonts/`.)
 
 For **`.fig`** input, images are embedded in the file; no extra images directory is needed. For **REST** input, use `--images` or a project directory with `images/` to render IMAGE fills correctly.
+
+## Known limitations
+
+- **Rich text** — Text with mixed styles (e.g. bold and italic in the same paragraph) is not yet supported.
+- **Image transformation** — Complex image transforms from Figma designs are not yet properly aligned. Known issue; will fix.
+- **Emoji** — Rendered with Noto Color Emoji instead of Figma's platform emoji (Apple Color Emoji / Segoe UI Emoji). Output differs by design.
 
 ## Not planned
 
@@ -371,7 +445,9 @@ Yes. Import from `@grida/refig/browser`. The core renderer uses `@grida/canvas-w
 
 ### What about fonts?
 
-The WASM runtime ships with embedded fallback fonts (Geist / Geist Mono). **`loadFigmaDefaultFonts`** is enabled by default: the renderer loads the Figma default font set (Inter, Noto Sans KR/JP/SC, and optionally Noto Sans TC/HK and Noto Color Emoji) from CDN and registers them as fallbacks before the first render, so mixed-script and CJK text avoid tofu. Set **`loadFigmaDefaultFonts: false`** to disable (e.g. to avoid network or use only embedded fonts). Custom or other Google Fonts are **not** loaded by the renderer; the user is responsible for fetching font bytes and registering them with the canvas if needed.
+The WASM runtime ships with embedded fallback fonts (Geist / Geist Mono). **`loadFigmaDefaultFonts`** is enabled by default: the renderer loads the Figma default font set (Inter, Noto Sans KR/JP/SC, and optionally Noto Sans TC/HK and Noto Color Emoji) from CDN and registers them as fallbacks before the first render, so mixed-script and CJK text avoid tofu. Set **`loadFigmaDefaultFonts: false`** to disable (e.g. to avoid network or use only embedded fonts).
+
+**Custom fonts** (e.g. Caveat, Roboto, brand typefaces) use the bring-your-own-font flow: call **`document.listFontFamilies(rootNodeId?)`** to see which families are used, load those fonts yourself, then pass **`fonts: Record<string, Uint8Array>`** to `FigmaRenderer`. See [Render with custom fonts](#render-with-custom-fonts).
 
 ## Contributing
 

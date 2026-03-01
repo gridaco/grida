@@ -42,6 +42,15 @@ export interface RefigRendererOptions {
    * Ref must match document references (e.g. 40-char hex for .fig, Figma image fill hash for REST).
    */
   images?: Record<string, Uint8Array>;
+
+  /**
+   * Custom fonts keyed by family name. Use the family name returned by
+   * `listFontFamilies()` (e.g. from Figma's `style.font_family`). Pass one or
+   * more font files per family; the canvas resolves the correct face per
+   * text style. Skip Figma defaults (Inter, Noto Sans KR/JP/SC, etc.) —
+   * those are loaded by `loadFigmaDefaultFonts`.
+   */
+  fonts?: Record<string, Uint8Array | Uint8Array[]>;
 }
 
 export interface RefigRenderOptions {
@@ -66,35 +75,218 @@ export interface RefigRenderResult {
 
 type FigmaJsonDocument = Record<string, unknown>;
 
+type FigFileDocument = ReturnType<typeof iofigma.kiwi.parseFile>;
+
+function isFigFileDocument(value: unknown): value is FigFileDocument {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    "pages" in value &&
+    "metadata" in value &&
+    Array.isArray((value as FigFileDocument).pages)
+  );
+}
+
 export class FigmaDocument {
   readonly sourceType: "fig-file" | "rest-api-json";
 
   /**
-   * For "fig-file" this is the raw bytes of the .fig file.
+   * For "fig-file" this is the raw bytes (Uint8Array) or a pre-parsed FigFileDocument
+   * (e.g. from parseFileFromStream for large ZIP files).
    * For "rest-api-json" this is the parsed REST API document JSON.
    */
-  readonly payload: Uint8Array | FigmaJsonDocument;
+  readonly payload: Uint8Array | FigmaJsonDocument | FigFileDocument;
+
+  /** Cached parsed FigFile (.fig only). */
+  private _figFile?: FigFileDocument;
 
   /**
-   * @param input Raw `.fig` bytes (Uint8Array) or a parsed Figma REST API
-   *              document JSON object.
+   * Cache of ResolvedScene per rootNodeId. REST with images is not cached.
+   * Bounded to avoid unbounded memory growth in --export-all flows.
+   */
+  private _sceneCache = new Map<string, ResolvedScene>();
+
+  /** Max cached scenes; evicts LRU when exceeded. */
+  private static readonly _MAX_SCENE_CACHE = 64;
+
+  /**
+   * @param input Raw `.fig` bytes (Uint8Array), a pre-parsed FigFileDocument
+   *              (e.g. from parseFileFromStream for large files), or REST JSON.
    *
    * For file-path convenience in Node, use `FigmaDocument.fromFile()` from
    * the `@grida/refig` entrypoint.
    */
-  constructor(input: Uint8Array | FigmaJsonDocument) {
+  constructor(input: Uint8Array | FigmaJsonDocument | FigFileDocument) {
     if (input instanceof Uint8Array) {
       this.sourceType = "fig-file";
       this.payload = input;
       return;
     }
 
+    if (isFigFileDocument(input)) {
+      this.sourceType = "fig-file";
+      this.payload = input;
+      this._figFile = input;
+      return;
+    }
+
     if (!input || typeof input !== "object" || Array.isArray(input)) {
-      throw new Error("FigmaDocument: input must be a Uint8Array or object");
+      throw new Error(
+        "FigmaDocument: input must be a Uint8Array, FigFileDocument, or REST JSON object"
+      );
     }
 
     this.sourceType = "rest-api-json";
     this.payload = input;
+  }
+
+  /**
+   * Resolve document to Grida IR (scene JSON + images to register).
+   * On-demand, cached when deterministic (no images for REST).
+   * Cache is bounded (LRU eviction) to avoid OOM in --export-all flows.
+   * @internal
+   */
+  _resolve(
+    rootNodeId?: string,
+    images?: Record<string, Uint8Array>
+  ): ResolvedScene {
+    const cacheKey = rootNodeId ?? "";
+
+    if (this.sourceType === "fig-file") {
+      const cached = this._sceneCacheGet(cacheKey);
+      if (cached) return cached;
+      const resolved = this._figToScene(rootNodeId);
+      this._sceneCacheSet(cacheKey, resolved);
+      return resolved;
+    }
+
+    if (images == null || Object.keys(images).length === 0) {
+      const cached = this._sceneCacheGet(cacheKey);
+      if (cached) return cached;
+      const resolved = this._restToScene(rootNodeId);
+      this._sceneCacheSet(cacheKey, resolved);
+      return resolved;
+    }
+
+    return this._restToScene(rootNodeId, images);
+  }
+
+  private _sceneCacheGet(key: string): ResolvedScene | undefined {
+    const v = this._sceneCache.get(key);
+    if (v === undefined) return undefined;
+    this._sceneCache.delete(key);
+    this._sceneCache.set(key, v);
+    return v;
+  }
+
+  private _sceneCacheSet(key: string, value: ResolvedScene): void {
+    if (this._sceneCache.size >= FigmaDocument._MAX_SCENE_CACHE) {
+      const firstKey = this._sceneCache.keys().next().value;
+      if (firstKey !== undefined) this._sceneCache.delete(firstKey);
+    }
+    this._sceneCache.set(key, value);
+  }
+
+  /** @internal */
+  private _restToScene(
+    rootNodeId?: string,
+    images?: Record<string, Uint8Array>
+  ): ResolvedScene {
+    const result = restJsonToSceneJson(
+      this.payload as FigmaJsonDocument,
+      rootNodeId,
+      images
+    );
+    if (images && Object.keys(images).length > 0) {
+      const imagesToRegister: Record<string, Uint8Array> = {};
+      for (const ref of result.imageRefsUsed) {
+        if (ref in images) {
+          imagesToRegister[ref] = images[ref];
+        }
+      }
+      return {
+        sceneJson: result.sceneJson,
+        images: imagesToRegister,
+        imageRefsUsed: result.imageRefsUsed,
+      };
+    }
+    return {
+      sceneJson: result.sceneJson,
+      images: {},
+      imageRefsUsed: result.imageRefsUsed,
+    };
+  }
+
+  /** @internal */
+  private _figToScene(rootNodeId?: string): ResolvedScene {
+    if (!this._figFile) {
+      this._figFile = iofigma.kiwi.parseFile(this.payload as Uint8Array);
+    }
+    return figFileToSceneJson(this._figFile, rootNodeId);
+  }
+
+  /**
+   * Returns the list of font family names used in this document.
+   *
+   * The result is family names only — no weights, PostScript names, or other metadata.
+   * That is intentional: in practice, you can load all TTF/OTF files for each family
+   * (variable or static) and pass them to the renderer; it will resolve the correct face
+   * per text style. We prioritize simple usage and accurate font selection over
+   * performance or resource-optimized patterns.
+   *
+   * When rootNodeId is omitted, traverses all pages so fonts from every page are included.
+   *
+   * @param rootNodeId — Optional. When provided, scope to that node's subtree. Omit for the full document (all pages).
+   * @returns Unique font family names (e.g. `["Inter", "Caveat", "Roboto"]`).
+   */
+  listFontFamilies(rootNodeId?: string): string[] {
+    if (rootNodeId != null && rootNodeId !== "") {
+      const resolved = this._resolve(rootNodeId);
+      return this._collectFontFamiliesFromSceneJson(resolved.sceneJson);
+    }
+
+    if (this.sourceType === "rest-api-json") {
+      return collectFontFamiliesFromRestDocument(
+        this.payload as FigmaJsonDocument
+      );
+    }
+
+    if (!this._figFile) {
+      this._figFile = iofigma.kiwi.parseFile(this.payload as Uint8Array);
+    }
+    const figFile = this._figFile;
+    const pages = figFile.pages;
+    if (!pages?.length) return [];
+
+    const sortedPages = [...pages].sort((a, b) =>
+      a.sortkey.localeCompare(b.sortkey)
+    );
+    const families = new Set<string>();
+    for (let i = 0; i < sortedPages.length; i++) {
+      const resolved = figFileToSceneJson(figFile, undefined, i);
+      for (const f of this._collectFontFamiliesFromSceneJson(
+        resolved.sceneJson
+      )) {
+        families.add(f);
+      }
+    }
+    return Array.from(families);
+  }
+
+  private _collectFontFamiliesFromSceneJson(sceneJson: string): string[] {
+    const parsed = JSON.parse(sceneJson) as {
+      document?: { nodes?: Record<string, { font_family?: string }> };
+    };
+    const nodes = parsed?.document?.nodes;
+    if (!nodes || typeof nodes !== "object") return [];
+    const families = new Set<string>();
+    for (const node of Object.values(nodes)) {
+      const family = (node as { font_family?: string }).font_family;
+      if (typeof family === "string" && family) {
+        families.add(family);
+      }
+    }
+    return Array.from(families);
   }
 }
 
@@ -264,6 +456,37 @@ export function exportSettingToRenderOptions(
 }
 
 /**
+ * Collect font family names from a Figma REST document by walking all pages.
+ * Used when rootNodeId is omitted so listFontFamilies covers the full document.
+ */
+function collectFontFamiliesFromRestDocument(
+  json: FigmaJsonDocument
+): string[] {
+  const families = new Set<string>();
+  const doc = json as { document?: { children?: RestNode[] } };
+  const pages = doc?.document?.children;
+  if (!pages?.length) return [];
+
+  function walk(nodes: RestNode[]): void {
+    for (const node of nodes) {
+      const style = (node as { style?: { fontFamily?: string } }).style;
+      const family = style?.fontFamily;
+      if (typeof family === "string" && family) {
+        families.add(family);
+      }
+      const children = node.children as RestNode[] | undefined;
+      if (children?.length) walk(children);
+    }
+  }
+
+  for (const page of pages) {
+    const pageChildren = page.children as RestNode[] | undefined;
+    if (pageChildren?.length) walk(pageChildren);
+  }
+  return Array.from(families);
+}
+
+/**
  * Find a node by id in the Figma REST document tree (walks all pages and descendants).
  */
 function findNodeInRestDocument(
@@ -335,6 +558,16 @@ function findPageContainingNode(
 interface RestConversionResult {
   sceneJson: string;
   imageRefsUsed: string[];
+}
+
+/**
+ * Resolved scene: Grida IR ready for canvas load.
+ * @internal
+ */
+interface ResolvedScene {
+  sceneJson: string;
+  images: Record<string, Uint8Array>;
+  imageRefsUsed?: string[];
 }
 
 /**
@@ -469,12 +702,6 @@ function restJsonToSceneJson(
   };
 }
 
-/** Result of .fig conversion with images to register. */
-interface FigConversionResult {
-  sceneJson: string;
-  images: Record<string, Uint8Array>;
-}
-
 /**
  * Build a REST-like document structure from .fig bytes for export collection.
  * Wraps page.rootNodes in document/children so collectExportsFromDocument can walk it.
@@ -529,14 +756,15 @@ export function figFileToRestLikeDocument(figFile: {
 }
 
 /**
- * Convert .fig file bytes -> Grida snapshot JSON string.
- * When rootNodeId is provided, loads only the page containing that node (enables export from any page).
+ * Convert parsed FigFile -> Grida snapshot JSON + images.
+ * When rootNodeId is provided, loads only the page containing that node.
+ * When pageIndex is provided (and rootNodeId is not), loads that page by index.
  */
-function figBytesToSceneJson(
-  figBytes: Uint8Array,
-  rootNodeId?: string
-): FigConversionResult {
-  const figFile = iofigma.kiwi.parseFile(figBytes);
+function figFileToSceneJson(
+  figFile: FigFileDocument,
+  rootNodeId?: string,
+  pageIndex?: number
+): ResolvedScene {
   const pages = figFile.pages;
   if (!pages || pages.length === 0) {
     throw new Error("FigmaDocument: .fig file has no pages");
@@ -555,6 +783,12 @@ function figBytesToSceneJson(
       );
     }
     page = pageWithNode as (typeof sortedPages)[0];
+  } else if (
+    pageIndex != null &&
+    pageIndex >= 0 &&
+    pageIndex < sortedPages.length
+  ) {
+    page = sortedPages[pageIndex]!;
   } else {
     page = sortedPages[0]!;
   }
@@ -632,42 +866,29 @@ export class FigmaRenderer {
       );
     }
 
+    if (this.options.fonts) {
+      for (const [family, data] of Object.entries(this.options.fonts)) {
+        const entries = Array.isArray(data) ? data : [data];
+        for (const bytes of entries) {
+          this._canvas.addFont(family, bytes);
+        }
+      }
+    }
+
     return this._canvas;
   }
 
   private loadScene(canvas: Canvas, nodeId: string): void {
     if (this._sceneLoaded && this._requestedNodeId === nodeId) return;
 
-    let sceneJson: string;
-    let imagesToRegister: Record<string, Uint8Array> = {};
-
-    if (this.document.sourceType === "fig-file") {
-      const figResult = figBytesToSceneJson(
-        this.document.payload as Uint8Array,
-        nodeId || undefined
-      );
-      sceneJson = figResult.sceneJson;
-      imagesToRegister = figResult.images;
-    } else {
-      const restResult = restJsonToSceneJson(
-        this.document.payload as FigmaJsonDocument,
-        nodeId || undefined,
-        this.options.images
-      );
-      sceneJson = restResult.sceneJson;
-      const used = new Set(restResult.imageRefsUsed);
-      const provided = this.options.images ?? {};
-      for (const ref of used) {
-        if (ref in provided) {
-          imagesToRegister[ref] = provided[ref];
-        }
-      }
-    }
-
-    for (const [ref, bytes] of Object.entries(imagesToRegister)) {
+    const resolved = this.document._resolve(
+      nodeId || undefined,
+      this.options.images
+    );
+    for (const [ref, bytes] of Object.entries(resolved.images)) {
       canvas.addImageWithId(bytes, `res://images/${ref}`);
     }
-    canvas.loadScene(sceneJson);
+    canvas.loadScene(resolved.sceneJson);
     this._requestedNodeId = nodeId;
     this._sceneLoaded = true;
   }

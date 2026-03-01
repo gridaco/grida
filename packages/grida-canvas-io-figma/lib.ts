@@ -1,3 +1,21 @@
+/**
+ * @fileoverview
+ * @grida/io-figma — Figma data conversion utilities
+ *
+ * Converts Figma clipboard (Kiwi) and REST API formats into the Grida Canvas schema.
+ *
+ * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Fig.kiwi format glossary
+ *
+ * ## TODO — Kiwi → REST (not yet fully mapped)
+ *
+ * - **Rich text**: `characterStyleOverrides` and `styleOverrideTable` are always empty.
+ *   Kiwi has `textData.characterStyleIDs` and `textData.styleOverrideTable` (NodeChange[]).
+ *   Full support would require per-run font resolution and building the REST override map.
+ * - **lineTypes / lineIndentations**: Always `[]`. Should derive from `textData.lines`
+ *   (lineType: PLAIN→NONE, ORDERED, UNORDERED; indentationLevel).
+ * - **fontVariant***: `fontVariantCommonLigatures`, etc. are not mapped.
+ * - **textTracking vs letterSpacing**: Only letterSpacing is used; clarify canonical source.
+ */
 import cg from "@grida/cg";
 import type grida from "@grida/schema";
 import vn from "@grida/vn";
@@ -10,6 +28,7 @@ import {
   getBlobBytes,
   parseVectorNetworkBlob,
   readFigFile,
+  readFigFileFromStream,
   type ParsedFigmaArchive,
 } from "./fig-kiwi";
 
@@ -1483,6 +1502,8 @@ export namespace iofigma {
               font_family: node.style.fontFamily,
               font_weight:
                 (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
+              font_postscript_name: node.style.fontPostScriptName || undefined,
+              font_style_italic: node.style.italic ?? false,
               font_kerning: true,
             };
           }
@@ -2172,10 +2193,38 @@ export namespace iofigma {
       }
 
       /**
+       * Find FontMetaData entry matching the given FontName.
+       *
+       * FontMetaData is the authoritative source for fontWeight and italic; fontName.style
+       * alone cannot reliably derive CSS semantics. Match by key (family + style); for
+       * single-style text, fontMetaData[0] typically applies.
+       *
+       * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Text & Font section
+       */
+      function findFontMetaDataEntry(
+        fontMetaData: figkiwi.FontMetaData[] | undefined,
+        fontName: figkiwi.FontName | undefined
+      ): figkiwi.FontMetaData | undefined {
+        if (!fontMetaData?.length || !fontName) return undefined;
+        const match =
+          fontMetaData.find(
+            (m) =>
+              m.key?.family === fontName.family &&
+              m.key?.style === fontName.style
+          ) ?? fontMetaData[0];
+        return match;
+      }
+
+      /**
        * TypePropertiesTrait - Text-specific properties
        */
       function kiwi_text_style_trait(nc: figkiwi.NodeChange) {
         const characters = nc.textData?.characters ?? "";
+        const fontMetaData =
+          nc.derivedTextData?.fontMetaData ?? nc.textData?.fontMetaData;
+        const fontMeta = findFontMetaDataEntry(fontMetaData, nc.fontName);
+        const fontWeight = (fontMeta?.fontWeight ?? 400) as cg.NFontWeight;
+        const italic = fontMeta?.fontStyle === "ITALIC";
         return {
           characters,
           fills: nc.fillPaints ? paints(nc.fillPaints) : [],
@@ -2186,8 +2235,11 @@ export namespace iofigma {
             : "INSIDE",
           style: {
             fontFamily: nc.fontName?.family ?? "Inter",
-            fontPostScriptName: nc.fontName?.postscript,
-            fontWeight: 400,
+            fontPostScriptName: nc.fontName?.postscript
+              ? nc.fontName.postscript
+              : undefined,
+            fontWeight,
+            italic,
             fontSize: nc.fontSize ?? 12,
             textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
             textAlignVertical: nc.textAlignVertical ?? "TOP",
@@ -2236,6 +2288,7 @@ export namespace iofigma {
           ...kiwi_geometry_trait(nc),
           ...kiwi_corner_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.RectangleNode;
       }
 
@@ -2254,6 +2307,7 @@ export namespace iofigma {
           ...kiwi_geometry_trait(nc),
           ...kiwi_arc_data_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.EllipseNode;
       }
 
@@ -2276,6 +2330,7 @@ export namespace iofigma {
           strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
           strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
           strokeMiterAngle: nc.miterLimit,
+          ...kiwi_has_export_settings_trait(nc),
           ...kiwi_effects_trait(nc),
         } satisfies figrest.LineNode;
       }
@@ -2292,6 +2347,7 @@ export namespace iofigma {
           ...kiwi_layout_trait(nc),
           ...kiwi_text_style_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.TextNode;
       }
 
@@ -2348,6 +2404,7 @@ export namespace iofigma {
             clipsContent: false,
             fills: [],
             ...kiwi_effects_trait(nc),
+            ...kiwi_has_export_settings_trait(nc),
           } satisfies figrest.GroupNode;
         }
 
@@ -2425,6 +2482,7 @@ export namespace iofigma {
           ...kiwi_frame_clip_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.InstanceNode;
 
         // Minimal override support (fixtures-based):
@@ -2504,6 +2562,7 @@ export namespace iofigma {
           clipsContent: false,
           fills: [],
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.GroupNode;
       }
 
@@ -2550,6 +2609,7 @@ export namespace iofigma {
                 ...kiwi_layout_trait(nc),
                 ...kiwi_geometry_trait(nc),
                 ...kiwi_effects_trait(nc),
+                ...kiwi_has_export_settings_trait(nc),
                 cornerRadius: nc.cornerRadius ?? 0,
                 vectorNetwork,
               } as __ir.VectorNodeWithVectorNetworkDataPresent;
@@ -2576,6 +2636,7 @@ export namespace iofigma {
               : "NONZERO",
           })),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.VectorNode;
       }
 
@@ -2593,6 +2654,7 @@ export namespace iofigma {
           ...kiwi_layout_trait(nc),
           ...kiwi_geometry_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
           cornerRadius: nc.cornerRadius ?? 0,
           pointCount: nc.count ?? 5,
           innerRadius: nc.starInnerScale ?? 0.5,
@@ -2681,6 +2743,7 @@ export namespace iofigma {
           ...kiwi_geometry_trait(nc),
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.BooleanOperationNode;
       }
 
@@ -2698,6 +2761,7 @@ export namespace iofigma {
           ...kiwi_layout_trait(nc),
           ...kiwi_geometry_trait(nc),
           ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
           cornerRadius: nc.cornerRadius ?? 0,
           pointCount: nc.count ?? 3,
         } as __ir.RegularPolygonNodeWithPointsDataPresent;
@@ -3134,6 +3198,28 @@ export namespace iofigma {
       options: BuildTreeOptions = {}
     ): FigFileDocument {
       const figData = readFigFile(fileData);
+      const pages = extractPages(figData, options);
+
+      return {
+        pages,
+        metadata: {
+          version: figData.header.version,
+        },
+        zip_files: figData.zip_files,
+      };
+    }
+
+    /**
+     * Parse and extract pages from a .fig file stream.
+     * Supports .fig (ZIP) archives larger than 2GB by streaming instead of loading into memory.
+     * @param stream - Async iterable of Uint8Array chunks (e.g. Node Readable, fetch body)
+     * @returns Document with pages ready for import
+     */
+    export async function parseFileFromStream(
+      stream: AsyncIterable<Uint8Array>,
+      options: BuildTreeOptions = {}
+    ): Promise<FigFileDocument> {
+      const figData = await readFigFileFromStream(stream);
       const pages = extractPages(figData, options);
 
       return {

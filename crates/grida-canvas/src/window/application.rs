@@ -864,6 +864,9 @@ impl UnknownTargetApplication {
     }
 
     /// Register font bytes with the renderer.
+    ///
+    /// Multiple calls with the same `family` and different font files are
+    /// supported (e.g. Regular, Bold, Italic per family).
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.renderer.add_font(family, data);
         self.renderer.invalidate_cache();

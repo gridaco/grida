@@ -62,8 +62,9 @@ const TEST_OUTPUT_DIR = join(process.cwd(), "__tests__", ".tmp", "lib");
 // ---------------------------------------------------------------------------
 // Minimal Figma REST-like fixture
 //
-// This is a minimal document that the REST->Grida conversion accepts.
-// It has one page with a single FRAME containing a solid fill rectangle.
+// Single fixture for all tests. One page, one FRAME with solid fill and a
+// TEXT child. Used for rendering, listFontFamilies, and collectExports (when
+// exportSettings are added programmatically).
 // ---------------------------------------------------------------------------
 
 const MINIMAL_REST_FIXTURE = {
@@ -93,55 +94,34 @@ const MINIMAL_REST_FIXTURE = {
             strokes: [],
             strokeWeight: 0,
             effects: [],
-            children: [],
-          },
-        ],
-      },
-    ],
-  },
-};
-
-/** REST fixture with exportSettings on the frame (Figma HasExportSettingsTrait). */
-const REST_FIXTURE_WITH_EXPORT_SETTINGS = {
-  document: {
-    id: "0:0",
-    type: "DOCUMENT",
-    name: "Export Test Doc",
-    children: [
-      {
-        id: "0:1",
-        type: "CANVAS",
-        name: "Page 1",
-        children: [
-          {
-            id: "41:64",
-            type: "FRAME",
-            name: "Export Frame",
-            absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 50 },
-            absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 50 },
-            exportSettings: [
+            children: [
               {
-                suffix: "@2x",
-                format: "PNG",
-                constraint: { type: "SCALE", value: 2 },
-              },
-              {
-                suffix: "",
-                format: "SVG",
-                constraint: { type: "WIDTH", value: 200 },
+                id: "1:2",
+                type: "TEXT",
+                name: "Label",
+                characters: "Hello",
+                style: {
+                  fontFamily: "Inter",
+                  fontSize: 16,
+                  fontWeight: 400,
+                  textAlignHorizontal: "LEFT",
+                  textAlignVertical: "TOP",
+                  textDecoration: "NONE",
+                  lineHeightPercentFontSize: 100,
+                },
+                absoluteBoundingBox: { x: 0, y: 0, width: 40, height: 20 },
+                absoluteRenderBounds: { x: 0, y: 0, width: 40, height: 20 },
+                relativeTransform: [
+                  [1, 0, 0],
+                  [0, 1, 0],
+                ],
+                size: { x: 40, y: 20 },
+                fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+                strokes: [],
+                strokeWeight: 0,
+                effects: [],
               },
             ],
-            relativeTransform: [
-              [1, 0, 0],
-              [0, 1, 0],
-            ],
-            size: { x: 100, y: 50 },
-            clipsContent: false,
-            fills: [{ type: "SOLID", color: { r: 0, g: 0.5, b: 0.5, a: 1 } }],
-            strokes: [],
-            strokeWeight: 0,
-            effects: [],
-            children: [],
           },
         ],
       },
@@ -167,15 +147,18 @@ describe("collectExportsFromDocument", () => {
   });
 
   it("returns one item per (node, setting) for nodes with exportSettings", () => {
-    const items = collectExportsFromDocument(
-      REST_FIXTURE_WITH_EXPORT_SETTINGS as any
-    );
+    const doc = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE)) as any;
+    doc.document.children[0].children[0].exportSettings = [
+      { suffix: "@2x", format: "PNG", constraint: { type: "SCALE", value: 2 } },
+      { suffix: "", format: "SVG", constraint: { type: "WIDTH", value: 200 } },
+    ];
+    const items = collectExportsFromDocument(doc);
     expect(items).toHaveLength(2);
-    expect(items[0].nodeId).toBe("41:64");
+    expect(items[0].nodeId).toBe("1:1");
     expect(items[0].setting.format).toBe("PNG");
     expect(items[0].setting.constraint.type).toBe("SCALE");
     expect(items[0].setting.suffix).toBe("@2x");
-    expect(items[1].nodeId).toBe("41:64");
+    expect(items[1].nodeId).toBe("1:1");
     expect(items[1].setting.format).toBe("SVG");
     expect(items[1].setting.constraint.type).toBe("WIDTH");
     expect(items[1].setting.constraint.value).toBe(200);
@@ -250,6 +233,82 @@ describe("@grida/refig (real render)", () => {
   it("creates a FigmaDocument from REST API JSON", () => {
     const doc = new FigmaDocument(MINIMAL_REST_FIXTURE);
     expect(doc.sourceType).toBe("rest-api-json");
+  });
+
+  it("listFontFamilies returns unique font families from REST document", () => {
+    const doc = new FigmaDocument(MINIMAL_REST_FIXTURE);
+    const families = doc.listFontFamilies();
+    expect(families).toContain("Inter");
+    expect(families.length).toBe(1);
+  });
+
+  it("listFontFamilies returns empty when no text nodes", () => {
+    const docNoText = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE)) as any;
+    docNoText.document.children[0].children[0].children = [];
+    const doc = new FigmaDocument(docNoText);
+    const families = doc.listFontFamilies();
+    expect(families).toEqual([]);
+  });
+
+  it("listFontFamilies traverses all pages when rootNodeId is omitted", () => {
+    const multiPage = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE)) as any;
+    multiPage.document.children.push({
+      id: "0:2",
+      type: "CANVAS",
+      name: "Page 2",
+      children: [
+        {
+          id: "2:1",
+          type: "FRAME",
+          name: "Frame 2",
+          absoluteBoundingBox: { x: 0, y: 0, width: 50, height: 50 },
+          absoluteRenderBounds: { x: 0, y: 0, width: 50, height: 50 },
+          relativeTransform: [
+            [1, 0, 0],
+            [0, 1, 0],
+          ],
+          size: { x: 50, y: 50 },
+          clipsContent: false,
+          fills: [],
+          strokes: [],
+          strokeWeight: 0,
+          effects: [],
+          children: [
+            {
+              id: "2:2",
+              type: "TEXT",
+              name: "Page2 Label",
+              characters: "Caveat",
+              style: {
+                fontFamily: "Caveat",
+                fontSize: 14,
+                fontWeight: 400,
+                textAlignHorizontal: "LEFT",
+                textAlignVertical: "TOP",
+                textDecoration: "NONE",
+                lineHeightPercentFontSize: 100,
+              },
+              absoluteBoundingBox: { x: 0, y: 0, width: 30, height: 16 },
+              absoluteRenderBounds: { x: 0, y: 0, width: 30, height: 16 },
+              relativeTransform: [
+                [1, 0, 0],
+                [0, 1, 0],
+              ],
+              size: { x: 30, y: 16 },
+              fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+              strokes: [],
+              strokeWeight: 0,
+              effects: [],
+            },
+          ],
+        },
+      ],
+    });
+    const doc = new FigmaDocument(multiPage);
+    const families = doc.listFontFamilies();
+    expect(families).toContain("Inter");
+    expect(families).toContain("Caveat");
+    expect(families.length).toBe(2);
   });
 
   it("FigmaDocument.fromFile reads a JSON file from disk", () => {
@@ -366,6 +425,48 @@ describe("@grida/refig (real render)", () => {
       expectPng(result.data);
 
       const outPath = join(TEST_OUTPUT_DIR, "scaled-2x.png");
+      writeFileSync(outPath, Buffer.from(result.data));
+    } finally {
+      renderer.dispose();
+    }
+  }, 30_000);
+
+  it("renders with custom fonts option", async () => {
+    const caveatPath = join(
+      __dirname,
+      "../../../fixtures/fonts/Caveat/Caveat-VariableFont_wght.ttf"
+    );
+    if (!existsSync(caveatPath)) {
+      console.warn(`Skipping: Caveat font not found at ${caveatPath}`);
+      return;
+    }
+
+    const docWithCaveat = JSON.parse(
+      JSON.stringify(MINIMAL_REST_FIXTURE)
+    ) as typeof MINIMAL_REST_FIXTURE;
+    const textNode = docWithCaveat.document.children[0].children[0]
+      .children[0] as { style?: { fontFamily?: string } };
+    if (textNode?.style) textNode.style.fontFamily = "Caveat";
+
+    const fonts = {
+      Caveat: new Uint8Array(readFileSync(caveatPath)),
+    };
+
+    const renderer = new FigmaRenderer(docWithCaveat, {
+      fonts,
+      loadFigmaDefaultFonts: false,
+    });
+
+    try {
+      const result = await renderer.render("1:1", {
+        format: "png",
+        width: 256,
+        height: 256,
+      });
+
+      expectPng(result.data);
+
+      const outPath = join(TEST_OUTPUT_DIR, "rest-custom-font.png");
       writeFileSync(outPath, Buffer.from(result.data));
     } finally {
       renderer.dispose();

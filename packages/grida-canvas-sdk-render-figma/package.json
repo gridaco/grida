@@ -1,6 +1,6 @@
 {
   "name": "@grida/refig",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": false,
   "description": "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG",
   "keywords": [
@@ -67,6 +67,7 @@
   },
   "devDependencies": {
     "@figma/rest-api-spec": "0.36.0",
+    "@grida/fonts": "0.0.0",
     "@grida/io-figma": "workspace:*",
     "@grida/schema": "workspace:*",
     "fflate": "^0.8.2",

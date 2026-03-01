@@ -11,6 +11,7 @@ import {
   existsSync,
   statSync,
   mkdtempSync,
+  createReadStream,
 } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -24,6 +25,7 @@ import {
   type ExportItem,
   type RefigRenderFormat,
 } from "./lib";
+import Typr from "@grida/fonts/typr";
 import { iofigma } from "@grida/io-figma";
 
 const FORMAT_SET = new Set<string>(["png", "jpeg", "webp", "pdf", "svg"]);
@@ -32,6 +34,13 @@ const FORMAT_SET = new Set<string>(["png", "jpeg", "webp", "pdf", "svg"]);
 const DOCUMENT_JSON = "document.json";
 /** Subdirectory name for images when using a project directory. */
 const IMAGES_SUBDIR = "images";
+/** Subdirectory name for fonts when using a project directory. */
+const FONTS_SUBDIR = "fonts";
+
+const FONT_EXTENSIONS = new Set<string>([".ttf", ".otf"]);
+
+/** .fig (ZIP) files >= 2GB cannot be read via readFileSync due to Node.js buffer limit. */
+const LARGE_FILE_THRESHOLD = 2 * 1024 * 1024 * 1024;
 
 function formatFromOutFile(outPath: string): string {
   const ext = path.extname(outPath).replace(/^\./, "").toLowerCase();
@@ -58,16 +67,18 @@ function sanitizeForFilename(s: string): string {
 }
 
 /**
- * Resolve CLI input to document path and optional images directory.
- * - If input is a directory: document must be at <input>/document.json; images at <input>/images/ if present.
- * - If input is a file: document is that file; images only if --images <dir> is provided.
+ * Resolve CLI input to document path and optional images/fonts directories.
+ * - If input is a directory: document at <input>/document.json; images at <input>/images/; fonts at <input>/fonts/ if present.
+ * - If input is a file: document is that file; images/fonts only if --images/--fonts provided.
  */
 function resolveInput(
   inputPath: string,
-  explicitImagesDir: string | undefined
+  explicitImagesDir: string | undefined,
+  explicitFontsDir: string | undefined
 ): {
   documentPath: string;
   imagesDir: string | undefined;
+  fontsDir: string | undefined;
   /** True when document is REST API JSON (file path ending in .json or directory with document.json). */
   isRestJson: boolean;
 } {
@@ -86,11 +97,17 @@ function resolveInput(
       existsSync(imagesDir) && statSync(imagesDir).isDirectory()
         ? imagesDir
         : undefined;
+    const fontsDir = path.join(resolved, FONTS_SUBDIR);
+    const useFontsDir =
+      existsSync(fontsDir) && statSync(fontsDir).isDirectory()
+        ? fontsDir
+        : undefined;
     return {
       documentPath,
       imagesDir: explicitImagesDir
         ? path.resolve(explicitImagesDir)
         : useImagesDir,
+      fontsDir: explicitFontsDir ? path.resolve(explicitFontsDir) : useFontsDir,
       isRestJson: true,
     };
   }
@@ -98,6 +115,7 @@ function resolveInput(
   return {
     documentPath: resolved,
     imagesDir: explicitImagesDir ? path.resolve(explicitImagesDir) : undefined,
+    fontsDir: explicitFontsDir ? path.resolve(explicitFontsDir) : undefined,
     isRestJson: resolved.toLowerCase().endsWith(".json"),
   };
 }
@@ -120,6 +138,56 @@ function readImagesFromDir(dirPath: string): Record<string, Uint8Array> {
   return out;
 }
 
+/**
+ * Recursively walk directory for .ttf and .otf files.
+ */
+function* walkFontFiles(dirPath: string): Generator<string> {
+  for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+    const fullPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      yield* walkFontFiles(fullPath);
+    } else if (entry.isFile()) {
+      const ext = path.extname(entry.name).toLowerCase();
+      if (FONT_EXTENSIONS.has(ext)) {
+        yield fullPath;
+      }
+    }
+  }
+}
+
+/**
+ * Read font files from a directory (recursively).
+ * Parses each .ttf/.otf to get family from name table; groups multiple files per family.
+ * Fallback: basename without extension if parse fails.
+ * @returns Record of family -> Uint8Array[] (array for in-place push, no realloc per add)
+ */
+function readFontsFromDir(dirPath: string): Record<string, Uint8Array[]> {
+  const out: Record<string, Uint8Array[]> = {};
+  for (const fullPath of walkFontFiles(dirPath)) {
+    const file = path.basename(fullPath);
+    const buf = readFileSync(fullPath);
+    const bytes = new Uint8Array(buf);
+    const basenameNoExt = file.replace(/\.[^.]+$/, "") || file;
+    let family: string;
+    try {
+      const [font] = Typr.parse(bytes);
+      family =
+        (font?.name as { fontFamily?: string } | undefined)?.fontFamily ??
+        basenameNoExt;
+    } catch {
+      family = basenameNoExt;
+    }
+    if (!family) continue;
+    const existing = out[family];
+    if (existing === undefined) {
+      out[family] = [bytes];
+    } else {
+      existing.push(bytes);
+    }
+  }
+  return out;
+}
+
 function exportAllOutputBasename(
   nodeId: string,
   suffix: string,
@@ -136,6 +204,7 @@ async function runExportAll(
   documentPath: string,
   outDir: string,
   imagesDir?: string,
+  fontsDir?: string,
   skipDefaultFonts?: boolean
 ): Promise<void> {
   const isFig = documentPath.toLowerCase().endsWith(".fig");
@@ -143,15 +212,29 @@ async function runExportAll(
   let items: ExportItem[];
   let rendererOptions: {
     images?: Record<string, Uint8Array>;
+    fonts?: Record<string, Uint8Array | Uint8Array[]>;
     loadFigmaDefaultFonts?: boolean;
   } = {};
 
   if (isFig) {
-    const bytes = new Uint8Array(readFileSync(documentPath));
-    const figFile = iofigma.kiwi.parseFile(bytes);
+    const stat = statSync(documentPath);
+    const useStreaming =
+      stat.size >= LARGE_FILE_THRESHOLD;
+
+    let figFile: ReturnType<typeof iofigma.kiwi.parseFile>;
+    if (useStreaming) {
+      const stream = createReadStream(documentPath, {
+        highWaterMark: 1024 * 1024,
+      });
+      figFile = await iofigma.kiwi.parseFileFromStream(stream);
+      document = new FigmaDocument(figFile);
+    } else {
+      const bytes = new Uint8Array(readFileSync(documentPath));
+      figFile = iofigma.kiwi.parseFile(bytes);
+      document = new FigmaDocument(bytes);
+    }
     const restDoc = figFileToRestLikeDocument(figFile);
     items = collectExportsFromDocument(restDoc as Record<string, unknown>);
-    document = new FigmaDocument(bytes);
     const imagesMap = iofigma.kiwi.extractImages(figFile.zip_files);
     const images: Record<string, Uint8Array> = {};
     imagesMap.forEach((imgBytes, ref) => {
@@ -167,8 +250,17 @@ async function runExportAll(
       document.payload as Record<string, unknown>
     );
     if (imagesDir) {
-      rendererOptions = { images: readImagesFromDir(imagesDir) };
+      rendererOptions = {
+        ...rendererOptions,
+        images: readImagesFromDir(imagesDir),
+      };
     }
+  }
+  if (fontsDir) {
+    rendererOptions = {
+      ...rendererOptions,
+      fonts: readFontsFromDir(fontsDir),
+    };
   }
   if (skipDefaultFonts || process.env.REFIG_SKIP_DEFAULT_FONTS === "1") {
     rendererOptions = { ...rendererOptions, loadFigmaDefaultFonts: false };
@@ -211,6 +303,7 @@ async function runSingleNode(
     height: number;
     scale: number;
     imagesDir?: string;
+    fontsDir?: string;
     skipDefaultFonts?: boolean;
   }
 ): Promise<void> {
@@ -220,17 +313,39 @@ async function runSingleNode(
   }
 
   const isJson = documentPath.toLowerCase().endsWith(".json");
-  const document = isJson
-    ? new FigmaDocument(JSON.parse(readFileSync(documentPath, "utf8")))
-    : new FigmaDocument(new Uint8Array(readFileSync(documentPath)));
+  let document: FigmaDocument;
+  if (isJson) {
+    document = new FigmaDocument(
+      JSON.parse(readFileSync(documentPath, "utf8"))
+    );
+  } else {
+    const isFig = documentPath.toLowerCase().endsWith(".fig");
+    const useStreaming =
+      isFig && statSync(documentPath).size >= LARGE_FILE_THRESHOLD;
+    if (useStreaming) {
+      const stream = createReadStream(documentPath, {
+        highWaterMark: 1024 * 1024,
+      });
+      const figFile = await iofigma.kiwi.parseFileFromStream(stream);
+      document = new FigmaDocument(figFile);
+    } else {
+      document = new FigmaDocument(
+        new Uint8Array(readFileSync(documentPath))
+      );
+    }
+  }
 
   const rendererOptions: {
     images?: Record<string, Uint8Array>;
+    fonts?: Record<string, Uint8Array | Uint8Array[]>;
     loadFigmaDefaultFonts?: boolean;
-  } =
-    isJson && opts.imagesDir
-      ? { images: readImagesFromDir(opts.imagesDir) }
-      : {};
+  } = {};
+  if (isJson && opts.imagesDir) {
+    rendererOptions.images = readImagesFromDir(opts.imagesDir);
+  }
+  if (opts.fontsDir) {
+    rendererOptions.fonts = readFontsFromDir(opts.fontsDir);
+  }
   if (opts.skipDefaultFonts || process.env.REFIG_SKIP_DEFAULT_FONTS === "1") {
     rendererOptions.loadFigmaDefaultFonts = false;
   }
@@ -260,7 +375,7 @@ async function main(): Promise<void> {
     )
     .argument(
       "<input>",
-      "Path to .fig, JSON file (REST API response), or directory containing document.json (and optionally images/)"
+      "Path to .fig, JSON file (REST API response), or directory containing document.json (and optionally images/, fonts/)"
     )
     .option(
       "--out <path>",
@@ -271,12 +386,16 @@ async function main(): Promise<void> {
       "Directory of image files for REST API document (optional; not used if <input> is a dir with images/)"
     )
     .option(
+      "--fonts <dir>",
+      "Directory of font files (TTF/OTF) for custom fonts (optional; not used if <input> is a dir with fonts/)"
+    )
+    .option(
       "--node <id>",
       "Figma node ID to render (required unless --export-all)"
     )
     .option(
       "--export-all",
-      "Export every node that has exportSettings (REST JSON only)"
+      "Export every node that has exportSettings (REST JSON or .fig)"
     )
     .option(
       "--format <fmt>",
@@ -299,10 +418,13 @@ async function main(): Promise<void> {
         const nodeId = String(options.node ?? "").trim();
         const explicitImagesDir =
           typeof options.images === "string" ? options.images : undefined;
+        const explicitFontsDir =
+          typeof options.fonts === "string" ? options.fonts : undefined;
 
-        const { documentPath, imagesDir, isRestJson } = resolveInput(
+        const { documentPath, imagesDir, fontsDir } = resolveInput(
           input.trim(),
-          explicitImagesDir
+          explicitImagesDir,
+          explicitFontsDir
         );
 
         if (exportAll) {
@@ -329,6 +451,7 @@ async function main(): Promise<void> {
             documentPath,
             outDir,
             imagesDir,
+            fontsDir,
             options.skipDefaultFonts === true
           );
           return;
@@ -370,6 +493,7 @@ async function main(): Promise<void> {
           height,
           scale,
           imagesDir,
+          fontsDir,
           skipDefaultFonts: options.skipDefaultFonts === true,
         });
       }

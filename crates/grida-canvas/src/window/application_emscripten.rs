@@ -375,6 +375,9 @@ impl EmscriptenApplication {
     /// files must be fetched by the host environment and provided as raw
     /// bytes.  This method allows those bytes to be registered under the given
     /// family name so that subsequent text layout can resolve the typeface.
+    ///
+    /// Multiple calls with the same `family` and different font files are
+    /// supported (e.g. Regular, Bold, Italic per family).
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.base.renderer.add_font(family, data);
         // Newly registered fonts may affect cached text layout; invalidate any

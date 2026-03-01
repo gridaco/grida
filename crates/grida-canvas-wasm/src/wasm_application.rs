@@ -312,7 +312,8 @@ pub struct FontKey {
 }
 
 #[no_mangle]
-/// js::_add_font
+/// js::_add_font - Register font bytes. Multiple calls with the same family
+/// and different font files are supported (e.g. Regular, Bold, Italic per family).
 pub unsafe extern "C" fn add_font(
     app: *mut UnknownTargetApplication,
     family_ptr: *const u8,
