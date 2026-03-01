@@ -250,6 +250,67 @@ describe("@grida/refig (real render)", () => {
     expect(families).toEqual([]);
   });
 
+  it("listFontFamilies traverses all pages when rootNodeId is omitted", () => {
+    const multiPage = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE)) as any;
+    multiPage.document.children.push({
+      id: "0:2",
+      type: "CANVAS",
+      name: "Page 2",
+      children: [
+        {
+          id: "2:1",
+          type: "FRAME",
+          name: "Frame 2",
+          absoluteBoundingBox: { x: 0, y: 0, width: 50, height: 50 },
+          absoluteRenderBounds: { x: 0, y: 0, width: 50, height: 50 },
+          relativeTransform: [
+            [1, 0, 0],
+            [0, 1, 0],
+          ],
+          size: { x: 50, y: 50 },
+          clipsContent: false,
+          fills: [],
+          strokes: [],
+          strokeWeight: 0,
+          effects: [],
+          children: [
+            {
+              id: "2:2",
+              type: "TEXT",
+              name: "Page2 Label",
+              characters: "Caveat",
+              style: {
+                fontFamily: "Caveat",
+                fontSize: 14,
+                fontWeight: 400,
+                textAlignHorizontal: "LEFT",
+                textAlignVertical: "TOP",
+                textDecoration: "NONE",
+                lineHeightPercentFontSize: 100,
+              },
+              absoluteBoundingBox: { x: 0, y: 0, width: 30, height: 16 },
+              absoluteRenderBounds: { x: 0, y: 0, width: 30, height: 16 },
+              relativeTransform: [
+                [1, 0, 0],
+                [0, 1, 0],
+              ],
+              size: { x: 30, y: 16 },
+              fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+              strokes: [],
+              strokeWeight: 0,
+              effects: [],
+            },
+          ],
+        },
+      ],
+    });
+    const doc = new FigmaDocument(multiPage);
+    const families = doc.listFontFamilies();
+    expect(families).toContain("Inter");
+    expect(families).toContain("Caveat");
+    expect(families.length).toBe(2);
+  });
+
   it("FigmaDocument.fromFile reads a JSON file from disk", () => {
     const fixturePath = join(TEST_OUTPUT_DIR, "fromfile-fixture.json");
     writeFileSync(fixturePath, JSON.stringify(MINIMAL_REST_FIXTURE));

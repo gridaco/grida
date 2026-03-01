@@ -155,12 +155,10 @@ function* walkFontFiles(dirPath: string): Generator<string> {
  * Read font files from a directory (recursively).
  * Parses each .ttf/.otf to get family from name table; groups multiple files per family.
  * Fallback: basename without extension if parse fails.
- * @returns Record of family -> bytes or bytes[]
+ * @returns Record of family -> Uint8Array[] (array for in-place push, no realloc per add)
  */
-function readFontsFromDir(
-  dirPath: string
-): Record<string, Uint8Array | Uint8Array[]> {
-  const out: Record<string, Uint8Array | Uint8Array[]> = {};
+function readFontsFromDir(dirPath: string): Record<string, Uint8Array[]> {
+  const out: Record<string, Uint8Array[]> = {};
   for (const fullPath of walkFontFiles(dirPath)) {
     const file = path.basename(fullPath);
     const buf = readFileSync(fullPath);
@@ -178,11 +176,9 @@ function readFontsFromDir(
     if (!family) continue;
     const existing = out[family];
     if (existing === undefined) {
-      out[family] = bytes;
+      out[family] = [bytes];
     } else {
-      out[family] = Array.isArray(existing)
-        ? [...existing, bytes]
-        : [existing, bytes];
+      existing.push(bytes);
     }
   }
   return out;
