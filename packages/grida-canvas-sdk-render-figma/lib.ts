@@ -77,14 +77,25 @@ type FigmaJsonDocument = Record<string, unknown>;
 
 type FigFileDocument = ReturnType<typeof iofigma.kiwi.parseFile>;
 
+function isFigFileDocument(value: unknown): value is FigFileDocument {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    "pages" in value &&
+    "metadata" in value &&
+    Array.isArray((value as FigFileDocument).pages)
+  );
+}
+
 export class FigmaDocument {
   readonly sourceType: "fig-file" | "rest-api-json";
 
   /**
-   * For "fig-file" this is the raw bytes of the .fig file.
+   * For "fig-file" this is the raw bytes (Uint8Array) or a pre-parsed FigFileDocument
+   * (e.g. from parseFileFromStream for large ZIP files).
    * For "rest-api-json" this is the parsed REST API document JSON.
    */
-  readonly payload: Uint8Array | FigmaJsonDocument;
+  readonly payload: Uint8Array | FigmaJsonDocument | FigFileDocument;
 
   /** Cached parsed FigFile (.fig only). */
   private _figFile?: FigFileDocument;
@@ -99,21 +110,30 @@ export class FigmaDocument {
   private static readonly _MAX_SCENE_CACHE = 64;
 
   /**
-   * @param input Raw `.fig` bytes (Uint8Array) or a parsed Figma REST API
-   *              document JSON object.
+   * @param input Raw `.fig` bytes (Uint8Array), a pre-parsed FigFileDocument
+   *              (e.g. from parseFileFromStream for large files), or REST JSON.
    *
    * For file-path convenience in Node, use `FigmaDocument.fromFile()` from
    * the `@grida/refig` entrypoint.
    */
-  constructor(input: Uint8Array | FigmaJsonDocument) {
+  constructor(input: Uint8Array | FigmaJsonDocument | FigFileDocument) {
     if (input instanceof Uint8Array) {
       this.sourceType = "fig-file";
       this.payload = input;
       return;
     }
 
+    if (isFigFileDocument(input)) {
+      this.sourceType = "fig-file";
+      this.payload = input;
+      this._figFile = input;
+      return;
+    }
+
     if (!input || typeof input !== "object" || Array.isArray(input)) {
-      throw new Error("FigmaDocument: input must be a Uint8Array or object");
+      throw new Error(
+        "FigmaDocument: input must be a Uint8Array, FigFileDocument, or REST JSON object"
+      );
     }
 
     this.sourceType = "rest-api-json";

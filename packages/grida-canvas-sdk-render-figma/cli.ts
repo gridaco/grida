@@ -11,6 +11,7 @@ import {
   existsSync,
   statSync,
   mkdtempSync,
+  createReadStream,
 } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -37,6 +38,9 @@ const IMAGES_SUBDIR = "images";
 const FONTS_SUBDIR = "fonts";
 
 const FONT_EXTENSIONS = new Set<string>([".ttf", ".otf"]);
+
+/** .fig (ZIP) files >= 2GB cannot be read via readFileSync due to Node.js buffer limit. */
+const LARGE_FILE_THRESHOLD = 2 * 1024 * 1024 * 1024;
 
 function formatFromOutFile(outPath: string): string {
   const ext = path.extname(outPath).replace(/^\./, "").toLowerCase();
@@ -213,11 +217,24 @@ async function runExportAll(
   } = {};
 
   if (isFig) {
-    const bytes = new Uint8Array(readFileSync(documentPath));
-    const figFile = iofigma.kiwi.parseFile(bytes);
+    const stat = statSync(documentPath);
+    const useStreaming =
+      stat.size >= LARGE_FILE_THRESHOLD;
+
+    let figFile: ReturnType<typeof iofigma.kiwi.parseFile>;
+    if (useStreaming) {
+      const stream = createReadStream(documentPath, {
+        highWaterMark: 1024 * 1024,
+      });
+      figFile = await iofigma.kiwi.parseFileFromStream(stream);
+      document = new FigmaDocument(figFile);
+    } else {
+      const bytes = new Uint8Array(readFileSync(documentPath));
+      figFile = iofigma.kiwi.parseFile(bytes);
+      document = new FigmaDocument(bytes);
+    }
     const restDoc = figFileToRestLikeDocument(figFile);
     items = collectExportsFromDocument(restDoc as Record<string, unknown>);
-    document = new FigmaDocument(bytes);
     const imagesMap = iofigma.kiwi.extractImages(figFile.zip_files);
     const images: Record<string, Uint8Array> = {};
     imagesMap.forEach((imgBytes, ref) => {
@@ -296,9 +313,27 @@ async function runSingleNode(
   }
 
   const isJson = documentPath.toLowerCase().endsWith(".json");
-  const document = isJson
-    ? new FigmaDocument(JSON.parse(readFileSync(documentPath, "utf8")))
-    : new FigmaDocument(new Uint8Array(readFileSync(documentPath)));
+  let document: FigmaDocument;
+  if (isJson) {
+    document = new FigmaDocument(
+      JSON.parse(readFileSync(documentPath, "utf8"))
+    );
+  } else {
+    const isFig = documentPath.toLowerCase().endsWith(".fig");
+    const useStreaming =
+      isFig && statSync(documentPath).size >= LARGE_FILE_THRESHOLD;
+    if (useStreaming) {
+      const stream = createReadStream(documentPath, {
+        highWaterMark: 1024 * 1024,
+      });
+      const figFile = await iofigma.kiwi.parseFileFromStream(stream);
+      document = new FigmaDocument(figFile);
+    } else {
+      document = new FigmaDocument(
+        new Uint8Array(readFileSync(documentPath))
+      );
+    }
+  }
 
   const rendererOptions: {
     images?: Record<string, Uint8Array>;

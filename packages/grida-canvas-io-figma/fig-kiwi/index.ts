@@ -1,5 +1,12 @@
 import { toByteArray } from "base64-js";
-import { deflateSync, inflateSync, unzipSync } from "fflate";
+import {
+  deflateSync,
+  inflateSync,
+  unzipSync,
+  Unzip,
+  UnzipInflate,
+  UnzipPassThrough,
+} from "fflate";
 import { decompress } from "fzstd";
 import {
   compileSchema,
@@ -279,6 +286,111 @@ export function readFigFile(data: Uint8Array): ParsedFigmaArchive {
     archiveData = unzipped[mainFile];
   }
 
+  return { ...parseFigData(archiveData), zip_files: zipFiles };
+}
+
+/**
+ * Read a .fig file from an async stream of chunks.
+ * Supports .fig (ZIP) archives larger than 2GB by streaming instead of loading into memory.
+ * Environment-agnostic: accepts any AsyncIterable (Node Readable, fetch body, etc.).
+ */
+export async function readFigFileFromStream(
+  stream: AsyncIterable<Uint8Array>
+): Promise<ParsedFigmaArchive> {
+  const zipFiles: { [key: string]: Uint8Array } = {};
+  const unzip = new Unzip((file) => {
+    const fileChunks: Uint8Array[] = [];
+    file.ondata = (err, data, final) => {
+      if (err) throw err;
+      if (data && data.length > 0) fileChunks.push(data);
+      if (final) {
+        const size = fileChunks.reduce((s, c) => s + c.length, 0);
+        const result = new Uint8Array(size);
+        let off = 0;
+        for (const c of fileChunks) {
+          result.set(c, off);
+          off += c.length;
+        }
+        zipFiles[file.name] = result;
+      }
+    };
+    file.start();
+  });
+  unzip.register(UnzipPassThrough);
+  unzip.register(UnzipInflate);
+
+  const buffer: Uint8Array[] = [];
+  let haveCheckedSignature = false;
+
+  for await (const chunk of stream) {
+    if (haveCheckedSignature) {
+      unzip.push(chunk);
+      continue;
+    }
+    buffer.push(chunk);
+    const total = buffer.reduce((s, c) => s + c.length, 0);
+    if (total < 4) continue;
+
+    haveCheckedSignature = true;
+    const merged = new Uint8Array(total);
+    let off = 0;
+    for (const c of buffer) {
+      merged.set(c, off);
+      off += c.length;
+    }
+
+    if (!isSignature(merged, ZIP_SIGNATURE)) {
+      for await (const c of stream) buffer.push(c);
+      const fullSize = buffer.reduce((s, c) => s + c.length, 0);
+      const full = new Uint8Array(fullSize);
+      off = 0;
+      for (const c of buffer) {
+        full.set(c, off);
+        off += c.length;
+      }
+      return { ...parseFigData(full), zip_files: undefined };
+    }
+
+    unzip.push(merged);
+  }
+
+  if (!haveCheckedSignature) {
+    if (buffer.length === 0) {
+      throw new Error("readFigFileFromStream: empty stream");
+    }
+    const total = buffer.reduce((s, c) => s + c.length, 0);
+    if (total < 4) {
+      throw new Error("readFigFileFromStream: stream too short to detect format");
+    }
+    const merged = new Uint8Array(total);
+    let off = 0;
+    for (const c of buffer) {
+      merged.set(c, off);
+      off += c.length;
+    }
+    return { ...parseFigData(merged), zip_files: undefined };
+  }
+  unzip.push(new Uint8Array(0), true);
+
+  const keys = Object.keys(zipFiles);
+  const mainFile =
+    keys.find((key) => {
+      const fileData = zipFiles[key];
+      if (!fileData || fileData.length <= 8) return false;
+      const prelude = String.fromCharCode.apply(
+        String,
+        Array.from(fileData.slice(0, 8))
+      );
+      return prelude === FIG_KIWI_PRELUDE || prelude === FIGJAM_KIWI_PRELUDE;
+    }) || keys.find((k) => k.endsWith(".fig"));
+
+  if (!mainFile) {
+    throw new Error(
+      `ZIP archive found but no valid Figma file inside. Files: ${keys.join(", ")}`
+    );
+  }
+
+  const archiveData = zipFiles[mainFile]!;
   return { ...parseFigData(archiveData), zip_files: zipFiles };
 }
 

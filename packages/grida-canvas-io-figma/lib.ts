@@ -28,6 +28,7 @@ import {
   getBlobBytes,
   parseVectorNetworkBlob,
   readFigFile,
+  readFigFileFromStream,
   type ParsedFigmaArchive,
 } from "./fig-kiwi";
 
@@ -3197,6 +3198,28 @@ export namespace iofigma {
       options: BuildTreeOptions = {}
     ): FigFileDocument {
       const figData = readFigFile(fileData);
+      const pages = extractPages(figData, options);
+
+      return {
+        pages,
+        metadata: {
+          version: figData.header.version,
+        },
+        zip_files: figData.zip_files,
+      };
+    }
+
+    /**
+     * Parse and extract pages from a .fig file stream.
+     * Supports .fig (ZIP) archives larger than 2GB by streaming instead of loading into memory.
+     * @param stream - Async iterable of Uint8Array chunks (e.g. Node Readable, fetch body)
+     * @returns Document with pages ready for import
+     */
+    export async function parseFileFromStream(
+      stream: AsyncIterable<Uint8Array>,
+      options: BuildTreeOptions = {}
+    ): Promise<FigFileDocument> {
+      const figData = await readFigFileFromStream(stream);
       const pages = extractPages(figData, options);
 
       return {
