@@ -53,6 +53,8 @@ native-clock-tick = []
 criterion = "0.5"
 clap = { version = "4.5.39", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+rendiff = "0.2"
+imgref = "1.10"
 
 [[bench]]
 name = "bench_rectangles"

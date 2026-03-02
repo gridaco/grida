@@ -1,4 +1,3 @@
-use super::vn::VectorNetwork;
 use super::*;
 use crate::cg::*;
 use skia_safe;
@@ -68,13 +67,13 @@ pub fn build_star_path(shape: &RegularStarShape) -> skia_safe::Path {
     })
 }
 
-#[deprecated(note = "use VectorGeometryShape instead")]
-pub fn build_star_vector_network(shape: &RegularStarShape) -> VectorNetwork {
+/// Build a [`VectorGeometryShape`] from the star polygon points, preserving the corner radius.
+pub fn build_star_vector_geometry(shape: &RegularStarShape) -> VectorGeometryShape {
     let points = build_star_points(shape);
-    if points.is_empty() {
-        return VectorNetwork::default();
+    if points.len() < 3 {
+        return VectorGeometryShape::new();
     }
-    build_simple_polygon_vector_network(&SimplePolygonShape {
+    build_simple_polygon_vector_geometry(&SimplePolygonShape {
         points,
         corner_radius: shape.corner_radius,
     })

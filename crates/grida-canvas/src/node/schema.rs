@@ -780,6 +780,7 @@ impl LayoutPositioningBasis {
         match self {
             Self::Cartesian(point) => Some(point.x),
             Self::Inset(inset) => Some(inset.left),
+            #[allow(deprecated)]
             Self::Anchored => unreachable!("Anchored positioning is not supported"),
         }
     }
@@ -788,6 +789,7 @@ impl LayoutPositioningBasis {
         match self {
             Self::Cartesian(point) => Some(point.y),
             Self::Inset(inset) => Some(inset.top),
+            #[allow(deprecated)]
             Self::Anchored => unreachable!("Anchored positioning is not supported"),
         }
     }
@@ -1813,7 +1815,7 @@ impl NodeShapeMixin for PolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_simple_polygon_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 
@@ -1930,7 +1932,7 @@ impl NodeShapeMixin for RegularPolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_regular_polygon_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 
@@ -2035,7 +2037,7 @@ impl NodeShapeMixin for RegularStarPolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_star_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 

@@ -1,5 +1,6 @@
-use crate::io::io_grida::JSONVectorNetwork;
+use crate::io::io_grida::JSONFlattenResult;
 use crate::io::io_grida_patch::TransactionApplyReport;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
@@ -8,6 +9,7 @@ use crate::window::application::ApplicationApi;
 use crate::window::application::UnknownTargetApplication;
 use crate::window::command::ApplicationCommand;
 use crate::window::state::{self, GpuState, SurfaceState};
+#[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
@@ -119,7 +121,9 @@ pub fn new_webgl_app(
     } = gpu_state;
     let mut state = SurfaceState::from_parts(context, framebuffer_info, surface);
 
+    #[cfg(not(target_arch = "wasm32"))]
     let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
+    #[cfg(not(target_arch = "wasm32"))]
     let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
 
     let camera = Camera2D::new(crate::node::schema::Size {
@@ -133,7 +137,9 @@ pub fn new_webgl_app(
         backend,
         camera,
         120,
+        #[cfg(not(target_arch = "wasm32"))]
         image_rx,
+        #[cfg(not(target_arch = "wasm32"))]
         font_rx,
         None,
         options,
@@ -214,7 +220,7 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.export_node_as(id, format)
     }
 
-    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
         self.base.to_vector_network(id)
     }
 
@@ -303,7 +309,9 @@ impl EmscriptenApplication {
         } = gpu_state;
         let mut state = SurfaceState::from_parts(context, framebuffer_info, surface);
 
+        #[cfg(not(target_arch = "wasm32"))]
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
+        #[cfg(not(target_arch = "wasm32"))]
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
 
         let camera = Camera2D::new(crate::node::schema::Size {
@@ -317,7 +325,9 @@ impl EmscriptenApplication {
             backend,
             camera,
             120,
+            #[cfg(not(target_arch = "wasm32"))]
             image_rx,
+            #[cfg(not(target_arch = "wasm32"))]
             font_rx,
             None,
             options,
@@ -336,7 +346,8 @@ impl EmscriptenApplication {
             return Box::from_raw(app_ptr);
         }
 
-        unreachable!("emscipten cannot be initialized on native")
+        #[cfg(not(target_os = "emscripten"))]
+        unreachable!("emscripten cannot be initialized on native")
     }
 
     pub fn redraw(&mut self) {

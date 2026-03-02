@@ -4,7 +4,7 @@ use crate::devtools::{
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
-use crate::io::io_grida::{self, JSONVectorNetwork};
+use crate::io::io_grida::{self, JSONFlattenResult};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
 use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
@@ -16,6 +16,7 @@ use crate::sys::timer::TimerMgr;
 use crate::text;
 use crate::vectornetwork::VectorNetwork;
 use crate::window::command::ApplicationCommand;
+#[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 use serde_json::Value;
@@ -44,7 +45,7 @@ pub trait ApplicationApi {
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
-    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork>;
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult>;
 
     /// Enable or disable caching of raster tiles.
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
@@ -158,7 +159,9 @@ pub struct UnknownTargetApplication {
     pub(crate) hit_test_result: Option<crate::node::schema::NodeId>,
     pub(crate) hit_test_last: std::time::Instant,
     pub(crate) hit_test_interval: std::time::Duration,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
@@ -343,17 +346,34 @@ impl ApplicationApi for UnknownTargetApplication {
         return None;
     }
 
-    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
         let internal_id = self.user_id_to_internal(id)?;
         if let Some(scene) = self.renderer.scene.as_ref() {
             if let Ok(node) = scene.graph.get_node(&internal_id) {
-                let vn = match node {
-                    Node::Rectangle(n) => Some(n.to_vector_network()),
-                    Node::Ellipse(n) => Some(n.to_vector_network()),
-                    Node::Polygon(n) => Some(n.to_vector_network()),
-                    Node::RegularPolygon(n) => Some(n.to_vector_network()),
-                    Node::RegularStarPolygon(n) => Some(n.to_vector_network()),
-                    Node::Vector(n) => Some(n.network.clone()),
+                /// Convert a positive corner radius to `Some`, zero/negative to `None`.
+                fn nonzero_radius(r: f32) -> Option<f32> {
+                    if r > 0.0 { Some(r) } else { None }
+                }
+
+                let result: Option<(VectorNetwork, Option<f32>)> = match node {
+                    // Rectangle: always bake corner geometry into the VN.
+                    // Skia's native rrect uses conic arcs while corner_path
+                    // PathEffect uses a different curve type (quadratic Bézier).
+                    // See `shape/corner.rs` for documentation.
+                    Node::Rectangle(n) => Some((n.to_vector_network(), None)),
+                    Node::Ellipse(n) => Some((n.to_vector_network(), None)),
+                    // Polygon/star shapes use corner_path for rendering, so
+                    // corner_radius is preserved as a rendering effect.
+                    Node::Polygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::RegularPolygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::RegularStarPolygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::Vector(n) => Some((n.network.clone(), None)),
                     // TODO: find a better way to clean this, as simple as Text::to_vector_network()
                     Node::TextSpan(n) => {
                         let paragraph = self.renderer.get_cache().paragraph.borrow_mut().paragraph(
@@ -386,11 +406,14 @@ impl ApplicationApi for UnknownTargetApplication {
                         if y_offset != 0.0 {
                             path = path.make_transform(&Matrix::translate((0.0, y_offset)));
                         }
-                        Some(VectorNetwork::from(&path))
+                        Some((VectorNetwork::from(&path), None))
                     }
                     _ => None,
                 };
-                return vn.map(|v| v.into());
+                return result.map(|(vn, cr)| JSONFlattenResult {
+                    vector_network: vn.into(),
+                    corner_radius: cr,
+                });
             }
         }
         None
@@ -547,8 +570,8 @@ impl UnknownTargetApplication {
         backend: Backend,
         camera: Camera2D,
         target_fps: u32,
-        image_rx: mpsc::UnboundedReceiver<ImageMessage>,
-        font_rx: mpsc::UnboundedReceiver<FontMessage>,
+        #[cfg(not(target_arch = "wasm32"))] image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+        #[cfg(not(target_arch = "wasm32"))] font_rx: mpsc::UnboundedReceiver<FontMessage>,
         request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
         options: crate::runtime::scene::RendererOptions,
     ) -> Self {
@@ -571,7 +594,9 @@ impl UnknownTargetApplication {
             hit_test_result: None,
             hit_test_last: std::time::Instant::now(),
             hit_test_interval: std::time::Duration::from_millis(0),
+            #[cfg(not(target_arch = "wasm32"))]
             image_rx,
+            #[cfg(not(target_arch = "wasm32"))]
             font_rx,
             scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
             last_frame_time: std::time::Instant::now(),
@@ -603,7 +628,9 @@ impl UnknownTargetApplication {
         height: i32,
         options: crate::runtime::scene::RendererOptions,
     ) -> Box<Self> {
+        #[cfg(not(target_arch = "wasm32"))]
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
+        #[cfg(not(target_arch = "wasm32"))]
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
 
         let camera = Camera2D::new(crate::node::schema::Size {
@@ -615,7 +642,16 @@ impl UnknownTargetApplication {
         let backend = state.backend();
 
         Box::new(Self::new(
-            state, backend, camera, 120, image_rx, font_rx, None, options,
+            state,
+            backend,
+            camera,
+            120,
+            #[cfg(not(target_arch = "wasm32"))]
+            image_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            font_rx,
+            None,
+            options,
         ))
     }
 
@@ -769,6 +805,7 @@ impl UnknownTargetApplication {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn print_font_repository_info(&self) {
         let font_repo = &self.renderer.fonts;
         let family_count = font_repo.family_count();

@@ -1135,6 +1135,27 @@ impl From<VectorNetwork> for JSONVectorNetwork {
     }
 }
 
+/// Result of flattening a shape to a vector network.
+///
+/// When `corner_radius` is `Some`, the vector network contains straight
+/// segments and the corner radius should be applied as a rendering effect
+/// (e.g. polygon, star). These shapes use `corner_path` PathEffect for
+/// rendering, so the effect is preserved.
+///
+/// When `corner_radius` is `None`, the corner geometry is already baked
+/// into the vector network as Bézier curves (e.g. rectangle, ellipse).
+/// Rectangles always bake because their native rrect rendering uses conic
+/// arcs, which differ from the `corner_path` PathEffect. See
+/// [`crate::shape::build_corner_radius_path`] for details.
+#[derive(Debug, Serialize)]
+pub struct JSONFlattenResult {
+    #[serde(flatten)]
+    pub vector_network: JSONVectorNetwork,
+    /// Uniform corner radius to apply as a rendering effect, if applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub corner_radius: Option<f32>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct JSONLineNode {
     #[serde(flatten)]

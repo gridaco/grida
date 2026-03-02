@@ -1,4 +1,5 @@
 use super::*;
+use crate::vectornetwork::VectorNetwork;
 
 ///
 /// Portable VectorGeometry Shape definition, that can be converted to VectorNetwork
@@ -80,6 +81,16 @@ impl From<SimplePolygonShape> for VectorGeometryShape {
         let mut geometry = Self::from_points(vertices);
         geometry.corner_radius = shape.corner_radius;
         geometry
+    }
+}
+
+impl From<VectorGeometryShape> for VectorNetwork {
+    fn from(shape: VectorGeometryShape) -> Self {
+        VectorNetwork {
+            vertices: shape.vertices,
+            segments: shape.segments,
+            regions: vec![],
+        }
     }
 }
 
