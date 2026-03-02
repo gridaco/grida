@@ -16,6 +16,7 @@ use crate::sys::timer::TimerMgr;
 use crate::text;
 use crate::vectornetwork::VectorNetwork;
 use crate::window::command::ApplicationCommand;
+#[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 use serde_json::Value;
@@ -158,7 +159,9 @@ pub struct UnknownTargetApplication {
     pub(crate) hit_test_result: Option<crate::node::schema::NodeId>,
     pub(crate) hit_test_last: std::time::Instant,
     pub(crate) hit_test_interval: std::time::Duration,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
@@ -567,8 +570,8 @@ impl UnknownTargetApplication {
         backend: Backend,
         camera: Camera2D,
         target_fps: u32,
-        image_rx: mpsc::UnboundedReceiver<ImageMessage>,
-        font_rx: mpsc::UnboundedReceiver<FontMessage>,
+        #[cfg(not(target_arch = "wasm32"))] image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+        #[cfg(not(target_arch = "wasm32"))] font_rx: mpsc::UnboundedReceiver<FontMessage>,
         request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
         options: crate::runtime::scene::RendererOptions,
     ) -> Self {
@@ -591,7 +594,9 @@ impl UnknownTargetApplication {
             hit_test_result: None,
             hit_test_last: std::time::Instant::now(),
             hit_test_interval: std::time::Duration::from_millis(0),
+            #[cfg(not(target_arch = "wasm32"))]
             image_rx,
+            #[cfg(not(target_arch = "wasm32"))]
             font_rx,
             scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
             last_frame_time: std::time::Instant::now(),
@@ -623,7 +628,9 @@ impl UnknownTargetApplication {
         height: i32,
         options: crate::runtime::scene::RendererOptions,
     ) -> Box<Self> {
+        #[cfg(not(target_arch = "wasm32"))]
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
+        #[cfg(not(target_arch = "wasm32"))]
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
 
         let camera = Camera2D::new(crate::node::schema::Size {
@@ -635,7 +642,16 @@ impl UnknownTargetApplication {
         let backend = state.backend();
 
         Box::new(Self::new(
-            state, backend, camera, 120, image_rx, font_rx, None, options,
+            state,
+            backend,
+            camera,
+            120,
+            #[cfg(not(target_arch = "wasm32"))]
+            image_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            font_rx,
+            None,
+            options,
         ))
     }
 
@@ -789,6 +805,7 @@ impl UnknownTargetApplication {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn print_font_repository_info(&self) {
         let font_repo = &self.renderer.fonts;
         let family_count = font_repo.family_count();

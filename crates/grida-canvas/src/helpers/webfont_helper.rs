@@ -163,7 +163,7 @@ pub async fn fetch_webfont(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Err
 }
 
 #[cfg(target_arch = "wasm32")]
-pub async fn fetch_webfont(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub async fn fetch_webfont(_url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     // Stub for wasm
     Err("Webfont fetching not supported in wasm".into())
 }

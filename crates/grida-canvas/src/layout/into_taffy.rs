@@ -153,6 +153,7 @@ impl From<LayoutPositioningBasis> for Rect<LengthPercentageAuto> {
                 top: LengthPercentageAuto::length(inset.top),
                 bottom: LengthPercentageAuto::length(inset.bottom),
             },
+            #[allow(deprecated)]
             LayoutPositioningBasis::Anchored => {
                 unreachable!("Anchored positioning is not supported")
             }

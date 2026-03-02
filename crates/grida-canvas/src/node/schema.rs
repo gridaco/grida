@@ -780,6 +780,7 @@ impl LayoutPositioningBasis {
         match self {
             Self::Cartesian(point) => Some(point.x),
             Self::Inset(inset) => Some(inset.left),
+            #[allow(deprecated)]
             Self::Anchored => unreachable!("Anchored positioning is not supported"),
         }
     }
@@ -788,6 +789,7 @@ impl LayoutPositioningBasis {
         match self {
             Self::Cartesian(point) => Some(point.y),
             Self::Inset(inset) => Some(inset.top),
+            #[allow(deprecated)]
             Self::Anchored => unreachable!("Anchored positioning is not supported"),
         }
     }
