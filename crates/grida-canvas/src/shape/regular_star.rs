@@ -70,7 +70,7 @@ pub fn build_star_path(shape: &RegularStarShape) -> skia_safe::Path {
 /// Build a [`VectorGeometryShape`] from the star polygon points, preserving the corner radius.
 pub fn build_star_vector_geometry(shape: &RegularStarShape) -> VectorGeometryShape {
     let points = build_star_points(shape);
-    if points.is_empty() {
+    if points.len() < 3 {
         return VectorGeometryShape::new();
     }
     build_simple_polygon_vector_geometry(&SimplePolygonShape {

@@ -42,8 +42,12 @@ pub fn build_regular_polygon_path(shape: &RegularPolygonShape) -> skia_safe::Pat
 
 /// Build a [`VectorGeometryShape`] from the regular polygon points, preserving the corner radius.
 pub fn build_regular_polygon_vector_geometry(shape: &RegularPolygonShape) -> VectorGeometryShape {
+    let points = build_regular_polygon_points(shape);
+    if points.len() < 3 {
+        return VectorGeometryShape::new();
+    }
     build_simple_polygon_vector_geometry(&SimplePolygonShape {
-        points: build_regular_polygon_points(shape),
+        points,
         corner_radius: shape.corner_radius,
     })
 }

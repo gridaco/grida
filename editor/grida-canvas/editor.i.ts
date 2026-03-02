@@ -2780,7 +2780,7 @@ export namespace editor.api {
   }
 
   export interface IDocumentVectorInterfaceActions {
-    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+    toVectorNetwork(node_id: string): vn.FlattenResult | null;
   }
 
   export interface IDocumentSVGInterfaceActions {

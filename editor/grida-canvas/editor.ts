@@ -3783,7 +3783,7 @@ export class Editor
   // #endregion IRulerActions implementation
 
   // #region IVectorInterfaceActions implementation
-  toVectorNetwork(node_id: string): vn.VectorNetwork | null {
+  toVectorNetwork(node_id: string): vn.FlattenResult | null {
     if (!this.vectorProvider) {
       throw new Error("Vector interface provider is not bound");
     }

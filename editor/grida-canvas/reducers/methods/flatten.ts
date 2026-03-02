@@ -140,6 +140,10 @@ function toVectorNetworkFallback(
 ): vn.FlattenResult | null {
   switch (node.type) {
     case "rectangle": {
+      // Rectangle does NOT carry corner_radius here. Native rrect uses
+      // conic arcs while corner_path uses quadratic Bézier — different
+      // curves. The Rust backend bakes rrect geometry; this fallback
+      // produces a sharp rect (acceptable degradation when WASM is absent).
       return vn.fromRect({
         x: 0,
         y: 0,
@@ -157,23 +161,34 @@ function toVectorNetworkFallback(
       });
     }
     case "polygon": {
-      return vn.fromRegularPolygon({
-        x: 0,
-        y: 0,
-        width: size.width,
-        height: size.height,
-        points: node.point_count ?? 3,
-      });
+      // Polygon/star use corner_path PathEffect for rendering, so
+      // corner_radius is a rendering effect — preserve it on the result.
+      // (Mirrors what the Rust backend returns for these shapes.)
+      const cr = node.corner_radius;
+      return {
+        ...vn.fromRegularPolygon({
+          x: 0,
+          y: 0,
+          width: size.width,
+          height: size.height,
+          points: node.point_count ?? 3,
+        }),
+        ...(cr && cr > 0 ? { corner_radius: cr } : {}),
+      };
     }
     case "star": {
-      return vn.fromRegularStarPolygon({
-        x: 0,
-        y: 0,
-        width: size.width,
-        height: size.height,
-        points: node.point_count ?? 5,
-        innerRadius: node.inner_radius ?? 0.5,
-      });
+      const cr = node.corner_radius;
+      return {
+        ...vn.fromRegularStarPolygon({
+          x: 0,
+          y: 0,
+          width: size.width,
+          height: size.height,
+          points: node.point_count ?? 5,
+          innerRadius: node.inner_radius ?? 0.5,
+        }),
+        ...(cr && cr > 0 ? { corner_radius: cr } : {}),
+      };
     }
     case "line": {
       // return vn.fromLine({
