@@ -1,4 +1,4 @@
-use crate::io::io_grida::JSONVectorNetwork;
+use crate::io::io_grida::JSONFlattenResult;
 use crate::io::io_grida_patch::TransactionApplyReport;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
@@ -214,7 +214,7 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.export_node_as(id, format)
     }
 
-    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
         self.base.to_vector_network(id)
     }
 

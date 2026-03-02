@@ -4,7 +4,7 @@ use crate::devtools::{
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
-use crate::io::io_grida::{self, JSONVectorNetwork};
+use crate::io::io_grida::{self, JSONFlattenResult};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
 use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
@@ -44,7 +44,7 @@ pub trait ApplicationApi {
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
-    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork>;
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult>;
 
     /// Enable or disable caching of raster tiles.
     fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
@@ -343,17 +343,34 @@ impl ApplicationApi for UnknownTargetApplication {
         return None;
     }
 
-    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
         let internal_id = self.user_id_to_internal(id)?;
         if let Some(scene) = self.renderer.scene.as_ref() {
             if let Ok(node) = scene.graph.get_node(&internal_id) {
-                let vn = match node {
-                    Node::Rectangle(n) => Some(n.to_vector_network()),
-                    Node::Ellipse(n) => Some(n.to_vector_network()),
-                    Node::Polygon(n) => Some(n.to_vector_network()),
-                    Node::RegularPolygon(n) => Some(n.to_vector_network()),
-                    Node::RegularStarPolygon(n) => Some(n.to_vector_network()),
-                    Node::Vector(n) => Some(n.network.clone()),
+                /// Convert a positive corner radius to `Some`, zero/negative to `None`.
+                fn nonzero_radius(r: f32) -> Option<f32> {
+                    if r > 0.0 { Some(r) } else { None }
+                }
+
+                let result: Option<(VectorNetwork, Option<f32>)> = match node {
+                    // Rectangle: always bake corner geometry into the VN.
+                    // Skia's native rrect uses conic arcs while corner_path
+                    // PathEffect uses a different curve type (quadratic Bézier).
+                    // See `shape/corner.rs` for documentation.
+                    Node::Rectangle(n) => Some((n.to_vector_network(), None)),
+                    Node::Ellipse(n) => Some((n.to_vector_network(), None)),
+                    // Polygon/star shapes use corner_path for rendering, so
+                    // corner_radius is preserved as a rendering effect.
+                    Node::Polygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::RegularPolygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::RegularStarPolygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::Vector(n) => Some((n.network.clone(), None)),
                     // TODO: find a better way to clean this, as simple as Text::to_vector_network()
                     Node::TextSpan(n) => {
                         let paragraph = self.renderer.get_cache().paragraph.borrow_mut().paragraph(
@@ -386,11 +403,14 @@ impl ApplicationApi for UnknownTargetApplication {
                         if y_offset != 0.0 {
                             path = path.make_transform(&Matrix::translate((0.0, y_offset)));
                         }
-                        Some(VectorNetwork::from(&path))
+                        Some((VectorNetwork::from(&path), None))
                     }
                     _ => None,
                 };
-                return vn.map(|v| v.into());
+                return result.map(|(vn, cr)| JSONFlattenResult {
+                    vector_network: vn.into(),
+                    corner_radius: cr,
+                });
             }
         }
         None

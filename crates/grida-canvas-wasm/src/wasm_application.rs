@@ -552,8 +552,8 @@ pub unsafe extern "C" fn to_vector_network(
         return std::ptr::null();
     };
 
-    if let Some(vn) = app.to_vector_network(&id) {
-        if let Ok(json) = serde_json::to_string(&vn) {
+    if let Some(result) = app.to_vector_network(&id) {
+        if let Ok(json) = serde_json::to_string(&result) {
             return alloc_len_prefixed(json.as_bytes());
         }
     }

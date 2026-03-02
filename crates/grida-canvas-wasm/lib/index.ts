@@ -115,6 +115,17 @@ export namespace types {
     vertices: VectorNetworkVertex[];
     segments: VectorNetworkSegment[];
   }
+
+  /**
+   * Result of flattening a shape node to a vector network.
+   *
+   * When `corner_radius` is present, the vector network contains straight
+   * segments and corner radius should be applied as a rendering effect.
+   * When absent, corner geometry is baked into the vector network as curves.
+   */
+  export interface FlattenResult extends VectorNetwork {
+    corner_radius?: number;
+  }
 }
 
 // ====================================================================================================

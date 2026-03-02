@@ -160,7 +160,7 @@ export class CanvasWasmVectorInterfaceProvider
     readonly surface: Scene
   ) {}
 
-  toVectorNetwork(node_id: string): vn.VectorNetwork | null {
+  toVectorNetwork(node_id: string): vn.FlattenResult | null {
     return this.surface.toVectorNetwork(node_id);
   }
 }

@@ -344,8 +344,15 @@ export class Scene {
   /**
    * Convert a node into a vector network representation.
    * Supports primitive shapes and text nodes.
+   *
+   * Returns a flatten result containing the vector network and an optional
+   * corner radius. When `corner_radius` is present, it means the vector
+   * network has straight segments and corner radius should be applied as
+   * a rendering effect. When absent, curves are baked into the geometry.
    */
-  toVectorNetwork(id: string): types.VectorNetwork | null {
+  toVectorNetwork(
+    id: string
+  ): types.FlattenResult | null {
     this._assertAlive();
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._to_vector_network(this.appptr, ptr, len - 1);

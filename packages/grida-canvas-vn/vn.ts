@@ -212,6 +212,20 @@ export namespace vn {
   }
 
   /**
+   * Result of flattening a shape node to a vector network.
+   *
+   * When `corner_radius` is present, the vector network contains straight
+   * segments and corner radius should be applied as a rendering effect
+   * (e.g. polygon, star).
+   *
+   * When `corner_radius` is absent, corner geometry is already baked into
+   * the vector network as Bézier curves (e.g. rectangle, ellipse).
+   */
+  export interface FlattenResult extends VectorNetwork {
+    corner_radius?: number;
+  }
+
+  /**
    * tangent mirroring mode
    *
    * **description based on moving ta (applies the same vice versa for tb)**

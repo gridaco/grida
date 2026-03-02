@@ -2732,11 +2732,16 @@ export namespace editor.api {
 
   export interface IDocumentVectorInterfaceProvider {
     /**
-     * converts the node into a vector network
+     * Converts the node into a flatten result (vector network + optional corner radius).
+     *
+     * When `corner_radius` is present in the result, the vector network has
+     * straight segments and corner radius should be preserved on the vector node.
+     * When absent, corner geometry is baked into the Bézier curves.
+     *
      * @param node_id
-     * @returns vector network or null if unsupported
+     * @returns flatten result or null if unsupported
      */
-    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+    toVectorNetwork(node_id: string): vn.FlattenResult | null;
   }
 
   //
