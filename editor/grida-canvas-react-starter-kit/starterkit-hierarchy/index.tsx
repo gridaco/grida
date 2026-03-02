@@ -54,22 +54,24 @@ export function DocumentHierarchy() {
   const editor = useCurrentEditor();
 
   return (
-    <ResizablePanelGroup orientation="vertical" className="h-full">
-      <ResizablePanel defaultSize={15} minSize={10} maxSize={40}>
+    <ResizablePanelGroup orientation="vertical" className="h-full min-h-0">
+      <ResizablePanel defaultSize={"15%"} minSize={100} className="min-h-0">
         <SidebarGroup
           onContextMenu={(e) => e.preventDefault()}
-          className="h-full flex flex-col"
+          className="h-full flex flex-col min-h-0 p-0"
         >
-          <SidebarGroupLabel>
-            Scenes
-            <SidebarGroupAction
-              onClick={() => editor.surface.surfaceCreateScene()}
-            >
-              <PlusIcon />
-              <span className="sr-only">New Scene</span>
-            </SidebarGroupAction>
-          </SidebarGroupLabel>
-          <SidebarGroupContent className="flex-1 overflow-y-auto">
+          <div className="p-2">
+            <SidebarGroupLabel>
+              Scenes
+              <SidebarGroupAction
+                onClick={() => editor.surface.surfaceCreateScene()}
+              >
+                <PlusIcon />
+                <span className="sr-only">New Scene</span>
+              </SidebarGroupAction>
+            </SidebarGroupLabel>
+          </div>
+          <SidebarGroupContent className="flex-1 min-h-0 overflow-y-auto px-2">
             <ScenesList />
           </SidebarGroupContent>
         </SidebarGroup>
@@ -77,13 +79,15 @@ export function DocumentHierarchy() {
 
       <ResizableHandle />
 
-      <ResizablePanel defaultSize={80}>
+      <ResizablePanel minSize={120} className="min-h-0">
         <SidebarGroup
-          className="h-full flex flex-col"
+          className="h-full flex flex-col min-h-0 p-0"
           onContextMenu={(e) => e.preventDefault()}
         >
-          <SidebarGroupLabel>Layers</SidebarGroupLabel>
-          <SidebarGroupContent className="flex-1 overflow-y-auto">
+          <div className="p-2">
+            <SidebarGroupLabel>Layers</SidebarGroupLabel>
+          </div>
+          <SidebarGroupContent className="flex-1 min-h-0 overflow-y-auto px-2">
             <NodeHierarchyList />
           </SidebarGroupContent>
         </SidebarGroup>
