@@ -1813,7 +1813,7 @@ impl NodeShapeMixin for PolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_simple_polygon_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 
@@ -1930,7 +1930,7 @@ impl NodeShapeMixin for RegularPolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_regular_polygon_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 
@@ -2035,7 +2035,7 @@ impl NodeShapeMixin for RegularStarPolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_star_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 

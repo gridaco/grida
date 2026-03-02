@@ -1,4 +1,3 @@
-use super::vn::VectorNetwork;
 use super::*;
 use crate::{cg::*, shape::build_simple_polygon_path};
 
@@ -41,8 +40,9 @@ pub fn build_regular_polygon_path(shape: &RegularPolygonShape) -> skia_safe::Pat
     })
 }
 
-pub fn build_regular_polygon_vector_network(shape: &RegularPolygonShape) -> VectorNetwork {
-    build_simple_polygon_vector_network(&SimplePolygonShape {
+/// Build a [`VectorGeometryShape`] from the regular polygon points, preserving the corner radius.
+pub fn build_regular_polygon_vector_geometry(shape: &RegularPolygonShape) -> VectorGeometryShape {
+    build_simple_polygon_vector_geometry(&SimplePolygonShape {
         points: build_regular_polygon_points(shape),
         corner_radius: shape.corner_radius,
     })

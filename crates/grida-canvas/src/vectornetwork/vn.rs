@@ -545,18 +545,50 @@ impl From<&skia_safe::Path> for VectorNetwork {
                     let c = pts[1];
                     let p2 = pts[2];
                     let w = iter.conic_weight().unwrap_or(1.0);
-                    let (c1, c2) = conic_to_cubic(p0, c, p2, w);
-                    let idx = vertices.len();
-                    vertices.push((p2.x, p2.y));
-                    let seg_idx = segments.len();
-                    segments.push(VectorNetworkSegment {
-                        a: prev_idx.unwrap(),
-                        b: idx,
-                        ta: (c1.x - p0.x, c1.y - p0.y),
-                        tb: (c2.x - p2.x, c2.y - p2.y),
-                    });
-                    current_loop.push(seg_idx);
-                    prev_idx = Some(idx);
+
+                    // Split the conic into 2^pow2 quadratic segments for accuracy,
+                    // then convert each quad to a cubic (lossless).
+                    // pow2=2 (4 quads per conic) balances accuracy with vertex count.
+                    let pow2 = 2usize;
+                    let max_pts = 1 + 2 * (1 << pow2); // 9 points for pow2=2
+                    let mut quad_pts = vec![skia_safe::Point::default(); max_pts];
+                    if let Some(_count) =
+                        skia_safe::Path::convert_conic_to_quads(p0, c, p2, w, &mut quad_pts, pow2)
+                    {
+                        // quad_pts layout: [q0_start, q0_ctrl, q0_end/q1_start, q1_ctrl, q1_end, ...]
+                        let num_quads = 1 << pow2;
+                        for qi in 0..num_quads {
+                            let qp0 = quad_pts[qi * 2];
+                            let qp1 = quad_pts[qi * 2 + 1];
+                            let qp2 = quad_pts[qi * 2 + 2];
+                            let (cc1, cc2) = quad_to_cubic(qp0, qp1, qp2);
+                            let idx = vertices.len();
+                            vertices.push((qp2.x, qp2.y));
+                            let seg_idx = segments.len();
+                            segments.push(VectorNetworkSegment {
+                                a: prev_idx.unwrap(),
+                                b: idx,
+                                ta: (cc1.x - qp0.x, cc1.y - qp0.y),
+                                tb: (cc2.x - qp2.x, cc2.y - qp2.y),
+                            });
+                            current_loop.push(seg_idx);
+                            prev_idx = Some(idx);
+                        }
+                    } else {
+                        // Fallback: single cubic approximation
+                        let (c1, c2) = conic_to_cubic(p0, c, p2, w);
+                        let idx = vertices.len();
+                        vertices.push((p2.x, p2.y));
+                        let seg_idx = segments.len();
+                        segments.push(VectorNetworkSegment {
+                            a: prev_idx.unwrap(),
+                            b: idx,
+                            ta: (c1.x - p0.x, c1.y - p0.y),
+                            tb: (c2.x - p2.x, c2.y - p2.y),
+                        });
+                        current_loop.push(seg_idx);
+                        prev_idx = Some(idx);
+                    }
                 }
                 Verb::Cubic => {
                     let p0 = pts[0];
