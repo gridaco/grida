@@ -54,11 +54,11 @@ export function DocumentHierarchy() {
   const editor = useCurrentEditor();
 
   return (
-    <ResizablePanelGroup orientation="vertical" className="h-full">
-      <ResizablePanel defaultSize={15} minSize={10} maxSize={40}>
+    <ResizablePanelGroup orientation="vertical" className="h-full min-h-0">
+      <ResizablePanel defaultSize={"15%"} minSize={100} className="min-h-0">
         <SidebarGroup
           onContextMenu={(e) => e.preventDefault()}
-          className="h-full flex flex-col"
+          className="h-full flex flex-col min-h-0"
         >
           <SidebarGroupLabel>
             Scenes
@@ -69,7 +69,7 @@ export function DocumentHierarchy() {
               <span className="sr-only">New Scene</span>
             </SidebarGroupAction>
           </SidebarGroupLabel>
-          <SidebarGroupContent className="flex-1 overflow-y-auto">
+          <SidebarGroupContent className="flex-1 min-h-0 overflow-y-auto">
             <ScenesList />
           </SidebarGroupContent>
         </SidebarGroup>
@@ -77,13 +77,13 @@ export function DocumentHierarchy() {
 
       <ResizableHandle />
 
-      <ResizablePanel defaultSize={80}>
+      <ResizablePanel minSize={120} className="min-h-0">
         <SidebarGroup
-          className="h-full flex flex-col"
+          className="h-full flex flex-col min-h-0"
           onContextMenu={(e) => e.preventDefault()}
         >
           <SidebarGroupLabel>Layers</SidebarGroupLabel>
-          <SidebarGroupContent className="flex-1 overflow-y-auto">
+          <SidebarGroupContent className="flex-1 min-h-0 overflow-y-auto">
             <NodeHierarchyList />
           </SidebarGroupContent>
         </SidebarGroup>
