@@ -6,6 +6,8 @@ export interface PricingInformation {
   href: string;
   priceLabel?: string;
   priceMonthly: number | string;
+  /** Small note under price (e.g. "Starts from $599/mo" for Enterprise) */
+  priceNote?: string;
   warning?: string;
   warningTooltip?: string;
   description: string;
@@ -145,24 +147,17 @@ export const plans: PricingInformation[] = [
     id: "tier_enterprise",
     name: "Enterprise",
     href: "https://grida.co/d/e/c3cf8937-f4f3-4c69-81f3-8d3b9e109013",
-    description:
-      "For large-scale and building custom solutions on top fo Grida",
-    features: [
-      {
-        name: "Dedicated support",
-      },
-      {
-        name: "Dedicated instance",
-      },
-      {
-        name: "Bulk operations",
-      },
-      {
-        name: "Any Custom feature you need",
-      },
-    ],
     priceLabel: "",
     priceMonthly: "Custom",
+    priceNote: "Starts from $599/mo",
+    description:
+      "Dedicated support and managed experience. We run it, you ship.",
+    features: [
+      { name: "Direct Slack access to engineers" },
+      { name: "Managed platform—no fork needed" },
+      { name: "Cloud or On-premises deployment" },
+      { name: "Custom features tailored to you" },
+    ],
     cta: "Contact Sales",
   },
 ];

@@ -54,6 +54,7 @@ export function Pricing() {
               price={{
                 primary: `${plan.priceMonthly}`,
                 secondary: plan.costUnit,
+                note: plan.priceNote,
               }}
               features={plan.features}
               excerpt={plan.description}

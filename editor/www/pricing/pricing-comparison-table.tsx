@@ -61,6 +61,7 @@ function PricingMobileHeader({
 
 const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   const [activeMobilePlan, setActiveMobilePlan] = useState("Free");
+  const enterprisePlan = plans.find((p) => p.name === "Enterprise");
 
   return (
     <div
@@ -250,14 +251,11 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingMobileHeader
               plans={plans}
               plan="Enterprise"
-              price={"Contact us"}
-              priceDescription={""}
-              description={
-                "Designated support team, account manager and technical specialist"
-              }
+              price="Custom"
+              priceDescription={enterprisePlan?.priceNote ?? ""}
+              description={enterprisePlan?.description ?? ""}
               showDollarSign={false}
             />
-
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"enterprise"}
@@ -330,9 +328,15 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
                       </span>
                     </div>
                     <div className="h-5">
-                      {["Free", "Pro", "Team"].includes(plan.name) && (
+                      {["Free", "Pro", "Team"].includes(plan.name) &&
+                        plan.costUnit && (
+                          <span className="text-[13px] opacity-50 leading-4">
+                            {plan.costUnit}
+                          </span>
+                        )}
+                      {plan.name === "Enterprise" && plan.priceNote && (
                         <span className="text-[13px] opacity-50 leading-4">
-                          {plan.costUnit}
+                          {plan.priceNote}
                         </span>
                       )}
                     </div>
