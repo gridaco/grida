@@ -744,6 +744,7 @@ FlatBuffers schema evolution with the types defined in this document. Rust and T
 ### Internal references
 
 - Text Editing Manifesto: `docs/wg/feat-text-editing/index.md`
+- Performance Model: `docs/wg/feat-text-editing/impl-performance.md`
 - Paragraph Roadmap: `docs/wg/feat-paragraph/index.md`
 - FlatBuffers Schema: `format/grida.fbs`
 - Figma kiwi schema reference: `.ref/figma/fig.kiwi`

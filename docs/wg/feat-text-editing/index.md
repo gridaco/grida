@@ -32,7 +32,7 @@ This document proposes a **minimal but extensible** text editing model and geome
 - **Model vs view separation**: input state is pure data; geometry is queried; rendering is host-defined.
 - **Text positions are contracts**: cursoring and selection operate on _valid cursor stops_, not arbitrary integers.
 - **Determinism (scoped)**: for fixed font set, shaping engine, and layout constraints, the mapping (state) → geometry is a function (same input ⇒ same output).
-- **Incremental computation**: queries should be cheap, cacheable, and invalidated predictably.
+- **Incremental computation**: queries should be cheap, cacheable, and invalidated predictably. (See `impl-performance.md` for the full performance model.)
 - **Accessibility compatibility**: expose enough structure to bridge to platform accessibility layers.
 
 ## Core contracts (read this first)
