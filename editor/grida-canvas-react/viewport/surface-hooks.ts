@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
+import {
+  useCurrentEditor,
+  useEditorState,
+} from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import cmath from "@grida/cmath";
 import { NodeWithMeta, useTransformState } from "../provider";
@@ -243,23 +246,33 @@ export function useSelectionGroups(
   ...node_ids: string[]
 ): SurfaceSelectionGroup[] {
   const instance = useCurrentEditor();
-  const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
 
   // Use stable node IDs to avoid unnecessary re-renders
   const __node_ids = useStableNodeIds(node_ids);
 
+  // Narrow subscription: only select the specific nodes we need + document_ctx
+  // instead of the entire document object. This avoids deep-equal checks on the
+  // full document tree for every state change (e.g. pointer moves).
+  const { selectedNodes, document_ctx } = useEditorState(
+    instance,
+    (state) => ({
+      selectedNodes: __node_ids.map(
+        (id) => state.document.nodes[id] as grida.program.nodes.UnknownNode
+      ),
+      document_ctx: state.document_ctx,
+    })
+  );
+
   const [groups, setGroups] = useState<SurfaceSelectionGroup[]>([]);
 
   const grouped = useMemo(() => {
-    const activenodes = __node_ids
-      .map((id) => document.nodes[id])
-      .filter((n) => n?.active);
+    const activenodes = selectedNodes.filter((n) => n?.active);
     return Object.groupBy(
       activenodes,
       (it) => dq.getParentId(document_ctx, it.id) ?? ""
     );
-  }, [document.nodes, document_ctx, __node_ids]);
+  }, [selectedNodes, document_ctx, __node_ids]);
 
   useEffect(() => {
     const groupkeys = Object.keys(grouped);
@@ -301,9 +314,14 @@ export function useSingleSelection(
   } = { enabled: true }
 ): SurfaceSingleSelection | undefined {
   const instance = useCurrentEditor();
-  const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
-  const node = document.nodes[node_id];
+
+  // Narrow subscription: only select the specific node + document_ctx
+  // instead of the entire document object.
+  const { node, document_ctx } = useEditorState(instance, (state) => ({
+    node: state.document.nodes[node_id],
+    document_ctx: state.document_ctx,
+  }));
 
   const [data, setData] = useState<SurfaceSingleSelection | undefined>(
     undefined

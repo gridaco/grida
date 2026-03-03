@@ -16,7 +16,6 @@ import {
   useClipboardSync,
   useContentEditModeMinimalState,
   useCurrentSceneState,
-  useDocumentState,
   useEventTargetCSSCursor,
   useGestureState,
   useIsTransforming,
@@ -620,12 +619,17 @@ function DropzoneOverlay(props: editor.state.DropzoneIndication) {
 
 function RootFramesBarOverlay() {
   const { selection, hovered_node_id } = useSelectionState();
-  const { document } = useDocumentState();
+  const editor = useCurrentEditor();
   const scene = useCurrentSceneState();
 
+  // Narrow subscription: only select nodes for the scene's root children
+  // instead of the entire document.nodes object.
+  const rootChildren = useEditorState(editor, (state) =>
+    scene.children_refs.map((id) => state.document.nodes[id])
+  );
+
   const rootframes = useMemo(() => {
-    const children = scene.children_refs.map((id) => document.nodes[id]);
-    return children.filter(
+    return rootChildren.filter(
       (n) =>
         n &&
         n.active !== false &&
@@ -634,7 +638,7 @@ function RootFramesBarOverlay() {
           n.type === "component" ||
           n.type === "instance")
     );
-  }, [scene.children_refs, document.nodes]);
+  }, [rootChildren]);
 
   if (scene.constraints.children === "single") {
     const rootframe = rootframes[0];
