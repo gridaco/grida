@@ -1721,4 +1721,47 @@ mod tests {
         // "Hello" bold + ", World!" normal
         assert_eq!(at.runs().len(), 2);
     }
+
+    // -----------------------------------------------------------------------
+    // Clone / snapshot round-trip (verifies history can snapshot and restore)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn clone_preserves_full_state() {
+        let mut at = AttributedText::new("Hello World", default_style());
+        at.apply_style(0, 5, |s| { s.font_weight = 700; });
+        at.apply_style(6, 11, |s| { s.font_style_italic = true; });
+
+        // Clone (simulates history snapshot).
+        let snapshot = at.clone();
+
+        // Mutate the original.
+        at.apply_style(0, 11, |s| { s.font_weight = 400; s.font_style_italic = false; });
+        assert_eq!(at.runs().len(), 1); // everything uniform now
+
+        // Snapshot is untouched: [0,5) bold, [5,6) default, [6,11) italic.
+        assert_eq!(snapshot.runs().len(), 3);
+        assert_eq!(snapshot.runs()[0].style.font_weight, 700);
+        assert!(snapshot.runs()[2].style.font_style_italic);
+    }
+
+    #[test]
+    fn clone_restore_round_trip() {
+        let mut at = AttributedText::new("ABCDE", default_style());
+        at.apply_style(2, 4, |s| { s.font_weight = 700; });
+
+        // Snapshot before style change.
+        let before = at.clone();
+
+        // Apply a style change.
+        at.apply_style(0, 5, |s| { s.font_style_italic = true; });
+        assert!(at.runs()[0].style.font_style_italic);
+
+        // "Undo" by restoring the snapshot.
+        at = before;
+        assert_eq!(at.runs().len(), 3);
+        assert!(!at.runs()[0].style.font_style_italic);
+        assert_eq!(at.runs()[1].style.font_weight, 700);
+        assert!(at.check_invariants().is_ok());
+    }
 }

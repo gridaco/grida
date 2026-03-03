@@ -8,7 +8,7 @@ pub mod skia_layout;
 #[cfg(test)]
 mod tests;
 
-pub use history::{EditHistory, EditKind};
+pub use history::{EditHistory, EditKind, GenericEditHistory};
 pub use layout::{line_index_for_offset, CaretRect, LineMetrics, SelectionRect, TextLayoutEngine};
 pub use simple_layout::SimpleLayoutEngine;
 #[cfg(feature = "skia")]

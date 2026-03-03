@@ -66,6 +66,8 @@
 //   [x] Undo / redo (Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z)
 //       Snapshot-based history with merge: consecutive typing, backspace, or
 //       delete are grouped; paste, newline, and IME commit are discrete steps.
+//       Snapshots capture both text and style runs, so undo/redo restores
+//       formatting changes (bold, italic, underline, font size) as well.
 //
 // Rich text (per-run styling via AttributedText)
 //   [x] Cmd/Ctrl+B         toggle bold (variable font wght axis)
@@ -116,7 +118,7 @@ use winit::{
 
 use grida_text_edit::{
     apply_command, utf8_to_utf16_offset,
-    EditHistory, EditKind, EditingCommand,
+    EditKind, EditingCommand, GenericEditHistory,
     SkiaLayoutEngine, TextEditorState, TextLayoutEngine,
     attributed_text::{
         AttributedText, TextStyle as AttrTextStyle,
@@ -328,6 +330,13 @@ fn skia_line_index_for_u16_offset(
 // TextEditor  – thin shell: pure editing state + Skia layout + UI state
 // ---------------------------------------------------------------------------
 
+/// Snapshot capturing both editor state and attributed text for undo/redo.
+#[derive(Clone)]
+struct RichTextSnapshot {
+    state: TextEditorState,
+    content: AttributedText,
+}
+
 struct TextEditor {
     /// Pure editing state: text, cursor, anchor.
     pub state: TextEditorState,
@@ -352,8 +361,8 @@ struct TextEditor {
 
     empty_line_policy: EmptyLineSelectionPolicy,
 
-    /// Undo / redo history (snapshot-based).
-    history: EditHistory,
+    /// Undo / redo history capturing both text and style state.
+    history: GenericEditHistory<RichTextSnapshot>,
 }
 
 impl TextEditor {
@@ -372,17 +381,33 @@ impl TextEditor {
             drag_anchor_utf8: None,
             preedit: None,
             empty_line_policy: config.empty_line_policy,
-            history: EditHistory::new(),
+            history: GenericEditHistory::new(),
         }
     }
 
+    /// Capture the current state + content as a snapshot for history.
+    fn snapshot(&self) -> RichTextSnapshot {
+        RichTextSnapshot {
+            state: self.state.clone(),
+            content: self.content.clone(),
+        }
+    }
+
+    /// Restore from a snapshot.
+    fn restore(&mut self, snap: RichTextSnapshot) {
+        self.state = snap.state;
+        self.content = snap.content;
+        self.caret_style_override = None;
+        self.layout.invalidate();
+    }
+
     // -----------------------------------------------------------------------
-    // Core: apply an editing command
+    // Core: apply an editing command (text mutation)
     // -----------------------------------------------------------------------
 
     fn apply(&mut self, cmd: EditingCommand) {
         if let Some(kind) = cmd.edit_kind() {
-            self.history.push(&self.state, kind);
+            self.history.push(&self.snapshot(), kind);
         }
         let old_cursor = self.state.cursor;
         let old_text = self.state.text.clone();
@@ -392,7 +417,7 @@ impl TextEditor {
     }
 
     fn apply_with_kind(&mut self, cmd: EditingCommand, kind: EditKind) {
-        self.history.push(&self.state, kind);
+        self.history.push(&self.snapshot(), kind);
         let old_cursor = self.state.cursor;
         let old_text = self.state.text.clone();
         self.state = apply_command(&self.state, cmd, &mut self.layout);
@@ -416,25 +441,15 @@ impl TextEditor {
         let insert_style = self.caret_style_override.clone()
             .unwrap_or_else(|| self.content.caret_style_at(old_cursor as u32).clone());
 
-        // Reconstruct content from the new text, preserving existing runs
-        // where possible. The simplest correct approach: rebuild from scratch
-        // with the new text and re-apply styles from the old content at
-        // corresponding positions. But for typical edits (insert/delete at
-        // cursor), we can do better with a diff.
-        //
-        // For now, use a practical approach:
-        // 1. The old content covers old_text.
-        // 2. Compute the common prefix and suffix to find the edit span.
         let old_len = old_text.len();
         let new_len = new_text.len();
 
-        // Find common prefix length (byte level, but snap to char boundaries).
+        // Find common prefix length (byte level, snap to char boundaries).
         let mut prefix = 0;
         for (a, b) in old_text.bytes().zip(new_text.bytes()) {
             if a != b { break; }
             prefix += 1;
         }
-        // Snap to char boundary
         while prefix > 0 && !old_text.is_char_boundary(prefix) {
             prefix -= 1;
         }
@@ -462,11 +477,9 @@ impl TextEditor {
         let new_end = new_len - suffix;
 
         if old_end > prefix {
-            // Text was deleted in [prefix, old_end).
             self.content.delete(prefix, old_end);
         }
         if new_end > prefix {
-            // Text was inserted at prefix.
             let inserted = &new_text[prefix..new_end];
             self.content.insert_with_style(prefix, inserted, insert_style);
         }
@@ -475,12 +488,13 @@ impl TextEditor {
         self.caret_style_override = None;
     }
 
+    // -----------------------------------------------------------------------
+    // Undo / redo — restores full snapshot (text + styles)
+    // -----------------------------------------------------------------------
+
     fn undo(&mut self) -> bool {
-        if let Some(prev) = self.history.undo(&self.state) {
-            let old_text = self.state.text.clone();
-            let old_cursor = self.state.cursor;
-            self.state = prev;
-            self.sync_content_after_edit(&old_text, old_cursor);
+        if let Some(prev) = self.history.undo(&self.snapshot()) {
+            self.restore(prev);
             self.reset_blink();
             true
         } else {
@@ -489,11 +503,8 @@ impl TextEditor {
     }
 
     fn redo(&mut self) -> bool {
-        if let Some(next) = self.history.redo(&self.state) {
-            let old_text = self.state.text.clone();
-            let old_cursor = self.state.cursor;
-            self.state = next;
-            self.sync_content_after_edit(&old_text, old_cursor);
+        if let Some(next) = self.history.redo(&self.snapshot()) {
+            self.restore(next);
             self.reset_blink();
             true
         } else {
@@ -507,13 +518,12 @@ impl TextEditor {
 
     fn toggle_bold(&mut self) {
         if let Some((lo, hi)) = self.selection_range() {
-            // Check if the first character in the selection is already bold.
+            self.history.push(&self.snapshot(), EditKind::Style);
             let is_bold = self.content.style_at(lo as u32).font_weight >= 700;
             let new_weight = if is_bold { 400 } else { 700 };
             self.content.apply_style(lo, hi, |s| { s.font_weight = new_weight; });
             self.layout.invalidate();
         } else {
-            // No selection — toggle the caret style override.
             let current = self.caret_style_override.clone()
                 .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
             let mut new_style = current;
@@ -524,6 +534,7 @@ impl TextEditor {
 
     fn toggle_italic(&mut self) {
         if let Some((lo, hi)) = self.selection_range() {
+            self.history.push(&self.snapshot(), EditKind::Style);
             let is_italic = self.content.style_at(lo as u32).font_style_italic;
             self.content.apply_style(lo, hi, |s| { s.font_style_italic = !is_italic; });
             self.layout.invalidate();
@@ -538,6 +549,7 @@ impl TextEditor {
 
     fn toggle_underline(&mut self) {
         if let Some((lo, hi)) = self.selection_range() {
+            self.history.push(&self.snapshot(), EditKind::Style);
             let is_underline = self.content.style_at(lo as u32).text_decoration_line
                 == TextDecorationLine::Underline;
             let new_deco = if is_underline { TextDecorationLine::None } else { TextDecorationLine::Underline };
@@ -569,6 +581,7 @@ impl TextEditor {
     fn adjust_font_size(&mut self, delta: f32) {
         const MIN_FONT_SIZE: f32 = 1.0;
         if let Some((lo, hi)) = self.selection_range() {
+            self.history.push(&self.snapshot(), EditKind::Style);
             self.content.apply_style(lo, hi, |s| {
                 s.font_size = (s.font_size + delta).max(MIN_FONT_SIZE);
             });

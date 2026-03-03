@@ -17,6 +17,9 @@ pub enum EditKind {
     Paste,
     ImeCommit,
     Newline,
+    /// A style-only change (bold, italic, font size, etc.).
+    /// Never merges with text-editing kinds.
+    Style,
 }
 
 impl EditKind {
@@ -26,27 +29,36 @@ impl EditKind {
 }
 
 // ---------------------------------------------------------------------------
-// HistoryEntry
+// HistoryEntry<S>
 // ---------------------------------------------------------------------------
 
-struct HistoryEntry {
-    state: TextEditorState,
+struct HistoryEntry<S> {
+    state: S,
     kind: EditKind,
     timestamp: Instant,
 }
 
 // ---------------------------------------------------------------------------
-// EditHistory
+// GenericEditHistory<S> – snapshot-based undo/redo, generic over state type
 // ---------------------------------------------------------------------------
 
-pub struct EditHistory {
-    undo_stack: Vec<HistoryEntry>,
-    redo_stack: Vec<HistoryEntry>,
+/// A snapshot-based undo/redo stack, generic over the state type `S`.
+///
+/// The history stores snapshots of the state **before** each edit.
+/// Consecutive edits of the same mergeable kind within the merge timeout
+/// are grouped into a single undo step.
+///
+/// `S` must implement `Clone` so snapshots can be captured. For plain-text
+/// editing, `S = TextEditorState`. For rich-text editing, `S` should include
+/// both the editor state and the attributed text content.
+pub struct GenericEditHistory<S> {
+    undo_stack: Vec<HistoryEntry<S>>,
+    redo_stack: Vec<HistoryEntry<S>>,
     max_entries: usize,
     merge_timeout: Duration,
 }
 
-impl EditHistory {
+impl<S: Clone> GenericEditHistory<S> {
     pub fn new() -> Self {
         Self {
             undo_stack: Vec::new(),
@@ -77,7 +89,7 @@ impl EditHistory {
     /// state before the entire merged run).
     ///
     /// Any pending redo stack is cleared on push.
-    pub fn push(&mut self, state_before: &TextEditorState, kind: EditKind) {
+    pub fn push(&mut self, state_before: &S, kind: EditKind) {
         if kind.is_mergeable() {
             if let Some(top) = self.undo_stack.last_mut() {
                 if top.kind == kind && top.timestamp.elapsed() < self.merge_timeout {
@@ -102,7 +114,7 @@ impl EditHistory {
     }
 
     /// Undo: saves `current` onto the redo stack and returns the previous state.
-    pub fn undo(&mut self, current: &TextEditorState) -> Option<TextEditorState> {
+    pub fn undo(&mut self, current: &S) -> Option<S> {
         let entry = self.undo_stack.pop()?;
         self.redo_stack.push(HistoryEntry {
             state: current.clone(),
@@ -113,7 +125,7 @@ impl EditHistory {
     }
 
     /// Redo: saves `current` onto the undo stack and returns the next state.
-    pub fn redo(&mut self, current: &TextEditorState) -> Option<TextEditorState> {
+    pub fn redo(&mut self, current: &S) -> Option<S> {
         let entry = self.redo_stack.pop()?;
         self.undo_stack.push(HistoryEntry {
             state: current.clone(),
@@ -124,18 +136,25 @@ impl EditHistory {
     }
 }
 
-impl Default for EditHistory {
+impl<S: Clone> Default for GenericEditHistory<S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
 // ---------------------------------------------------------------------------
+// EditHistory – the plain-text specialization (backward compatible)
+// ---------------------------------------------------------------------------
+
+/// Plain-text edit history. Type alias preserving backward compatibility.
+pub type EditHistory = GenericEditHistory<TextEditorState>;
+
+// ---------------------------------------------------------------------------
 // Test-only helpers
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-impl EditHistory {
+impl<S: Clone> GenericEditHistory<S> {
     /// Create a history with a custom merge timeout (useful for testing).
     pub fn with_merge_timeout(timeout: Duration) -> Self {
         Self {
