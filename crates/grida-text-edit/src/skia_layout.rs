@@ -2,7 +2,7 @@ use skia_safe::{
     self as skia_safe,
     textlayout::{
         FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle,
-        RectHeightStyle, RectWidthStyle, TextStyle, TypefaceFontProvider,
+        RectHeightStyle, RectWidthStyle, TextDecoration, TextStyle, TypefaceFontProvider,
     },
     Color, FontMgr, Point,
 };
@@ -152,6 +152,29 @@ impl SkiaLayoutEngine {
         let weight = skia_safe::font_style::Weight::from(self.config.font_weight as i32);
         let font_style = skia_safe::FontStyle::new(weight, skia_safe::font_style::Width::NORMAL, slant);
         ts.set_font_style(font_style);
+
+        // Variable font axis interpolation — push wght and opsz so that
+        // variable fonts actually render at the requested weight.
+        {
+            use skia_safe::font_arguments::variation_position::Coordinate;
+            let coords = [
+                Coordinate {
+                    axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
+                    value: self.config.font_weight as f32,
+                },
+                Coordinate {
+                    axis: skia_safe::FourByteTag::from(('o', 'p', 's', 'z')),
+                    value: self.config.font_size,
+                },
+            ];
+            let variation_position = skia_safe::font_arguments::VariationPosition {
+                coordinates: &coords,
+            };
+            let font_args = skia_safe::FontArguments::new()
+                .set_variation_design_position(variation_position);
+            ts.set_font_arguments(&font_args);
+        }
+
         if let Some(ls) = self.config.letter_spacing {
             ts.set_letter_spacing(ls);
         }
@@ -199,6 +222,188 @@ impl SkiaLayoutEngine {
             self.font_collection.set_asset_font_manager(Some(provider.into()));
         }
         self.paragraph = None;
+    }
+
+    /// Register multiple fonts at once under the same family. Each byte slice
+    /// is a separate TTF/OTF file (e.g. regular, italic, bold, bold-italic).
+    /// Skia will match the correct typeface by weight/slant when building
+    /// paragraphs.
+    pub fn add_font_family(&mut self, family: &str, font_data: &[&[u8]]) {
+        let loader = FontMgr::new();
+        let mut provider = TypefaceFontProvider::new();
+        for bytes in font_data {
+            if let Some(tf) = loader.new_from_data(bytes, None) {
+                provider.register_typeface(tf, Some(family));
+            }
+        }
+        self.font_collection.set_asset_font_manager(Some(provider.into()));
+        self.paragraph = None;
+    }
+
+    /// Build and cache a paragraph from an [`AttributedText`], pushing
+    /// per-run styles to `ParagraphBuilder`. This is the rich-text layout
+    /// path — each run gets its own font weight, slant, decoration, color,
+    /// etc.
+    pub fn ensure_layout_attributed(
+        &mut self,
+        at: &crate::attributed_text::AttributedText,
+    ) {
+        if self.paragraph.is_some() && self.cached_text == at.text() {
+            return;
+        }
+        self.rebuild_attributed(at);
+    }
+
+    fn rebuild_attributed(
+        &mut self,
+        at: &crate::attributed_text::AttributedText,
+    ) {
+        use crate::attributed_text as at_mod;
+
+        let mut para_style = ParagraphStyle::new();
+        para_style.set_apply_rounding_hack(false);
+        para_style.set_text_align(self.config.text_align.to_skia());
+
+        let mut builder = ParagraphBuilder::new(&para_style, &self.font_collection);
+
+        let text = at.text();
+        let families: Vec<&str> = self.config.font_families.iter().map(|s| s.as_str()).collect();
+
+        for run in at.runs() {
+            let style = &run.style;
+            let mut ts = TextStyle::new();
+
+            // Font size
+            ts.set_font_size(style.font_size);
+
+            // Font families
+            ts.set_font_families(&families);
+
+            // Font style (for typeface matching in FontCollection)
+            let slant = if style.font_style_italic {
+                skia_safe::font_style::Slant::Italic
+            } else {
+                skia_safe::font_style::Slant::Upright
+            };
+            let weight = skia_safe::font_style::Weight::from(style.font_weight as i32);
+            let width = skia_safe::font_style::Width::from(style.font_width as i32);
+            ts.set_font_style(skia_safe::FontStyle::new(weight, width, slant));
+
+            // Variable font axes (FontArguments) — this is what actually
+            // triggers weight/width/opsz interpolation on variable fonts.
+            // Without this, set_font_style only selects among registered
+            // typefaces but does NOT interpolate variable font axes.
+            {
+                use skia_safe::font_arguments::variation_position::Coordinate;
+
+                let mut coords: Vec<Coordinate> = Vec::new();
+
+                // User-specified custom font variations (e.g. CASL, MONO, slnt)
+                for v in &style.font_variations {
+                    let bytes = v.axis.as_bytes();
+                    let tag = skia_safe::FourByteTag::from((
+                        *bytes.first().unwrap_or(&b' ') as char,
+                        *bytes.get(1).unwrap_or(&b' ') as char,
+                        *bytes.get(2).unwrap_or(&b' ') as char,
+                        *bytes.get(3).unwrap_or(&b' ') as char,
+                    ));
+                    coords.push(Coordinate { axis: tag, value: v.value });
+                }
+
+                // wght — always push from font_weight
+                coords.push(Coordinate {
+                    axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
+                    value: style.font_weight as f32,
+                });
+
+                // wdth — from font_width if not default (100.0)
+                if (style.font_width - 100.0).abs() > f32::EPSILON {
+                    coords.push(Coordinate {
+                        axis: skia_safe::FourByteTag::from(('w', 'd', 't', 'h')),
+                        value: style.font_width,
+                    });
+                }
+
+                // opsz — auto = font_size
+                match style.font_optical_sizing {
+                    at_mod::FontOpticalSizing::Auto => {
+                        coords.push(Coordinate {
+                            axis: skia_safe::FourByteTag::from(('o', 'p', 's', 'z')),
+                            value: style.font_size,
+                        });
+                    }
+                    at_mod::FontOpticalSizing::Fixed(v) => {
+                        coords.push(Coordinate {
+                            axis: skia_safe::FourByteTag::from(('o', 'p', 's', 'z')),
+                            value: v,
+                        });
+                    }
+                    at_mod::FontOpticalSizing::None => {}
+                }
+
+                let variation_position = skia_safe::font_arguments::VariationPosition {
+                    coordinates: &coords,
+                };
+                let font_args = skia_safe::FontArguments::new()
+                    .set_variation_design_position(variation_position);
+                ts.set_font_arguments(&font_args);
+            }
+
+            // Color / fill
+            match &style.fill {
+                at_mod::TextFill::Solid(rgba) => {
+                    ts.set_color(Color::from_argb(
+                        (rgba.a * 255.0) as u8,
+                        (rgba.r * 255.0) as u8,
+                        (rgba.g * 255.0) as u8,
+                        (rgba.b * 255.0) as u8,
+                    ));
+                }
+            }
+
+            // Letter spacing
+            match style.letter_spacing {
+                at_mod::TextDimension::Fixed(v) => { ts.set_letter_spacing(v); }
+                _ => {}
+            }
+
+            // Kerning
+            ts.add_font_feature("kern", if style.font_kerning { 1 } else { 0 });
+
+            // User font features
+            for feat in &style.font_features {
+                ts.add_font_feature(feat.tag.clone(), if feat.value { 1 } else { 0 });
+            }
+
+            // Decoration
+            let mut deco = TextDecoration::NO_DECORATION;
+            match style.text_decoration_line {
+                at_mod::TextDecorationLine::Underline => {
+                    deco = TextDecoration::UNDERLINE;
+                }
+                at_mod::TextDecorationLine::LineThrough => {
+                    deco = TextDecoration::LINE_THROUGH;
+                }
+                at_mod::TextDecorationLine::Overline => {
+                    deco = TextDecoration::OVERLINE;
+                }
+                at_mod::TextDecorationLine::None => {}
+            }
+            ts.set_decoration_type(deco);
+
+            builder.push_style(&ts);
+
+            let start = run.start as usize;
+            let end = run.end as usize;
+            if start < end && end <= text.len() {
+                builder.add_text(&text[start..end]);
+            }
+        }
+
+        let mut para = builder.build();
+        para.layout(self.layout_width);
+        self.paragraph = Some(para);
+        self.cached_text = text.to_owned();
     }
 
     /// Invalidate the cached paragraph so the next layout call rebuilds.

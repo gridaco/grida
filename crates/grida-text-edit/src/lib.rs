@@ -1,3 +1,4 @@
+pub mod attributed_text;
 pub mod history;
 pub mod layout;
 pub mod simple_layout;

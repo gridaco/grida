@@ -1,6 +1,14 @@
-//! Minimal plain-text editor built directly on winit + Skia.
+//! Rich-text editor prototype built directly on winit + Skia.
 //!
-//! Uses the grida-text-edit crate for editing logic and Skia paragraph layout.
+//! Uses the grida-text-edit crate for editing logic, `AttributedText` for
+//! per-run styling, and Skia paragraph layout for rendering.
+//!
+//! Rich text shortcuts:
+//!   Cmd/Ctrl+B           toggle bold
+//!   Cmd/Ctrl+I           toggle italic
+//!   Cmd/Ctrl+U           toggle underline
+//!   Cmd/Ctrl+Shift+>     increase font size (+1 pt)
+//!   Cmd/Ctrl+Shift+<     decrease font size (-1 pt)
 
 #![allow(clippy::single_match)]
 
@@ -59,6 +67,16 @@
 //       Snapshot-based history with merge: consecutive typing, backspace, or
 //       delete are grouped; paste, newline, and IME commit are discrete steps.
 //
+// Rich text (per-run styling via AttributedText)
+//   [x] Cmd/Ctrl+B         toggle bold (variable font wght axis)
+//   [x] Cmd/Ctrl+I         toggle italic (real italic typeface)
+//   [x] Cmd/Ctrl+U         toggle underline
+//   [x] Cmd/Ctrl+Shift+>   increase font size (+1 pt, min 1)
+//   [x] Cmd/Ctrl+Shift+<   decrease font size (-1 pt, min 1)
+//   [x] Caret style override (toggle with no selection sets typing style)
+//   [x] Per-run layout via Skia ParagraphBuilder (pushStyle/addText per run)
+//   [x] Variable font axis interpolation (wght, opsz via FontArguments)
+//
 // Not yet implemented
 //   [ ] Scroll (vertical)
 //   [ ] Visual-order bidi cursor movement
@@ -100,6 +118,10 @@ use grida_text_edit::{
     apply_command, utf8_to_utf16_offset,
     EditHistory, EditKind, EditingCommand,
     SkiaLayoutEngine, TextEditorState, TextLayoutEngine,
+    attributed_text::{
+        AttributedText, TextStyle as AttrTextStyle,
+        TextDecorationLine,
+    },
 };
 
 // ---------------------------------------------------------------------------
@@ -312,6 +334,13 @@ struct TextEditor {
     /// Skia-backed layout engine (shared with apply_command calls).
     layout: SkiaLayoutEngine,
 
+    /// Attributed text model (runs of styled text).
+    pub content: AttributedText,
+
+    /// Explicit caret style override (set by Cmd+B/I/U with no selection).
+    /// Cleared on cursor movement.
+    caret_style_override: Option<AttrTextStyle>,
+
     // UI-only state (not part of editing logic)
     cursor_visible: bool,
     last_blink: Instant,
@@ -328,13 +357,15 @@ struct TextEditor {
 }
 
 impl TextEditor {
-    fn new(config: TextEditorConfig) -> Self {
+    fn new(config: TextEditorConfig, default_style: AttrTextStyle) -> Self {
         Self {
             state: TextEditorState::with_cursor(String::new(), 0),
             layout: SkiaLayoutEngine::new(
                 (WINDOW_W as f32) - PADDING * 2.0,
                 (WINDOW_H as f32) - PADDING * 2.0,
             ),
+            content: AttributedText::empty(default_style),
+            caret_style_override: None,
             cursor_visible: true,
             last_blink: Instant::now(),
             mouse_down: false,
@@ -353,19 +384,103 @@ impl TextEditor {
         if let Some(kind) = cmd.edit_kind() {
             self.history.push(&self.state, kind);
         }
+        let old_cursor = self.state.cursor;
+        let old_text = self.state.text.clone();
         self.state = apply_command(&self.state, cmd, &mut self.layout);
+        self.sync_content_after_edit(&old_text, old_cursor);
         self.reset_blink();
     }
 
     fn apply_with_kind(&mut self, cmd: EditingCommand, kind: EditKind) {
         self.history.push(&self.state, kind);
+        let old_cursor = self.state.cursor;
+        let old_text = self.state.text.clone();
         self.state = apply_command(&self.state, cmd, &mut self.layout);
+        self.sync_content_after_edit(&old_text, old_cursor);
         self.reset_blink();
+    }
+
+    /// After apply_command changes `self.state.text`, diff and update
+    /// `self.content` (the AttributedText) to keep runs in sync.
+    fn sync_content_after_edit(&mut self, old_text: &str, old_cursor: usize) {
+        let new_text = &self.state.text;
+        if old_text == new_text {
+            // Pure cursor movement — clear caret style override.
+            if self.state.cursor != old_cursor {
+                self.caret_style_override = None;
+            }
+            return;
+        }
+
+        // Determine the effective style for inserted text.
+        let insert_style = self.caret_style_override.clone()
+            .unwrap_or_else(|| self.content.caret_style_at(old_cursor as u32).clone());
+
+        // Reconstruct content from the new text, preserving existing runs
+        // where possible. The simplest correct approach: rebuild from scratch
+        // with the new text and re-apply styles from the old content at
+        // corresponding positions. But for typical edits (insert/delete at
+        // cursor), we can do better with a diff.
+        //
+        // For now, use a practical approach:
+        // 1. The old content covers old_text.
+        // 2. Compute the common prefix and suffix to find the edit span.
+        let old_len = old_text.len();
+        let new_len = new_text.len();
+
+        // Find common prefix length (byte level, but snap to char boundaries).
+        let mut prefix = 0;
+        for (a, b) in old_text.bytes().zip(new_text.bytes()) {
+            if a != b { break; }
+            prefix += 1;
+        }
+        // Snap to char boundary
+        while prefix > 0 && !old_text.is_char_boundary(prefix) {
+            prefix -= 1;
+        }
+        while prefix > 0 && prefix < new_len && !new_text.is_char_boundary(prefix) {
+            prefix -= 1;
+        }
+
+        // Find common suffix length.
+        let mut suffix = 0;
+        let max_suffix = old_len.min(new_len) - prefix;
+        for i in 0..max_suffix {
+            let oi = old_len - 1 - i;
+            let ni = new_len - 1 - i;
+            if old_text.as_bytes()[oi] != new_text.as_bytes()[ni] { break; }
+            suffix += 1;
+        }
+        while suffix > 0 && !old_text.is_char_boundary(old_len - suffix) {
+            suffix -= 1;
+        }
+        while suffix > 0 && !new_text.is_char_boundary(new_len - suffix) {
+            suffix -= 1;
+        }
+
+        let old_end = old_len - suffix;
+        let new_end = new_len - suffix;
+
+        if old_end > prefix {
+            // Text was deleted in [prefix, old_end).
+            self.content.delete(prefix, old_end);
+        }
+        if new_end > prefix {
+            // Text was inserted at prefix.
+            let inserted = &new_text[prefix..new_end];
+            self.content.insert_with_style(prefix, inserted, insert_style);
+        }
+
+        // After any text edit, clear the override.
+        self.caret_style_override = None;
     }
 
     fn undo(&mut self) -> bool {
         if let Some(prev) = self.history.undo(&self.state) {
+            let old_text = self.state.text.clone();
+            let old_cursor = self.state.cursor;
             self.state = prev;
+            self.sync_content_after_edit(&old_text, old_cursor);
             self.reset_blink();
             true
         } else {
@@ -375,11 +490,95 @@ impl TextEditor {
 
     fn redo(&mut self) -> bool {
         if let Some(next) = self.history.redo(&self.state) {
+            let old_text = self.state.text.clone();
+            let old_cursor = self.state.cursor;
             self.state = next;
+            self.sync_content_after_edit(&old_text, old_cursor);
             self.reset_blink();
             true
         } else {
             false
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Rich text: toggle bold / italic / underline
+    // -----------------------------------------------------------------------
+
+    fn toggle_bold(&mut self) {
+        if let Some((lo, hi)) = self.selection_range() {
+            // Check if the first character in the selection is already bold.
+            let is_bold = self.content.style_at(lo as u32).font_weight >= 700;
+            let new_weight = if is_bold { 400 } else { 700 };
+            self.content.apply_style(lo, hi, |s| { s.font_weight = new_weight; });
+            self.layout.invalidate();
+        } else {
+            // No selection — toggle the caret style override.
+            let current = self.caret_style_override.clone()
+                .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
+            let mut new_style = current;
+            new_style.font_weight = if new_style.font_weight >= 700 { 400 } else { 700 };
+            self.caret_style_override = Some(new_style);
+        }
+    }
+
+    fn toggle_italic(&mut self) {
+        if let Some((lo, hi)) = self.selection_range() {
+            let is_italic = self.content.style_at(lo as u32).font_style_italic;
+            self.content.apply_style(lo, hi, |s| { s.font_style_italic = !is_italic; });
+            self.layout.invalidate();
+        } else {
+            let current = self.caret_style_override.clone()
+                .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
+            let mut new_style = current;
+            new_style.font_style_italic = !new_style.font_style_italic;
+            self.caret_style_override = Some(new_style);
+        }
+    }
+
+    fn toggle_underline(&mut self) {
+        if let Some((lo, hi)) = self.selection_range() {
+            let is_underline = self.content.style_at(lo as u32).text_decoration_line
+                == TextDecorationLine::Underline;
+            let new_deco = if is_underline { TextDecorationLine::None } else { TextDecorationLine::Underline };
+            self.content.apply_style(lo, hi, |s| { s.text_decoration_line = new_deco; });
+            self.layout.invalidate();
+        } else {
+            let current = self.caret_style_override.clone()
+                .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
+            let mut new_style = current;
+            new_style.text_decoration_line = if new_style.text_decoration_line == TextDecorationLine::Underline {
+                TextDecorationLine::None
+            } else {
+                TextDecorationLine::Underline
+            };
+            self.caret_style_override = Some(new_style);
+        }
+    }
+
+    /// Increase font size by `delta` (clamped to >= 1.0).
+    fn increase_font_size(&mut self, delta: f32) {
+        self.adjust_font_size(delta);
+    }
+
+    /// Decrease font size by `delta` (clamped to >= 1.0).
+    fn decrease_font_size(&mut self, delta: f32) {
+        self.adjust_font_size(-delta);
+    }
+
+    fn adjust_font_size(&mut self, delta: f32) {
+        const MIN_FONT_SIZE: f32 = 1.0;
+        if let Some((lo, hi)) = self.selection_range() {
+            self.content.apply_style(lo, hi, |s| {
+                s.font_size = (s.font_size + delta).max(MIN_FONT_SIZE);
+            });
+            self.layout.invalidate();
+        } else {
+            let current = self.caret_style_override.clone()
+                .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
+            let mut new_style = current;
+            new_style.font_size = (new_style.font_size + delta).max(MIN_FONT_SIZE);
+            self.caret_style_override = Some(new_style);
         }
     }
 
@@ -602,18 +801,19 @@ impl TextEditor {
             let preedit_start_u16 = utf8_to_utf16_offset(&display_text, pre.len());
             let preedit_end_u16 = utf8_to_utf16_offset(&display_text, preedit_end_utf8);
 
+            let font_families: Vec<&str> = self.layout.config.font_families.iter().map(|s| s.as_str()).collect();
             let ts_normal = {
                 let mut ts = TextStyle::new();
                 ts.set_font_size(FONT_SIZE);
                 ts.set_color(Color::BLACK);
-                ts.set_font_families(&["Menlo", "Courier New", "monospace"]);
+                ts.set_font_families(&font_families);
                 ts
             };
             let ts_preedit = {
                 let mut ts = TextStyle::new();
                 ts.set_font_size(FONT_SIZE);
                 ts.set_color(Color::BLACK);
-                ts.set_font_families(&["Menlo", "Courier New", "monospace"]);
+                ts.set_font_families(&font_families);
                 ts.set_decoration_type(TextDecoration::UNDERLINE);
                 ts
             };
@@ -695,8 +895,8 @@ impl TextEditor {
                 &cp,
             );
         } else {
-            // ---- normal mode ----
-            self.layout.ensure_layout(&self.state.text);
+            // ---- normal mode (rich text) ----
+            self.layout.ensure_layout_attributed(&self.content);
 
             // Selection
             if let Some((lo, hi)) = self.selection_range() {
@@ -944,78 +1144,50 @@ impl ApplicationHandler for TextEditorApp {
             stencil_bits,
         };
 
-        let mut editor = TextEditor::new(TextEditorConfig {
-            empty_line_policy: self.config.empty_line_policy,
-        });
+        let default_style = AttrTextStyle {
+            font_family: String::from("Inter"),
+            font_size: FONT_SIZE,
+            ..AttrTextStyle::default()
+        };
+
+        let mut editor = TextEditor::new(
+            TextEditorConfig { empty_line_policy: self.config.empty_line_policy },
+            default_style.clone(),
+        );
+
+        // Load Inter variable fonts (upright + italic).
+        // Skia will match the correct weight/slant from the variable font axes.
+        let inter_upright = include_bytes!(
+            "../../../fixtures/fonts/Inter/Inter-VariableFont_opsz,wght.ttf"
+        );
+        let inter_italic = include_bytes!(
+            "../../../fixtures/fonts/Inter/Inter-Italic-VariableFont_opsz,wght.ttf"
+        );
+        editor.layout.add_font_family("Inter", &[inter_upright, inter_italic]);
+        editor.layout.config.font_families = vec!["Inter".into()];
+
         editor.set_layout_width(w as f32);
         editor.set_layout_height(h as f32);
-        editor.state.text = concat!(
+
+        let demo_text = concat!(
             "Hello, World!\n",
-            "Type here to edit text.\n",
+            "Type here to edit text. Use Cmd+B for bold, Cmd+I for italic, Cmd+U for underline.\n",
             "\n",
-            "=== Controls ===\n",
-            "← → ↑ ↓  move cursor         Shift+arrow  extends selection\n",
-            "Cmd+← / →  line start/end     Cmd+↑ / ↓  document start/end\n",
-            "Option+← / →  word jump       Ctrl+← / →  word jump (Win/Linux)\n",
-            "Home / End  line start/end    PageUp / PageDown  move by ~visible lines\n",
-            "Double-click  select word     Mouse drag  select range\n",
-            "Cmd+A  select all             Cmd+C / X / V  clipboard\n",
-            "Cmd+Z  undo                   Cmd+Shift+Z  redo\n",
-            "Option+Backspace  delete word backward    Option+Delete  delete word forward\n",
-            "Cmd+Backspace  delete to line start     Cmd+Delete  delete to line end\n",
+            "Select text and toggle styles, or toggle with no selection to set the typing style.\n",
             "\n",
-            "=== Writing Systems / Shaping / Selection Tests ===\n",
-            "\n",
-            "[Latin + punctuation]\n",
-            "The quick brown fox jumps over 13 lazy dogs. (quotes) \u{201C}like this\u{201D} and \u{2018}this\u{2019}.\n",
-            "Hyphens: state-of-the-art \u{2014} em dash \u{2014} en dash \u{2013} minus \u{2212}  ellipsis \u{2026}\n",
-            "\n",
-            "[Accents / combining marks]\n",
-            "precomposed: caf\u{00E9}, na\u{00EF}ve, co\u{00F6}perate\n",
-            "combining:   cafe\u{0301}  (e + U+0301)   a\u{0308} (a + U+0308)\n",
-            "edge:        Z\u{0351}\u{0327}\u{0301}  (stacked combining marks)\n",
-            "\n",
-            "[Hangul]\n",
-            "Korean: \u{C548}\u{B155}\u{D558}\u{C138}\u{C694}  (precomposed syllables)\n",
-            "Jamo:   \u{3147}\u{314F}\u{3134}\u{3134}\u{3155}\u{3147}\u{314E}\u{314F}\u{3145}\u{3154}\u{3147}\u{3155}  (decomposed jamo sequence)\n",
-            "Mix:    ABC\u{AC00}\u{B098}\u{B2E4}123 (Latin + Hangul + digits)\n",
-            "\n",
-            "[Japanese]\n",
-            "\u{65E5}\u{672C}\u{8A9E}: \u{3053}\u{3093}\u{306B}\u{3061}\u{306F}\u{4E16}\u{754C}  / \u{30AB}\u{30BF}\u{30AB}\u{30CA}: \u{30C6}\u{30B9}\u{30C8}  / \u{3072}\u{3089}\u{304C}\u{306A}: \u{3066}\u{3059}\u{3068}\n",
-            "\n",
-            "[Chinese]\n",
-            "\u{4E2D}\u{6587}: \u{4F60}\u{597D}\u{FF0C}\u{4E16}\u{754C}\u{3002}\u{7E41}\u{9AD4}\u{5B57}\u{FF1A}\u{7E41}\u{9AD4}\u{4E2D}\u{6587}\u{3002}\n",
-            "\n",
-            "[Arabic (RTL) + mixing]\n",
-            "\u{0627}\u{0644}\u{0639}\u{0631}\u{0628}\u{064A}\u{0629}: \u{0645}\u{0631}\u{062D}\u{0628}\u{0627} \u{0628}\u{0627}\u{0644}\u{0639}\u{0627}\u{0644}\u{0645}\n",
-            "mix RTL/LTR: ABC \u{0627}\u{0644}\u{0639}\u{0631}\u{0628}\u{064A}\u{0629} 123 DEF\n",
-            "numbers: \u{0661}\u{0662}\u{0663}\u{0664}\u{0665}  vs  12345\n",
-            "\n",
-            "[Hebrew (RTL) + mixing]\n",
-            "\u{05E2}\u{05D1}\u{05E8}\u{05D9}\u{05EA}: \u{05E9}\u{05DC}\u{05D5}\u{05DD} \u{05E2}\u{05D5}\u{05DC}\u{05DD}\n",
-            "mix RTL/LTR: ABC \u{05E9}\u{05DC}\u{05D5}\u{05DD} 123 DEF\n",
-            "\n",
-            "[Devanagari (conjuncts / reordering)]\n",
-            "\u{0939}\u{093F}\u{0928}\u{094D}\u{0926}\u{0940}: \u{0928}\u{092E}\u{0938}\u{094D}\u{0924}\u{0947} \u{0926}\u{0941}\u{0928}\u{093F}\u{092F}\u{093E}  / conjunct-ish: \u{0915}\u{094D}\u{0937}, \u{0924}\u{094D}\u{0930}, \u{091C}\u{094D}\u{091E}\n",
-            "\n",
-            "[Thai (no spaces between words)]\n",
-            "\u{0E44}\u{0E17}\u{0E22}: \u{0E2A}\u{0E27}\u{0E31}\u{0E2A}\u{0E14}\u{0E35}\u{0E42}\u{0E25}\u{0E01} (word boundaries can be tricky)\n",
-            "\n",
-            "[Emoji / ZWJ sequences / skin tones]\n",
-            "emoji: \u{1F600} \u{1F601} \u{1F602} \u{1F605} \u{1F607}\n",
-            "ZWJ family: \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}   couple: \u{1F469}\u{200D}\u{2764}\u{FE0F}\u{200D}\u{1F469}\n",
-            "professions: \u{1F9D1}\u{200D}\u{1F4BB}  \u{1F469}\u{200D}\u{1F52C}  \u{1F468}\u{200D}\u{1F373}\n",
-            "skin tones: \u{1F44D} \u{1F44D}\u{1F3FB} \u{1F44D}\u{1F3FD} \u{1F44D}\u{1F3FF}\n",
-            "flags: \u{1F1F0}\u{1F1F7} \u{1F1FA}\u{1F1F8} \u{1F1EF}\u{1F1F5} \u{1F1EB}\u{1F1F7}\n",
-            "\n",
-            "[Ligature hint (font-dependent)]\n",
-            "fi fl ffi ffl (ligatures may appear depending on font)\n",
-            "\n",
-            "[Whitespace / tabs]\n",
-            "spaces: A  B   C    D\n",
-            "tabs:   A\tB\tC\tD\n",
-        )
-        .to_string();
+            "The quick brown fox jumps over 13 lazy dogs.\n",
+            "fi fl ffi ffl (ligatures with Inter)\n",
+        );
+
+        editor.content = AttributedText::new(demo_text, default_style.clone());
+        editor.state.text = demo_text.to_string();
+
+        // Pre-style some demo text to show rich text capabilities.
+        // "Hello" bold
+        editor.content.apply_style(0, 5, |s| { s.font_weight = 700; });
+        // "World" italic
+        editor.content.apply_style(7, 12, |s| { s.font_style_italic = true; });
+
         editor.state.cursor = editor.state.text.len();
 
         window.set_ime_allowed(true);
@@ -1176,6 +1348,28 @@ impl ApplicationHandler for TextEditorApp {
 
                     _ if cmd => {
                         match ke.physical_key {
+                            PhysicalKey::Code(KeyCode::KeyB) => {
+                                inner.editor.toggle_bold();
+                                inner.window.request_redraw();
+                            }
+                            PhysicalKey::Code(KeyCode::KeyI) => {
+                                inner.editor.toggle_italic();
+                                inner.window.request_redraw();
+                            }
+                            PhysicalKey::Code(KeyCode::KeyU) => {
+                                inner.editor.toggle_underline();
+                                inner.window.request_redraw();
+                            }
+                            // Cmd+Shift+> (Period) — increase font size
+                            PhysicalKey::Code(KeyCode::Period) if shift => {
+                                inner.editor.increase_font_size(1.0);
+                                inner.window.request_redraw();
+                            }
+                            // Cmd+Shift+< (Comma) — decrease font size
+                            PhysicalKey::Code(KeyCode::Comma) if shift => {
+                                inner.editor.decrease_font_size(1.0);
+                                inner.window.request_redraw();
+                            }
                             PhysicalKey::Code(KeyCode::KeyA) => {
                                 inner.editor.select_all();
                                 inner.window.request_redraw();
