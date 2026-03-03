@@ -7,6 +7,7 @@
 //!   Cmd/Ctrl+B           toggle bold
 //!   Cmd/Ctrl+I           toggle italic
 //!   Cmd/Ctrl+U           toggle underline
+//!   Cmd/Ctrl+Shift+X     toggle strikethrough
 //!   Cmd/Ctrl+Shift+>     increase font size (+1 pt)
 //!   Cmd/Ctrl+Shift+<     decrease font size (-1 pt)
 
@@ -48,9 +49,12 @@
 //   [x] Cmd+A                 select all
 //
 // Clipboard
-//   [x] Cmd/Ctrl+C            copy selection
-//   [x] Cmd/Ctrl+X            cut selection
-//   [x] Cmd/Ctrl+V            paste
+//   [x] Cmd/Ctrl+C            copy selection (HTML + plain text fallback)
+//   [x] Cmd/Ctrl+X            cut selection (HTML + plain text fallback)
+//   [x] Cmd/Ctrl+V            paste (HTML with formatting, or plain text fallback)
+//       Copy/paste preserves bold, italic, underline, font size, color.
+//       Cross-app: paste from Chrome/Word/Figma imports formatting;
+//       copy from here pastes with formatting into other apps.
 //
 // Rendering
 //   [x] Multiline text with wrapping
@@ -73,6 +77,7 @@
 //   [x] Cmd/Ctrl+B         toggle bold (variable font wght axis)
 //   [x] Cmd/Ctrl+I         toggle italic (real italic typeface)
 //   [x] Cmd/Ctrl+U         toggle underline
+//   [x] Cmd/Ctrl+Shift+X   toggle strikethrough
 //   [x] Cmd/Ctrl+Shift+>   increase font size (+1 pt, min 1)
 //   [x] Cmd/Ctrl+Shift+<   decrease font size (-1 pt, min 1)
 //   [x] Caret style override (toggle with no selection sets typing style)
@@ -123,6 +128,7 @@ use grida_text_edit::{
     attributed_text::{
         AttributedText, TextStyle as AttrTextStyle,
         TextDecorationLine,
+        html::{runs_to_html, html_to_attributed_text},
     },
 };
 
@@ -568,6 +574,27 @@ impl TextEditor {
         }
     }
 
+    fn toggle_strikethrough(&mut self) {
+        if let Some((lo, hi)) = self.selection_range() {
+            self.history.push(&self.snapshot(), EditKind::Style);
+            let is_strike = self.content.style_at(lo as u32).text_decoration_line
+                == TextDecorationLine::LineThrough;
+            let new_deco = if is_strike { TextDecorationLine::None } else { TextDecorationLine::LineThrough };
+            self.content.apply_style(lo, hi, |s| { s.text_decoration_line = new_deco; });
+            self.layout.invalidate();
+        } else {
+            let current = self.caret_style_override.clone()
+                .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
+            let mut new_style = current;
+            new_style.text_decoration_line = if new_style.text_decoration_line == TextDecorationLine::LineThrough {
+                TextDecorationLine::None
+            } else {
+                TextDecorationLine::LineThrough
+            };
+            self.caret_style_override = Some(new_style);
+        }
+    }
+
     /// Increase font size by `delta` (clamped to >= 1.0).
     fn increase_font_size(&mut self, delta: f32) {
         self.adjust_font_size(delta);
@@ -593,6 +620,46 @@ impl TextEditor {
             new_style.font_size = (new_style.font_size + delta).max(MIN_FONT_SIZE);
             self.caret_style_override = Some(new_style);
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Rich paste: insert an AttributedText (from HTML clipboard)
+    // -----------------------------------------------------------------------
+
+    fn paste_attributed(&mut self, pasted: &AttributedText) {
+        if pasted.is_empty() {
+            return;
+        }
+        self.history.push(&self.snapshot(), EditKind::Paste);
+
+        // Delete selection if any.
+        if let Some((lo, hi)) = self.selection_range() {
+            self.content.delete(lo, hi);
+            self.state.text = self.content.text().to_owned();
+            self.state.cursor = lo;
+            self.state.anchor = None;
+        }
+
+        let pos = self.state.cursor;
+
+        // Insert each run from the pasted content with its own style.
+        for run in pasted.runs() {
+            let start = run.start as usize;
+            let end = run.end as usize;
+            if start >= end || end > pasted.text().len() {
+                continue;
+            }
+            let slice = &pasted.text()[start..end];
+            let insert_at = pos + start; // offset within the growing text
+            self.content.insert_with_style(insert_at, slice, run.style.clone());
+        }
+
+        self.state.text = self.content.text().to_owned();
+        self.state.cursor = pos + pasted.text().len();
+        self.state.anchor = None;
+        self.caret_style_override = None;
+        self.layout.invalidate();
+        self.reset_blink();
     }
 
     // -----------------------------------------------------------------------
@@ -1397,13 +1464,23 @@ impl ApplicationHandler for TextEditorApp {
                                 }
                             }
                             PhysicalKey::Code(KeyCode::KeyC) => {
-                                if let Some(sel) = inner.editor.selected_text() {
-                                    let _ = self.clipboard.set_text(sel.to_string());
+                                if let Some((lo, hi)) = inner.editor.selection_range() {
+                                    let plain = inner.editor.selected_text().unwrap_or("").to_string();
+                                    let html = runs_to_html(&inner.editor.content, lo, hi);
+                                    let _ = self.clipboard.set_html(&html, Some(&plain));
                                 }
                             }
+                            PhysicalKey::Code(KeyCode::KeyX) if shift => {
+                                // Cmd+Shift+X — toggle strikethrough
+                                inner.editor.toggle_strikethrough();
+                                inner.window.request_redraw();
+                            }
                             PhysicalKey::Code(KeyCode::KeyX) => {
-                                if let Some(sel) = inner.editor.selected_text() {
-                                    let _ = self.clipboard.set_text(sel.to_string());
+                                // Cmd+X — cut
+                                if let Some((lo, hi)) = inner.editor.selection_range() {
+                                    let plain = inner.editor.selected_text().unwrap_or("").to_string();
+                                    let html = runs_to_html(&inner.editor.content, lo, hi);
+                                    let _ = self.clipboard.set_html(&html, Some(&plain));
                                 }
                                 if inner.editor.has_selection() {
                                     inner.editor.apply(EditingCommand::Delete);
@@ -1411,7 +1488,13 @@ impl ApplicationHandler for TextEditorApp {
                                 }
                             }
                             PhysicalKey::Code(KeyCode::KeyV) => {
-                                if let Ok(text) = self.clipboard.get_text() {
+                                // Try HTML first (preserves formatting), fall back to plain text.
+                                if let Ok(html) = self.clipboard.get().html() {
+                                    let base = inner.editor.content.default_style().clone();
+                                    let pasted = html_to_attributed_text(&html, base);
+                                    inner.editor.paste_attributed(&pasted);
+                                    inner.window.request_redraw();
+                                } else if let Ok(text) = self.clipboard.get_text() {
                                     inner.editor.insert_text(&text);
                                     inner.window.request_redraw();
                                 }

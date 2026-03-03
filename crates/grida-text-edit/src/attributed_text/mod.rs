@@ -26,6 +26,8 @@
 //! 6. **Boundary alignment** — all offsets are valid UTF-8 char boundaries.
 //! 7. **Monotonicity** — `runs[i].start < runs[i+1].start` (implied by 3+4).
 
+pub mod html;
+
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
