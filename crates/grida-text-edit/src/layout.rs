@@ -118,12 +118,16 @@ pub trait TextLayoutEngine {
 
 /// Find which line contains `utf8_offset`.
 ///
-/// Forward-scan: first line where `offset < end_index`.
+/// Uses binary search on `end_index` (which is monotonically non-decreasing).
+/// Semantics: returns the first line where `offset < end_index`.
 /// Falls back to the last line when offset is past all end indices.
 /// This is the same rule used by `caret_rect_at`.
 pub fn line_index_for_offset(metrics: &[LineMetrics], utf8_offset: usize) -> usize {
-    metrics
-        .iter()
-        .position(|lm| utf8_offset < lm.end_index)
-        .unwrap_or(metrics.len().saturating_sub(1))
+    if metrics.is_empty() {
+        return 0;
+    }
+    // partition_point returns the first index where the predicate is false,
+    // i.e. the first line where end_index > utf8_offset.
+    let idx = metrics.partition_point(|lm| lm.end_index <= utf8_offset);
+    idx.min(metrics.len() - 1)
 }

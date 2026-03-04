@@ -307,6 +307,364 @@ impl SkiaLayoutEngine {
         self.cached_text = text.to_owned();
     }
 
+    // -------------------------------------------------------------------
+    // Incremental layout: rebuild only the affected block(s)
+    // -------------------------------------------------------------------
+
+    /// Notify the layout engine that a text edit occurred, enabling
+    /// incremental re-layout of only the affected paragraph block(s).
+    ///
+    /// Call this **after** mutating the text buffer but **before** the next
+    /// `ensure_layout` / `line_metrics` / `caret_rect_at` call.
+    ///
+    /// * `text`        — the **new** (post-edit) text string.
+    /// * `edit_offset` — byte offset in the **old** text where the edit starts.
+    /// * `old_len`     — number of bytes removed from the old text (0 for pure insert).
+    /// * `new_len`     — number of bytes inserted into the new text (0 for pure delete).
+    ///
+    /// The method falls back to a full rebuild when:
+    /// - There is no existing block layout (first call or after `invalidate`).
+    /// - The edit spans across block boundaries in ways that change the
+    ///   paragraph structure (inserting/removing `\n`).
+    pub fn notify_edit(
+        &mut self,
+        text: &str,
+        edit_offset: usize,
+        old_len: usize,
+        new_len: usize,
+    ) {
+        // If we are in attributed (single-paragraph) mode, or have no blocks,
+        // fall back to full rebuild.
+        if self.blocks.is_empty() || self.paragraph.is_some() {
+            self.rebuild_blocks(text);
+            return;
+        }
+
+        let delta = new_len as isize - old_len as isize;
+        let old_edit_end = edit_offset + old_len;
+
+        // Check whether the edit changed the paragraph structure (\n inserted
+        // or removed). If so, fall back to a targeted rebuild of the affected
+        // region rather than a full rebuild of the entire document.
+        let inserted_text = &text[edit_offset..edit_offset + new_len];
+        let newlines_inserted = inserted_text.as_bytes().iter().filter(|&&b| b == b'\n').count();
+
+        // For the removed region, we need to count newlines that were in the
+        // old text. We can infer this from the block boundaries.
+        let newlines_removed = if old_len > 0 {
+            // Count how many block boundaries (each ends with \n except
+            // possibly the last) fall strictly inside the removed range.
+            self.blocks.iter().filter(|b| {
+                // A block boundary at byte_end (which includes the \n) is
+                // "removed" if byte_end falls within (edit_offset, old_edit_end].
+                b.byte_end > edit_offset && b.byte_end <= old_edit_end
+                    && b.byte_end < self.cached_text.len() // not the last block
+            }).count()
+        } else {
+            0
+        };
+
+        let structure_changed = newlines_inserted > 0 || newlines_removed > 0;
+
+        if structure_changed {
+            // Paragraph structure changed — do a partial rebuild.
+            // Find the range of blocks that are affected by the edit.
+            let first_affected = self.blocks
+                .iter()
+                .position(|b| b.byte_end > edit_offset)
+                .unwrap_or(self.blocks.len().saturating_sub(1));
+
+            // The last affected block is the one that contains old_edit_end
+            // (in the old coordinate system).
+            let last_affected = self.blocks
+                .iter()
+                .position(|b| b.byte_end >= old_edit_end)
+                .unwrap_or(self.blocks.len().saturating_sub(1));
+
+            // Remove old phantom trailing block if present.
+            if let Some(last) = self.blocks.last() {
+                if last.byte_start == last.byte_end
+                    && last.byte_start == self.cached_text.len()
+                    && self.cached_text.ends_with('\n')
+                {
+                    self.blocks.pop();
+                }
+            }
+
+            // Determine the byte range in the NEW text that we need to
+            // re-parse into blocks.
+            let rebuild_start = self.blocks.get(first_affected)
+                .map(|b| b.byte_start)
+                .unwrap_or(0);
+            let old_rebuild_end = self.blocks.get(last_affected)
+                .map(|b| b.byte_end)
+                .unwrap_or(self.cached_text.len());
+            let rebuild_end = (old_rebuild_end as isize + delta).max(0) as usize;
+            let rebuild_end = rebuild_end.min(text.len());
+
+            let y_start = self.blocks.get(first_affected)
+                .map(|b| b.y_offset)
+                .unwrap_or(0.0);
+
+            // Build new blocks for the affected region.
+            let mut new_blocks = Vec::new();
+            let mut y_offset = y_start;
+            let mut start = rebuild_start;
+
+            let region = &text[rebuild_start..rebuild_end];
+            let mut cursor = 0usize;
+
+            loop {
+                if cursor >= region.len() && start >= rebuild_end {
+                    break;
+                }
+                let remaining = &region[cursor..];
+                let has_newline;
+                let chunk_len = if let Some(pos) = remaining.find('\n') {
+                    has_newline = true;
+                    pos + 1
+                } else {
+                    has_newline = false;
+                    remaining.len()
+                };
+
+                let end = start + chunk_len;
+                let content_end = if has_newline { end - 1 } else { end };
+                let content_slice = &text[start..content_end];
+                let para = self.build_paragraph_for_slice(content_slice);
+
+                let mut stored_lines = self.convert_block_line_metrics(&para, content_slice, start);
+
+                if stored_lines.is_empty() {
+                    let skia_metrics = para.get_line_metrics();
+                    let (ascent, descent, baseline) = if let Some(lm) = skia_metrics.first() {
+                        (lm.ascent as f32, lm.descent as f32, lm.baseline as f32)
+                    } else {
+                        (self.font_size, self.font_size * 0.2, self.font_size)
+                    };
+                    stored_lines.push(LineMetrics {
+                        start_index: start,
+                        end_index: start,
+                        baseline,
+                        ascent,
+                        descent,
+                    });
+                }
+
+                if has_newline {
+                    if let Some(last) = stored_lines.last_mut() {
+                        last.end_index = end;
+                    }
+                }
+
+                let height: f32 = if let Some(last) = stored_lines.last() {
+                    last.baseline + last.descent
+                } else {
+                    self.font_size * 1.2
+                };
+
+                new_blocks.push(ParaBlock {
+                    byte_start: start,
+                    byte_end: end,
+                    paragraph: para,
+                    y_offset,
+                    height,
+                    line_metrics: stored_lines,
+                });
+
+                y_offset += height;
+                cursor += chunk_len;
+                start = end;
+
+                if start >= rebuild_end {
+                    break;
+                }
+            }
+
+            // Splice the new blocks into the existing blocks array.
+            let remove_count = (last_affected + 1).min(self.blocks.len()) - first_affected;
+            let tail_start = first_affected + remove_count;
+            let old_y_after = if tail_start < self.blocks.len() {
+                self.blocks[tail_start].y_offset
+            } else {
+                // No tail blocks.
+                y_offset // doesn't matter, no shifting needed
+            };
+
+            // Shift tail blocks: only byte offsets and y_offset change.
+            // Per-block lm.baseline is block-local (from Skia) and stays the same.
+            let y_delta = y_offset - old_y_after;
+            for block in &mut self.blocks[tail_start..] {
+                block.byte_start = (block.byte_start as isize + delta) as usize;
+                block.byte_end = (block.byte_end as isize + delta) as usize;
+                block.y_offset += y_delta;
+                for lm in &mut block.line_metrics {
+                    lm.start_index = (lm.start_index as isize + delta) as usize;
+                    lm.end_index = (lm.end_index as isize + delta) as usize;
+                }
+            }
+
+            // Replace affected blocks with new blocks.
+            self.blocks.splice(first_affected..first_affected + remove_count, new_blocks);
+
+            // Re-add phantom trailing block if needed.
+            if text.ends_with('\n') && !text.is_empty() {
+                // Remove old phantom if present.
+                if let Some(last) = self.blocks.last() {
+                    if last.byte_start == last.byte_end && last.byte_start == text.len() {
+                        self.blocks.pop();
+                    }
+                }
+                if let Some(last_block) = self.blocks.last() {
+                    let last_lm = last_block.line_metrics.last();
+                    let (ascent, descent) = last_lm
+                        .map(|lm| (lm.ascent, lm.descent))
+                        .unwrap_or((self.font_size, self.font_size * 0.2));
+                    let phantom_y = last_block.y_offset + last_block.height;
+                    let phantom = LineMetrics {
+                        start_index: text.len(),
+                        end_index: text.len(),
+                        baseline: ascent,
+                        ascent,
+                        descent,
+                    };
+                    let phantom_height = ascent + descent;
+                    self.blocks.push(ParaBlock {
+                        byte_start: text.len(),
+                        byte_end: text.len(),
+                        paragraph: self.build_paragraph_for_slice(""),
+                        y_offset: phantom_y,
+                        height: phantom_height,
+                        line_metrics: vec![phantom],
+                    });
+                }
+            } else {
+                // Remove phantom if text no longer ends with \n.
+                if let Some(last) = self.blocks.last() {
+                    if last.byte_start == last.byte_end && last.byte_start == text.len() && !text.is_empty() {
+                        self.blocks.pop();
+                    }
+                }
+            }
+        } else {
+            // No paragraph structure change — only one block is affected.
+            // Find it and rebuild just that block.
+            let block_idx = self.blocks
+                .iter()
+                .position(|b| edit_offset < b.byte_end || (b.byte_start == b.byte_end && edit_offset == b.byte_start))
+                .unwrap_or(self.blocks.len().saturating_sub(1));
+
+            // Remove old phantom trailing block before modifying.
+            let had_phantom = if let Some(last) = self.blocks.last() {
+                last.byte_start == last.byte_end
+                    && last.byte_start == self.cached_text.len()
+                    && self.cached_text.ends_with('\n')
+            } else {
+                false
+            };
+            if had_phantom {
+                self.blocks.pop();
+            }
+
+            // Rebuild the affected block.
+            if block_idx < self.blocks.len() {
+                let old_block = &self.blocks[block_idx];
+                let old_height = old_block.height;
+                let new_start = old_block.byte_start;
+                let new_end = (old_block.byte_end as isize + delta) as usize;
+                let y_off = old_block.y_offset;
+
+                let has_newline = new_end > 0 && new_end <= text.len()
+                    && text.as_bytes().get(new_end - 1) == Some(&b'\n');
+                let content_end = if has_newline { new_end - 1 } else { new_end };
+                let content_slice = &text[new_start..content_end];
+                let para = self.build_paragraph_for_slice(content_slice);
+
+                let mut stored_lines = self.convert_block_line_metrics(&para, content_slice, new_start);
+
+                if stored_lines.is_empty() {
+                    let skia_metrics = para.get_line_metrics();
+                    let (ascent, descent, baseline) = if let Some(lm) = skia_metrics.first() {
+                        (lm.ascent as f32, lm.descent as f32, lm.baseline as f32)
+                    } else {
+                        (self.font_size, self.font_size * 0.2, self.font_size)
+                    };
+                    stored_lines.push(LineMetrics {
+                        start_index: new_start,
+                        end_index: new_start,
+                        baseline,
+                        ascent,
+                        descent,
+                    });
+                }
+
+                if has_newline {
+                    if let Some(last) = stored_lines.last_mut() {
+                        last.end_index = new_end;
+                    }
+                }
+
+                let new_height: f32 = if let Some(last) = stored_lines.last() {
+                    last.baseline + last.descent
+                } else {
+                    self.font_size * 1.2
+                };
+
+                self.blocks[block_idx] = ParaBlock {
+                    byte_start: new_start,
+                    byte_end: new_end,
+                    paragraph: para,
+                    y_offset: y_off,
+                    height: new_height,
+                    line_metrics: stored_lines,
+                };
+
+                // Shift all subsequent blocks: byte offsets and y_offset.
+                // Per-block lm.baseline is block-local and stays the same.
+                let y_delta = new_height - old_height;
+                for block in &mut self.blocks[block_idx + 1..] {
+                    block.byte_start = (block.byte_start as isize + delta) as usize;
+                    block.byte_end = (block.byte_end as isize + delta) as usize;
+                    block.y_offset += y_delta;
+                    for lm in &mut block.line_metrics {
+                        lm.start_index = (lm.start_index as isize + delta) as usize;
+                        lm.end_index = (lm.end_index as isize + delta) as usize;
+                    }
+                }
+            }
+
+            // Re-add phantom trailing block if needed.
+            if text.ends_with('\n') && !text.is_empty() {
+                if let Some(last_block) = self.blocks.last() {
+                    let last_lm = last_block.line_metrics.last();
+                    let (ascent, descent) = last_lm
+                        .map(|lm| (lm.ascent, lm.descent))
+                        .unwrap_or((self.font_size, self.font_size * 0.2));
+                    let phantom_y = last_block.y_offset + last_block.height;
+                    let phantom = LineMetrics {
+                        start_index: text.len(),
+                        end_index: text.len(),
+                        baseline: ascent,
+                        ascent,
+                        descent,
+                    };
+                    let phantom_height = ascent + descent;
+                    self.blocks.push(ParaBlock {
+                        byte_start: text.len(),
+                        byte_end: text.len(),
+                        paragraph: self.build_paragraph_for_slice(""),
+                        y_offset: phantom_y,
+                        height: phantom_height,
+                        line_metrics: vec![phantom],
+                    });
+                }
+            }
+        }
+
+        self.cached_text = text.to_owned();
+        self.cached_line_metrics = None;
+    }
+
     /// Build a Skia `Paragraph` for a text slice (uniform style from config).
     fn build_paragraph_for_slice(&self, slice: &str) -> Paragraph {
         let mut para_style = ParagraphStyle::new();
@@ -469,11 +827,24 @@ impl SkiaLayoutEngine {
     }
 
     /// Find the block index that contains `byte_offset` in the full text.
+    ///
+    /// Uses binary search on `byte_end` (monotonically non-decreasing).
     fn block_index_for_offset(&self, byte_offset: usize) -> usize {
-        self.blocks
-            .iter()
-            .position(|b| byte_offset < b.byte_end || (b.byte_start == b.byte_end && byte_offset == b.byte_start))
-            .unwrap_or(self.blocks.len().saturating_sub(1))
+        if self.blocks.is_empty() {
+            return 0;
+        }
+        let idx = self.blocks.partition_point(|b| b.byte_end <= byte_offset);
+        // Handle phantom zero-length blocks (byte_start == byte_end) at the
+        // exact offset.
+        let idx = idx.min(self.blocks.len() - 1);
+        // If we landed past the matching block, check if a zero-length block
+        // at this offset exists at the found position.
+        if self.blocks[idx].byte_start == self.blocks[idx].byte_end
+            && self.blocks[idx].byte_start == byte_offset
+        {
+            return idx;
+        }
+        idx
     }
 
     // -------------------------------------------------------------------
@@ -759,15 +1130,13 @@ impl TextLayoutEngine for SkiaLayoutEngine {
             return snap_grapheme_boundary(text, raw);
         }
 
-        // Per-block path.
-        let block_idx = self.blocks
-            .iter()
-            .position(|b| y < b.y_offset + b.height + 0.5)
-            .unwrap_or(self.blocks.len().saturating_sub(1));
-
+        // Per-block path: binary search by y position.
         if self.blocks.is_empty() {
             return 0;
         }
+        let block_idx = self.blocks
+            .partition_point(|b| b.y_offset + b.height + 0.5 <= y)
+            .min(self.blocks.len() - 1);
 
         let block = &self.blocks[block_idx];
         let local_y = y - block.y_offset;

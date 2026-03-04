@@ -132,8 +132,8 @@ use winit::{
 };
 
 use grida_text_edit::{
-    apply_command, utf8_to_utf16_offset,
-    EditKind, EditingCommand, GenericEditHistory,
+    apply_command_mut, utf8_to_utf16_offset,
+    CaretRect, EditKind, EditingCommand, GenericEditHistory,
     SkiaLayoutEngine, TextEditorState, TextLayoutEngine,
     attributed_text::{
         AttributedText, TextStyle as AttrTextStyle,
@@ -382,6 +382,10 @@ struct TextEditor {
 
     /// Vertical scroll offset in layout-local pixels.
     scroll_y: f32,
+
+    /// Cached caret rectangle — avoids redundant recomputation within a frame.
+    /// Invalidated (set to `None`) whenever cursor or text changes.
+    cached_caret_rect: Option<CaretRect>,
 }
 
 impl TextEditor {
@@ -402,7 +406,23 @@ impl TextEditor {
             empty_line_policy: config.empty_line_policy,
             history: GenericEditHistory::new(),
             scroll_y: 0.0,
+            cached_caret_rect: None,
         }
+    }
+
+    /// Return the caret rectangle, using a per-frame cache.
+    fn caret_rect(&mut self) -> CaretRect {
+        if let Some(ref cr) = self.cached_caret_rect {
+            return cr.clone();
+        }
+        let cr = self.layout.caret_rect_at(&self.state.text, self.state.cursor);
+        self.cached_caret_rect = Some(cr.clone());
+        cr
+    }
+
+    /// Invalidate the cached caret rect (call after cursor/text changes).
+    fn invalidate_caret_cache(&mut self) {
+        self.cached_caret_rect = None;
     }
 
     /// Capture the current state + content as a snapshot for history.
@@ -418,6 +438,7 @@ impl TextEditor {
         self.state = snap.state;
         self.content = snap.content;
         self.caret_style_override = None;
+        self.cached_caret_rect = None;
         self.layout.invalidate();
         self.ensure_cursor_visible();
     }
@@ -427,13 +448,21 @@ impl TextEditor {
     // -----------------------------------------------------------------------
 
     fn apply(&mut self, cmd: EditingCommand) {
+        let is_edit = cmd.edit_kind().is_some();
         if let Some(kind) = cmd.edit_kind() {
             self.history.push(&self.snapshot(), kind);
         }
         let old_cursor = self.state.cursor;
-        let old_text = self.state.text.clone();
-        self.state = apply_command(&self.state, cmd, &mut self.layout);
-        self.sync_content_after_edit(&old_text, old_cursor);
+        // Only clone the old text when the command may mutate it.
+        let old_text = if is_edit { Some(self.state.text.clone()) } else { None };
+        apply_command_mut(&mut self.state, cmd, &mut self.layout);
+        self.invalidate_caret_cache();
+        if let Some(old) = old_text {
+            self.sync_content_after_edit(&old, old_cursor);
+        } else if self.state.cursor != old_cursor {
+            // Pure cursor movement — clear caret style override.
+            self.caret_style_override = None;
+        }
         self.reset_blink();
         self.ensure_cursor_visible();
     }
@@ -442,7 +471,8 @@ impl TextEditor {
         self.history.push(&self.snapshot(), kind);
         let old_cursor = self.state.cursor;
         let old_text = self.state.text.clone();
-        self.state = apply_command(&self.state, cmd, &mut self.layout);
+        apply_command_mut(&mut self.state, cmd, &mut self.layout);
+        self.invalidate_caret_cache();
         self.sync_content_after_edit(&old_text, old_cursor);
         self.reset_blink();
         self.ensure_cursor_visible();
@@ -506,6 +536,12 @@ impl TextEditor {
             let inserted = &new_text[prefix..new_end];
             self.content.insert_with_style(prefix, inserted, insert_style);
         }
+
+        // Incrementally update the per-block layout so only the affected
+        // paragraph is re-shaped (instead of rebuilding all blocks).
+        let removed_bytes = old_end - prefix;
+        let inserted_bytes = new_end - prefix;
+        self.layout.notify_edit(new_text, prefix, removed_bytes, inserted_bytes);
 
         // After any text edit, clear the override.
         self.caret_style_override = None;
@@ -820,6 +856,7 @@ impl TextEditor {
         self.state.cursor = pos;
         self.state.anchor = None;
         self.drag_anchor_utf8 = Some(pos);
+        self.invalidate_caret_cache();
         self.reset_blink();
     }
 
@@ -840,6 +877,7 @@ impl TextEditor {
             self.drag_anchor_utf8 = Some(pos);
             self.state.cursor = pos;
         }
+        self.invalidate_caret_cache();
     }
 
     fn on_mouse_up(&mut self) {
@@ -910,7 +948,7 @@ impl TextEditor {
 
     /// Adjust scroll so the caret is within the visible viewport.
     fn ensure_cursor_visible(&mut self) {
-        let cr = self.layout.caret_rect_at(&self.state.text, self.state.cursor);
+        let cr = self.caret_rect();
         let viewport_height = self.layout.layout_height;
         let margin = cr.height; // one line of margin
 
@@ -1132,7 +1170,7 @@ impl TextEditor {
 
             // Cursor
             if self.cursor_visible && !self.has_selection() {
-                let cr = self.layout.caret_rect_at(&self.state.text, self.state.cursor);
+                let cr = self.caret_rect();
                 let cursor_rect = Rect::from_xywh(
                     cr.x + origin.x - CURSOR_WIDTH / 2.0,
                     cr.y + origin.y,
@@ -1789,10 +1827,7 @@ impl ApplicationHandler for TextEditorApp {
                 }
                 inner.gl_skia.flush_and_present();
 
-                let cr = inner.editor.layout.caret_rect_at(
-                    &inner.editor.state.text,
-                    inner.editor.state.cursor,
-                );
+                let cr = inner.editor.caret_rect();
                 let scroll_y = inner.editor.scroll_y;
                 inner.window.set_ime_cursor_area(
                     LogicalPosition::new(
@@ -1824,6 +1859,7 @@ impl ApplicationHandler for TextEditorApp {
                             inner.editor.state.cursor = inner.editor.state.text.len();
                             inner.editor.state.anchor = None;
                             inner.editor.caret_style_override = None;
+                            inner.editor.cached_caret_rect = None;
                             inner.editor.layout.invalidate();
                             inner.editor.scroll_y = 0.0;
                             inner.editor.reset_blink();
@@ -1843,6 +1879,7 @@ impl ApplicationHandler for TextEditorApp {
                             inner.editor.state.cursor = inner.editor.state.text.len();
                             inner.editor.state.anchor = None;
                             inner.editor.caret_style_override = None;
+                            inner.editor.cached_caret_rect = None;
                             inner.editor.layout.invalidate();
                             inner.editor.scroll_y = 0.0;
                             inner.editor.reset_blink();
