@@ -84,11 +84,17 @@
 //   [x] Per-run layout via Skia ParagraphBuilder (pushStyle/addText per run)
 //   [x] Variable font axis interpolation (wght, opsz via FontArguments)
 //
+// Dev-only function key presets (no GUI needed)
+//   [x] F1: black  F2: red  F3: blue          set text color
+//   [x] F5: Inter (sans)  F6: Lora (serif)  F7: Inconsolata (mono)
+//   [x] Drag-and-drop .txt / .html files to load content
+//
 // Not yet implemented
 //   [ ] Scroll (vertical)
 //   [ ] Visual-order bidi cursor movement
 
 use std::ffi::CString;
+use std::fs;
 use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
 
@@ -127,7 +133,7 @@ use grida_text_edit::{
     SkiaLayoutEngine, TextEditorState, TextLayoutEngine,
     attributed_text::{
         AttributedText, TextStyle as AttrTextStyle,
-        TextDecorationLine,
+        TextDecorationLine, TextFill, RGBA,
         html::{runs_to_html, html_to_attributed_text},
     },
 };
@@ -619,6 +625,41 @@ impl TextEditor {
             let mut new_style = current;
             new_style.font_size = (new_style.font_size + delta).max(MIN_FONT_SIZE);
             self.caret_style_override = Some(new_style);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Dev-only: function key style presets
+    // -----------------------------------------------------------------------
+
+    /// Set a preset color on the selection or caret style.
+    fn dev_set_color(&mut self, color: RGBA) {
+        if let Some((lo, hi)) = self.selection_range() {
+            self.history.push(&self.snapshot(), EditKind::Style);
+            self.content.apply_style(lo, hi, |s| {
+                s.fill = TextFill::Solid(color);
+            });
+            self.layout.invalidate();
+        } else {
+            let mut style = self.caret_style_override.clone()
+                .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
+            style.fill = TextFill::Solid(color);
+            self.caret_style_override = Some(style);
+        }
+    }
+
+    /// Set the font family on the selection or caret style.
+    fn dev_set_font(&mut self, family: &str) {
+        let family = family.to_string();
+        if let Some((lo, hi)) = self.selection_range() {
+            self.history.push(&self.snapshot(), EditKind::Style);
+            self.content.apply_style(lo, hi, |s| { s.font_family = family.clone(); });
+            self.layout.invalidate();
+        } else {
+            let mut style = self.caret_style_override.clone()
+                .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
+            style.font_family = family;
+            self.caret_style_override = Some(style);
         }
     }
 
@@ -1243,30 +1284,57 @@ impl ApplicationHandler for TextEditorApp {
         let inter_italic = include_bytes!(
             "../../../fixtures/fonts/Inter/Inter-Italic-VariableFont_opsz,wght.ttf"
         );
+        let lora_upright = include_bytes!(
+            "../../../fixtures/fonts/Lora/Lora-VariableFont_wght.ttf"
+        );
+        let lora_italic = include_bytes!(
+            "../../../fixtures/fonts/Lora/Lora-Italic-VariableFont_wght.ttf"
+        );
+        let inconsolata = include_bytes!(
+            "../../../fixtures/fonts/Inconsolata/Inconsolata-VariableFont_wdth,wght.ttf"
+        );
         editor.layout.add_font_family("Inter", &[inter_upright, inter_italic]);
+        editor.layout.add_font_family("Lora", &[lora_upright, lora_italic]);
+        editor.layout.add_font_family("Inconsolata", &[inconsolata]);
         editor.layout.config.font_families = vec!["Inter".into()];
 
         editor.set_layout_width(w as f32);
         editor.set_layout_height(h as f32);
 
         let demo_text = concat!(
-            "Hello, World!\n",
-            "Type here to edit text. Use Cmd+B for bold, Cmd+I for italic, Cmd+U for underline.\n",
+            "Grida Rich Text Editor\n",
             "\n",
-            "Select text and toggle styles, or toggle with no selection to set the typing style.\n",
+            "Formatting\n",
+            "  Cmd+B  bold       Cmd+I  italic\n",
+            "  Cmd+U  underline  Cmd+Shift+X  strikethrough\n",
+            "\n",
+            "Font Size\n",
+            "  Cmd+Shift+>  increase    Cmd+Shift+<  decrease\n",
+            "\n",
+            "Fonts (dev)\n",
+            "  F5  Inter (sans)  F6  Lora (serif)  F7  Inconsolata (mono)\n",
+            "\n",
+            "Colors (dev)\n",
+            "  F1  black   F2  red   F3  blue\n",
+            "\n",
+            "Editing\n",
+            "  Cmd+Z  undo   Cmd+Shift+Z  redo\n",
+            "  Cmd+C  copy   Cmd+X  cut   Cmd+V  paste (with formatting)\n",
+            "  Cmd+A  select all\n",
             "\n",
             "The quick brown fox jumps over 13 lazy dogs.\n",
-            "fi fl ffi ffl (ligatures with Inter)\n",
         );
 
         editor.content = AttributedText::new(demo_text, default_style.clone());
         editor.state.text = demo_text.to_string();
 
-        // Pre-style some demo text to show rich text capabilities.
-        // "Hello" bold
-        editor.content.apply_style(0, 5, |s| { s.font_weight = 700; });
-        // "World" italic
-        editor.content.apply_style(7, 12, |s| { s.font_style_italic = true; });
+        // Pre-style the title.
+        // "Grida Rich Text Editor" — bold, 24px
+        let title_end = "Grida Rich Text Editor".len();
+        editor.content.apply_style(0, title_end, |s| {
+            s.font_weight = 700;
+            s.font_size = 24.0;
+        });
 
         editor.state.cursor = editor.state.text.len();
 
@@ -1503,6 +1571,36 @@ impl ApplicationHandler for TextEditorApp {
                         }
                     }
 
+                    // -------------------------------------------------------
+                    // Dev-only function key bindings
+                    // -------------------------------------------------------
+                    // F1: black  F2: red  F3: blue    — color presets
+                    // F5: Inter (sans)  F6: Lora (serif)  F7: Inconsolata (mono)
+                    Key::Named(NamedKey::F1) => {
+                        inner.editor.dev_set_color(RGBA::BLACK);
+                        inner.window.request_redraw();
+                    }
+                    Key::Named(NamedKey::F2) => {
+                        inner.editor.dev_set_color(RGBA { r: 0.9, g: 0.2, b: 0.2, a: 1.0 });
+                        inner.window.request_redraw();
+                    }
+                    Key::Named(NamedKey::F3) => {
+                        inner.editor.dev_set_color(RGBA { r: 0.2, g: 0.4, b: 0.9, a: 1.0 });
+                        inner.window.request_redraw();
+                    }
+                    Key::Named(NamedKey::F5) => {
+                        inner.editor.dev_set_font("Inter");
+                        inner.window.request_redraw();
+                    }
+                    Key::Named(NamedKey::F6) => {
+                        inner.editor.dev_set_font("Lora");
+                        inner.window.request_redraw();
+                    }
+                    Key::Named(NamedKey::F7) => {
+                        inner.editor.dev_set_font("Inconsolata");
+                        inner.window.request_redraw();
+                    }
+
                     Key::Character(c)
                         if !cmd && inner.editor.preedit.is_none() =>
                     {
@@ -1612,6 +1710,60 @@ impl ApplicationHandler for TextEditorApp {
 
                 let deadline = inner.editor.next_blink_deadline();
                 event_loop.set_control_flow(ControlFlow::WaitUntil(deadline));
+            }
+
+            // ---------------------------------------------------------------
+            // Dev-only: drag-and-drop .txt / .html files to load content
+            // ---------------------------------------------------------------
+            WindowEvent::DroppedFile(path) => {
+                let ext = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|s| s.to_ascii_lowercase());
+
+                match ext.as_deref() {
+                    Some("txt") => match fs::read_to_string(&path) {
+                        Ok(content) => {
+                            let default_style = inner.editor.content.default_style().clone();
+                            inner.editor.content = AttributedText::new(&content, default_style);
+                            inner.editor.state.text = content;
+                            inner.editor.state.cursor = inner.editor.state.text.len();
+                            inner.editor.state.anchor = None;
+                            inner.editor.caret_style_override = None;
+                            inner.editor.layout.invalidate();
+                            inner.editor.reset_blink();
+                            eprintln!("loaded plain text: {}", path.display());
+                            inner.window.request_redraw();
+                        }
+                        Err(err) => {
+                            eprintln!("failed to read {}: {err}", path.display());
+                        }
+                    },
+                    Some("html" | "htm") => match fs::read_to_string(&path) {
+                        Ok(html) => {
+                            let base = inner.editor.content.default_style().clone();
+                            let content = html_to_attributed_text(&html, base);
+                            inner.editor.state.text = content.text().to_owned();
+                            inner.editor.content = content;
+                            inner.editor.state.cursor = inner.editor.state.text.len();
+                            inner.editor.state.anchor = None;
+                            inner.editor.caret_style_override = None;
+                            inner.editor.layout.invalidate();
+                            inner.editor.reset_blink();
+                            eprintln!("loaded HTML: {}", path.display());
+                            inner.window.request_redraw();
+                        }
+                        Err(err) => {
+                            eprintln!("failed to read {}: {err}", path.display());
+                        }
+                    },
+                    _ => {
+                        eprintln!(
+                            "unsupported drop (expected .txt or .html): {}",
+                            path.display()
+                        );
+                    }
+                }
             }
 
             _ => {}

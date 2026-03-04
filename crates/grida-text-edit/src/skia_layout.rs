@@ -98,6 +98,14 @@ pub struct SkiaLayoutEngine {
     pub font_size: f32,
     pub config: TextConfig,
     cached_text: String,
+    /// Persistent font provider accumulating all registered typefaces.
+    font_provider: TypefaceFontProvider,
+    /// Cached line metrics with UTF-8 offsets, invalidated together with `paragraph`.
+    ///
+    /// Skia returns line metrics in UTF-16 offsets. Converting to UTF-8 requires
+    /// a per-line `utf16_to_utf8_offset` call — O(n) each, O(n·L) total.
+    /// Caching the converted result avoids this cost on every frame / query.
+    cached_line_metrics: Option<Vec<crate::layout::LineMetrics>>,
 }
 
 impl SkiaLayoutEngine {
@@ -117,6 +125,8 @@ impl SkiaLayoutEngine {
             font_size,
             config,
             cached_text: String::new(),
+            font_provider: TypefaceFontProvider::new(),
+            cached_line_metrics: None,
         }
     }
 
@@ -125,6 +135,7 @@ impl SkiaLayoutEngine {
         self.config.font_size = size;
         self.font_size = size;
         self.paragraph = None;
+        self.cached_line_metrics = None;
         self
     }
 
@@ -193,6 +204,7 @@ impl SkiaLayoutEngine {
         para.layout(self.layout_width);
         self.paragraph = Some(para);
         self.cached_text = text.to_owned();
+        self.cached_line_metrics = None;
     }
 
     pub fn set_layout_width(&mut self, w: f32) {
@@ -200,6 +212,7 @@ impl SkiaLayoutEngine {
         if (new_w - self.layout_width).abs() > 0.5 {
             self.layout_width = new_w;
             self.paragraph = None;
+            self.cached_line_metrics = None;
         }
     }
 
@@ -210,34 +223,40 @@ impl SkiaLayoutEngine {
         }
     }
 
-    /// Register a font from raw TTF/OTF bytes.
+    /// Register a font from raw TTF/OTF bytes under `family`.
     ///
-    /// In environments where system fonts are unavailable (e.g. WASM/browser)
-    /// this is the only way to give Skia a font to shape with.
+    /// Multiple calls accumulate — all registered typefaces remain available.
     pub fn add_font_bytes(&mut self, family: &str, bytes: &[u8]) {
         let loader = FontMgr::new();
         if let Some(tf) = loader.new_from_data(bytes, None) {
-            let mut provider = TypefaceFontProvider::new();
-            provider.register_typeface(tf, Some(family));
-            self.font_collection.set_asset_font_manager(Some(provider.into()));
+            self.font_provider.register_typeface(tf, Some(family));
+            self.flush_font_provider();
         }
-        self.paragraph = None;
     }
 
-    /// Register multiple fonts at once under the same family. Each byte slice
-    /// is a separate TTF/OTF file (e.g. regular, italic, bold, bold-italic).
-    /// Skia will match the correct typeface by weight/slant when building
-    /// paragraphs.
+    /// Register multiple font files under the same family at once.
+    ///
+    /// Each byte slice is a separate TTF/OTF file (e.g. regular, italic).
+    /// Multiple calls accumulate — all registered typefaces remain available.
     pub fn add_font_family(&mut self, family: &str, font_data: &[&[u8]]) {
         let loader = FontMgr::new();
-        let mut provider = TypefaceFontProvider::new();
         for bytes in font_data {
             if let Some(tf) = loader.new_from_data(bytes, None) {
-                provider.register_typeface(tf, Some(family));
+                self.font_provider.register_typeface(tf, Some(family));
             }
         }
-        self.font_collection.set_asset_font_manager(Some(provider.into()));
+        self.flush_font_provider();
+    }
+
+    /// Push the accumulated font provider into the font collection.
+    fn flush_font_provider(&mut self) {
+        // TypefaceFontProvider is consumed by `set_asset_font_manager` (via
+        // Into<FontMgr>), but we need to keep accumulating. Clone it.
+        let provider_clone = self.font_provider.clone();
+        self.font_collection
+            .set_asset_font_manager(Some(provider_clone.into()));
         self.paragraph = None;
+        self.cached_line_metrics = None;
     }
 
     /// Build and cache a paragraph from an [`AttributedText`], pushing
@@ -267,7 +286,7 @@ impl SkiaLayoutEngine {
         let mut builder = ParagraphBuilder::new(&para_style, &self.font_collection);
 
         let text = at.text();
-        let families: Vec<&str> = self.config.font_families.iter().map(|s| s.as_str()).collect();
+        let fallback_families: Vec<&str> = self.config.font_families.iter().map(|s| s.as_str()).collect();
 
         for run in at.runs() {
             let style = &run.style;
@@ -276,7 +295,14 @@ impl SkiaLayoutEngine {
             // Font size
             ts.set_font_size(style.font_size);
 
-            // Font families
+            // Font families: use the run's font_family as primary,
+            // fall back to the config's family list.
+            let mut families: Vec<&str> = vec![style.font_family.as_str()];
+            for f in &fallback_families {
+                if *f != style.font_family.as_str() {
+                    families.push(f);
+                }
+            }
             ts.set_font_families(&families);
 
             // Font style (for typeface matching in FontCollection)
@@ -404,12 +430,14 @@ impl SkiaLayoutEngine {
         para.layout(self.layout_width);
         self.paragraph = Some(para);
         self.cached_text = text.to_owned();
+        self.cached_line_metrics = None;
     }
 
     /// Invalidate the cached paragraph so the next layout call rebuilds.
     /// Call this after modifying `font_collection` externally.
     pub fn invalidate(&mut self) {
         self.paragraph = None;
+        self.cached_line_metrics = None;
     }
 
     fn para(&mut self, text: &str) -> &Paragraph {
@@ -428,7 +456,16 @@ impl SkiaLayoutEngine {
 
 impl TextLayoutEngine for SkiaLayoutEngine {
     fn line_metrics(&mut self, text: &str) -> Vec<LineMetrics> {
-        let skia = self.para(text).get_line_metrics();
+        // Ensure the paragraph is up-to-date first — this may clear the cache
+        // if text or layout width changed, triggering a rebuild.
+        self.ensure_layout(text);
+
+        // Return cached metrics if available (same paragraph, no rebuild).
+        if let Some(ref cached) = self.cached_line_metrics {
+            return cached.clone();
+        }
+
+        let skia = self.paragraph.as_ref().unwrap().get_line_metrics();
         let mut result = Vec::with_capacity(skia.len());
         let mut prev_end: usize = 0;
 
@@ -466,6 +503,7 @@ impl TextLayoutEngine for SkiaLayoutEngine {
             }
         }
 
+        self.cached_line_metrics = Some(result.clone());
         result
     }
 
