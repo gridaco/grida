@@ -173,12 +173,28 @@ impl SkiaLayoutEngine {
     // Layout: per-block architecture
     // -------------------------------------------------------------------
 
-    /// Ensure the per-block layout is up-to-date for `text`.
+    /// Ensure layout is up-to-date for `text`.
+    ///
+    /// If an attributed (rich text) paragraph already exists for this text,
+    /// it is preserved — the per-block path is only used when no attributed
+    /// paragraph is available.
     pub fn ensure_layout(&mut self, text: &str) {
+        // If per-block layout is already current, nothing to do.
         if !self.blocks.is_empty() && self.cached_text == text {
             return;
         }
+        // If the attributed (single-paragraph) layout is current, skip
+        // the per-block rebuild — callers will use the legacy paragraph.
+        if self.paragraph.is_some() && self.cached_text == text {
+            return;
+        }
         self.rebuild_blocks(text);
+    }
+
+    /// Returns true when the layout is backed by a single attributed
+    /// paragraph (rich text path) rather than per-block layout.
+    fn is_attributed_layout(&self) -> bool {
+        self.paragraph.is_some() && self.blocks.is_empty()
     }
 
     /// Full rebuild: split `text` on `\n` and lay out each block.
@@ -401,6 +417,54 @@ impl SkiaLayoutEngine {
                 });
             }
         }
+        result
+    }
+
+    /// Convert line metrics from the legacy single paragraph (attributed path).
+    fn convert_single_para_line_metrics(&self, text: &str) -> Vec<LineMetrics> {
+        let para = self.paragraph.as_ref().unwrap();
+        let skia = para.get_line_metrics();
+        let mut result = Vec::with_capacity(skia.len());
+        let mut prev_end: usize = 0;
+
+        for lm in &skia {
+            let start = utf16_to_utf8_offset(text, lm.start_index);
+            let end = utf16_to_utf8_offset(text, lm.end_including_newline).min(text.len());
+
+            let start = start.max(prev_end);
+            let end = end.max(start);
+
+            result.push(LineMetrics {
+                start_index: start,
+                end_index: end,
+                baseline: lm.baseline as f32,
+                ascent: lm.ascent as f32,
+                descent: lm.descent as f32,
+            });
+            prev_end = end;
+        }
+
+        if !text.is_empty() && text.ends_with('\n') {
+            let last_end = result.last().map_or(0, |lm| lm.end_index);
+            if last_end < text.len()
+                || result
+                    .last()
+                    .map_or(true, |lm| lm.start_index < lm.end_index)
+            {
+                if last_end <= text.len() {
+                    let last = result.last().unwrap();
+                    let line_height = last.ascent + last.descent;
+                    result.push(LineMetrics {
+                        start_index: text.len(),
+                        end_index: text.len(),
+                        baseline: last.baseline + line_height,
+                        ascent: last.ascent,
+                        descent: last.descent,
+                    });
+                }
+            }
+        }
+
         result
     }
 
@@ -663,7 +727,12 @@ impl TextLayoutEngine for SkiaLayoutEngine {
             return cached.clone();
         }
 
-        let result = self.flatten_line_metrics();
+        let result = if self.is_attributed_layout() {
+            // Attributed (single-paragraph) path: convert from the legacy paragraph.
+            self.convert_single_para_line_metrics(text)
+        } else {
+            self.flatten_line_metrics()
+        };
         self.cached_line_metrics = Some(result.clone());
         result
     }
@@ -671,7 +740,26 @@ impl TextLayoutEngine for SkiaLayoutEngine {
     fn position_at_point(&mut self, text: &str, x: f32, y: f32) -> usize {
         self.ensure_layout(text);
 
-        // Find the block that contains this y coordinate.
+        if self.is_attributed_layout() {
+            // Attributed (single-paragraph) path.
+            let para = self.paragraph.as_ref().unwrap();
+            let metrics = para.get_line_metrics();
+            for lm in &metrics {
+                let top = lm.baseline as f32 - lm.ascent as f32;
+                let bot = lm.baseline as f32 + lm.descent as f32;
+                if y >= top - 0.5 && y <= bot + 0.5 {
+                    if lm.end_index.saturating_sub(lm.start_index) <= 1 {
+                        return utf16_to_utf8_offset(text, lm.start_index).min(text.len());
+                    }
+                    break;
+                }
+            }
+            let pwa = para.get_glyph_position_at_coordinate(Point::new(x, y));
+            let raw = utf16_to_utf8_offset(text, pwa.position.max(0) as usize).min(text.len());
+            return snap_grapheme_boundary(text, raw);
+        }
+
+        // Per-block path.
         let block_idx = self.blocks
             .iter()
             .position(|b| y < b.y_offset + b.height + 0.5)
@@ -723,8 +811,19 @@ impl TextLayoutEngine for SkiaLayoutEngine {
 
         let x = if offset <= lm.start_index {
             0.0
+        } else if self.is_attributed_layout() {
+            // Attributed (single-paragraph) path.
+            let u16_end = utf8_to_utf16_offset(text, offset);
+            let cluster_start = prev_grapheme_boundary(text, offset);
+            let u16_start = utf8_to_utf16_offset(text, cluster_start);
+            let rects = self.paragraph.as_ref().unwrap().get_rects_for_range(
+                u16_start..u16_end,
+                RectHeightStyle::Max,
+                RectWidthStyle::Tight,
+            );
+            rects.iter().map(|tb| tb.rect.right()).fold(0.0_f32, f32::max)
         } else {
-            // Find the block for this offset
+            // Per-block path.
             let block_idx = self.block_index_for_offset(offset);
             let block = &self.blocks[block_idx];
             let local_offset = offset - block.byte_start;
@@ -750,6 +849,15 @@ impl TextLayoutEngine for SkiaLayoutEngine {
 
     fn word_boundary_at(&mut self, text: &str, offset: usize) -> (usize, usize) {
         self.ensure_layout(text);
+
+        if self.is_attributed_layout() {
+            let u16_pos = utf8_to_utf16_offset(text, offset) as u32;
+            let para = self.paragraph.as_ref().unwrap();
+            let range = para.get_word_boundary(u16_pos);
+            let start = utf16_to_utf8_offset(text, range.start as usize);
+            let end = utf16_to_utf8_offset(text, range.end as usize);
+            return (start, end);
+        }
 
         if self.blocks.is_empty() {
             return (0, 0);
@@ -780,7 +888,43 @@ impl TextLayoutEngine for SkiaLayoutEngine {
 
         self.ensure_layout(text);
 
-        // Find blocks that overlap the selection range.
+        if self.is_attributed_layout() {
+            // Attributed (single-paragraph) path.
+            let para = self.paragraph.as_ref().unwrap();
+            let u16_lo = utf8_to_utf16_offset(text, start);
+            let u16_hi = utf8_to_utf16_offset(text, end);
+            let raw = para.get_rects_for_range(
+                u16_lo..u16_hi,
+                skia_safe::textlayout::RectHeightStyle::Max,
+                skia_safe::textlayout::RectWidthStyle::Tight,
+            );
+            let mut rects: Vec<SelectionRect> = raw.iter().map(|tb| SelectionRect {
+                x: tb.rect.left(),
+                y: tb.rect.top(),
+                width: (tb.rect.right() - tb.rect.left()).max(0.0),
+                height: (tb.rect.bottom() - tb.rect.top()).max(0.0),
+            }).collect();
+
+            let first_line = line_index_for_offset_utf8(&metrics, start);
+            let last_line = line_index_for_offset_utf8(&metrics, end.saturating_sub(1).max(start));
+            for idx in first_line..=last_line {
+                let lm = &metrics[idx];
+                if !lm.is_empty_line(text) { continue; }
+                let mid_y = lm.baseline - lm.ascent * 0.5;
+                let already = rects.iter().any(|r| r.y <= mid_y && mid_y <= r.y + r.height);
+                if !already {
+                    rects.push(SelectionRect {
+                        x: 0.0,
+                        y: lm.baseline - lm.ascent,
+                        width: self.font_size * 0.5,
+                        height: lm.ascent + lm.descent,
+                    });
+                }
+            }
+            return rects;
+        }
+
+        // Per-block path: find blocks that overlap the selection range.
         let mut rects: Vec<SelectionRect> = Vec::new();
         for block in &self.blocks {
             if block.byte_start >= end || block.byte_end <= start {

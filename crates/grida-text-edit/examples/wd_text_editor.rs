@@ -89,8 +89,12 @@
 //   [x] F5: Inter (sans)  F6: Lora (serif)  F7: Inconsolata (mono)
 //   [x] Drag-and-drop .txt / .html files to load content
 //
+// Scroll
+//   [x] Vertical scroll (mouse wheel / trackpad)
+//   [x] Auto-scroll to keep cursor visible
+//   [x] Viewport clipping
+//
 // Not yet implemented
-//   [ ] Scroll (vertical)
 //   [ ] Visual-order bidi cursor movement
 
 use std::ffi::CString;
@@ -121,7 +125,7 @@ use skia_safe::{
 use winit::{
     application::ApplicationHandler,
     dpi::{LogicalPosition, LogicalSize, PhysicalSize},
-    event::{ElementState, Ime, MouseButton, WindowEvent},
+    event::{ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{Key, KeyCode, ModifiersState, NamedKey, PhysicalKey},
     window::{Window, WindowAttributes, WindowId},
@@ -375,6 +379,9 @@ struct TextEditor {
 
     /// Undo / redo history capturing both text and style state.
     history: GenericEditHistory<RichTextSnapshot>,
+
+    /// Vertical scroll offset in layout-local pixels.
+    scroll_y: f32,
 }
 
 impl TextEditor {
@@ -394,6 +401,7 @@ impl TextEditor {
             preedit: None,
             empty_line_policy: config.empty_line_policy,
             history: GenericEditHistory::new(),
+            scroll_y: 0.0,
         }
     }
 
@@ -411,6 +419,7 @@ impl TextEditor {
         self.content = snap.content;
         self.caret_style_override = None;
         self.layout.invalidate();
+        self.ensure_cursor_visible();
     }
 
     // -----------------------------------------------------------------------
@@ -426,6 +435,7 @@ impl TextEditor {
         self.state = apply_command(&self.state, cmd, &mut self.layout);
         self.sync_content_after_edit(&old_text, old_cursor);
         self.reset_blink();
+        self.ensure_cursor_visible();
     }
 
     fn apply_with_kind(&mut self, cmd: EditingCommand, kind: EditKind) {
@@ -435,6 +445,7 @@ impl TextEditor {
         self.state = apply_command(&self.state, cmd, &mut self.layout);
         self.sync_content_after_edit(&old_text, old_cursor);
         self.reset_blink();
+        self.ensure_cursor_visible();
     }
 
     /// After apply_command changes `self.state.text`, diff and update
@@ -863,6 +874,58 @@ impl TextEditor {
 
     fn set_layout_height(&mut self, h: f32) {
         self.layout.set_layout_height((h - PADDING * 2.0).max(1.0));
+        self.clamp_scroll();
+    }
+
+    // -----------------------------------------------------------------------
+    // Scroll
+    // -----------------------------------------------------------------------
+
+    /// Total content height from the layout engine.
+    fn content_height(&mut self) -> f32 {
+        let metrics = self.layout.line_metrics(&self.state.text);
+        if let Some(last) = metrics.last() {
+            last.baseline + last.descent
+        } else {
+            0.0
+        }
+    }
+
+    /// Maximum scroll offset (content may be shorter than viewport).
+    fn max_scroll_y(&mut self) -> f32 {
+        (self.content_height() - self.layout.layout_height).max(0.0)
+    }
+
+    /// Clamp scroll_y to valid range.
+    fn clamp_scroll(&mut self) {
+        let max = self.max_scroll_y();
+        self.scroll_y = self.scroll_y.clamp(0.0, max);
+    }
+
+    /// Adjust scroll offset by `delta` pixels (positive = scroll down).
+    fn scroll_by(&mut self, delta: f32) {
+        self.scroll_y += delta;
+        self.clamp_scroll();
+    }
+
+    /// Adjust scroll so the caret is within the visible viewport.
+    fn ensure_cursor_visible(&mut self) {
+        let cr = self.layout.caret_rect_at(&self.state.text, self.state.cursor);
+        let viewport_height = self.layout.layout_height;
+        let margin = cr.height; // one line of margin
+
+        // Cursor above viewport
+        if cr.y < self.scroll_y + margin {
+            self.scroll_y = (cr.y - margin).max(0.0);
+        }
+
+        // Cursor below viewport
+        let cursor_bottom = cr.y + cr.height;
+        if cursor_bottom > self.scroll_y + viewport_height - margin {
+            self.scroll_y = cursor_bottom - viewport_height + margin;
+        }
+
+        self.clamp_scroll();
     }
 
     // -----------------------------------------------------------------------
@@ -908,7 +971,20 @@ impl TextEditor {
 
     fn draw(&mut self, canvas: &skia_safe::Canvas) {
         canvas.clear(Color::WHITE);
-        let origin = Point::new(PADDING, PADDING);
+
+        // Clip to the text area and translate by the scroll offset.
+        canvas.save();
+        canvas.clip_rect(
+            Rect::from_xywh(
+                PADDING,
+                PADDING,
+                self.layout.layout_width,
+                self.layout.layout_height,
+            ),
+            None,
+            None,
+        );
+        let origin = Point::new(PADDING, PADDING - self.scroll_y);
 
         let preedit = self.preedit.as_deref().filter(|p| !p.is_empty()).map(str::to_owned);
 
@@ -1069,6 +1145,8 @@ impl TextEditor {
                 canvas.draw_rect(cursor_rect, &cp);
             }
         }
+
+        canvas.restore();
     }
 }
 
@@ -1633,11 +1711,23 @@ impl ApplicationHandler for TextEditorApp {
                 }
             }
 
+            WindowEvent::MouseWheel { delta, .. } => {
+                let dy = match delta {
+                    MouseScrollDelta::PixelDelta(pos) => pos.y as f32,
+                    MouseScrollDelta::LineDelta(_, lines) => lines * FONT_SIZE * 3.0,
+                };
+                inner.editor.scroll_by(-dy);
+                inner.window.request_redraw();
+            }
+
             WindowEvent::CursorMoved { position, .. } => {
                 let x = position.x as f32;
                 let y = position.y as f32;
                 self.last_mouse_pos = (x, y);
-                inner.editor.on_mouse_move(x - PADDING, y - PADDING);
+                inner.editor.on_mouse_move(
+                    x - PADDING,
+                    y - PADDING + inner.editor.scroll_y,
+                );
                 if inner.editor.mouse_down {
                     inner.window.request_redraw();
                 }
@@ -1654,8 +1744,11 @@ impl ApplicationHandler for TextEditorApp {
                     let local_y = y - PADDING;
                     let shift = self.modifiers.shift_key();
 
+                    let scroll_y = inner.editor.scroll_y;
+                    let layout_y = local_y + scroll_y;
+
                     if shift {
-                        inner.editor.shift_click(local_x, local_y);
+                        inner.editor.shift_click(local_x, layout_y);
                         inner.window.request_redraw();
                     } else {
                         let now = Instant::now();
@@ -1675,9 +1768,9 @@ impl ApplicationHandler for TextEditorApp {
                         self.last_click_pos = (x, y);
 
                         match self.click_count {
-                            1 => inner.editor.on_mouse_down(local_x, local_y),
-                            2 => inner.editor.select_word_at(local_x, local_y),
-                            3 => inner.editor.select_line_at(local_x, local_y),
+                            1 => inner.editor.on_mouse_down(local_x, layout_y),
+                            2 => inner.editor.select_word_at(local_x, layout_y),
+                            3 => inner.editor.select_line_at(local_x, layout_y),
                             _ => inner.editor.select_all(),
                         }
                         inner.window.request_redraw();
@@ -1700,10 +1793,11 @@ impl ApplicationHandler for TextEditorApp {
                     &inner.editor.state.text,
                     inner.editor.state.cursor,
                 );
+                let scroll_y = inner.editor.scroll_y;
                 inner.window.set_ime_cursor_area(
                     LogicalPosition::new(
                         (cr.x + PADDING) as f64,
-                        (cr.y + PADDING) as f64,
+                        (cr.y + PADDING - scroll_y) as f64,
                     ),
                     LogicalSize::new(1.0f64, cr.height as f64),
                 );
@@ -1726,11 +1820,12 @@ impl ApplicationHandler for TextEditorApp {
                         Ok(content) => {
                             let default_style = inner.editor.content.default_style().clone();
                             inner.editor.content = AttributedText::new(&content, default_style);
-                            inner.editor.state.text = content;
+                            inner.editor.state.text = inner.editor.content.text().to_owned();
                             inner.editor.state.cursor = inner.editor.state.text.len();
                             inner.editor.state.anchor = None;
                             inner.editor.caret_style_override = None;
                             inner.editor.layout.invalidate();
+                            inner.editor.scroll_y = 0.0;
                             inner.editor.reset_blink();
                             eprintln!("loaded plain text: {}", path.display());
                             inner.window.request_redraw();
@@ -1749,6 +1844,7 @@ impl ApplicationHandler for TextEditorApp {
                             inner.editor.state.anchor = None;
                             inner.editor.caret_style_override = None;
                             inner.editor.layout.invalidate();
+                            inner.editor.scroll_y = 0.0;
                             inner.editor.reset_blink();
                             eprintln!("loaded HTML: {}", path.display());
                             inner.window.request_redraw();
