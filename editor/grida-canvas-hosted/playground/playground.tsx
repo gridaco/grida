@@ -78,10 +78,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { Kbd } from "@/components/ui/kbd";
 import ErrorBoundary from "./error-boundary";
-import { uikbdk, M } from "@/grida-canvas/keybinding";
-import { KeyCode } from "@/grida-canvas/keycode";
+import { keyboardShortcutText } from "./uxhost-shortcut-renderer";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
@@ -585,7 +584,7 @@ function Consumer({
   });
 
   useHotkeys(
-    "shift+i",
+    "meta+i, ctrl+i",
     (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -597,7 +596,7 @@ function Consumer({
       }
     },
     {
-      // keep shortcut disabled while typing (library default, made explicit here)
+      // keep shortcut disabled while typing in inputs/text fields
       enableOnFormTags: false,
       enableOnContentEditable: false,
     }
@@ -885,10 +884,7 @@ function SidebarLeft({
           <TooltipContent side="right" sideOffset={8}>
             <div className="flex items-center gap-2">
               <span>Open Library</span>
-              <KbdGroup>
-                <Kbd>{uikbdk(M.CtrlCmd)}</Kbd>
-                <Kbd>{uikbdk(KeyCode.KeyI)}</Kbd>
-              </KbdGroup>
+              <Kbd>{keyboardShortcutText("workbench.surface.ui.open-library")}</Kbd>
             </div>
           </TooltipContent>
         </Tooltip>

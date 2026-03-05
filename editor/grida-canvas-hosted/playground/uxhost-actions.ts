@@ -55,12 +55,12 @@ export const actions = {
   //   keybindings: kb(KeyCode.KeyL, M.Alt),
   // },
 
-  // ["workbench.surface.ui.open-library"]: {
-  //   name: "open library",
-  //   description: "Open the library",
-  //   command: "todo!()",
-  //   keybindings: kb(KeyCode.KeyI, M.Shift),
-  // },
+  ["workbench.surface.ui.open-library"]: {
+    name: "open library",
+    description: "Open the library",
+    command: "workbench.surface.ui.open-library",
+    keybindings: kb(KeyCode.KeyI, M.CtrlCmd),
+  },
 
   ["workbench.surface.edit.undo"]: {
     name: "undo",

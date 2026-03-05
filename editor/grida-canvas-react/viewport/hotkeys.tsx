@@ -352,9 +352,25 @@ export function useEditorHotKeys() {
     editor.surface.a11yToggleBold("selection");
   });
 
-  useHotkeys("meta+i, ctrl+i", () => {
-    editor.surface.a11yToggleItalic("selection");
-  });
+  useHotkeys(
+    "meta+i, ctrl+i",
+    () => {
+      editor.surface.a11yToggleItalic("selection");
+    },
+    {
+      // Only toggle italic when editing text; otherwise Cmd+I opens the library
+      enableOnFormTags: true,
+      enableOnContentEditable: true,
+      ignoreEventWhen: (e) => {
+        const el = e.target as HTMLElement | null;
+        const isEditable =
+          el?.isContentEditable ||
+          el?.closest?.("[contenteditable=true]") ||
+          el?.getAttribute?.("contenteditable") === "true";
+        return !isEditable;
+      },
+    }
+  );
 
   useHotkeys("meta+u, ctrl+u", () => {
     editor.surface.a11yToggleUnderline("selection");
