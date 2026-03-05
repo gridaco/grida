@@ -16,6 +16,158 @@ use crate::{
 
 const DEFAULT_FONT_SIZE: f32 = 18.0;
 
+/// Convert an [`AttributedText`] `TextStyle` to a Skia `TextStyle`.
+///
+/// Extracted as a free function so it can be reused by both the monolithic
+/// and per-block attributed layout paths.
+fn attr_style_to_skia(
+    style: &crate::attributed_text::TextStyle,
+    fallback_families: &[&str],
+) -> TextStyle {
+    use crate::attributed_text as at_mod;
+
+    let mut ts = TextStyle::new();
+    ts.set_font_size(style.font_size);
+
+    let mut families: Vec<&str> = vec![style.font_family.as_str()];
+    for f in fallback_families {
+        if *f != style.font_family.as_str() {
+            families.push(f);
+        }
+    }
+    ts.set_font_families(&families);
+
+    let slant = if style.font_style_italic {
+        skia_safe::font_style::Slant::Italic
+    } else {
+        skia_safe::font_style::Slant::Upright
+    };
+    let weight = skia_safe::font_style::Weight::from(style.font_weight as i32);
+    let width = skia_safe::font_style::Width::from(style.font_width as i32);
+    ts.set_font_style(skia_safe::FontStyle::new(weight, width, slant));
+
+    {
+        use skia_safe::font_arguments::variation_position::Coordinate;
+        let mut coords: Vec<Coordinate> = Vec::new();
+
+        for v in &style.font_variations {
+            let bytes = v.axis.as_bytes();
+            let tag = skia_safe::FourByteTag::from((
+                *bytes.first().unwrap_or(&b' ') as char,
+                *bytes.get(1).unwrap_or(&b' ') as char,
+                *bytes.get(2).unwrap_or(&b' ') as char,
+                *bytes.get(3).unwrap_or(&b' ') as char,
+            ));
+            coords.push(Coordinate { axis: tag, value: v.value });
+        }
+
+        coords.push(Coordinate {
+            axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
+            value: style.font_weight as f32,
+        });
+
+        if (style.font_width - 100.0).abs() > f32::EPSILON {
+            coords.push(Coordinate {
+                axis: skia_safe::FourByteTag::from(('w', 'd', 't', 'h')),
+                value: style.font_width,
+            });
+        }
+
+        match style.font_optical_sizing {
+            at_mod::FontOpticalSizing::Auto => {
+                coords.push(Coordinate {
+                    axis: skia_safe::FourByteTag::from(('o', 'p', 's', 'z')),
+                    value: style.font_size,
+                });
+            }
+            at_mod::FontOpticalSizing::Fixed(v) => {
+                coords.push(Coordinate {
+                    axis: skia_safe::FourByteTag::from(('o', 'p', 's', 'z')),
+                    value: v,
+                });
+            }
+            at_mod::FontOpticalSizing::None => {}
+        }
+
+        let variation_position = skia_safe::font_arguments::VariationPosition {
+            coordinates: &coords,
+        };
+        let font_args =
+            skia_safe::FontArguments::new().set_variation_design_position(variation_position);
+        ts.set_font_arguments(&font_args);
+    }
+
+    match &style.fill {
+        at_mod::TextFill::Solid(rgba) => {
+            ts.set_color(Color::from_argb(
+                (rgba.a * 255.0) as u8,
+                (rgba.r * 255.0) as u8,
+                (rgba.g * 255.0) as u8,
+                (rgba.b * 255.0) as u8,
+            ));
+        }
+    }
+
+    match style.letter_spacing {
+        at_mod::TextDimension::Fixed(v) => {
+            ts.set_letter_spacing(v);
+        }
+        _ => {}
+    }
+
+    ts.add_font_feature("kern", if style.font_kerning { 1 } else { 0 });
+
+    for feat in &style.font_features {
+        ts.add_font_feature(feat.tag.clone(), if feat.value { 1 } else { 0 });
+    }
+
+    let mut deco = TextDecoration::NO_DECORATION;
+    match style.text_decoration_line {
+        at_mod::TextDecorationLine::Underline => {
+            deco = TextDecoration::UNDERLINE;
+        }
+        at_mod::TextDecorationLine::LineThrough => {
+            deco = TextDecoration::LINE_THROUGH;
+        }
+        at_mod::TextDecorationLine::Overline => {
+            deco = TextDecoration::OVERLINE;
+        }
+        at_mod::TextDecorationLine::None => {}
+    }
+    ts.set_decoration_type(deco);
+
+    ts
+}
+
+// ---------------------------------------------------------------------------
+// Incremental UTF-16 → UTF-8 offset conversion
+// ---------------------------------------------------------------------------
+
+/// Advance a running `(utf16_count, byte_offset)` cursor through `text` to
+/// the given UTF-16 target, returning the corresponding UTF-8 byte offset.
+///
+/// The caller must ensure that calls are made with **monotonically
+/// non-decreasing** `target_u16` values so the iterator only moves forward.
+/// This makes each call amortized O(1) instead of O(n).
+fn incremental_u16_to_u8(
+    target_u16: usize,
+    text: &str,
+    run_u16: &mut usize,
+    run_byte: &mut usize,
+    iter: &mut std::iter::Peekable<std::str::CharIndices>,
+) -> usize {
+    while *run_u16 < target_u16 {
+        if let Some(&(byte_idx, ch)) = iter.peek() {
+            *run_u16 += ch.len_utf16();
+            *run_byte = byte_idx + ch.len_utf8();
+            iter.next();
+        } else {
+            break;
+        }
+    }
+    (*run_byte).min(text.len())
+}
+
 /// Horizontal text alignment.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub enum TextAlign {
@@ -740,9 +892,18 @@ impl SkiaLayoutEngine {
         let mut result = Vec::with_capacity(skia.len());
         let mut prev_end: usize = 0;
 
+        // Incremental UTF-16 → UTF-8 tracking within this block slice.
+        let mut run_u16: usize = 0;
+        let mut run_byte: usize = 0;
+        let mut char_iter = slice.char_indices().peekable();
+
         for lm in &skia {
-            let local_start = utf16_to_utf8_offset(slice, lm.start_index);
-            let local_end = utf16_to_utf8_offset(slice, lm.end_including_newline).min(slice.len());
+            let local_start = incremental_u16_to_u8(
+                lm.start_index, slice, &mut run_u16, &mut run_byte, &mut char_iter,
+            );
+            let local_end = incremental_u16_to_u8(
+                lm.end_including_newline, slice, &mut run_u16, &mut run_byte, &mut char_iter,
+            ).min(slice.len());
 
             let local_start = local_start.max(prev_end);
             let local_end = local_end.max(local_start);
@@ -779,15 +940,26 @@ impl SkiaLayoutEngine {
     }
 
     /// Convert line metrics from the legacy single paragraph (attributed path).
+    ///
+    /// Uses incremental UTF-16 → UTF-8 offset tracking instead of scanning
+    /// from byte 0 per line, making this O(n) instead of O(n × L).
     fn convert_single_para_line_metrics(&self, text: &str) -> Vec<LineMetrics> {
         let para = self.paragraph.as_ref().unwrap();
         let skia = para.get_line_metrics();
         let mut result = Vec::with_capacity(skia.len());
         let mut prev_end: usize = 0;
 
+        let mut run_u16: usize = 0;
+        let mut run_byte: usize = 0;
+        let mut char_iter = text.char_indices().peekable();
+
         for lm in &skia {
-            let start = utf16_to_utf8_offset(text, lm.start_index);
-            let end = utf16_to_utf8_offset(text, lm.end_including_newline).min(text.len());
+            let start = incremental_u16_to_u8(
+                lm.start_index, text, &mut run_u16, &mut run_byte, &mut char_iter,
+            );
+            let end = incremental_u16_to_u8(
+                lm.end_including_newline, text, &mut run_u16, &mut run_byte, &mut char_iter,
+            ).min(text.len());
 
             let start = start.max(prev_end);
             let end = end.max(start);
@@ -848,179 +1020,173 @@ impl SkiaLayoutEngine {
     }
 
     // -------------------------------------------------------------------
-    // Legacy single-paragraph paths (for attributed text / preedit)
+    // Attributed text layout (per-block, rich text)
     // -------------------------------------------------------------------
 
-    /// Build and cache a monolithic paragraph from an [`AttributedText`],
-    /// pushing per-run styles to `ParagraphBuilder`. This is the rich-text
-    /// layout path — each run gets its own font weight, slant, decoration,
-    /// color, etc.
+    /// Ensure layout is up-to-date for the given [`AttributedText`].
     ///
-    /// NOTE: this populates the legacy `paragraph` field, NOT the per-block
-    /// architecture. The `wd_text_editor` uses this for rich text rendering.
+    /// Uses the same per-block architecture as plain text, but pushes
+    /// per-run styles within each block. This avoids feeding the entire
+    /// document into a single Skia `Paragraph`.
     pub fn ensure_layout_attributed(
         &mut self,
         at: &crate::attributed_text::AttributedText,
     ) {
-        if self.paragraph.is_some() && self.cached_text == at.text() {
+        if !self.blocks.is_empty() && self.cached_text == at.text() {
             return;
         }
-        self.rebuild_attributed(at);
+        self.rebuild_blocks_attributed(at);
     }
 
-    fn rebuild_attributed(
-        &mut self,
-        at: &crate::attributed_text::AttributedText,
-    ) {
-        use crate::attributed_text as at_mod;
-
+    /// Build a Skia `Paragraph` for a block slice with per-run styling
+    /// from the given runs. Runs are clipped to the block range.
+    fn build_paragraph_for_attributed_slice(
+        &self,
+        text: &str,
+        block_start: usize,
+        block_content_end: usize,
+        runs: &[crate::attributed_text::StyledRun],
+    ) -> Paragraph {
         let mut para_style = ParagraphStyle::new();
         para_style.set_apply_rounding_hack(false);
         para_style.set_text_align(self.config.text_align.to_skia());
 
         let mut builder = ParagraphBuilder::new(&para_style, &self.font_collection);
+        let fallback_families: Vec<&str> =
+            self.config.font_families.iter().map(|s| s.as_str()).collect();
 
-        let text = at.text();
-        let fallback_families: Vec<&str> = self.config.font_families.iter().map(|s| s.as_str()).collect();
-
-        for run in at.runs() {
-            let style = &run.style;
+        // If no runs overlap, use config defaults.
+        if runs.is_empty() || block_start >= block_content_end {
             let mut ts = TextStyle::new();
-
-            // Font size
-            ts.set_font_size(style.font_size);
-
-            // Font families: use the run's font_family as primary,
-            // fall back to the config's family list.
-            let mut families: Vec<&str> = vec![style.font_family.as_str()];
-            for f in &fallback_families {
-                if *f != style.font_family.as_str() {
-                    families.push(f);
-                }
-            }
+            ts.set_font_size(self.config.font_size);
+            let families: Vec<&str> = self.config.font_families.iter().map(|s| s.as_str()).collect();
             ts.set_font_families(&families);
-
-            // Font style (for typeface matching in FontCollection)
-            let slant = if style.font_style_italic {
-                skia_safe::font_style::Slant::Italic
-            } else {
-                skia_safe::font_style::Slant::Upright
-            };
-            let weight = skia_safe::font_style::Weight::from(style.font_weight as i32);
-            let width = skia_safe::font_style::Width::from(style.font_width as i32);
-            ts.set_font_style(skia_safe::FontStyle::new(weight, width, slant));
-
-            // Variable font axes (FontArguments)
-            {
-                use skia_safe::font_arguments::variation_position::Coordinate;
-
-                let mut coords: Vec<Coordinate> = Vec::new();
-
-                for v in &style.font_variations {
-                    let bytes = v.axis.as_bytes();
-                    let tag = skia_safe::FourByteTag::from((
-                        *bytes.first().unwrap_or(&b' ') as char,
-                        *bytes.get(1).unwrap_or(&b' ') as char,
-                        *bytes.get(2).unwrap_or(&b' ') as char,
-                        *bytes.get(3).unwrap_or(&b' ') as char,
-                    ));
-                    coords.push(Coordinate { axis: tag, value: v.value });
-                }
-
-                coords.push(Coordinate {
-                    axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
-                    value: style.font_weight as f32,
-                });
-
-                if (style.font_width - 100.0).abs() > f32::EPSILON {
-                    coords.push(Coordinate {
-                        axis: skia_safe::FourByteTag::from(('w', 'd', 't', 'h')),
-                        value: style.font_width,
-                    });
-                }
-
-                match style.font_optical_sizing {
-                    at_mod::FontOpticalSizing::Auto => {
-                        coords.push(Coordinate {
-                            axis: skia_safe::FourByteTag::from(('o', 'p', 's', 'z')),
-                            value: style.font_size,
-                        });
-                    }
-                    at_mod::FontOpticalSizing::Fixed(v) => {
-                        coords.push(Coordinate {
-                            axis: skia_safe::FourByteTag::from(('o', 'p', 's', 'z')),
-                            value: v,
-                        });
-                    }
-                    at_mod::FontOpticalSizing::None => {}
-                }
-
-                let variation_position = skia_safe::font_arguments::VariationPosition {
-                    coordinates: &coords,
-                };
-                let font_args = skia_safe::FontArguments::new()
-                    .set_variation_design_position(variation_position);
-                ts.set_font_arguments(&font_args);
-            }
-
-            // Color / fill
-            match &style.fill {
-                at_mod::TextFill::Solid(rgba) => {
-                    ts.set_color(Color::from_argb(
-                        (rgba.a * 255.0) as u8,
-                        (rgba.r * 255.0) as u8,
-                        (rgba.g * 255.0) as u8,
-                        (rgba.b * 255.0) as u8,
-                    ));
-                }
-            }
-
-            // Letter spacing
-            match style.letter_spacing {
-                at_mod::TextDimension::Fixed(v) => { ts.set_letter_spacing(v); }
-                _ => {}
-            }
-
-            // Kerning
-            ts.add_font_feature("kern", if style.font_kerning { 1 } else { 0 });
-
-            // User font features
-            for feat in &style.font_features {
-                ts.add_font_feature(feat.tag.clone(), if feat.value { 1 } else { 0 });
-            }
-
-            // Decoration
-            let mut deco = TextDecoration::NO_DECORATION;
-            match style.text_decoration_line {
-                at_mod::TextDecorationLine::Underline => {
-                    deco = TextDecoration::UNDERLINE;
-                }
-                at_mod::TextDecorationLine::LineThrough => {
-                    deco = TextDecoration::LINE_THROUGH;
-                }
-                at_mod::TextDecorationLine::Overline => {
-                    deco = TextDecoration::OVERLINE;
-                }
-                at_mod::TextDecorationLine::None => {}
-            }
-            ts.set_decoration_type(deco);
-
             builder.push_style(&ts);
+            builder.add_text(&text[block_start..block_content_end]);
+        } else {
+            for run in runs {
+                // Clip run to block range.
+                let run_start = (run.start as usize).max(block_start);
+                let run_end = (run.end as usize).min(block_content_end);
+                if run_start >= run_end {
+                    continue;
+                }
 
-            let start = run.start as usize;
-            let end = run.end as usize;
-            if start < end && end <= text.len() {
-                builder.add_text(&text[start..end]);
+                let ts = attr_style_to_skia(&run.style, &fallback_families);
+                builder.push_style(&ts);
+                builder.add_text(&text[run_start..run_end]);
             }
         }
 
         let mut para = builder.build();
         para.layout(self.layout_width);
-        self.paragraph = Some(para);
-        self.cached_text = text.to_owned();
-        // Clear per-block state — the attributed path uses the legacy paragraph.
+        para
+    }
+
+    /// Full rebuild of per-block layout from an [`AttributedText`].
+    fn rebuild_blocks_attributed(
+        &mut self,
+        at: &crate::attributed_text::AttributedText,
+    ) {
         self.blocks.clear();
         self.cached_line_metrics = None;
+        self.paragraph = None;
+
+        let text = at.text();
+        let mut y_offset: f32 = 0.0;
+        let mut start = 0usize;
+
+        loop {
+            let has_newline;
+            let end = if let Some(pos) = text[start..].find('\n') {
+                has_newline = true;
+                start + pos + 1
+            } else {
+                has_newline = false;
+                text.len()
+            };
+
+            let content_end = if has_newline { end - 1 } else { end };
+
+            // Get runs overlapping this block.
+            let runs = at.runs_in_range(start as u32, content_end as u32);
+            let para = self.build_paragraph_for_attributed_slice(text, start, content_end, runs);
+
+            let content_slice = &text[start..content_end];
+            let mut stored_lines = self.convert_block_line_metrics(&para, content_slice, start);
+
+            if stored_lines.is_empty() {
+                let skia_metrics = para.get_line_metrics();
+                let (ascent, descent, baseline) = if let Some(lm) = skia_metrics.first() {
+                    (lm.ascent as f32, lm.descent as f32, lm.baseline as f32)
+                } else {
+                    (self.font_size, self.font_size * 0.2, self.font_size)
+                };
+                stored_lines.push(LineMetrics {
+                    start_index: start,
+                    end_index: start,
+                    baseline,
+                    ascent,
+                    descent,
+                });
+            }
+
+            if has_newline {
+                if let Some(last) = stored_lines.last_mut() {
+                    last.end_index = end;
+                }
+            }
+
+            let height: f32 = if let Some(last) = stored_lines.last() {
+                last.baseline + last.descent
+            } else {
+                self.font_size * 1.2
+            };
+
+            self.blocks.push(ParaBlock {
+                byte_start: start,
+                byte_end: end,
+                paragraph: para,
+                y_offset,
+                height,
+                line_metrics: stored_lines,
+            });
+
+            y_offset += height;
+            start = end;
+
+            if start >= text.len() {
+                break;
+            }
+        }
+
+        // Trailing newline phantom block.
+        if text.ends_with('\n') && !text.is_empty() {
+            if let Some(last_block) = self.blocks.last() {
+                let last_lm = last_block.line_metrics.last();
+                let (ascent, descent) = last_lm
+                    .map(|lm| (lm.ascent, lm.descent))
+                    .unwrap_or((self.font_size, self.font_size * 0.2));
+                let phantom = LineMetrics {
+                    start_index: text.len(),
+                    end_index: text.len(),
+                    baseline: ascent,
+                    ascent,
+                    descent,
+                };
+                let phantom_height = ascent + descent;
+                self.blocks.push(ParaBlock {
+                    byte_start: text.len(),
+                    byte_end: text.len(),
+                    paragraph: self.build_paragraph_for_slice(""),
+                    y_offset,
+                    height: phantom_height,
+                    line_metrics: vec![phantom],
+                });
+            }
+        }
+
+        self.cached_text = text.to_owned();
     }
 
     /// Invalidate all cached layout so the next call rebuilds.
@@ -1086,6 +1252,20 @@ impl SkiaLayoutEngine {
         self.ensure_layout(text);
         for block in &self.blocks {
             block.paragraph.paint(canvas, Point::new(0.0, block.y_offset));
+        }
+    }
+
+    /// Paint the laid-out paragraph at the given origin offset.
+    pub fn paint_paragraph_at(
+        &self,
+        canvas: &skia_safe::Canvas,
+        _text: &str,
+        origin: Point,
+    ) {
+        for block in &self.blocks {
+            block
+                .paragraph
+                .paint(canvas, Point::new(origin.x, origin.y + block.y_offset));
         }
     }
 }

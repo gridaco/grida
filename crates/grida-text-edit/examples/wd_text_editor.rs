@@ -1130,32 +1130,25 @@ impl TextEditor {
                 &cp,
             );
         } else {
-            // ---- normal mode (rich text) ----
+            // ---- normal mode (rich text, per-block layout) ----
             self.layout.ensure_layout_attributed(&self.content);
 
-            // Selection
+            // Selection (using per-block selection_rects_for_range)
             if let Some((lo, hi)) = self.selection_range() {
                 if lo < hi {
-                    let u16_lo = utf8_to_utf16_offset(&self.state.text, lo);
-                    let u16_hi = utf8_to_utf16_offset(&self.state.text, hi);
-                    let rects = selection_rects_with_empty_line_invariant(
-                        self.layout.paragraph.as_ref().unwrap(),
-                        &self.state.text,
-                        u16_lo,
-                        u16_hi,
-                        self.layout.layout_width,
-                        self.empty_line_policy,
+                    let sel_rects = self.layout.selection_rects_for_range(
+                        &self.state.text, lo, hi,
                     );
                     let mut sp = Paint::default();
                     sp.set_color(Color::from_argb(80, 66, 133, 244));
                     sp.set_anti_alias(true);
-                    for r in &rects {
+                    for r in &sel_rects {
                         canvas.draw_rect(
                             Rect::from_ltrb(
-                                r.left + origin.x,
-                                r.top + origin.y,
-                                r.right + origin.x,
-                                r.bottom + origin.y,
+                                r.x + origin.x,
+                                r.y + origin.y,
+                                r.x + r.width + origin.x,
+                                r.y + r.height + origin.y,
                             ),
                             &sp,
                         );
@@ -1163,10 +1156,9 @@ impl TextEditor {
                 }
             }
 
-            // Text
-            if let Some(ref para) = self.layout.paragraph {
-                para.paint(canvas, origin);
-            }
+            // Text (per-block painting with origin offset)
+            self.layout.ensure_layout(&self.state.text);
+            self.layout.paint_paragraph_at(canvas, &self.state.text, origin);
 
             // Cursor
             if self.cursor_visible && !self.has_selection() {
@@ -1856,7 +1848,7 @@ impl ApplicationHandler for TextEditorApp {
                             let default_style = inner.editor.content.default_style().clone();
                             inner.editor.content = AttributedText::new(&content, default_style);
                             inner.editor.state.text = inner.editor.content.text().to_owned();
-                            inner.editor.state.cursor = inner.editor.state.text.len();
+                            inner.editor.state.cursor = 0;
                             inner.editor.state.anchor = None;
                             inner.editor.caret_style_override = None;
                             inner.editor.cached_caret_rect = None;
@@ -1876,7 +1868,7 @@ impl ApplicationHandler for TextEditorApp {
                             let content = html_to_attributed_text(&html, base);
                             inner.editor.state.text = content.text().to_owned();
                             inner.editor.content = content;
-                            inner.editor.state.cursor = inner.editor.state.text.len();
+                            inner.editor.state.cursor = 0;
                             inner.editor.state.anchor = None;
                             inner.editor.caret_style_override = None;
                             inner.editor.cached_caret_rect = None;
