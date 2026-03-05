@@ -133,7 +133,7 @@ use winit::{
 
 use grida_text_edit::{
     apply_command_mut, utf8_to_utf16_offset,
-    CaretRect, EditKind, EditingCommand, GenericEditHistory,
+    CaretRect, EditDelta, EditKind, EditingCommand, GenericEditHistory,
     SkiaLayoutEngine, TextEditorState, TextLayoutEngine,
     attributed_text::{
         AttributedText, TextStyle as AttrTextStyle,
@@ -440,6 +440,7 @@ impl TextEditor {
         self.caret_style_override = None;
         self.cached_caret_rect = None;
         self.layout.invalidate();
+        self.layout.ensure_layout_attributed(&self.content);
         self.ensure_cursor_visible();
     }
 
@@ -448,100 +449,67 @@ impl TextEditor {
     // -----------------------------------------------------------------------
 
     fn apply(&mut self, cmd: EditingCommand) {
-        let is_edit = cmd.edit_kind().is_some();
         if let Some(kind) = cmd.edit_kind() {
-            self.history.push(&self.snapshot(), kind);
+            if !self.history.would_merge(kind) {
+                self.history.push(&self.snapshot(), kind);
+            } else {
+                self.history.push_merge(kind);
+            }
         }
         let old_cursor = self.state.cursor;
-        // Only clone the old text when the command may mutate it.
-        let old_text = if is_edit { Some(self.state.text.clone()) } else { None };
-        apply_command_mut(&mut self.state, cmd, &mut self.layout);
+        let delta = apply_command_mut(&mut self.state, cmd, &mut self.layout);
         self.invalidate_caret_cache();
-        if let Some(old) = old_text {
-            self.sync_content_after_edit(&old, old_cursor);
+        if let Some(d) = delta {
+            self.sync_content_with_delta(&d, old_cursor);
         } else if self.state.cursor != old_cursor {
-            // Pure cursor movement — clear caret style override.
             self.caret_style_override = None;
         }
         self.reset_blink();
+        // Ensure attributed layout is up-to-date before querying caret geometry,
+        // otherwise ensure_cursor_visible triggers the plain-text rebuild path.
+        self.layout.ensure_layout_attributed(&self.content);
         self.ensure_cursor_visible();
     }
 
     fn apply_with_kind(&mut self, cmd: EditingCommand, kind: EditKind) {
-        self.history.push(&self.snapshot(), kind);
+        if !self.history.would_merge(kind) {
+            self.history.push(&self.snapshot(), kind);
+        } else {
+            self.history.push_merge(kind);
+        }
         let old_cursor = self.state.cursor;
-        let old_text = self.state.text.clone();
-        apply_command_mut(&mut self.state, cmd, &mut self.layout);
+        let delta = apply_command_mut(&mut self.state, cmd, &mut self.layout);
         self.invalidate_caret_cache();
-        self.sync_content_after_edit(&old_text, old_cursor);
+        if let Some(d) = delta {
+            self.sync_content_with_delta(&d, old_cursor);
+        }
         self.reset_blink();
+        self.layout.ensure_layout_attributed(&self.content);
         self.ensure_cursor_visible();
     }
 
-    /// After apply_command changes `self.state.text`, diff and update
-    /// `self.content` (the AttributedText) to keep runs in sync.
-    fn sync_content_after_edit(&mut self, old_text: &str, old_cursor: usize) {
-        let new_text = &self.state.text;
-        if old_text == new_text {
-            // Pure cursor movement — clear caret style override.
-            if self.state.cursor != old_cursor {
-                self.caret_style_override = None;
-            }
-            return;
-        }
-
-        // Determine the effective style for inserted text.
+    /// Update the `AttributedText` content and incremental layout using
+    /// the edit delta returned by `apply_command_mut` — O(1) offset lookup
+    /// instead of O(n) text diff.
+    fn sync_content_with_delta(&mut self, delta: &EditDelta, old_cursor: usize) {
         let insert_style = self.caret_style_override.clone()
             .unwrap_or_else(|| self.content.caret_style_at(old_cursor as u32).clone());
 
-        let old_len = old_text.len();
-        let new_len = new_text.len();
+        let old_end = delta.offset + delta.old_len;
+        let new_end = delta.offset + delta.new_len;
 
-        // Find common prefix length (byte level, snap to char boundaries).
-        let mut prefix = 0;
-        for (a, b) in old_text.bytes().zip(new_text.bytes()) {
-            if a != b { break; }
-            prefix += 1;
+        if delta.old_len > 0 {
+            self.content.delete(delta.offset, old_end);
         }
-        while prefix > 0 && !old_text.is_char_boundary(prefix) {
-            prefix -= 1;
-        }
-        while prefix > 0 && prefix < new_len && !new_text.is_char_boundary(prefix) {
-            prefix -= 1;
+        if delta.new_len > 0 {
+            let inserted = &self.state.text[delta.offset..new_end];
+            self.content.insert_with_style(delta.offset, inserted, insert_style);
         }
 
-        // Find common suffix length.
-        let mut suffix = 0;
-        let max_suffix = old_len.min(new_len) - prefix;
-        for i in 0..max_suffix {
-            let oi = old_len - 1 - i;
-            let ni = new_len - 1 - i;
-            if old_text.as_bytes()[oi] != new_text.as_bytes()[ni] { break; }
-            suffix += 1;
-        }
-        while suffix > 0 && !old_text.is_char_boundary(old_len - suffix) {
-            suffix -= 1;
-        }
-        while suffix > 0 && !new_text.is_char_boundary(new_len - suffix) {
-            suffix -= 1;
-        }
-
-        let old_end = old_len - suffix;
-        let new_end = new_len - suffix;
-
-        if old_end > prefix {
-            self.content.delete(prefix, old_end);
-        }
-        if new_end > prefix {
-            let inserted = &new_text[prefix..new_end];
-            self.content.insert_with_style(prefix, inserted, insert_style);
-        }
-
-        // Incrementally update the per-block layout so only the affected
-        // paragraph is re-shaped (instead of rebuilding all blocks).
-        let removed_bytes = old_end - prefix;
-        let inserted_bytes = new_end - prefix;
-        self.layout.notify_edit(new_text, prefix, removed_bytes, inserted_bytes);
+        // Invalidate the per-block layout so the next ensure_layout_attributed
+        // call rebuilds the affected blocks. (notify_edit is designed for the
+        // plain-text path and doesn't handle per-run attributed styles.)
+        self.layout.invalidate();
 
         // After any text edit, clear the override.
         self.caret_style_override = None;
@@ -947,6 +915,12 @@ impl TextEditor {
     }
 
     /// Adjust scroll so the caret is within the visible viewport.
+    ///
+    /// **Ordering constraint:** `ensure_layout_attributed` must be called
+    /// before this method when editing rich text. `caret_rect()` internally
+    /// triggers `ensure_layout` (the plain-text path); if the attributed
+    /// blocks haven't been built yet, `ensure_layout` would rebuild them
+    /// with uniform styling, losing all formatting.
     fn ensure_cursor_visible(&mut self) {
         let cr = self.caret_rect();
         let viewport_height = self.layout.layout_height;
@@ -1157,7 +1131,6 @@ impl TextEditor {
             }
 
             // Text (per-block painting with origin offset)
-            self.layout.ensure_layout(&self.state.text);
             self.layout.paint_paragraph_at(canvas, &self.state.text, origin);
 
             // Cursor

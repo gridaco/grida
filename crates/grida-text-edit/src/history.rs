@@ -81,6 +81,32 @@ impl<S: Clone> GenericEditHistory<S> {
         self.redo_stack.clear();
     }
 
+    /// Returns `true` if a `push` with this `kind` would merge into the
+    /// existing top-of-stack entry (i.e. the snapshot would be discarded).
+    ///
+    /// Use this to avoid expensive snapshot creation when the result would
+    /// be thrown away anyway.
+    pub fn would_merge(&self, kind: EditKind) -> bool {
+        if kind.is_mergeable() {
+            if let Some(top) = self.undo_stack.last() {
+                return top.kind == kind && top.timestamp.elapsed() < self.merge_timeout;
+            }
+        }
+        false
+    }
+
+    /// Record a merge into the top-of-stack entry without creating a snapshot.
+    ///
+    /// Call this when `would_merge(kind)` returned `true` to update the
+    /// merge timestamp and clear the redo stack without allocating.
+    pub fn push_merge(&mut self, kind: EditKind) {
+        debug_assert!(self.would_merge(kind), "push_merge called when would_merge is false");
+        if let Some(top) = self.undo_stack.last_mut() {
+            top.timestamp = Instant::now();
+        }
+        self.redo_stack.clear();
+    }
+
     /// Record the state **before** an edit.
     ///
     /// If the top of the undo stack has the same mergeable kind and the
