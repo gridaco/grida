@@ -14,6 +14,12 @@ pub struct LineMetrics {
     pub ascent: f32,
     /// Distance below baseline to the bottom of the line.
     pub descent: f32,
+    /// X offset of the line's left edge in layout-local space.
+    ///
+    /// For left-aligned text this is `0.0`. For center-aligned text it is
+    /// `(layout_width - content_width) / 2`, etc. Comes from Skia's
+    /// `LineMetrics::left` field; `SimpleLayoutEngine` always sets `0.0`.
+    pub left: f32,
 }
 
 impl LineMetrics {

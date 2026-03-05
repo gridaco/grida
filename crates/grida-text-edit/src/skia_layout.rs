@@ -187,6 +187,15 @@ impl TextAlign {
             Self::Justify => skia_safe::textlayout::TextAlign::Justify,
         }
     }
+
+    /// X offset for an empty line (zero content width) at the given layout width.
+    pub fn empty_line_left(&self, layout_width: f32) -> f32 {
+        match self {
+            Self::Left | Self::Justify => 0.0,
+            Self::Center => layout_width / 2.0,
+            Self::Right => layout_width,
+        }
+    }
 }
 
 /// Configuration for the Skia text layout paragraph.
@@ -386,6 +395,7 @@ impl SkiaLayoutEngine {
                     baseline,
                     ascent,
                     descent,
+                    left: self.config.text_align.empty_line_left(self.layout_width),
                 });
             }
 
@@ -434,6 +444,7 @@ impl SkiaLayoutEngine {
                     baseline: ascent,
                     ascent,
                     descent,
+                    left: self.config.text_align.empty_line_left(self.layout_width),
                 };
                 let phantom_height = ascent + descent;
                 self.blocks.push(ParaBlock {
@@ -594,6 +605,7 @@ impl SkiaLayoutEngine {
                         baseline,
                         ascent,
                         descent,
+                        left: self.config.text_align.empty_line_left(self.layout_width),
                     });
                 }
 
@@ -673,6 +685,7 @@ impl SkiaLayoutEngine {
                         baseline: ascent,
                         ascent,
                         descent,
+                        left: self.config.text_align.empty_line_left(self.layout_width),
                     };
                     let phantom_height = ascent + descent;
                     self.blocks.push(ParaBlock {
@@ -741,6 +754,7 @@ impl SkiaLayoutEngine {
                         baseline,
                         ascent,
                         descent,
+                        left: self.config.text_align.empty_line_left(self.layout_width),
                     });
                 }
 
@@ -793,6 +807,7 @@ impl SkiaLayoutEngine {
                         baseline: ascent,
                         ascent,
                         descent,
+                        left: self.config.text_align.empty_line_left(self.layout_width),
                     };
                     let phantom_height = ascent + descent;
                     self.blocks.push(ParaBlock {
@@ -908,6 +923,7 @@ impl SkiaLayoutEngine {
                 baseline: lm.baseline as f32, // block-local
                 ascent: lm.ascent as f32,
                 descent: lm.descent as f32,
+                left: lm.left as f32,
             });
             prev_end = local_end;
         }
@@ -927,6 +943,7 @@ impl SkiaLayoutEngine {
                     baseline: block.y_offset + lm.baseline,
                     ascent: lm.ascent,
                     descent: lm.descent,
+                    left: lm.left,
                 });
             }
         }
@@ -1063,6 +1080,7 @@ impl SkiaLayoutEngine {
                     baseline,
                     ascent,
                     descent,
+                    left: self.config.text_align.empty_line_left(self.layout_width),
                 });
             }
 
@@ -1108,6 +1126,7 @@ impl SkiaLayoutEngine {
                     baseline: ascent,
                     ascent,
                     descent,
+                    left: self.config.text_align.empty_line_left(self.layout_width),
                 };
                 let phantom_height = ascent + descent;
                 self.blocks.push(ParaBlock {
@@ -1181,6 +1200,110 @@ impl SkiaLayoutEngine {
         self.font_collection
             .set_asset_font_manager(Some(provider_clone.into()));
         self.invalidate();
+    }
+
+    // -------------------------------------------------------------------
+    // Preedit (IME composition) support
+    // -------------------------------------------------------------------
+
+    /// Build a display string and a laid-out `Paragraph` with the preedit
+    /// text spliced in at `cursor` and styled with an underline.
+    ///
+    /// Returns `(display_text, paragraph, preedit_byte_range)` where
+    /// `preedit_byte_range` is the UTF-8 byte range of the preedit segment
+    /// within `display_text`.
+    ///
+    /// The caller uses the returned paragraph for rendering and the byte
+    /// range for caret positioning (caret goes at `preedit_byte_range.end`).
+    pub fn build_preedit_paragraph(
+        &self,
+        content: &crate::attributed_text::AttributedText,
+        cursor: usize,
+        preedit: &str,
+    ) -> (String, Paragraph, std::ops::Range<usize>) {
+        let text = content.text();
+        let pre = &text[..cursor];
+        let post = &text[cursor..];
+        let display_text = format!("{}{}{}", pre, preedit, post);
+
+        let preedit_start = cursor;
+        let preedit_end = cursor + preedit.len();
+
+        let mut para_style = ParagraphStyle::new();
+        para_style.set_apply_rounding_hack(false);
+        para_style.set_text_align(self.config.text_align.to_skia());
+
+        if let Some(lh) = self.config.line_height {
+            let mut strut = skia_safe::textlayout::StrutStyle::new();
+            strut.set_strut_enabled(true);
+            strut.set_force_strut_height(true);
+            strut.set_height(lh);
+            para_style.set_strut_style(strut);
+        }
+
+        let fallback_families: Vec<&str> =
+            self.config.font_families.iter().map(|s| s.as_str()).collect();
+
+        let mut builder = ParagraphBuilder::new(&para_style, &self.font_collection);
+
+        // Build runs from the AttributedText, but splice the preedit at
+        // the cursor. We walk three regions: [0..cursor), [cursor..cursor)
+        // with preedit inserted, [cursor..end).
+        //
+        // For each region of the original text we push the attributed runs.
+        // The preedit itself gets the caret style with an underline added.
+        let runs = content.runs();
+        let preedit_style = content.caret_style_at(cursor as u32);
+
+        // --- Region 1: text before cursor ---
+        for run in runs {
+            let run_start = run.start as usize;
+            let run_end = run.end as usize;
+            // Clip to [0..cursor)
+            let s = run_start.max(0).min(cursor);
+            let e = run_end.min(cursor);
+            if s >= e {
+                continue;
+            }
+            let ts = attr_style_to_skia(&run.style, &fallback_families);
+            builder.push_style(&ts);
+            builder.add_text(&text[s..e]);
+        }
+
+        // --- Region 2: preedit text (underlined) ---
+        {
+            let mut ts = attr_style_to_skia(preedit_style, &fallback_families);
+            ts.set_decoration_type(TextDecoration::UNDERLINE);
+            builder.push_style(&ts);
+            builder.add_text(preedit);
+        }
+
+        // --- Region 3: text after cursor ---
+        for run in runs {
+            let run_start = run.start as usize;
+            let run_end = run.end as usize;
+            // Clip to [cursor..text.len())
+            let s = run_start.max(cursor);
+            let e = run_end.min(text.len());
+            if s >= e {
+                continue;
+            }
+            let ts = attr_style_to_skia(&run.style, &fallback_families);
+            builder.push_style(&ts);
+            builder.add_text(&text[s..e]);
+        }
+
+        // Handle empty document: if no runs produced any text, push a
+        // default-styled empty span so the paragraph has valid metrics.
+        if runs.is_empty() && pre.is_empty() && post.is_empty() {
+            let ts = attr_style_to_skia(preedit_style, &fallback_families);
+            builder.push_style(&ts);
+        }
+
+        let mut para = builder.build();
+        para.layout(self.layout_width);
+
+        (display_text, para, preedit_start..preedit_end)
     }
 
     /// Paint the laid-out paragraph at (0, 0). Used by the host to draw the
@@ -1273,7 +1396,7 @@ impl TextLayoutEngine for SkiaLayoutEngine {
         let height = lm.ascent + lm.descent;
 
         let x = if offset <= lm.start_index {
-            0.0
+            lm.left
         } else {
             let block_idx = self.block_index_for_offset(offset);
             let block = &self.blocks[block_idx];
@@ -1379,7 +1502,7 @@ impl TextLayoutEngine for SkiaLayoutEngine {
             });
             if !already {
                 rects.push(SelectionRect {
-                    x: 0.0,
+                    x: lm.left,
                     y: lm.baseline - lm.ascent,
                     width: self.font_size * 0.5,
                     height: lm.ascent + lm.descent,
