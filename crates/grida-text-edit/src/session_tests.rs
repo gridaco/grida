@@ -15,7 +15,7 @@
 //!    must equal `state.text`. Several tests verify this explicitly.
 
 use std::thread;
-use std::time::Duration;
+use crate::time::Duration;
 
 use crate::attributed_text::{
     AttributedText, TextDecorationLine, TextFill, TextStyle as AttrTextStyle, RGBA,

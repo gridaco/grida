@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use crate::time::{Duration, Instant};
 
 use super::TextEditorState;
 

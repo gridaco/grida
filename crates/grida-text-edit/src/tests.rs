@@ -1028,7 +1028,7 @@ fn different_kinds_do_not_merge() {
 
 #[test]
 fn timeout_breaks_merge() {
-    use std::time::Duration;
+    use crate::time::Duration;
 
     let mut h = EditHistory::with_merge_timeout(Duration::from_secs(2));
     let s0 = TextEditorState::with_cursor("", 0);

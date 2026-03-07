@@ -91,7 +91,7 @@
 //!
 //! - [ ] Visual-order bidi cursor movement
 
-use std::time::{Duration, Instant};
+use crate::time::{Duration, Instant};
 
 use crate::{
     apply_command_mut,

@@ -16,7 +16,9 @@
 use std::ffi::CString;
 use std::fs;
 use std::num::NonZeroU32;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use grida_text_edit::time::Instant;
 
 use arboard::Clipboard;
 use gl::types::GLint;
@@ -521,11 +523,12 @@ impl ApplicationHandler for TextEditorApp {
         _window_id: WindowId,
         event: WindowEvent,
     ) {
-        let next_blink = self
+        let next_blink: std::time::Instant = self
             .inner
             .as_ref()
             .map(|i| i.session.next_blink_deadline())
-            .unwrap_or_else(|| Instant::now() + Duration::from_millis(500));
+            .unwrap_or_else(|| Instant::now() + Duration::from_millis(500))
+            .into();
         event_loop.set_control_flow(ControlFlow::WaitUntil(next_blink));
 
         let Some(inner) = self.inner.as_mut() else {
@@ -717,7 +720,7 @@ impl ApplicationHandler for TextEditorApp {
                     LogicalSize::new(1.0f64, cr.height as f64),
                 );
 
-                let deadline = inner.session.next_blink_deadline();
+                let deadline: std::time::Instant = inner.session.next_blink_deadline().into();
                 event_loop.set_control_flow(ControlFlow::WaitUntil(deadline));
             }
 
@@ -774,7 +777,7 @@ impl ApplicationHandler for TextEditorApp {
         if inner.session.tick_blink() {
             inner.window.request_redraw();
         }
-        let deadline = inner.session.next_blink_deadline();
+        let deadline: std::time::Instant = inner.session.next_blink_deadline().into();
         event_loop.set_control_flow(ControlFlow::WaitUntil(deadline));
     }
 }

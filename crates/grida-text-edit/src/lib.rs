@@ -5,6 +5,7 @@ pub mod selection_rects;
 pub mod simple_layout;
 pub mod skia_layout;
 pub mod text_edit_session;
+pub mod time;
 
 #[cfg(test)]
 mod tests;
