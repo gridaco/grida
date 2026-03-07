@@ -1957,15 +1957,12 @@ fn nav_never_locks_simple() {
 
 // --- SkiaLayoutEngine (real Skia paragraph layout, no GPU needed) ---
 
-#[cfg(feature = "skia")]
 use crate::skia_layout::SkiaLayoutEngine;
 
-#[cfg(feature = "skia")]
 fn skia_layout() -> SkiaLayoutEngine {
     SkiaLayoutEngine::new(752.0, 576.0)
 }
 
-#[cfg(feature = "skia")]
 #[test]
 fn nav_never_locks_skia() {
     run_nav_tests(&mut skia_layout());
@@ -2032,7 +2029,6 @@ fn hit_test_invariants_simple() {
     run_hit_test_invariants(&mut layout(), "simple");
 }
 
-#[cfg(feature = "skia")]
 #[test]
 fn hit_test_invariants_skia() {
     run_hit_test_invariants(&mut skia_layout(), "skia");
