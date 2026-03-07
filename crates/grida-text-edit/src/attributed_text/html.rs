@@ -72,8 +72,12 @@ fn style_to_css(style: &TextStyle, default: &TextStyle) -> String {
     if style.font_weight != default.font_weight {
         parts.push(format!("font-weight:{}", style.font_weight));
     }
-    if style.font_style_italic != default.font_style_italic && style.font_style_italic {
-        parts.push("font-style:italic".into());
+    if style.font_style_italic != default.font_style_italic {
+        parts.push(if style.font_style_italic {
+            "font-style:italic".into()
+        } else {
+            "font-style:normal".into()
+        });
     }
     if (style.font_size - default.font_size).abs() > f32::EPSILON {
         parts.push(format!("font-size:{}px", style.font_size));
@@ -136,12 +140,15 @@ fn html_escape_into(out: &mut String, s: &str) {
 /// Unknown tags are ignored (their text content is still captured).
 /// HTML entities `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#NNN;`, `&#xHH;` are
 /// decoded.
-pub fn html_to_attributed_text(html: &str, base_style: TextStyle) -> AttributedText {
+pub fn html_to_attributed_text(
+    html: &str,
+    base_style: TextStyle,
+) -> Result<AttributedText, super::InvariantError> {
     let mut parser = HtmlParser::new(html, base_style.clone());
     parser.parse();
 
     if parser.text.is_empty() {
-        return AttributedText::empty(base_style);
+        return Ok(AttributedText::empty(base_style));
     }
 
     // Build runs from the collected segments.
@@ -171,7 +178,7 @@ pub fn html_to_attributed_text(html: &str, base_style: TextStyle) -> AttributedT
         });
     }
 
-    AttributedText::from_parts(parser.text, base_style, Default::default(), runs)
+    AttributedText::try_from_parts(parser.text, base_style, Default::default(), runs)
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +197,18 @@ struct HtmlParser {
     text: String,
     segments: Vec<Segment>,
     style_stack: Vec<TextStyle>,
+}
+
+/// Returns `true` for HTML tags that represent block-level elements.
+/// Closing a block element inserts a newline to preserve paragraph structure.
+fn is_block_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "p" | "div" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+            | "li" | "ul" | "ol" | "blockquote" | "pre"
+            | "section" | "article" | "header" | "footer"
+            | "tr" | "table"
+    )
 }
 
 impl HtmlParser {
@@ -216,8 +235,17 @@ impl HtmlParser {
                 self.push_char(ch);
             } else {
                 let ch = self.input[self.pos];
-                self.push_char(ch);
                 self.pos += 1;
+                // HTML whitespace collapsing: \n, \r, \t → space,
+                // and consecutive whitespace collapses to a single space.
+                if ch == '\n' || ch == '\r' || ch == '\t' {
+                    // Collapse to a single space (skip if previous char was already a space).
+                    if !self.text.ends_with(' ') && !self.text.ends_with('\n') && !self.text.is_empty() {
+                        self.push_char(' ');
+                    }
+                } else {
+                    self.push_char(ch);
+                }
             }
         }
     }
@@ -247,6 +275,14 @@ impl HtmlParser {
         // Tag name
         let tag_name = self.read_ident().to_lowercase();
 
+        // Skip comments (<!--...-->), directives (<!doctype>, <?xml?>),
+        // and namespaced tags (<o:p>) — read_ident() yields an empty or
+        // unparsable name for these because '!', '?', ':' are not ident chars.
+        if tag_name.is_empty() {
+            self.skip_to_tag_end();
+            return;
+        }
+
         // Self-closing or void tags
         if tag_name == "br" {
             self.skip_to_tag_end();
@@ -259,6 +295,11 @@ impl HtmlParser {
             if self.style_stack.len() > 1 {
                 self.style_stack.pop();
             }
+            // Block-level closing tags insert a newline (unless already at
+            // line start, to avoid double newlines from adjacent blocks).
+            if is_block_tag(&tag_name) && !self.text.is_empty() && !self.text.ends_with('\n') {
+                self.push_char('\n');
+            }
             return;
         }
 
@@ -270,6 +311,12 @@ impl HtmlParser {
                 break;
             }
             let attr_name = self.read_ident().to_lowercase();
+            if attr_name.is_empty() {
+                // Non-ident char (e.g. '=', '!', '?', ':') — skip to end of
+                // tag to avoid an infinite loop.
+                self.skip_to_tag_end();
+                return;
+            }
             self.skip_whitespace();
             if self.pos < self.input.len() && self.input[self.pos] == '=' {
                 self.pos += 1; // skip '='
@@ -566,14 +613,14 @@ mod tests {
 
     #[test]
     fn deserialize_plain_text() {
-        let at = html_to_attributed_text("Hello", base());
+        let at = html_to_attributed_text("Hello", base()).unwrap();
         assert_eq!(at.text(), "Hello");
         assert_eq!(at.runs().len(), 1);
     }
 
     #[test]
     fn deserialize_bold_tag() {
-        let at = html_to_attributed_text("A<b>B</b>C", base());
+        let at = html_to_attributed_text("A<b>B</b>C", base()).unwrap();
         assert_eq!(at.text(), "ABC");
         assert_eq!(at.runs().len(), 3);
         assert_eq!(at.runs()[0].style.font_weight, 400);
@@ -583,14 +630,14 @@ mod tests {
 
     #[test]
     fn deserialize_italic_tag() {
-        let at = html_to_attributed_text("<i>italic</i>", base());
+        let at = html_to_attributed_text("<i>italic</i>", base()).unwrap();
         assert_eq!(at.text(), "italic");
         assert!(at.runs()[0].style.font_style_italic);
     }
 
     #[test]
     fn deserialize_underline_tag() {
-        let at = html_to_attributed_text("<u>under</u>", base());
+        let at = html_to_attributed_text("<u>under</u>", base()).unwrap();
         assert_eq!(at.runs()[0].style.text_decoration_line, TextDecorationLine::Underline);
     }
 
@@ -599,7 +646,7 @@ mod tests {
         let at = html_to_attributed_text(
             r#"<span style="font-weight:700;font-size:24px;color:#ff0000">red bold</span>"#,
             base(),
-        );
+        ).unwrap();
         assert_eq!(at.text(), "red bold");
         assert_eq!(at.runs()[0].style.font_weight, 700);
         assert_eq!(at.runs()[0].style.font_size, 24.0);
@@ -611,7 +658,7 @@ mod tests {
 
     #[test]
     fn deserialize_nested_tags() {
-        let at = html_to_attributed_text("<b><i>bold italic</i></b>", base());
+        let at = html_to_attributed_text("<b><i>bold italic</i></b>", base()).unwrap();
         assert_eq!(at.text(), "bold italic");
         assert_eq!(at.runs()[0].style.font_weight, 700);
         assert!(at.runs()[0].style.font_style_italic);
@@ -619,13 +666,13 @@ mod tests {
 
     #[test]
     fn deserialize_br_tag() {
-        let at = html_to_attributed_text("A<br>B", base());
+        let at = html_to_attributed_text("A<br>B", base()).unwrap();
         assert_eq!(at.text(), "A\nB");
     }
 
     #[test]
     fn deserialize_entities() {
-        let at = html_to_attributed_text("&lt;&amp;&gt;", base());
+        let at = html_to_attributed_text("&lt;&amp;&gt;", base()).unwrap();
         assert_eq!(at.text(), "<&>");
     }
 
@@ -636,7 +683,7 @@ mod tests {
         original.apply_style(6, 11, |s| s.font_style_italic = true);
 
         let html = runs_to_html(&original, 0, original.len());
-        let restored = html_to_attributed_text(&html, base());
+        let restored = html_to_attributed_text(&html, base()).unwrap();
 
         assert_eq!(restored.text(), "Hello World!");
         // Bold "Hello"

@@ -297,6 +297,11 @@ pub struct SkiaLayoutEngine {
     blocks: Vec<ParaBlock>,
     /// Flattened line metrics across all blocks (cached, invalidated with blocks).
     cached_line_metrics: Option<Vec<LineMetrics>>,
+    /// Tracks the [`AttributedText::generation`] seen by the last
+    /// `ensure_layout_attributed` call. When the generation advances
+    /// (e.g. a style-only change), the cache is invalidated even though
+    /// the text bytes are unchanged.
+    cached_attributed_generation: u64,
 }
 
 impl SkiaLayoutEngine {
@@ -319,6 +324,7 @@ impl SkiaLayoutEngine {
             font_provider: TypefaceFontProvider::new(),
             blocks: Vec::new(),
             cached_line_metrics: None,
+            cached_attributed_generation: 0,
         }
     }
 
@@ -533,10 +539,20 @@ impl SkiaLayoutEngine {
 
             // The last affected block is the one that contains old_edit_end
             // (in the old coordinate system).
-            let last_affected = self.blocks
+            let mut last_affected = self.blocks
                 .iter()
                 .position(|b| b.byte_end >= old_edit_end)
                 .unwrap_or(self.blocks.len().saturating_sub(1));
+
+            // When newlines were removed, the block starting at old_edit_end
+            // must also be included: deleting '\n' merges two paragraphs, so
+            // the following block needs to be re-parsed together with the
+            // preceding one.
+            if newlines_removed > 0 {
+                if let Some(next_idx) = self.blocks.iter().position(|b| b.byte_start == old_edit_end) {
+                    last_affected = last_affected.max(next_idx);
+                }
+            }
 
             // Remove old phantom trailing block if present.
             if let Some(last) = self.blocks.last() {
@@ -984,9 +1000,14 @@ impl SkiaLayoutEngine {
         &mut self,
         at: &crate::attributed_text::AttributedText,
     ) {
-        if !self.blocks.is_empty() && self.cached_text == at.text() {
+        let gen = at.generation();
+        if !self.blocks.is_empty()
+            && self.cached_text == at.text()
+            && self.cached_attributed_generation == gen
+        {
             return;
         }
+        self.cached_attributed_generation = gen;
         self.rebuild_blocks_attributed(at);
     }
 

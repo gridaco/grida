@@ -155,36 +155,29 @@ pub fn ceil_char_boundary(text: &str, pos: usize) -> usize {
 // making it O(1) amortized regardless of position in the document.
 // ---------------------------------------------------------------------------
 
-/// Size of the lookback/lookahead window for word boundary scanning.
-/// UAX#29 word segmentation is context-dependent but the context is local;
-/// 256 bytes covers even long compound words in CJK/Thai.
-const WORD_WINDOW: usize = 256;
-
 /// Find the UAX #29 word segment containing `offset`.
 ///
 /// Returns `(start, end)` — the byte range of the segment. This is the
 /// standalone equivalent of `TextLayoutEngine::word_boundary_at` so that
 /// pure editing commands (`BackspaceWord`, `DeleteWord`) can resolve word
 /// boundaries without requiring a layout engine.
+///
+/// The iterator is lazy — it stops as soon as the segment containing
+/// `offset` is found, so cost is proportional to the offset position,
+/// not the full document length.
 pub fn word_segment_at(text: &str, offset: usize) -> (usize, usize) {
     let offset = offset.min(text.len());
 
-    // Scan a local window around offset.
-    let window_start = floor_char_boundary(text, offset.saturating_sub(WORD_WINDOW));
-    let window_end = ceil_char_boundary(text, (offset + WORD_WINDOW).min(text.len()));
-    let slice = &text[window_start..window_end];
-    let local_offset = offset - window_start;
-
     let mut last_start = 0usize;
-    for (byte_idx, segment) in slice.split_word_bound_indices() {
+    for (byte_idx, segment) in text.split_word_bound_indices() {
         let end = byte_idx + segment.len();
-        if byte_idx <= local_offset && local_offset < end {
-            return (window_start + byte_idx, window_start + end);
+        if byte_idx <= offset && offset < end {
+            return (byte_idx, end);
         }
         last_start = byte_idx;
     }
-    // offset is at or past the last segment boundary in the window.
-    (window_start + last_start, window_end)
+    // offset is at or past the last segment boundary.
+    (last_start, text.len())
 }
 
 /// Find the start of the previous word segment from `pos`.

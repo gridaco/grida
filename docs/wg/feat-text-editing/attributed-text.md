@@ -93,7 +93,7 @@ Key properties:
 
 Figma's model is unique. It uses three layers:
 
-```
+```text
 TextData {
     characters: string                    // flat plain text
     characterStyleIDs: uint[]             // per-character style ID
@@ -113,7 +113,7 @@ Additionally, Figma cleanly separates **authoring data** (`TextData`: characters
 
 Figma also stores per-line metadata via `TextLineData`:
 
-```
+```text
 TextLineData {
     lineType: LineType          // PLAIN | ORDERED_LIST | UNORDERED_LIST | BLOCKQUOTE | HEADER
     styleId: int
@@ -241,7 +241,7 @@ The caret style can be **overridden** by explicit user action (e.g., clicking "B
 
 ### The core structure
 
-```
+```text
 AttributedText = (text, default_style, paragraph_style, runs)
 ```
 
@@ -455,7 +455,7 @@ Given a style mutation `f: TextStyle -> TextStyle`:
 
 ### Split at offset
 
-```
+```rust
 split_at(runs, offset) -> ()
 ```
 
@@ -463,7 +463,7 @@ If `offset` falls exactly on a run boundary, no-op. Otherwise, find the run cont
 
 ### Merge adjacent equal runs (coalesce)
 
-```
+```rust
 coalesce(runs) -> ()
 ```
 
@@ -475,7 +475,7 @@ This is Apple's "automatic coalescing" behavior. Android's span model notably la
 
 ### Style at offset
 
-```
+```rust
 style_at(offset: u32) -> &TextStyle
 ```
 
@@ -485,7 +485,7 @@ Binary search on runs (O(log k)). For an offset exactly at a run boundary, retur
 
 ### Caret style at offset
 
-```
+```rust
 caret_style_at(offset: u32) -> &TextStyle
 ```
 
@@ -493,7 +493,7 @@ At a run boundary, returns the **upstream** run's style (the run that ends at `o
 
 ### Runs in range
 
-```
+```rust
 runs_in_range(lo: u32, hi: u32) -> &[StyledRun]
 ```
 
@@ -583,7 +583,7 @@ The attributed text model is designed to **layer on top of** a plain-text editin
 
 The integration follows a two-layer architecture:
 
-```
+```rust
 RichTextEditorState
     content: AttributedText          // text + runs
     cursor: usize                    // caret position (UTF-8 byte offset)
@@ -630,7 +630,7 @@ Contrast with Figma's O(1) per-character lookup (direct array index). Our O(log 
 
 For a text block with `k` runs:
 
-```
+```text
 AttributedText:
     text:            24 bytes (String: ptr + len + cap)
     default_style:   ~120 bytes (fixed fields + vecs)
@@ -647,7 +647,7 @@ StyledRun:
 
 For a typical text block with 5 runs: ~24 + 120 + 48 + 24 + 640 = ~856 bytes. This is compact enough for thousands of text nodes in a design document.
 
-**Comparison with Figma**: For a 500-character paragraph with 5 style changes, Figma stores 500 _ 4 = 2000 bytes for `characterStyleIDs` alone, plus the override table. Our model stores 5 _ 128 = 640 bytes for runs, plus the default style. The run-based model uses ~3x less memory for this typical case.
+**Comparison with Figma**: For a 500-character paragraph with 5 style changes, Figma stores 500 × 4 = 2000 bytes for `characterStyleIDs` alone, plus the override table. Our model stores 5 × 128 = 640 bytes for runs, plus the default style. The run-based model uses ~3x less memory for this typical case.
 
 **Future optimization**: Style interning (`Arc<TextStyle>`) can reduce per-run cost to ~16 bytes when many runs share the same style. This is an implementation optimization, not a model change.
 
@@ -655,7 +655,7 @@ For a typical text block with 5 runs: ~24 + 120 + 48 + 24 + 640 = ~856 bytes. Th
 
 The model exposes mutation only through methods that maintain invariants. Direct field access is restricted to reads. The key methods form a closed algebra:
 
-```
+```rust
 fn insert(&mut self, pos: usize, s: &str)
 fn delete(&mut self, lo: usize, hi: usize)
 fn apply_style(&mut self, lo: usize, hi: usize, f: impl Fn(&mut TextStyle))

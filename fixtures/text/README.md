@@ -6,13 +6,14 @@ Plain text samples used for layout, editing, and rendering tests. Header and foo
 
 ## Text Fixtures Attribution
 
-| file       | source            | description                                              | url                                                  |
-| ---------- | ----------------- | -------------------------------------------------------- | ---------------------------------------------------- |
-| ascii.txt  | —                 | ASCII-only text (printable chars, punctuation)           | —                                                    |
-| bidi.txt   | —                 | Bidirectional text (Arabic, Hebrew, embedded LTR/RTL)    | —                                                    |
-| cjk.txt    | —                 | CJK text (Chinese, Japanese, Korean, mixed)              | —                                                    |
-| hamlet.txt | Project Gutenberg | William Shakespeare, _Hamlet_ (full play, public domain) | https://www.gutenberg.org/cache/epub/1524/pg1524.txt |
-| lorem.txt  | —                 | Lorem ipsum placeholder text                             | —                                                    |
+| file       | source            | description                                                                           | url                                                  |
+| ---------- | ----------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| editor.txt | —                 | **Comprehensive single fixture** for full-featured editors: scripts, bidi, edge cases | —                                                    |
+| ascii.txt  | —                 | ASCII-only text (printable chars, punctuation)                                        | —                                                    |
+| bidi.txt   | —                 | Bidirectional text (Arabic, Hebrew, embedded LTR/RTL)                                 | —                                                    |
+| cjk.txt    | —                 | CJK text (Chinese, Japanese, Korean, mixed)                                           | —                                                    |
+| hamlet.txt | Project Gutenberg | William Shakespeare, _Hamlet_ (full play, public domain)                              | https://www.gutenberg.org/cache/epub/1524/pg1524.txt |
+| lorem.txt  | —                 | Lorem ipsum placeholder text                                                          | —                                                    |
 
 ## See also
 

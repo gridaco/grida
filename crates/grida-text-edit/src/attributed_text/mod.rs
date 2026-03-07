@@ -455,6 +455,13 @@ pub struct AttributedText {
     paragraph_style: ParagraphStyle,
     /// Ordered, non-overlapping, gap-free, maximal runs.
     runs: Vec<StyledRun>,
+    /// Monotonic counter incremented on every mutation (text or style).
+    ///
+    /// Used by [`SkiaLayoutEngine::ensure_layout_attributed`] to detect
+    /// style-only changes that leave the text bytes unchanged but require
+    /// a paragraph rebuild.
+    #[serde(skip)]
+    generation: u64,
 }
 
 impl AttributedText {
@@ -472,6 +479,7 @@ impl AttributedText {
             default_style: style,
             paragraph_style: ParagraphStyle::default(),
             runs,
+            generation: 0,
         };
         debug_assert!(this.check_invariants().is_ok(), "{:?}", this.check_invariants());
         this
@@ -485,6 +493,7 @@ impl AttributedText {
             default_style: style,
             paragraph_style: ParagraphStyle::default(),
             runs,
+            generation: 0,
         }
     }
 
@@ -498,11 +507,26 @@ impl AttributedText {
         paragraph_style: ParagraphStyle,
         runs: Vec<StyledRun>,
     ) -> Self {
-        let this = Self { text, default_style, paragraph_style, runs };
+        let this = Self { text, default_style, paragraph_style, runs, generation: 0 };
         if let Err(e) = this.check_invariants() {
             panic!("AttributedText::from_parts: invariant violated: {e}");
         }
         this
+    }
+
+    /// Non-panicking variant of [`from_parts`](Self::from_parts).
+    ///
+    /// Returns `Err(InvariantError)` when the runs violate structural
+    /// invariants (gaps, overlaps, out-of-bounds offsets, etc.).
+    pub fn try_from_parts(
+        text: String,
+        default_style: TextStyle,
+        paragraph_style: ParagraphStyle,
+        runs: Vec<StyledRun>,
+    ) -> Result<Self, InvariantError> {
+        let this = Self { text, default_style, paragraph_style, runs, generation: 0 };
+        this.check_invariants()?;
+        Ok(this)
     }
 
     // -----------------------------------------------------------------------
@@ -513,6 +537,15 @@ impl AttributedText {
     #[inline]
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Monotonic generation counter. Incremented on every mutation
+    /// (text insert/delete **and** style changes). Layout engines use
+    /// this to detect when a rebuild is needed even if the text bytes
+    /// are unchanged.
+    #[inline]
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
 
     /// Byte length of the text.
@@ -649,6 +682,7 @@ impl AttributedText {
         if s.is_empty() {
             return;
         }
+        self.generation += 1;
         debug_assert!(
             pos <= self.text.len() && (pos == self.text.len() || self.text.is_char_boundary(pos)),
             "insert pos {pos} is not a valid boundary in text of len {}",
@@ -692,6 +726,7 @@ impl AttributedText {
         if s.is_empty() {
             return;
         }
+        self.generation += 1;
         debug_assert!(
             pos <= self.text.len() && (pos == self.text.len() || self.text.is_char_boundary(pos)),
             "insert_with_style pos {pos} is not a valid boundary in text of len {}",
@@ -743,6 +778,7 @@ impl AttributedText {
         if lo >= hi || lo >= self.text.len() {
             return;
         }
+        self.generation += 1;
         let hi = hi.min(self.text.len());
         debug_assert!(
             self.text.is_char_boundary(lo) && self.text.is_char_boundary(hi),
@@ -817,11 +853,16 @@ impl AttributedText {
         if lo >= hi || self.text.is_empty() {
             return;
         }
+        self.generation += 1;
         let lo = lo.min(self.text.len());
         let hi = hi.min(self.text.len());
         if lo >= hi {
             return;
         }
+        debug_assert!(
+            self.text.is_char_boundary(lo) && self.text.is_char_boundary(hi),
+            "apply_style range [{lo}, {hi}) contains invalid char boundaries"
+        );
         let lo32 = lo as u32;
         let hi32 = hi as u32;
 

@@ -449,17 +449,28 @@ impl TextEditor {
     // -----------------------------------------------------------------------
 
     fn apply(&mut self, cmd: EditingCommand) {
-        if let Some(kind) = cmd.edit_kind() {
-            if !self.history.would_merge(kind) {
-                self.history.push(&self.snapshot(), kind);
+        let kind = cmd.edit_kind();
+        // Capture snapshot BEFORE mutation — history.push requires the
+        // pre-edit state so that undo restores the correct document.
+        let pre_snapshot = kind.and_then(|k| {
+            if !self.history.would_merge(k) {
+                Some((self.snapshot(), k))
             } else {
-                self.history.push_merge(kind);
+                None
             }
-        }
+        });
+        let merge_kind = if pre_snapshot.is_none() { kind } else { None };
+
         let old_cursor = self.state.cursor;
         let delta = apply_command_mut(&mut self.state, cmd, &mut self.layout);
         self.invalidate_caret_cache();
         if let Some(d) = delta {
+            // The edit mutated the document — record history.
+            if let Some((snap, k)) = pre_snapshot {
+                self.history.push(&snap, k);
+            } else if let Some(k) = merge_kind {
+                self.history.push_merge(k);
+            }
             self.sync_content_with_delta(&d, old_cursor);
         } else if self.state.cursor != old_cursor {
             self.caret_style_override = None;
@@ -472,16 +483,26 @@ impl TextEditor {
     }
 
     fn apply_with_kind(&mut self, cmd: EditingCommand, kind: EditKind) {
-        if !self.history.would_merge(kind) {
-            self.history.push(&self.snapshot(), kind);
+        // Capture snapshot BEFORE mutation.
+        let pre_snapshot = if !self.history.would_merge(kind) {
+            Some(self.snapshot())
         } else {
-            self.history.push_merge(kind);
-        }
+            None
+        };
+
         let old_cursor = self.state.cursor;
         let delta = apply_command_mut(&mut self.state, cmd, &mut self.layout);
         self.invalidate_caret_cache();
         if let Some(d) = delta {
+            // The edit mutated the document — record history.
+            if let Some(snap) = pre_snapshot {
+                self.history.push(&snap, kind);
+            } else {
+                self.history.push_merge(kind);
+            }
             self.sync_content_with_delta(&d, old_cursor);
+        } else if self.state.cursor != old_cursor {
+            self.caret_style_override = None;
         }
         self.reset_blink();
         self.layout.ensure_layout_attributed(&self.content);
@@ -876,6 +897,12 @@ impl TextEditor {
 
     fn set_layout_width(&mut self, w: f32) {
         self.layout.set_layout_width((w - PADDING * 2.0).max(1.0));
+        // After a width change the layout is invalidated; rebuild
+        // immediately from the attributed content so the plain-text
+        // `ensure_layout` path (called internally by trait methods)
+        // doesn't clobber per-run styles.
+        self.layout.ensure_layout_attributed(&self.content);
+        self.cached_caret_rect = None;
     }
 
     fn set_layout_height(&mut self, h: f32) {
@@ -1638,14 +1665,20 @@ impl ApplicationHandler for TextEditorApp {
                             }
                             PhysicalKey::Code(KeyCode::KeyV) => {
                                 // Try HTML first (preserves formatting), fall back to plain text.
+                                let mut handled = false;
                                 if let Ok(html) = self.clipboard.get().html() {
                                     let base = inner.editor.content.default_style().clone();
-                                    let pasted = html_to_attributed_text(&html, base);
-                                    inner.editor.paste_attributed(&pasted);
-                                    inner.window.request_redraw();
-                                } else if let Ok(text) = self.clipboard.get_text() {
-                                    inner.editor.insert_text(&text);
-                                    inner.window.request_redraw();
+                                    if let Ok(pasted) = html_to_attributed_text(&html, base) {
+                                        inner.editor.paste_attributed(&pasted);
+                                        inner.window.request_redraw();
+                                        handled = true;
+                                    }
+                                }
+                                if !handled {
+                                    if let Ok(text) = self.clipboard.get_text() {
+                                        inner.editor.insert_text(&text);
+                                        inner.window.request_redraw();
+                                    }
                                 }
                             }
                             _ => {}
@@ -1838,18 +1871,24 @@ impl ApplicationHandler for TextEditorApp {
                     Some("html" | "htm") => match fs::read_to_string(&path) {
                         Ok(html) => {
                             let base = inner.editor.content.default_style().clone();
-                            let content = html_to_attributed_text(&html, base);
-                            inner.editor.state.text = content.text().to_owned();
-                            inner.editor.content = content;
-                            inner.editor.state.cursor = 0;
-                            inner.editor.state.anchor = None;
-                            inner.editor.caret_style_override = None;
-                            inner.editor.cached_caret_rect = None;
-                            inner.editor.layout.invalidate();
-                            inner.editor.scroll_y = 0.0;
-                            inner.editor.reset_blink();
-                            eprintln!("loaded HTML: {}", path.display());
-                            inner.window.request_redraw();
+                            match html_to_attributed_text(&html, base) {
+                                Ok(content) => {
+                                    inner.editor.state.text = content.text().to_owned();
+                                    inner.editor.content = content;
+                                    inner.editor.state.cursor = 0;
+                                    inner.editor.state.anchor = None;
+                                    inner.editor.caret_style_override = None;
+                                    inner.editor.cached_caret_rect = None;
+                                    inner.editor.layout.invalidate();
+                                    inner.editor.scroll_y = 0.0;
+                                    inner.editor.reset_blink();
+                                    eprintln!("loaded HTML: {}", path.display());
+                                    inner.window.request_redraw();
+                                }
+                                Err(e) => {
+                                    eprintln!("malformed HTML in {}: {e}", path.display());
+                                }
+                            }
                         }
                         Err(err) => {
                             eprintln!("failed to read {}: {err}", path.display());
