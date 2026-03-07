@@ -55,6 +55,7 @@ impl SimpleLayoutEngine {
                 baseline,
                 ascent,
                 descent,
+                left: 0.0,
             });
 
             if !has_nl {

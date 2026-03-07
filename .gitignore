@@ -212,3 +212,7 @@ node-compile-cache/
 __pycache__/
 *.py[codz]
 *$py.class
+
+
+# AI & Tooling
+*.plan.md

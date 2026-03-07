@@ -1,0 +1,23 @@
+Bidirectional (bidi) text fixtures for RTL/LTR layout tests.
+
+Arabic (RTL):
+مرحبا بالعالم! هذا نص عربي للاختبار. العربية تكتب من اليمين إلى اليسار.
+Translation: Hello world! This is Arabic text for testing.
+
+Hebrew (RTL):
+שלום עולם! זהו טקסט עברי לבדיקה. העברית נכתבת מימין לשמאל.
+Translation: Hello world! This is Hebrew text for testing.
+
+Embedded LTR in RTL (numbers, English):
+السعر 123 دولار للعنصر item الأول. Price: $99.99
+
+Embedded RTL in LTR:
+The Arabic word مرحبا means hello. The Hebrew word שלום also means peace.
+
+Neutral characters and mirrors:
+(hello) [world] - parentheses and brackets in bidi.
+Bidi brackets: ]close[ ]open[ and )right( )left(
+Digits: ١٢٣ 123 (Arabic numerals vs ASCII)
+
+Complex embedding:
+HEBREW: עברית | ARABIC: عربية | ENGLISH: Latin script

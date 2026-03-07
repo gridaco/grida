@@ -1,0 +1,9 @@
+The quick brown fox jumps over the lazy dog.
+THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG.
+0123456789
+
+Punctuation: ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+ASCII range: 32-126 (printable)

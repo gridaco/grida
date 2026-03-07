@@ -14,6 +14,12 @@ pub struct LineMetrics {
     pub ascent: f32,
     /// Distance below baseline to the bottom of the line.
     pub descent: f32,
+    /// X offset of the line's left edge in layout-local space.
+    ///
+    /// For left-aligned text this is `0.0`. For center-aligned text it is
+    /// `(layout_width - content_width) / 2`, etc. Comes from Skia's
+    /// `LineMetrics::left` field; `SimpleLayoutEngine` always sets `0.0`.
+    pub left: f32,
 }
 
 impl LineMetrics {
@@ -118,12 +124,16 @@ pub trait TextLayoutEngine {
 
 /// Find which line contains `utf8_offset`.
 ///
-/// Forward-scan: first line where `offset < end_index`.
+/// Uses binary search on `end_index` (which is monotonically non-decreasing).
+/// Semantics: returns the first line where `offset < end_index`.
 /// Falls back to the last line when offset is past all end indices.
 /// This is the same rule used by `caret_rect_at`.
 pub fn line_index_for_offset(metrics: &[LineMetrics], utf8_offset: usize) -> usize {
-    metrics
-        .iter()
-        .position(|lm| utf8_offset < lm.end_index)
-        .unwrap_or(metrics.len().saturating_sub(1))
+    if metrics.is_empty() {
+        return 0;
+    }
+    // partition_point returns the first index where the predicate is false,
+    // i.e. the first line where end_index > utf8_offset.
+    let idx = metrics.partition_point(|lm| lm.end_index <= utf8_offset);
+    idx.min(metrics.len() - 1)
 }
