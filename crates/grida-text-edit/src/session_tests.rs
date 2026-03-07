@@ -20,6 +20,7 @@ use crate::time::Duration;
 use crate::attributed_text::{
     AttributedText, TextDecorationLine, TextFill, TextStyle as AttrTextStyle, RGBA,
 };
+use crate::layout::TextLayoutEngine;
 use crate::text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
 
 // ---------------------------------------------------------------------------
@@ -875,4 +876,118 @@ fn layout_resize_keeps_caret_valid() {
     let cr_wide = s.caret_rect();
     assert!(cr_wide.height > 0.0);
     assert_content_synced(&s);
+}
+
+// ===========================================================================
+// Scroll anchoring — first visible line stays pinned across width reflow
+// ===========================================================================
+
+#[test]
+fn scroll_anchor_pinned_on_width_increase() {
+    // Build a long document that wraps heavily at narrow width.
+    let text = (0..100).map(|i| format!("Line {i} with some words")).collect::<Vec<_>>().join("\n");
+    let mut s = session(&text);
+    s.set_layout_width(100.0); // narrow → heavy wrapping
+    s.set_layout_height(50.0); // small viewport
+
+    // Scroll to the middle of the document.
+    let mid_scroll = s.max_scroll_y() / 2.0;
+    s.set_scroll_y(mid_scroll);
+    assert!(s.scroll_y() > 0.0);
+
+    // Record which byte offset is at the top of the viewport.
+    let metrics_before = s.layout.line_metrics(&s.state.text);
+    let anchor_line_before = metrics_before
+        .iter()
+        .find(|lm| lm.bottom() > s.scroll_y())
+        .unwrap();
+    let anchor_byte = anchor_line_before.start_index;
+
+    // Widen the editor — wrapping decreases, content height shrinks.
+    s.set_layout_width(400.0);
+
+    // The anchor byte offset should still be visible near the top.
+    let metrics_after = s.layout.line_metrics(&s.state.text);
+    let anchor_line_after = metrics_after
+        .iter()
+        .find(|lm| lm.start_index <= anchor_byte && anchor_byte < lm.end_index)
+        .unwrap();
+
+    // The anchor line's top should be at or just above scroll_y (within one
+    // line height tolerance, since sub-line fraction is preserved).
+    let drift = (s.scroll_y() - anchor_line_after.top()).abs();
+    let tolerance = anchor_line_after.bottom() - anchor_line_after.top();
+    assert!(
+        drift <= tolerance,
+        "anchor line drifted {drift:.1}px from viewport top (tolerance {tolerance:.1}px)"
+    );
+}
+
+#[test]
+fn scroll_anchor_pinned_on_width_decrease() {
+    let text = (0..100).map(|i| format!("Line {i} with some words")).collect::<Vec<_>>().join("\n");
+    let mut s = session(&text);
+    s.set_layout_width(400.0); // wide
+    s.set_layout_height(50.0);
+
+    let mid_scroll = s.max_scroll_y() / 2.0;
+    s.set_scroll_y(mid_scroll);
+
+    let metrics_before = s.layout.line_metrics(&s.state.text);
+    let anchor_line_before = metrics_before
+        .iter()
+        .find(|lm| lm.bottom() > s.scroll_y())
+        .unwrap();
+    let anchor_byte = anchor_line_before.start_index;
+
+    // Narrow the editor — wrapping increases, content height grows.
+    s.set_layout_width(100.0);
+
+    let metrics_after = s.layout.line_metrics(&s.state.text);
+    let anchor_line_after = metrics_after
+        .iter()
+        .find(|lm| lm.start_index <= anchor_byte && anchor_byte < lm.end_index)
+        .unwrap();
+
+    let drift = (s.scroll_y() - anchor_line_after.top()).abs();
+    let tolerance = anchor_line_after.bottom() - anchor_line_after.top();
+    assert!(
+        drift <= tolerance,
+        "anchor line drifted {drift:.1}px from viewport top (tolerance {tolerance:.1}px)"
+    );
+}
+
+#[test]
+fn scroll_anchor_at_top_stays_at_top() {
+    let text = (0..50).map(|i| format!("Line {i}")).collect::<Vec<_>>().join("\n");
+    let mut s = session(&text);
+    s.set_layout_width(100.0);
+    s.set_layout_height(50.0);
+
+    // scroll_y = 0 — should stay at 0 after any width change.
+    assert_eq!(s.scroll_y(), 0.0);
+    s.set_layout_width(400.0);
+    assert_eq!(s.scroll_y(), 0.0);
+    s.set_layout_width(50.0);
+    assert_eq!(s.scroll_y(), 0.0);
+}
+
+#[test]
+fn scroll_clamps_after_width_increase_reduces_content() {
+    // Regression: widening can reduce wrapped line count enough that the old
+    // scroll_y exceeds the new max_scroll_y.
+    let text = (0..50).map(|i| format!("Line {i} with enough words to wrap at narrow widths")).collect::<Vec<_>>().join("\n");
+    let mut s = session(&text);
+    s.set_layout_width(80.0); // narrow → lots of wrapping
+    s.set_layout_height(100.0);
+
+    // Scroll to the very bottom.
+    let max = s.max_scroll_y();
+    s.set_scroll_y(max);
+    assert!((s.scroll_y() - max).abs() < 1.0);
+
+    // Widen drastically — content becomes much shorter.
+    s.set_layout_width(2000.0);
+    assert!(s.scroll_y() <= s.max_scroll_y());
+    assert!(s.scroll_y() >= 0.0);
 }

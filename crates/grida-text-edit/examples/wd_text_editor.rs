@@ -724,7 +724,7 @@ impl ApplicationHandler for TextEditorApp {
                 event_loop.set_control_flow(ControlFlow::WaitUntil(deadline));
             }
 
-            // Dev-only: drag-and-drop .txt / .html files
+            // Dev-only: drag-and-drop text files
             WindowEvent::DroppedFile(path) => {
                 let ext = path
                     .extension()
@@ -732,16 +732,6 @@ impl ApplicationHandler for TextEditorApp {
                     .map(|s| s.to_ascii_lowercase());
 
                 match ext.as_deref() {
-                    Some("txt") => match fs::read_to_string(&path) {
-                        Ok(content) => {
-                            inner.session.load_text(&content);
-                            eprintln!("loaded plain text: {}", path.display());
-                            inner.window.request_redraw();
-                        }
-                        Err(err) => {
-                            eprintln!("failed to read {}: {err}", path.display());
-                        }
-                    },
                     Some("html" | "htm") => match fs::read_to_string(&path) {
                         Ok(html) => match inner.session.parse_html_paste(&html) {
                             Ok(content) => {
@@ -757,9 +747,19 @@ impl ApplicationHandler for TextEditorApp {
                             eprintln!("failed to read {}: {err}", path.display());
                         }
                     },
+                    ext if is_text_file(ext) => match fs::read_to_string(&path) {
+                        Ok(content) => {
+                            inner.session.load_text(&content);
+                            eprintln!("loaded plain text: {}", path.display());
+                            inner.window.request_redraw();
+                        }
+                        Err(err) => {
+                            eprintln!("failed to read {}: {err}", path.display());
+                        }
+                    },
                     _ => {
                         eprintln!(
-                            "unsupported drop (expected .txt or .html): {}",
+                            "unsupported drop: {}",
                             path.display()
                         );
                     }
@@ -825,6 +825,48 @@ fn winit_key_to_key_name(
         Key::Character(c) => Some(KeyName::Character(c.to_string())),
         _ => None,
     }
+}
+
+// ---------------------------------------------------------------------------
+// Text file detection for drag-and-drop
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if the file extension (lower-cased) is a known plain-text
+/// format that can be loaded verbatim into the editor.
+fn is_text_file(ext: Option<&str>) -> bool {
+    matches!(
+        ext,
+        Some(
+            // Plain text
+            "txt" | "text" | "log"
+            // Markup / documentation
+            | "md" | "markdown" | "rst" | "adoc" | "asciidoc" | "tex" | "latex"
+            // Configuration
+            | "cfg" | "conf" | "ini" | "env" | "properties"
+            | "yaml" | "yml" | "toml" | "json" | "json5" | "jsonc" | "jsonl"
+            | "xml" | "svg" | "plist"
+            // Source code
+            | "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "mjs" | "cjs"
+            | "c" | "h" | "cpp" | "hpp" | "cc" | "cxx" | "hxx"
+            | "java" | "kt" | "kts" | "scala" | "groovy"
+            | "go" | "rb" | "php" | "pl" | "pm" | "lua" | "zig" | "nim"
+            | "swift" | "m" | "mm"
+            | "cs" | "fs" | "fsx" | "vb"
+            | "r" | "jl" | "ex" | "exs" | "erl" | "hrl"
+            | "hs" | "lhs" | "ml" | "mli" | "clj" | "cljs" | "cljc" | "el" | "lisp" | "scm"
+            | "dart" | "v" | "sv" | "vhd" | "vhdl"
+            // Shell / scripting
+            | "sh" | "bash" | "zsh" | "fish" | "ps1" | "bat" | "cmd"
+            // Web
+            | "css" | "scss" | "sass" | "less" | "vue" | "svelte" | "astro"
+            // Data / query
+            | "sql" | "graphql" | "gql" | "csv" | "tsv"
+            // Build / CI
+            | "dockerfile" | "makefile" | "cmake" | "just" | "gradle"
+            // Documentation / misc
+            | "diff" | "patch" | "gitignore" | "gitattributes" | "editorconfig"
+        )
+    )
 }
 
 // ---------------------------------------------------------------------------

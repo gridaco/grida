@@ -89,7 +89,12 @@ impl<S: Clone> GenericEditHistory<S> {
     pub fn would_merge(&self, kind: EditKind) -> bool {
         if kind.is_mergeable() {
             if let Some(top) = self.undo_stack.last() {
-                return top.kind == kind && top.timestamp.elapsed() < self.merge_timeout;
+                let elapsed = top.timestamp.elapsed();
+                // Guard: if elapsed is zero the clock may be frozen (wasm32
+                // without Instant::advance).  Refuse to merge so undo
+                // granularity is preserved even when the host never drives
+                // the clock.
+                return elapsed > Duration::ZERO && elapsed < self.merge_timeout && top.kind == kind;
             }
         }
         false
@@ -118,7 +123,10 @@ impl<S: Clone> GenericEditHistory<S> {
     pub fn push(&mut self, state_before: &S, kind: EditKind) {
         if kind.is_mergeable() {
             if let Some(top) = self.undo_stack.last_mut() {
-                if top.kind == kind && top.timestamp.elapsed() < self.merge_timeout {
+                let elapsed = top.timestamp.elapsed();
+                // Same zero-elapsed guard as `would_merge`: a frozen clock
+                // must not cause unbounded merge.
+                if top.kind == kind && elapsed > Duration::ZERO && elapsed < self.merge_timeout {
                     top.timestamp = Instant::now();
                     self.redo_stack.clear();
                     return;

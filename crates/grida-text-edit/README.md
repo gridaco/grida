@@ -103,6 +103,7 @@ Provides a complete, embeddable rich text editor that separates editing logic fr
 ### Scroll
 
 - [x] Vertical scroll, auto-scroll to keep cursor visible, clamping
+- [x] Scroll anchoring on width reflow (first visible line stays pinned)
 
 ### Rendering (host responsibility, session provides data)
 
@@ -128,7 +129,7 @@ Provides a complete, embeddable rich text editor that separates editing logic fr
 grida_text_edit::time::Instant::advance(frame_dt);
 ```
 
-Without advancing, the engine degrades gracefully (every edit becomes a separate undo step; cursor never blinks).
+Without advancing, every edit becomes a separate undo step (no merge grouping) and the cursor never blinks. The engine remains fully functional otherwise.
 
 ## Usage
 

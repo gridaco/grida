@@ -86,6 +86,7 @@
 //! - [x] Vertical scroll (caller provides delta)
 //! - [x] Auto-scroll to keep cursor visible
 //! - [x] Scroll clamping
+//! - [x] Scroll anchoring on width reflow (first visible line stays pinned)
 //!
 //! ## Not yet implemented
 //!
@@ -100,7 +101,7 @@ use crate::{
         AttributedText, TextDecorationLine, TextFill, TextStyle as AttrTextStyle, RGBA,
     },
     history::{EditKind, GenericEditHistory},
-    layout::CaretRect,
+    layout::{line_index_for_offset, CaretRect},
     skia_layout::SkiaLayoutEngine,
     EditDelta, EditingCommand, TextEditorState, TextLayoutEngine,
 };
@@ -369,6 +370,22 @@ impl ClickTracker {
 pub struct RichTextSnapshot {
     pub state: TextEditorState,
     pub content: AttributedText,
+}
+
+// ---------------------------------------------------------------------------
+// ScrollAnchor — reading-position snapshot for reflow
+// ---------------------------------------------------------------------------
+
+/// Snapshot of the user's reading position before a reflow operation.
+///
+/// Captures the byte offset of the first visible line and the pixel distance
+/// from that line's top to `scroll_y`, so the same content can be pinned to
+/// the same screen position after the layout changes.
+struct ScrollAnchor {
+    /// `start_index` of the first visible line before reflow.
+    byte_offset: usize,
+    /// `scroll_y - line.top()` — the fractional pixel offset within that line.
+    offset_within_line: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -1155,10 +1172,21 @@ impl TextEditSession {
     // -----------------------------------------------------------------------
 
     /// Set the available layout width and rebuild layout.
+    ///
+    /// Uses **scroll anchoring** to keep the user's reading position stable
+    /// across reflow: the first visible line before the width change stays
+    /// at the same screen-y after the width change.
     pub fn set_layout_width(&mut self, w: f32) {
+        // 1. Snapshot the scroll anchor before reflow.
+        let anchor = self.scroll_anchor();
+
+        // 2. Rebuild layout at the new width.
         self.layout.set_layout_width(w.max(1.0));
         self.layout.ensure_layout_attributed(&self.content);
         self.cached_caret_rect = None;
+
+        // 3. Restore scroll position from anchor, then clamp.
+        self.restore_scroll_anchor(anchor);
     }
 
     /// Set the available layout height (viewport height).
@@ -1190,6 +1218,56 @@ impl TextEditSession {
     pub fn clamp_scroll(&mut self) {
         let max = self.max_scroll_y();
         self.scroll_y = self.scroll_y.clamp(0.0, max);
+    }
+
+    // -----------------------------------------------------------------------
+    // Scroll anchoring
+    // -----------------------------------------------------------------------
+
+    /// Capture the scroll anchor: the byte offset and sub-line pixel fraction
+    /// of the first line visible at the current `scroll_y`.
+    ///
+    /// Used before a reflow operation so the reading position can be restored
+    /// afterwards via [`restore_scroll_anchor`].
+    fn scroll_anchor(&mut self) -> ScrollAnchor {
+        if self.scroll_y <= 0.0 {
+            return ScrollAnchor { byte_offset: 0, offset_within_line: 0.0 };
+        }
+        let metrics = self.layout.line_metrics(&self.state.text);
+        if metrics.is_empty() {
+            return ScrollAnchor { byte_offset: 0, offset_within_line: 0.0 };
+        }
+        // Find the first line whose bottom is below scroll_y (i.e. at least
+        // partially visible).
+        let idx = metrics
+            .iter()
+            .position(|lm| lm.bottom() > self.scroll_y)
+            .unwrap_or(metrics.len() - 1);
+        let line = &metrics[idx];
+        ScrollAnchor {
+            byte_offset: line.start_index,
+            offset_within_line: self.scroll_y - line.top(),
+        }
+    }
+
+    /// Restore scroll_y so the anchor line sits at the same sub-line screen
+    /// position it had before reflow.
+    fn restore_scroll_anchor(&mut self, anchor: ScrollAnchor) {
+        // Fast path: was at the very top, stay there.
+        if anchor.byte_offset == 0 && anchor.offset_within_line == 0.0 {
+            self.scroll_y = 0.0;
+            return;
+        }
+        let metrics = self.layout.line_metrics(&self.state.text);
+        if metrics.is_empty() {
+            self.scroll_y = 0.0;
+            return;
+        }
+        // Find the line that contains (or starts at) the anchor byte offset.
+        let idx = line_index_for_offset(&metrics, anchor.byte_offset);
+        let new_top = metrics[idx].top();
+        self.scroll_y = new_top + anchor.offset_within_line;
+        self.clamp_scroll();
     }
 
     /// Adjust scroll offset by `delta` pixels (positive = scroll down).

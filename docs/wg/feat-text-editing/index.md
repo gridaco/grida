@@ -329,6 +329,13 @@ The host maintains the scroll offset and adjusts it in response to:
 - **Cursor-following**: after any operation that moves the cursor (typing, arrow keys, PageUp/PageDown, search-and-jump), the host checks whether the caret rect is within the visible viewport. If not, the host adjusts the scroll offset to bring the caret into view, with at least one line of margin above or below.
 - **Content change**: when text is inserted or deleted, the content height may change. The host clamps the scroll offset to `[0, max(0, content_height - viewport_height)]`.
 - **Viewport resize**: same clamping applies.
+- **Width-driven reflow (scroll anchoring)**: when the layout width changes (e.g. the user resizes the editor), text re-wraps and content height changes. A naïve clamp can cause the visible content to jump unpredictably. Instead, the engine applies **scroll anchoring**: the first visual line that was visible before the reflow is pinned to the same screen-y position after the reflow. The algorithm is:
+  1. Before reflow, find the first line whose bottom exceeds `scroll_y`. Record that line's `start_index` (a UTF-8 byte offset, which is stable across reflow since no text mutation occurs) and the sub-line pixel fraction `scroll_y - line.top()`.
+  2. Rebuild layout at the new width.
+  3. After reflow, find the line that now contains the recorded byte offset. Compute `new_scroll_y = new_line.top() + fraction`.
+  4. Clamp to `[0, max_scroll_y]`.
+  
+  Special case: if `scroll_y == 0` before reflow, it stays `0` (no anchoring needed; the document top is already the anchor).
 
 ### Engine requirements
 

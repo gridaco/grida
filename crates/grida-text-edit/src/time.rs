@@ -139,11 +139,12 @@ mod imp {
 
         /// Advance the global clock by `dt`.
         ///
-        /// The host **must** call this regularly (e.g. once per frame with
+        /// The host **should** call this regularly (e.g. once per frame with
         /// the delta obtained from `performance.now()`).  Without it,
-        /// `elapsed()` always returns zero and merge-timeout / blink logic
-        /// degrades gracefully (every edit becomes a separate undo step,
-        /// cursor never blinks).
+        /// `elapsed()` always returns zero.  The history module treats
+        /// zero-elapsed as "timeout expired" so undo granularity is
+        /// preserved (every edit becomes a separate undo step).  Cursor
+        /// blink will not toggle.
         pub fn advance(dt: Duration) {
             CLOCK_US.fetch_add(dt.as_micros() as u64, Ordering::Relaxed);
         }
