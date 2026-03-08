@@ -886,7 +886,7 @@ function SidebarLeft({
             <div className="flex items-center gap-2">
               <span>Open Library</span>
               <KbdGroup>
-                <Kbd>{uikbdk(M.CtrlCmd)}</Kbd>
+                <Kbd>{uikbdk(M.Shift)}</Kbd>
                 <Kbd>{uikbdk(KeyCode.KeyI)}</Kbd>
               </KbdGroup>
             </div>

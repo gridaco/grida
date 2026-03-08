@@ -762,7 +762,8 @@ class EditorDocumentStore
     text = ""
   ): NodeProxy<grida.program.nodes.TextSpanNode> {
     const id = this.idgen.next();
-    // Use explicit scene-level target for programmatic text node creation
+    // Use explicit scene-level target for programmatic text node creation.
+    // Include key text properties so pasted/external text respects the contract.
     this.insert(
       {
         id: id,
@@ -772,6 +773,12 @@ class EditorDocumentStore
           text: text,
           layout_target_width: "auto",
           layout_target_height: "auto",
+          layout_positioning: "absolute",
+          layout_inset_left: 0,
+          layout_inset_top: 0,
+          ...editor.config.fonts.DEFAULT_TEXT_STYLE_INTER,
+          text_align: "left",
+          text_align_vertical: "top",
           fill: {
             type: "solid",
             color: kolor.colorformats.RGBA32F.BLACK,
