@@ -32,6 +32,7 @@ use grida_text_edit::{
 
 // Re-export for WASM layer (so it doesn't depend on grida-text-edit directly)
 pub use grida_text_edit::EditingCommand as EditCommand;
+pub use grida_text_edit::DEFAULT_CARET_WIDTH;
 
 // Re-export the session type for convenience
 pub type CanvasTextEditSession = TextEditSession<ParagraphCacheLayout>;

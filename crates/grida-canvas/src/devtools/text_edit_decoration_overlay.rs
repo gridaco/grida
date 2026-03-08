@@ -5,8 +5,8 @@
 //!
 //! - **Not clipped** by parent containers (visible even when the text
 //!   overflows its bounds — matching standard OS text editor behavior).
-//! - **Zoom-independent**: the caret is always 1 screen-pixel wide,
-//!   regardless of the canvas zoom level.
+//! - **Zoom-independent**: the caret width is fixed in screen pixels
+//!   (see [`DEFAULT_CARET_WIDTH`]), regardless of the canvas zoom level.
 //!
 //! The overlay transforms layout-local decoration geometry to screen space
 //! using the node's world transform and the camera view matrix, following
@@ -17,7 +17,7 @@ use crate::node::schema::NodeId;
 use crate::painter::layer::Layer;
 use crate::runtime::camera::Camera2D;
 use crate::sk;
-use grida_text_edit::{CaretRect, SelectionRect};
+use grida_text_edit::{CaretRect, SelectionRect, DEFAULT_CARET_WIDTH};
 use skia_safe::{Canvas, Color, Matrix, Paint, PaintStyle, Rect};
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ const SELECTION_COLOR: Color = Color::from_argb(80, 66, 133, 244);
 const CARET_COLOR: Color = Color::BLACK;
 
 /// Caret width in screen pixels (zoom-independent).
-const CARET_SCREEN_WIDTH: f32 = 1.0;
+const CARET_SCREEN_WIDTH: f32 = DEFAULT_CARET_WIDTH;
 
 pub struct TextEditDecorationOverlay;
 

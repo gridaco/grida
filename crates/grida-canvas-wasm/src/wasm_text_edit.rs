@@ -6,6 +6,7 @@
 //! boundary.
 
 use crate::_internal::*;
+use cg::text_edit_session::DEFAULT_CARET_WIDTH;
 use cg::window::application::UnknownTargetApplication;
 use serde::Deserialize;
 
@@ -316,7 +317,7 @@ pub unsafe extern "C" fn text_edit_get_caret_rect(
 ) -> *const u8 {
     let Some(app) = app.as_mut() else { return std::ptr::null() };
     let Some(cr) = app.text_edit_get_caret_rect() else { return std::ptr::null() };
-    let floats: [f32; 4] = [cr.x, cr.y, 1.0, cr.height];
+    let floats: [f32; 4] = [cr.x, cr.y, DEFAULT_CARET_WIDTH, cr.height];
     alloc_len_prefixed(&f32_slice_to_le_bytes(&floats))
 }
 

@@ -16,7 +16,7 @@ mod tests;
 mod session_tests;
 
 pub use history::EditKind;
-pub use layout::{line_index_for_offset, CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine};
+pub use layout::{line_index_for_offset, CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine, DEFAULT_CARET_WIDTH};
 pub use simple_layout::SimpleLayoutEngine;
 pub use text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
 

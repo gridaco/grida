@@ -43,6 +43,12 @@ impl LineMetrics {
     }
 }
 
+/// Default caret width in screen pixels.
+///
+/// Renderers (Skia overlay, WASM FFI, etc.) should use this constant as
+/// the default caret width unless the caller overrides it.
+pub const DEFAULT_CARET_WIDTH: f32 = 2.0;
+
 /// Caret geometry returned by [`TextLayoutEngine::caret_rect_at`].
 ///
 /// All coordinates are in **layout-local space** (origin at top-left of the
