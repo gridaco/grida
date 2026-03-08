@@ -34,7 +34,6 @@ use glutin_winit::DisplayBuilder;
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{
     gpu::{self, backend_render_targets, gl::FramebufferInfo, surfaces::wrap_backend_render_target},
-    textlayout::{RectHeightStyle, RectWidthStyle},
     Color, ColorType, Paint, Point, Rect, Surface,
 };
 use winit::{
@@ -47,10 +46,8 @@ use winit::{
 };
 
 use grida_text_edit::{
-    utf8_to_utf16_offset, TextLayoutEngine, SkiaLayoutEngine,
-    selection_rects::{
-        EmptyLineSelectionPolicy, selection_rects_with_policy, skia_line_index_for_u16_offset,
-    },
+    TextLayoutEngine, SkiaLayoutEngine,
+    selection_rects::EmptyLineSelectionPolicy,
     text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession},
     attributed_text::{
         AttributedText, TextStyle as AttrTextStyle, RGBA,
@@ -116,7 +113,7 @@ impl GlSkiaSurface {
 fn draw_session(
     canvas: &skia_safe::Canvas,
     session: &mut TextEditSession<SkiaLayoutEngine>,
-    policy: EmptyLineSelectionPolicy,
+    _policy: EmptyLineSelectionPolicy,
 ) {
     canvas.clear(Color::WHITE);
 
@@ -128,40 +125,33 @@ fn draw_session(
         .map(str::to_owned);
 
     if let Some(ref p) = preedit {
-        // ---- preedit mode ----
-        let (display_text, dp, preedit_range) =
-            session.layout.build_preedit_paragraph(
+        // ---- preedit mode (per-block, same path as normal) ----
+        // Build per-block layout with preedit text spliced in and
+        // underlined, producing identical metrics to the normal path.
+        let (display_text, preedit_range) =
+            session.layout.rebuild_blocks_with_preedit(
                 &session.content,
                 session.state.cursor,
                 p,
             );
 
-        let preedit_end_u16 = utf8_to_utf16_offset(&display_text, preedit_range.end);
-
-        // Selection
+        // Selection (using the display_text which includes preedit)
         if let Some((lo, hi)) = session.selection_range() {
             if lo < hi {
-                let u16_lo = utf8_to_utf16_offset(&display_text, lo);
-                let u16_hi = utf8_to_utf16_offset(&display_text, hi);
-                let rects = selection_rects_with_policy(
-                    &dp,
-                    &display_text,
-                    u16_lo,
-                    u16_hi,
-                    session.layout.layout_width,
-                    FONT_SIZE,
-                    policy,
-                );
+                let sel_rects =
+                    session
+                        .layout
+                        .selection_rects_for_range(&display_text, lo, hi);
                 let mut sp = Paint::default();
                 sp.set_color(Color::from_argb(80, 66, 133, 244));
                 sp.set_anti_alias(true);
-                for r in &rects {
+                for r in &sel_rects {
                     canvas.draw_rect(
                         Rect::from_ltrb(
-                            r.left + origin.x,
-                            r.top + origin.y,
-                            r.right + origin.x,
-                            r.bottom + origin.y,
+                            r.x + origin.x,
+                            r.y + origin.y,
+                            r.x + r.width + origin.x,
+                            r.y + r.height + origin.y,
                         ),
                         &sp,
                     );
@@ -169,41 +159,24 @@ fn draw_session(
             }
         }
 
-        dp.paint(canvas, origin);
+        // Text (per-block paint, same as normal mode)
+        session
+            .layout
+            .paint_paragraph_at(canvas, &display_text, origin);
 
-        // Cursor at end of preedit
-        let preedit_start_u16 = utf8_to_utf16_offset(&display_text, preedit_range.start);
-        let cx = if preedit_start_u16 < preedit_end_u16 {
-            let rects = dp.get_rects_for_range(
-                (preedit_end_u16 - 1)..preedit_end_u16,
-                RectHeightStyle::Max,
-                RectWidthStyle::Tight,
-            );
-            rects.last().map(|tb| tb.rect.right()).unwrap_or(0.0)
-        } else {
-            0.0
-        };
-        let cy = {
-            let skia_metrics = dp.get_line_metrics();
-            if skia_metrics.is_empty() {
-                FONT_SIZE
-            } else {
-                let idx = skia_line_index_for_u16_offset(&skia_metrics, preedit_end_u16);
-                skia_metrics[idx].baseline as f32
-            }
-        };
+        // Cursor at end of preedit (use caret_rect_at with display text)
+        let preedit_end = preedit_range.end;
+        let cr = session.layout.caret_rect_at(&display_text, preedit_end);
+        let cursor_rect = Rect::from_xywh(
+            cr.x + origin.x - CURSOR_WIDTH / 2.0,
+            cr.y + origin.y,
+            CURSOR_WIDTH,
+            cr.height,
+        );
         let mut cp = Paint::default();
         cp.set_color(Color::BLACK);
         cp.set_anti_alias(false);
-        canvas.draw_rect(
-            Rect::from_xywh(
-                cx + origin.x - CURSOR_WIDTH / 2.0,
-                cy - FONT_SIZE + origin.y,
-                CURSOR_WIDTH,
-                FONT_SIZE * 1.2,
-            ),
-            &cp,
-        );
+        canvas.draw_rect(cursor_rect, &cp);
     } else {
         // ---- normal mode (rich text, per-block layout) ----
         session
@@ -551,6 +524,23 @@ impl ApplicationHandler for TextEditorApp {
                 self.modifiers = m.state();
             }
 
+            // ---------------------------------------------------------
+            // IME (Input Method Editor) composition events
+            // ---------------------------------------------------------
+            // On macOS, winit 0.30 suppresses KeyboardInput during active
+            // IME composition at the platform level (view.rs key_down).
+            // We only receive Preedit / Commit here; no duplicate
+            // KeyboardInput for composed characters.
+            //
+            // Known issue (winit 0.30, macOS): when a non-composable
+            // character (e.g. ".", "?", symbols) finalizes an active
+            // composition, winit's insertText handler commits the
+            // composed text but silently drops the finalizing character.
+            // Neither Ime::Commit nor KeyboardInput is emitted for it,
+            // so it is lost. The user must press the key a second time.
+            // This is a winit bug — our handler is correct.
+            // ---------------------------------------------------------
+
             WindowEvent::Ime(Ime::Preedit(text, _cursor_range)) => {
                 if inner.session.handle_key_action(KeyAction::ImePreedit(text)) {
                     inner.window.request_redraw();
@@ -562,9 +552,13 @@ impl ApplicationHandler for TextEditorApp {
                 }
             }
             WindowEvent::Ime(Ime::Enabled) => {
-                inner.session.cancel_preedit();
+                // No-op. On macOS, Ime::Enabled fires when the first
+                // preedit begins — cancelling preedit here would race
+                // with the Preedit event and drop initial characters.
             }
             WindowEvent::Ime(Ime::Disabled) => {
+                // Input source switched away from CJK. Clear any
+                // in-progress composition.
                 inner.session.cancel_preedit();
                 inner.window.request_redraw();
             }
@@ -572,6 +566,11 @@ impl ApplicationHandler for TextEditorApp {
             WindowEvent::KeyboardInput { event: ke, .. }
                 if ke.state == ElementState::Pressed =>
             {
+                // Drain the empty-preedit sentinel *before* processing
+                // keys so that the session's preedit.is_some() guard
+                // doesn't suppress the next insertion.
+                inner.session.drain_empty_preedit();
+
                 let meta = self.modifiers.super_key();
                 let alt = self.modifiers.alt_key();
                 let ctrl = self.modifiers.control_key();
@@ -645,8 +644,6 @@ impl ApplicationHandler for TextEditorApp {
                         }
                     }
                 }
-
-                inner.session.drain_empty_preedit();
             }
 
             WindowEvent::MouseWheel { delta, .. } => {

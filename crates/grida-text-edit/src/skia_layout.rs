@@ -1024,6 +1024,24 @@ impl SkiaLayoutEngine {
         para_style.set_apply_rounding_hack(false);
         para_style.set_text_align(self.config.text_align.to_skia());
 
+        // Use a strut style based on the first run's font in this block
+        // (or the config defaults). This prevents font-fallback characters
+        // (e.g. CJK glyphs rendered by a system font) from changing the
+        // line height, which causes a visual "jump" during IME preedit.
+        {
+            let (strut_size, strut_family) = if let Some(run) = runs.first() {
+                (run.style.font_size, run.style.font_family.as_str())
+            } else {
+                (self.config.font_size, self.config.font_families.first().map(|s| s.as_str()).unwrap_or("sans-serif"))
+            };
+            let mut strut = skia_safe::textlayout::StrutStyle::new();
+            strut.set_strut_enabled(true);
+            strut.set_force_strut_height(true);
+            strut.set_font_size(strut_size);
+            strut.set_font_families(&[strut_family]);
+            para_style.set_strut_style(strut);
+        }
+
         let mut builder = ParagraphBuilder::new(&para_style, &self.font_collection);
         let fallback_families: Vec<&str> =
             self.config.font_families.iter().map(|s| s.as_str()).collect();
@@ -1226,6 +1244,38 @@ impl SkiaLayoutEngine {
     // -------------------------------------------------------------------
     // Preedit (IME composition) support
     // -------------------------------------------------------------------
+
+    /// Rebuild per-block layout with the preedit text spliced in at `cursor`.
+    ///
+    /// This uses the same per-block approach as
+    /// [`ensure_layout_attributed`](Self::ensure_layout_attributed) so the
+    /// resulting layout metrics are identical — avoiding the visual "jump"
+    /// that occurs when switching between a single-paragraph preedit layout
+    /// and a per-block normal layout.
+    ///
+    /// Returns `(display_text, preedit_byte_range)` so the caller can
+    /// position the cursor and draw selection rects using the display text.
+    pub fn rebuild_blocks_with_preedit(
+        &mut self,
+        content: &crate::attributed_text::AttributedText,
+        cursor: usize,
+        preedit: &str,
+    ) -> (String, std::ops::Range<usize>) {
+        use crate::attributed_text::TextDecorationLine;
+
+        let mut display_content = content.clone();
+        let mut preedit_style = content.caret_style_at(cursor as u32).clone();
+        preedit_style.text_decoration_line = TextDecorationLine::Underline;
+        display_content.insert_with_style(cursor, preedit, preedit_style);
+
+        let preedit_range = cursor..(cursor + preedit.len());
+
+        // Full per-block rebuild using the spliced content.
+        self.rebuild_blocks_attributed(&display_content);
+
+        let display_text = display_content.text().to_owned();
+        (display_text, preedit_range)
+    }
 
     /// Build a display string and a laid-out `Paragraph` with the preedit
     /// text spliced in at `cursor` and styled with an underline.
