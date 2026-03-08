@@ -2673,6 +2673,18 @@ export class Editor
   readonly doc: EditorDocumentStore;
 
   private _m_wasm_canvas_scene: Scene | null = null;
+
+  /**
+   * Access the underlying WASM Scene instance for the canvas backend.
+   *
+   * Returns `null` when the backend is not "canvas" or the scene is not
+   * yet initialized. Used by text editing components to call the text
+   * editing C ABI functions directly.
+   */
+  public get wasmScene(): Scene | null {
+    return this._m_wasm_canvas_scene;
+  }
+
   private _m_exporter: editor.api.IDocumentExporterInterfaceProvider =
     new NoopDefaultExportInterfaceProvider();
 

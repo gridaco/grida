@@ -86,4 +86,15 @@ impl PictureCache {
         self.default_store.clear();
         self.variant_store.clear();
     }
+
+    /// Invalidate cached pictures for a single node (all variants).
+    ///
+    /// Note: `variant_store.retain()` is O(n) over all entries.
+    /// Called on each keystroke during text editing. If profiling shows
+    /// this is hot, consider a `HashMap<NodeId, HashMap<VariantKey, …>>`
+    /// to make per-node invalidation O(1).
+    pub fn invalidate_node(&mut self, id: NodeId) {
+        self.default_store.remove(&id);
+        self.variant_store.retain(|&(nid, _), _| nid != id);
+    }
 }

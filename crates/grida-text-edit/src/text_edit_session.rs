@@ -722,42 +722,6 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
         }
     }
 
-    /// Returns the text at each undo boundary, from oldest to current.
-    ///
-    /// The first element is the oldest snapshot (the text before the first
-    /// recorded edit). The last element is the current text. Each consecutive
-    /// pair `(texts[i], texts[i+1])` represents one undo step.
-    ///
-    /// Returns an empty `Vec` if the session has no history (no edits were
-    /// made, or all edits were undone back to the original state).
-    ///
-    /// Used by hosts to replay session-level undo boundaries into their own
-    /// history system — for example, injecting fine-grained document-level
-    /// undo entries when exiting a text editing session.
-    ///
-    /// # Future direction
-    ///
-    /// A more principled approach would be a drain-based event system where
-    /// the session emits `HistoryEvent { previous_text, current_text, kind }`
-    /// as undo boundaries are created, and the host polls them per-frame
-    /// (similar to ProseMirror's transaction dispatch or CodeMirror's change
-    /// listener). This would keep the host's history in real-time sync during
-    /// editing, rather than batch-replaying at exit. The current batch
-    /// approach is chosen for simplicity and minimal FFI surface.
-    pub fn history_texts(&self) -> Vec<String> {
-        let snapshots: Vec<String> = self
-            .history
-            .undo_states()
-            .map(|snap| snap.state.text.clone())
-            .collect();
-        if snapshots.is_empty() {
-            return Vec::new();
-        }
-        let mut texts = snapshots;
-        texts.push(self.state.text.clone());
-        texts
-    }
-
     // -----------------------------------------------------------------------
     // Rich text: style toggles
     // -----------------------------------------------------------------------

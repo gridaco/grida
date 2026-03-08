@@ -497,6 +497,7 @@ dependencies = [
  "figma-api",
  "futures",
  "gl",
+ "grida-text-edit",
  "imgref",
  "json-patch",
  "math2",

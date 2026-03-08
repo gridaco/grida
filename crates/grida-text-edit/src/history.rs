@@ -76,18 +76,6 @@ impl<S: Clone> GenericEditHistory<S> {
         !self.redo_stack.is_empty()
     }
 
-    /// Returns references to the states in the undo stack, oldest first.
-    ///
-    /// Each entry represents the state **before** an edit. Combined with
-    /// the current session state, this gives the full sequence of undo
-    /// boundaries the user can step through.
-    ///
-    /// Used by hosts to replay session-level history into their own history
-    /// system (e.g., document-level undo after exiting a text editing session).
-    pub fn undo_states(&self) -> impl Iterator<Item = &S> {
-        self.undo_stack.iter().map(|e| &e.state)
-    }
-
     pub fn clear(&mut self) {
         self.undo_stack.clear();
         self.redo_stack.clear();

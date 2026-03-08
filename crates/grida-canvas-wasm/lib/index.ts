@@ -4,6 +4,7 @@ import {
   Scene,
   type CreateImageResourceResult,
   type AddImageWithIdResult,
+  type TextEditCommand,
 } from "./modules/canvas";
 import { svgtypes } from "./modules/svg-bindings";
 export {
@@ -11,6 +12,7 @@ export {
   type svgtypes,
   type CreateImageResourceResult,
   type AddImageWithIdResult,
+  type TextEditCommand,
 };
 export const version = _version;
 

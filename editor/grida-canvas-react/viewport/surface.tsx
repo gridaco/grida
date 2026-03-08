@@ -49,7 +49,7 @@ import { VectorMeasurementGuide } from "./ui/vector-measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
 import { cursors } from "../../components/cursor/cursor-data";
-import { SurfaceTextEditor } from "./ui/text-editor";
+import { SurfaceTextEditor } from "./ui/surface-text-editor";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
 import { SurfaceImageEditor } from "./ui/surface-image-editor";
@@ -264,7 +264,11 @@ export function EditorSurface() {
         if (event.defaultPrevented) return;
 
         // [order matters] - otherwise, it will always try to enter the content edit mode
-        editor.surface.surfaceTryToggleContentEditMode(); // 1
+        // Skip toggle when already in content edit mode — prevents double-click
+        // inside the text editor from exiting it.
+        if (!content_edit_mode) {
+          editor.surface.surfaceTryToggleContentEditMode(); // 1
+        }
         editor.surface.surfaceDoubleClick(event); // 2
       },
       onDragStart: ({ event }) => {

@@ -19,5 +19,6 @@ pub mod sk_tiny;
 pub mod svg;
 pub mod sys;
 pub mod text;
+pub mod text_edit_session;
 pub mod vectornetwork;
 pub mod window;

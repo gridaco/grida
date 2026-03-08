@@ -15,7 +15,7 @@ mod tests;
 #[cfg(test)]
 mod session_tests;
 
-pub use history::{EditHistory, EditKind, GenericEditHistory};
+pub use history::EditKind;
 pub use layout::{line_index_for_offset, CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine};
 pub use simple_layout::SimpleLayoutEngine;
 pub use text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};

@@ -3,7 +3,7 @@
 //! All tests use `SimpleLayoutEngine` — no Skia, no winit.  The layout is
 //! monospace / no-wrap, so every assertion is exact.
 
-use crate::{apply_command, floor_char_boundary, ceil_char_boundary, layout::{CaretRect, TextLayoutEngine}, line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
+use crate::{apply_command, floor_char_boundary, ceil_char_boundary, layout::{CaretRect, TextLayoutEngine}, line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, history::EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
 
 fn layout() -> SimpleLayoutEngine {
     SimpleLayoutEngine::default_test()
