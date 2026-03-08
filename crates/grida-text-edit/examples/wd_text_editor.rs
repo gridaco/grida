@@ -120,17 +120,6 @@ fn draw_session(
 ) {
     canvas.clear(Color::WHITE);
 
-    canvas.save();
-    canvas.clip_rect(
-        Rect::from_xywh(
-            PADDING,
-            PADDING,
-            session.layout.layout_width,
-            session.layout.layout_height,
-        ),
-        None,
-        None,
-    );
     let origin = Point::new(PADDING, PADDING - session.scroll_y());
 
     let preedit = session
@@ -265,8 +254,6 @@ fn draw_session(
             canvas.draw_rect(cursor_rect, &cp);
         }
     }
-
-    canvas.restore();
 }
 
 // ---------------------------------------------------------------------------
