@@ -1153,7 +1153,10 @@ impl UnknownTargetApplication {
         use crate::text::paragraph_cache_layout::ParagraphCacheLayout;
         use crate::text_edit_session::ActiveTextEdit;
 
-        let node_id = self.user_id_to_internal(user_node_id).unwrap_or(0);
+        let node_id = match self.user_id_to_internal(user_node_id) {
+            Some(id) => id,
+            None => return false,
+        };
 
         // Look up the text node from the scene to get the authoritative
         // properties — same data the Painter and ParagraphCache use.

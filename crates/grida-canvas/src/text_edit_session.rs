@@ -57,8 +57,8 @@ pub struct ActiveTextEdit {
     /// The generic text editing session with ParagraphCacheLayout.
     pub session: CanvasTextEditSession,
 
-    /// The canvas node being edited.
-    pub node_id: NodeId,
+    /// The canvas node being edited (internal ID, not exposed outside the crate).
+    pub(crate) node_id: NodeId,
 
     /// Original text at session start (for commit comparison).
     original_text: String,
