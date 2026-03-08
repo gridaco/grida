@@ -17,6 +17,9 @@ pub enum EditKind {
     Paste,
     ImeCommit,
     Newline,
+    /// Cut (deleteByCut) — selection deleted via clipboard cut.
+    /// Never merges with adjacent edits.
+    Cut,
     /// A style-only change (bold, italic, font size, etc.).
     /// Never merges with text-editing kinds.
     Style,

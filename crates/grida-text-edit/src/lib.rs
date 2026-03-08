@@ -315,6 +315,11 @@ pub enum EditingCommand {
     BackspaceWord,
     Delete,
     DeleteWord,
+    /// Delete the current selection (cut semantics per W3C Input Events L2
+    /// `deleteByCut`).  When the selection is collapsed this is a no-op —
+    /// the caller is responsible for having already copied text to the
+    /// clipboard before dispatching this command.
+    DeleteByCut,
     MoveLeft { extend: bool },
     MoveRight { extend: bool },
     MoveDocStart { extend: bool },
@@ -372,6 +377,7 @@ impl EditingCommand {
             Self::Delete | Self::DeleteWord | Self::DeleteLine => {
                 Some(EditKind::Delete)
             }
+            Self::DeleteByCut => Some(EditKind::Cut),
             _ => None,
         }
     }
@@ -499,6 +505,20 @@ pub fn apply_command_mut(
                 Some(EditDelta { offset: s.cursor, old_len: removed, new_len: 0 })
             } else {
                 s.anchor = None;
+                None
+            }
+        }
+
+        // deleteByCut (W3C Input Events L2): only acts when a
+        // non-collapsed selection exists; otherwise it's a no-op.
+        EditingCommand::DeleteByCut => {
+            if s.has_selection() {
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                s.anchor = None;
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
+            } else {
                 None
             }
         }

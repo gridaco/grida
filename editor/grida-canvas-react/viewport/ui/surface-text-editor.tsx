@@ -336,11 +336,11 @@ function WasmTextEditorRelay({ node_id }: { node_id: string }) {
         return;
       }
 
-      // Clipboard: Cut
+      // Clipboard: Cut (deleteByCut — no-op when selection is collapsed)
       if (mod && e.key === "x") {
         e.preventDefault();
         clipboardCopy(scene);
-        scene.textEditCommand({ type: "Backspace" });
+        scene.textEditCommand({ type: "DeleteByCut" });
         scene.redraw();
         return;
       }

@@ -778,6 +778,7 @@ export type TextEditCommand =
   | { type: "Delete" }
   | { type: "DeleteWord" }
   | { type: "DeleteLine" }
+  | { type: "DeleteByCut" }
   | { type: "MoveLeft"; extend: boolean }
   | { type: "MoveRight"; extend: boolean }
   | { type: "MoveUp"; extend: boolean }

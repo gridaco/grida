@@ -594,10 +594,8 @@ impl ApplicationHandler for TextEditorApp {
                                 let plain = inner.session.selected_text().unwrap_or("").to_string();
                                 let _ = self.clipboard.set_html(&html, Some(&plain));
                             }
-                            if inner.session.has_selection() {
-                                inner.session.apply(EditingCommand::Delete);
-                                inner.window.request_redraw();
-                            }
+                            inner.session.apply(EditingCommand::DeleteByCut);
+                            inner.window.request_redraw();
                             handled = true;
                         }
                         PhysicalKey::Code(KeyCode::KeyV) => {
