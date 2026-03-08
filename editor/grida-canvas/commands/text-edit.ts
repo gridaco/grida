@@ -24,21 +24,23 @@ export function keyEventToTextEditCommand(
   const shift = e.shiftKey;
   // Word-level navigation modifier: Option on Mac, Ctrl on Win/Linux.
   const wordMod = IS_MAC ? e.altKey : e.ctrlKey;
+  // Normalize single-letter keys for consistent shortcut matching across browsers/platforms.
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 
   // --- Undo / Redo ---
   // Note: undo/redo is typically intercepted earlier in handleKeyDown
   // (which handles cascading session → document undo). This branch
   // exists so the mapping is complete when used standalone.
-  if (mod && !e.altKey && e.key === "z") {
+  if (mod && !e.altKey && key === "z") {
     return shift ? { type: "Redo" } : { type: "Undo" };
   }
   // Cmd+Shift+Z on Mac, Ctrl+Y on Win/Linux
-  if (!IS_MAC && mod && e.key === "y") {
+  if (!IS_MAC && mod && key === "y") {
     return { type: "Redo" };
   }
 
   // --- Select All ---
-  if (mod && e.key === "a") {
+  if (mod && key === "a") {
     return { type: "SelectAll" };
   }
 
