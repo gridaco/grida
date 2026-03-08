@@ -944,8 +944,11 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
         self.state.cursor = pos + pasted.text().len();
         self.state.anchor = None;
         self.caret_style_override = None;
+        self.invalidate_caret_cache();
         self.layout.invalidate();
         self.reset_blink();
+        self.layout.ensure_layout(&self.content);
+        self.ensure_cursor_visible();
     }
 
     // -----------------------------------------------------------------------
