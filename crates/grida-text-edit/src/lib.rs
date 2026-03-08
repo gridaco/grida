@@ -1,11 +1,14 @@
 pub mod attributed_text;
 pub mod history;
 pub mod layout;
-pub mod selection_rects;
 pub mod simple_layout;
-pub mod skia_layout;
 pub mod text_edit_session;
 pub mod time;
+
+#[cfg(feature = "skia")]
+pub mod selection_rects;
+#[cfg(feature = "skia")]
+pub mod skia_layout;
 
 #[cfg(test)]
 mod tests;
@@ -13,11 +16,14 @@ mod tests;
 mod session_tests;
 
 pub use history::{EditHistory, EditKind, GenericEditHistory};
-pub use layout::{line_index_for_offset, CaretRect, LineMetrics, SelectionRect, TextLayoutEngine};
-pub use selection_rects::{EmptyLineSelectionPolicy, selection_rects_with_policy, skia_line_index_for_u16_offset};
+pub use layout::{line_index_for_offset, CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine};
 pub use simple_layout::SimpleLayoutEngine;
-pub use skia_layout::SkiaLayoutEngine;
 pub use text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
+
+#[cfg(feature = "skia")]
+pub use selection_rects::{EmptyLineSelectionPolicy, selection_rects_with_policy, skia_line_index_for_u16_offset};
+#[cfg(feature = "skia")]
+pub use skia_layout::SkiaLayoutEngine;
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -260,6 +266,23 @@ impl TextEditorState {
 
     pub fn has_selection(&self) -> bool {
         self.anchor.map_or(false, |a| a != self.cursor)
+    }
+
+    /// Whether the caret should be shown.
+    ///
+    /// Returns `true` when there is **no** active selection (caret mode).
+    /// When the user has selected text, the caret is hidden — only the
+    /// selection highlight is visible.  This is the standard behaviour of
+    /// every major OS text editor (macOS, Windows, Linux).
+    ///
+    /// Consumers should combine this with the blink state to decide whether
+    /// to actually paint the caret:
+    ///
+    /// ```text
+    /// let paint = state.should_show_caret() && blink_visible;
+    /// ```
+    pub fn should_show_caret(&self) -> bool {
+        !self.has_selection()
     }
 
     pub fn selection_range(&self) -> Option<(usize, usize)> {

@@ -47,7 +47,7 @@ use winit::{
 };
 
 use grida_text_edit::{
-    utf8_to_utf16_offset, TextLayoutEngine,
+    utf8_to_utf16_offset, TextLayoutEngine, SkiaLayoutEngine,
     selection_rects::{
         EmptyLineSelectionPolicy, selection_rects_with_policy, skia_line_index_for_u16_offset,
     },
@@ -66,7 +66,7 @@ const WINDOW_W: u32 = 800;
 const WINDOW_H: u32 = 600;
 const PADDING: f32 = 24.0;
 const FONT_SIZE: f32 = 18.0;
-const CURSOR_WIDTH: f32 = 2.0;
+const CURSOR_WIDTH: f32 = 1.0;
 
 // ---------------------------------------------------------------------------
 // GL + Skia surface helpers (purely windowing boilerplate)
@@ -115,7 +115,7 @@ impl GlSkiaSurface {
 
 fn draw_session(
     canvas: &skia_safe::Canvas,
-    session: &mut TextEditSession,
+    session: &mut TextEditSession<SkiaLayoutEngine>,
     policy: EmptyLineSelectionPolicy,
 ) {
     canvas.clear(Color::WHITE);
@@ -251,7 +251,7 @@ fn draw_session(
             .paint_paragraph_at(canvas, &session.state.text, origin);
 
         // Cursor
-        if session.cursor_visible() && !session.has_selection() {
+        if session.should_show_caret() {
             let cr = session.caret_rect();
             let cursor_rect = Rect::from_xywh(
                 cr.x + origin.x - CURSOR_WIDTH / 2.0,
@@ -285,7 +285,7 @@ struct TextEditorApp {
 struct AppInner {
     window: Window,
     gl_skia: GlSkiaSurface,
-    session: TextEditSession,
+    session: TextEditSession<SkiaLayoutEngine>,
 }
 
 impl TextEditorApp {
@@ -437,7 +437,8 @@ impl ApplicationHandler for TextEditorApp {
 
         let layout_w = (w as f32) - PADDING * 2.0;
         let layout_h = (h as f32) - PADDING * 2.0;
-        let mut session = TextEditSession::new(layout_w, layout_h, default_style.clone());
+        let layout = SkiaLayoutEngine::new(layout_w, layout_h);
+        let mut session = TextEditSession::new(layout, default_style.clone());
 
         // Load fonts
         let inter_upright = include_bytes!(

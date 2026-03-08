@@ -1538,3 +1538,33 @@ impl TextLayoutEngine for SkiaLayoutEngine {
         self.layout_height
     }
 }
+
+impl crate::layout::ManagedTextLayout for SkiaLayoutEngine {
+    fn ensure_layout(&mut self, content: &crate::attributed_text::AttributedText) {
+        self.ensure_layout_attributed(content);
+    }
+
+    fn invalidate(&mut self) {
+        // Delegate to the existing invalidate method.
+        self.paragraph = None;
+        self.blocks.clear();
+        self.cached_text.clear();
+        self.cached_line_metrics = None;
+    }
+
+    fn layout_width(&self) -> f32 {
+        self.layout_width
+    }
+
+    fn layout_height(&self) -> f32 {
+        self.layout_height
+    }
+
+    fn set_layout_width(&mut self, w: f32) {
+        SkiaLayoutEngine::set_layout_width(self, w);
+    }
+
+    fn set_layout_height(&mut self, h: f32) {
+        SkiaLayoutEngine::set_layout_height(self, h);
+    }
+}

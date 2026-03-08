@@ -21,6 +21,7 @@ use crate::attributed_text::{
     AttributedText, TextDecorationLine, TextFill, TextStyle as AttrTextStyle, RGBA,
 };
 use crate::layout::TextLayoutEngine;
+use crate::simple_layout::SimpleLayoutEngine;
 use crate::text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
 
 // ---------------------------------------------------------------------------
@@ -36,9 +37,10 @@ fn default_style() -> AttrTextStyle {
 }
 
 /// Create a session with some text, cursor at end.
-fn session(text: &str) -> TextEditSession {
+fn session(text: &str) -> TextEditSession<SimpleLayoutEngine> {
     let style = default_style();
-    let mut s = TextEditSession::new(400.0, 300.0, style.clone());
+    let layout = SimpleLayoutEngine::new(300.0, 24.0, 10.0);
+    let mut s = TextEditSession::new(layout, style.clone());
     if !text.is_empty() {
         s.content = AttributedText::new(text, style);
         s.state.text = text.to_string();
@@ -48,7 +50,7 @@ fn session(text: &str) -> TextEditSession {
 }
 
 /// Assert the critical invariant: content.text() == state.text.
-fn assert_content_synced(s: &TextEditSession) {
+fn assert_content_synced(s: &TextEditSession<SimpleLayoutEngine>) {
     assert_eq!(
         s.content.text(),
         &s.state.text,
