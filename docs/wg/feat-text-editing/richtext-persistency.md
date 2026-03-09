@@ -236,7 +236,70 @@ TextNode = {
 - (-) Requires a resolution step before layout (RLE the per-char array into runs for the paragraph builder).
 - **Summary**: Among the systems surveyed, Figma's model appears to have the strongest multiplayer characteristics. The per-character ID approach trades storage compactness for CRDT compatibility.
 
-### 1.5 Apple `NSAttributedString` (run-based / RLE)
+### 1.5 ProseMirror (schema-driven, tree of nodes + marks)
+
+**Source**: [ProseMirror Guide](https://prosemirror.net/docs/guide/), [ProseMirror Reference](https://prosemirror.net/docs/ref/)
+
+ProseMirror is a widely adopted web-based rich-text editing toolkit. It is included here because it represents a major **editor-native** model in the web ecosystem -- i.e., a model designed from the ground up around the editing lifecycle (selection, input, undo, commands) rather than being primarily a rendering or persistence format.
+
+#### Document model
+
+A ProseMirror document is a **tree of typed nodes**. Each node type is declared in a user-defined **schema** that specifies allowed children, attributes, and how the node maps to/from DOM. Inline content is represented as flat sequences of text and inline nodes under a parent block node; within that sequence, text ranges carry **marks** (bold, italic, link, etc.) rather than being nested elements.
+
+```
+doc
+ └─ paragraph
+      ├─ text "Hello "
+      ├─ text "world" [mark: bold]
+      └─ text "!"
+```
+
+- **Nodes** have a `type`, optional `attrs` (attribute dict), and an ordered list of child nodes.
+- **Marks** are annotations on inline text ranges. A mark has a `type` (from the schema) and optional `attrs`. Marks are order-independent and set-like per character position.
+- The schema constrains which node types may appear where and which marks are valid on which nodes. This gives the model a degree of structural validation absent from most other systems surveyed here.
+
+#### Editing model (transactions and transforms)
+
+Mutations are expressed as **steps** (atomic operations such as `ReplaceStep`, `AddMarkStep`, `RemoveMarkStep`). Steps compose into **transforms**, and a transform combined with a selection update forms a **transaction**. All document changes flow through this pipeline:
+
+1. Build a `Transaction` from the current `EditorState`.
+2. Each step produces a new immutable `Document`.
+3. The transaction is dispatched to produce a new `EditorState`.
+
+This explicit transform pipeline enables undo/redo (invert steps), collaborative editing (rebase steps), and change tracking. ProseMirror ships a collaboration module (`prosemirror-collab`) that implements an OT-style rebase against a central authority, though it is not a CRDT.
+
+#### Inline styling: marks vs. attributed-string runs
+
+ProseMirror's marks are structurally similar to attributed-string runs in some respects but differ in important ways:
+
+| Aspect      | ProseMirror marks                                                                                                                      | Attributed-string runs (NSAttributedString-style)                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Granularity | Per-character mark set                                                                                                                 | Per-run attribute dictionary                                            |
+| Overlap     | Freely overlapping (bold + italic + link coexist as independent marks)                                                                 | No overlap; each position belongs to exactly one run with a merged dict |
+| Storage     | Adjacent text nodes with identical mark sets are joined; a single paragraph's inline content is a flat `Fragment` of `TextNode` slices | Adjacent runs with identical attributes coalesce                        |
+| Inheritance | No cascading; marks are explicit per text range                                                                                        | Varies (Apple: none; Flutter: tree cascade)                             |
+
+#### Relevance to this survey
+
+ProseMirror is included because:
+
+1. It is a dominant model for **web-based structured editing** (used by or influencing editors such as Tiptap, Atlassian Editor, the New York Times, and others).
+2. Its schema-driven approach demonstrates a middle ground between pure free-form HTML editing and the compact flat-run models used in design tools.
+3. Its transform/step pipeline offers an explicit representation of mutations, which is relevant to collaboration -- though it uses OT-style rebasing rather than CRDTs.
+
+**Observations**:
+
+- (+) Schema-driven: the document model is validated by a grammar, reducing invalid states.
+- (+) Explicit transform pipeline enables undo, collaboration (OT-based), and change tracking.
+- (+) Marks as a set per character position handle overlapping styles naturally.
+- (+) Battle-tested at scale in production web editors.
+- (-) **Tree-structured**: the document is a node tree, not a flat array. This is well-suited to document editing (paragraphs, lists, headings) but adds structural complexity compared to flat run arrays in a design-tool context.
+- (-) Marks carry only lightweight attrs (typically a few fields). Rich per-run style records (dozens of typographic fields like in Figma or the Grida `TextStyleRec`) would require either many fine-grained mark types or mark attrs with complex objects -- neither of which ProseMirror's mark model is primarily optimized for.
+- (-) Collaboration is OT-based (central authority rebasing), not CRDT-native. Real-time peer-to-peer sync requires additional infrastructure.
+- (-) Serialization format is JSON-based by default; no built-in compact binary format. Not directly FlatBuffers-compatible without a custom mapping layer.
+- **Summary**: ProseMirror is the most mature editor-native model in the web ecosystem. Its strengths (schema validation, transform pipeline, mark-based inline styling) are most valuable for document-oriented editors. For a design-tool text model that prioritizes compact flat-run persistence, per-character-level CRDT compatibility, and rich typographic style records, ProseMirror's tree structure and mark granularity represent a different set of trade-offs than the flat run-based or per-character-ID models also surveyed here.
+
+### 1.6 Apple `NSAttributedString` (run-based / RLE)
 
 **Source**: [Apple NSAttributedString](https://developer.apple.com/documentation/foundation/nsattributedstring)
 
@@ -249,7 +312,7 @@ Apple's model: flat `CFString` + **run-length encoded attribute dictionaries**. 
 
 **Observations**: The longest-running attributed text model in wide production use (in use since the early 1990s in NeXTSTEP, ~30+ years). Direct layout mapping (run = `pushStyle` + `addText`). However, run splits at boundaries create merge conflicts in collaborative editing scenarios.
 
-### 1.6 Android `SpannableStringBuilder` (span-based / interval set)
+### 1.7 Android `SpannableStringBuilder` (span-based / interval set)
 
 **Source**: [Android SpannableStringBuilder](https://developer.android.com/reference/android/text/SpannableStringBuilder)
 
@@ -257,7 +320,7 @@ Android stores spans as independent `(start, end, flags, object)` tuples over a 
 
 **Observations**: Provides maximum flexibility (overlapping spans, per-span insertion policy). Typically has the weakest query performance among the models surveyed (O(n) linear scan, though newer implementations use interval trees). No automatic coalescing. The overlapping span model is generally considered difficult to use in collaborative editing contexts.
 
-### 1.7 Peritext (CRDT for rich text collaboration)
+### 1.8 Peritext (CRDT for rich text collaboration)
 
 **Source**: [Ink & Switch - Peritext](https://www.inkandswitch.com/peritext/) (CSCW 2022)
 
@@ -450,19 +513,19 @@ These represent block-level structure. Whether and how to support them is a sepa
 
 This matrix compares the structural approaches from Section 1 across key dimensions. The "Run-based candidate" column reflects the direction that appears most aligned with the constraints in the Purpose section, but is included for comparison, not as a committed choice.
 
-| Dimension                | Apple (runs)             | Android (spans)      | Flutter (tree)         | Figma (per-char IDs)        | Peritext (CRDT marks)   | Run-based candidate                                                    |
-| ------------------------ | ------------------------ | -------------------- | ---------------------- | --------------------------- | ----------------------- | ---------------------------------------------------------------------- |
-| **Topology**             | Flat run array           | Flat interval set    | Immutable tree         | Flat char array + table     | Mark ops on char IDs    | Flat run array (storage), convertible to per-char IDs at sync boundary |
-| **Overlap**              | No                       | Yes                  | No (hierarchy)         | No                          | Yes (marks)             | No (resolved runs)                                                     |
-| **Style lookup**         | O(log k)                 | O(n) or O(log n+k)   | O(depth)               | O(1)                        | O(marks at position)    | O(log k) in-memory                                                     |
-| **Insert**               | Inherits adjacent        | Controlled by flags  | Rebuild tree           | Inherits base (ID 0)        | Anchor semantics        | Inherits upstream (caret style)                                        |
-| **Coalescing**           | Automatic                | None                 | N/A                    | N/A (no runs)               | N/A                     | Automatic                                                              |
-| **Inheritance**          | None                     | None                 | Tree merge             | Two-level (base + override) | None (mark union)       | Two-level (default + run override)                                     |
-| **Multiplayer**          | Poor                     | Poor                 | Poor                   | Excellent                   | Excellent               | Dependent on sync layer design                                         |
-| **Memory (uniform)**     | 1 run                    | 0 spans              | 1 node                 | n integers                  | 0 marks                 | 0 runs (delta encoded = empty)                                         |
-| **Memory (k styles)**    | k runs                   | k spans              | tree nodes             | n integers + k entries      | 2k mark ops             | k runs                                                                 |
-| **Layout mapping**       | Direct (run = push+text) | Resolve then push    | DFS produces push+text | Resolve per-char then RLE   | Resolve marks then push | Direct (run = push+text)                                               |
-| **FlatBuffers friendly** | Yes (table array)        | Possible but complex | No (recursive)         | Yes (vector + table array)  | Complex (op log)        | Yes (table array)                                                      |
+| Dimension                | Apple (runs)             | Android (spans)      | Flutter (tree)         | ProseMirror (schema tree + marks) | Figma (per-char IDs)        | Peritext (CRDT marks)   | Run-based candidate                                                    |
+| ------------------------ | ------------------------ | -------------------- | ---------------------- | --------------------------------- | --------------------------- | ----------------------- | ---------------------------------------------------------------------- |
+| **Topology**             | Flat run array           | Flat interval set    | Immutable tree         | Schema-constrained node tree      | Flat char array + table     | Mark ops on char IDs    | Flat run array (storage), convertible to per-char IDs at sync boundary |
+| **Overlap**              | No                       | Yes                  | No (hierarchy)         | Yes (marks are independent sets)  | No                          | Yes (marks)             | No (resolved runs)                                                     |
+| **Style lookup**         | O(log k)                 | O(n) or O(log n+k)   | O(depth)               | O(marks at position)              | O(1)                        | O(marks at position)    | O(log k) in-memory                                                     |
+| **Insert**               | Inherits adjacent        | Controlled by flags  | Rebuild tree           | Schema-dependent (storedMarks)    | Inherits base (ID 0)        | Anchor semantics        | Inherits upstream (caret style)                                        |
+| **Coalescing**           | Automatic                | None                 | N/A                    | Adjacent same-mark texts joined   | N/A (no runs)               | N/A                     | Automatic                                                              |
+| **Inheritance**          | None                     | None                 | Tree merge             | None (marks explicit per range)   | Two-level (base + override) | None (mark union)       | Two-level (default + run override)                                     |
+| **Multiplayer**          | Poor                     | Poor                 | Poor                   | Moderate (OT-based collab)        | Excellent                   | Excellent               | Dependent on sync layer design                                         |
+| **Memory (uniform)**     | 1 run                    | 0 spans              | 1 node                 | 1 text node                       | n integers                  | 0 marks                 | 0 runs (delta encoded = empty)                                         |
+| **Memory (k styles)**    | k runs                   | k spans              | tree nodes             | k text node slices + marks        | n integers + k entries      | 2k mark ops             | k runs                                                                 |
+| **Layout mapping**       | Direct (run = push+text) | Resolve then push    | DFS produces push+text | Walk fragment, push mark ranges   | Resolve per-char then RLE   | Resolve marks then push | Direct (run = push+text)                                               |
+| **FlatBuffers friendly** | Yes (table array)        | Possible but complex | No (recursive)         | No (tree + JSON default)          | Yes (vector + table array)  | Complex (op log)        | Yes (table array)                                                      |
 
 ---
 
@@ -712,6 +775,8 @@ TextSpan(
 - [Figma REST API `@figma/rest-api-spec`](https://www.npmjs.com/package/@figma/rest-api-spec) -- TypeStyle, TextNode types
 - [Apple NSAttributedString](https://developer.apple.com/documentation/foundation/nsattributedstring) -- run-based model
 - [Android SpannableStringBuilder](https://developer.android.com/reference/android/text/SpannableStringBuilder) -- span-based model
+- [ProseMirror Guide](https://prosemirror.net/docs/guide/) -- schema-driven document model, transforms, marks
+- [ProseMirror Reference Manual](https://prosemirror.net/docs/ref/) -- API reference for `prosemirror-model`, `prosemirror-transform`, `prosemirror-collab`
 - [Peritext: A CRDT for Rich-Text Collaboration](https://www.inkandswitch.com/peritext/) (Ink & Switch, CSCW 2022) -- CRDT mark operations with anchor semantics
 - [FlatBuffers Schema Evolution](https://flatbuffers.dev/flatbuffers_guide_writing_schema.html)
 - [Unicode Text Segmentation (UAX#29)](https://www.unicode.org/reports/tr29/)
