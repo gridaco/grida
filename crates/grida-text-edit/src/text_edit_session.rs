@@ -488,6 +488,26 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
     }
 
     // -----------------------------------------------------------------------
+    // Invariant: state.text == content.text()
+    // -----------------------------------------------------------------------
+
+    /// Assert that the two text copies (`state.text` and `content.text()`)
+    /// are identical.
+    ///
+    /// This is a **debug-only** check (compiled away in release builds).
+    /// The dual-source-of-truth design means mutations update one copy
+    /// and then patch the other. If any code path forgets to synchronize,
+    /// this assertion will catch it immediately.
+    #[inline]
+    fn assert_text_synced(&self) {
+        debug_assert_eq!(
+            self.state.text,
+            self.content.text(),
+            "BUG: TextEditSession state.text and content.text() diverged"
+        );
+    }
+
+    // -----------------------------------------------------------------------
     // Accessors
     // -----------------------------------------------------------------------
 
@@ -605,6 +625,7 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
     fn restore(&mut self, snap: RichTextSnapshot) {
         self.state = snap.state;
         self.content = snap.content;
+        self.assert_text_synced();
         self.caret_style_override = None;
         self.cached_caret_rect = None;
         self.layout.invalidate();
@@ -641,6 +662,7 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
         } else if self.state.cursor != old_cursor {
             self.caret_style_override = None;
         }
+        self.assert_text_synced();
         self.reset_blink();
         self.layout.ensure_layout(&self.content);
         self.ensure_cursor_visible();
@@ -667,6 +689,7 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
         } else if self.state.cursor != old_cursor {
             self.caret_style_override = None;
         }
+        self.assert_text_synced();
         self.reset_blink();
         self.layout.ensure_layout(&self.content);
         self.ensure_cursor_visible();
@@ -944,6 +967,7 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
         self.state.cursor = pos + pasted.text().len();
         self.state.anchor = None;
         self.caret_style_override = None;
+        self.assert_text_synced();
         self.invalidate_caret_cache();
         self.layout.invalidate();
         self.reset_blink();
@@ -1420,6 +1444,7 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
         self.state.cursor = 0;
         self.state.anchor = None;
         self.caret_style_override = None;
+        self.assert_text_synced();
         self.cached_caret_rect = None;
         self.layout.invalidate();
         self.scroll_y = 0.0;
@@ -1433,6 +1458,7 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
         self.state.cursor = 0;
         self.state.anchor = None;
         self.caret_style_override = None;
+        self.assert_text_synced();
         self.cached_caret_rect = None;
         self.layout.invalidate();
         self.scroll_y = 0.0;

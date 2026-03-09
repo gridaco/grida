@@ -44,6 +44,7 @@
 //! cursor offset mapping. When the user commits the edit, the scene re-renders
 //! the node with `text_transform` applied as normal.
 
+use skia_safe;
 use skia_safe::textlayout;
 
 use grida_text_edit::{
@@ -131,50 +132,114 @@ impl ParagraphCacheLayout {
     }
 
     /// Build a Skia paragraph using the **same** code path as
-    /// `ParagraphCache::measure()`.
+    /// `ParagraphCache::measure()`, with **uniform** styling from the
+    /// node's `TextStyleRec`.
     ///
-    /// Key properties that match the Painter:
-    /// - `textstyle()` with `TextStyleRecBuildContext` (user fallback fonts)
-    /// - `FontRepository::font_collection()`
-    /// - `set_apply_rounding_hack(false)`
-    /// - Intrinsic width handling for `node_width: None`
-    fn build_paragraph(&self, text: &str) -> textlayout::Paragraph {
+    /// Used as the fallback when no `AttributedText` is available (e.g.
+    /// for the plain-text `ensure_paragraph` path used by `TextLayoutEngine`
+    /// methods).
+    fn build_paragraph_uniform(&self, text: &str) -> textlayout::Paragraph {
         let mut paragraph_style = textlayout::ParagraphStyle::new();
         paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
         paragraph_style.set_text_align(self.text_align.into());
         paragraph_style.set_apply_rounding_hack(false);
-        // No max_lines or ellipsis during editing.
 
         let ctx = TextStyleRecBuildContext {
-            color: CGColor::TRANSPARENT, // No paint for measurement
+            color: CGColor::TRANSPARENT,
             user_fallback_fonts: self.user_fallback_families.clone(),
         };
         let mut builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, &self.font_collection);
         let ts = textstyle(&self.text_style, &Some(ctx));
         builder.push_style(&ts);
-        // NOTE: We do NOT apply text_transform here. During editing, the
-        // engine works with raw text. See module-level doc for rationale.
         builder.add_text(text);
         let para = builder.build();
         builder.pop();
         para
     }
 
-    /// Build and layout the paragraph, handling intrinsic width for
-    /// auto-width nodes (same logic as `ParagraphCache::compute_measurements`).
-    fn rebuild(&mut self, text: &str) {
-        let mut para = self.build_paragraph(text);
+    /// Build a Skia paragraph with **per-run** styling from `AttributedText`.
+    ///
+    /// Each run's `TextStyle` is converted to a canvas `TextStyleRec` via
+    /// the bidirectional conversion in `attributed_text_conv`, then passed
+    /// through the same `textstyle()` function the Painter uses. This
+    /// ensures bold, italic, font size, color, and other per-run properties
+    /// are visually rendered during editing.
+    ///
+    /// Falls back to uniform styling if no runs overlap the text range.
+    fn build_paragraph_attributed(
+        &self,
+        content: &grida_text_edit::attributed_text::AttributedText,
+    ) -> textlayout::Paragraph {
+        let text = content.text();
+        let runs = content.runs();
+
+        let mut paragraph_style = textlayout::ParagraphStyle::new();
+        paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
+        paragraph_style.set_text_align(self.text_align.into());
+        paragraph_style.set_apply_rounding_hack(false);
+
+        let mut builder =
+            textlayout::ParagraphBuilder::new(&paragraph_style, &self.font_collection);
+
+        if runs.is_empty() || text.is_empty() {
+            // No runs — fall back to uniform node style.
+            let ctx = Some(TextStyleRecBuildContext {
+                color: CGColor::TRANSPARENT,
+                user_fallback_fonts: self.user_fallback_families.clone(),
+            });
+            let ts = textstyle(&self.text_style, &ctx);
+            builder.push_style(&ts);
+            builder.add_text(text);
+        } else {
+            for run in runs {
+                let run_start = run.start as usize;
+                let run_end = run.end as usize;
+                if run_start >= run_end || run_end > text.len() {
+                    continue;
+                }
+                // Convert attributed TextStyle → canvas TextStyleRec → Skia TextStyle.
+                let run_rec: TextStyleRec = (&run.style).into();
+                let ctx = Some(TextStyleRecBuildContext {
+                    color: CGColor::TRANSPARENT,
+                    user_fallback_fonts: self.user_fallback_families.clone(),
+                });
+                let mut ts = textstyle(&run_rec, &ctx);
+                // Apply the run's fill color (textstyle() doesn't handle fill).
+                match &run.style.fill {
+                    grida_text_edit::attributed_text::TextFill::Solid(rgba) => {
+                        ts.set_color(skia_safe::Color::from_argb(
+                            (rgba.a * 255.0) as u8,
+                            (rgba.r * 255.0) as u8,
+                            (rgba.g * 255.0) as u8,
+                            (rgba.b * 255.0) as u8,
+                        ));
+                    }
+                }
+                builder.push_style(&ts);
+                builder.add_text(&text[run_start..run_end]);
+            }
+        }
+
+        let para = builder.build();
+        para
+    }
+
+    /// Build and layout the paragraph with **per-run** attributed styling,
+    /// handling intrinsic width for auto-width nodes (same logic as
+    /// `ParagraphCache::compute_measurements`).
+    fn rebuild_attributed(
+        &mut self,
+        content: &grida_text_edit::attributed_text::AttributedText,
+    ) {
+        let text = content.text();
+        let mut para = self.build_paragraph_attributed(content);
 
         let layout_width = if let Some(width) = self.node_width {
             width
         } else {
-            // Auto-width: layout at infinity to get intrinsic width,
-            // then re-layout at that width. Same as ParagraphCache.
             para.layout(f32::INFINITY);
             let intrinsic = para.max_intrinsic_width();
-            // Empty text returns 0 intrinsic width — use a minimum so
-            // the caret renders at the correct alignment offset.
             if intrinsic < 1.0 { 1.0 } else { intrinsic }
         };
 
@@ -185,12 +250,35 @@ impl ParagraphCacheLayout {
         self.cached_line_metrics = None;
     }
 
-    /// Ensure the paragraph is built for the given text.
+    /// Build and layout the paragraph with **uniform** node styling,
+    /// handling intrinsic width for auto-width nodes.
+    ///
+    /// Used by the plain-text `ensure_paragraph` path (for `TextLayoutEngine`
+    /// methods that receive `&str` instead of `AttributedText`).
+    fn rebuild_uniform(&mut self, text: &str) {
+        let mut para = self.build_paragraph_uniform(text);
+
+        let layout_width = if let Some(width) = self.node_width {
+            width
+        } else {
+            para.layout(f32::INFINITY);
+            let intrinsic = para.max_intrinsic_width();
+            if intrinsic < 1.0 { 1.0 } else { intrinsic }
+        };
+
+        para.layout(layout_width);
+        self.layout_width = layout_width.max(1.0);
+        self.paragraph = Some(para);
+        self.cached_text = text.to_owned();
+        self.cached_line_metrics = None;
+    }
+
+    /// Ensure the paragraph is built for the given text (uniform style).
     fn ensure_paragraph(&mut self, text: &str) {
         if self.paragraph.is_some() && self.cached_text == text {
             return;
         }
-        self.rebuild(text);
+        self.rebuild_uniform(text);
     }
 
     /// Convert Skia's UTF-16 line metrics to UTF-8.
@@ -474,7 +562,7 @@ impl ManagedTextLayout for ParagraphCacheLayout {
             return;
         }
         self.cached_generation = gen;
-        self.rebuild(text);
+        self.rebuild_attributed(content);
     }
 
     fn invalidate(&mut self) {

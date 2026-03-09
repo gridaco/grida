@@ -355,7 +355,128 @@ impl SkiaLayoutEngine {
         self.rebuild_blocks(text);
     }
 
-    /// Full rebuild: split `text` on `\n` and lay out each block.
+    // -------------------------------------------------------------------
+    // Shared block-building helpers
+    // -------------------------------------------------------------------
+
+    /// Finalize a built paragraph into a `ParaBlock`.
+    ///
+    /// Converts Skia line metrics, synthesizes empty-line metrics if needed,
+    /// adjusts `end_index` to include trailing `\n`, and computes block height.
+    /// This is the single source of truth for the per-block post-processing
+    /// that was previously duplicated across `rebuild_blocks`,
+    /// `rebuild_blocks_attributed`, and `notify_edit`.
+    fn finalize_block(
+        &self,
+        para: Paragraph,
+        text: &str,
+        start: usize,
+        end: usize,
+        has_newline: bool,
+        y_offset: f32,
+    ) -> ParaBlock {
+        let content_end = if has_newline { end - 1 } else { end };
+        let content_slice = &text[start..content_end];
+        let mut stored_lines = self.convert_block_line_metrics(&para, content_slice, start);
+
+        // Empty content (e.g. line between two `\n`s): Skia may return 0
+        // lines for "". Synthesize one so the block has vertical extent.
+        if stored_lines.is_empty() {
+            let skia_metrics = para.get_line_metrics();
+            let (ascent, descent, baseline) = if let Some(lm) = skia_metrics.first() {
+                (lm.ascent as f32, lm.descent as f32, lm.baseline as f32)
+            } else {
+                (self.font_size, self.font_size * 0.2, self.font_size)
+            };
+            stored_lines.push(LineMetrics {
+                start_index: start,
+                end_index: start,
+                baseline,
+                ascent,
+                descent,
+                left: self.config.text_align.empty_line_left(self.layout_width),
+            });
+        }
+
+        // For the flattened line_metrics view, the line that owns the `\n`
+        // must have its end_index include the `\n` byte.
+        if has_newline {
+            if let Some(last) = stored_lines.last_mut() {
+                last.end_index = end;
+            }
+        }
+
+        let height: f32 = if let Some(last) = stored_lines.last() {
+            last.baseline + last.descent
+        } else {
+            self.font_size * 1.2
+        };
+
+        ParaBlock {
+            byte_start: start,
+            byte_end: end,
+            paragraph: para,
+            y_offset,
+            height,
+            line_metrics: stored_lines,
+        }
+    }
+
+    /// Append a phantom empty block for trailing `\n`, so the cursor can
+    /// sit on the blank line after the last newline.
+    ///
+    /// Returns the new y_offset after the phantom block (if appended).
+    fn append_phantom_trailing_block(&mut self, text: &str, y_offset: f32) -> f32 {
+        if !text.ends_with('\n') || text.is_empty() {
+            return y_offset;
+        }
+        if let Some(last_block) = self.blocks.last() {
+            let last_lm = last_block.line_metrics.last();
+            let (ascent, descent) = last_lm
+                .map(|lm| (lm.ascent, lm.descent))
+                .unwrap_or((self.font_size, self.font_size * 0.2));
+            let phantom = LineMetrics {
+                start_index: text.len(),
+                end_index: text.len(),
+                baseline: ascent,
+                ascent,
+                descent,
+                left: self.config.text_align.empty_line_left(self.layout_width),
+            };
+            let phantom_height = ascent + descent;
+            self.blocks.push(ParaBlock {
+                byte_start: text.len(),
+                byte_end: text.len(),
+                paragraph: self.build_paragraph_for_slice(""),
+                y_offset,
+                height: phantom_height,
+                line_metrics: vec![phantom],
+            });
+            return y_offset + phantom_height;
+        }
+        y_offset
+    }
+
+    /// Remove a phantom trailing block if one exists at the end of the
+    /// cached text. Returns `true` if one was removed.
+    fn remove_phantom_trailing_block(&mut self) -> bool {
+        if let Some(last) = self.blocks.last() {
+            if last.byte_start == last.byte_end
+                && last.byte_start == self.cached_text.len()
+                && self.cached_text.ends_with('\n')
+            {
+                self.blocks.pop();
+                return true;
+            }
+        }
+        false
+    }
+
+    // -------------------------------------------------------------------
+    // Full rebuilds
+    // -------------------------------------------------------------------
+
+    /// Full rebuild: split `text` on `\n` and lay out each block (uniform style).
     fn rebuild_blocks(&mut self, text: &str) {
         self.blocks.clear();
         self.cached_line_metrics = None;
@@ -364,106 +485,29 @@ impl SkiaLayoutEngine {
         let mut y_offset: f32 = 0.0;
         let mut start = 0usize;
 
-        // Split on hard line breaks. Each block's byte_end includes the `\n`,
-        // but we pass only the content (without the trailing `\n`) to Skia
-        // so it doesn't generate phantom empty lines for newlines. We handle
-        // inter-block spacing ourselves.
         loop {
             let has_newline;
             let end = if let Some(pos) = text[start..].find('\n') {
                 has_newline = true;
-                start + pos + 1 // byte_end includes the `\n`
+                start + pos + 1
             } else {
                 has_newline = false;
                 text.len()
             };
 
-            // The content slice fed to Skia excludes the trailing `\n`.
             let content_end = if has_newline { end - 1 } else { end };
-            let content_slice = &text[start..content_end];
-            let para = self.build_paragraph_for_slice(content_slice);
+            let para = self.build_paragraph_for_slice(&text[start..content_end]);
+            let block = self.finalize_block(para, text, start, end, has_newline, y_offset);
+            y_offset += block.height;
+            self.blocks.push(block);
 
-            // Line metrics use block-local baselines. Byte offsets are global.
-            let mut stored_lines = self.convert_block_line_metrics(&para, content_slice, start);
-
-            // Empty content (e.g. line between two `\n`s): Skia may return 0
-            // lines for "". Synthesize one so the block has vertical extent.
-            if stored_lines.is_empty() {
-                let skia_metrics = para.get_line_metrics();
-                let (ascent, descent, baseline) = if let Some(lm) = skia_metrics.first() {
-                    (lm.ascent as f32, lm.descent as f32, lm.baseline as f32)
-                } else {
-                    (self.font_size, self.font_size * 0.2, self.font_size)
-                };
-                stored_lines.push(LineMetrics {
-                    start_index: start,
-                    end_index: start,
-                    baseline,
-                    ascent,
-                    descent,
-                    left: self.config.text_align.empty_line_left(self.layout_width),
-                });
-            }
-
-            // For the flattened line_metrics view, the line that owns the `\n`
-            // must have its end_index include the `\n` byte.
-            if has_newline {
-                if let Some(last) = stored_lines.last_mut() {
-                    last.end_index = end;
-                }
-            }
-
-            let height: f32 = if let Some(last) = stored_lines.last() {
-                last.baseline + last.descent
-            } else {
-                self.font_size * 1.2
-            };
-
-            self.blocks.push(ParaBlock {
-                byte_start: start,
-                byte_end: end,
-                paragraph: para,
-                y_offset,
-                height,
-                line_metrics: stored_lines,
-            });
-
-            y_offset += height;
             start = end;
-
             if start >= text.len() {
                 break;
             }
         }
 
-        // Handle trailing `\n`: add a phantom empty block so the cursor can
-        // sit on the blank line after the last newline.
-        if text.ends_with('\n') && !text.is_empty() {
-            if let Some(last_block) = self.blocks.last() {
-                let last_lm = last_block.line_metrics.last();
-                let (ascent, descent) = last_lm
-                    .map(|lm| (lm.ascent, lm.descent))
-                    .unwrap_or((self.font_size, self.font_size * 0.2));
-                let phantom = LineMetrics {
-                    start_index: text.len(),
-                    end_index: text.len(),
-                    baseline: ascent,
-                    ascent,
-                    descent,
-                    left: self.config.text_align.empty_line_left(self.layout_width),
-                };
-                let phantom_height = ascent + descent;
-                self.blocks.push(ParaBlock {
-                    byte_start: text.len(),
-                    byte_end: text.len(),
-                    paragraph: self.build_paragraph_for_slice(""),
-                    y_offset,
-                    height: phantom_height,
-                    line_metrics: vec![phantom],
-                });
-            }
-        }
-
+        self.append_phantom_trailing_block(text, y_offset);
         self.cached_text = text.to_owned();
     }
 
@@ -555,14 +599,7 @@ impl SkiaLayoutEngine {
             }
 
             // Remove old phantom trailing block if present.
-            if let Some(last) = self.blocks.last() {
-                if last.byte_start == last.byte_end
-                    && last.byte_start == self.cached_text.len()
-                    && self.cached_text.ends_with('\n')
-                {
-                    self.blocks.pop();
-                }
-            }
+            self.remove_phantom_trailing_block();
 
             // Determine the byte range in the NEW text that we need to
             // re-parse into blocks.
@@ -579,7 +616,7 @@ impl SkiaLayoutEngine {
                 .map(|b| b.y_offset)
                 .unwrap_or(0.0);
 
-            // Build new blocks for the affected region.
+            // Build new blocks for the affected region using finalize_block.
             let mut new_blocks = Vec::new();
             let mut y_offset = y_start;
             let mut start = rebuild_start;
@@ -605,48 +642,10 @@ impl SkiaLayoutEngine {
                 let content_end = if has_newline { end - 1 } else { end };
                 let content_slice = &text[start..content_end];
                 let para = self.build_paragraph_for_slice(content_slice);
+                let block = self.finalize_block(para, text, start, end, has_newline, y_offset);
+                y_offset += block.height;
+                new_blocks.push(block);
 
-                let mut stored_lines = self.convert_block_line_metrics(&para, content_slice, start);
-
-                if stored_lines.is_empty() {
-                    let skia_metrics = para.get_line_metrics();
-                    let (ascent, descent, baseline) = if let Some(lm) = skia_metrics.first() {
-                        (lm.ascent as f32, lm.descent as f32, lm.baseline as f32)
-                    } else {
-                        (self.font_size, self.font_size * 0.2, self.font_size)
-                    };
-                    stored_lines.push(LineMetrics {
-                        start_index: start,
-                        end_index: start,
-                        baseline,
-                        ascent,
-                        descent,
-                        left: self.config.text_align.empty_line_left(self.layout_width),
-                    });
-                }
-
-                if has_newline {
-                    if let Some(last) = stored_lines.last_mut() {
-                        last.end_index = end;
-                    }
-                }
-
-                let height: f32 = if let Some(last) = stored_lines.last() {
-                    last.baseline + last.descent
-                } else {
-                    self.font_size * 1.2
-                };
-
-                new_blocks.push(ParaBlock {
-                    byte_start: start,
-                    byte_end: end,
-                    paragraph: para,
-                    y_offset,
-                    height,
-                    line_metrics: stored_lines,
-                });
-
-                y_offset += height;
                 cursor += chunk_len;
                 start = end;
 
@@ -661,12 +660,10 @@ impl SkiaLayoutEngine {
             let old_y_after = if tail_start < self.blocks.len() {
                 self.blocks[tail_start].y_offset
             } else {
-                // No tail blocks.
-                y_offset // doesn't matter, no shifting needed
+                y_offset
             };
 
             // Shift tail blocks: only byte offsets and y_offset change.
-            // Per-block lm.baseline is block-local (from Skia) and stays the same.
             let y_delta = y_offset - old_y_after;
             for block in &mut self.blocks[tail_start..] {
                 block.byte_start = (block.byte_start as isize + delta) as usize;
@@ -683,36 +680,16 @@ impl SkiaLayoutEngine {
 
             // Re-add phantom trailing block if needed.
             if text.ends_with('\n') && !text.is_empty() {
-                // Remove old phantom if present.
+                // Remove old phantom if present (may have been shifted).
                 if let Some(last) = self.blocks.last() {
                     if last.byte_start == last.byte_end && last.byte_start == text.len() {
                         self.blocks.pop();
                     }
                 }
-                if let Some(last_block) = self.blocks.last() {
-                    let last_lm = last_block.line_metrics.last();
-                    let (ascent, descent) = last_lm
-                        .map(|lm| (lm.ascent, lm.descent))
-                        .unwrap_or((self.font_size, self.font_size * 0.2));
-                    let phantom_y = last_block.y_offset + last_block.height;
-                    let phantom = LineMetrics {
-                        start_index: text.len(),
-                        end_index: text.len(),
-                        baseline: ascent,
-                        ascent,
-                        descent,
-                        left: self.config.text_align.empty_line_left(self.layout_width),
-                    };
-                    let phantom_height = ascent + descent;
-                    self.blocks.push(ParaBlock {
-                        byte_start: text.len(),
-                        byte_end: text.len(),
-                        paragraph: self.build_paragraph_for_slice(""),
-                        y_offset: phantom_y,
-                        height: phantom_height,
-                        line_metrics: vec![phantom],
-                    });
-                }
+                let final_y = self.blocks.last()
+                    .map(|b| b.y_offset + b.height)
+                    .unwrap_or(0.0);
+                self.append_phantom_trailing_block(text, final_y);
             } else {
                 // Remove phantom if text no longer ends with \n.
                 if let Some(last) = self.blocks.last() {
@@ -723,80 +700,32 @@ impl SkiaLayoutEngine {
             }
         } else {
             // No paragraph structure change — only one block is affected.
-            // Find it and rebuild just that block.
             let block_idx = self.blocks
                 .iter()
                 .position(|b| edit_offset < b.byte_end || (b.byte_start == b.byte_end && edit_offset == b.byte_start))
                 .unwrap_or(self.blocks.len().saturating_sub(1));
 
             // Remove old phantom trailing block before modifying.
-            let had_phantom = if let Some(last) = self.blocks.last() {
-                last.byte_start == last.byte_end
-                    && last.byte_start == self.cached_text.len()
-                    && self.cached_text.ends_with('\n')
-            } else {
-                false
-            };
-            if had_phantom {
-                self.blocks.pop();
-            }
+            let had_phantom = self.remove_phantom_trailing_block();
+            let _ = had_phantom;
 
-            // Rebuild the affected block.
+            // Rebuild the affected block using finalize_block.
             if block_idx < self.blocks.len() {
-                let old_block = &self.blocks[block_idx];
-                let old_height = old_block.height;
-                let new_start = old_block.byte_start;
-                let new_end = (old_block.byte_end as isize + delta) as usize;
-                let y_off = old_block.y_offset;
+                let old_height = self.blocks[block_idx].height;
+                let new_start = self.blocks[block_idx].byte_start;
+                let new_end = (self.blocks[block_idx].byte_end as isize + delta) as usize;
+                let y_off = self.blocks[block_idx].y_offset;
 
                 let has_newline = new_end > 0 && new_end <= text.len()
                     && text.as_bytes().get(new_end - 1) == Some(&b'\n');
                 let content_end = if has_newline { new_end - 1 } else { new_end };
                 let content_slice = &text[new_start..content_end];
                 let para = self.build_paragraph_for_slice(content_slice);
-
-                let mut stored_lines = self.convert_block_line_metrics(&para, content_slice, new_start);
-
-                if stored_lines.is_empty() {
-                    let skia_metrics = para.get_line_metrics();
-                    let (ascent, descent, baseline) = if let Some(lm) = skia_metrics.first() {
-                        (lm.ascent as f32, lm.descent as f32, lm.baseline as f32)
-                    } else {
-                        (self.font_size, self.font_size * 0.2, self.font_size)
-                    };
-                    stored_lines.push(LineMetrics {
-                        start_index: new_start,
-                        end_index: new_start,
-                        baseline,
-                        ascent,
-                        descent,
-                        left: self.config.text_align.empty_line_left(self.layout_width),
-                    });
-                }
-
-                if has_newline {
-                    if let Some(last) = stored_lines.last_mut() {
-                        last.end_index = new_end;
-                    }
-                }
-
-                let new_height: f32 = if let Some(last) = stored_lines.last() {
-                    last.baseline + last.descent
-                } else {
-                    self.font_size * 1.2
-                };
-
-                self.blocks[block_idx] = ParaBlock {
-                    byte_start: new_start,
-                    byte_end: new_end,
-                    paragraph: para,
-                    y_offset: y_off,
-                    height: new_height,
-                    line_metrics: stored_lines,
-                };
+                let block = self.finalize_block(para, text, new_start, new_end, has_newline, y_off);
+                let new_height = block.height;
+                self.blocks[block_idx] = block;
 
                 // Shift all subsequent blocks: byte offsets and y_offset.
-                // Per-block lm.baseline is block-local and stays the same.
                 let y_delta = new_height - old_height;
                 for block in &mut self.blocks[block_idx + 1..] {
                     block.byte_start = (block.byte_start as isize + delta) as usize;
@@ -810,32 +739,10 @@ impl SkiaLayoutEngine {
             }
 
             // Re-add phantom trailing block if needed.
-            if text.ends_with('\n') && !text.is_empty() {
-                if let Some(last_block) = self.blocks.last() {
-                    let last_lm = last_block.line_metrics.last();
-                    let (ascent, descent) = last_lm
-                        .map(|lm| (lm.ascent, lm.descent))
-                        .unwrap_or((self.font_size, self.font_size * 0.2));
-                    let phantom_y = last_block.y_offset + last_block.height;
-                    let phantom = LineMetrics {
-                        start_index: text.len(),
-                        end_index: text.len(),
-                        baseline: ascent,
-                        ascent,
-                        descent,
-                        left: self.config.text_align.empty_line_left(self.layout_width),
-                    };
-                    let phantom_height = ascent + descent;
-                    self.blocks.push(ParaBlock {
-                        byte_start: text.len(),
-                        byte_end: text.len(),
-                        paragraph: self.build_paragraph_for_slice(""),
-                        y_offset: phantom_y,
-                        height: phantom_height,
-                        line_metrics: vec![phantom],
-                    });
-                }
-            }
+            let final_y = self.blocks.last()
+                .map(|b| b.y_offset + b.height)
+                .unwrap_or(0.0);
+            self.append_phantom_trailing_block(text, final_y);
         }
 
         self.cached_text = text.to_owned();
@@ -1098,87 +1005,19 @@ impl SkiaLayoutEngine {
             };
 
             let content_end = if has_newline { end - 1 } else { end };
-
-            // Get runs overlapping this block.
             let runs = at.runs_in_range(start as u32, content_end as u32);
             let para = self.build_paragraph_for_attributed_slice(text, start, content_end, runs);
+            let block = self.finalize_block(para, text, start, end, has_newline, y_offset);
+            y_offset += block.height;
+            self.blocks.push(block);
 
-            let content_slice = &text[start..content_end];
-            let mut stored_lines = self.convert_block_line_metrics(&para, content_slice, start);
-
-            if stored_lines.is_empty() {
-                let skia_metrics = para.get_line_metrics();
-                let (ascent, descent, baseline) = if let Some(lm) = skia_metrics.first() {
-                    (lm.ascent as f32, lm.descent as f32, lm.baseline as f32)
-                } else {
-                    (self.font_size, self.font_size * 0.2, self.font_size)
-                };
-                stored_lines.push(LineMetrics {
-                    start_index: start,
-                    end_index: start,
-                    baseline,
-                    ascent,
-                    descent,
-                    left: self.config.text_align.empty_line_left(self.layout_width),
-                });
-            }
-
-            if has_newline {
-                if let Some(last) = stored_lines.last_mut() {
-                    last.end_index = end;
-                }
-            }
-
-            let height: f32 = if let Some(last) = stored_lines.last() {
-                last.baseline + last.descent
-            } else {
-                self.font_size * 1.2
-            };
-
-            self.blocks.push(ParaBlock {
-                byte_start: start,
-                byte_end: end,
-                paragraph: para,
-                y_offset,
-                height,
-                line_metrics: stored_lines,
-            });
-
-            y_offset += height;
             start = end;
-
             if start >= text.len() {
                 break;
             }
         }
 
-        // Trailing newline phantom block.
-        if text.ends_with('\n') && !text.is_empty() {
-            if let Some(last_block) = self.blocks.last() {
-                let last_lm = last_block.line_metrics.last();
-                let (ascent, descent) = last_lm
-                    .map(|lm| (lm.ascent, lm.descent))
-                    .unwrap_or((self.font_size, self.font_size * 0.2));
-                let phantom = LineMetrics {
-                    start_index: text.len(),
-                    end_index: text.len(),
-                    baseline: ascent,
-                    ascent,
-                    descent,
-                    left: self.config.text_align.empty_line_left(self.layout_width),
-                };
-                let phantom_height = ascent + descent;
-                self.blocks.push(ParaBlock {
-                    byte_start: text.len(),
-                    byte_end: text.len(),
-                    paragraph: self.build_paragraph_for_slice(""),
-                    y_offset,
-                    height: phantom_height,
-                    line_metrics: vec![phantom],
-                });
-            }
-        }
-
+        self.append_phantom_trailing_block(text, y_offset);
         self.cached_text = text.to_owned();
     }
 
