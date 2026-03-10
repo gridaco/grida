@@ -231,6 +231,8 @@ function WasmTextEditorRelay({ node_id }: { node_id: string }) {
       if (textareaRef.current?.contains(target)) return;
       if (isPointInsideNodeRef.current(e.clientX, e.clientY)) return;
       editor.surface.surfaceTryExitContentEditMode();
+      e.preventDefault();
+      e.stopPropagation();
     };
 
     window.addEventListener("pointerdown", handleWindowPointerDown, true);
