@@ -1836,9 +1836,25 @@ function RulerGuideOverlay() {
 
   const bindX = useSurfaceGesture(
     {
+      onPointerDown: ({ event }) => {
+        event.stopPropagation();
+      },
       onDragStart: ({ event }) => {
-        editorInstance.surface.surfaceStartGuideGesture("y", -1);
         event.preventDefault();
+        editorInstance.surface.surfaceStartGuideGesture("y", -1);
+      },
+      onDrag: (e) => {
+        if (e.event.defaultPrevented) return;
+        editorInstance.surface.surfaceDrag({
+          delta: e.delta,
+          distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
+          xy: e.xy,
+        });
+      },
+      onDragEnd: ({ event }) => {
+        editorInstance.surface.surfaceDragEnd(event as PointerEvent);
       },
     },
     {
@@ -1849,9 +1865,25 @@ function RulerGuideOverlay() {
 
   const bindY = useSurfaceGesture(
     {
+      onPointerDown: ({ event }) => {
+        event.stopPropagation();
+      },
       onDragStart: ({ event }) => {
-        editorInstance.surface.surfaceStartGuideGesture("x", -1);
         event.preventDefault();
+        editorInstance.surface.surfaceStartGuideGesture("x", -1);
+      },
+      onDrag: (e) => {
+        if (e.event.defaultPrevented) return;
+        editorInstance.surface.surfaceDrag({
+          delta: e.delta,
+          distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
+          xy: e.xy,
+        });
+      },
+      onDragEnd: ({ event }) => {
+        editorInstance.surface.surfaceDragEnd(event as PointerEvent);
       },
     },
     {

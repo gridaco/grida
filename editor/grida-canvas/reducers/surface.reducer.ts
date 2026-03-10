@@ -483,6 +483,12 @@ function __self_start_gesture(
         return;
       }
 
+      // Cancel marquee/lasso started by event-target (threshold 2px) before ruler
+      // fires (threshold 8px). Otherwise __self_evt_on_drag prioritizes marquee and
+      // the guide never receives movement updates.
+      draft.marquee = undefined;
+      draft.lasso = undefined;
+
       const { axis, idx } = gesture;
 
       assert(draft.scene_id, "scene_id is not set");
