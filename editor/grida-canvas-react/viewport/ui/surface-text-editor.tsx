@@ -452,6 +452,10 @@ function WasmTextEditorRelay({ node_id }: { node_id: string }) {
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
         />
       )}
       {/* Hidden textarea for keyboard/IME capture */}
@@ -569,6 +573,11 @@ function DOMTextEditorOverlay({ node_id }: { node_id: string }) {
     e.stopPropagation();
   };
 
+  const handleDoubleClick = (e: React.BaseSyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
     <div
       id="richtext-editor-surface"
@@ -601,7 +610,7 @@ function DOMTextEditorOverlay({ node_id }: { node_id: string }) {
             contentEditable="plaintext-only"
             className="box-border outline-none"
             onPointerDown={stopPropagation}
-            onDoubleClick={stopPropagation}
+            onDoubleClick={handleDoubleClick}
             onKeyDown={(e) => {
               if (editor.surface.explicitlyOverrideInputUndoRedo(e)) return;
               if (e.key === "Escape") e.currentTarget.blur();
