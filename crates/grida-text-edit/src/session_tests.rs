@@ -21,6 +21,7 @@ use crate::attributed_text::{
     AttributedText, TextDecorationLine, TextFill, TextStyle as AttrTextStyle, RGBA,
 };
 use crate::layout::TextLayoutEngine;
+use crate::simple_layout::SimpleLayoutEngine;
 use crate::text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
 
 // ---------------------------------------------------------------------------
@@ -36,9 +37,10 @@ fn default_style() -> AttrTextStyle {
 }
 
 /// Create a session with some text, cursor at end.
-fn session(text: &str) -> TextEditSession {
+fn session(text: &str) -> TextEditSession<SimpleLayoutEngine> {
     let style = default_style();
-    let mut s = TextEditSession::new(400.0, 300.0, style.clone());
+    let layout = SimpleLayoutEngine::new(300.0, 24.0, 10.0);
+    let mut s = TextEditSession::new(layout, style.clone());
     if !text.is_empty() {
         s.content = AttributedText::new(text, style);
         s.state.text = text.to_string();
@@ -48,7 +50,7 @@ fn session(text: &str) -> TextEditSession {
 }
 
 /// Assert the critical invariant: content.text() == state.text.
-fn assert_content_synced(s: &TextEditSession) {
+fn assert_content_synced(s: &TextEditSession<SimpleLayoutEngine>) {
     assert_eq!(
         s.content.text(),
         &s.state.text,
@@ -700,6 +702,88 @@ fn drain_empty_preedit_only_clears_empty() {
     s.update_preedit("ko".into());
     s.drain_empty_preedit();
     assert_eq!(s.preedit(), Some("ko"));
+}
+
+// ===========================================================================
+// IME caret positioning — preedit-aware caret_rect
+// ===========================================================================
+
+#[test]
+fn preedit_caret_advances_past_composed_text() {
+    let mut s = session("abc");
+    // Cursor at end → offset 3
+    assert_eq!(s.state.cursor, 3);
+    let cr_before = s.caret_rect();
+
+    // Simulate Korean IME: preedit "한" (3 UTF-8 bytes)
+    s.update_preedit("\u{D55C}".into());
+    let cr_preedit = s.caret_rect();
+
+    // Caret must advance past the preedit text.
+    assert!(
+        cr_preedit.x > cr_before.x,
+        "caret should advance past preedit: before.x={}, preedit.x={}",
+        cr_before.x,
+        cr_preedit.x,
+    );
+
+    // Same line — y should not change.
+    assert_eq!(cr_preedit.y, cr_before.y);
+}
+
+#[test]
+fn preedit_caret_mid_text() {
+    let mut s = session("abcd");
+    // Place cursor between 'b' and 'c' → offset 2
+    s.state.cursor = 2;
+    let cr_before = s.caret_rect();
+
+    // Preedit inserted at cursor position
+    s.update_preedit("XY".into());
+    let cr_preedit = s.caret_rect();
+
+    // Caret should be further right (past the preedit).
+    assert!(
+        cr_preedit.x > cr_before.x,
+        "mid-text preedit caret should advance: before.x={}, preedit.x={}",
+        cr_before.x,
+        cr_preedit.x,
+    );
+}
+
+#[test]
+fn preedit_cancel_restores_caret() {
+    let mut s = session("abc");
+    let cr_before = s.caret_rect();
+
+    s.update_preedit("XY".into());
+    let cr_preedit = s.caret_rect();
+    assert!(cr_preedit.x > cr_before.x);
+
+    // Cancel preedit → caret returns to the committed cursor position.
+    s.cancel_preedit();
+    let cr_after = s.caret_rect();
+    assert_eq!(cr_after.x, cr_before.x);
+    assert_eq!(cr_after.y, cr_before.y);
+}
+
+#[test]
+fn preedit_caret_cache_invalidated_on_update() {
+    let mut s = session("abc");
+    let _cr1 = s.caret_rect(); // populate cache
+
+    s.update_preedit("X".into());
+    let cr2 = s.caret_rect();
+
+    // Update preedit with longer text → cache must be invalidated.
+    s.update_preedit("XYZ".into());
+    let cr3 = s.caret_rect();
+    assert!(
+        cr3.x > cr2.x,
+        "caret should advance with longer preedit: cr2.x={}, cr3.x={}",
+        cr2.x,
+        cr3.x,
+    );
 }
 
 // ===========================================================================

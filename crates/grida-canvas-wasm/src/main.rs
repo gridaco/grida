@@ -5,6 +5,7 @@ mod wasm_application;
 mod wasm_fonts;
 mod wasm_markdown;
 mod wasm_svg;
+mod wasm_text_edit;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {}

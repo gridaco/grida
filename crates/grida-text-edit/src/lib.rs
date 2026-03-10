@@ -1,23 +1,29 @@
 pub mod attributed_text;
 pub mod history;
 pub mod layout;
-pub mod selection_rects;
 pub mod simple_layout;
-pub mod skia_layout;
 pub mod text_edit_session;
 pub mod time;
+
+#[cfg(feature = "skia")]
+pub mod selection_rects;
+#[cfg(feature = "skia")]
+pub mod skia_layout;
 
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod session_tests;
 
-pub use history::{EditHistory, EditKind, GenericEditHistory};
-pub use layout::{line_index_for_offset, CaretRect, LineMetrics, SelectionRect, TextLayoutEngine};
-pub use selection_rects::{EmptyLineSelectionPolicy, selection_rects_with_policy, skia_line_index_for_u16_offset};
+pub use history::EditKind;
+pub use layout::{line_index_for_offset, CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine, DEFAULT_CARET_WIDTH};
 pub use simple_layout::SimpleLayoutEngine;
-pub use skia_layout::SkiaLayoutEngine;
 pub use text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
+
+#[cfg(feature = "skia")]
+pub use selection_rects::{EmptyLineSelectionPolicy, selection_rects_with_policy, skia_line_index_for_u16_offset};
+#[cfg(feature = "skia")]
+pub use skia_layout::SkiaLayoutEngine;
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -262,6 +268,23 @@ impl TextEditorState {
         self.anchor.map_or(false, |a| a != self.cursor)
     }
 
+    /// Whether the caret should be shown.
+    ///
+    /// Returns `true` when there is **no** active selection (caret mode).
+    /// When the user has selected text, the caret is hidden — only the
+    /// selection highlight is visible.  This is the standard behaviour of
+    /// every major OS text editor (macOS, Windows, Linux).
+    ///
+    /// Consumers should combine this with the blink state to decide whether
+    /// to actually paint the caret:
+    ///
+    /// ```text
+    /// let paint = state.should_show_caret() && blink_visible;
+    /// ```
+    pub fn should_show_caret(&self) -> bool {
+        !self.has_selection()
+    }
+
     pub fn selection_range(&self) -> Option<(usize, usize)> {
         self.anchor.map(|a| {
             let lo = a.min(self.cursor);
@@ -292,6 +315,11 @@ pub enum EditingCommand {
     BackspaceWord,
     Delete,
     DeleteWord,
+    /// Delete the current selection (cut semantics per W3C Input Events L2
+    /// `deleteByCut`).  When the selection is collapsed this is a no-op —
+    /// the caller is responsible for having already copied text to the
+    /// clipboard before dispatching this command.
+    DeleteByCut,
     MoveLeft { extend: bool },
     MoveRight { extend: bool },
     MoveDocStart { extend: bool },
@@ -349,6 +377,7 @@ impl EditingCommand {
             Self::Delete | Self::DeleteWord | Self::DeleteLine => {
                 Some(EditKind::Delete)
             }
+            Self::DeleteByCut => Some(EditKind::Cut),
             _ => None,
         }
     }
@@ -476,6 +505,20 @@ pub fn apply_command_mut(
                 Some(EditDelta { offset: s.cursor, old_len: removed, new_len: 0 })
             } else {
                 s.anchor = None;
+                None
+            }
+        }
+
+        // deleteByCut (W3C Input Events L2): only acts when a
+        // non-collapsed selection exists; otherwise it's a no-op.
+        EditingCommand::DeleteByCut => {
+            if s.has_selection() {
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                s.anchor = None;
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
+            } else {
                 None
             }
         }

@@ -480,6 +480,11 @@ impl ParagraphCache {
         self.entries_measurement_by_shapekey_unstable.clear();
     }
 
+    /// Invalidate the cached paragraph for a single node.
+    pub fn invalidate_by_id(&mut self, id: NodeId) {
+        self.entries_measurement_by_id.remove(&id);
+    }
+
     pub fn len(&self) -> usize {
         self.entries_measurement_by_id.len() + self.entries_measurement_by_shapekey_unstable.len()
     }

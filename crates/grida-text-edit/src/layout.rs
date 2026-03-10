@@ -43,6 +43,12 @@ impl LineMetrics {
     }
 }
 
+/// Default caret width in screen pixels.
+///
+/// Renderers (Skia overlay, WASM FFI, etc.) should use this constant as
+/// the default caret width unless the caller overrides it.
+pub const DEFAULT_CARET_WIDTH: f32 = 2.0;
+
 /// Caret geometry returned by [`TextLayoutEngine::caret_rect_at`].
 ///
 /// All coordinates are in **layout-local space** (origin at top-left of the
@@ -116,6 +122,45 @@ pub trait TextLayoutEngine {
 
     /// Height of the visible viewport, used for PageUp / PageDown.
     fn viewport_height(&self) -> f32;
+}
+
+// ---------------------------------------------------------------------------
+// ManagedTextLayout — layout lifecycle trait
+// ---------------------------------------------------------------------------
+
+/// Extended layout engine trait that adds lifecycle management.
+///
+/// `TextLayoutEngine` provides read-only geometry queries (caret position,
+/// selection rects, etc.). `ManagedTextLayout` extends it with layout
+/// invalidation, rebuild, and sizing — everything `TextEditSession` needs
+/// to orchestrate the full editing loop.
+///
+/// Implementors:
+/// - `SimpleLayoutEngine` — trivial no-ops (test-only, monospace).
+/// - `SkiaLayoutEngine` — Skia Paragraph per-block layout (behind `skia` feature).
+/// - Canvas-side adapters — delegate to the scene's paragraph cache.
+pub trait ManagedTextLayout: TextLayoutEngine {
+    /// Ensure layout is up-to-date for the given attributed text.
+    ///
+    /// Implementations may cache and skip rebuild if content hasn't changed
+    /// (e.g. by checking `AttributedText::generation()`).
+    fn ensure_layout(&mut self, content: &crate::attributed_text::AttributedText);
+
+    /// Invalidate all cached layout. The next `ensure_layout` call will
+    /// rebuild from scratch.
+    fn invalidate(&mut self);
+
+    /// The current layout width (the wrap boundary).
+    fn layout_width(&self) -> f32;
+
+    /// The current layout height (viewport/container height).
+    fn layout_height(&self) -> f32;
+
+    /// Update layout width. Implementations should invalidate if changed.
+    fn set_layout_width(&mut self, width: f32);
+
+    /// Update layout height.
+    fn set_layout_height(&mut self, height: f32);
 }
 
 // ---------------------------------------------------------------------------

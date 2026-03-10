@@ -1,3 +1,5 @@
+pub mod attributed_text_conv;
+pub mod paragraph_cache_layout;
 pub mod text_style;
 pub mod text_transform;
 

@@ -313,6 +313,64 @@ impl Renderer {
         &self.scene_cache
     }
 
+    /// Update the text content for a node in the layer list and render
+    /// command tree.
+    ///
+    /// Used during text editing to keep the rendered text in sync with the
+    /// editing session without rebuilding the full layer list. Also
+    /// invalidates the paragraph cache and picture cache for this node so
+    /// the next draw uses the fresh text.
+    ///
+    /// **Fragility note**: This walks both the flat layer list and the
+    /// render command tree to patch text in-place. If new
+    /// `PainterRenderCommand` variants are added, the inner
+    /// `update_commands` function must be updated to traverse them.
+    pub fn update_layer_text(&mut self, node_id: NodeId, text: &str) {
+        use crate::painter::layer::{PainterPictureLayer, PainterRenderCommand};
+
+        // Update text in the flat layer entries.
+        for entry in &mut self.scene_cache.layers.layers {
+            if let PainterPictureLayer::Text(ref mut tl) = entry.layer {
+                if tl.base.id == node_id {
+                    tl.text = text.to_owned();
+                    break;
+                }
+            }
+        }
+
+        // Update text in the render command tree (this is what the Painter
+        // actually draws via draw_render_commands).
+        fn update_commands(commands: &mut [PainterRenderCommand], node_id: NodeId, text: &str) {
+            for cmd in commands.iter_mut() {
+                match cmd {
+                    PainterRenderCommand::Draw(ref mut layer) => {
+                        if let PainterPictureLayer::Text(ref mut tl) = layer {
+                            if tl.base.id == node_id {
+                                tl.text = text.to_owned();
+                            }
+                        }
+                    }
+                    PainterRenderCommand::MaskGroup(ref mut group) => {
+                        update_commands(&mut group.mask_commands, node_id, text);
+                        update_commands(&mut group.content_commands, node_id, text);
+                    }
+                }
+            }
+        }
+        update_commands(&mut self.scene_cache.layers.commands, node_id, text);
+
+        // Invalidate the paragraph cache for this node so the Painter
+        // rebuilds the paragraph with the new text.
+        self.scene_cache
+            .paragraph
+            .borrow_mut()
+            .invalidate_by_id(node_id);
+
+        // Invalidate the picture cache for this node so the Painter
+        // doesn't use a stale cached picture.
+        self.scene_cache.picture.invalidate_node(node_id);
+    }
+
     pub fn canvas(&self) -> &Canvas {
         let surface = unsafe { &mut *self.backend.get_surface() };
         surface.canvas()
@@ -891,7 +949,7 @@ impl Renderer {
         // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // Always use the command pipeline for export to ensure masks are applied
+        // Always use the command pipeline for export to ensure masks are applied.
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,

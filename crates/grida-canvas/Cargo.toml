@@ -8,13 +8,23 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # skia
-skia-safe = { version = "0.91.0", features = ["gpu", "gl", "textlayout", "pdf", "svg", "webp"] }
+skia-safe = { version = "0.91.0", features = [
+  "gpu",
+  "gl",
+  "textlayout",
+  "pdf",
+  "svg",
+  "webp",
+] }
 gl = "0.14.0"
 
 # io
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 json-patch = "4.1.0"
+
+# text editing
+grida-text-edit = { path = "../grida-text-edit" }
 
 # geo
 math2 = { path = "../math2" }
@@ -26,7 +36,7 @@ seahash = "4.1.0"
 taffy = "0.9.1"
 # svg parsing
 # (+2mb wasm32-unknown-emscripten@opt-level=3)
-usvg = { path = "../../third_party/usvg" } 
+usvg = { path = "../../third_party/usvg" }
 # markdown parsing
 # (+0.25mb wasm32-unknown-emscripten@opt-level=3)
 pulldown-cmark = "0.13.0"

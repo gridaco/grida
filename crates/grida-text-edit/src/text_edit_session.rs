@@ -1,9 +1,17 @@
 //! Rich text editing session.
 //!
 //! [`TextEditSession`] bundles the pure editing state ([`TextEditorState`]),
-//! a Skia-backed layout engine ([`SkiaLayoutEngine`]), and an
+//! a layout engine implementing [`ManagedTextLayout`], and an
 //! [`AttributedText`] content model into a single, self-contained editing
 //! session.
+//!
+//! The session is generic over the layout backend `L: ManagedTextLayout`.
+//! Built-in implementations:
+//! - `SkiaLayoutEngine` — real shaping via Skia Paragraph (behind `skia` feature).
+//! - `SimpleLayoutEngine` — monospace, no wrapping; for deterministic tests.
+//!
+//! External consumers (e.g. `grida-canvas`) can provide their own implementation
+//! that delegates to the host's paragraph cache.
 //!
 //! This is the primary integration point that hosts (WASM canvas, winit
 //! desktop, headless tests) consume. The session does **not** own any
@@ -101,9 +109,8 @@ use crate::{
         AttributedText, TextDecorationLine, TextFill, TextStyle as AttrTextStyle, RGBA,
     },
     history::{EditKind, GenericEditHistory},
-    layout::{line_index_for_offset, CaretRect},
-    skia_layout::SkiaLayoutEngine,
-    EditDelta, EditingCommand, TextEditorState, TextLayoutEngine,
+    layout::{line_index_for_offset, CaretRect, ManagedTextLayout},
+    EditDelta, EditingCommand, TextEditorState,
 };
 
 // ---------------------------------------------------------------------------
@@ -397,14 +404,18 @@ struct ScrollAnchor {
 /// Bundles editing state, layout engine, attributed content, history,
 /// cursor blink, pointer tracking, IME composition, and scroll.
 ///
+/// Generic over the layout backend `L`. Built-in options:
+/// - `SkiaLayoutEngine` (behind `skia` feature) — real shaping.
+/// - `SimpleLayoutEngine` — monospace, for tests.
+///
 /// Hosts create a session, feed events into it, and use the exposed
 /// layout engine + geometry queries to render.
-pub struct TextEditSession {
+pub struct TextEditSession<L: ManagedTextLayout> {
     /// Pure editing state: text, cursor, anchor.
     pub state: TextEditorState,
 
-    /// Skia-backed layout engine.
-    pub layout: SkiaLayoutEngine,
+    /// Layout engine (generic — could be Skia, simple, or host-provided).
+    pub layout: L,
 
     /// Attributed text model (runs of styled text).
     pub content: AttributedText,
@@ -436,16 +447,13 @@ pub struct TextEditSession {
     cached_caret_rect: Option<CaretRect>,
 }
 
-impl TextEditSession {
-    /// Create a new empty editing session with the given default style.
-    pub fn new(
-        layout_width: f32,
-        layout_height: f32,
-        default_style: AttrTextStyle,
-    ) -> Self {
+impl<L: ManagedTextLayout> TextEditSession<L> {
+    /// Create a new empty editing session with the given layout engine and
+    /// default style.
+    pub fn new(layout: L, default_style: AttrTextStyle) -> Self {
         Self {
             state: TextEditorState::with_cursor(String::new(), 0),
-            layout: SkiaLayoutEngine::new(layout_width, layout_height),
+            layout,
             content: AttributedText::empty(default_style),
             caret_style_override: None,
             cursor_visible: true,
@@ -460,16 +468,12 @@ impl TextEditSession {
     }
 
     /// Create a session pre-loaded with text content.
-    pub fn with_content(
-        layout_width: f32,
-        layout_height: f32,
-        content: AttributedText,
-    ) -> Self {
+    pub fn with_content(layout: L, content: AttributedText) -> Self {
         let text = content.text().to_owned();
         let cursor = text.len();
         Self {
             state: TextEditorState::with_cursor(text, cursor),
-            layout: SkiaLayoutEngine::new(layout_width, layout_height),
+            layout,
             content,
             caret_style_override: None,
             cursor_visible: true,
@@ -481,6 +485,26 @@ impl TextEditSession {
             scroll_y: 0.0,
             cached_caret_rect: None,
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Invariant: state.text == content.text()
+    // -----------------------------------------------------------------------
+
+    /// Assert that the two text copies (`state.text` and `content.text()`)
+    /// are identical.
+    ///
+    /// This is a **debug-only** check (compiled away in release builds).
+    /// The dual-source-of-truth design means mutations update one copy
+    /// and then patch the other. If any code path forgets to synchronize,
+    /// this assertion will catch it immediately.
+    #[inline]
+    fn assert_text_synced(&self) {
+        debug_assert_eq!(
+            self.state.text,
+            self.content.text(),
+            "BUG: TextEditSession state.text and content.text() diverged"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -497,9 +521,23 @@ impl TextEditSession {
         self.caret_style_override = style;
     }
 
-    /// Whether the cursor is currently visible (for blink rendering).
+    /// Whether the cursor is currently in its visible blink phase.
+    ///
+    /// **Prefer [`should_show_caret`](Self::should_show_caret)** for
+    /// rendering decisions — it combines blink state with selection state.
     pub fn cursor_visible(&self) -> bool {
         self.cursor_visible
+    }
+
+    /// Whether the caret should be painted this frame.
+    ///
+    /// Combines the blink phase (`cursor_visible`) with the selection
+    /// state: when text is selected, the caret is hidden regardless of
+    /// the blink timer.  This is the single authority for "should I draw
+    /// the caret?" — callers should not need to check `has_selection()`
+    /// separately.
+    pub fn should_show_caret(&self) -> bool {
+        self.state.should_show_caret() && self.cursor_visible
     }
 
     /// Whether a mouse drag is in progress.
@@ -540,11 +578,28 @@ impl TextEditSession {
     // -----------------------------------------------------------------------
 
     /// Return the caret rectangle, using a per-frame cache.
+    ///
+    /// When an IME preedit is active, the caret is positioned at the
+    /// **end** of the preedit text (not the committed cursor offset).
+    /// This is computed by laying out the display text (committed text
+    /// with preedit spliced in) and querying the caret at
+    /// `cursor + preedit.len()`.
     pub fn caret_rect(&mut self) -> CaretRect {
         if let Some(ref cr) = self.cached_caret_rect {
             return cr.clone();
         }
-        let cr = self.layout.caret_rect_at(&self.state.text, self.state.cursor);
+        let cr = match self.preedit.as_deref() {
+            Some(preedit) if !preedit.is_empty() => {
+                let cursor = self.state.cursor;
+                let text = &self.state.text;
+                let mut display = String::with_capacity(text.len() + preedit.len());
+                display.push_str(&text[..cursor]);
+                display.push_str(preedit);
+                display.push_str(&text[cursor..]);
+                self.layout.caret_rect_at(&display, cursor + preedit.len())
+            }
+            _ => self.layout.caret_rect_at(&self.state.text, self.state.cursor),
+        };
         self.cached_caret_rect = Some(cr.clone());
         cr
     }
@@ -570,10 +625,11 @@ impl TextEditSession {
     fn restore(&mut self, snap: RichTextSnapshot) {
         self.state = snap.state;
         self.content = snap.content;
+        self.assert_text_synced();
         self.caret_style_override = None;
         self.cached_caret_rect = None;
         self.layout.invalidate();
-        self.layout.ensure_layout_attributed(&self.content);
+        self.layout.ensure_layout(&self.content);
         self.ensure_cursor_visible();
     }
 
@@ -606,8 +662,9 @@ impl TextEditSession {
         } else if self.state.cursor != old_cursor {
             self.caret_style_override = None;
         }
+        self.assert_text_synced();
         self.reset_blink();
-        self.layout.ensure_layout_attributed(&self.content);
+        self.layout.ensure_layout(&self.content);
         self.ensure_cursor_visible();
     }
 
@@ -632,8 +689,9 @@ impl TextEditSession {
         } else if self.state.cursor != old_cursor {
             self.caret_style_override = None;
         }
+        self.assert_text_synced();
         self.reset_blink();
-        self.layout.ensure_layout_attributed(&self.content);
+        self.layout.ensure_layout(&self.content);
         self.ensure_cursor_visible();
     }
 
@@ -909,8 +967,12 @@ impl TextEditSession {
         self.state.cursor = pos + pasted.text().len();
         self.state.anchor = None;
         self.caret_style_override = None;
+        self.assert_text_synced();
+        self.invalidate_caret_cache();
         self.layout.invalidate();
         self.reset_blink();
+        self.layout.ensure_layout(&self.content);
+        self.ensure_cursor_visible();
     }
 
     // -----------------------------------------------------------------------
@@ -1182,7 +1244,7 @@ impl TextEditSession {
 
         // 2. Rebuild layout at the new width.
         self.layout.set_layout_width(w.max(1.0));
-        self.layout.ensure_layout_attributed(&self.content);
+        self.layout.ensure_layout(&self.content);
         self.cached_caret_rect = None;
 
         // 3. Restore scroll position from anchor, then clamp.
@@ -1211,7 +1273,7 @@ impl TextEditSession {
 
     /// Maximum scroll offset (content may be shorter than viewport).
     pub fn max_scroll_y(&mut self) -> f32 {
-        (self.content_height() - self.layout.layout_height).max(0.0)
+        (self.content_height() - self.layout.layout_height()).max(0.0)
     }
 
     /// Clamp scroll_y to valid range.
@@ -1278,11 +1340,11 @@ impl TextEditSession {
 
     /// Adjust scroll so the caret is within the visible viewport.
     ///
-    /// **Ordering constraint:** `ensure_layout_attributed` must be called
+    /// **Ordering constraint:** `ensure_layout` must be called
     /// before this method when editing rich text.
     pub fn ensure_cursor_visible(&mut self) {
         let cr = self.caret_rect();
-        let viewport_height = self.layout.layout_height;
+        let viewport_height = self.layout.layout_height();
         let margin = cr.height;
 
         if cr.y < self.scroll_y + margin {
@@ -1308,7 +1370,25 @@ impl TextEditSession {
     }
 
     /// Advance the blink timer. Returns `true` if visibility changed.
+    ///
+    /// When a selection is active the caret is unconditionally hidden, so
+    /// the timer is not toggled — this avoids unnecessary redraws and
+    /// ensures the caret appears immediately when the selection is
+    /// collapsed.
     pub fn tick_blink(&mut self) -> bool {
+        // No blinking while text is selected — the caret is not shown.
+        if self.state.has_selection() {
+            // Keep the phase "visible" so that collapsing the selection
+            // will show the caret immediately without waiting for a full
+            // blink interval.
+            if !self.cursor_visible {
+                self.cursor_visible = true;
+                self.last_blink = Instant::now();
+                return true;
+            }
+            return false;
+        }
+
         if self.last_blink.elapsed() >= BLINK_INTERVAL {
             self.cursor_visible = !self.cursor_visible;
             self.last_blink = Instant::now();
@@ -1330,12 +1410,14 @@ impl TextEditSession {
     /// Update the IME preedit string.
     pub fn update_preedit(&mut self, text: String) {
         self.preedit = Some(text);
+        self.cached_caret_rect = None;
         self.reset_blink();
     }
 
     /// Cancel/clear the IME preedit.
     pub fn cancel_preedit(&mut self) {
         self.preedit = None;
+        self.cached_caret_rect = None;
         self.reset_blink();
     }
 
@@ -1362,6 +1444,7 @@ impl TextEditSession {
         self.state.cursor = 0;
         self.state.anchor = None;
         self.caret_style_override = None;
+        self.assert_text_synced();
         self.cached_caret_rect = None;
         self.layout.invalidate();
         self.scroll_y = 0.0;
@@ -1375,6 +1458,7 @@ impl TextEditSession {
         self.state.cursor = 0;
         self.state.anchor = None;
         self.caret_style_override = None;
+        self.assert_text_synced();
         self.cached_caret_rect = None;
         self.layout.invalidate();
         self.scroll_y = 0.0;
