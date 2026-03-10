@@ -108,6 +108,9 @@ import { cn } from "@/components/lib/utils";
 
 const DRAG_THRESHOLD = 2;
 
+/** Minimum pointer movement (px) before creating a new ruler guideline. Prevents accidental insertion on click. */
+const RULER_GUIDELINE_DRAG_THRESHOLD = 4;
+
 /*
 const SURFACE_TRANSFORM_CONTEXT = React.createContext<cmath.Transform>(
   cmath.transform.identity
@@ -1833,22 +1836,60 @@ function RulerGuideOverlay() {
 
   const bindX = useSurfaceGesture(
     {
+      onPointerDown: ({ event }) => {
+        event.stopPropagation();
+      },
       onDragStart: ({ event }) => {
-        editorInstance.surface.surfaceStartGuideGesture("y", -1);
         event.preventDefault();
+        editorInstance.surface.surfaceStartGuideGesture("y", -1);
+      },
+      onDrag: (e) => {
+        if (e.event.defaultPrevented) return;
+        editorInstance.surface.surfaceDrag({
+          delta: e.delta,
+          distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
+          xy: e.xy,
+        });
+      },
+      onDragEnd: ({ event }) => {
+        editorInstance.surface.surfaceDragEnd(event as PointerEvent);
       },
     },
-    { enabled: !eager_canvas_input }
+    {
+      enabled: !eager_canvas_input,
+      drag: { threshold: RULER_GUIDELINE_DRAG_THRESHOLD },
+    }
   );
 
   const bindY = useSurfaceGesture(
     {
+      onPointerDown: ({ event }) => {
+        event.stopPropagation();
+      },
       onDragStart: ({ event }) => {
-        editorInstance.surface.surfaceStartGuideGesture("x", -1);
         event.preventDefault();
+        editorInstance.surface.surfaceStartGuideGesture("x", -1);
+      },
+      onDrag: (e) => {
+        if (e.event.defaultPrevented) return;
+        editorInstance.surface.surfaceDrag({
+          delta: e.delta,
+          distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
+          xy: e.xy,
+        });
+      },
+      onDragEnd: ({ event }) => {
+        editorInstance.surface.surfaceDragEnd(event as PointerEvent);
       },
     },
-    { enabled: !eager_canvas_input }
+    {
+      enabled: !eager_canvas_input,
+      drag: { threshold: RULER_GUIDELINE_DRAG_THRESHOLD },
+    }
   );
 
   const ranges = useMemo(() => {
