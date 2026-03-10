@@ -266,12 +266,10 @@ export function EditorSurface() {
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
 
-        // [order matters] - otherwise, it will always try to enter the content edit mode
-        // Skip toggle when already in content edit mode — prevents double-click
-        // inside the text editor from exiting it.
-        if (!content_edit_mode) {
-          editor.surface.surfaceTryToggleContentEditMode(); // 1
-        }
+        // Double-click toggles content edit mode (enter or exit). Modes that must
+        // not exit on double-click (e.g. text, for word select) consume the event
+        // in their overlay (stopPropagation) so this handler does not run.
+        editor.surface.surfaceTryToggleContentEditMode(); // 1
         editor.surface.surfaceDoubleClick(event); // 2
       },
       onDragStart: ({ event }) => {
