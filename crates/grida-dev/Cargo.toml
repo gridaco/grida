@@ -11,6 +11,7 @@ cg = { path = "../grida-canvas", features = [
   "figma",
   "web",
   "native-clock-tick",
+  "native-gl-context",
 ] }
 math2 = { path = "../math2" }
 anyhow = "1.0"
