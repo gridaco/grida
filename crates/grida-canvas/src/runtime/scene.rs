@@ -236,29 +236,6 @@ impl Renderer {
     fn draw_layers_with_scene_cache(&mut self, canvas: &Canvas, plan: &FramePlan) -> usize {
         self.prefill_picture_cache_for_plan(plan);
 
-        // Collect visible node IDs from the frame plan so the painter can skip
-        // off-screen layers. The plan's regions contain indices into the flat
-        // layer list produced by the R-tree viewport query.
-        //
-        // We use a Vec<bool> indexed by NodeId (which is a sequential u64)
-        // instead of a HashSet for O(1) lookups without hashing overhead.
-        let max_id = self
-            .scene_cache
-            .layers
-            .layers
-            .iter()
-            .map(|e| e.id as usize)
-            .max()
-            .unwrap_or(0);
-        let mut visible_ids = vec![false; max_id + 1];
-        for (_, indices) in &plan.regions {
-            for idx in indices {
-                if let Some(entry) = self.scene_cache.layers.layers.get(*idx) {
-                    visible_ids[entry.id as usize] = true;
-                }
-            }
-        }
-
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,
@@ -266,7 +243,7 @@ impl Renderer {
             &self.scene_cache,
             self.config.render_policy,
         );
-        painter.draw_layer_list_culled(&self.scene_cache.layers, &visible_ids);
+        painter.draw_layer_list(&self.scene_cache.layers);
         painter.cache_picture_hits()
     }
 
@@ -771,7 +748,11 @@ impl Renderer {
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
         for rect in painter_region {
-            let indices = self.scene_cache.intersects(rect);
+            let mut indices = self.scene_cache.intersects(rect);
+
+            // TODO: sort is expensive
+            indices.sort();
+
             regions.push((rect, indices));
         }
 
