@@ -499,7 +499,7 @@ function __self_start_gesture(
       if (idx === -1) {
         // Use pointer position at drag start (after threshold) so guide appears
         // where the user has dragged, not at the ruler edge.
-        const axi = axis === "x" ? 1 : 0; // x-axis guide: y pos, y-axis guide: x pos
+        const axi = axis === "x" ? 0 : 1; // x-axis guide: x pos, y-axis guide: y pos
         const next = {
           axis,
           offset: cmath.quantize(draft.pointer.position[axi], 1),
