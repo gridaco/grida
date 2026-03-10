@@ -109,7 +109,7 @@ import { cn } from "@/components/lib/utils";
 const DRAG_THRESHOLD = 2;
 
 /** Minimum pointer movement (px) before creating a new ruler guideline. Prevents accidental insertion on click. */
-const RULER_GUIDELINE_DRAG_THRESHOLD = 8;
+const RULER_GUIDELINE_DRAG_THRESHOLD = 4;
 
 /*
 const SURFACE_TRANSFORM_CONTEXT = React.createContext<cmath.Transform>(
