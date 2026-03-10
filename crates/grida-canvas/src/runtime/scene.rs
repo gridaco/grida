@@ -771,11 +771,7 @@ impl Renderer {
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
         for rect in painter_region {
-            let mut indices = self.scene_cache.intersects(rect);
-
-            // TODO: sort is expensive
-            indices.sort();
-
+            let indices = self.scene_cache.intersects(rect);
             regions.push((rect, indices));
         }
 
