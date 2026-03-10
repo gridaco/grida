@@ -16,14 +16,14 @@ So for mixed-script text, the **effective** fonts used at render time include bo
 
 Figma has stated they **fall back only to Noto fonts**, regardless of platform ([Figma: When fonts fall](https://www.figma.com/blog/when-fonts-fall/)). The effective default fallback set (by script) is summarized below. Exact names/order may vary; this table reflects the mapping we align to.
 
-| Script / usage         | Figma default font                  | Note                               |
-| ---------------------- | ----------------------------------- | ---------------------------------- |
-| Latin, Cyrillic, Greek | Inter                               | Common default for Western         |
-| Korean (Hangul, etc.)  | Noto Sans KR                        | CJK fallback                       |
-| Japanese (Kana, Kanji) | Noto Sans JP                        | CJK fallback                       |
-| Chinese (Simplified)   | Noto Sans SC                        | CJK fallback                       |
-| Chinese (Traditional)  | Noto Sans TC                        | Optional; TC/HK variants           |
-| Chinese (Hong Kong)    | Noto Sans HK                        | Optional                           |
+| Script / usage         | Figma default font                          | Note                                           |
+| ---------------------- | ------------------------------------------- | ---------------------------------------------- |
+| Latin, Cyrillic, Greek | Inter                                       | Common default for Western                     |
+| Korean (Hangul, etc.)  | Noto Sans KR                                | CJK fallback                                   |
+| Japanese (Kana, Kanji) | Noto Sans JP                                | CJK fallback                                   |
+| Chinese (Simplified)   | Noto Sans SC                                | CJK fallback                                   |
+| Chinese (Traditional)  | Noto Sans TC                                | Optional; TC/HK variants                       |
+| Chinese (Hong Kong)    | Noto Sans HK                                | Optional                                       |
 | Emoji                  | CDN-hosted PNG images (see [Emoji](#emoji)) | Apple emoji style; served from Figma's own CDN |
 
 None of the fallback choices appear in the Figma API or `.fig`; they are implicit at render time.
@@ -62,11 +62,11 @@ The built-in implementation uses CDN URLs defined in the package (see `figma-def
 
 ## Emoji
 
-|              | Figma                                                                                                                                                        | This renderer (@grida/refig)                                             |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| **Method**   | **CDN-hosted PNG images** (not a font) — each emoji is a separate PNG fetched from Figma's own CDN                                                           | **Noto Color Emoji** font                                                |
-| **Reason**   | Figma hosts emoji as individual PNGs on their own CDN to bypass font licensing (e.g. Apple Color Emoji is proprietary); rendering is consistent across all platforms | We cannot ship Apple/Segoe emoji fonts (license/redistribution).         |
-| **Output**   | Consistent across all platforms — Apple emoji visual style, CDN-served PNGs                                                                                 | Fixed (Noto Color Emoji); **visually different from Figma by design**.   |
+|            | Figma                                                                                                                                                                | This renderer (@grida/refig)                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Method** | **CDN-hosted PNG images** (not a font) — each emoji is a separate PNG fetched from Figma's own CDN                                                                   | **Noto Color Emoji** font                                              |
+| **Reason** | Figma hosts emoji as individual PNGs on their own CDN to bypass font licensing (e.g. Apple Color Emoji is proprietary); rendering is consistent across all platforms | We cannot ship Apple/Segoe emoji fonts (license/redistribution).       |
+| **Output** | Consistent across all platforms — Apple emoji visual style, CDN-served PNGs                                                                                          | Fixed (Noto Color Emoji); **visually different from Figma by design**. |
 
 Figma does **not** use OS/platform emoji fonts. It renders emoji as individual PNG images fetched from its own CDN, which allows it to present the Apple emoji visual style on every platform (macOS, Windows, Linux, browser) without distributing the proprietary font file. Output is therefore **platform-independent**, not OS-dependent.
 
