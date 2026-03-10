@@ -4518,7 +4518,7 @@ export namespace format {
         fbs.GridaFile.addDocument(builder, documentOffset);
         const rootOffset = fbs.GridaFile.endGridaFile(builder);
 
-        builder.finish(rootOffset);
+        builder.finish(rootOffset, "GRID");
 
         return builder.asUint8Array();
       }
