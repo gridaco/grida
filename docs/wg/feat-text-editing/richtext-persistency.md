@@ -211,7 +211,7 @@ TextNode = {
 | `letterSpacing`             | number                                | px                                                      |
 | `fills`                     | Paint[]                               | **Per-run fills**                                       |
 | `hyperlink`                 | Hyperlink                             | URL or NODE                                             |
-| `opentypeFlags`             | { [tag]: 0\|1 }                       |                                                         |
+| `opentypeFlags`             | `{ [tag]: 0\|1 }`                     |                                                         |
 | `semanticWeight`            | BOLD/NORMAL                           |                                                         |
 | `semanticItalic`            | ITALIC/NORMAL                         |                                                         |
 | `paragraphSpacing`          | number                                | px                                                      |
@@ -224,7 +224,7 @@ TextNode = {
 | `lineHeightPx`              | number                                |                                                         |
 | `lineHeightPercentFontSize` | number                                |                                                         |
 | `lineHeightUnit`            | PIXELS/FONT*SIZE*%/INTRINSIC\_%       |                                                         |
-| `boundVariables`            | { field: VariableAlias }              | Variable bindings                                       |
+| `boundVariables`            | `{ field: VariableAlias }`            | Variable bindings                                       |
 
 **Observations**:
 
