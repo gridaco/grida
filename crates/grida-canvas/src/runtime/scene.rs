@@ -236,6 +236,16 @@ impl Renderer {
     fn draw_layers_with_scene_cache(&mut self, canvas: &Canvas, plan: &FramePlan) -> usize {
         self.prefill_picture_cache_for_plan(plan);
 
+        // Collect visible node IDs from the frame plan so the painter can skip
+        // off-screen layers. The plan's regions contain indices into the flat
+        // layer list produced by the R-tree viewport query.
+        let visible_ids: HashSet<NodeId> = plan
+            .regions
+            .iter()
+            .flat_map(|(_, indices)| indices.iter())
+            .filter_map(|idx| self.scene_cache.layers.layers.get(*idx).map(|e| e.id))
+            .collect();
+
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,
@@ -243,7 +253,7 @@ impl Renderer {
             &self.scene_cache,
             self.config.render_policy,
         );
-        painter.draw_layer_list(&self.scene_cache.layers);
+        painter.draw_layer_list_culled(&self.scene_cache.layers, &visible_ids);
         painter.cache_picture_hits()
     }
 

@@ -19,6 +19,7 @@ use skia_safe::{
     Shader,
 };
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// A painter that handles all drawing operations for nodes,
@@ -1498,6 +1499,67 @@ impl<'a> Painter<'a> {
 
     fn draw_layer_list_standard(&self, list: &LayerList) {
         self.draw_render_commands(&list.commands);
+    }
+
+    /// Draw only the layers whose IDs appear in `visible`, skipping off-screen
+    /// content. Mask groups are drawn unconditionally to preserve clip correctness.
+    pub fn draw_layer_list_culled(&self, list: &LayerList, visible: &HashSet<NodeId>) {
+        if !self.policy.is_wireframe() {
+            self.draw_render_commands_culled(&list.commands, visible);
+        } else {
+            self.draw_layer_list_outline_culled(list, visible);
+        }
+    }
+
+    fn draw_render_commands_culled(
+        &self,
+        commands: &[PainterRenderCommand],
+        visible: &HashSet<NodeId>,
+    ) {
+        for command in commands {
+            match command {
+                PainterRenderCommand::Draw(layer) => {
+                    if !visible.contains(layer.id()) {
+                        continue;
+                    }
+                    // Prefer cached picture if available
+                    if let Some(scene_cache) = self.scene_cache {
+                        if let Some(pic) =
+                            scene_cache.get_node_picture_variant(layer.id(), self.variant_key)
+                        {
+                            self.canvas.draw_picture(pic, None, None);
+                            *self.cache_hits.borrow_mut() += 1;
+                            continue;
+                        }
+                    }
+                    self.draw_layer(layer)
+                }
+                PainterRenderCommand::MaskGroup(group) => {
+                    self.draw_mask_group_or_passthrough(group)
+                }
+            }
+        }
+    }
+
+    fn draw_layer_list_outline_culled(&self, list: &LayerList, visible: &HashSet<NodeId>) {
+        let Some(style) = self.policy.outline_style() else {
+            return;
+        };
+
+        for entry in &list.layers {
+            if !visible.contains(&entry.id) {
+                continue;
+            }
+            if let Some(scene_cache) = self.scene_cache {
+                if let Some(pic) = scene_cache.get_node_picture_variant(&entry.id, self.variant_key)
+                {
+                    self.canvas.draw_picture(pic, None, None);
+                    *self.cache_hits.borrow_mut() += 1;
+                    continue;
+                }
+            }
+            self.draw_layer_outline(&entry.layer, style);
+        }
     }
 
     fn draw_layer_list_outline(&self, list: &LayerList) {
