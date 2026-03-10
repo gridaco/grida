@@ -483,6 +483,12 @@ function __self_start_gesture(
         return;
       }
 
+      // Cancel marquee/lasso started by event-target (threshold 2px) before ruler
+      // fires (threshold 8px). Otherwise __self_evt_on_drag prioritizes marquee and
+      // the guide never receives movement updates.
+      draft.marquee = undefined;
+      draft.lasso = undefined;
+
       const { axis, idx } = gesture;
 
       assert(draft.scene_id, "scene_id is not set");
@@ -491,14 +497,12 @@ function __self_start_gesture(
       ] as grida.program.nodes.SceneNode;
 
       if (idx === -1) {
-        const t = cmath.transform.getTranslate(draft.transform);
-        const s = cmath.transform.getScale(draft.transform);
-
-        const axi = axis === "x" ? 0 : 1;
-
+        // Use pointer position at drag start (after threshold) so guide appears
+        // where the user has dragged, not at the ruler edge.
+        const axi = axis === "x" ? 0 : 1; // x-axis guide: x pos, y-axis guide: y pos
         const next = {
           axis,
-          offset: -cmath.quantize(t[axi] * (1 / s[axi]), 1),
+          offset: cmath.quantize(draft.pointer.position[axi], 1),
         } satisfies grida.program.document.Guide2D;
         const idx = scene.guides.push(next) - 1;
 
