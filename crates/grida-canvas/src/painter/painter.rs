@@ -19,7 +19,6 @@ use skia_safe::{
     Shader,
 };
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 /// A painter that handles all drawing operations for nodes,
@@ -1501,9 +1500,10 @@ impl<'a> Painter<'a> {
         self.draw_render_commands(&list.commands);
     }
 
-    /// Draw only the layers whose IDs appear in `visible`, skipping off-screen
-    /// content. Mask groups are drawn unconditionally to preserve clip correctness.
-    pub fn draw_layer_list_culled(&self, list: &LayerList, visible: &HashSet<NodeId>) {
+    /// Draw only the layers whose node ID is marked `true` in the `visible`
+    /// bitset (indexed by `NodeId as usize`), skipping off-screen content.
+    /// Mask groups are drawn unconditionally to preserve clip correctness.
+    pub fn draw_layer_list_culled(&self, list: &LayerList, visible: &[bool]) {
         if !self.policy.is_wireframe() {
             self.draw_render_commands_culled(&list.commands, visible);
         } else {
@@ -1514,12 +1514,13 @@ impl<'a> Painter<'a> {
     fn draw_render_commands_culled(
         &self,
         commands: &[PainterRenderCommand],
-        visible: &HashSet<NodeId>,
+        visible: &[bool],
     ) {
         for command in commands {
             match command {
                 PainterRenderCommand::Draw(layer) => {
-                    if !visible.contains(layer.id()) {
+                    let id = *layer.id() as usize;
+                    if id >= visible.len() || !visible[id] {
                         continue;
                     }
                     // Prefer cached picture if available
@@ -1541,13 +1542,14 @@ impl<'a> Painter<'a> {
         }
     }
 
-    fn draw_layer_list_outline_culled(&self, list: &LayerList, visible: &HashSet<NodeId>) {
+    fn draw_layer_list_outline_culled(&self, list: &LayerList, visible: &[bool]) {
         let Some(style) = self.policy.outline_style() else {
             return;
         };
 
         for entry in &list.layers {
-            if !visible.contains(&entry.id) {
+            let id = entry.id as usize;
+            if id >= visible.len() || !visible[id] {
                 continue;
             }
             if let Some(scene_cache) = self.scene_cache {

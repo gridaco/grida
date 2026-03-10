@@ -239,12 +239,25 @@ impl Renderer {
         // Collect visible node IDs from the frame plan so the painter can skip
         // off-screen layers. The plan's regions contain indices into the flat
         // layer list produced by the R-tree viewport query.
-        let visible_ids: HashSet<NodeId> = plan
-            .regions
+        //
+        // We use a Vec<bool> indexed by NodeId (which is a sequential u64)
+        // instead of a HashSet for O(1) lookups without hashing overhead.
+        let max_id = self
+            .scene_cache
+            .layers
+            .layers
             .iter()
-            .flat_map(|(_, indices)| indices.iter())
-            .filter_map(|idx| self.scene_cache.layers.layers.get(*idx).map(|e| e.id))
-            .collect();
+            .map(|e| e.id as usize)
+            .max()
+            .unwrap_or(0);
+        let mut visible_ids = vec![false; max_id + 1];
+        for (_, indices) in &plan.regions {
+            for idx in indices {
+                if let Some(entry) = self.scene_cache.layers.layers.get(*idx) {
+                    visible_ids[entry.id as usize] = true;
+                }
+            }
+        }
 
         let painter = Painter::new_with_scene_cache(
             canvas,
