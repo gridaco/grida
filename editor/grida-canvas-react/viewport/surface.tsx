@@ -108,6 +108,9 @@ import { cn } from "@/components/lib/utils";
 
 const DRAG_THRESHOLD = 2;
 
+/** Minimum pointer movement (px) before creating a new ruler guideline. Prevents accidental insertion on click. */
+const RULER_GUIDELINE_DRAG_THRESHOLD = 8;
+
 /*
 const SURFACE_TRANSFORM_CONTEXT = React.createContext<cmath.Transform>(
   cmath.transform.identity
@@ -1838,7 +1841,10 @@ function RulerGuideOverlay() {
         event.preventDefault();
       },
     },
-    { enabled: !eager_canvas_input }
+    {
+      enabled: !eager_canvas_input,
+      drag: { threshold: RULER_GUIDELINE_DRAG_THRESHOLD },
+    }
   );
 
   const bindY = useSurfaceGesture(
@@ -1848,7 +1854,10 @@ function RulerGuideOverlay() {
         event.preventDefault();
       },
     },
-    { enabled: !eager_canvas_input }
+    {
+      enabled: !eager_canvas_input,
+      drag: { threshold: RULER_GUIDELINE_DRAG_THRESHOLD },
+    }
   );
 
   const ranges = useMemo(() => {
