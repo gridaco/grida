@@ -1,230 +1,226 @@
-# Hi robots, welcome to the Grida project.
+# Grida — agent guide (root)
 
-Grida is a open source Design tool that aims to provide high-performance, configurable canvas-based editor.
+This file is **for LLM agents** working anywhere in the Grida monorepo.
 
-**Mission**
+Read this first, then read the `AGENTS.md` for the specific directory you are working in — those files contain domain-specific rules, constraints, and checklists that are not repeated here.
 
-- Build a high performance interactive graphics engine and its ecosystem
+---
 
-Currently, we have below features / modules.
+## What is Grida
 
-- canvas
-- forms
-- database
+Grida is an open-source design tool aimed at providing a high-performance, configurable canvas-based editor.
 
-## Project Structure
+**Mission**: Build a high-performance interactive graphics engine and its ecosystem.
 
-| directory              | README                                       | AGENTS                                       | notes                                         |
-| ---------------------- | -------------------------------------------- | -------------------------------------------- | --------------------------------------------- |
-| [docs](./docs)         | -                                            | [`docs/AGENTS.md`](./docs/AGENTS.md)         | the docs directory                            |
-| [format](./format)     | [`format/README.md`](./format/README.md)     | [`format/AGENTS.md`](./format/AGENTS.md)     | grida file formats & schemas                  |
-| [editor](./editor)     | -                                            | [`editor/AGENTS.md`](./editor/AGENTS.md)     | the editor directory                          |
-| [crates](./crates)     | -                                            | -                                            | the rust crates directory                     |
-| [packages](./packages) | -                                            | -                                            | shared packages                               |
-| [desktop](./desktop)   | [`desktop/README.md`](./desktop/README.md)   | -                                            | the electron desktop app                      |
-| [supabase](./supabase) | [`supabase/README.md`](./supabase/README.md) | [`supabase/AGENTS.md`](./supabase/AGENTS.md) | the supabase project                          |
-| [apps](./apps)         | -                                            | -                                            | micro sites for Grida                         |
-| [library](./library)   | [`library/README.md`](./library/README.md)   | -                                            | hosted library workers                        |
-| [jobs](./jobs)         | [`jobs/README.md`](./jobs/README.md)         | -                                            | hosted jobs                                   |
-| [.legacy](./.legacy)   | -                                            | -                                            | will be removed (fully ignore this directory) |
+**Core product areas**: canvas, forms, database.
 
-## Languages, Frameworks, Tools, Infrastructures
+---
 
-**Languages**
+## Quick navigation
 
-- Node.js 22 - main runtime for most apps
-- TypeScript 5 - main language for most apps
-- Python 3.12 - partially used for tasks / jobs, that are independent, e.g. `/library`
-- Deno - partially used for tasks / jobs, that shares the codebase, e.g. `/jobs`
-- Rust (2024 edition) - used for wasm builds, mostly for graphics core.
+When starting a task, find the right sub-directory AGENTS.md first:
 
-**Database**
+| directory              | AGENTS.md                                              | importance    | notes                                                   |
+| ---------------------- | ------------------------------------------------------ | ------------- | ------------------------------------------------------- |
+| [editor](./editor)     | [`editor/AGENTS.md`](./editor/AGENTS.md)               | **Very high** | Next.js app powering grida.co and tenant sites          |
+| [supabase](./supabase) | [`supabase/AGENTS.md`](./supabase/AGENTS.md)           | **Very high** | Database, RLS, migrations, security posture             |
+| [crates](./crates)     | [`crates/grida-canvas/AGENTS.md`](./crates/grida-canvas/AGENTS.md) | **High** | Rust rendering engine (Skia-backed canvas)         |
+| [format](./format)     | [`format/AGENTS.md`](./format/AGENTS.md)               | **High**      | `.grida` file format (FlatBuffers schema)               |
+| [packages](./packages) | —                                                      | **High**      | Shared TypeScript packages (see each package's README)  |
+| [docs](./docs)         | [`docs/AGENTS.md`](./docs/AGENTS.md)                   | Medium        | Documentation source of truth                           |
+| [apps](./apps)         | —                                                      | Low           | Micro sites (e.g. `apps/docs` — Docusaurus)             |
+| [desktop](./desktop)   | —                                                      | Low           | Electron desktop app                                    |
+| [library](./library)   | —                                                      | Low           | Hosted library workers (Railway)                        |
+| [jobs](./jobs)         | —                                                      | Low           | Hosted background jobs (Railway)                        |
+| [.legacy](./.legacy)   | —                                                      | —             | **Fully ignore — pending removal**                      |
 
-Grida heavily relies on Supabase (PostgreSQL).
+Also check for local `AGENTS.md` files within sub-paths (e.g. `editor/components/AGENTS.md`, `editor/kits/AGENTS.md`, tool-level files like `editor/app/(tools)/tools/halftone/AGENTS.md`).
 
-- Supabase
+---
 
-**Web**
+## Key rules (monorepo-wide)
 
-- React.js 19
-- Next.js 16
+Things that cause problems if ignored:
 
-**UI**
+- **Use `pnpm`** — never `npm install` or `yarn`. The workspace uses pnpm workspaces.
+- **Never touch `.legacy/`** — this directory is pending removal; do not read or edit it.
+- **Auth is off-limits**: `editor/app/(auth)` is security-critical — **do not modify** any routes or flows there.
+- **Public API is backwards-compatible**: `editor/app/(api)/(public)/v1` — additive changes only; no breaking changes unless intentionally v2-ing.
+- **No new `middleware.ts` in editor** — the edge entrypoint is `proxy.ts` (replaces `middleware.ts` under Next.js 16).
+- **Production database is off-limits** — bots never have access to the main (production) Supabase project.
+- **Code formatter is oxfmt (oxc)** — do not run `prettier` or other formatters directly on TypeScript/JavaScript files.
+- **Turborepo manages the build graph** — use `turbo` commands rather than raw `tsc` or `next build` unless instructed otherwise.
+- **Do not commit generated artifacts** — generated FlatBuffers bindings and other build outputs are not committed.
 
-- Tailwind CSS 4
-- Shadcn UI
-- Lucide / Radix Icons
+---
 
-**Graphics Backend**
+## Monorepo layout
 
-- DOM - plain dom as canvas - for website builder canvas. (binded with react)
-- Skia - the graphics backend - for 2D graphics. (binded with skia-safe)
+```
+/ (root)
+├── editor/       Next.js app (grida.co + *.grida.site tenant sites)   ← Very high importance
+├── packages/     Shared TypeScript packages                            ← High importance
+├── crates/       Rust crates (Skia-backed canvas engine)               ← High importance
+├── supabase/     Supabase project (migrations, schema, pgTAP tests)    ← Very high importance
+├── format/       .grida file format spec (FlatBuffers)                 ← High importance
+├── docs/         Documentation source of truth                         ← Medium importance
+├── apps/         Micro sites (apps/docs, etc.)
+├── desktop/      Electron desktop app
+├── library/      Hosted library workers
+├── jobs/         Hosted background jobs (Deno)
+└── .legacy/      IGNORE — pending removal
+```
 
-**Desktop**
+---
 
-- electron with electron-forge
-- vite
+## Languages and stack
 
-**Tooling**
+| concern              | technology                                                         |
+| -------------------- | ------------------------------------------------------------------ |
+| Runtime              | Node.js 22                                                         |
+| Language (TS)        | TypeScript 5                                                       |
+| Language (Rust)      | Rust 2024 edition                                                  |
+| Language (Python)    | Python 3.12 — isolated jobs/library only                           |
+| Language (Deno)      | Deno — jobs that share the TS codebase                             |
+| Web framework        | Next.js 16 + React 19                                              |
+| UI                   | Tailwind CSS 4, Shadcn UI, Lucide / Radix Icons                    |
+| Database             | Supabase (PostgreSQL)                                              |
+| Graphics (2D)        | Skia via `skia-safe` (Rust crate)                                  |
+| Graphics (DOM)       | Plain DOM canvas bound to React — website builder canvas           |
+| Desktop              | Electron + Vite                                                    |
+| Build orchestration  | Turborepo                                                          |
+| Code formatter       | oxfmt (oxc)                                                        |
+| Package manager      | pnpm                                                               |
 
-- Turborepo - monorepo build orchestration
-- oxfmt (oxc) - code formatter
-
-## Documentation
-
-Documentation files are located in the `./docs` directory.
-
-This directory contains the docs as-is, the deployment of the docs are handled by [apps/docs](./apps/docs). A docusaurus project that syncs the docs content to its directory. When writing docs, the root `./docs` directory is the source of truth.
-
-See [`docs/AGENTS.md`](./docs/AGENTS.md) for the docs contribution scope (we only actively maintain `docs/wg/**` and `docs/reference/**`).
-When linking docs to editor pages, prefer **universal routing** (`https://grida.co/_/<path>`). See `docs/wg/platform/universal-docs-routing.md`.
-
-## `/crates/*`
-
-Importance: **High**
-
-monorepo rust crates.
-
-The rust implementation of the Grida Canvas. this is rapidly under development. - it will serve as our new rendering backend once it is stable.
+---
 
 ## `/editor`
 
-Importance: **Very high**
+The editor is a Next.js monorepo app powering `grida.co` and tenant domains (e.g. `[tenant].grida.site`, custom domains).
 
-The editor is a monorepo nextjs project that contains the codebase for the editor.
+See **[`editor/AGENTS.md`](./editor/AGENTS.md)** for the full "where to change what" map, multi-tenancy routing details, and key rules. A short summary of high-risk areas:
 
-grida.co and \[tenant\].grida.site domains are connected.
+| area                              | rule                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| `app/(auth)`                      | Security-critical. **Do not modify.**                                           |
+| `app/(api)/(public)/v1`           | Public API. Additive changes only (backwards-compatible).                       |
+| `proxy.ts`                        | Edge entrypoint (replaces `middleware.ts`). Do not add a new `middleware.ts`.   |
+| `app/(workbench)`, `(workspace)`  | Performance-sensitive. Keep `use client` boundaries narrow.                     |
+| `components/`                     | Route-agnostic, override-friendly UI primitives. See `components/AGENTS.md`.   |
+| `kits/`                           | Stateful drop-in widgets; no global store coupling. See `kits/AGENTS.md`.       |
+| `scaffolds/`                      | Feature assemblies; may bind to global/editor state.                            |
+| `lib/`                            | Stable, non-opinionated modules — candidates for promotion to `/packages`.      |
 
-- `/editor`
-  - `/app` the nextjs app directory, no shared root layout, each has its own root layout.
-    - `(api)/(public)/v1` contains the public api routes.
-    - `(api)/private` contains the private, editor only api routes.
-    - `(auth)` contains the auth specific flow routes. do not modify.
-    - `(insiders)` contains the insiders, local-only routes. e.g. Grida does not allow email signups, the insiders locally can.
-    - `(library)` contains the Grida Library (open assets) specific pages.
-    - `(preview)` contains the embed-purpose slave preview pages, maily used by the playground.
-    - `(site)` similar to `(www)`, but contains pages that are not seo-purpose.
-    - `(tenant)` contains the tenant-site rendered pages.
-    - `(tools)` contains the standalone tools and editor pages, like playground, etc.
-    - `(workbench)` contains the workbench, the main editor page.
-    - `(workspace)` similar to `(workbench)`, but contains the dashboard, not the actual editor.
-    - `(www)` contains the landing page, seo-purpose static pages. when to add new webpages, this is the root directory.
-    - `sitemap.ts` contains the sitemap.xml generator. this contains the sitemap for the public pages, usually under `(www)` directory.
-  - `/www` contains the landing page specific components.
-  - `/components` contains the generally reusable components.
-  - `/components/ui` contains the shadcn ui components.
-  - `/scaffolds` contains the feature-specific larger components / pages / editors.
-  - `/lib` contains the core, strictly designed modules with non-opinionated, reusable, and stable modules. - all of them must be worthy to be promoted to `<root>/packages` directory.
-  - `/grida-*` aims to isolate the modules to a domain-specific scope. once reasonably well-defined, they will be promoted to `<root>/packages` directory.
+---
 
-## `/desktop`
+## `/packages`
 
-Importance: **Low**
+Shared TypeScript packages, some published to npm, some workspace-only.
 
-The desktop is a electron app that runs a hosted version of the editor. we choose this way to make things maintainable.
-We choose electron for stability, consistency, and relies on chrome-specific functions.
+Key group: **`packages/grida-canvas-*`** — powers the canvas. Large modules may still live under `/editor` and will progressively migrate to `/packages` as they stabilize.
+
+For details on any individual package, read its own `README.md`.
+
+---
+
+## `/crates`
+
+Rust implementation of the Grida Canvas — rapidly in development. It will serve as the new rendering backend once stable.
+
+- Uses `skia-safe` for painting
+- Uses `math2` crate for geometry / math
+
+See **[`crates/grida-canvas/AGENTS.md`](./crates/grida-canvas/AGENTS.md)** for the NodeID system, testing commands, and available tooling.
+
+---
 
 ## `/supabase`
 
-Importance: **Very high**
+Database, auth, and storage layer. See **[`supabase/AGENTS.md`](./supabase/AGENTS.md)** for the full security posture, RLS patterns, migration conventions, and pgTAP testing requirements.
 
-We use supabase for database, auth, and storage.
+Quick constraints:
+- **RLS is mandatory** for any tenant/user data table.
+- **Agents only run local commands** — never `supabase link`, `supabase db push`, or anything that could target the production project.
+- Local commands: `supabase start/stop/status`, `supabase db reset`, `supabase migration new/up`, `supabase db test`.
 
-- /supabase
-  - ~~/functions~~ - we are not using supabase edge functions.
-  - /migrations - applied migration sqls.
-  - /schema - human friendly organized schema sqls.
+Structure:
+- `supabase/migrations/` — source of truth (applied SQL migrations)
+- `supabase/schema/` — human-friendly organized schema reference (may drift; not ground truth)
+- `supabase/tests/` — pgTAP security tests
 
-- To run supabase locally, follow the instructions in the [supabase docs](https://supabase.com/docs/guides/local-development).
-- To suggest a new feature, use `supabase migration new <feature-name>`.
-- To apply migrations, use `supabase migration up`.
+---
 
-In any cases, bots will never have access to the main (production) database.
+## `/format`
 
-## `/jobs`
+The canonical on-disk contract: the `.grida` file format (FlatBuffers schema at `format/grida.fbs`).
 
-Importance: **Low**
+See **[`format/AGENTS.md`](./format/AGENTS.md)** for schema evolution rules, breaking-change guidance, and the review checklist. Treat changes here like public API changes — they ripple into Rust and TypeScript codecs.
 
-Jobs are hosted on railway.com
+---
 
-## `/library`
+## `/docs`
 
-Importance: **Low**
+Source of truth for documentation. Deployed at `https://grida.co/docs` via `apps/docs` (Docusaurus).
 
-Library workers are hosted on railway.com
+- **Actively maintained**: `docs/wg/**` and `docs/reference/**` only.
+- **Do not edit** content outside those areas unless explicitly required.
+- **Do not edit** generated artifacts under `apps/docs/docs/`.
+- When linking to editor pages from docs, prefer **universal routing**: `https://grida.co/_/<path>`. See `docs/wg/platform/universal-docs-routing.md`.
 
-## `/packages/*`
+---
 
-Importance: **High**
+## `/desktop`
 
-monorepo node packages
+Electron app that runs a hosted version of the editor. Low priority; uses Vite and electron-forge.
 
-**`/packages/grida-canvas-*`**
+---
 
-Packages that powers the canvas. (some are published to npm, some are not)
+## `/jobs` and `/library`
 
-Since our project is in a rapid development, some large modules still lives under the `/editor` directory. Which will progressively move to `/packages` directory, once things are sorted out and fully defined with the good models.
+Both hosted on Railway.com. Low priority for most tasks.
 
-For each individual package, refer to the README of its own.
+- `/jobs` — uses Deno and shares parts of the TS codebase.
+- `/library` — Python 3.12 workers.
 
-## Testing & Development
+---
 
-We use turborepo (except few isolated packages).
+## Testing and development
 
-To run test, build, and dev, use below commands.
+All commands are run from the repo root unless noted. Use Turborepo for the monorepo; use `cargo` directly for Rust crates.
 
 ```sh
-# run tests (all, not recommended. requires crates build)
-turbo test
+# --- TypeScript / Node ---
 
-# run tests for packages
+# recommended: test packages only (fast)
 turbo test --filter='./packages/*'
 
-# build packages (required for typecheck for its dependants)
+# test packages + editor
+pnpm turbo test --filter='./packages/*' --filter=editor
+
+# build shared packages (required before typecheck)
 turbo build --filter='./packages/*'
 
 # build packages in watch mode
 pnpm dev:packages
 
-# run tests except for rust crates
-turbo test --filter='!./crates/*'
+# typecheck (always run before considering work done)
+turbo typecheck
 
-# run lint (CI enforces lint for Next.js apps)
+# lint (CI enforces lint for Next.js apps)
 turbo lint
 
-# run build (all, not recommended)
-turbo build
+# --- Rust ---
 
-# run dev
-turbo dev
-
-# run typecheck (always run)
-turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
-
-# for crates specific tests
 cargo test
-
-# for crates specific check
-cargo check
-
-# for crates (with long build time deps, e.g. skia)
-cargo clippy --no-deps
-
-# for crates specific build
+cargo check --all-targets --all-features
+cargo clippy --no-deps --all-targets --all-features
 cargo build
-
-# format crates
 cargo fmt --all
 ```
 
-Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
-To handle this, you can build the `/packages/*`, then run typecheck. (when networking is not available)
+### Typecheck from a clean checkout
 
-### Running `pnpm typecheck` from a clean checkout
-
-`pnpm typecheck` depends on compiled packages and the editor's Next.js env
-file. After cloning the repo or installing dependencies, run the following
-steps before executing `pnpm typecheck`:
+`pnpm typecheck` depends on compiled packages and the editor's Next.js env file. After a fresh clone or install:
 
 ```sh
 pnpm install
@@ -233,9 +229,21 @@ pnpm install
 pnpm turbo build --filter="./packages/*"
 pnpm turbo build --filter @grida/canvas-wasm
 
-# finally, run the repository-wide typecheck
+# typecheck
 pnpm typecheck
-
-# run test (only packages and editor)
-pnpm turbo test --filter='./packages/*' --filter=editor
 ```
+
+> **Note**: `typecheck` depends on build artifacts. If it fails with missing types, build `/packages/*` first.
+
+---
+
+## Before submitting changes
+
+- [ ] `turbo typecheck` passes (build packages first if needed).
+- [ ] `turbo lint` passes (for TypeScript / Next.js changes).
+- [ ] `cargo clippy --no-deps` passes (for Rust changes).
+- [ ] You have **not** modified `editor/app/(auth)`.
+- [ ] You have **not** added or edited anything in `.legacy/`.
+- [ ] If you changed `supabase/`: RLS is enabled, policies are tenant-scoped, pgTAP tests are added/updated (see `supabase/AGENTS.md`).
+- [ ] If you changed `format/grida.fbs`: Rust and TS codec ripple updates are applied (see `format/AGENTS.md`).
+- [ ] If you changed public-facing docs: universal routing links are used where applicable.
