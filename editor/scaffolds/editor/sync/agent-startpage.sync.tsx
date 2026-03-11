@@ -30,7 +30,7 @@ export function useSyncFormAgentStartPage() {
         .update({
           start_page: debounced
             ? ({
-                __schema_version: "0.90.0-beta+20260108",
+                __schema_version: "0.91.0-beta+20260311",
                 template_id: startpagestate!.template_id,
                 ...debounced,
               } satisfies FormStartPageSchema as {})

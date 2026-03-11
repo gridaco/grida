@@ -3149,7 +3149,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.90.0-beta+20260108",
+          version: "0.91.0-beta+20260311",
           document: payloadDocument,
         });
         surface.loadScene(p);

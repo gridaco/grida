@@ -3214,7 +3214,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {
@@ -3271,7 +3271,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {
@@ -3338,7 +3338,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {

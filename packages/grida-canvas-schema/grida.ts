@@ -530,7 +530,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.90.0-beta+20260108";
+  export const SCHEMA_VERSION = "0.91.0-beta+20260311";
 
   /**
    * JSON-serializable value type
