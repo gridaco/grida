@@ -4,15 +4,18 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 
 ### File formats
 
-- **`.grida` files**: Modern format using ZIP/FlatBuffer binary format. These are the current production format.
+- **`.grida` files**: Modern format. Two sub-variants:
+  - **ZIP/FlatBuffer**: Production format. ZIP archive containing a FlatBuffers binary with "GRID" magic header.
+  - **Raw FlatBuffer**: Bare FlatBuffers binary (no ZIP wrapper). Used for Rust decoder unit tests (`crates/grida-canvas/src/io/io_grida_fbs.rs`).
 - **`.grida1.zip` files**: Legacy/test-only format containing JSON snapshots in a ZIP archive. Used for internal testing and fixtures. Not part of the public `.grida` file format specification.
 
 ### Naming convention
 
 - **Prefix**: `d[n]` is a simple counter (`d1`, `d2`, `d3`, ...).
 - **Schema version specifier**: we encode the schema version **build metadata date** as `yyyymmdd`.
-  - Example: schema version `0.90.0-beta+20260108` → version specifier `20260108`
+  - Example: schema version `0.91.0-beta+20260311` → version specifier `20260311`
   - **Note**: this `yyyymmdd` is **not** the authoring date of the file.
+- **`basic.grida`**: Raw FlatBuffer fixture for Rust decoder tests. Exercises every node type, paint variant, effect, stroke option, mask type, and layout configuration in one scene. In-memory round-trip coverage is in `cargo test --package cg --test fbs_roundtrip`. No version suffix (regenerated as needed).
 
 ### Support expectations (important)
 
@@ -22,10 +25,16 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 
 ### Changelog
 
+- **0.91.0-beta+20260311** ⚠️ Breaking FBS schema change:
+  - Added `NodeSlot` wrapper table in `grida.fbs` to work around a `flatc --rust` limitation (Rust codegen does not support `[Node]` — vectors of unions).
+  - `CanvasDocument.nodes` field type changed: `[Node]` → `[NodeSlot]`.
+  - `CanvasDocument` field IDs reindexed as a result: `nodes` moved to `id:1`, `scenes` moved to `id:2`.
+  - Added Rust FlatBuffers decoder: `crates/grida-canvas/src/io/io_grida_fbs.rs`.
+
 - **0.90.0-beta+20260108**: Migrated from legacy `.grida` (JSON/ZIP) format to new `.grida` (ZIP/FlatBuffer) binary format. Legacy snapshot files are now stored as `.grida1.zip` for test fixtures.
 
 <details>
-<summary>`grida1` `0.89.0` -> `0.90.0`</summary>
+<summary><code>grida1</code> <code>0.89.0</code> → <code>0.90.0</code> field renames</summary>
 
 | `0.89.0`               | `0.90.0`                      |
 | ---------------------- | ----------------------------- |
@@ -51,4 +60,4 @@ This directory contains **meaningful** `.grida` files used for **testing**.
 
 ---
 
-> Current Version: `0.90.0-beta+20260108` (last updated: 2026-01-08)
+> Current Version: `0.91.0-beta+20260311` (last updated: 2026-03-11)
