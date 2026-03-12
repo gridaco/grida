@@ -2891,9 +2891,11 @@ export class Editor
    * - OPFS persistence (playground `Cmd/Ctrl+S`)
    *
    * What it does:
-   * - Collects **used** image paint `src` references (res://images/<ref>).
+   * - Collects **used** image paint `src` references (res://images/<ref>), excluding system:// built-ins.
    * - Parses ref from each src, resolves bytes from WASM, produces `images/<ref>.<ext>` entries.
    * - Document keeps `src` unchanged (no rewrite).
+   * - `system://` images (built-in runtime resources) are excluded — they are
+   *   auto-registered by the WASM runtime on load and must not be embedded.
    *
    * For DOM backend (hosted HTML flow), we keep external `src` values as-is and do not embed.
    *
@@ -2912,7 +2914,9 @@ export class Editor
       .document as grida.program.document.Document;
     const images: Record<string, Uint8Array> = {};
 
-    const usedSrcs = new dq.DocumentStateQuery(snapshot).image_srcs();
+    const usedSrcs = new dq.DocumentStateQuery(
+      snapshot
+    ).persistable_image_srcs();
     if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) {
       throw new Error(
         "`archivedir()` requires the canvas/WASM backend to be mounted."
