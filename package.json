@@ -6,6 +6,8 @@
     "build": "turbo run build",
     "build:packages": "turbo run build --filter=./packages/*",
     "dev": "turbo run dev",
+    "dev:init": " ./scripts/dev/init.sh",
+    "dev:services": "./scripts/dev/services.sh",
     "dev:editor": "turbo run dev --filter=./editor",
     "dev:packages": "turbo run dev --filter=./packages/*",
     "generate": "turbo run generate",
