@@ -1,5 +1,5 @@
 use super::winit::{winit_window, WinitResult};
-use cg::node::schema::Size;
+use cg::node::schema::{Scene, Size};
 use cg::resources::{FontMessage, ImageMessage};
 use cg::runtime::camera::Camera2D;
 use cg::window::application::{ApplicationApi, HostEvent, UnknownTargetApplication};
@@ -72,7 +72,11 @@ fn handle_key_pressed(
             _ => ApplicationCommand::None,
         }
     } else {
-        ApplicationCommand::None
+        match key {
+            Key::Named(winit::keyboard::NamedKey::PageDown) => ApplicationCommand::NextScene,
+            Key::Named(winit::keyboard::NamedKey::PageUp) => ApplicationCommand::PrevScene,
+            _ => ApplicationCommand::None,
+        }
     }
 }
 
@@ -84,6 +88,10 @@ pub struct NativeApplication {
     pub(crate) modifiers: winit::keyboard::ModifiersState,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
     fit_scene_on_load: bool,
+    /// All scenes loaded from the file (for PageUp/PageDown switching).
+    pub(crate) scenes: Vec<Scene>,
+    /// Index of the currently displayed scene in `scenes`.
+    pub(crate) scene_index: usize,
 }
 
 impl NativeApplication {
@@ -154,6 +162,8 @@ impl NativeApplication {
             modifiers: winit::keyboard::ModifiersState::default(),
             file_drop_tx,
             fit_scene_on_load,
+            scenes: Vec::new(),
+            scene_index: 0,
         };
 
         std::thread::spawn(move || loop {
@@ -217,8 +227,39 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             }
         }
 
-        match handle_window_event(&event, &self.modifiers) {
-            cmd => {
+        let cmd = handle_window_event(&event, &self.modifiers);
+        match &cmd {
+            ApplicationCommand::NextScene | ApplicationCommand::PrevScene => {
+                if !self.scenes.is_empty() {
+                    let new_index = match &cmd {
+                        ApplicationCommand::NextScene => {
+                            (self.scene_index + 1) % self.scenes.len()
+                        }
+                        ApplicationCommand::PrevScene => {
+                            (self.scene_index + self.scenes.len() - 1) % self.scenes.len()
+                        }
+                        _ => unreachable!(),
+                    };
+                    if new_index != self.scene_index {
+                        self.scene_index = new_index;
+                        let scene = self.scenes[new_index].clone();
+                        let title = format!(
+                            "[{}/{}] {}",
+                            new_index + 1,
+                            self.scenes.len(),
+                            scene.name,
+                        );
+                        eprintln!("{title}");
+                        let renderer = self.app.renderer_mut();
+                        renderer.load_scene(scene);
+                        fit_camera_to_scene(renderer);
+                        renderer.queue_unstable();
+                        self.window.request_redraw();
+                        self.window.set_title(&title);
+                    }
+                }
+            }
+            _ => {
                 let is_copy_png = matches!(cmd, ApplicationCommand::TryCopyAsPNG);
                 let ok = self.app.command(cmd);
 

@@ -13,6 +13,16 @@ pub async fn run_demo_window(scene: Scene) {
     run_demo_window_with(scene, |_, _, _, _| {}).await;
 }
 
+/// Run a demo window with multiple scenes (PageUp/PageDown to switch).
+#[allow(dead_code)]
+pub async fn run_demo_window_multi(scenes: Vec<Scene>) {
+    let first = scenes
+        .first()
+        .cloned()
+        .expect("run_demo_window_multi requires at least one scene");
+    run_demo_window_core_multi(first, scenes, |_, _, _, _| {}, None).await;
+}
+
 pub async fn run_demo_window_with<F>(scene: Scene, init: F)
 where
     F: FnOnce(
@@ -22,7 +32,7 @@ where
         winit::event_loop::EventLoopProxy<HostEvent>,
     ),
 {
-    run_demo_window_core(scene, init, None).await;
+    run_demo_window_core_multi(scene.clone(), vec![scene], init, None).await;
 }
 
 pub async fn run_demo_window_with_drop<F>(scene: Scene, init: F, drop_tx: UnboundedSender<PathBuf>)
@@ -34,11 +44,12 @@ where
         winit::event_loop::EventLoopProxy<HostEvent>,
     ),
 {
-    run_demo_window_core(scene, init, Some(drop_tx)).await;
+    run_demo_window_core_multi(scene.clone(), vec![scene], init, Some(drop_tx)).await;
 }
 
-async fn run_demo_window_core<F>(
+async fn run_demo_window_core_multi<F>(
     scene: Scene,
+    all_scenes: Vec<Scene>,
     init: F,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
 ) where
@@ -98,6 +109,12 @@ async fn run_demo_window_core<F>(
     {
         let renderer = app.app.renderer_mut();
         renderer.load_scene(scene.clone());
+    }
+    app.scenes = all_scenes;
+    app.scene_index = 0;
+    if app.scenes.len() > 1 {
+        let title = format!("[1/{}] {}", app.scenes.len(), scene.name);
+        app.window.set_title(&title);
     }
     app.app.devtools_rendering_set_show_fps_meter(true);
     app.app.devtools_rendering_set_show_stats(true);
