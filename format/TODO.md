@@ -24,3 +24,11 @@ This document tracks **design flaws and improvement candidates** in the current 
 We should migrate to a table-backed vertex model (e.g. `[VectorNetworkVertex]`) where each vertex can evolve safely over time while preserving explicit intent. **Breaking.**
 
 ---
+
+### 2. `CanonicalEllipticalShapeRingSectorParameters` missing `corner_radius`
+
+The ellipse arc's `corner_radius` field (`EllipseNodeRec.corner_radius: Option<f32>`) controls rounding of arc endpoints. It exists in the Rust runtime model but has no corresponding field in `CanonicalEllipticalShapeRingSectorParameters`. The value is silently lost on FBS roundtrip.
+
+**Fix**: Add `corner_radius: float = 0.0;` to `CanonicalEllipticalShapeRingSectorParameters` in `grida.fbs`, then update encoder/decoder. **Evolution.**
+
+---
