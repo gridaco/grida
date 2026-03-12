@@ -205,6 +205,20 @@ export const actions = {
     keybindings: kb(KeyCode.Space, M.Shift),
   },
 
+  ["workbench.surface.view.scene-previous"]: {
+    name: "previous scene",
+    description: "Switch to the previous scene",
+    command: "workbench.surface.view.scene-previous",
+    keybindings: kb(KeyCode.PageUp),
+  },
+
+  ["workbench.surface.view.scene-next"]: {
+    name: "next scene",
+    description: "Switch to the next scene",
+    command: "workbench.surface.view.scene-next",
+    keybindings: kb(KeyCode.PageDown),
+  },
+
   ["workbench.surface.cursor.select-all-siblings"]: {
     name: "select all siblings",
     description: "Select all siblings of the current selection",
