@@ -5436,8 +5436,13 @@ export namespace format {
           );
         }
 
-        const schemaVersion =
-          document.schemaVersion() || grida.program.document.SCHEMA_VERSION;
+        const schemaVersion = document.schemaVersion() ?? "";
+
+        if (!grida.program.document.isSchemaCompatible(schemaVersion)) {
+          throw new Error(
+            `schema incompatible: file version "${schemaVersion}" is not compatible with current "${grida.program.document.SCHEMA_VERSION}"`
+          );
+        }
 
         // Decode nodes array and collect parent references
         const nodes: Record<string, grida.program.nodes.Node> = {};
