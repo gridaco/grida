@@ -1,17 +1,21 @@
-//! L0 fixture writer — packs all L0 scenes into a single `L0.grida`.
+//! Fixture Generator Tool
 //!
-//! To regenerate:
-//!   cargo test --package cg --test fbs_fixtures -- write_l0
+//! Packs all L0 scene builders into a single `L0.grida` file and writes it to
+//! `fixtures/test-grida/`.
+//!
+//! ## Usage
+//!
+//! ```bash
+//! cargo run --package cg --example tool_gen_fixtures
+//! ```
+//!
+//! ## Output
+//!
+//! On success the tool prints the byte count, scene count, and output path.
 
 mod fixtures;
 
-/// Pack all L0 scenes into `L0.grida`.
-///
-/// This test writes files to disk and should only be run explicitly:
-///   cargo test --package cg --test fbs_fixtures -- write_l0 --ignored
-#[test]
-#[ignore]
-fn write_l0() {
+fn main() {
     let scenes: Vec<(&str, _)> = vec![
         ("L0-shapes",              fixtures::l0_shapes::build()),
         ("L0-shape-arc",           fixtures::l0_shape_arc::build()),
