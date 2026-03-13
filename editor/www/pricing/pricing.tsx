@@ -46,7 +46,7 @@ export function Pricing() {
             </Tabs>
           </label>
         </div>
-        <div className="columns-1 md:columns-2 xl:columns-4 gap-6 space-y-10 w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-6 gap-y-10 w-full">
           {plans.map((plan) => (
             <PricingCard
               key={plan.id}

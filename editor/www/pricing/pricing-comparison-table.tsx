@@ -46,11 +46,13 @@ function PricingMobileHeader({
       </h2>
       <div className="flex items-baseline gap-2">
         {from && <span className="text-foreground text-base">From</span>}
-        {showDollarSign ? (
-          <span className="h1 font-mono">{price}</span>
-        ) : (
-          <span className="text-foreground-light">{price}</span>
-        )}
+        {price ? (
+          showDollarSign ? (
+            <span className="h1 font-mono">{price}</span>
+          ) : (
+            <span className="text-foreground-light">{price}</span>
+          )
+        ) : null}
 
         <p className="p opacity-50">{priceDescription}</p>
       </div>
@@ -251,7 +253,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingMobileHeader
               plans={plans}
               plan="Enterprise"
-              price="Custom"
+              price=""
               priceDescription={enterprisePlan?.priceNote ?? ""}
               description={enterprisePlan?.description ?? ""}
               showDollarSign={false}
@@ -323,9 +325,11 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
                       <h3 className="text-lg xl:text-xl 2xl:text-2xl leading-5 uppercase font-mono font-normal">
                         {plan.name}
                       </h3>
-                      <span className="text-foreground-lighter font-mono text-lg tracking-tighter">
-                        {plan.priceMonthly}
-                      </span>
+                      {plan.name !== "Enterprise" && (
+                        <span className="text-foreground-lighter font-mono text-lg tracking-tighter">
+                          {plan.priceMonthly}
+                        </span>
+                      )}
                     </div>
                     <div className="h-5">
                       {["Free", "Pro", "Team"].includes(plan.name) &&
