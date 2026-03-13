@@ -90,7 +90,7 @@ fn main() {
                 text_decoration_color: Some(*color),
                 text_decoration_style: None,
                 text_decoration_skip_ink: None,
-                text_decoration_thinkness: Some(1.5),
+                text_decoration_thickness: Some(1.5),
             }),
             font_family: "Geist".to_string(),
             font_size: font_size,

@@ -197,7 +197,7 @@ pub fn build() -> Scene {
                 text_decoration_color: Some(CGColor { r: 220, g: 59, b: 59, a: 255 }),
                 text_decoration_style: Some(TextDecorationStyle::Solid),
                 text_decoration_skip_ink: Some(true),
-                text_decoration_thinkness: Some(2.0),
+                text_decoration_thickness: Some(2.0),
             });
             ts
         },

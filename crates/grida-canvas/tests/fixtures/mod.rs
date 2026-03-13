@@ -101,8 +101,8 @@ pub fn write_multi_fixture(scenes: &[(&str, Scene)], name: &str) {
         HashMap<NodeId, String>,
     )> = Vec::new();
 
-    for (i, (_, scene)) in scenes.iter().enumerate() {
-        let scene_id = format!("scene{}", i + 1);
+    for (i, (key, scene)) in scenes.iter().enumerate() {
+        let scene_id = key.to_string();
         let mut id_map = HashMap::new();
         let mut position_map = HashMap::new();
         // Prefix node IDs with scene index to avoid collisions across scenes

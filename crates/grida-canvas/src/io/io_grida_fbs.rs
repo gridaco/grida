@@ -18,6 +18,12 @@ use std::collections::HashMap;
 
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 
+/// Schema version emitted by the Rust FlatBuffers writer.
+///
+/// Keep in sync with the TS constant `grida.program.document.SCHEMA_VERSION`
+/// (`packages/grida-canvas-schema/grida.ts`).
+pub const SCHEMA_VERSION: &str = "0.91.0-beta+20260311";
+
 use crate::cg::{
     alignment::Alignment,
     color::CGColor,
@@ -1632,7 +1638,7 @@ pub fn encode(
     let scenes_vec = fbb.create_vector(&[scene_nid]);
 
     // ── 4. Build CanvasDocument ─────────────────────────────────────────────
-    let schema_version_str = fbb.create_string("0.0.0");
+    let schema_version_str = fbb.create_string(SCHEMA_VERSION);
     let doc = fbs::CanvasDocument::create(
         &mut fbb,
         &fbs::CanvasDocumentArgs {
@@ -1700,7 +1706,7 @@ pub fn encode_multi(
 
     let nodes_vec = fbb.create_vector(&node_slot_offsets);
     let scenes_vec = fbb.create_vector(&scene_nids);
-    let schema_version_str = fbb.create_string("0.0.0");
+    let schema_version_str = fbb.create_string(SCHEMA_VERSION);
     let doc = fbs::CanvasDocument::create(
         &mut fbb,
         &fbs::CanvasDocumentArgs {

@@ -15,7 +15,7 @@ The naming convention is `L0-<topic>.grida` where `L0` indicates baseline covera
 
 One of each basic shape type with a plain solid fill. No effects, no strokes (except line), no layout tricks.
 
-```
+```text
 scene "L0 Shapes"
 ├─ rectangle       200×100   red solid
 ├─ ellipse         100×80    blue solid
@@ -34,7 +34,7 @@ scene "L0 Shapes"
 
 Ellipse arcs demonstrating inner_radius, start_angle, sweep angle, and corner_radius.
 
-```
+```text
 scene "L0 Shape Arc"
 ├─ ellipse   full circle (defaults)
 ├─ ellipse   semicircle (angle=180°)
@@ -51,7 +51,7 @@ scene "L0 Shape Arc"
 
 Regular polygons and star polygons with varying point counts and parameters.
 
-```
+```text
 scene "L0 Shape Polygon"
 ├─ regular_polygon   triangle (3 sides)
 ├─ regular_polygon   pentagon (5, corner_radius=10)
@@ -71,7 +71,7 @@ scene "L0 Shape Polygon"
 
 Vector network nodes: closed shapes, open paths, region fills, variable-width strokes.
 
-```
+```text
 scene "L0 Vector"
 ├─ vector   closed bezier quad (4 curved segments, EvenOdd region, blue fill)
 ├─ vector   open path (3 vertices, 2 segments, no region, markers)
@@ -87,7 +87,7 @@ scene "L0 Vector"
 
 One rectangle per paint type. Each rectangle uses exactly one fill to isolate the paint variant.
 
-```
+```text
 scene "L0 Paints"
 ├─ rectangle   solid           (red, full opacity)
 ├─ rectangle   linear gradient (red→blue, left→right)
@@ -104,7 +104,7 @@ scene "L0 Paints"
 
 A single rectangle with multiple fills stacked bottom-to-top, demonstrating paint compositing.
 
-```
+```text
 scene "L0 Paints Stack"
 └─ rectangle  200×200
      fill[0]: solid white (base)
@@ -122,7 +122,7 @@ scene "L0 Paints Stack"
 
 Stroke options on basic shapes: alignment, cap, join, dash array, markers.
 
-```
+```text
 scene "L0 Strokes"
 ├─ rectangle   stroke_align=Center, cap=Butt, join=Miter, 2px black
 ├─ rectangle   stroke_align=Inside, cap=Round, join=Round, 3px blue
@@ -140,7 +140,7 @@ scene "L0 Strokes"
 
 Container-specific rectangular (per-side) stroke widths and per-side corner radii.
 
-```
+```text
 scene "L0 Strokes Rect"
 ├─ container  300×200  rectangular stroke (top=1, right=2, bottom=3, left=4), black
 └─ container  300×200  uniform stroke 2px + per-side corner radii (tl=0, tr=8, bl=16, br=24)
@@ -154,7 +154,7 @@ scene "L0 Strokes Rect"
 
 Image paint-specific properties: fit modes, resource references, quarter turns, alignment.
 
-```
+```text
 scene "L0 Image"
 ├─ rectangle   ImagePaint, HASH ref, BoxFit::Cover, alignment=CENTER
 ├─ rectangle   ImagePaint, RID ref, BoxFit::Contain, alignment=CENTER
@@ -170,7 +170,7 @@ scene "L0 Image"
 
 Image paint with non-default ImageFilters: exposure, contrast, saturation, temperature, tint, highlights, shadows.
 
-```
+```text
 scene "L0 Image Filters"
 ├─ rectangle   bright + warm (exposure=0.5, temperature=0.4)
 ├─ rectangle   high contrast + desaturated (contrast=0.25, saturation=-0.8)
@@ -186,7 +186,7 @@ scene "L0 Image Filters"
 
 Each effect type on its own rectangle, one per node. Solid grey fill so the effect is visible.
 
-```
+```text
 scene "L0 Effects"
 ├─ rectangle   blur: gaussian, radius=5
 ├─ rectangle   backdrop_blur: gaussian, radius=8
@@ -206,7 +206,7 @@ padding (matching the golden reference pattern). The 380×380 stripe background
 is drawn first; the 300×300 glass panel sits centered with 40 px padding on
 every side.
 
-```
+```text
 scene "L0 Effects Glass"
 ├─ rectangle 380×380  fill: white       (background)
 ├─ 10× rectangle 20×380  fill: black    (even stripes over white bg)
@@ -223,7 +223,7 @@ over a stripe pattern (same approach as `golden_liquid_glass.rs`).
 
 Core typography: font sizes, weights, alignment, decoration, spacing, transforms, stroke, effects.
 
-```
+```text
 scene "L0 Type"
 ├─ text_span  "Regular 16px"              Inter 16px, weight=400, Left/Top
 ├─ text_span  "Bold 24px"                 Inter 24px, weight=700, Center/Center
@@ -245,7 +245,7 @@ scene "L0 Type"
 
 Variable font axes: weight, width, optical sizing, custom fvar axes, italic.
 
-```
+```text
 scene "L0 Type fvar"
 ├─ text_span  "Thin 100"                  Inter weight=100
 ├─ text_span  "Light 300"                 Inter weight=300
@@ -266,7 +266,7 @@ scene "L0 Type fvar"
 
 OpenType font features: ligatures, small caps, stylistic sets, tabular numbers, kerning.
 
-```
+```text
 scene "L0 Type Features"
 ├─ text_span  "ffi ffl — liga off"         Inter, liga=false
 ├─ text_span  "ffi ffl — liga on"          Inter, liga=true
@@ -284,7 +284,7 @@ scene "L0 Type Features"
 
 Mask composition with each mask type. Each mask + its target are inside a dedicated group to avoid masking unrelated siblings.
 
-```
+```text
 scene "L0 Masks"
 ├─ group (image mask demo)
 │  ├─ rectangle  100×100  red solid (content)
@@ -302,7 +302,7 @@ scene "L0 Masks"
 
 All four boolean path operations, each with two overlapping child rectangles.
 
-```
+```text
 scene "L0 Boolean Operation"
 ├─ boolean_op  Union (red, 2 overlapping rects)
 ├─ boolean_op  Intersection (blue, 2 overlapping rects)
@@ -318,7 +318,7 @@ scene "L0 Boolean Operation"
 
 Positioning modes for shapes within a container. No flex — uses Normal layout mode.
 
-```
+```text
 scene "L0 Layout Position"
 └─ container  400×300  Normal layout, light grey fill
    ├─ rectangle  80×60  Cartesian position (x=20, y=20)
@@ -334,7 +334,7 @@ scene "L0 Layout Position"
 
 Flex layout demonstration with two containers showing different configurations.
 
-```
+```text
 scene "L0 Layout Flex"
 ├─ container  500×80  horizontal flex, gap=10, main=SpaceBetween, cross=Center
 │  ├─ rectangle  100×50  (auto)
@@ -353,7 +353,7 @@ scene "L0 Layout Flex"
 
 Rotation and affine transforms on containers and shapes.
 
-```
+```text
 scene "L0 Layout Transform"
 ├─ container  200×150  rotated 90°, Cartesian at (300, 50), blue fill
 ├─ rectangle  120×80   rotated 45°, at (50, 50), red fill

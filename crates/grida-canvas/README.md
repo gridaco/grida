@@ -113,5 +113,5 @@ Validates file structure, reports node counts and types, and surfaces decode err
 ## Package docs
 
 ```sh
-cargo doc --package skia-safe --open --no-deps
+cargo doc --package cg --open --no-deps
 ```

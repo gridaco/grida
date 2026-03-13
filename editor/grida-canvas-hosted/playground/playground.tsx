@@ -499,7 +499,12 @@ export default function CanvasPlayground({
         } catch (error) {
           if (error instanceof Error && error.message.includes("not found")) {
             // File doesn't exist yet - this is fine, continue to fallback
-          } else {
+          } else if (
+            error instanceof Error &&
+            /decode|schema|corrupt|unreadable|invalid|flatbuffers/i.test(
+              error.message
+            )
+          ) {
             // Decode failure (likely a schema change) or other corruption.
             // Quarantine the stale files so the user's data is preserved
             // for possible future migration, then fall through to the
@@ -516,6 +521,10 @@ export default function CanvasPlayground({
                 quarantineError
               );
             }
+          } else {
+            // Transient or runtime error (e.g. from reset() / loadImages()).
+            // Do not quarantine - rethrow so the caller can handle it.
+            console.error("OPFS load error (not quarantining):", error);
           }
         }
 

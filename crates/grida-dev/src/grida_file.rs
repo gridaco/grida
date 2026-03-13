@@ -6,13 +6,14 @@
 //!   `document.grida` (a raw FlatBuffers binary) plus optional `images/` and `bitmaps/`.
 
 use anyhow::{anyhow, Context, Result};
-use cg::io::io_grida_fbs;
+use cg::io::{id_converter::IdConverter, io_grida, io_grida_fbs};
 use cg::node::schema::Scene;
 
 /// Detected variant of a `.grida` file.
 enum Format {
     RawFbs,
     Zip,
+    Json,
     Unknown,
 }
 
@@ -21,13 +22,22 @@ fn detect(bytes: &[u8]) -> Format {
     if bytes.len() >= 4
         && bytes[0] == 0x50
         && bytes[1] == 0x4b
-        && (bytes[2] == 0x03 || bytes[2] == 0x05)
+        && ((bytes[2] == 0x03 && bytes[3] == 0x04) || (bytes[2] == 0x05 && bytes[3] == 0x06))
     {
         return Format::Zip;
     }
     // Raw FlatBuffers: file identifier "GRID" at bytes 4–7
     if bytes.len() >= 8 && &bytes[4..8] == b"GRID" {
         return Format::RawFbs;
+    }
+    // JSON: starts with '{' or '[' (after optional UTF-8 BOM / whitespace)
+    let trimmed = bytes
+        .iter()
+        .position(|&b| !b.is_ascii_whitespace() && b != 0xEF && b != 0xBB && b != 0xBF)
+        .map(|i| bytes[i])
+        .unwrap_or(0);
+    if trimmed == b'{' || trimmed == b'[' {
+        return Format::Json;
     }
     Format::Unknown
 }
@@ -72,8 +82,18 @@ pub fn decode_all(bytes: &[u8]) -> Result<Vec<Scene>> {
             let fbs_bytes = extract_fbs_from_zip(bytes)?;
             io_grida_fbs::decode_all(&fbs_bytes).map_err(|err| anyhow!("{err}"))
         }
+        Format::Json => {
+            let json_str = std::str::from_utf8(bytes).context("invalid UTF-8 in JSON scene")?;
+            let file = io_grida::parse(json_str)
+                .map_err(|err| anyhow!("failed to parse JSON scene: {err}"))?;
+            let mut converter = IdConverter::new();
+            let scene = converter
+                .convert_json_canvas_file(file)
+                .map_err(|err| anyhow!("failed to convert JSON scene: {err}"))?;
+            Ok(vec![scene])
+        }
         Format::Unknown => Err(anyhow!(
-            "unrecognized file format: expected a .grida FlatBuffers binary or ZIP archive"
+            "unrecognized file format: expected a .grida FlatBuffers binary, ZIP archive, or JSON"
         )),
     }
 }

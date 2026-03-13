@@ -126,6 +126,9 @@ async fn main() -> Result<()> {
 
 async fn run_scene(source: &str) -> Result<()> {
     let scenes = load_scenes_from_source(source).await?;
+    if scenes.is_empty() {
+        return Err(anyhow!("no scenes decoded from source: {source}"));
+    }
     if scenes.len() > 1 {
         println!("Loaded {} scenes (PageUp/PageDown to switch)", scenes.len());
         run_demo_window_multi(scenes).await;

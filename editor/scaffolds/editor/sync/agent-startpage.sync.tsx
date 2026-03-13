@@ -6,6 +6,7 @@ import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import type { FormStartPageSchema } from "@/grida-forms-hosted/types";
 import { useEditorState } from "@/scaffolds/editor/use-editor";
 import equal from "deep-equal";
+import grida from "@grida/schema";
 
 export function useSyncFormAgentStartPage() {
   const [state, dispatch] = useEditorState();
@@ -30,7 +31,7 @@ export function useSyncFormAgentStartPage() {
         .update({
           start_page: debounced
             ? ({
-                __schema_version: "0.91.0-beta+20260311",
+                __schema_version: grida.program.document.SCHEMA_VERSION,
                 template_id: startpagestate!.template_id,
                 ...debounced,
               } satisfies FormStartPageSchema as {})

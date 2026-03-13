@@ -6,7 +6,11 @@
 mod fixtures;
 
 /// Pack all L0 scenes into `L0.grida`.
+///
+/// This test writes files to disk and should only be run explicitly:
+///   cargo test --package cg --test fbs_fixtures -- write_l0 --ignored
 #[test]
+#[ignore]
 fn write_l0() {
     let scenes: Vec<(&str, _)> = vec![
         ("L0-shapes",              fixtures::l0_shapes::build()),

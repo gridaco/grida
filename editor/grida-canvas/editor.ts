@@ -3153,7 +3153,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.91.0-beta+20260311",
+          version: grida.program.document.SCHEMA_VERSION,
           document: payloadDocument,
         });
         surface.loadScene(p);

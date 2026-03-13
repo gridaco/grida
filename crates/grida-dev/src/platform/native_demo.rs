@@ -93,6 +93,10 @@ async fn run_demo_window_core_multi<F>(
             let _ = proxy_clone.send_event(event);
         })
     };
+    // Store image_tx and event_cb for scene-switch image loading.
+    app.image_tx = Some(tx.clone());
+    app.event_cb = Some(event_cb.clone());
+
     std::thread::spawn(move || {
         let event_cb = event_cb.clone();
         futures::executor::block_on(async move {

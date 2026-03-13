@@ -1,8 +1,8 @@
 use super::winit::{winit_window, WinitResult};
 use cg::node::schema::{Scene, Size};
-use cg::resources::{FontMessage, ImageMessage};
+use cg::resources::{load_scene_images, FontMessage, ImageMessage};
 use cg::runtime::camera::Camera2D;
-use cg::window::application::{ApplicationApi, HostEvent, UnknownTargetApplication};
+use cg::window::application::{ApplicationApi, HostEvent, HostEventCallback, UnknownTargetApplication};
 use cg::window::command::ApplicationCommand;
 use cg::window::state::AnySurfaceState;
 use futures::channel::mpsc;
@@ -92,6 +92,10 @@ pub struct NativeApplication {
     pub(crate) scenes: Vec<Scene>,
     /// Index of the currently displayed scene in `scenes`.
     pub(crate) scene_index: usize,
+    /// Image channel sender for loading scene images on scene switch.
+    pub(crate) image_tx: Option<mpsc::UnboundedSender<ImageMessage>>,
+    /// Host event callback for notifying the event loop of image load completion.
+    pub(crate) event_cb: Option<HostEventCallback>,
 }
 
 impl NativeApplication {
@@ -164,6 +168,8 @@ impl NativeApplication {
             fit_scene_on_load,
             scenes: Vec::new(),
             scene_index: 0,
+            image_tx: None,
+            event_cb: None,
         };
 
         std::thread::spawn(move || loop {
@@ -250,6 +256,19 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                             scene.name,
                         );
                         eprintln!("{title}");
+
+                        // Load scene images in background for the new scene.
+                        if let (Some(image_tx), Some(event_cb)) =
+                            (self.image_tx.clone(), self.event_cb.clone())
+                        {
+                            let scene_for_images = scene.clone();
+                            std::thread::spawn(move || {
+                                futures::executor::block_on(async move {
+                                    load_scene_images(&scene_for_images, image_tx, event_cb).await;
+                                });
+                            });
+                        }
+
                         let renderer = self.app.renderer_mut();
                         renderer.load_scene(scene);
                         fit_camera_to_scene(renderer);
