@@ -1033,7 +1033,7 @@ pub struct JSONTextSpanNode {
         alias = "textDecorationThickness",
         default
     )]
-    pub text_decoration_thinkness: Option<f32>,
+    pub text_decoration_thickness: Option<f32>,
 
     #[serde(rename = "line_height", alias = "lineHeight", default)]
     pub line_height: Option<f32>,
@@ -1431,7 +1431,7 @@ impl From<JSONTextSpanNode> for TextSpanNodeRec {
                     text_decoration_color: Some(node.text_decoration_color),
                     text_decoration_style: node.text_decoration_style,
                     text_decoration_skip_ink: node.text_decoration_skip_ink,
-                    text_decoration_thinkness: node.text_decoration_thinkness,
+                    text_decoration_thickness: node.text_decoration_thickness,
                 }),
                 font_family: node.font_family.unwrap_or_else(|| "".to_string()),
                 font_size: node.font_size.unwrap_or(14.0),
@@ -3214,7 +3214,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {
@@ -3271,7 +3271,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {
@@ -3338,7 +3338,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {

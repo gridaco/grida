@@ -54,5 +54,13 @@ python3 bin/activate-flatc -- --ts --ts-no-import-ext -o /tmp/grida-fbs-gen/ts f
 python3 bin/activate-flatc -- --rust -o /tmp/grida-fbs-gen/rust format/grida.fbs
 ```
 
-> Note: In-repo generated code locations + automation scripts are intentionally
-> not committed yet; we’ll add them once the schema stabilizes.
+> In-repo generated code + automation:
+>
+> - **TypeScript**: `packages/grida-format/` — **committed**; regenerated on `pnpm build` via `prebuild`. Changes to generated TS files are expected in PRs that modify `grida.fbs`.
+> - **Rust**: `crates/grida-canvas/src/io/generated/` — **committed**; regenerated on `pnpm build` via `prebuild`. Changes to generated Rust files are expected in PRs that modify `grida.fbs`.
+>
+> **Contributor workflow**: after editing `grida.fbs`, run `pnpm build` (or the individual `prebuild` scripts in each package) to regenerate bindings, then commit the updated generated files alongside your schema change.
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).

@@ -267,7 +267,7 @@ impl From<&TextStyleRec> for TextStyle {
                       a: c.a as f32 / 255.0,
                   }),
                   d.text_decoration_skip_ink.unwrap_or(true),
-                  d.text_decoration_thinkness.unwrap_or(1.0),
+                  d.text_decoration_thickness.unwrap_or(1.0),
               )
           } else {
               (
@@ -336,7 +336,7 @@ impl From<&TextStyle> for TextStyleRec {
                   )
               }),
               text_decoration_skip_ink: Some(s.text_decoration_skip_ink),
-              text_decoration_thinkness: Some(s.text_decoration_thickness),
+              text_decoration_thickness: Some(s.text_decoration_thickness),
           })
       };
 

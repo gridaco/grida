@@ -295,7 +295,9 @@ impl ApplicationApi for UnknownTargetApplication {
                     }
                 }
             }
-            ApplicationCommand::None => {}
+            ApplicationCommand::None
+            | ApplicationCommand::NextScene
+            | ApplicationCommand::PrevScene => {}
         }
 
         false

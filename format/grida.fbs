@@ -1281,7 +1281,7 @@ table LayerTrait {
   /// Default is `pass_through`.
   blend_mode:LayerBlendMode = PassThrough;
 
-  /// Rust: `LayerMaskType` (union; default is Image(alpha) since it's the first union member)
+  /// Rust: `LayerMaskType` (union; NONE means the node is not a mask)
   mask_type:LayerMaskType;
 
   /// layer effects.
@@ -1513,15 +1513,29 @@ union Node {
 // Document root
 // -----------------------------------------------------------------------------
 
+/// Wrapper table for a single Node union entry in a flat node vector.
+///
+/// FlatBuffers Rust codegen does not support `[Node]` (vector of unions) directly.
+/// Using `[NodeSlot]` (vector of tables each containing a union field) is the
+/// canonical workaround — identical in spirit to `PaintStackItem` wrapping `Paint`.
+/// See: https://github.com/google/flatbuffers/issues/8011
+table NodeSlot {
+  node:Node;
+}
+
 table CanvasDocument {
   /// Schema version string (keep in sync with TS `grida.program.document.SCHEMA_VERSION`).
   schema_version:string (id: 0);
 
   /// Flat node repository.
-  nodes:[Node] (id: 2);
+  ///
+  /// Stored as `[NodeSlot]` (vector of wrapper tables) rather than `[Node]`
+  /// (vector of unions) to maintain compatibility with Rust FlatBuffers codegen,
+  /// which does not support vectors of unions directly.
+  nodes:[NodeSlot] (id: 1);
 
   /// Scene node ids (scene nodes are also stored in `nodes`).
-  scenes:[NodeIdentifier] (id: 3);
+  scenes:[NodeIdentifier] (id: 2);
 }
 
 /// Top-level wrapper (allows future multi-document bundles, signatures, etc.)

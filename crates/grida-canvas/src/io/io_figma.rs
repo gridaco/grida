@@ -1292,7 +1292,7 @@ impl FigmaConverter {
                     text_decoration_color: None,
                     text_decoration_style: None,
                     text_decoration_skip_ink: None,
-                    text_decoration_thinkness: None,
+                    text_decoration_thickness: None,
                 }),
                 font_family: style
                     .font_family

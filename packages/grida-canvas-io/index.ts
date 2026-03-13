@@ -1434,6 +1434,88 @@ export namespace io {
         const file = await fileHandle.getFile();
         return new Uint8Array(await file.arrayBuffer());
       }
+
+      /**
+       * Quarantines all document files into `_quarantine/<label>/` and removes
+       * the originals.  This is used when stored data becomes unreadable
+       * (e.g. after a breaking schema change) so the user's bytes are
+       * isolated and preserved for possible future migration rather than
+       * being silently deleted.
+       *
+       * The quarantine directory lives **inside** this Handle's directory so
+       * each playground file-key gets its own quarantine history.
+       *
+       * @param label - Sub-directory name inside `_quarantine/` (defaults to
+       *   an ISO-8601 timestamp). Keep it filesystem-safe (no colons on
+       *   Windows, but OPFS is origin-scoped so we just replace `:` with `-`).
+       */
+      async quarantine(label?: string): Promise<void> {
+        const dir = await this.getDirectoryHandle();
+        const safeLabel =
+          label ?? new Date().toISOString().replace(/:/g, "-");
+        const archiveRoot = await dir.getDirectoryHandle("_quarantine", {
+          create: true,
+        });
+        const archiveDir = await archiveRoot.getDirectoryHandle(safeLabel, {
+          create: true,
+        });
+
+        // Move each known document file (best-effort per file).
+        const keys: FileKey[] = ["document.grida", "document.grida1"];
+        for (const key of keys) {
+          try {
+            const srcHandle = await dir.getFileHandle(key);
+            const file = await srcHandle.getFile();
+            const bytes = new Uint8Array(await file.arrayBuffer());
+
+            // Write into archive
+            const dstHandle = await archiveDir.getFileHandle(key, {
+              create: true,
+            });
+            const writable = await dstHandle.createWritable();
+            await writable.write(bytes as unknown as FileSystemWriteChunkType);
+            await writable.close();
+
+            // Remove original
+            await dir.removeEntry(key);
+          } catch {
+            // Source file missing or other error — skip silently.
+          }
+        }
+
+        // Archive images/ directory (if present).
+        try {
+          const imagesDir = await dir.getDirectoryHandle("images");
+          const archiveImagesDir = await archiveDir.getDirectoryHandle(
+            "images",
+            { create: true }
+          );
+          const entries = (
+            imagesDir as unknown as {
+              entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
+            }
+          ).entries();
+          for await (const [name, handle] of entries) {
+            if (handle.kind !== "file") continue;
+            try {
+              const fh = await imagesDir.getFileHandle(name);
+              const file = await fh.getFile();
+              const bytes = new Uint8Array(await file.arrayBuffer());
+              const dst = await archiveImagesDir.getFileHandle(name, {
+                create: true,
+              });
+              const w = await dst.createWritable();
+              await w.write(bytes as unknown as FileSystemWriteChunkType);
+              await w.close();
+              await imagesDir.removeEntry(name);
+            } catch {
+              // skip
+            }
+          }
+        } catch {
+          // No images directory — nothing to archive.
+        }
+      }
     }
   }
 

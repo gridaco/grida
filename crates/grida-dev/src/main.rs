@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use cg::cg::prelude::*;
 use cg::cg::types::ResourceRef;
 use cg::helpers::webfont_helper::{find_font_files, load_webfonts_metadata};
-use cg::io::{io_figma::FigmaConverter, io_grida};
+use cg::io::io_figma::FigmaConverter;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::{Node, Scene, Size};
@@ -17,8 +17,9 @@ use figma_api::apis::{
 use futures::channel::mpsc;
 use futures::future::join_all;
 use grida_dev::platform::native_demo::{
-    run_demo_window, run_demo_window_with, run_demo_window_with_drop,
+    run_demo_window, run_demo_window_multi, run_demo_window_with, run_demo_window_with_drop,
 };
+mod grida_file;
 mod reftest;
 use image::image_dimensions;
 use math2::transform::AffineTransform;
@@ -124,8 +125,16 @@ async fn main() -> Result<()> {
 }
 
 async fn run_scene(source: &str) -> Result<()> {
-    let scene = load_scene_from_source(source).await?;
-    run_demo_window(scene).await;
+    let scenes = load_scenes_from_source(source).await?;
+    if scenes.is_empty() {
+        return Err(anyhow!("no scenes decoded from source: {source}"));
+    }
+    if scenes.len() > 1 {
+        println!("Loaded {} scenes (PageUp/PageDown to switch)", scenes.len());
+        run_demo_window_multi(scenes).await;
+    } else {
+        run_demo_window(scenes.into_iter().next().unwrap()).await;
+    }
     Ok(())
 }
 
@@ -277,26 +286,29 @@ async fn run_master() -> Result<()> {
 }
 
 async fn load_scene_from_source(source: &str) -> Result<Scene> {
-    let data = if is_url(source) {
+    let bytes = read_source_bytes(source).await?;
+    grida_file::decode(&bytes)
+}
+
+async fn load_scenes_from_source(source: &str) -> Result<Vec<Scene>> {
+    let bytes = read_source_bytes(source).await?;
+    grida_file::decode_all(&bytes)
+}
+
+async fn read_source_bytes(source: &str) -> Result<Vec<u8>> {
+    if is_url(source) {
         reqwest::get(source)
             .await
             .with_context(|| format!("failed to download scene from {source}"))?
-            .text()
+            .bytes()
             .await
-            .context("failed to read downloaded scene body")?
+            .context("failed to read downloaded scene body")
+            .map(|b| b.to_vec())
     } else {
-        async_fs::read_to_string(source)
+        async_fs::read(source)
             .await
-            .with_context(|| format!("failed to read scene file at {source}"))?
-    };
-
-    let file =
-        io_grida::parse(&data).context("failed to parse scene JSON. expected a `.grida` export")?;
-
-    let mut converter = cg::io::id_converter::IdConverter::new();
-    converter
-        .convert_json_canvas_file(file)
-        .map_err(|err| anyhow!(err))
+            .with_context(|| format!("failed to read scene file at {source}"))
+    }
 }
 
 async fn load_figma_scene(args: &FigmaArgs) -> Result<(Scene, FigmaConverter)> {

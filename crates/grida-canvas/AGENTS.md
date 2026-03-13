@@ -75,6 +75,5 @@ See [examples/tool_io_grida.rs](./examples/tool_io_grida.rs) for full documentat
 ## Package Docs
 
 ```sh
-# skia-safe
-cargo doc --package skia-safe --open --no-deps
+cargo doc --package cg --open --no-deps
 ```

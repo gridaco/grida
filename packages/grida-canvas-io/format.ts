@@ -2,7 +2,7 @@ import grida from "@grida/schema";
 import cg from "@grida/cg";
 import type cmath from "@grida/cmath";
 import * as fbs from "@grida/format";
-import { unionToPaint, unionListToNode, unionToFeBlur } from "@grida/format";
+import { unionToPaint, unionToNode, unionToFeBlur } from "@grida/format";
 import type { vn } from "@grida/schema";
 import * as flatbuffers from "flatbuffers";
 import { generateNKeysBetween } from "@grida/sequence";
@@ -960,15 +960,31 @@ export namespace format {
         // Nodes don't have blend_mode directly - it's not part of the TS node model
         const blendMode: fbs.LayerBlendMode = fbs.LayerBlendMode.PassThrough;
 
-        // Encode mask_type (LayerMaskType union)
-        // Default to Image(Alpha) - create LayerMaskTypeImage
-        fbs.LayerMaskTypeImage.startLayerMaskTypeImage(builder);
-        fbs.LayerMaskTypeImage.addImageMaskType(
-          builder,
-          fbs.ImageMaskType.Alpha
-        );
-        const maskTypeOffset =
-          fbs.LayerMaskTypeImage.endLayerMaskTypeImage(builder);
+        // Encode mask_type (LayerMaskType union) — only when the node is actually a mask
+        const nodeWithMask = node as grida.program.nodes.Node &
+          Partial<grida.program.nodes.i.ILayerMaskType>;
+        let maskTypeOffset: flatbuffers.Offset | undefined = undefined;
+        let maskTypeEnum: fbs.LayerMaskType = fbs.LayerMaskType.NONE;
+        if (nodeWithMask.mask != null) {
+          if (nodeWithMask.mask === "geometry") {
+            fbs.LayerMaskTypeGeometry.startLayerMaskTypeGeometry(builder);
+            maskTypeOffset =
+              fbs.LayerMaskTypeGeometry.endLayerMaskTypeGeometry(builder);
+            maskTypeEnum = fbs.LayerMaskType.LayerMaskTypeGeometry;
+          } else {
+            // ImageMaskType: "alpha" | "luminance"
+            fbs.LayerMaskTypeImage.startLayerMaskTypeImage(builder);
+            fbs.LayerMaskTypeImage.addImageMaskType(
+              builder,
+              nodeWithMask.mask === "luminance"
+                ? fbs.ImageMaskType.Luminance
+                : fbs.ImageMaskType.Alpha
+            );
+            maskTypeOffset =
+              fbs.LayerMaskTypeImage.endLayerMaskTypeImage(builder);
+            maskTypeEnum = fbs.LayerMaskType.LayerMaskTypeImage;
+          }
+        }
 
         // Encode effects
         let effectsOffset: flatbuffers.Offset | undefined = undefined;
@@ -1027,12 +1043,11 @@ export namespace format {
         // 3. Blend mode
         fbs.LayerTrait.addBlendMode(builder, blendMode);
 
-        // 4. Mask type
-        fbs.LayerTrait.addMaskTypeType(
-          builder,
-          fbs.LayerMaskType.LayerMaskTypeImage
-        );
-        fbs.LayerTrait.addMaskType(builder, maskTypeOffset);
+        // 4. Mask type (only set when the node is a mask)
+        if (maskTypeOffset !== undefined) {
+          fbs.LayerTrait.addMaskTypeType(builder, maskTypeEnum);
+          fbs.LayerTrait.addMaskType(builder, maskTypeOffset);
+        }
 
         // 5. Effects
         if (effectsOffset !== undefined) {
@@ -4430,8 +4445,7 @@ export namespace format {
         // Deterministic ordering: sort by string id
         nodeIds.sort();
 
-        const nodeOffsets: flatbuffers.Offset[] = [];
-        const nodeTypes: fbs.Node[] = [];
+        const nodeSlotOffsets: flatbuffers.Offset[] = [];
         for (const nodeId of nodeIds) {
           const node = document.nodes[nodeId]!;
           const parentRef = nodeToParentRef.get(nodeId);
@@ -4483,18 +4497,16 @@ export namespace format {
             parentRef,
             layoutOffset
           );
-          nodeOffsets.push(nodeOffset);
-          nodeTypes.push(nodeType);
+          // Wrap in NodeSlot table (avoids vector-of-unions, enables Rust codegen)
+          fbs.NodeSlot.startNodeSlot(builder);
+          fbs.NodeSlot.addNodeType(builder, nodeType);
+          fbs.NodeSlot.addNode(builder, nodeOffset);
+          nodeSlotOffsets.push(fbs.NodeSlot.endNodeSlot(builder));
         }
 
-        // Create both nodesType and nodes vectors for union
-        const nodesTypeOffset = fbs.CanvasDocument.createNodesTypeVector(
-          builder,
-          nodeTypes
-        );
         const nodesOffset = fbs.CanvasDocument.createNodesVector(
           builder,
-          nodeOffsets
+          nodeSlotOffsets
         );
 
         // Encode scenes array
@@ -4508,7 +4520,6 @@ export namespace format {
         // Build CanvasDocument table
         fbs.CanvasDocument.startCanvasDocument(builder);
         fbs.CanvasDocument.addSchemaVersion(builder, schemaVersionOffset);
-        fbs.CanvasDocument.addNodesType(builder, nodesTypeOffset);
         fbs.CanvasDocument.addNodes(builder, nodesOffset);
         fbs.CanvasDocument.addScenes(builder, scenesOffset);
         const documentOffset = fbs.CanvasDocument.endCanvasDocument(builder);
@@ -4518,7 +4529,7 @@ export namespace format {
         fbs.GridaFile.addDocument(builder, documentOffset);
         const rootOffset = fbs.GridaFile.endGridaFile(builder);
 
-        builder.finish(rootOffset);
+        builder.finish(rootOffset, "GRID");
 
         return builder.asUint8Array();
       }
@@ -5438,15 +5449,14 @@ export namespace format {
 
         const nodeCount = document.nodesLength();
         for (let i = 0; i < nodeCount; i++) {
-          const nodeType = document.nodesType(i);
-          if (nodeType === null || nodeType === fbs.Node.NONE) continue;
+          const slot = document.nodes(i);
+          if (!slot) continue;
 
-          // Get typed node table using union
-          const typedNode = unionListToNode(
-            nodeType,
-            (index: number, obj: any) => document.nodes(index, obj),
-            i
-          );
+          const nodeType = slot.nodeType();
+          if (nodeType === fbs.Node.NONE) continue;
+
+          // Unwrap NodeSlot to get the typed node table
+          const typedNode = unionToNode(nodeType, (obj: any) => slot.node(obj));
           if (!typedNode) continue;
 
           // SceneNode is special - it doesn't use LayerTrait

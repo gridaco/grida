@@ -263,6 +263,14 @@ impl SceneGraph {
         self.nodes.is_empty()
     }
 
+    /// Iterate over all `(NodeId, &Node)` pairs in the graph.
+    ///
+    /// The iteration order is not guaranteed; callers should use `roots()` +
+    /// `get_children()` if they need tree order.
+    pub fn nodes_iter(&self) -> impl Iterator<Item = (&NodeId, &Node)> {
+        self.nodes.iter()
+    }
+
     // -------------------------------------------------------------------------
     // Tree Traversal Methods
     // -------------------------------------------------------------------------

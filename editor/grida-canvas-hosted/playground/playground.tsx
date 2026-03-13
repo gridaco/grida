@@ -497,11 +497,34 @@ export default function CanvasPlayground({
             }
           }
         } catch (error) {
-          // File not found or other error - continue to fallback
           if (error instanceof Error && error.message.includes("not found")) {
             // File doesn't exist yet - this is fine, continue to fallback
+          } else if (
+            error instanceof Error &&
+            /decode|schema|corrupt|unreadable|invalid|flatbuffers/i.test(
+              error.message
+            )
+          ) {
+            // Decode failure (likely a schema change) or other corruption.
+            // Quarantine the stale files so the user's data is preserved
+            // for possible future migration, then fall through to the
+            // default document.
+            console.warn(
+              "OPFS document unreadable (possible schema change), quarantining:",
+              error
+            );
+            try {
+              await opfs?.quarantine();
+            } catch (quarantineError) {
+              console.error(
+                "Failed to quarantine stale OPFS data:",
+                quarantineError
+              );
+            }
           } else {
-            console.error("Failed to load from OPFS:", error);
+            // Transient or runtime error (e.g. from reset() / loadImages()).
+            // Do not quarantine - rethrow so the caller can handle it.
+            console.error("OPFS load error (not quarantining):", error);
           }
         }
 

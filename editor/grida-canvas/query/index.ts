@@ -654,8 +654,7 @@ export namespace dq {
     /**
      * Returns unique image `src` references used by image paints.
      *
-     * - Persisted: typically `hex16` (content hash id)
-     * - Runtime: typically `blob:` or `mem://...`
+     * Includes all protocol schemes (`res://`, `system://`, etc.).
      */
     image_srcs(): string[] {
       return Array.from(
@@ -664,6 +663,19 @@ export namespace dq {
             .map((p) => p.paint.src)
             .filter(Boolean)
         )
+      );
+    }
+
+    /**
+     * Returns unique image `src` references that must be persisted in archives.
+     *
+     * Excludes `system://` images (built-in resources baked into the runtime)
+     * since they are auto-registered on load and must not be embedded in
+     * `.grida` archives.
+     */
+    persistable_image_srcs(): string[] {
+      return this.image_srcs().filter(
+        (src) => !src.startsWith("system://")
       );
     }
   }

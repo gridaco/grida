@@ -1407,7 +1407,7 @@ pub struct TextDecorationRec {
     pub text_decoration_skip_ink: Option<bool>,
 
     /// The thickness of the decoration stroke as a multiplier of the thickness defined by the font.
-    pub text_decoration_thinkness: Option<f32>,
+    pub text_decoration_thickness: Option<f32>,
 }
 
 impl TextDecorationRec {
@@ -1417,7 +1417,7 @@ impl TextDecorationRec {
             text_decoration_color: None,
             text_decoration_style: None,
             text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration_thickness: None,
         }
     }
 
@@ -1427,7 +1427,7 @@ impl TextDecorationRec {
             text_decoration_color: None,
             text_decoration_style: None,
             text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration_thickness: None,
         }
     }
 
@@ -1437,7 +1437,7 @@ impl TextDecorationRec {
             text_decoration_color: None,
             text_decoration_style: None,
             text_decoration_skip_ink: None,
-            text_decoration_thinkness: None,
+            text_decoration_thickness: None,
         }
     }
 }
@@ -1454,7 +1454,7 @@ pub struct TextDecoration {
     pub text_decoration_color: CGColor,
     pub text_decoration_style: TextDecorationStyle,
     pub text_decoration_skip_ink: bool,
-    pub text_decoration_thinkness: f32,
+    pub text_decoration_thickness: f32,
 }
 
 impl Default for TextDecoration {
@@ -1464,7 +1464,7 @@ impl Default for TextDecoration {
             text_decoration_color: CGColor::TRANSPARENT,
             text_decoration_style: TextDecorationStyle::Solid,
             text_decoration_skip_ink: true,
-            text_decoration_thinkness: 1.0,
+            text_decoration_thickness: 1.0,
         }
     }
 }
@@ -1476,14 +1476,14 @@ impl FromWithContext<TextDecorationRec, DecorationRecBuildContext> for TextDecor
             .text_decoration_style
             .unwrap_or(TextDecorationStyle::default());
         let text_decoration_skip_ink = value.text_decoration_skip_ink.unwrap_or(true);
-        let text_decoration_thinkness = value.text_decoration_thinkness.unwrap_or(1.0);
+        let text_decoration_thickness = value.text_decoration_thickness.unwrap_or(1.0);
 
         Self {
             text_decoration_line: value.text_decoration_line,
             text_decoration_color: text_decoration_color,
             text_decoration_style: text_decoration_style,
             text_decoration_skip_ink: text_decoration_skip_ink,
-            text_decoration_thinkness: text_decoration_thinkness,
+            text_decoration_thickness: text_decoration_thickness,
         }
     }
 }
