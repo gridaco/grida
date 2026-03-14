@@ -21,6 +21,10 @@
  * PR.  The tier descriptions and `multimodal` flags document the contract each
  * consumer relies on.
  *
+ * Context window, output limits, and cost are sourced from models.dev
+ * (`python .tools/model_info.py <model_id>`).  Update them when bumping model
+ * IDs.
+ *
  * @module
  */
 
@@ -42,6 +46,23 @@ import { gateway } from "ai";
  */
 export type ModelTier = "nano" | "mini" | "pro" | "max";
 
+/**
+ * Cost per 1M tokens in USD.
+ *
+ * Values from models.dev — represent direct provider pricing (not reseller
+ * markup).
+ */
+export interface ModelCostPerMillion {
+  /** USD per 1M input tokens. */
+  input: number;
+  /** USD per 1M output tokens. */
+  output: number;
+  /** USD per 1M cached input tokens (read). `undefined` if not supported. */
+  cacheRead?: number;
+  /** USD per 1M cached input tokens (write). `undefined` if not supported. */
+  cacheWrite?: number;
+}
+
 export interface ModelSpec {
   /** Vercel AI Gateway model ID (`creator/model-name`). */
   id: string;
@@ -49,10 +70,19 @@ export interface ModelSpec {
   label: string;
   /** Whether the model accepts image/file inputs. */
   multimodal: boolean;
+  /** Maximum context window in tokens (input + output combined). */
+  contextWindow: number;
+  /** Maximum output tokens per response. */
+  outputLimit: number;
+  /** Cost per 1M tokens in USD. */
+  cost: ModelCostPerMillion;
 }
 
 // ---------------------------------------------------------------------------
 // Current model assignments — edit here when bumping models
+//
+// All values from https://models.dev/api.json
+// To look up: python .tools/model_info.py <model_id>
 // ---------------------------------------------------------------------------
 
 const specs = {
@@ -60,21 +90,33 @@ const specs = {
     id: "openai/gpt-5-nano",
     label: "GPT-5 Nano",
     multimodal: true,
+    contextWindow: 400_000,
+    outputLimit: 128_000,
+    cost: { input: 0.05, output: 0.4 },
   },
   mini: {
     id: "openai/gpt-5-mini",
     label: "GPT-5 Mini",
     multimodal: true,
+    contextWindow: 400_000,
+    outputLimit: 128_000,
+    cost: { input: 0.25, output: 2 },
   },
   pro: {
     id: "anthropic/claude-sonnet-4",
     label: "Claude Sonnet 4",
     multimodal: true,
+    contextWindow: 200_000,
+    outputLimit: 64_000,
+    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
   },
   max: {
     id: "anthropic/claude-opus-4",
     label: "Claude Opus 4",
     multimodal: true,
+    contextWindow: 200_000,
+    outputLimit: 32_000,
+    cost: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   },
 } as const satisfies Record<ModelTier, ModelSpec>;
 
@@ -84,6 +126,38 @@ const specs = {
 
 /** Read-only map of tier → model spec. */
 export const models: Record<ModelTier, ModelSpec> = specs;
+
+/**
+ * Look up a model spec by model ID.
+ *
+ * Accepts:
+ * - Full gateway format: `"openai/gpt-5-mini"` (exact match)
+ * - Bare provider ID: `"gpt-5-mini"` (matches `openai/gpt-5-mini`)
+ * - Date-suffixed ID: `"gpt-5-mini-2025-08-07"` (providers often append a
+ *   snapshot date to the model ID in their API responses)
+ */
+export function modelSpecById(modelId: string): ModelSpec | undefined {
+  for (const spec of Object.values(specs)) {
+    // Exact match (gateway format)
+    if (spec.id === modelId) return spec;
+
+    // Extract the base model name from the spec (strip provider prefix)
+    const baseName = spec.id.includes("/")
+      ? spec.id.split("/").slice(1).join("/")
+      : spec.id;
+
+    // Bare ID match, or date-suffixed match (e.g. "gpt-5-mini-2025-08-07"
+    // starts with "gpt-5-mini" and the next char is "-" followed by digits)
+    if (modelId === baseName) return spec;
+    if (
+      modelId.startsWith(baseName) &&
+      /^-\d/.test(modelId.slice(baseName.length))
+    ) {
+      return spec;
+    }
+  }
+  return undefined;
+}
 
 /**
  * Return a `LanguageModelV3` instance for the given tier, ready to pass into

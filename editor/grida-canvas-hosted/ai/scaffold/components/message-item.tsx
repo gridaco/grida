@@ -80,13 +80,27 @@ export function AssistantMessage({
     ? ((message as any).parts as any[])
     : [];
 
-  // Track whether we've seen any renderable content at all so we can show a
-  // shimmer for the very first streaming frame.
-  let hasRenderedContent = false;
-
   // Group consecutive reasoning / text parts so they render as single blocks
   // instead of one-per-delta, while tool parts stay individual.
   const groupedParts = groupConsecutiveParts(parts);
+
+  // Whether any group has renderable content (for showing shimmer on first streaming frame).
+  const hasRenderedContent = groupedParts.some((group) => {
+    if (group.kind === "reasoning") {
+      const text = group.items
+        .map((p: any) => p.text ?? p.delta ?? "")
+        .join("");
+      return !!text;
+    }
+    if (group.kind === "text") {
+      const text = group.items
+        .map((p: any) => p.text ?? p.delta ?? "")
+        .join("");
+      return !!text;
+    }
+    if (group.kind === "tool") return true;
+    return false;
+  });
 
   const rendered = groupedParts.map((group, groupIndex) => {
     const key = `part-${groupIndex}`;
@@ -97,7 +111,6 @@ export function AssistantMessage({
         .map((p: any) => p.text ?? p.delta ?? "")
         .join("");
       if (!reasoningText) return null;
-      hasRenderedContent = true;
 
       // Reasoning is streaming if:
       //  a) the parts themselves are still delta/start types, OR
@@ -131,7 +144,6 @@ export function AssistantMessage({
         .map((p: any) => p.text ?? p.delta ?? "")
         .join("");
       if (!textContent) return null;
-      hasRenderedContent = true;
 
       return (
         <MessageContent
@@ -146,7 +158,6 @@ export function AssistantMessage({
     // ── Tool part (rendered individually) ────────────────────────────
     if (group.kind === "tool") {
       const part = group.items[0];
-      hasRenderedContent = true;
       return <ToolPart key={key} part={part} />;
     }
 

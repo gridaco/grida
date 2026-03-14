@@ -10,10 +10,29 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
-import type { ChatStatus } from "ai";
+import {
+  Context,
+  ContextContent,
+  ContextContentBody,
+  ContextContentFooter,
+  ContextContentHeader,
+  ContextInputUsage,
+  ContextOutputUsage,
+  ContextReasoningUsage,
+  ContextCacheUsage,
+  ContextTrigger,
+} from "@/components/ai-elements/context";
+import type { ChatStatus, LanguageModelUsage } from "ai";
 import { ArrowUpIcon, XIcon } from "lucide-react";
 import { InputGroupButton } from "@/components/ui/input-group";
 import { Spinner } from "@/components/ui/spinner";
+
+export type ContextUsageData = {
+  usedTokens: number;
+  maxTokens: number;
+  usage: LanguageModelUsage;
+  modelId: string | undefined;
+};
 
 export interface AgentInputProps {
   onSend: (content: string) => Promise<void>;
@@ -21,7 +40,7 @@ export interface AgentInputProps {
   disabled?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
-  onIncludeContext?: () => void;
+  contextUsage?: ContextUsageData;
 }
 
 export function AgentInput({
@@ -30,6 +49,7 @@ export function AgentInput({
   disabled = false,
   placeholder = "Ask anything",
   autoFocus = true,
+  contextUsage,
 }: AgentInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const status = isLoading ? "streaming" : "ready";
@@ -56,14 +76,55 @@ export function AgentInput({
           />
         </PromptInputBody>
         <PromptInputFooter>
-          {/* layout placeholder */}
-          <PromptInputTools />
+          <PromptInputTools>
+            {contextUsage && contextUsage.usedTokens > 0 && (
+              <ContextIndicator {...contextUsage} />
+            )}
+          </PromptInputTools>
           <PromptInputSubmit status={status} disabled={disabled} />
         </PromptInputFooter>
       </PromptInput>
     </PromptInputProvider>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Context window indicator
+// ---------------------------------------------------------------------------
+
+function ContextIndicator({
+  usedTokens,
+  maxTokens,
+  usage,
+  modelId,
+}: ContextUsageData) {
+  return (
+    <Context
+      usedTokens={usedTokens}
+      maxTokens={maxTokens || 1}
+      usage={usage}
+      modelId={modelId}
+    >
+      <ContextTrigger className="h-6 px-1.5 text-xs" />
+      <ContextContent side="top" align="start">
+        <ContextContentHeader />
+        <ContextContentBody>
+          <div className="space-y-1">
+            <ContextInputUsage />
+            <ContextOutputUsage />
+            <ContextReasoningUsage />
+            <ContextCacheUsage />
+          </div>
+        </ContextContentBody>
+        <ContextContentFooter />
+      </ContextContent>
+    </Context>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Submit button
+// ---------------------------------------------------------------------------
 
 const PromptInputSubmit = ({
   status,
