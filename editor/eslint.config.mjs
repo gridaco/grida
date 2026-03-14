@@ -25,6 +25,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // shadcn / generated UI (no control over code):
+    "components/ui/**",
+    "components/ui2/**",
+    "components/ai-elements/**",
   ]),
   // Custom rules
   {
