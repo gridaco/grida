@@ -1,9 +1,7 @@
 "use client";
 
-import React from "react";
 import type { CanvasDesignAgentMessage } from "@/grida-canvas-hosted/ai/agent/server-agent";
-import type { ToolUIPart } from "ai";
-import { Spinner } from "@/components/ui/spinner";
+import { getToolName, type ToolUIPart } from "ai";
 import {
   Reasoning,
   ReasoningContent,
@@ -23,9 +21,15 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
-import Image from "next/image";
-import { cn } from "@/components/lib/utils";
+import { canvas_use } from "@/grida-canvas-hosted/ai/tools/canvas-use";
 import { CopyIcon } from "lucide-react";
+import { cn } from "@/components/lib/utils";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import { SvgToolUI } from "./tool-ui-svg";
+import { TreeToolUI } from "./tool-ui-tree";
+import { ArtboardSizesToolUI } from "./tool-ui-artboard-sizes";
+import { GenerateImageToolUI } from "./tool-ui-generate-image";
+import { MarkdownToolUI } from "./tool-ui-markdown";
 
 export interface BaseMessageProps {
   message: CanvasDesignAgentMessage;
@@ -36,235 +40,304 @@ export interface AssistantMessageProps extends BaseMessageProps {
   isStreaming?: boolean;
 }
 
-type ToolItem = {
-  id: string;
-  name: string;
-  state?: ToolUIPart["state"];
-  input?: ToolUIPart["input"];
-  output?: ToolUIPart["output"];
-  errorText?: ToolUIPart["errorText"];
-  type: ToolUIPart["type"];
-};
+// ---------------------------------------------------------------------------
+// User message
+// ---------------------------------------------------------------------------
 
 export function UserMessage({ message, className }: BaseMessageProps) {
-  const { textSegments } = parseMessageParts(message);
-
-  let content = textSegments.join("").trim();
-  if (!content) {
-    const directContent = getDirectContent(message).trim();
-    content = directContent;
-  }
+  const content = getTextFromParts(message);
 
   return (
-    <React.Fragment>
-      <div className="flex max-w-full flex-col gap-1 items-end">
-        <Message from="user" className={className}>
-          <MessageContent>
-            <MessageResponse>{content}</MessageResponse>
-          </MessageContent>
-        </Message>
-        <MessageActions>
-          <MessageAction
-            onClick={() => navigator.clipboard.writeText(content)}
-            label="Copy"
-          >
-            <CopyIcon className="size-3" />
-          </MessageAction>
-        </MessageActions>
-      </div>
-    </React.Fragment>
+    <div className="flex max-w-full flex-col gap-1 items-end">
+      <Message from="user" className={className}>
+        <MessageContent>
+          <MessageResponse>{content}</MessageResponse>
+        </MessageContent>
+      </Message>
+      <MessageActions>
+        <MessageAction
+          onClick={() => navigator.clipboard.writeText(content)}
+          label="Copy"
+        >
+          <CopyIcon className="size-3" />
+        </MessageAction>
+      </MessageActions>
+    </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Assistant message — renders parts inline in stream order
+// ---------------------------------------------------------------------------
 
 export function AssistantMessage({
   message,
   isStreaming,
   className,
 }: AssistantMessageProps) {
-  const { textSegments, reasoningSegments, reasoningStreaming, toolMap } =
-    parseMessageParts(message);
-
-  let content = textSegments.join("").trim();
-  if (!content) {
-    const directContent = getDirectContent(message).trim();
-    content = directContent;
-  }
-
-  const reasoningText = reasoningSegments.join("").trim();
-  const reasoningIsStreaming = reasoningStreaming;
-
-  const toolItems = Array.from(toolMap.values());
-
-  return (
-    <Message from="assistant" className={cn("w-full max-w-none", className)}>
-      <div className="flex max-w-full flex-col gap-3">
-        {reasoningText && (
-          <Reasoning isStreaming={reasoningIsStreaming}>
-            <ReasoningTrigger />
-            <ReasoningContent>{reasoningText}</ReasoningContent>
-          </Reasoning>
-        )}
-
-        {(content || isStreaming) && (
-          <MessageContent className="w-full rounded-none border-0 px-0">
-            {content ? (
-              <MessageResponse>{content}</MessageResponse>
-            ) : (
-              <Spinner className="size-4" />
-            )}
-          </MessageContent>
-        )}
-
-        {toolItems.length > 0 && (
-          <div className="w-full space-y-2">
-            {toolItems.map((tool) => {
-              const state =
-                tool.state ??
-                (tool.output ? "output-available" : "input-available");
-              const generatedImageOutput =
-                tool.name === "generateImage" &&
-                tool.output &&
-                isGeneratedImage(tool.output)
-                  ? tool.output
-                  : null;
-
-              return (
-                <Tool
-                  key={tool.id}
-                  defaultOpen={
-                    state !== "input-streaming" &&
-                    state !== "approval-requested"
-                  }
-                >
-                  <ToolHeader
-                    title={tool.name}
-                    type={tool.type}
-                    state={state}
-                  />
-                  <ToolContent>
-                    {tool.input !== undefined && (
-                      <ToolInput input={tool.input} />
-                    )}
-                    {(tool.output !== undefined || tool.errorText) && (
-                      <ToolOutput
-                        output={tool.output}
-                        errorText={tool.errorText ?? undefined}
-                      />
-                    )}
-                    {generatedImageOutput && (
-                      <div className="p-4 pt-0">
-                        <GeneratedImagePreview output={generatedImageOutput} />
-                      </div>
-                    )}
-                  </ToolContent>
-                </Tool>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </Message>
-  );
-}
-
-function parseMessageParts(message: CanvasDesignAgentMessage) {
   const parts = Array.isArray((message as any).parts)
     ? ((message as any).parts as any[])
     : [];
 
-  const textSegments: string[] = [];
-  const reasoningSegments: string[] = [];
-  let reasoningStreaming = false;
-  const toolMap = new Map<string, ToolItem>();
+  // Group consecutive reasoning / text parts so they render as single blocks
+  // instead of one-per-delta, while tool parts stay individual.
+  const groupedParts = groupConsecutiveParts(parts);
 
-  const ensureToolEntry = (part: any) => {
-    const id =
-      part.toolCallId || part.id || part.name || `tool-${toolMap.size + 1}`;
-    const name = part.toolName || part.name || "tool";
+  // Whether any group has renderable content (for showing shimmer on first streaming frame).
+  const hasRenderedContent = groupedParts.some((group) => {
+    if (group.kind === "reasoning") {
+      const text = group.items
+        .map((p: any) => p.text ?? p.delta ?? "")
+        .join("");
+      return !!text;
+    }
+    if (group.kind === "text") {
+      const text = group.items
+        .map((p: any) => p.text ?? p.delta ?? "")
+        .join("");
+      return !!text;
+    }
+    if (group.kind === "tool") return true;
+    return false;
+  });
 
-    let entry = toolMap.get(id);
-    if (!entry) {
-      const inferredType =
-        typeof part.type === "string" && part.type.startsWith("tool-")
-          ? (part.type as ToolUIPart["type"])
-          : (`tool-${name}` as ToolUIPart["type"]);
+  const rendered = groupedParts.map((group, groupIndex) => {
+    const key = `part-${groupIndex}`;
 
-      entry = {
-        id,
-        name,
-        type: inferredType,
-      } as ToolItem;
-      toolMap.set(id, entry);
+    // ── Reasoning group ──────────────────────────────────────────────
+    if (group.kind === "reasoning") {
+      const reasoningText = group.items
+        .map((p: any) => p.text ?? p.delta ?? "")
+        .join("");
+      if (!reasoningText) return null;
+
+      // Reasoning is streaming if:
+      //  a) the parts themselves are still delta/start types, OR
+      //  b) the overall message is still streaming and nothing else
+      //     (text or tool) follows this reasoning group — meaning the
+      //     reasoning block is still the active stream frontier.
+      const hasDeltaParts = group.items.some(
+        (p: any) =>
+          p.type === "reasoning-delta" || p.type === "reasoning-start"
+      );
+      const isLastGroup = groupIndex === groupedParts.length - 1;
+      const nothingFollows =
+        isLastGroup ||
+        groupedParts
+          .slice(groupIndex + 1)
+          .every((g) => g.kind === "reasoning");
+      const isReasoningStreaming =
+        hasDeltaParts || (!!isStreaming && nothingFollows);
+
+      return (
+        <Reasoning key={key} isStreaming={isReasoningStreaming}>
+          <ReasoningTrigger />
+          <ReasoningContent>{reasoningText}</ReasoningContent>
+        </Reasoning>
+      );
     }
 
-    if (part.state) {
-      entry.state = part.state;
+    // ── Text group ────────────────────────────────────────────────────
+    if (group.kind === "text") {
+      const textContent = group.items
+        .map((p: any) => p.text ?? p.delta ?? "")
+        .join("");
+      if (!textContent) return null;
+
+      return (
+        <MessageContent
+          key={key}
+          className="w-full rounded-none border-0 px-0"
+        >
+          <MessageResponse>{textContent}</MessageResponse>
+        </MessageContent>
+      );
     }
-    if (part.input !== undefined) {
-      entry.input = part.input;
+
+    // ── Tool part (rendered individually) ────────────────────────────
+    if (group.kind === "tool") {
+      const part = group.items[0];
+      return <ToolPart key={key} part={part} />;
     }
-    if (part.output !== undefined) {
-      entry.output = part.output;
-    }
-    if (part.result !== undefined) {
-      entry.output = part.result;
-    }
-    if (part.errorText) {
-      entry.errorText = part.errorText;
-      entry.state = part.state ?? "output-error";
-    }
-  };
+
+    return null;
+  });
+
+  // If streaming but nothing rendered yet, show shimmer
+  if (isStreaming && !hasRenderedContent) {
+    rendered.push(
+      <Shimmer key="streaming-planning" className="text-xs">
+        Planning next moves
+      </Shimmer>
+    );
+  }
+
+  return (
+    <Message from="assistant" className={cn("w-full max-w-none", className)}>
+      <div className="flex max-w-full flex-col gap-3">{rendered}</div>
+    </Message>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ToolPart — dispatches to custom UIs or falls back to generic Tool chrome
+// ---------------------------------------------------------------------------
+
+function ToolPart({ part }: { part: any }) {
+  const toolName = getToolName(part);
+  const state: ToolUIPart["state"] =
+    part.state ?? (part.output ? "output-available" : "input-available");
+  const input = part.input;
+  const output = part.output;
+  const errorText: string | undefined = part.errorText;
+
+  // ── Custom tool UIs ────────────────────────────────────────────────
+  switch (toolName) {
+    case canvas_use.tools_spec.name_make_from_svg:
+      return (
+        <SvgToolUI
+          input={input}
+          output={output}
+          state={state}
+          errorText={errorText}
+        />
+      );
+    case canvas_use.tools_spec.name_tree:
+      return (
+        <TreeToolUI output={output} state={state} errorText={errorText} />
+      );
+    case canvas_use.tools_spec.name_data_artboard_sizes:
+      return (
+        <ArtboardSizesToolUI
+          output={output}
+          state={state}
+          errorText={errorText}
+        />
+      );
+    case canvas_use.tools_spec.name_make_from_markdown:
+      return (
+        <MarkdownToolUI
+          input={input}
+          output={output}
+          state={state}
+          errorText={errorText}
+        />
+      );
+    case canvas_use.tools_spec.name_platform_sys_tool_ai_generate_image:
+      return (
+        <GenerateImageToolUI
+          input={input}
+          output={output}
+          state={state}
+          errorText={errorText}
+        />
+      );
+  }
+
+  // ── Generic fallback ───────────────────────────────────────────────
+  return (
+    <div className="w-full">
+      <Tool
+        defaultOpen={
+          state !== "input-streaming" && state !== "approval-requested"
+        }
+      >
+        <ToolHeader title={toolName} type={part.type} state={state} />
+        <ToolContent>
+          {input !== undefined && <ToolInput input={input} />}
+          {(output !== undefined || errorText) && (
+            <ToolOutput output={output} errorText={errorText ?? undefined} />
+          )}
+        </ToolContent>
+      </Tool>
+    </div>
+  );
+}
+
+// ===========================================================================
+// Helpers
+// ===========================================================================
+
+type GroupedPart =
+  | { kind: "reasoning"; items: any[] }
+  | { kind: "text"; items: any[] }
+  | { kind: "tool"; items: [any] };
+
+/**
+ * Groups consecutive parts of the same kind (text or reasoning) so they
+ * render as a single block, while tool parts remain individual.
+ */
+function groupConsecutiveParts(parts: any[]): GroupedPart[] {
+  const groups: GroupedPart[] = [];
 
   for (const part of parts) {
     const type = part?.type;
+    if (!type) continue;
 
-    switch (type) {
-      case "text-start":
-      case "text":
-      case "text-delta":
-      case "text-end":
-        if (typeof part.text === "string") {
-          textSegments.push(part.text);
-        }
-        if (typeof part.delta === "string") {
-          textSegments.push(part.delta);
-        }
-        break;
-      case "reasoning-start":
-      case "reasoning":
-      case "reasoning-delta":
-      case "reasoning-end":
-        if (typeof part.text === "string") {
-          reasoningSegments.push(part.text);
-        }
-        if (typeof part.delta === "string") {
-          reasoningSegments.push(part.delta);
-        }
-        if (type === "reasoning-delta" || type === "reasoning-start") {
-          reasoningStreaming = true;
-        }
-        if (type === "reasoning-end") {
-          reasoningStreaming = false;
-        }
-        break;
-      default:
-        if (type && typeof type === "string" && type.startsWith("tool")) {
-          ensureToolEntry(part);
-        }
-        break;
+    const partKind = getPartKind(type);
+
+    if (partKind === "tool") {
+      groups.push({ kind: "tool", items: [part] });
+    } else if (partKind === "text" || partKind === "reasoning") {
+      const last = groups[groups.length - 1];
+      if (last && last.kind === partKind) {
+        last.items.push(part);
+      } else {
+        groups.push({ kind: partKind, items: [part] });
+      }
+    }
+    // Skip unknown part types
+  }
+
+  return groups;
+}
+
+function getPartKind(type: string): "text" | "reasoning" | "tool" | "unknown" {
+  switch (type) {
+    case "text-start":
+    case "text":
+    case "text-delta":
+    case "text-end":
+      return "text";
+    case "reasoning-start":
+    case "reasoning":
+    case "reasoning-delta":
+    case "reasoning-end":
+      return "reasoning";
+    default:
+      if (typeof type === "string" && type.startsWith("tool")) {
+        return "tool";
+      }
+      return "unknown";
+  }
+}
+
+/** Extract all text from a message's parts (or fall back to .content). */
+function getTextFromParts(message: CanvasDesignAgentMessage): string {
+  const parts = Array.isArray((message as any).parts)
+    ? ((message as any).parts as any[])
+    : [];
+
+  const texts: string[] = [];
+  for (const part of parts) {
+    const type = part?.type;
+    if (
+      type === "text" ||
+      type === "text-start" ||
+      type === "text-delta" ||
+      type === "text-end"
+    ) {
+      if (typeof part.text === "string") texts.push(part.text);
+      if (typeof part.delta === "string") texts.push(part.delta);
     }
   }
 
-  return { textSegments, reasoningSegments, reasoningStreaming, toolMap };
-}
+  const joined = texts.join("").trim();
+  if (joined) return joined;
 
-function getDirectContent(message: CanvasDesignAgentMessage) {
+  // Fallback: read .content directly
   const rawContent = (message as any).content;
-
-  if (typeof rawContent === "string") {
-    return rawContent;
-  }
-
+  if (typeof rawContent === "string") return rawContent;
   if (Array.isArray(rawContent)) {
     return rawContent
       .map((item) => {
@@ -274,53 +347,5 @@ function getDirectContent(message: CanvasDesignAgentMessage) {
       })
       .join("");
   }
-
   return "";
-}
-
-function isGeneratedImage(output: unknown) {
-  return (
-    typeof output === "object" &&
-    output !== null &&
-    "base64" in output &&
-    typeof (output as any).base64 === "string"
-  );
-}
-
-function GeneratedImagePreview({ output }: { output: any }) {
-  return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      {output.base64 && (
-        <div className="relative aspect-square w-full">
-          <Image
-            src={`data:image/png;base64,${output.base64}`}
-            alt={output.prompt || "Generated image"}
-            fill
-            className="object-contain"
-          />
-        </div>
-      )}
-      <div className="p-3 text-xs space-y-1">
-        <div className="font-medium text-foreground">🎨 Generated Image</div>
-        {output.prompt && (
-          <div className="text-muted-foreground">Prompt: {output.prompt}</div>
-        )}
-        {output.width && output.height && (
-          <div className="text-muted-foreground">
-            Size: {output.width} × {output.height}
-          </div>
-        )}
-        {output.imageUrl && (
-          <a
-            href={output.imageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline inline-flex items-center gap-1"
-          >
-            Open in new tab →
-          </a>
-        )}
-      </div>
-    </div>
-  );
 }

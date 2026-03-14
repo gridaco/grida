@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ShineBorder } from "@/www/ui/shine-border";
 import { useStopwatch } from "react-timer-hook";
 import { cn } from "@/components/lib/utils";
-import Image from "next/image";
+
 
 export function GenerationImageFrame({
   image,
@@ -47,13 +47,15 @@ export function GenerationImageFrame({
     >
       {!image && <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />}
       {image ? (
-        <Image
-          src={image.src}
-          width={image.width}
-          height={image.height}
-          alt={image.alt ?? "Generated"}
-          className="w-full h-auto"
-        />
+        <picture>
+          <img
+            src={image.src}
+            width={image.width}
+            height={image.height}
+            alt={image.alt ?? "Generated"}
+            className="w-full h-auto"
+          />
+        </picture>
       ) : (
         <div className="relative w-full h-full">
           <Skeleton className="w-full h-full" />

@@ -20,10 +20,8 @@ export function makeEditorChat(editor: Editor) {
 
       switch (toolCall.toolName) {
         case canvas_use.tools_spec.name_tree: {
-          const output = await canvas_use.client_impls.tree(
-            editor,
-            toolCall.input
-          );
+          const input = toolCall.input as { entry_id?: string };
+          const output = await canvas_use.client_impls.tree(editor, input);
           chat.addToolOutput({
             tool: toolCall.toolName,
             toolCallId: toolCall.toolCallId,
@@ -32,9 +30,10 @@ export function makeEditorChat(editor: Editor) {
           break;
         }
         case canvas_use.tools_spec.name_make_from_svg: {
+          const input = toolCall.input as { name?: string; svg: string };
           const output = await canvas_use.client_impls.make_from_svg(
             editor,
-            toolCall.input
+            input
           );
 
           chat.addToolOutput({
@@ -45,9 +44,15 @@ export function makeEditorChat(editor: Editor) {
           break;
         }
         case canvas_use.tools_spec.name_make_from_image: {
+          const input = toolCall.input as {
+            name?: string;
+            image_url?: string;
+            width?: number;
+            height?: number;
+          };
           const output = await canvas_use.client_impls.make_from_image(
             editor,
-            toolCall.input
+            input
           );
 
           chat.addToolOutput({
@@ -58,9 +63,10 @@ export function makeEditorChat(editor: Editor) {
           break;
         }
         case canvas_use.tools_spec.name_make_from_markdown: {
+          const input = toolCall.input as { markdown: string };
           const output = await canvas_use.client_impls.make_from_markdown(
             editor,
-            toolCall.input
+            input
           );
           chat.addToolOutput({
             tool: toolCall.toolName,

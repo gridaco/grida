@@ -214,6 +214,12 @@ export namespace canvas_use {
       description:
         "Create a node from an SVG string under new container node. Return the ID of the created node.",
       inputSchema: z.object({
+        name: z
+          .string()
+          .describe(
+            "A short, semantic name for the node (e.g. 'home-icon', 'logo', 'arrow-right')"
+          )
+          .optional(),
         svg: z.string().describe("The SVG string to create a node from"),
       }),
       outputSchema: z.object({
@@ -293,11 +299,15 @@ export namespace canvas_use {
     export async function make_from_svg(
       editor: Editor,
       params: {
+        name?: string;
         svg: string;
       }
     ): Promise<ToolCallOutput<{ node_id: string }>> {
       try {
         const n = await editor.commands.createNodeFromSvg(params.svg);
+        if (params.name) {
+          n.$.name = params.name;
+        }
         return {
           state: "output-available",
           output: {

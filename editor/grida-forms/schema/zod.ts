@@ -155,12 +155,49 @@ export const zJSONForm = z.object({
 });
 
 /**
- * schema for ai generation - exclude redundant fields
+ * Strict-mode-compatible schema for AI generation (OpenAI structured outputs).
+ *
+ * OpenAI's structured output requires:
+ * - Every object property listed in `required` (use `nullable` not `optional`)
+ * - Every `anyOf` branch must carry a `type` key (no mixed object/primitive unions)
+ * - No open-ended types (`z.any()`, `z.record()`)
+ *
+ * This schema is intentionally **separate** from the shared validation schemas
+ * above so that strict-mode constraints don't leak into general form validation.
  */
-export const GENzJSONForm = zJSONForm.omit({
-  action: true,
-  enctype: true,
-  method: true,
-  novalidate: true,
-  target: true,
+const GENzJSONOption = z.object({
+  value: z.string(),
+  label: z.string().nullable(),
+  src: z.string().nullable(),
+  disabled: z.boolean().nullable(),
+});
+
+const GENzJSONField = z.object({
+  name: z.string().describe("HTML5 form `name` attribute"),
+  label: z.string().nullable().describe("User facing label"),
+  placeholder: z
+    .string()
+    .nullable()
+    .describe(
+      "HTML5 form `placeholder` attribute + also used for `select` input"
+    ),
+  required: z.boolean().nullable(),
+  pattern: z.string().nullable(),
+  type: zFormInputType.describe("`FormInputType` HTML5 + extended input type"),
+  options: z.array(GENzJSONOption).nullable(),
+  multiple: z.boolean().nullable(),
+  autocomplete: zFormFieldAutocompleteType.nullable(),
+});
+
+export const GENzJSONForm = z.object({
+  $schema: z
+    .literal("https://grida.co/schema/form.schema.json")
+    .describe("https://grida.co/schema/form.schema.json"),
+  title: z.string().nullable().describe("User facing form title"),
+  name: z.string().describe("HTML5 form `name` attribute"),
+  description: z.string().nullable().describe("description for the editor"),
+  fields: z
+    .array(GENzJSONField)
+    .nullable()
+    .describe("form fields definition, array of fields of `FormInputType`"),
 });
