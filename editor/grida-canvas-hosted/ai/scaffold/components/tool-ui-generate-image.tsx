@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckIcon, ImageIcon } from "lucide-react";
-import Image from "next/image";
+
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
   deriveToolState,
@@ -55,12 +55,13 @@ export function GenerateImageToolUI({
       {isDone && output?.publicUrl && (
         <div className="border-t">
           <div className="relative aspect-square w-full max-h-64">
-            <Image
-              src={output.publicUrl}
-              alt={input?.prompt || "Generated image"}
-              fill
-              className="object-contain"
-            />
+            <picture>
+              <img
+                src={output.publicUrl}
+                alt={input?.prompt || "Generated image"}
+                className="w-full h-full object-contain"
+              />
+            </picture>
           </div>
           <div className="px-3 py-1.5 text-xs text-muted-foreground border-t flex items-center gap-3">
             {output.width && output.height && (
@@ -79,12 +80,13 @@ export function GenerateImageToolUI({
       {isDone && !output?.publicUrl && output?.base64 && (
         <div className="border-t">
           <div className="relative aspect-square w-full max-h-64">
-            <Image
-              src={`data:image/png;base64,${output.base64}`}
-              alt={input?.prompt || "Generated image"}
-              fill
-              className="object-contain"
-            />
+            <picture>
+              <img
+                src={`data:image/png;base64,${output.base64}`}
+                alt={input?.prompt || "Generated image"}
+                className="w-full h-full object-contain"
+              />
+            </picture>
           </div>
         </div>
       )}
