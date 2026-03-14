@@ -92,10 +92,7 @@ export function PricingCardButton({
   );
 }
 
-export function PricingFeatureRow({
-  name,
-  trail,
-}: PricingCardFeatureItem) {
+export function PricingFeatureRow({ name, trail }: PricingCardFeatureItem) {
   return (
     <div className="flex items-center w-full gap-2">
       <CheckIcon />

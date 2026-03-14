@@ -168,7 +168,10 @@ export function ScenesList() {
         // Root or deleted scene: tree may hold stale refs until rebuildTree runs.
         // Return a stub so syncDataLoaderFeature doesn't throw "returned undefined".
         if (itemId === "<document>") {
-          return { id: "<document>", name: "<document>" } as grida.program.nodes.SceneNode;
+          return {
+            id: "<document>",
+            name: "<document>",
+          } as grida.program.nodes.SceneNode;
         }
         return { id: itemId, name: "" } as grida.program.nodes.SceneNode;
       },
