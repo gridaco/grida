@@ -30,6 +30,7 @@ import { SvgToolUI } from "./tool-ui-svg";
 import { TreeToolUI } from "./tool-ui-tree";
 import { ArtboardSizesToolUI } from "./tool-ui-artboard-sizes";
 import { GenerateImageToolUI } from "./tool-ui-generate-image";
+import { MarkdownToolUI } from "./tool-ui-markdown";
 
 export interface BaseMessageProps {
   message: CanvasDesignAgentMessage;
@@ -198,6 +199,15 @@ function ToolPart({ part }: { part: any }) {
     case canvas_use.tools_spec.name_data_artboard_sizes:
       return (
         <ArtboardSizesToolUI
+          output={output}
+          state={state}
+          errorText={errorText}
+        />
+      );
+    case canvas_use.tools_spec.name_make_from_markdown:
+      return (
+        <MarkdownToolUI
+          input={input}
           output={output}
           state={state}
           errorText={errorText}

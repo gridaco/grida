@@ -1,10 +1,10 @@
 "use client";
 
 import type { ToolUIPart } from "ai";
-import { CheckIcon, PenToolIcon } from "lucide-react";
+import { CheckIcon, TypeIcon } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 
-export function SvgToolUI({
+export function MarkdownToolUI({
   input,
   output,
   state,
@@ -15,20 +15,25 @@ export function SvgToolUI({
   state: ToolUIPart["state"];
   errorText?: string;
 }) {
-  const name: string | undefined = input?.name;
-  const svg: string | undefined = input?.svg;
+  const markdown: string | undefined = input?.markdown;
   const nodeId: string | undefined = output?.node_id;
   const isRunning = state === "input-streaming" || state === "input-available";
   const isDone = state === "output-available";
   const isError = state === "output-error";
 
+  // Truncate preview to a reasonable length
+  const preview =
+    markdown && markdown.length > 280
+      ? markdown.slice(0, 280) + "..."
+      : markdown;
+
   return (
     <div className="w-full rounded-md border overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 bg-muted/30">
-        <PenToolIcon className="size-3.5 text-muted-foreground" />
+        <TypeIcon className="size-3.5 text-muted-foreground" />
         <span className="text-xs font-medium text-muted-foreground">
-          {name || "Create from SVG"}
+          Create Text
         </span>
         <span className="ml-auto">
           {isRunning && (
@@ -48,13 +53,12 @@ export function SvgToolUI({
         </span>
       </div>
 
-      {/* SVG preview */}
-      {svg && (
-        <div className="flex items-center justify-center p-4 bg-[repeating-conic-gradient(var(--color-muted)_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
-          <div
-            className="max-w-full max-h-48 [&>svg]:max-w-full [&>svg]:max-h-48 [&>svg]:w-auto [&>svg]:h-auto"
-            dangerouslySetInnerHTML={{ __html: svg }}
-          />
+      {/* Text preview */}
+      {preview && (
+        <div className="px-3 py-2.5 border-t">
+          <pre className="whitespace-pre-wrap text-xs text-foreground font-sans leading-relaxed">
+            {preview}
+          </pre>
         </div>
       )}
 

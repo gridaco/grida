@@ -30,7 +30,7 @@ export function makeEditorChat(editor: Editor) {
           break;
         }
         case canvas_use.tools_spec.name_make_from_svg: {
-          const input = toolCall.input as { svg: string };
+          const input = toolCall.input as { name?: string; svg: string };
           const output = await canvas_use.client_impls.make_from_svg(
             editor,
             input
