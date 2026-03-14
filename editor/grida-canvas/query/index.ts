@@ -674,9 +674,7 @@ export namespace dq {
      * `.grida` archives.
      */
     persistable_image_srcs(): string[] {
-      return this.image_srcs().filter(
-        (src) => !src.startsWith("system://")
-      );
+      return this.image_srcs().filter((src) => !src.startsWith("system://"));
     }
   }
 

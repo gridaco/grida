@@ -350,7 +350,8 @@ function __init_form_start_page_state(
 
   // check the version
   if (
-    (data as FormStartPageSchema).__schema_version !== grida.program.document.SCHEMA_VERSION
+    (data as FormStartPageSchema).__schema_version !==
+    grida.program.document.SCHEMA_VERSION
   ) {
     return {
       __schema_version: (data as FormStartPageSchema).__schema_version,
