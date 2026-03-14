@@ -1,4 +1,9 @@
-import { ToolLoopAgent, stepCountIs, InferAgentUIMessage } from "ai";
+import {
+  ToolLoopAgent,
+  stepCountIs,
+  InferAgentUIMessage,
+  type ToolSet,
+} from "ai";
 import { openai } from "@ai-sdk/openai";
 import { canvas_use } from "../tools/canvas-use";
 import { model } from "@/lib/ai/models";
@@ -23,9 +28,11 @@ const tools = {
     canvas_use.tools_spec.data_artboard_sizes,
   // grida_canvas_scripting_exec: grida_canvas_scripting_exec,
 
-  // web search - needs to be exactly "web_search" as name
-  web_search: openai.tools.webSearch({}),
-};
+  // Provider-executed tool — the webSearch schema uses an internal symbol from
+  // a different @ai-sdk/provider-utils version, which breaks the ToolSet
+  // constraint.  The cast is safe because the tool is executed by the provider.
+  web_search: openai.tools.webSearch({}) as any,
+} satisfies ToolSet;
 
 /**
  * Canvas Design Agent using AI SDK 6 ToolLoopAgent
