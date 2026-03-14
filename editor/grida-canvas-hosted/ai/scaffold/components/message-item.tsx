@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import type { CanvasDesignAgentMessage } from "@/grida-canvas-hosted/ai/agent/server-agent";
 import { getToolName, type ToolUIPart } from "ai";
 import {
@@ -189,7 +188,7 @@ function ToolPart({ part }: { part: any }) {
   const state: ToolUIPart["state"] =
     part.state ?? (part.output ? "output-available" : "input-available");
   const input = part.input;
-  const output = part.output ?? part.result;
+  const output = part.output;
   const errorText: string | undefined = part.errorText;
 
   // ── Custom tool UIs ────────────────────────────────────────────────

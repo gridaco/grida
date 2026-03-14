@@ -1,26 +1,35 @@
 "use client";
 
-import type { ToolUIPart } from "ai";
+import { useMemo } from "react";
+import DOMPurify from "dompurify";
 import { CheckIcon, PenToolIcon } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+  deriveToolState,
+  type ToolUIProps,
+  type SvgInput,
+  type SvgOutput,
+} from "./tool-ui-shared";
 
 export function SvgToolUI({
   input,
   output,
   state,
   errorText,
-}: {
-  input: any;
-  output: any;
-  state: ToolUIPart["state"];
-  errorText?: string;
-}) {
-  const name: string | undefined = input?.name;
-  const svg: string | undefined = input?.svg;
-  const nodeId: string | undefined = output?.node_id;
-  const isRunning = state === "input-streaming" || state === "input-available";
-  const isDone = state === "output-available";
-  const isError = state === "output-error";
+}: ToolUIProps<SvgInput, SvgOutput>) {
+  const { isRunning, isDone, isError } = deriveToolState(state);
+  const name = input?.name;
+  const svg = input?.svg;
+  const nodeId = output?.node_id;
+
+  // Sanitize SVG to prevent XSS (strips scripts, event handlers, foreignObject)
+  const sanitizedSvg = useMemo(() => {
+    if (!svg) return undefined;
+    return DOMPurify.sanitize(svg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ADD_TAGS: ["use"],
+    });
+  }, [svg]);
 
   return (
     <div className="w-full rounded-md border overflow-hidden">
@@ -49,11 +58,11 @@ export function SvgToolUI({
       </div>
 
       {/* SVG preview */}
-      {svg && (
+      {sanitizedSvg && (
         <div className="flex items-center justify-center p-4 bg-[repeating-conic-gradient(var(--color-muted)_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
           <div
             className="max-w-full max-h-48 [&>svg]:max-w-full [&>svg]:max-h-48 [&>svg]:w-auto [&>svg]:h-auto"
-            dangerouslySetInnerHTML={{ __html: svg }}
+            dangerouslySetInnerHTML={{ __html: sanitizedSvg }}
           />
         </div>
       )}

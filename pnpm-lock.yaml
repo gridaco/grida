@@ -425,7 +425,7 @@ importers:
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.3))
       '@mdx-js/loader':
         specifier: ^3.0.1
-        version: 3.1.1(acorn@8.15.0)(webpack@5.98.0(esbuild@0.27.3))
+        version: 3.1.1(acorn@8.16.0)(webpack@5.98.0(esbuild@0.27.3))
       '@mdx-js/react':
         specifier: ^3.1.0
         version: 3.1.1(@types/react@19.1.3)(react@19.2.3)
@@ -434,7 +434,7 @@ importers:
         version: 4.7.0(monaco-editor@0.47.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@next/mdx':
         specifier: 16.1.3
-        version: 16.1.3(@mdx-js/loader@3.1.1(acorn@8.15.0)(webpack@5.98.0(esbuild@0.27.3)))(@mdx-js/react@3.1.1(@types/react@19.1.3)(react@19.2.3))
+        version: 16.1.3(@mdx-js/loader@3.1.1(acorn@8.16.0)(webpack@5.98.0(esbuild@0.27.3)))(@mdx-js/react@3.1.1(@types/react@19.1.3)(react@19.2.3))
       '@next/third-parties':
         specifier: 16.1.3
         version: 16.1.3(next@16.1.6(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react@19.2.3)
@@ -633,6 +633,9 @@ importers:
       deep-equal:
         specifier: ^2.2.3
         version: 2.2.3
+      dompurify:
+        specifier: ^3.3.3
+        version: 3.3.3
       embla-carousel-autoplay:
         specifier: ^8.3.0
         version: 8.6.0(embla-carousel@8.6.0)
@@ -931,6 +934,9 @@ importers:
       '@types/deep-equal':
         specifier: ^1.0.4
         version: 1.0.4
+      '@types/dompurify':
+        specifier: ^3.2.0
+        version: 3.2.0
       '@types/file-saver':
         specifier: ^2.0.5
         version: 2.0.7
@@ -6412,6 +6418,10 @@ packages:
   '@types/deep-equal@1.0.4':
     resolution: {integrity: sha512-tqdiS4otQP4KmY0PR3u6KbZ5EWvhNdUoS/jc93UuK23C220lOZ/9TvjfxdPcKvqwwDVtmtSCrnr0p/2dirAxkA==}
 
+  '@types/dompurify@3.2.0':
+    resolution: {integrity: sha512-Fgg31wv9QbLDA0SpTOXO3MaxySc4DKGLi8sna4/Utjo4r3ZRPdCt4UQee8BWr+Q5z21yifghREPJGYaEOEIACg==}
+    deprecated: This is a stub types definition. dompurify provides its own type definitions, so you do not need this installed.
+
   '@types/draco3d@1.4.10':
     resolution: {integrity: sha512-AX22jp8Y7wwaBgAixaSvkoG4M/+PlAcm3Qs4OW8yT9DM4xUpWKeFhLueTAyZF39pviAdcDdeJoACapiAceqNcw==}
 
@@ -8713,8 +8723,8 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
 
-  dompurify@3.3.0:
-    resolution: {integrity: sha512-r+f6MYR1gGN1eJv0TVQbhA7if/U7P87cdPl3HN5rikqaBSBxLiCb/b9O+2eG0cxz0ghyU+mU1QkbsOwERMYlWQ==}
+  dompurify@3.3.3:
+    resolution: {integrity: sha512-Oj6pzI2+RqBfFG+qOaOLbFXLQ90ARpcGG6UePL82bJLtdsa6CYJD7nmiU8MW9nQNOtCHV3lZ/Bzq1X0QYbBZCA==}
 
   domutils@2.8.0:
     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
@@ -18543,42 +18553,12 @@ snapshots:
       rw: 1.3.3
       sort-object: 3.0.3
 
-  '@mdx-js/loader@3.1.1(acorn@8.15.0)(webpack@5.98.0(esbuild@0.27.3))':
+  '@mdx-js/loader@3.1.1(acorn@8.16.0)(webpack@5.98.0(esbuild@0.27.3))':
     dependencies:
-      '@mdx-js/mdx': 3.1.0(acorn@8.15.0)
+      '@mdx-js/mdx': 3.1.0(acorn@8.16.0)
       source-map: 0.7.4
     optionalDependencies:
       webpack: 5.98.0(esbuild@0.27.3)
-    transitivePeerDependencies:
-      - acorn
-      - supports-color
-
-  '@mdx-js/mdx@3.1.0(acorn@8.15.0)':
-    dependencies:
-      '@types/estree': 1.0.6
-      '@types/estree-jsx': 1.0.5
-      '@types/hast': 3.0.4
-      '@types/mdx': 2.0.13
-      collapse-white-space: 2.1.0
-      devlop: 1.1.0
-      estree-util-is-identifier-name: 3.0.0
-      estree-util-scope: 1.0.0
-      estree-walker: 3.0.3
-      hast-util-to-jsx-runtime: 2.3.2
-      markdown-extensions: 2.0.0
-      recma-build-jsx: 1.0.0
-      recma-jsx: 1.0.0(acorn@8.15.0)
-      recma-stringify: 1.0.0
-      rehype-recma: 1.0.0
-      remark-mdx: 3.1.0
-      remark-parse: 11.0.0
-      remark-rehype: 11.1.1
-      source-map: 0.7.4
-      unified: 11.0.5
-      unist-util-position-from-estree: 2.0.0
-      unist-util-stringify-position: 4.0.0
-      unist-util-visit: 5.0.0
-      vfile: 6.0.3
     transitivePeerDependencies:
       - acorn
       - supports-color
@@ -18700,11 +18680,11 @@ snapshots:
     dependencies:
       fast-glob: 3.3.1
 
-  '@next/mdx@16.1.3(@mdx-js/loader@3.1.1(acorn@8.15.0)(webpack@5.98.0(esbuild@0.27.3)))(@mdx-js/react@3.1.1(@types/react@19.1.3)(react@19.2.3))':
+  '@next/mdx@16.1.3(@mdx-js/loader@3.1.1(acorn@8.16.0)(webpack@5.98.0(esbuild@0.27.3)))(@mdx-js/react@3.1.1(@types/react@19.1.3)(react@19.2.3))':
     dependencies:
       source-map: 0.7.4
     optionalDependencies:
-      '@mdx-js/loader': 3.1.1(acorn@8.15.0)(webpack@5.98.0(esbuild@0.27.3))
+      '@mdx-js/loader': 3.1.1(acorn@8.16.0)(webpack@5.98.0(esbuild@0.27.3))
       '@mdx-js/react': 3.1.1(@types/react@19.1.3)(react@19.2.3)
 
   '@next/swc-darwin-arm64@16.1.6':
@@ -21423,6 +21403,10 @@ snapshots:
 
   '@types/deep-equal@1.0.4': {}
 
+  '@types/dompurify@3.2.0':
+    dependencies:
+      dompurify: 3.3.3
+
   '@types/draco3d@1.4.10': {}
 
   '@types/eslint-scope@3.7.7':
@@ -24125,7 +24109,7 @@ snapshots:
     dependencies:
       domelementtype: 2.3.0
 
-  dompurify@3.3.0:
+  dompurify@3.3.3:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -26995,7 +26979,7 @@ snapshots:
       d3-sankey: 0.12.3
       dagre-d3-es: 7.0.13
       dayjs: 1.11.19
-      dompurify: 3.3.0
+      dompurify: 3.3.3
       katex: 0.16.25
       khroma: 2.1.0
       lodash-es: 4.17.21
@@ -29334,16 +29318,6 @@ snapshots:
       '@types/estree': 1.0.8
       estree-util-build-jsx: 3.0.1
       vfile: 6.0.3
-
-  recma-jsx@1.0.0(acorn@8.15.0):
-    dependencies:
-      acorn-jsx: 5.3.2(acorn@8.15.0)
-      estree-util-to-js: 2.0.0
-      recma-parse: 1.0.0
-      recma-stringify: 1.0.0
-      unified: 11.0.5
-    transitivePeerDependencies:
-      - acorn
 
   recma-jsx@1.0.0(acorn@8.16.0):
     dependencies:

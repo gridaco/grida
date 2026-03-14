@@ -1,6 +1,5 @@
 "use client";
 
-import type { ToolUIPart } from "ai";
 import { ListTreeIcon } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
@@ -9,20 +8,15 @@ import {
   TaskItem,
   TaskTrigger,
 } from "@/components/ai-elements/task";
+import { deriveToolState, type ToolUIOutputProps, type TreeOutput } from "./tool-ui-shared";
 
 export function TreeToolUI({
   output,
   state,
   errorText,
-}: {
-  output: any;
-  state: ToolUIPart["state"];
-  errorText?: string;
-}) {
-  const tree: string | undefined = output?.tree;
-  const isRunning = state === "input-streaming" || state === "input-available";
-  const isDone = state === "output-available";
-  const isError = state === "output-error";
+}: ToolUIOutputProps<TreeOutput>) {
+  const { isRunning, isDone, isError } = deriveToolState(state);
+  const tree = output?.tree;
 
   const title = isRunning
     ? "Inspecting canvas tree..."

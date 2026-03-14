@@ -1,6 +1,5 @@
 "use client";
 
-import type { ToolUIPart } from "ai";
 import { LayoutGridIcon } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
@@ -9,19 +8,17 @@ import {
   TaskItem,
   TaskTrigger,
 } from "@/components/ai-elements/task";
+import { deriveToolState, type ToolUIOutputProps } from "./tool-ui-shared";
+
+/** Artboard sizes output is a record of category → array of size entries. */
+type ArtboardSizesOutput = Record<string, unknown[]>;
 
 export function ArtboardSizesToolUI({
   output,
   state,
   errorText,
-}: {
-  output: any;
-  state: ToolUIPart["state"];
-  errorText?: string;
-}) {
-  const isRunning = state === "input-streaming" || state === "input-available";
-  const isDone = state === "output-available";
-  const isError = state === "output-error";
+}: ToolUIOutputProps<ArtboardSizesOutput>) {
+  const { isRunning, isDone, isError } = deriveToolState(state);
 
   // Count total artboard entries across all categories
   let totalCount = 0;

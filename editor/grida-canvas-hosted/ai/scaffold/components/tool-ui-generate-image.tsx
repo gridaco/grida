@@ -1,24 +1,22 @@
 "use client";
 
-import type { ToolUIPart } from "ai";
 import { CheckIcon, ImageIcon } from "lucide-react";
 import Image from "next/image";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+  deriveToolState,
+  type ToolUIProps,
+  type GenerateImageInput,
+  type GenerateImageOutput,
+} from "./tool-ui-shared";
 
 export function GenerateImageToolUI({
   input,
   output,
   state,
   errorText,
-}: {
-  input: any;
-  output: any;
-  state: ToolUIPart["state"];
-  errorText?: string;
-}) {
-  const isRunning = state === "input-streaming" || state === "input-available";
-  const isDone = state === "output-available";
-  const isError = state === "output-error";
+}: ToolUIProps<GenerateImageInput, GenerateImageOutput>) {
+  const { isRunning, isDone, isError } = deriveToolState(state);
 
   return (
     <div className="w-full rounded-md border overflow-hidden">

@@ -1,25 +1,23 @@
 "use client";
 
-import type { ToolUIPart } from "ai";
 import { CheckIcon, TypeIcon } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+  deriveToolState,
+  type ToolUIProps,
+  type MarkdownInput,
+  type MarkdownOutput,
+} from "./tool-ui-shared";
 
 export function MarkdownToolUI({
   input,
   output,
   state,
   errorText,
-}: {
-  input: any;
-  output: any;
-  state: ToolUIPart["state"];
-  errorText?: string;
-}) {
-  const markdown: string | undefined = input?.markdown;
-  const nodeId: string | undefined = output?.node_id;
-  const isRunning = state === "input-streaming" || state === "input-available";
-  const isDone = state === "output-available";
-  const isError = state === "output-error";
+}: ToolUIProps<MarkdownInput, MarkdownOutput>) {
+  const { isRunning, isDone, isError } = deriveToolState(state);
+  const markdown = input?.markdown;
+  const nodeId = output?.node_id;
 
   // Truncate preview to a reasonable length
   const preview =
