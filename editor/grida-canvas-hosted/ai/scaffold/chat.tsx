@@ -31,7 +31,7 @@ export function AgentPanel({ className }: { className?: string }) {
   );
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex flex-col select-text", className)}>
       <div className="flex-1 min-h-0">
         <Conversation className="relative h-full">
           <ConversationContent className="flex flex-col gap-4 py-4 px-6">
