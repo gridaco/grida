@@ -1,19 +1,17 @@
 "use server";
 
 import { streamText, Output } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "@ai-sdk/rsc";
 import { GENzJSONForm } from "@/grida-forms/schema/zod";
 import { service_role } from "@/lib/supabase/server";
-
-const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-5-mini";
+import { model } from "@/lib/ai/models";
 
 export async function generate(input: string, gist?: string) {
   const stream = createStreamableValue({});
 
   (async () => {
     const { partialOutputStream } = streamText({
-      model: openai(MODEL),
+      model: model("mini"),
       prompt: input,
       output: Output.object({ schema: GENzJSONForm }),
     });

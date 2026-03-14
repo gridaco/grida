@@ -1,101 +1,76 @@
-import OpenAI from "openai";
+import { generateObject } from "ai";
+import { z } from "zod/v3";
 import { NextRequest, NextResponse } from "next/server";
 import { supported_field_types } from "@/k/supported_field_types";
+import { model } from "@/lib/ai/models";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+/**
+ * Strict-mode-compatible Zod schema for AI structured output.
+ *
+ * Uses `.nullable()` instead of `.optional()` so every property appears in the
+ * JSON Schema `required` array (OpenAI structured output requirement).
+ *
+ * The `type` enum is built dynamically from `supported_field_types` so it stays
+ * in sync with the rest of the codebase.
+ */
+const formFieldSchema = z.object({
+  name: z
+    .string()
+    .describe(
+      "The input's name identifier. Use lowercase with underscores, e.g. column_name"
+    ),
+  label: z.string().describe("Human-readable label for the field"),
+  type: z
+    .enum(supported_field_types as [FormInputType, ...FormInputType[]])
+    .describe("HTML5 + extended input type"),
+  placeholder: z.string().describe("Placeholder text"),
+  required: z.boolean().describe("Whether the field is required"),
+  help_text: z.string().describe("Help text displayed below the field"),
+  pattern: z
+    .string()
+    .nullable()
+    .describe(
+      "Regular expression pattern for validation (HTML input pattern attribute)"
+    ),
+  options: z
+    .array(
+      z.object({
+        label: z.string(),
+        value: z.string(),
+      })
+    )
+    .nullable()
+    .describe("Options for select / radio fields"),
 });
-
-const type_form_field_type = `export type FormFieldType = | ${supported_field_types.map((type) => `"${type}"`).join(" | ")};`;
-
-const interface_txt = `
-\`\`\`
-export type FormField = {
-  name: string; // The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name
-  label: string; // Human readable label
-  type: FormFieldType; // Type of field
-  placeholder: string; // Placeholder text
-  required: boolean; // Whether the field is required
-  help_text: string; // Help text, displayed below the field
-  pattern?: string; // Regular expression pattern for validation (for html input pattern attribute)
-  options?: { label: string; value: string }[]; // Options for [select, radio]
-};
-
-${type_form_field_type}
-\`\`\`
-`;
 
 export async function POST(req: NextRequest) {
   const requestBody = await req.json();
   const description = requestBody.description;
 
   if (!description) {
-    return new NextResponse(
-      JSON.stringify({ error: "Description is required" }),
-      {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
+    return NextResponse.json(
+      { error: "Description is required" },
+      { status: 400 }
     );
   }
 
-  const prompt = `Based on the user's field description: "${description}", create a form field schema with the \`FormField\` interface. The json should be acceptable by the following interface with JSON.parse()
-${interface_txt}
-`;
-
   try {
-    const response = await openai.chat.completions.create({
-      model: process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-5-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Create a JSON schema for a form field based on a description, ensuring the type matches specific options. Users might not speak english, so be sure to localize the response based on their input.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: {
-        type: "json_object",
-      },
-      max_completion_tokens: 1024,
+    const { object: schema } = await generateObject({
+      model: model("nano"),
+      schema: formFieldSchema,
+      system:
+        "Generate a form field definition based on the user's description. " +
+        "Users might not speak English — localise label, placeholder, and help_text to match their input language.",
+      prompt: description,
     });
 
-    const content = response.choices[0].message.content!;
-    console.log("ai", content);
-    const schema = JSON.parse(content);
-    console.log("ai", schema);
-
-    // Validate the type field
-    if (!supported_field_types.includes(schema.type)) {
-      // if the response is not a valid form field type, fallback to text
-      schema.type = "text";
-    }
-
-    // Additional validation and adjustment logic here if necessary
-
-    return new NextResponse(JSON.stringify(schema), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    return NextResponse.json(schema);
   } catch (error: any) {
     console.error(error);
-    return new NextResponse(
-      JSON.stringify({
-        error: error.message || "Failed to generate form field schema",
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
+    return NextResponse.json(
+      { error: error.message || "Failed to generate form field schema" },
+      { status: 500 }
     );
   }
 }

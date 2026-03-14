@@ -1,6 +1,7 @@
 import { ToolLoopAgent, stepCountIs, InferAgentUIMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { canvas_use } from "../tools/canvas-use";
+import { model } from "@/lib/ai/models";
 
 const tools = {
   [canvas_use.tools_spec.name_platform_sys_tool_ai_fetch_preflight]:
@@ -30,15 +31,13 @@ const tools = {
  * Canvas Design Agent using AI SDK 6 ToolLoopAgent
  *
  * Features:
- * - GPT-4o-mini for fast, cost-effective responses
+ * - Multimodal "mini" tier model for cost-effective agent responses
  * - Tool calling for image generation, text creation, UI components
- * - Automatic tool loop handling (up to 20 steps)
+ * - Automatic tool loop handling (up to 10 steps)
  * - Type-safe agent definition
- *
- * Note: Switch to anthropic("claude-3-5-sonnet-20241022") when ANTHROPIC_API_KEY is set in .env
  */
 export const canvasDesignAgent = new ToolLoopAgent({
-  model: openai("gpt-5-mini-2025-08-07"),
+  model: model("mini"),
   instructions: canvas_use.llm.instructions,
   tools: tools,
   onStepFinish: (step) => {

@@ -3,18 +3,17 @@
 import {
   streamText,
   Output,
+  gateway,
   type UserModelMessage,
   type UserContent,
   type TextPart,
   type FilePart,
   type ImagePart,
 } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "@ai-sdk/rsc";
 import { request_schema } from "./schema";
+import { model as tieredModel, models } from "@/lib/ai/models";
 import assert from "assert";
-
-const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-5-mini";
 
 export type UserAttachment = {
   type: "file" | "image";
@@ -43,7 +42,9 @@ export async function generate({
   temperature?: number;
   topP?: number;
 }) {
-  const model = openai(modelId ?? MODEL);
+  // Dev tool: allow user-selected model override via the model selector UI;
+  // fall back to the "mini" tier default.
+  const model = modelId ? gateway(modelId) : tieredModel("mini");
   const model_config = {
     maxOutputTokens: maxOutputTokens,
     temperature: temperature,
