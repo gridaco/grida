@@ -77,7 +77,7 @@ fn add_image_with_rid_scene_renders() {
         active: true,
         image: ResourceRef::RID(rid.to_string()),
         quarter_turns: 0,
-        alignement: Alignment::CENTER,
+        alignment: Alignment::CENTER,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         opacity: 1.0,
         blend_mode: BlendMode::Normal,

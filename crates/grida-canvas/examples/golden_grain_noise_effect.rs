@@ -40,7 +40,7 @@ fn main() {
         active: true,
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
-        alignement: Alignment::CENTER_LEFT, // Left-aligned
+        alignment: Alignment::CENTER_LEFT, // Left-aligned
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
@@ -58,7 +58,7 @@ fn main() {
         active: true,
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
-        alignement: Alignment::CENTER_RIGHT, // Right-aligned
+        alignment: Alignment::CENTER_RIGHT, // Right-aligned
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         opacity: 1.0,
         blend_mode: BlendMode::Normal,

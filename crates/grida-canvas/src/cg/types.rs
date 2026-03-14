@@ -2757,7 +2757,7 @@ impl Default for ImageRepeat {
 ///
 /// - **`image`**: Reference to the image resource to be painted
 /// - **`quarter_turns`**: Clockwise 90° rotations applied before layout/fitting
-/// - **`alignement`**: Positions the fitted image within its container using normalized coordinates
+/// - **`alignment`**: Positions the fitted image within its container using normalized coordinates
 /// - **`fit`**: Defines how the image should be fitted within its container
 /// - **`opacity`**: Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)
 /// - **`blend_mode`**: Determines how the image blends with underlying content
@@ -2864,7 +2864,7 @@ pub struct ImagePaint {
     /// Uses normalized coordinates where `(-1.0, -1.0)` represents the top-left corner,
     /// `(0.0, 0.0)` represents the center, and `(1.0, 1.0)` represents the bottom-right corner.
     /// This behaves similarly to CSS `object-position`.
-    pub alignement: Alignment,
+    pub alignment: Alignment,
     /// Defines how the image should be fitted within its container
     pub fit: ImagePaintFit,
     /// Controls the transparency of the image (0.0 = fully transparent, 1.0 = fully opaque)

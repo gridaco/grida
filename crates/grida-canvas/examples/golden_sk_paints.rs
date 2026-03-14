@@ -224,7 +224,7 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref.clone(),
                     quarter_turns: 0,
-                    alignement: Alignment::CENTER,
+                    alignment: Alignment::CENTER,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.6,
                     blend_mode: BlendMode::Normal,
@@ -245,7 +245,7 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref.clone(),
                     quarter_turns: 0,
-                    alignement: Alignment::CENTER,
+                    alignment: Alignment::CENTER,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.5,
                     blend_mode: BlendMode::Normal,
@@ -313,7 +313,7 @@ fn main() {
                 Paint::Image(ImagePaint {
                     image: checker_image_ref,
                     quarter_turns: 0,
-                    alignement: Alignment::CENTER,
+                    alignment: Alignment::CENTER,
                     fit: ImagePaintFit::Fit(BoxFit::Fill),
                     opacity: 0.5,
                     blend_mode: BlendMode::Overlay,

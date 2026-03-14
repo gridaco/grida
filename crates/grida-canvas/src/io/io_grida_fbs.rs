@@ -612,8 +612,8 @@ fn decode_paint_item(item: &fbs::PaintStackItem<'_>) -> Option<Paint> {
             } else {
                 return None;
             };
-            let alignement = ip
-                .alignement()
+            let alignment = ip
+                .alignment()
                 .map(|a| Alignment(a.x(), a.y()))
                 .unwrap_or(Alignment::CENTER);
             let fit = decode_image_paint_fit(&ip);
@@ -621,7 +621,7 @@ fn decode_paint_item(item: &fbs::PaintStackItem<'_>) -> Option<Paint> {
                 active: ip.active(),
                 image: image_ref,
                 quarter_turns: ip.quarter_turns(),
-                alignement,
+                alignment,
                 fit,
                 opacity: ip.opacity(),
                 blend_mode: decode_blend_mode(ip.blend_mode()),
@@ -2164,14 +2164,14 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                     (fbs::ResourceRef::ResourceRefRID, rref.as_union_value())
                 }
             };
-            let alignment = fbs::Alignment::new(ip.alignement.0, ip.alignement.1);
+            let alignment = fbs::Alignment::new(ip.alignment.0, ip.alignment.1);
             let (fit_type, fit_value) = encode_image_paint_fit(fbb, &ip.fit);
             let ip_offset = fbs::ImagePaint::create(fbb, &fbs::ImagePaintArgs {
                 active: ip.active,
                 image_type: image_ref_offset.0,
                 image: Some(image_ref_offset.1),
                 quarter_turns: ip.quarter_turns,
-                alignement: Some(&alignment),
+                alignment: Some(&alignment),
                 fit_type,
                 fit: Some(fit_value),
                 opacity: ip.opacity,

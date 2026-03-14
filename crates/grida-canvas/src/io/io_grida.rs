@@ -487,7 +487,7 @@ impl From<Option<JSONPaint>> for Paint {
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(url),
                     quarter_turns: quarter_turns % 4,
-                    alignement: Alignment::CENTER,
+                    alignment: Alignment::CENTER,
                     fit: json_paint_to_image_paint_fit(fit, transform, Some(scale), Some(repeat)),
                     opacity,
                     blend_mode,
@@ -1635,7 +1635,7 @@ impl From<JSONImageNode> for Node {
                 let image_paint = ImagePaint {
                     image: ResourceRef::RID(resolved),
                     quarter_turns: quarter_turns % 4,
-                    alignement: Alignment::CENTER,
+                    alignment: Alignment::CENTER,
                     fit: json_paint_to_image_paint_fit(fit, t, Some(scale), Some(repeat)),
                     opacity,
                     blend_mode,
@@ -1648,7 +1648,7 @@ impl From<JSONImageNode> for Node {
             _ => ImagePaint {
                 image: ResourceRef::RID(url.clone()),
                 quarter_turns: 0,
-                alignement: Alignment::CENTER,
+                alignment: Alignment::CENTER,
                 fit: json_paint_to_image_paint_fit(node.fit, None, None, None),
                 opacity: 1.0,
                 blend_mode: BlendMode::default(),

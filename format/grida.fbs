@@ -744,8 +744,7 @@ table ImagePaint {
   active:bool = true;
   image:ResourceRef;
   quarter_turns:ubyte = 0;
-  /// NOTE: Rust field name is `alignement` (typo preserved for 1:1)
-  alignement:Alignment;
+  alignment:Alignment;
   fit:ImagePaintFit;
   opacity:float = 1.0;
   blend_mode:BlendMode = Normal;

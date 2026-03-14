@@ -95,7 +95,7 @@ pub fn image_paint_matrix(
             let matrix = apply_scale_for_fit(matrix, 1.0, oriented_image_size, container_size);
             apply_alignment_to_matrix(
                 matrix,
-                &paint.alignement,
+                &paint.alignment,
                 oriented_image_size,
                 container_size,
             )
@@ -117,7 +117,7 @@ pub fn image_paint_matrix(
             );
             apply_alignment_to_matrix(
                 matrix,
-                &paint.alignement,
+                &paint.alignment,
                 oriented_image_size,
                 container_size,
             )
@@ -353,7 +353,7 @@ mod tests {
             active: true,
             image: ResourceRef::RID(String::new()),
             quarter_turns,
-            alignement: Alignment::CENTER,
+            alignment: Alignment::CENTER,
             fit,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,

@@ -40,7 +40,7 @@ impl NodeFactory {
             // TODO: use the built in image ref
             image: ResourceRef::RID(String::new()),
             quarter_turns: 0,
-            alignement: Alignment::CENTER,
+            alignment: Alignment::CENTER,
             fit: ImagePaintFit::Fit(BoxFit::Cover),
             opacity: 1.0,
             blend_mode: BlendMode::default(),

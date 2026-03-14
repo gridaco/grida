@@ -56,7 +56,7 @@ pub fn build() -> Scene {
                 opacity: 0.5,
                 blend_mode: BlendMode::Normal,
                 quarter_turns: 0,
-                alignement: Alignment::CENTER,
+                alignment: Alignment::CENTER,
             }),
         ]),
         strokes: Paints::new(vec![]),

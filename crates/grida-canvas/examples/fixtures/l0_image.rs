@@ -30,7 +30,7 @@ pub fn build() -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Screen,
             quarter_turns: 2,
-            alignement: Alignment::BOTTOM_RIGHT,
+            alignment: Alignment::BOTTOM_RIGHT,
         }));
 
     flat_scene("L0 Image", vec![r1, r2, r3, r4])

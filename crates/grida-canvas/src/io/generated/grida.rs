@@ -9553,7 +9553,7 @@ impl<'a> ImagePaint<'a> {
   pub const VT_IMAGE_TYPE: ::flatbuffers::VOffsetT = 6;
   pub const VT_IMAGE: ::flatbuffers::VOffsetT = 8;
   pub const VT_QUARTER_TURNS: ::flatbuffers::VOffsetT = 10;
-  pub const VT_ALIGNEMENT: ::flatbuffers::VOffsetT = 12;
+  pub const VT_ALIGNMENT: ::flatbuffers::VOffsetT = 12;
   pub const VT_FIT_TYPE: ::flatbuffers::VOffsetT = 14;
   pub const VT_FIT: ::flatbuffers::VOffsetT = 16;
   pub const VT_OPACITY: ::flatbuffers::VOffsetT = 18;
@@ -9573,7 +9573,7 @@ impl<'a> ImagePaint<'a> {
     if let Some(x) = args.filters { builder.add_filters(x); }
     builder.add_opacity(args.opacity);
     if let Some(x) = args.fit { builder.add_fit(x); }
-    if let Some(x) = args.alignement { builder.add_alignement(x); }
+    if let Some(x) = args.alignment { builder.add_alignment(x); }
     if let Some(x) = args.image { builder.add_image(x); }
     builder.add_blend_mode(args.blend_mode);
     builder.add_fit_type(args.fit_type);
@@ -9612,13 +9612,12 @@ impl<'a> ImagePaint<'a> {
     // which contains a valid value in this slot
     unsafe { self._tab.get::<u8>(ImagePaint::VT_QUARTER_TURNS, Some(0)).unwrap()}
   }
-  /// NOTE: Rust field name is `alignement` (typo preserved for 1:1)
   #[inline]
-  pub fn alignement(&self) -> Option<&'a Alignment> {
+  pub fn alignment(&self) -> Option<&'a Alignment> {
     // Safety:
     // Created from valid Table for this object
     // which contains a valid value in this slot
-    unsafe { self._tab.get::<Alignment>(ImagePaint::VT_ALIGNEMENT, None)}
+    unsafe { self._tab.get::<Alignment>(ImagePaint::VT_ALIGNMENT, None)}
   }
   #[inline]
   pub fn fit_type(&self) -> ImagePaintFit {
@@ -9747,7 +9746,7 @@ impl ::flatbuffers::Verifiable for ImagePaint<'_> {
         }
      })?
      .visit_field::<u8>("quarter_turns", Self::VT_QUARTER_TURNS, false)?
-     .visit_field::<Alignment>("alignement", Self::VT_ALIGNEMENT, false)?
+     .visit_field::<Alignment>("alignment", Self::VT_ALIGNMENT, false)?
      .visit_union::<ImagePaintFit, _>("fit_type", Self::VT_FIT_TYPE, "fit", Self::VT_FIT, false, |key, v, pos| {
         match key {
           ImagePaintFit::ImagePaintFitFit => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<ImagePaintFitFit>>("ImagePaintFit::ImagePaintFitFit", pos),
@@ -9768,7 +9767,7 @@ pub struct ImagePaintArgs<'a> {
     pub image_type: ResourceRef,
     pub image: Option<::flatbuffers::WIPOffset<::flatbuffers::UnionWIPOffset>>,
     pub quarter_turns: u8,
-    pub alignement: Option<&'a Alignment>,
+    pub alignment: Option<&'a Alignment>,
     pub fit_type: ImagePaintFit,
     pub fit: Option<::flatbuffers::WIPOffset<::flatbuffers::UnionWIPOffset>>,
     pub opacity: f32,
@@ -9783,7 +9782,7 @@ impl<'a> Default for ImagePaintArgs<'a> {
       image_type: ResourceRef::NONE,
       image: None,
       quarter_turns: 0,
-      alignement: None,
+      alignment: None,
       fit_type: ImagePaintFit::NONE,
       fit: None,
       opacity: 1.0,
@@ -9815,8 +9814,8 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ImagePaintBuilder<'a, 'b, A> 
     self.fbb_.push_slot::<u8>(ImagePaint::VT_QUARTER_TURNS, quarter_turns, 0);
   }
   #[inline]
-  pub fn add_alignement(&mut self, alignement: &Alignment) {
-    self.fbb_.push_slot_always::<&Alignment>(ImagePaint::VT_ALIGNEMENT, alignement);
+  pub fn add_alignment(&mut self, alignment: &Alignment) {
+    self.fbb_.push_slot_always::<&Alignment>(ImagePaint::VT_ALIGNMENT, alignment);
   }
   #[inline]
   pub fn add_fit_type(&mut self, fit_type: ImagePaintFit) {
@@ -9879,7 +9878,7 @@ impl ::core::fmt::Debug for ImagePaint<'_> {
         },
       };
       ds.field("quarter_turns", &self.quarter_turns());
-      ds.field("alignement", &self.alignement());
+      ds.field("alignment", &self.alignment());
       ds.field("fit_type", &self.fit_type());
       match self.fit_type() {
         ImagePaintFit::ImagePaintFitFit => {

@@ -20,7 +20,7 @@ pub fn build() -> Scene {
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
         quarter_turns: 0,
-        alignement: Alignment::CENTER,
+        alignment: Alignment::CENTER,
     }));
 
     // High contrast + desaturated
@@ -36,7 +36,7 @@ pub fn build() -> Scene {
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
         quarter_turns: 0,
-        alignement: Alignment::CENTER,
+        alignment: Alignment::CENTER,
     }));
 
     // Cool tint + shadow lift
@@ -53,7 +53,7 @@ pub fn build() -> Scene {
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
         quarter_turns: 0,
-        alignement: Alignment::CENTER,
+        alignment: Alignment::CENTER,
     }));
 
     // All filters non-zero
@@ -73,7 +73,7 @@ pub fn build() -> Scene {
         opacity: 1.0,
         blend_mode: BlendMode::Normal,
         quarter_turns: 0,
-        alignement: Alignment::CENTER,
+        alignment: Alignment::CENTER,
     }));
 
     flat_scene("L0 Image Filters", vec![bright_warm, contrast_desat, cool_shadow, all_filters])

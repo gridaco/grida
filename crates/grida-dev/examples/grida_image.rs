@@ -36,7 +36,7 @@ async fn demo_image() -> (Scene, Vec<u8>) {
         image: ResourceRef::RID(url.clone()),
         quarter_turns: 0,
         opacity: 1.0,
-        alignement: Alignment::CENTER,
+        alignment: Alignment::CENTER,
         fit: ImagePaintFit::Fit(BoxFit::Cover),
         blend_mode: BlendMode::Normal,
         active: true,
