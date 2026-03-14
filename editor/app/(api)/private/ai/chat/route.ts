@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     return createAgentUIStreamResponse({
       agent: canvasDesignAgent,
       uiMessages: messages,
+      sendReasoning: true,
     });
   } catch (error) {
     console.error("Error in agent chat:", error);

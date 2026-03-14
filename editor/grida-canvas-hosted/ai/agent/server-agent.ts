@@ -42,11 +42,29 @@ const tools = {
  * - Tool calling for image generation, text creation, UI components
  * - Automatic tool loop handling (up to 10 steps)
  * - Type-safe agent definition
+ * - Reasoning (thinking) enabled for OpenAI and Anthropic via providerOptions
+ *
+ * @see https://vercel.com/docs/ai-gateway/capabilities/reasoning
+ * @see https://vercel.com/docs/ai-gateway/capabilities/reasoning/openai
+ * @see https://vercel.com/docs/ai-gateway/capabilities/reasoning/anthropic
  */
 export const canvasDesignAgent = new ToolLoopAgent({
   model: model("mini"),
   instructions: canvas_use.llm.instructions,
   tools: tools,
+  prepareCall: (settings) => ({
+    ...settings,
+    providerOptions: {
+      openai: {
+        reasoningEffort: "medium",
+        reasoningSummary: "detailed",
+      },
+      // Claude 4.6: adaptive thinking (model decides when/how much to think)
+      anthropic: {
+        thinking: { type: "adaptive" },
+      },
+    },
+  }),
   onStepFinish: (step) => {
     if (step.toolCalls.length > 0 || step.dynamicToolCalls.length > 0) {
       const staticCalls = step.toolCalls.map((call) => call.toolName);
