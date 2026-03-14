@@ -3,7 +3,6 @@
 import {
   streamText,
   Output,
-  gateway,
   type UserModelMessage,
   type UserContent,
   type TextPart,
@@ -12,7 +11,7 @@ import {
 } from "ai";
 import { createStreamableValue } from "@ai-sdk/rsc";
 import { request_schema } from "./schema";
-import { model as tieredModel, models } from "@/lib/ai/models";
+import { gateway, model as tieredModel } from "@/lib/ai/models";
 import assert from "assert";
 
 export type UserAttachment = {

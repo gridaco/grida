@@ -28,7 +28,7 @@
  * @module
  */
 
-import { gateway } from "ai";
+import { createGateway } from "ai";
 
 // ---------------------------------------------------------------------------
 // Tier definitions
@@ -158,6 +158,26 @@ export function modelSpecById(modelId: string): ModelSpec | undefined {
   }
   return undefined;
 }
+
+// ---------------------------------------------------------------------------
+// AI Gateway instance — with app attribution headers
+//
+// @see https://vercel.com/docs/ai-gateway/ecosystem/app-attribution
+// ---------------------------------------------------------------------------
+
+/**
+ * Attributed AI Gateway instance.
+ *
+ * Use this instead of the bare `gateway` from `"ai"` so all requests carry
+ * the app attribution headers. This is the **only** gateway instance that
+ * should be used across the codebase.
+ */
+export const gateway = createGateway({
+  headers: {
+    "http-referer": "https://grida.co",
+    "x-title": "Grida",
+  },
+});
 
 /**
  * Return a `LanguageModelV3` instance for the given tier, ready to pass into
