@@ -14,12 +14,7 @@ import {
   Context,
   ContextContent,
   ContextContentBody,
-  ContextContentFooter,
   ContextContentHeader,
-  ContextInputUsage,
-  ContextOutputUsage,
-  ContextReasoningUsage,
-  ContextCacheUsage,
   ContextTrigger,
 } from "@/components/ai-elements/context";
 import type { ChatStatus, LanguageModelUsage } from "ai";
@@ -76,12 +71,13 @@ export function AgentInput({
           />
         </PromptInputBody>
         <PromptInputFooter>
-          <PromptInputTools>
+          <PromptInputTools />
+          <div className="flex items-center gap-0">
             {contextUsage && contextUsage.usedTokens > 0 && (
               <ContextIndicator {...contextUsage} />
             )}
-          </PromptInputTools>
-          <PromptInputSubmit status={status} disabled={disabled} />
+            <PromptInputSubmit status={status} disabled={disabled} />
+          </div>
         </PromptInputFooter>
       </PromptInput>
     </PromptInputProvider>
@@ -92,33 +88,51 @@ export function AgentInput({
 // Context window indicator
 // ---------------------------------------------------------------------------
 
-function ContextIndicator({
-  usedTokens,
-  maxTokens,
-  usage,
-  modelId,
-}: ContextUsageData) {
+function ContextIndicator({ usedTokens, maxTokens, usage }: ContextUsageData) {
   return (
-    <Context
-      usedTokens={usedTokens}
-      maxTokens={maxTokens || 1}
-      usage={usage}
-      modelId={modelId}
-    >
-      <ContextTrigger className="h-6 px-1.5 text-xs" />
-      <ContextContent side="top" align="start">
+    <Context usedTokens={usedTokens} maxTokens={maxTokens || 1} usage={usage}>
+      <ContextTrigger className="h-6 px-1 text-xs [&>span]:hidden" />
+      <ContextContent
+        side="top"
+        align="center"
+        sideOffset={0}
+        collisionPadding={8}
+      >
         <ContextContentHeader />
         <ContextContentBody>
           <div className="space-y-1">
-            <ContextInputUsage />
-            <ContextOutputUsage />
-            <ContextReasoningUsage />
-            <ContextCacheUsage />
+            <TokenRow label="Input" tokens={usage?.inputTokens} />
+            <TokenRow label="Output" tokens={usage?.outputTokens} />
+            <TokenRow
+              label="Reasoning"
+              tokens={
+                usage?.outputTokenDetails?.reasoningTokens ??
+                usage?.reasoningTokens
+              }
+            />
+            <TokenRow
+              label="Cache"
+              tokens={
+                usage?.inputTokenDetails?.cacheReadTokens ??
+                usage?.cachedInputTokens
+              }
+            />
           </div>
         </ContextContentBody>
-        <ContextContentFooter />
       </ContextContent>
     </Context>
+  );
+}
+
+function TokenRow({ label, tokens }: { label: string; tokens?: number }) {
+  if (!tokens) return null;
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span>
+        {new Intl.NumberFormat("en-US", { notation: "compact" }).format(tokens)}
+      </span>
+    </div>
   );
 }
 
