@@ -584,7 +584,8 @@ export namespace Platform.Customer {
         "A customer with this visitor ID already exists in this project.",
       [CONSTRAINT.CUSTOMER_UNIQUE_VERIFIED_EMAIL_PER_PROJECT]:
         "A customer with this verified email already exists in this project.",
-      DEFAULT_UNIQUE: "Duplicate value: a record with this value already exists.",
+      DEFAULT_UNIQUE:
+        "Duplicate value: a record with this value already exists.",
       GENERIC: "Failed to insert customers.",
     } as const;
 

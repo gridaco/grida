@@ -145,103 +145,106 @@ export function ImportCSVDialog({
           )}
 
           {step === "preview" && (
-          <div className="flex flex-1 min-h-0 flex-col space-y-4 py-4 max-w-full overflow-hidden">
-            <div className="flex shrink-0 items-center justify-between">
-              <h3 className="text-lg font-medium">Preview Import Data</h3>
-              <div className="text-sm text-muted-foreground">
-                {file?.name} ({csv.length} records)
+            <div className="flex flex-1 min-h-0 flex-col space-y-4 py-4 max-w-full overflow-hidden">
+              <div className="flex shrink-0 items-center justify-between">
+                <h3 className="text-lg font-medium">Preview Import Data</h3>
+                <div className="text-sm text-muted-foreground">
+                  {file?.name} ({csv.length} records)
+                </div>
               </div>
-            </div>
 
-            <div className="flex-1 min-h-0 overflow-hidden rounded-md border">
-              <SimpleCSVTable
-                data={csv}
-                count={csv.length}
-                className="h-full rounded-none border-0"
-              />
-            </div>
+              <div className="flex-1 min-h-0 overflow-hidden rounded-md border">
+                <SimpleCSVTable
+                  data={csv}
+                  count={csv.length}
+                  className="h-full rounded-none border-0"
+                />
+              </div>
 
-            <Alert className="shrink-0">
-              <AlertCircle className="size-4" />
-              <AlertTitle>Review your data</AlertTitle>
-              <AlertDescription>
-                Please review the data before importing. This action cannot be
-                undone.
-              </AlertDescription>
-            </Alert>
-            <Field orientation="horizontal">
-              <Checkbox
-                id="import-csv-dialog-data-checked"
-                checked={datachecked}
-                onCheckedChange={(s) => setDataChecked(s === true)}
-              />
-              <FieldLabel
-                htmlFor="import-csv-dialog-data-checked"
-                className="font-normal"
-              >
-                I&apos;ve reviewed the data and want to import these customers
-              </FieldLabel>
-            </Field>
-            <label className="flex items-center space-x-2 cursor-pointer mt-2 w-full">
-              <span></span>
-            </label>
-          </div>
+              <Alert className="shrink-0">
+                <AlertCircle className="size-4" />
+                <AlertTitle>Review your data</AlertTitle>
+                <AlertDescription>
+                  Please review the data before importing. This action cannot be
+                  undone.
+                </AlertDescription>
+              </Alert>
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="import-csv-dialog-data-checked"
+                  checked={datachecked}
+                  onCheckedChange={(s) => setDataChecked(s === true)}
+                />
+                <FieldLabel
+                  htmlFor="import-csv-dialog-data-checked"
+                  className="font-normal"
+                >
+                  I&apos;ve reviewed the data and want to import these customers
+                </FieldLabel>
+              </Field>
+              <label className="flex items-center space-x-2 cursor-pointer mt-2 w-full">
+                <span></span>
+              </label>
+            </div>
           )}
 
           {step === "importing" && (
-          <div className="space-y-6 py-8">
-            <div className="text-center">
-              <h3 className="text-lg font-medium mb-2">Importing Customers</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Please wait while we import your customers...
-              </p>
-              <Progress indeterminate className="h-2 w-full" />
-              <p className="text-sm text-muted-foreground mt-2">
-                Importing {csv.length} customers
-              </p>
+            <div className="space-y-6 py-8">
+              <div className="text-center">
+                <h3 className="text-lg font-medium mb-2">
+                  Importing Customers
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Please wait while we import your customers...
+                </p>
+                <Progress indeterminate className="h-2 w-full" />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Importing {csv.length} customers
+                </p>
+              </div>
             </div>
-          </div>
           )}
 
           {step === "complete" && (
-          <div className="space-y-6 py-8">
-            <div className="text-center">
-              <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-green-100 mb-4">
-                <CheckCircle2 className="size-10 text-green-600" />
+            <div className="space-y-6 py-8">
+              <div className="text-center">
+                <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-green-100 mb-4">
+                  <CheckCircle2 className="size-10 text-green-600" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">Import Complete</h3>
+                <p className="text-sm text-muted-foreground">
+                  Successfully imported {csv.length} customers to your CRM.
+                </p>
               </div>
-              <h3 className="text-lg font-medium mb-2">Import Complete</h3>
-              <p className="text-sm text-muted-foreground">
-                Successfully imported {csv.length} customers to your CRM.
-              </p>
             </div>
-          </div>
           )}
 
           {step === "error" && (
-          <div className="space-y-6 py-8">
-            <div className="text-center">
-              <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-red-100 mb-4">
-                <AlertCircle className="size-10 text-red-600" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">Import Failed</h3>
-              <p className="text-sm text-muted-foreground">
-                {error != null && typeof error === "object"
-                  ? ("message" in error
-                      ? (error as { message: string }).message
-                      : "hint" in error
-                        ? (error as { hint: string }).hint
-                        : null) ?? "There was an error importing your customers. Please try again."
-                  : "There was an error importing your customers. Please try again."}
-              </p>
-              {error != null && (
-                <div className="max-h-[400px] rounded-md border mt-4 overflow-scroll p-4">
-                  <p className="text-xs text-start text-muted-foreground font-mono">
-                    <pre>{JSON.stringify(error, null, 2)}</pre>
-                  </p>
+            <div className="space-y-6 py-8">
+              <div className="text-center">
+                <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-red-100 mb-4">
+                  <AlertCircle className="size-10 text-red-600" />
                 </div>
-              )}
+                <h3 className="text-lg font-medium mb-2">Import Failed</h3>
+                <p className="text-sm text-muted-foreground">
+                  {error != null && typeof error === "object"
+                    ? (("message" in error
+                        ? (error as { message: string }).message
+                        : "hint" in error
+                          ? (error as { hint: string }).hint
+                          : null) ??
+                      "There was an error importing your customers. Please try again.")
+                    : "There was an error importing your customers. Please try again."}
+                </p>
+                {error != null && (
+                  <div className="max-h-[400px] rounded-md border mt-4 overflow-scroll p-4">
+                    <p className="text-xs text-start text-muted-foreground font-mono">
+                      <pre>{JSON.stringify(error, null, 2)}</pre>
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
           )}
         </div>
 
