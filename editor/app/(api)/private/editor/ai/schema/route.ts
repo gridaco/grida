@@ -47,7 +47,7 @@ ${interface_txt}
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-5-mini",
       messages: [
         {
           role: "system",
@@ -62,9 +62,7 @@ ${interface_txt}
       response_format: {
         type: "json_object",
       },
-      temperature: 0.5,
-      max_tokens: 1024,
-      stop: null,
+      max_completion_tokens: 1024,
     });
 
     const content = response.choices[0].message.content!;

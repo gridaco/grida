@@ -1,7 +1,8 @@
 "use server";
 
 import {
-  streamObject,
+  streamText,
+  Output,
   type UserModelMessage,
   type UserContent,
   type TextPart,
@@ -13,7 +14,7 @@ import { createStreamableValue } from "@ai-sdk/rsc";
 import { request_schema } from "./schema";
 import assert from "assert";
 
-const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-4o-mini";
+const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-5-mini";
 
 export type UserAttachment = {
   type: "file" | "image";
@@ -91,17 +92,17 @@ export async function generate({
 
   const stream = createStreamableValue({});
   (async () => {
-    const { partialObjectStream } = await streamObject({
+    const { partialOutputStream } = streamText({
       model,
       ...model_config,
-      system: system,
+      system,
       ...(message
         ? { messages: [message] }
-        : { prompt: prompt || "Generate content" }),
-      schema: request_schema,
+        : { prompt: prompt ?? "Generate content" }),
+      output: Output.object({ schema: request_schema }),
     });
 
-    for await (const partialObject of partialObjectStream) {
+    for await (const partialObject of partialOutputStream) {
       stream.update(partialObject as any);
     }
 
