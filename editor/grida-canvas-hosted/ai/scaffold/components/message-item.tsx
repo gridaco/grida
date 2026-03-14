@@ -2,13 +2,11 @@
 
 import React from "react";
 import type { CanvasDesignAgentMessage } from "@/grida-canvas-hosted/ai/agent/server-agent";
-import type { ToolUIPart } from "ai";
-import { Spinner } from "@/components/ui/spinner";
+import { getToolName, type ToolUIPart } from "ai";
 import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-  useReasoning,
 } from "@/components/ai-elements/reasoning";
 import {
   Message,
@@ -24,9 +22,14 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
-import Image from "next/image";
-import { cn } from "@/components/lib/utils";
+import { canvas_use } from "@/grida-canvas-hosted/ai/tools/canvas-use";
 import { CopyIcon } from "lucide-react";
+import { cn } from "@/components/lib/utils";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import { SvgToolUI } from "./tool-ui-svg";
+import { TreeToolUI } from "./tool-ui-tree";
+import { ArtboardSizesToolUI } from "./tool-ui-artboard-sizes";
+import { GenerateImageToolUI } from "./tool-ui-generate-image";
 
 export interface BaseMessageProps {
   message: CanvasDesignAgentMessage;
@@ -77,11 +80,11 @@ export function AssistantMessage({
     : [];
 
   // Track whether we've seen any renderable content at all so we can show a
-  // spinner for the very first streaming frame.
+  // shimmer for the very first streaming frame.
   let hasRenderedContent = false;
 
-  // Group consecutive reasoning parts together so they render as a single
-  // collapsible block instead of one-per-delta.
+  // Group consecutive reasoning / text parts so they render as single blocks
+  // instead of one-per-delta, while tool parts stay individual.
   const groupedParts = groupConsecutiveParts(parts);
 
   const rendered = groupedParts.map((group, groupIndex) => {
@@ -95,9 +98,24 @@ export function AssistantMessage({
       if (!reasoningText) return null;
       hasRenderedContent = true;
 
-      const isReasoningStreaming = group.items.some(
-        (p: any) => p.type === "reasoning-delta" || p.type === "reasoning-start"
+      // Reasoning is streaming if:
+      //  a) the parts themselves are still delta/start types, OR
+      //  b) the overall message is still streaming and nothing else
+      //     (text or tool) follows this reasoning group — meaning the
+      //     reasoning block is still the active stream frontier.
+      const hasDeltaParts = group.items.some(
+        (p: any) =>
+          p.type === "reasoning-delta" || p.type === "reasoning-start"
       );
+      const isLastGroup = groupIndex === groupedParts.length - 1;
+      const nothingFollows =
+        isLastGroup ||
+        groupedParts
+          .slice(groupIndex + 1)
+          .every((g) => g.kind === "reasoning");
+      const isReasoningStreaming =
+        hasDeltaParts || (!!isStreaming && nothingFollows);
+
       return (
         <Reasoning key={key} isStreaming={isReasoningStreaming}>
           <ReasoningTrigger />
@@ -115,7 +133,10 @@ export function AssistantMessage({
       hasRenderedContent = true;
 
       return (
-        <MessageContent key={key} className="w-full rounded-none border-0 px-0">
+        <MessageContent
+          key={key}
+          className="w-full rounded-none border-0 px-0"
+        >
           <MessageResponse>{textContent}</MessageResponse>
         </MessageContent>
       );
@@ -131,15 +152,12 @@ export function AssistantMessage({
     return null;
   });
 
-  // If streaming but nothing rendered yet, show a loading spinner
+  // If streaming but nothing rendered yet, show shimmer
   if (isStreaming && !hasRenderedContent) {
     rendered.push(
-      <MessageContent
-        key="streaming-spinner"
-        className="w-full rounded-none border-0 px-0"
-      >
-        <Spinner className="size-4" />
-      </MessageContent>
+      <Shimmer key="streaming-planning" className="text-xs">
+        Planning next moves
+      </Shimmer>
     );
   }
 
@@ -151,29 +169,52 @@ export function AssistantMessage({
 }
 
 // ---------------------------------------------------------------------------
-// ToolPart — renders a single tool invocation inline
+// ToolPart — dispatches to custom UIs or falls back to generic Tool chrome
 // ---------------------------------------------------------------------------
 
 function ToolPart({ part }: { part: any }) {
-  const toolCallId =
-    part.toolCallId || part.id || part.name || `tool-${Math.random()}`;
-  const toolName = part.toolName || part.name || "tool";
+  const toolName = getToolName(part);
   const state: ToolUIPart["state"] =
     part.state ?? (part.output ? "output-available" : "input-available");
-  const type: ToolUIPart["type"] =
-    typeof part.type === "string" && part.type.startsWith("tool-")
-      ? part.type
-      : (`tool-${toolName}` as ToolUIPart["type"]);
   const input = part.input;
   const output = part.output ?? part.result;
-  const errorText = part.errorText;
+  const errorText: string | undefined = part.errorText;
 
-  // Special rendering for generateImage tool
-  const generatedImageOutput =
-    toolName === "generateImage" && output && isGeneratedImage(output)
-      ? output
-      : null;
+  // ── Custom tool UIs ────────────────────────────────────────────────
+  switch (toolName) {
+    case canvas_use.tools_spec.name_make_from_svg:
+      return (
+        <SvgToolUI
+          input={input}
+          output={output}
+          state={state}
+          errorText={errorText}
+        />
+      );
+    case canvas_use.tools_spec.name_tree:
+      return (
+        <TreeToolUI output={output} state={state} errorText={errorText} />
+      );
+    case canvas_use.tools_spec.name_data_artboard_sizes:
+      return (
+        <ArtboardSizesToolUI
+          output={output}
+          state={state}
+          errorText={errorText}
+        />
+      );
+    case canvas_use.tools_spec.name_platform_sys_tool_ai_generate_image:
+      return (
+        <GenerateImageToolUI
+          input={input}
+          output={output}
+          state={state}
+          errorText={errorText}
+        />
+      );
+  }
 
+  // ── Generic fallback ───────────────────────────────────────────────
   return (
     <div className="w-full">
       <Tool
@@ -181,16 +222,11 @@ function ToolPart({ part }: { part: any }) {
           state !== "input-streaming" && state !== "approval-requested"
         }
       >
-        <ToolHeader title={toolName} type={type} state={state} />
+        <ToolHeader title={toolName} type={part.type} state={state} />
         <ToolContent>
           {input !== undefined && <ToolInput input={input} />}
           {(output !== undefined || errorText) && (
             <ToolOutput output={output} errorText={errorText ?? undefined} />
-          )}
-          {generatedImageOutput && (
-            <div className="p-4 pt-0">
-              <GeneratedImagePreview output={generatedImageOutput} />
-            </div>
           )}
         </ToolContent>
       </Tool>
@@ -198,9 +234,9 @@ function ToolPart({ part }: { part: any }) {
   );
 }
 
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // Helpers
-// ---------------------------------------------------------------------------
+// ===========================================================================
 
 type GroupedPart =
   | { kind: "reasoning"; items: any[] }
@@ -292,51 +328,4 @@ function getTextFromParts(message: CanvasDesignAgentMessage): string {
       .join("");
   }
   return "";
-}
-
-function isGeneratedImage(output: unknown) {
-  return (
-    typeof output === "object" &&
-    output !== null &&
-    "base64" in output &&
-    typeof (output as any).base64 === "string"
-  );
-}
-
-function GeneratedImagePreview({ output }: { output: any }) {
-  return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      {output.base64 && (
-        <div className="relative aspect-square w-full">
-          <Image
-            src={`data:image/png;base64,${output.base64}`}
-            alt={output.prompt || "Generated image"}
-            fill
-            className="object-contain"
-          />
-        </div>
-      )}
-      <div className="p-3 text-xs space-y-1">
-        <div className="font-medium text-foreground">Generated Image</div>
-        {output.prompt && (
-          <div className="text-muted-foreground">Prompt: {output.prompt}</div>
-        )}
-        {output.width && output.height && (
-          <div className="text-muted-foreground">
-            Size: {output.width} x {output.height}
-          </div>
-        )}
-        {output.imageUrl && (
-          <a
-            href={output.imageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline inline-flex items-center gap-1"
-          >
-            Open in new tab
-          </a>
-        )}
-      </div>
-    </div>
-  );
 }

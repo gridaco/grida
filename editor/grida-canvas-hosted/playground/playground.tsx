@@ -1000,6 +1000,7 @@ function SidebarRight({
   setTab: (tab: "inspect" | "agent") => void;
 }) {
   const should_show_artboards_list = useArtboardListCondition();
+  const AGENT_PANEL_WIDTH = "540px";
 
   return (
     <aside
@@ -1008,7 +1009,7 @@ function SidebarRight({
       className="relative data-[variant=floating]:absolute data-[variant=floating]:right-0"
       style={
         {
-          "--sidebar-width": tab === "inspect" ? "240px" : "400px",
+          "--sidebar-width": tab === "inspect" ? "240px" : AGENT_PANEL_WIDTH,
         } as React.CSSProperties
       }
     >
