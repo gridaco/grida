@@ -66,6 +66,7 @@ export default function RulerDemoPage() {
           offset={offset.x}
           ranges={x_ranges}
           marks={x_marks}
+          subticks="auto"
         />
       </div>
       <div className="fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize">
@@ -76,12 +77,13 @@ export default function RulerDemoPage() {
           zoom={zoom}
           offset={offset.y}
           ranges={y_ranges}
+          subticks="auto"
         />
       </div>
       <div className="fixed inset-0 -z-10">
         <div
           style={{
-            transform: `scale(${zoom}) translate(${offset.x}px, ${offset.y}px)`,
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
             transformOrigin: "0 0",
           }}
         >
