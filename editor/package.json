@@ -15,7 +15,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "3.0.0",
     "@ai-sdk/openai": "3.0.0",
     "@ai-sdk/react": "3.0.1",
     "@ai-sdk/replicate": "2.0.0",
@@ -109,7 +108,7 @@
     "@visx/visx": "^3.11.0",
     "@visx/xychart": "^3.11.0",
     "@xyflow/react": "^12.6.4",
-    "ai": "6.0.1",
+    "ai": "6.0.116",
     "ajv": "^8.13.0",
     "axios": "^1",
     "canvas-confetti": "^1.9.3",
