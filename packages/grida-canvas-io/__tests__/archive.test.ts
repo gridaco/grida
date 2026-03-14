@@ -22,7 +22,7 @@ function createFile(filename: string, content: Uint8Array): File {
 }
 
 describe("archive (.grida zip)", () => {
-  const schemaVersion = "0.0.0-test+00000000";
+  const schemaVersion = grida.program.document.SCHEMA_VERSION;
 
   // Helper to create a minimal test document
   function createTestDocument(): grida.program.document.Document {
