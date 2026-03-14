@@ -13,6 +13,9 @@ export type RulerProps = Partial<
     | "overlapThreshold"
     | "ranges"
     | "steps"
+    | "subticks"
+    | "subtickHeight"
+    | "subtickColor"
   >
 > & {
   axis: Axis;
@@ -47,6 +50,9 @@ export const AxisRuler: React.FC<RulerProps> = (props) => {
       offset: props.offset,
       textSideOffset: props.textSideOffset,
       font: props.font,
+      subticks: props.subticks,
+      subtickHeight: props.subtickHeight,
+      subtickColor: props.subtickColor,
     });
 
     rulerRef.current.setSize(props.width, props.height);

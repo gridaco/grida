@@ -1,6 +1,6 @@
 # `@grida/ruler`
 
-Zero-Dependency Canvas Ruler Component for Infinite Canvas. A lightweight, performant ruler component that supports zooming, panning, and custom markers.
+Zero-Dependency Canvas Ruler Component for Infinite Canvas. A lightweight, performant ruler component that supports zooming, panning, custom markers, and subticks.
 
 ## Installation
 
@@ -44,6 +44,7 @@ function MyCanvas() {
         offset={offset.x}
         ranges={ranges}
         marks={marks}
+        subticks="auto"
       />
 
       {/* Vertical Ruler */}
@@ -54,6 +55,7 @@ function MyCanvas() {
         zoom={zoom}
         offset={offset.y}
         ranges={ranges}
+        subticks="auto"
       />
     </div>
   );
@@ -72,6 +74,7 @@ const ruler = new RulerCanvas(canvas, {
   offset: 0,
   ranges: [[100, 200]],
   marks: [{ pos: 50, color: "red", text: "50" }],
+  subticks: "auto",
 });
 
 // Update ruler
@@ -89,57 +92,102 @@ ruler.draw();
 
 ## API Reference
 
+### `RulerOptions`
+
+Used by `RulerCanvas` (core API). The React `<AxisRuler>` component exposes a subset of these — see [React Component Props](#react-component-props) below.
+
+| Property                | Type                                | Default                                                  | Description                                        |
+| ----------------------- | ----------------------------------- | -------------------------------------------------------- | -------------------------------------------------- |
+| `axis`                  | `"x" \| "y"`                        | —                                                        | **Required.** Ruler orientation                    |
+| `zoom`                  | `number`                            | `1`                                                      | **Required.** Current zoom level                   |
+| `offset`                | `number`                            | `0`                                                      | **Required.** Current offset / scroll position     |
+| `steps`                 | `number[]`                          | `[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]` | Candidate step sizes (1-2-5 series)                |
+| `ranges`                | `Range[]`                           | `[]`                                                     | Highlighted ranges                                 |
+| `marks`                 | `Tick[]`                            | `[]`                                                     | Custom tick marks                                  |
+| `overlapThreshold`      | `number`                            | `80`                                                     | Pixel distance for alpha-fade near priority points |
+| `textSideOffset`        | `number`                            | `12`                                                     | Text offset from ruler edge                        |
+| `tickHeight`            | `number`                            | `6`                                                      | Height of major tick lines                         |
+| `font`                  | `string`                            | `"10px sans-serif"`                                      | CSS font for tick labels                           |
+| `backgroundColor`       | `string`                            | `"transparent"`                                          | Ruler background color                             |
+| `color`                 | `string`                            | `"rgba(128, 128, 128, 0.5)"`                             | Default tick and label color                       |
+| `accentBackgroundColor` | `string`                            | `"rgba(80, 200, 255, 0.25)"`                             | Range highlight fill color                         |
+| `accentColor`           | `string`                            | `"rgba(80, 200, 255, 1)"`                                | Range tick and label color                         |
+| `subticks`              | `false \| true \| "auto" \| number` | `false`                                                  | Subdivision mode (see [Subticks](#subticks))       |
+| `subtickHeight`         | `number`                            | `Math.round(tickHeight * 0.4)`                           | Height of subtick lines                            |
+| `subtickColor`          | `string`                            | same as `color`                                          | Color of subtick lines                             |
+
+### Subticks
+
+Subticks are minor tick marks rendered between major ticks. They are unlabeled and shorter than major ticks.
+
+| Value               | Behavior                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `false` or `0`      | Disabled (default)                                                                  |
+| `true` or `"auto"`  | Automatically infer subdivisions from the current step using a 1-2-5 heuristic      |
+| `number` (e.g. `5`) | Fixed subdivision count — renders `(n-1)` subticks between each pair of major ticks |
+
+**Auto heuristic** — when the major step is derived from the 1-2-5 series, auto mode picks a natural subdivision:
+
+| Step pattern | Example steps    | Subdivisions |
+| ------------ | ---------------- | ------------ |
+| 1 × 10^n     | 1, 10, 100, 1000 | 10           |
+| 2 × 10^n     | 2, 20, 200, 2000 | 4            |
+| 2.5 × 10^n   | 25, 250, 2500    | 5            |
+| 5 × 10^n     | 5, 50, 500, 5000 | 5            |
+
+### `Tick`
+
+```typescript
+type Tick = {
+  pos: number; // Position on the ruler (document-space)
+  color: string; // Base color
+  font?: string; // CSS font string
+  text?: string; // Label text
+  textColor?: string; // Label color (defaults to color)
+  textAlign?: CanvasTextAlign;
+  textAlignOffset?: number;
+  strokeColor?: string; // Tick line color (defaults to color)
+  strokeWidth?: number; // Tick line width (defaults to 1)
+  strokeHeight?: number; // Tick line height (defaults to tickHeight)
+};
+```
+
+### `Range`
+
+```typescript
+type Range = [a: number, b: number];
+```
+
 ### React Component Props
 
-```typescript
-type RulerProps = {
-  axis: "x" | "y"; // Ruler orientation
-  width: number; // Width of the ruler
-  height: number; // Height of the ruler
-  zoom: number; // Current zoom level
-  offset: number; // Current offset/scroll position
-  marks?: Tick[]; // Optional custom marks
-  ranges?: Range[]; // Optional ranges to highlight
-  font?: string; // Optional font specification
-  textSideOffset?: number; // Optional text offset
-  overlapThreshold?: number; // Optional threshold for overlapping marks
-  steps?: number; // Optional step size for marks
-};
+The React `<AxisRuler>` component accepts:
 
-type Tick = {
-  pos: number; // Position on the ruler
-  color?: string; // Optional color
-  text?: string; // Optional label
-};
-
-type Range = [number, number]; // [start, end]
-```
-
-### Core API Types
-
-```typescript
-type RulerOptions = {
-  axis: "x" | "y";
-  zoom: number;
-  offset: number;
-  marks?: Tick[];
-  ranges?: Range[];
-  font?: string;
-  textSideOffset?: number;
-  overlapThreshold?: number;
-  steps?: number;
-};
-```
+| Prop               | Type                                | Required | Description                      |
+| ------------------ | ----------------------------------- | -------- | -------------------------------- |
+| `axis`             | `"x" \| "y"`                        | Yes      | Ruler orientation                |
+| `width`            | `number`                            | Yes      | Canvas width in pixels           |
+| `height`           | `number`                            | Yes      | Canvas height in pixels          |
+| `zoom`             | `number`                            | Yes      | Current zoom level               |
+| `offset`           | `number`                            | Yes      | Current offset / scroll position |
+| `marks`            | `Tick[]`                            | No       | Custom tick marks                |
+| `ranges`           | `Range[]`                           | No       | Highlighted ranges               |
+| `steps`            | `number[]`                          | No       | Candidate step sizes             |
+| `font`             | `string`                            | No       | CSS font for labels              |
+| `textSideOffset`   | `number`                            | No       | Text offset from ruler edge      |
+| `overlapThreshold` | `number`                            | No       | Pixel distance for alpha-fade    |
+| `subticks`         | `false \| true \| "auto" \| number` | No       | Subdivision mode                 |
+| `subtickHeight`    | `number`                            | No       | Height of subtick lines          |
+| `subtickColor`     | `string`                            | No       | Color of subtick lines           |
 
 ## Features
 
-- 🎯 Zero dependencies
-- ⚡️ High performance canvas-based rendering
-- 🔍 Support for zooming and panning
-- 📏 Custom markers and ranges
-- 🎨 Customizable appearance
-- 📱 Responsive design
-- 🔄 Both React and vanilla JS support
+- Zero dependencies
+- High performance canvas-based rendering
+- Support for zooming and panning
+- Custom markers and ranges
+- Subticks (minor ticks) with auto or manual subdivision
+- Customizable appearance
+- Both React and vanilla JS support
 
 ## License
 
