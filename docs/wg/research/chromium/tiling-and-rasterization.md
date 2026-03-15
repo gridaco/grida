@@ -23,7 +23,7 @@ Tile sizes depend on the rasterization mode:
 
 - Width: viewport width
 - Height: viewport height / 4 (the viewport is divided into ~4 horizontal strips)
-- If content width <= viewport width / 2: fewer divisions
+- If content width `<=` viewport width / 2: fewer divisions
 - Rounded up to multiples of 32 pixels
 - Minimum height: 256 pixels
 
