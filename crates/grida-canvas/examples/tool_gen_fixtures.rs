@@ -13,6 +13,7 @@
 //!
 //! On success the tool prints the byte count, scene count, and output path.
 
+mod fixture_helpers;
 mod fixtures;
 
 fn main() {
