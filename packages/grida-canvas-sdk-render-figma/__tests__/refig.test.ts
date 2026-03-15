@@ -17,6 +17,7 @@ import {
   exportSettingToRenderOptions,
 } from "../index";
 import { figBytesToRestLikeDocument } from "../lib";
+import { isFigFixtureAvailable } from "./fig-fixture-available";
 
 // ---------------------------------------------------------------------------
 // Binary signatures for output validation
@@ -164,7 +165,9 @@ describe("collectExportsFromDocument", () => {
     expect(items[1].setting.constraint.value).toBe(200);
   });
 
-  it("collects exportSettings from REST doc built from .fig via figBytesToRestLikeDocument", () => {
+  it.skipIf(!isFigFixtureAvailable())(
+    "collects exportSettings from REST doc built from .fig via figBytesToRestLikeDocument",
+    () => {
     const figPath = join(
       process.cwd(),
       "../../fixtures/test-fig/community/1510053249065427020-workos-radix-icons.fig"
@@ -181,7 +184,8 @@ describe("collectExportsFromDocument", () => {
     expect(items[0]).toHaveProperty("setting");
     expect(items[0].setting).toHaveProperty("format");
     expect(items[0].setting).toHaveProperty("constraint");
-  });
+  }
+  );
 });
 
 describe("exportSettingToRenderOptions", () => {

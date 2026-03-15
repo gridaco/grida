@@ -1,12 +1,14 @@
 import { readFileSync } from "fs";
+import { describe, expect, test } from "vitest";
 import {
   readFigFile,
   getBlobBytes,
   parseCommandsBlob,
   parseVectorNetworkBlob,
 } from "../index";
+import { isFigFixtureAvailable } from "./fig-fixture-available";
 
-describe("blob parser", () => {
+describe.skipIf(!isFigFixtureAvailable())("blob parser (requires LFS fixtures)", () => {
   test("parses vector.fig and extracts vector network blob", () => {
     const figData = readFileSync(
       __dirname + "/../../../../fixtures/test-fig/L0/vector.fig"
@@ -102,7 +104,9 @@ describe("blob parser", () => {
     const result = getBlobBytes(99999, parsed.message);
     expect(result).toBeNull();
   });
+});
 
+describe("blob parser (no fixtures)", () => {
   test("parseCommandsBlob handles invalid data", () => {
     // Empty buffer
     expect(parseCommandsBlob(new Uint8Array())).toEqual([]);

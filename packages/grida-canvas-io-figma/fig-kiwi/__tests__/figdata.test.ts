@@ -7,51 +7,56 @@ import {
   prettyPrintSchema,
   encodeBinarySchema,
 } from "kiwi-schema";
+import { describe, expect, test } from "vitest";
+
 import schema from "../schema";
 import { Schema as CompiledSchema, NodeChange, Message } from "../schema";
 import { deflateSync, inflateSync } from "fflate";
+import { isFigFixtureAvailable } from "./fig-fixture-available";
 
 test.skip("this just formats the schema", () => {
   const prettySchema = prettyPrintSchema(schema);
   writeFileSync(__dirname + "/fig.kiwi", prettySchema);
 });
 
-test("able to parse figma kiwi", () => {
-  const data = readFileSync(
-    __dirname + "/../../../../fixtures/test-fig/L0/blank.fig"
-  );
-  const parsed = readFigFile(data);
-  expect(parsed.header.version).toBeGreaterThanOrEqual(15);
-  expect(parsed.schema).toHaveProperty("definitions");
-  expect(parsed.message).not.toBeNull();
-});
-
-test("realworld files assertion", () => {
-  const communityFiles = [
-    "1380235722331273046-figma-simple-design-system.fig",
-    "1510053249065427020-workos-radix-icons.fig",
-    "1527721578857867021-apple-ios-26.fig",
-    "784448220678228461-figma-auto-layout-playground.fig",
-  ];
-
-  communityFiles.forEach((filename) => {
+describe.skipIf(!isFigFixtureAvailable())("fig file parsing (requires LFS fixtures)", () => {
+  test("able to parse figma kiwi", () => {
     const data = readFileSync(
-      __dirname + `/../../../../fixtures/test-fig/community/${filename}`
+      __dirname + "/../../../../fixtures/test-fig/L0/blank.fig"
+    );
+    const parsed = readFigFile(data);
+    expect(parsed.header.version).toBeGreaterThanOrEqual(15);
+    expect(parsed.schema).toHaveProperty("definitions");
+    expect(parsed.message).not.toBeNull();
+  });
+
+  test("realworld files assertion", () => {
+    const communityFiles = [
+      "1380235722331273046-figma-simple-design-system.fig",
+      "1510053249065427020-workos-radix-icons.fig",
+      "1527721578857867021-apple-ios-26.fig",
+      "784448220678228461-figma-auto-layout-playground.fig",
+    ];
+
+    communityFiles.forEach((filename) => {
+      const data = readFileSync(
+        __dirname + `/../../../../fixtures/test-fig/community/${filename}`
+      );
+      const parsed = readFigFile(data);
+      expect(parsed.message).toBeDefined();
+      expect(parsed.schema).toBeDefined();
+    });
+  });
+
+  test("parsed message has expected structure", () => {
+    const data = readFileSync(
+      __dirname + "/../../../../fixtures/test-fig/L0/blank.fig"
     );
     const parsed = readFigFile(data);
     expect(parsed.message).toBeDefined();
     expect(parsed.schema).toBeDefined();
+    expect(parsed.header).toBeDefined();
   });
-});
-
-test("parsed message has expected structure", () => {
-  const data = readFileSync(
-    __dirname + "/../../../../fixtures/test-fig/L0/blank.fig"
-  );
-  const parsed = readFigFile(data);
-  expect(parsed.message).toBeDefined();
-  expect(parsed.schema).toBeDefined();
-  expect(parsed.header).toBeDefined();
 });
 
 test("able to enc dec a known message", () => {

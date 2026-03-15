@@ -1,6 +1,8 @@
 import { readFileSync } from "fs";
+import { describe, expect, it } from "vitest";
 import { iofigma } from "../lib";
 import { readFigFile } from "../fig-kiwi";
+import { isFigFixtureAvailable } from "./fig-fixture-available";
 
 const FigImporter = iofigma.kiwi.FigImporter;
 
@@ -78,7 +80,7 @@ function getKiwiDepth(canvasGuid: string, allNodes: any[]): number {
   return maxDepth;
 }
 
-describe("FigImporter", () => {
+describe.skipIf(!isFigFixtureAvailable())("FigImporter", () => {
   const testFixture =
     __dirname +
     "/../../../fixtures/test-fig/community/1510053249065427020-workos-radix-icons.fig";

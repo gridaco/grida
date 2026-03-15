@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from "vitest";
 
-describe("node smoke", () => {
+import { isWasmAvailable } from "./wasm-available";
+
+describe.skipIf(!isWasmAvailable())("node smoke", () => {
   it("can import dist and initialize wasm module in Node", async () => {
     // NOTE: this package is CommonJS (no `"type": "module"`), so avoid `import.meta`.
     const pkg = require("../../dist/index.js") as {

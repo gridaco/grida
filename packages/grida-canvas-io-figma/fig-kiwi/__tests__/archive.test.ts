@@ -6,37 +6,41 @@ import {
   getMeta,
 } from "../index";
 import { readFileSync } from "fs";
+import { describe, expect, it, test } from "vitest";
+import { isFigFixtureAvailable } from "./fig-fixture-available";
 
-test("it should parse empty file", () => {
-  const data = readFileSync(
-    __dirname + "/../../../../fixtures/test-fig/L0/blank.fig"
-  );
-  const parsed = readFigFile(data);
-  expect(parsed.header).toBeDefined();
-  expect(parsed.schema).toBeDefined();
-  expect(parsed.message).toBeDefined();
-});
-
-test("realworld files assertion", () => {
-  const communityFiles = [
-    "community/1380235722331273046-figma-simple-design-system.fig",
-    "community/1510053249065427020-workos-radix-icons.fig",
-    "community/1527721578857867021-apple-ios-26.fig",
-    "community/784448220678228461-figma-auto-layout-playground.fig",
-  ];
-
-  communityFiles.forEach((filename) => {
+describe.skipIf(!isFigFixtureAvailable())("fig file parsing (requires LFS fixtures)", () => {
+  test("it should parse empty file", () => {
     const data = readFileSync(
-      __dirname + `/../../../../fixtures/test-fig/${filename}`
+      __dirname + "/../../../../fixtures/test-fig/L0/blank.fig"
     );
     const parsed = readFigFile(data);
     expect(parsed.header).toBeDefined();
     expect(parsed.schema).toBeDefined();
     expect(parsed.message).toBeDefined();
   });
+
+  test("realworld files assertion", () => {
+    const communityFiles = [
+      "community/1380235722331273046-figma-simple-design-system.fig",
+      "community/1510053249065427020-workos-radix-icons.fig",
+      "community/1527721578857867021-apple-ios-26.fig",
+      "community/784448220678228461-figma-auto-layout-playground.fig",
+    ];
+
+    communityFiles.forEach((filename) => {
+      const data = readFileSync(
+        __dirname + `/../../../../fixtures/test-fig/${filename}`
+      );
+      const parsed = readFigFile(data);
+      expect(parsed.header).toBeDefined();
+      expect(parsed.schema).toBeDefined();
+      expect(parsed.message).toBeDefined();
+    });
+  });
 });
 
-describe("fig-kiwi archive utilities", () => {
+describe.skipIf(!isFigFixtureAvailable())("fig-kiwi archive utilities", () => {
   it("should extract images from ZIP archive", () => {
     const data = readFileSync(
       __dirname +
@@ -100,9 +104,10 @@ describe("fig-kiwi archive utilities", () => {
     expect(typeof meta).toBe("object");
   });
 
-  it("should handle missing zip_files gracefully", () => {
-    expect(extractImages(undefined)).toEqual(new Map());
-    expect(getThumbnail(undefined)).toBeUndefined();
-    expect(getMeta(undefined)).toBeUndefined();
-  });
+});
+
+test("should handle missing zip_files gracefully", () => {
+  expect(extractImages(undefined)).toEqual(new Map());
+  expect(getThumbnail(undefined)).toBeUndefined();
+  expect(getMeta(undefined)).toBeUndefined();
 });

@@ -1,7 +1,9 @@
 import { readFileSync } from "fs";
+import { describe, expect, it } from "vitest";
 import { readFigFile, readHTMLMessage } from "../fig-kiwi";
 import { iofigma } from "../lib";
 import type * as figrest from "@figma/rest-api-spec";
+import { isFigFixtureAvailable } from "./fig-fixture-available";
 
 const FIXTURES_BASE = __dirname + "/../../../fixtures/test-fig";
 const CLIPBOARD_GROUP_FIXTURE =
@@ -88,7 +90,9 @@ describe("iofigma.kiwi.factory.node", () => {
         true
       );
     });
+  });
 
+  describe.skipIf(!isFigFixtureAvailable())("GROUP detection and conversion from .fig file", () => {
     it("should convert GROUP-originated FRAME to GroupNode from .fig file", () => {
       const figFileBytes = readFileSync(FIG_FRAME_FIXTURE);
 
@@ -163,7 +167,9 @@ describe("iofigma.kiwi.factory.node", () => {
         true
       );
     });
+  });
 
+  describe("GROUP detection edge cases", () => {
     it("should handle edge cases: FRAME with frameMaskDisabled=false but resizeToFit=undefined", () => {
       // Create a mock NodeChange that's a FRAME but doesn't match GROUP pattern
       const mockFrame: any = {
@@ -239,7 +245,7 @@ describe("iofigma.kiwi.factory.node", () => {
     });
   });
 
-  describe("frame clipping behavior", () => {
+  describe.skipIf(!isFigFixtureAvailable())("frame clipping behavior", () => {
     it("should correctly map frameMaskDisabled to clipsContent", () => {
       const figFileBytes = readFileSync(FIG_FRAME_FIXTURE);
       const figData = readFigFile(figFileBytes);

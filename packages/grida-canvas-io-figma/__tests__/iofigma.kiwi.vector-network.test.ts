@@ -1,7 +1,8 @@
 import { readFileSync } from "fs";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { readFigFile, getBlobBytes, parseVectorNetworkBlob } from "../fig-kiwi";
 import { iofigma } from "../lib";
+import { isFigFixtureAvailable } from "./fig-fixture-available";
 
 function bbox(vertices: Array<{ x: number; y: number }>) {
   let minX = Infinity,
@@ -18,7 +19,7 @@ function bbox(vertices: Array<{ x: number; y: number }>) {
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 
-describe("iofigma.kiwi vectorNetworkBlob mapping", () => {
+describe.skipIf(!isFigFixtureAvailable())("iofigma.kiwi vectorNetworkBlob mapping", () => {
   it("scales blob coordinates from normalizedSize space into node size space (.fig fixture)", () => {
     // Use a git-included .fig fixture to keep this regression test stable and shippable.
     const data = readFileSync(

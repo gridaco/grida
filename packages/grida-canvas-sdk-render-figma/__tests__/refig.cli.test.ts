@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { collectExportsFromDocument, figBytesToRestLikeDocument } from "../lib";
+import { isFigFixtureAvailable } from "./fig-fixture-available";
 
 const TEST_OUTPUT_DIR = join(process.cwd(), "__tests__", ".tmp", "cli");
 const BIN = join(process.cwd(), "cli.ts");
@@ -316,7 +317,7 @@ describe("refig CLI", () => {
     expect(bytes.byteLength).toBeGreaterThan(100);
   }, 60_000);
 
-  it("renders single node from .fig file", () => {
+  it.skipIf(!isFigFixtureAvailable())("renders single node from .fig file", () => {
     resetOutputDir();
     const figPath = join(
       process.cwd(),

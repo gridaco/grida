@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createCanvas } from "..";
+import { isWasmAvailable } from "./wasm-available";
 
 /**
  * WASM API Validation Tests (Node)
@@ -14,18 +15,10 @@ import { createCanvas } from "..";
  * methods like HEAP/UTF8 helpers) are present with the expected arity.
  *
  * Note: these tests intentionally do NOT call WebGL-dependent APIs.
+ * Skips when WASM binary is unavailable (e.g. Git LFS pointer not pulled).
  */
 
 let module: any;
-
-beforeAll(async () => {
-  const pkg = require("../../dist/index.js") as {
-    default?: (opts?: unknown) => Promise<any>;
-  };
-
-  const factory = await pkg.default!();
-  module = factory.module;
-}, 30_000);
 
 // List of expected C exports with their expected parameter counts.
 // Source of truth: `lib/modules/canvas-bindings.d.ts`
@@ -109,7 +102,16 @@ const EXPECTED_RUNTIME_METHODS = [
   "lengthBytesUTF8",
 ] as const;
 
-describe("WASM API Validation", () => {
+describe.skipIf(!isWasmAvailable())("WASM API Validation", () => {
+  beforeAll(async () => {
+    const pkg = require("../../dist/index.js") as {
+      default?: (opts?: unknown) => Promise<any>;
+    };
+
+    const factory = await pkg.default!();
+    module = factory.module;
+  }, 30_000);
+
   it("instantiates module in Node", () => {
     expect(module).toBeTruthy();
   });

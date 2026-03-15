@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { createCanvas } from "..";
+import { isWasmAvailable } from "./wasm-available";
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -39,7 +40,7 @@ async function renderDocToPng(opts: { docPath: string; nodeId: string }) {
   return { canvas, data };
 }
 
-describe("raster export (node)", () => {
+describe.skipIf(!isWasmAvailable())("raster export (node)", () => {
   it("createCanvas: creates a raster backend and exports PNG", async () => {
     const { canvas, data } = await renderDocToPng({
       docPath: "example/rectangle.grida1",
