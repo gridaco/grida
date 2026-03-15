@@ -48,6 +48,36 @@ unlisted: true
 ---
 ```
 
+## MDX compatibility
+
+Docs are built with Docusaurus which uses **MDX** (Markdown + JSX). MDX reserves `<` and `>` for JSX tags, so bare angle brackets in prose or tables will break the build.
+
+**Preferred fix — `format: md` frontmatter:**
+
+For files that don't use JSX/MDX features (most `wg/` and `reference/` docs), opt out of MDX entirely by adding `format: md` to the frontmatter:
+
+```md
+---
+format: md
+---
+```
+
+This prevents all MDX-related parsing issues for the entire file.
+
+**Per-occurrence alternatives** (when a file does use MDX features):
+
+| Technique          | Example       | Notes                          |
+| ------------------ | ------------- | ------------------------------ |
+| Backtick code span | `` `C < A` `` | Best for code/math expressions |
+| Backslash escape   | `C \< A`      | MDX-native escape              |
+| HTML entity        | `C &lt; A`    | Works but hurts readability    |
+
+**Common pitfalls:**
+
+- Comparison operators in tables: `C < A`, `> 80%`, `<100 nodes`
+- Angle-bracketed URLs: `<https://example.com>` — use `[text](url)` or bare URL instead
+- Generic type syntax: `Array<string>` — wrap in backticks
+
 ## Structure
 
 | directory                        | name          | description                                                            | active |

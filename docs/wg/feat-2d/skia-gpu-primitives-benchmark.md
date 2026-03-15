@@ -369,7 +369,7 @@ Chromium does this with `kMaxOpsToAnalyze = 5`.
 | Item                           | Just works?                         | Design decision needed?                     |
 | ------------------------------ | ----------------------------------- | ------------------------------------------- |
 | Per-node SkPicture cache       | Yes — already working               | No                                          |
-| Per-node SkImage for effects   | Yes — working for <100 nodes        | No                                          |
+| Per-node SkImage for effects   | Yes — working for &lt;100 nodes     | No                                          |
 | LOD during interaction         | Yes — pure quality trade-off        | Yes: how much degradation is acceptable     |
 | Viewport effect culling        | Yes — pure optimization             | No                                          |
 | Texture atlas                  | Yes — storage optimization          | No                                          |
