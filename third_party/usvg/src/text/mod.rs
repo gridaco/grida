@@ -207,10 +207,12 @@ pub(crate) fn convert(text: &mut Text, resolver: &FontResolver, cache: &mut Cach
     text.bounding_box = bbox.to_rect();
     text.abs_bounding_box = bbox.transform(text.abs_transform)?.to_rect();
 
-    let (group, stroke_bbox) = flatten::flatten(text, cache)?;
-    text.flattened = Box::new(group);
-    text.stroke_bounding_box = stroke_bbox.to_rect();
-    text.abs_stroke_bounding_box = stroke_bbox.transform(text.abs_transform)?.to_rect();
+    // Flattening is optional — keep the text node even if outlining fails.
+    if let Some((group, stroke_bbox)) = flatten::flatten(text, cache) {
+        text.flattened = Box::new(group);
+        text.stroke_bounding_box = stroke_bbox.to_rect();
+        text.abs_stroke_bounding_box = stroke_bbox.transform(text.abs_transform)?.to_rect();
+    }
 
     Some(())
 }

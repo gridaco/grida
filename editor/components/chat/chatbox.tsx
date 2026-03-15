@@ -6,7 +6,7 @@ import { useFilePicker } from "use-file-picker";
 import { cn } from "@/components/lib/utils";
 import TextareaAutoResize from "react-textarea-autosize";
 import { toast } from "sonner";
-import Image from "next/image";
+
 import type { FileIO } from "@/lib/file";
 
 export type Attachment = {
@@ -215,13 +215,15 @@ function ChatBoxAttachmentPreview() {
 
   return (
     <div className="relative">
-      <Image
-        src={attachment.url}
-        alt={attachment.filename ?? ""}
-        width={256}
-        height={256}
-        className="max-h-32 aspect-square w-auto object-cover border rounded-md"
-      />
+      <picture>
+        <img
+          src={attachment.url}
+          alt={attachment.filename ?? ""}
+          width={256}
+          height={256}
+          className="max-h-32 aspect-square w-auto object-cover border rounded-md"
+        />
+      </picture>
       <Button
         variant="outline"
         size="icon"

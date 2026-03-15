@@ -25,7 +25,11 @@ grant delete, insert, references, select, trigger, truncate, update on table pgm
 -- [enqueue_object_embedding_job] --
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION enqueue_object_embedding_job()
-RETURNS trigger AS $$
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
 BEGIN
   PERFORM pgmq.send(
     queue_name := 'grida_library_object_worker_jobs'::text,
@@ -37,7 +41,7 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 
 CREATE DOMAIN grida_library.color AS TEXT

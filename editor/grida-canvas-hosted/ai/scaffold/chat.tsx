@@ -12,6 +12,8 @@ import {
 } from "@/components/ai-elements/conversation";
 import { cn } from "@/components/lib/utils";
 import { useCurrentAgentChat } from "./chat-provider";
+import { useContextUsage } from "./use-context-usage";
+import type { AgentUIMessage } from "../types";
 
 export function AgentPanel({ className }: { className?: string }) {
   const chat = useCurrentAgentChat();
@@ -21,6 +23,7 @@ export function AgentPanel({ className }: { className?: string }) {
   });
 
   const isLoading = status === "submitted" || status === "streaming";
+  const contextUsage = useContextUsage(messages as AgentUIMessage[]);
 
   const handleSend = useCallback(
     async (content: string) => {
@@ -31,7 +34,7 @@ export function AgentPanel({ className }: { className?: string }) {
   );
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex flex-col select-text", className)}>
       <div className="flex-1 min-h-0">
         <Conversation className="relative h-full">
           <ConversationContent className="flex flex-col gap-4 py-4 px-6">
@@ -71,7 +74,12 @@ export function AgentPanel({ className }: { className?: string }) {
         </div>
       )}
       <div className="p-4 pt-0">
-        <AgentInput onSend={handleSend} isLoading={isLoading} autoFocus />
+        <AgentInput
+          onSend={handleSend}
+          isLoading={isLoading}
+          autoFocus
+          contextUsage={contextUsage}
+        />
       </div>
     </div>
   );

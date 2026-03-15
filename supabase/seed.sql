@@ -114,3 +114,11 @@ VALUES (
   'acme-project'
 );
 -- #endregion project
+
+
+-- #region library categories
+-- seed library categories required for local development
+INSERT INTO grida_library.category (id, name)
+VALUES ('generated', 'Generated')
+ON CONFLICT (id) DO NOTHING;
+-- #endregion library categories

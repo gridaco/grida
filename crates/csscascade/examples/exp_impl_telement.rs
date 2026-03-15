@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Experimental Stylo DOM adapter playground.
 //!
 //! This example is the working area for a fresh csscascade DOM/tree implementation.

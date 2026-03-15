@@ -135,6 +135,7 @@ export namespace svgtypes {
       fill: TOption<SVGFillAttributes>;
       stroke: TOption<SVGStrokeAttributes>;
       spans: Array<IRSVGTextSpanNode>;
+      bounds: { x: number; y: number; width: number; height: number };
     }
 
     export interface IRSVGTextSpanNode {
