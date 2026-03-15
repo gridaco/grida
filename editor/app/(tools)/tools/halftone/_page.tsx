@@ -652,7 +652,7 @@ export default function HalftoneTool() {
       </aside>
 
       {/* ── Canvas preview ── */}
-      <div className="flex-1 flex items-center justify-center rounded-xl border bg-[image:repeating-conic-gradient(#e5e5e5_0%_25%,#f5f5f5_0%_50%)] bg-[size:20px_20px] overflow-hidden min-h-[400px]">
+      <div className="flex-1 flex items-center justify-center rounded-xl border bg-muted overflow-hidden min-h-[400px]">
         {imageSrc ? (
           <canvas
             ref={canvasRef}
