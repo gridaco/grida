@@ -321,7 +321,6 @@ pub struct IRSVGTextNode {
     pub fill: Option<SVGFillAttributes>,
     pub stroke: Option<SVGStrokeAttributes>,
     pub spans: Vec<IRSVGTextSpanNode>,
-    #[serde(skip_serializing)]
     pub bounds: CGRect,
 }
 
@@ -343,7 +342,7 @@ pub struct IRSVGPathNode {
     pub fill: Option<SVGFillAttributes>,
     pub stroke: Option<SVGStrokeAttributes>,
     pub d: String,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, default)]
     pub bounds: CGRect,
 }
 

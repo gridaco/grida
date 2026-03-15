@@ -1,3 +1,4 @@
+use crate::svg::sanitize::sanitize_svg;
 use crate::svg::{into_tree, SVGPackedScene};
 
 type ErrorMessageString = String;
@@ -5,7 +6,8 @@ type JsonString = String;
 type SvgString = String;
 
 pub fn svg_pack(svg_source: &str) -> Result<JsonString, ErrorMessageString> {
-    let scene = SVGPackedScene::new_from_svg_str(svg_source)?;
+    let sanitized = sanitize_svg(svg_source);
+    let scene = SVGPackedScene::new_from_svg_str(&sanitized)?;
     serde_json::to_string(&scene).map_err(|err| err.to_string())
 }
 
@@ -64,7 +66,8 @@ pub fn svg_pack(svg_source: &str) -> Result<JsonString, ErrorMessageString> {
 /// Returns an error if the input SVG cannot be parsed or is invalid.
 ///
 pub fn svg_optimize(svg_source: &str) -> Result<SvgString, ErrorMessageString> {
-    let tree = into_tree(svg_source).map_err(|err| err.to_string())?;
+    let sanitized = sanitize_svg(svg_source);
+    let tree = into_tree(&sanitized).map_err(|err| err.to_string())?;
 
     let xml_opt = usvg::WriteOptions {
         id_prefix: None,

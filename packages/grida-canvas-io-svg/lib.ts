@@ -184,7 +184,8 @@ export namespace iosvg {
     | grida.program.nodes.VectorNodePrototype
     | grida.program.nodes.PathNodePrototype
     | grida.program.nodes.RectangleNodePrototype
-    | grida.program.nodes.EllipseNodePrototype;
+    | grida.program.nodes.EllipseNodePrototype
+    | grida.program.nodes.TextNodePrototype;
 
   /**
    * Convert IRSVGChildNode to Grida Node Prototype
@@ -258,9 +259,34 @@ export namespace iosvg {
       }
 
       case "text": {
-        // Text nodes are not yet fully supported, so we'll skip for now
-        // TODO: Implement text node conversion when text support is added
-        return null;
+        const { transform, text_content, fill: textFillAttr, spans, bounds } =
+          node;
+        const textPosition = map.extractTranslation(transform);
+
+        const fontSize =
+          spans.length > 0 && spans[0].font_size != null
+            ? spans[0].font_size
+            : 16;
+
+        const { paint: textFill } = map.fill(textFillAttr);
+
+        return {
+          type: "tspan",
+          name: name,
+          text: text_content,
+          font_size: fontSize,
+          font_weight: 400,
+          font_kerning: true,
+          text_decoration_line: "none",
+          text_align: "left",
+          text_align_vertical: "top",
+          layout_positioning: "absolute",
+          layout_inset_left: textPosition.left,
+          layout_inset_top: textPosition.top,
+          layout_target_width: bounds.width,
+          layout_target_height: bounds.height,
+          fill: textFill,
+        } satisfies grida.program.nodes.TextNodePrototype;
       }
 
       case "image": {

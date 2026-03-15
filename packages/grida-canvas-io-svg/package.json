@@ -2,6 +2,9 @@
   "name": "@grida/io-svg",
   "private": true,
   "description": "SVG I/O for Grida Canvas",
+  "scripts": {
+    "test": "vitest run"
+  },
   "dependencies": {
     "@grida/color": "workspace:*",
     "@grida/vn": "workspace:*"
