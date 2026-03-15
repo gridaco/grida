@@ -24,7 +24,7 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
       - name: Build Packages
-        run: pnpm turbo build --filter='./packages/*' --filter='@grida/canvas-wasm'
+        run: pnpm turbo build --filter='./packages/*'
       - name: Run Lint
         run: pnpm turbo lint
       - name: Run Tests
