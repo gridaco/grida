@@ -406,7 +406,7 @@ export default function HalftoneTool() {
   return (
     <main className="flex-1 w-full h-full flex py-4 container mx-auto gap-6 min-h-0">
       {/* ── Controls panel ── */}
-      <aside className="w-64 shrink-0 flex flex-col overflow-y-auto">
+      <aside className="w-64 shrink-0 flex flex-col overflow-y-auto overflow-x-hidden">
         {/* Source image */}
         <SectionLabel>Source Image</SectionLabel>
         <div className="flex flex-col gap-2 px-1 pb-3">
