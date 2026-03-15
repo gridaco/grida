@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -231,16 +231,20 @@ function SliderRow({
   onValueChange: (v: number) => void;
   format?: (v: number) => string;
 }) {
+  const id = useId();
   const display = format ? format(value) : String(value);
   return (
     <div className="grid gap-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span id={id} className="text-xs text-muted-foreground">
+          {label}
+        </span>
         <span className="text-xs font-mono tabular-nums text-foreground">
           {display}
         </span>
       </div>
       <Slider
+        aria-labelledby={id}
         min={min}
         max={max}
         step={step}
@@ -276,6 +280,7 @@ export default function HalftoneTool() {
   );
   const [customShapeImage, setCustomShapeImage] =
     useState<HTMLImageElement | null>(null);
+  const [isCanvasReady, setIsCanvasReady] = useState(false);
   const [canvasDims, setCanvasDims] = useState<{
     w: number;
     h: number;
@@ -283,6 +288,8 @@ export default function HalftoneTool() {
 
   const imageDataRef = useRef<ImageData | null>(null);
   const sizeRef = useRef<{ w: number; h: number } | null>(null);
+  // Tracks the active blob URL so it can be revoked when replaced
+  const blobUrlRef = useRef<string | null>(null);
 
   // Load demo image on first mount
   useEffect(() => {
@@ -297,9 +304,14 @@ export default function HalftoneTool() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    setIsCanvasReady(false);
+
+    let cancelled = false;
     const img = new Image();
-    img.src = imageSrc;
+
     img.onload = () => {
+      if (cancelled) return;
+
       let w = img.width;
       let h = img.height;
 
@@ -337,6 +349,15 @@ export default function HalftoneTool() {
         kolor.colorformats.RGBA32F.intoCSSRGBA(color),
         customShapeImage
       );
+
+      setIsCanvasReady(true);
+    };
+
+    img.src = imageSrc;
+
+    return () => {
+      cancelled = true;
+      img.onload = null;
     };
   }, [
     imageSrc,
@@ -351,7 +372,13 @@ export default function HalftoneTool() {
   ]);
 
   const handleImageUpload = (file: File) => {
-    setImageSrc(URL.createObjectURL(file));
+    // Revoke the previous blob URL to avoid memory leaks
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+    }
+    const url = URL.createObjectURL(file);
+    blobUrlRef.current = url;
+    setImageSrc(url);
     setIsDemo(false);
   };
 
@@ -456,6 +483,7 @@ export default function HalftoneTool() {
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) handleImageUpload(file);
+              e.currentTarget.value = "";
             }}
           />
         </div>
@@ -505,8 +533,15 @@ export default function HalftoneTool() {
                     };
                     reader.readAsDataURL(file);
                   }
+                  e.currentTarget.value = "";
                 }}
               />
+              {!customShapeImage && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Upload a PNG or SVG above — until then the canvas shows
+                  circles as a placeholder.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -582,7 +617,7 @@ export default function HalftoneTool() {
               size="sm"
               className="flex-1"
               onClick={exportPNG}
-              disabled={!imageSrc}
+              disabled={!isCanvasReady}
             >
               <DownloadIcon className="size-3.5" />
               PNG
@@ -592,7 +627,7 @@ export default function HalftoneTool() {
               size="sm"
               className="flex-1"
               onClick={exportSVG}
-              disabled={!imageSrc || shape === "image"}
+              disabled={!isCanvasReady || shape === "image"}
               title={
                 shape === "image"
                   ? "SVG export unavailable for custom image shapes"
