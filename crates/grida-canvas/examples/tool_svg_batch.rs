@@ -176,11 +176,11 @@ struct FileResult {
 
 enum StepResult {
     Ok {
-        elapsed_ms: f64,
+        _elapsed_ms: f64,
         info: String,
     },
     Err {
-        elapsed_ms: f64,
+        _elapsed_ms: f64,
         error: String,
     },
 }
@@ -191,14 +191,14 @@ fn test_optimize(source: &str) -> StepResult {
         Ok(optimized) => {
             let elapsed = start.elapsed().as_secs_f64() * 1000.0;
             StepResult::Ok {
-                elapsed_ms: elapsed,
+                _elapsed_ms: elapsed,
                 info: format!("{} bytes", optimized.len()),
             }
         }
         Err(err) => {
             let elapsed = start.elapsed().as_secs_f64() * 1000.0;
             StepResult::Err {
-                elapsed_ms: elapsed,
+                _elapsed_ms: elapsed,
                 error: err,
             }
         }
@@ -234,14 +234,14 @@ fn test_pack(source: &str, verbose: bool) -> StepResult {
                 Err(err) => format!("packed but failed to deserialize: {}", err),
             };
             StepResult::Ok {
-                elapsed_ms: elapsed,
+                _elapsed_ms: elapsed,
                 info,
             }
         }
         Err(err) => {
             let elapsed = start.elapsed().as_secs_f64() * 1000.0;
             StepResult::Err {
-                elapsed_ms: elapsed,
+                _elapsed_ms: elapsed,
                 error: err,
             }
         }

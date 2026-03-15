@@ -650,10 +650,9 @@ mod tests {
         assert_eq!(at.text(), "red bold");
         assert_eq!(at.runs()[0].style.font_weight, 700);
         assert_eq!(at.runs()[0].style.font_size, 24.0);
-        if let TextFill::Solid(c) = &at.runs()[0].style.fill {
-            assert!((c.r - 1.0).abs() < 0.01);
-            assert!(c.g.abs() < 0.01);
-        }
+        let TextFill::Solid(c) = &at.runs()[0].style.fill;
+        assert!((c.r - 1.0).abs() < 0.01);
+        assert!(c.g.abs() < 0.01);
     }
 
     #[test]
