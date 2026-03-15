@@ -652,7 +652,7 @@ export default function HalftoneTool() {
       </aside>
 
       {/* ── Canvas preview ── */}
-      <div className="flex-1 flex items-center justify-center rounded-xl border bg-muted overflow-hidden min-h-[400px]">
+      <div className="flex-1 flex items-center justify-center rounded-xl border overflow-hidden min-h-[400px]">
         {imageSrc ? (
           <canvas
             ref={canvasRef}
