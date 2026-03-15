@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -11,14 +11,61 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ColorPicker32F } from "@/scaffolds/sidecontrol/controls/color-picker";
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, ImageIcon, UploadIcon } from "lucide-react";
 import kolor from "@grida/color";
 
 const DEFAULT_GRID = 8;
 const MAX_SIZE = 1024; // px – down‑scale large uploads
+
+/** Generate a sample image for immediate play — portrait-like with good tonal range */
+function createSampleImageDataURL(): string {
+  const size = 384;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  // Light background
+  ctx.fillStyle = "#f5f5f5";
+  ctx.fillRect(0, 0, size, size);
+  // Face oval (dark → medium gradient)
+  const faceGrad = ctx.createRadialGradient(
+    size * 0.4,
+    size * 0.45,
+    0,
+    size * 0.5,
+    size * 0.5,
+    size * 0.5
+  );
+  faceGrad.addColorStop(0, "#1a1a1a");
+  faceGrad.addColorStop(0.5, "#404040");
+  faceGrad.addColorStop(1, "#808080");
+  ctx.beginPath();
+  ctx.ellipse(size / 2, size * 0.52, size * 0.38, size * 0.48, 0, 0, Math.PI * 2);
+  ctx.fillStyle = faceGrad;
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle = "#0d0d0d";
+  ctx.beginPath();
+  ctx.ellipse(size * 0.38, size * 0.44, size * 0.08, size * 0.06, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.62, size * 0.44, size * 0.08, size * 0.06, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Mouth
+  ctx.beginPath();
+  ctx.ellipse(size / 2, size * 0.68, size * 0.15, size * 0.06, 0, 0, Math.PI);
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  // Hair/shadow at top
+  const hairGrad = ctx.createLinearGradient(0, 0, 0, size);
+  hairGrad.addColorStop(0, "#111");
+  hairGrad.addColorStop(0.4, "transparent");
+  ctx.fillStyle = hairGrad;
+  ctx.fillRect(0, 0, size, size * 0.5);
+  return canvas.toDataURL("image/png");
+}
 
 type Shape =
   | "circle"
@@ -228,6 +275,14 @@ function shapeToSVG(shape: Shape, cx: number, cy: number, r: number): string {
 export default function HalftoneTool() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [hasInitializedSample, setHasInitializedSample] = useState(false);
+
+  // Load sample image on mount so users can play immediately
+  useEffect(() => {
+    if (hasInitializedSample || typeof document === "undefined") return;
+    setImageSrc(createSampleImageDataURL());
+    setHasInitializedSample(true);
+  }, [hasInitializedSample]);
   const [shape, setShape] = useState<Shape>("circle");
   const [grid, setGrid] = useState<number>(DEFAULT_GRID);
   const [maxRadius, setMaxRadius] = useState<number>(DEFAULT_GRID / 2);
@@ -357,26 +412,91 @@ export default function HalftoneTool() {
     downloadBlob(blob, "halftone.svg");
   };
 
+  const useSampleImage = useCallback(() => {
+    setImageSrc(createSampleImageDataURL());
+  }, []);
+
+  const handleFileSelect = useCallback((file: File) => {
+    if (file) setImageSrc(URL.createObjectURL(file));
+  }, []);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
-    <main className="flex-1 w-full h-full flex py-4 container mx-auto gap-4">
-      <aside className="flex-1">
-        <Card className="flex flex-col gap-6 p-6">
-          <Label>Shape</Label>
-          <div className="grid gap-2">
-            <span className="text-xs">Image</span>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setImageSrc(URL.createObjectURL(file));
-                }
-              }}
+    <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 px-4 py-8">
+      {/* Preview area */}
+      <section className="flex-[3] flex flex-col min-w-0 order-2 lg:order-1">
+        <input
+          ref={fileInputRef}
+          id="halftone-file-input"
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFileSelect(file);
+          }}
+        />
+        <div
+          className="rounded-xl border border-border bg-muted/30 overflow-hidden flex items-center justify-center min-h-[320px] aspect-square max-w-full mx-auto"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const file = e.dataTransfer.files?.[0];
+            if (file?.type.startsWith("image/")) handleFileSelect(file);
+          }}
+        >
+          {imageSrc ? (
+            <canvas
+              ref={canvasRef}
+              className="max-w-full h-auto object-contain"
+              style={{ maxHeight: "min(70vh, 640px)" }}
             />
+          ) : (
+            <label
+              htmlFor="halftone-file-input"
+              className="flex flex-col items-center justify-center gap-3 p-8 cursor-pointer w-full h-full hover:bg-muted/50 transition-colors rounded-lg"
+            >
+              <UploadIcon className="size-12 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground text-center">
+                Drop an image or click to upload
+              </span>
+            </label>
+          )}
+        </div>
+        {imageSrc && (
+          <div className="flex gap-2 mt-4 justify-center flex-wrap">
+            <Button variant="outline" size="sm" onClick={useSampleImage}>
+              <ImageIcon className="size-4" /> Use sample image
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <UploadIcon className="size-4" /> Upload your own
+            </Button>
           </div>
-          <div className="grid gap-2">
-            <span className="text-xs">Shape</span>
+        )}
+      </section>
+
+      {/* Controls */}
+      <aside className="flex-1 min-w-[280px] order-1 lg:order-2">
+        <Card className="flex flex-col gap-6 p-6 sticky top-4">
+          <div>
+            <h2 className="text-lg font-semibold mb-1">Halftone Generator</h2>
+            <p className="text-xs text-muted-foreground">
+              A sample image loads by default. Tweak the controls to see the effect, or upload your own.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-foreground">Dot shape</h3>
+            <div className="grid gap-2">
             <Select
               value={shape}
               onValueChange={(v) => setShape(v as Shape)}
@@ -399,7 +519,7 @@ export default function HalftoneTool() {
           </div>
           {shape === "image" && (
             <div className="grid gap-2">
-              <span className="text-xs">Custom Shape Image</span>
+              <span className="text-xs text-muted-foreground">Custom Shape Image</span>
               <Input
                 type="file"
                 accept="image/png,image/svg+xml"
@@ -420,8 +540,13 @@ export default function HalftoneTool() {
               />
             </div>
           )}
-          <div className="grid gap-2">
-            <span className="text-xs">Grid</span>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-foreground">Pattern</h3>
+            <div className="grid gap-4">
+            <div className="grid gap-2">
+            <span className="text-xs text-muted-foreground">Grid (spacing)</span>
             <Slider
               min={4}
               max={64}
@@ -431,7 +556,7 @@ export default function HalftoneTool() {
             />
           </div>
           <div className="grid gap-2">
-            <span className="text-xs">Max radius</span>
+            <span className="text-xs text-muted-foreground">Max radius</span>
             <Slider
               min={1}
               max={64}
@@ -440,9 +565,8 @@ export default function HalftoneTool() {
               onValueChange={([v]) => setMaxRadius(v)}
             />
           </div>
-
           <div className="grid gap-2">
-            <span className="text-xs">Gamma</span>
+            <span className="text-xs text-muted-foreground">Gamma</span>
             <Slider
               min={0.1}
               max={3}
@@ -451,20 +575,8 @@ export default function HalftoneTool() {
               onValueChange={([v]) => setGamma(v)}
             />
           </div>
-
           <div className="grid gap-2">
-            <span className="text-xs">Opacity</span>
-            <Slider
-              min={0}
-              max={1}
-              step={0.1}
-              value={[opacity]}
-              onValueChange={([v]) => setOpacity(v)}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <span className="text-xs">Jitter</span>
+            <span className="text-xs text-muted-foreground">Jitter</span>
             <Slider
               min={0}
               max={32}
@@ -473,14 +585,32 @@ export default function HalftoneTool() {
               onValueChange={([v]) => setJitter(v)}
             />
           </div>
-
-          <div className="grid gap-2">
-            <span className="text-xs">Color</span>
-            <ColorPicker32F color={color} onColorChange={setColor} />
+          </div>
           </div>
 
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-foreground">Appearance</h3>
+            <div className="grid gap-4">
+            <div className="grid gap-2">
+            <span className="text-xs text-muted-foreground">Opacity</span>
+            <Slider
+              min={0}
+              max={1}
+              step={0.1}
+              value={[opacity]}
+              onValueChange={([v]) => setOpacity(v)}
+            />
+          </div>
           <div className="grid gap-2">
-            <span className="text-xs">Download</span>
+            <span className="text-xs text-muted-foreground">Color</span>
+            <ColorPicker32F color={color} onColorChange={setColor} />
+          </div>
+          </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-foreground">Export</h3>
+            <div className="grid gap-2">
             <div className="w-full flex gap-2">
               <Button variant="outline" onClick={exportPNG}>
                 <DownloadIcon className="size-4" /> PNG
@@ -503,11 +633,9 @@ export default function HalftoneTool() {
                 SVG export is not available when using custom images
               </span>
             )}
+            </div>
           </div>
         </Card>
-      </aside>
-      <aside className="flex-[3] flex flex-col items-center justify-center">
-        <canvas ref={canvasRef} style={{ maxWidth: "100%" }} />
       </aside>
     </main>
   );

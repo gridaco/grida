@@ -15,7 +15,7 @@ export default function HalftoneToolPage() {
   return (
     <main>
       <Header />
-      <div className="py-40 min-h-screen flex flex-col items-center justify-center">
+      <div className="py-16 min-h-screen flex flex-col items-center">
         <HalftoneTool />
       </div>
       <Footer />
