@@ -2030,7 +2030,7 @@ export namespace format {
             (paint.quarter_turns ?? 0) & 0xff
           );
           // Create Alignment struct inline within ImagePaint context
-          fbs.ImagePaint.addAlignement(
+          fbs.ImagePaint.addAlignment(
             builder,
             structs.alignment(builder, 0, 0)
           );
