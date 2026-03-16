@@ -4,7 +4,7 @@
 //! identify the true cost of each compositing strategy.
 //!
 //! ```bash
-//! cargo run -p cg --example bench_skia_primitives --features native-gl-context --release
+//! cargo run -p cg --example skia_bench_primitives --features native-gl-context --release
 //! ```
 
 #[cfg(feature = "native-gl-context")]
