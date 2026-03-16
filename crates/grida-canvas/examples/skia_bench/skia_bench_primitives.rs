@@ -53,7 +53,7 @@ fn main() {
 
     // ─── Test 2: Rect with drop shadow (via save_layer + image_filter) ───
     // This is how Skia actually renders shadows — with an image filter on save_layer.
-    for &_count in &[10, 50, 100, 500, 1000, 2000] {
+    {
         let shadow_filter_4 = skia_safe::image_filters::drop_shadow_only(
             (4.0, 4.0), (8.0, 8.0),
             skia_safe::Color::from_argb(80, 0, 0, 0),

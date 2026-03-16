@@ -1504,8 +1504,10 @@ impl Renderer {
                 continue;
             }
 
-            let pixel_width = render_bounds.width.ceil() as i32;
-            let pixel_height = render_bounds.height.ceil() as i32;
+            // Compute pixel dimensions in screen space by applying zoom
+            // so cached images match the actual display resolution.
+            let pixel_width = (render_bounds.width * zoom).ceil() as i32;
+            let pixel_height = (render_bounds.height * zoom).ceil() as i32;
 
             if pixel_width <= 0 || pixel_height <= 0 {
                 continue;
@@ -1586,6 +1588,10 @@ impl Renderer {
                     let policy = self.config.render_policy;
                     self.compositor_atlas.draw_into_slot(&id, |slot_canvas| {
                         slot_canvas.clear(skia_safe::Color::TRANSPARENT);
+                        // Scale to match the zoom-scaled pixel dimensions of
+                        // the atlas slot, then translate so the node's
+                        // world-space render bounds start at the origin.
+                        slot_canvas.scale((zoom, zoom));
                         slot_canvas.translate((-render_bounds.x, -render_bounds.y));
                         let painter = Painter::new_with_scene_cache(
                             slot_canvas, fonts, images, scene_cache, policy,
@@ -1620,6 +1626,10 @@ impl Renderer {
                     None,
                 );
                 off_canvas.clear(skia_safe::Color::TRANSPARENT);
+                // Scale to match the zoom-scaled pixel dimensions of
+                // the capture surface, then translate so the node's
+                // world-space render bounds start at the origin.
+                off_canvas.scale((zoom, zoom));
                 off_canvas.translate((-render_bounds.x, -render_bounds.y));
 
                 let painter = Painter::new_with_scene_cache(

@@ -256,19 +256,23 @@ impl LayerImageCache {
     }
 
     /// Evict least-recently-used entries until memory is under budget.
+    /// Only individual (budgeted) entries are considered for eviction —
+    /// atlas-backed entries report 0 bytes and evicting them would not
+    /// reduce `memory_used`.
     pub fn evict_lru(&mut self) {
-        while self.memory_used > self.memory_budget && !self.images.is_empty() {
-            // Find the entry with the smallest last_used_frame.
+        while self.memory_used > self.memory_budget {
+            // Find the budgeted entry with the smallest last_used_frame.
             let lru_id = self
                 .images
                 .iter()
+                .filter(|(_, entry)| entry.estimated_bytes() > 0)
                 .min_by_key(|(_, entry)| entry.last_used_frame)
                 .map(|(id, _)| *id);
 
             if let Some(id) = lru_id {
                 self.remove(&id);
             } else {
-                break;
+                break; // No budgeted entries left to evict.
             }
         }
     }

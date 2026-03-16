@@ -99,13 +99,13 @@ impl LayerEffects {
         }
         // Note: backdrop_blur is context-dependent and excluded from
         // compositing by the promotion heuristic, so we don't count it here.
-        if !self.shadows.is_empty() {
+        if self.shadows.iter().any(|s| s.active()) {
             return true;
         }
         if self.glass.as_ref().is_some_and(|g| g.active) {
             return true;
         }
-        if !self.noises.is_empty() {
+        if self.noises.iter().any(|n| n.active) {
             return true;
         }
         false

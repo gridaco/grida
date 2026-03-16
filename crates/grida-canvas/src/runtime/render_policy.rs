@@ -181,9 +181,14 @@ impl RenderPolicy {
 
     /// Layer compositing cache is only correct/beneficial for the standard
     /// pipeline (same logic as tile cache — only standard rendering uses caching).
+    /// Note: `effect_quality` is intentionally ignored — reduced-quality
+    /// interactive frames still benefit from layer compositing.
     #[inline]
     pub fn allows_layer_compositing(&self) -> bool {
-        self.is_default()
+        matches!(self.content, ContentPolicy::Standard { render_fills: true, render_strokes: true })
+            && self.effects == EffectsPolicy::Enabled
+            && self.compositing == CompositingPolicy::Enabled
+            && !self.ignore_clips_content
     }
 
     /// Derive an in-memory cache namespace key for this render policy.

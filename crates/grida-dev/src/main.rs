@@ -272,6 +272,12 @@ async fn run_bench(args: BenchArgs) -> Result<()> {
     }
     let pan_wall = pan_start.elapsed();
 
+    if frame_times.is_empty() {
+        return Err(anyhow!(
+            "no benchmark samples collected, cannot compute summary"
+        ));
+    }
+
     frame_times.sort();
     let n = frame_times.len();
     let p50 = frame_times[n / 2];

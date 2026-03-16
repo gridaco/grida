@@ -443,6 +443,7 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn runtime_renderer_set_layer_compositing(&mut self, enable: bool) {
         self.renderer.set_layer_compositing(enable);
+        self.queue();
     }
 
     fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {

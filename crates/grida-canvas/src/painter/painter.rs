@@ -1509,6 +1509,14 @@ impl<'a> Painter<'a> {
     fn draw_render_surface(&self, surface: &PainterRenderSurface) {
         let canvas = self.canvas;
 
+        // Apply ancestor clip path so surface-level effects (blur, shadows)
+        // cannot escape ancestor clipping boundaries.
+        let has_clip = surface.clip_path.is_some();
+        if let Some(ref clip) = surface.clip_path {
+            canvas.save();
+            canvas.clip_path(clip, None, true);
+        }
+
         // Apply effect quality reduction for interactive frames.
         let reduced;
         let effects = if self.is_reduced_quality() {
@@ -1663,6 +1671,11 @@ impl<'a> Painter<'a> {
                 });
             });
         });
+
+        // Restore the clip if we applied one.
+        if has_clip {
+            canvas.restore();
+        }
     }
 
     /// Create a drop shadow image filter that includes both the shadow AND the

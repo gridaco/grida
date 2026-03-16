@@ -498,12 +498,22 @@ impl LayerList {
 
                 let clip_path = Self::compute_clip_path(id, graph, scene_cache);
 
+                // When using a render surface, the container's own layer and
+                // children are rendered at identity compositing (opacity=1.0,
+                // blend=PassThrough) so the RenderSurface applies opacity and
+                // blend mode exactly once during compositing.
+                let (inner_opacity, inner_blend_mode) = if use_render_surface {
+                    (parent_opacity, LayerBlendMode::PassThrough)
+                } else {
+                    (opacity, n.blend_mode)
+                };
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
                         z_index: out.len(),
-                        opacity,
-                        blend_mode: n.blend_mode,
+                        opacity: inner_opacity,
+                        blend_mode: inner_blend_mode,
                         transform,
                         clip_path: clip_path.clone(),
                     },
@@ -522,8 +532,9 @@ impl LayerList {
                 });
 
                 let children = graph.get_children(id).map(|c| c.as_slice()).unwrap_or(&[]);
+                let child_opacity = if use_render_surface { parent_opacity } else { opacity };
                 let child_commands =
-                    Self::build_render_commands(children, graph, scene_cache, opacity, out);
+                    Self::build_render_commands(children, graph, scene_cache, child_opacity, out);
 
                 if use_render_surface {
                     // Wrap the container's own layer + children in a RenderSurface.

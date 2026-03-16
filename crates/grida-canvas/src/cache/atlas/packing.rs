@@ -25,7 +25,7 @@
 //! let mut packer = ShelfPacker::new(4096, 4096);
 //! let slot = packer.allocate(100, 80).expect("fits");
 //! // slot.x, slot.y, slot.width, slot.height are the atlas-space coords
-//! packer.free(slot.id);
+//! packer.free(&slot);
 //! ```
 
 /// Unique identifier for an allocated slot within a packer.

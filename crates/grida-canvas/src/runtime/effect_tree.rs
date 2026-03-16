@@ -191,13 +191,14 @@ impl EffectTree {
             return;
         }
 
-        let children: Vec<NodeId> = graph
+        let all_children: Vec<NodeId> = graph
             .get_children(id)
             .cloned()
             .unwrap_or_default();
 
-        // Count visible (active) children for opacity heuristic.
-        let visible_child_count = children
+        // Filter to only active children — inactive nodes should not
+        // trigger render surface reasons (mask, shadow promotion, etc.).
+        let children: Vec<NodeId> = all_children
             .iter()
             .filter(|cid| {
                 graph
@@ -205,7 +206,10 @@ impl EffectTree {
                     .map(|n| n.active())
                     .unwrap_or(false)
             })
-            .count();
+            .copied()
+            .collect();
+
+        let visible_child_count = children.len();
 
         // Collect render surface reasons for this node.
         let reasons = Self::classify(node, visible_child_count, &children, graph);
@@ -234,8 +238,9 @@ impl EffectTree {
             );
         }
 
-        // Recurse into children regardless of whether this node needs a surface.
-        for child_id in &children {
+        // Recurse into all children (including inactive ones, which will
+        // early-return in visit) so the full tree is traversed.
+        for child_id in &all_children {
             Self::visit(graph, child_id, nodes, stats);
         }
     }
