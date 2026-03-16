@@ -13,6 +13,7 @@ Related:
 - [Chromium Compositor Research](../research/chromium/index.md) — reference architecture
 - Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_effects.rs` — effect cost ranking
 - Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_opacity.rs` — opacity proof
+- Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_atlas.rs` — texture atlas compositor
 
 ---
 
@@ -44,12 +45,15 @@ Related:
    - Eliminates Rust-side logic on replay (shape building, paint stacking).
    - Does NOT cache rasterized pixels — GPU effects (blur, shadow) are
      re-executed on every replay (~220 µs/shadow, measured).
-   - Supports render policy variants (standard, wireframe) via variant keys.
+   - Supports render policy variants (standard, wireframe) and effect
+     quality variants (full, reduced) via variant keys. Both coexist in
+     cache without invalidation.
 
 6. **Render Surface Architecture (Effect Isolation)**
 
-   > Replaces the previous "Tile-Based Raster Cache" and "Per-Node Image
-   > Cache" sections.
+   > Replaces the previous "Tile-Based Raster Cache" section. The global
+   > tile cache has been deleted. Per-node image caching (item 7) remains
+   > as a complementary mechanism for leaf nodes with expensive effects.
 
    Effects that cannot be applied per-node (blend modes, filters, opacity
    with children, backdrop filters) are isolated into **render surfaces** —
@@ -226,7 +230,32 @@ Related:
 
    **Limitation:** At scale (>500 promoted nodes), texture-switching
    overhead dominates (2.4 µs × 500 = 1.2 ms). For large scenes, the
-   render surface approach (item 6) is more effective.
+   render surface approach (item 6) is more effective. The texture atlas
+   (item 7b) mitigates this by packing cached images into shared pages.
+
+7b. **Texture Atlas (Compositor Cache Packing)**
+
+    Per-node cached images stored as individual GPU textures cause
+    texture-switching overhead during compositing. Packing cached images
+    into shared large textures (atlas pages) eliminates this.
+
+    **Approach:** Shelf-based bin-packing allocates cached node images
+    into atlas pages (default 4096x4096). The compositor blits sub-rects
+    from shared atlas textures instead of binding a different texture per
+    node.
+
+    **Measured impact (microbenchmarks):**
+
+    | Scenario                              | Separate textures | Atlas    | Speedup  |
+    | ------------------------------------- | ----------------- | -------- | -------- |
+    | Pan 64x64 x1000                       | 727 µs            | 118 µs   | 6.2x     |
+    | Pan 32x32 x2000                       | 8463 µs           | 364 µs   | 23.2x    |
+    | Full compositor sim (pan+opacity+blend, 64x64 x1000) | 2329 µs | 747 µs | 3.1x |
+
+    Falls back to individual texture capture when atlas allocation fails
+    (node too large for a page).
+
+    Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_atlas.rs`
 
 8. **Dirty & Re-Cache Strategy**
    - Nodes marked dirty trigger re-recording of their `SkPicture`.
@@ -263,11 +292,16 @@ Related:
    ```
 
 10. **Viewport Culling**
-    - Use camera's `visible_rect` to cull `world_bounds` via R-tree spatial index.
-    - Nodes entirely outside viewport are skipped.
-    - Effect bounds expansion: nodes whose base geometry is outside viewport
-      but whose effect expansion (shadow, blur) extends into viewport must
-      still be drawn.
+    - Use camera's `visible_rect` to cull via R-tree spatial index.
+    - The R-tree indexes effect-expanded render bounds
+      (`absolute_render_bounds`), not base geometry bounds. This means
+      nodes whose base rect is offscreen but whose effect output (shadow,
+      blur) extends into the viewport are correctly included.
+    - `compute_render_bounds_from_effects()` accounts for blur (3x sigma),
+      drop shadows (offset + spread + blur), progressive blur, backdrop
+      blur, and liquid glass.
+    - Nodes whose entire effect-expanded bounds are outside the viewport
+      are skipped.
 
 11. **Minimize Canvas State Changes**
     - Reuse transforms and paints.
@@ -342,13 +376,19 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
     enum CameraChangeKind {
         None,       // no camera change
         PanOnly,    // translation changed, zoom did not
-        ZoomOnly,   // zoom changed, translation did not
+        ZoomIn,     // zoom increased (viewport shrinks into existing content)
+        ZoomOut,    // zoom decreased (viewport expands, new content appears)
         PanAndZoom, // both changed (pinch gesture)
     }
     ```
 
     Computed once per frame, threaded through the pipeline so every stage
     can take the cheapest path.
+
+    **Frame cost hierarchy:** `None < ZoomIn < PanOnly < ZoomOut < PanAndZoom`.
+    Zoom-in is cheaper than pan because no new spatial content enters the
+    viewport — only pixel density changes. Zoom-out is more expensive than
+    pan because new content appears in all four directions simultaneously.
 
 16. **Cached Content Reuse on Pan**
 
@@ -395,16 +435,68 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
 
 ---
 
+## Zoom-In / Zoom-Out Asymmetry
+
+Zoom-in and zoom-out are fundamentally different operations from a caching
+perspective. The previous `ZoomOnly` classification treated them identically,
+missing the cheapest possible camera-change path.
+
+21. **Zoom-In: Pure Texture Scale**
+
+    When zooming in, the viewport shrinks into content that was already
+    rendered. The previous frame is a spatial superset of the current
+    frame — every pixel that will be visible was already visible. The only
+    deficit is pixel density (the texture is magnified past its native
+    resolution).
+
+    During an active zoom-in gesture:
+    - Blit the previous composited frame with a scale transform. No new
+      rasterization, no new content discovery, no visible-set changes.
+    - The only artifact is upscale blur, which is acceptable during a
+      gesture and disappears on refinement.
+    - This is the cheapest possible non-idle frame — one texture blit.
+
+    Chromium exploits this during pinch-to-zoom: existing compositor tiles
+    are scaled, and re-rasterization is deferred until the gesture settles.
+
+22. **Zoom-Out: Radial Content Discovery**
+
+    When zooming out, the viewport expands beyond previously rendered
+    content. New spatial regions appear at all four edges. The center of
+    the previous frame remains valid (at higher density than needed, so
+    scaling down looks visually clean), but the border strips are
+    unrasterized.
+
+    During an active zoom-out gesture:
+    - Scale the previous frame down for the center region.
+    - Treat newly exposed border strips like pan-discovered content:
+      apply the same incremental visible-set logic (item 17), but
+      radially rather than in one direction.
+    - Prioritize rasterizing the largest newly-visible regions first.
+
+    Scale-down produces fewer visual artifacts than scale-up (discarding
+    information vs. interpolating it), so zoom-out's intermediate frames
+    look better than zoom-in's even without refinement.
+
+23. **Settle & Refine (shared)**
+
+    After the gesture ends (~50 ms idle), re-rasterize at the correct zoom
+    density using progressive refinement (center-out ordering, focal point
+    priority). This is shared behavior for both zoom directions and is
+    covered further in items 25–27.
+
+---
+
 ## Zoom & Interaction Optimization
 
-21. **Adaptive Interactive Resolution (LOD While Zooming)**
+24. **Adaptive Interactive Resolution (LOD While Zooming)**
     - Maintain `interactive_scale` s in (0, 1]
     - Effective render resolution: `effective_dpr = device_dpr * s`
     - Drive `s` by zoom velocity, not zoom level
     - High velocity → lower `s` (faster), near-zero → ramp to 1 (sharpen)
     - Hysteresis to avoid flicker
 
-22. **Two-Phase Rendering: Fast Preview Then Refine**
+25. **Two-Phase Rendering: Fast Preview Then Refine**
 
     **During active zoom/pan:**
     - Reuse cached content at stale zoom (scale the texture)
@@ -418,40 +510,42 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
     Chromium does this with pinch-zoom: discrete raster scale jumps,
     snap to existing tilings, refine when gesture ends.
 
-23. **Effect LOD During Interaction**
+26. **Effect LOD During Interaction**
 
     While zooming/panning, selectively degrade expensive operations:
-    - Shadow: blur radius → 0 (sharp offset shadow, still visible)
+    - Drop shadow: blur radius → 0 (sharp offset shadow, still visible)
+    - Inner shadow: skip entirely
     - Layer blur: radius / 4
     - Noise: skip entirely
-    - Backdrop blur: reduced radius
+    - Backdrop blur: radius / 4
+    - Liquid glass: kept (cheap enough, visually jarring to remove)
 
     After settle: restore exact effects.
 
     Record two SkPicture variants per node (full quality, fast) and switch
     based on the `stable` frame flag.
 
-24. **Progressive Refinement Ordering**
+27. **Progressive Refinement Ordering**
 
     When restoring full quality after interaction:
     1. Content near focal point (pinch center / cursor)
     2. Content in the visible viewport
     3. Content in a margin ring (prefetch)
 
-25. **Snap Bounds to Reduce Thrash**
+28. **Snap Bounds to Reduce Thrash**
 
     Continuous zoom changes cause float differences that trigger re-raster.
     - Snap bounds to integer pixels in device space.
     - Quantize `effective_dpr` to a small set (e.g. `{0.5, 0.67, 0.75, 1.0}`)
 
-26. **Temporal Throttling**
+29. **Temporal Throttling**
 
     During active zoom:
     - Rate-limit expensive re-raster to 30–60 Hz
     - Still update transform (scale) every frame for responsiveness
     - Refine pass runs only after settle
 
-27. **Interaction Overlays at Full Resolution**
+30. **Interaction Overlays at Full Resolution**
 
     Always render UI overlays at native resolution:
     - Selection bounds, handles, guides, cursor, rulers
@@ -463,18 +557,18 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
 
 ## Image Optimization
 
-28. **LoD / Mipmapped Image Swapping**
+31. **LoD / Mipmapped Image Swapping**
     - Use lower-res versions of images at low zoom.
     - Prevents high GPU bandwidth use at low visibility.
 
-29. **ImageRepository with Transform-Aware Access**
+32. **ImageRepository with Transform-Aware Access**
     - Pick image resolution based on projected screen size.
 
 ---
 
 ## Text & Glyph Optimization
 
-30. **Glyph Cache (Paragraph Caching)**
+33. **Glyph Cache (Paragraph Caching)**
     - Cache rasterized or vector glyphs used across the document.
     - Prevents redundant layout or rendering of text.
     - Content-hash keyed to prevent memory leaks.
@@ -483,15 +577,15 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
 
 ## Engine-Level
 
-31. **Precomputed World Transforms**
+34. **Precomputed World Transforms**
     - Avoid recalculating transforms per draw call.
     - Essential for random-access rendering.
 
-32. **Flat Table Architecture**
+35. **Flat Table Architecture**
     - All node data (transforms, bounds, styles) stored in flat maps.
     - Enables fast diffing, syncing, and concurrent access.
 
-33. **Scene Planner & Scheduler**
+36. **Scene Planner & Scheduler**
     - Builds the render pass list per frame.
     - Reacts to scene changes, memory pressure, frame budget.
     - Drives decisions to re-record, cache, evict, or degrade fidelity.
@@ -500,7 +594,7 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
 
 ## Future: Worker-Thread Rasterization
 
-34. **Multithreaded Rasterization**
+37. **Multithreaded Rasterization**
 
     Move SkPicture recording and/or render surface rasterization to worker
     threads. This is the single largest performance gap vs. Chromium:
@@ -514,11 +608,19 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
     Prerequisite: the render surface / effect tree architecture (item 6)
     which defines independent units of work that can be parallelized.
 
-35. **BVH or Quadtree Spatial Index**
+    **Constraint:** Grida's primary target is WASM. WASM does not support
+    shared-memory threads in a way compatible with Skia's GPU context.
+    Worker-thread rasterization is not feasible on the web target. All
+    single-thread optimizations (effect tree, render surfaces, effect LOD,
+    viewport culling, texture atlas, pan fast path, quantized DPR) exist
+    specifically to compensate for this. Multithreaded rasterization
+    applies only to native (desktop) builds.
+
+38. **BVH or Quadtree Spatial Index**
     - Build dynamic index from `world_bounds` for fast spatial queries.
     - Currently using R-tree (rstar crate).
 
-36. **CRDT-Ready Data Stores**
+39. **CRDT-Ready Data Stores**
     - Flat table model enables future collaboration support.
 
 ---
