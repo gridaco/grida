@@ -58,7 +58,6 @@ Grida Canvas is a **safe, high-performance 2D real-time rendering engine** for t
 | `io::io_grida_fbs`                            | Encode/decode `.grida` FlatBuffers binaries. Bindings are generated from `format/grida.fbs` via `flatc --rust` (see repo root and `format/README.md`). |
 | `io::io_grida`                                | Decode Grida JSON documents into a `Scene`.                                                                                                            |
 | `io::io_grida_patch`                          | Apply JSON Patch to a decoded scene.                                                                                                                   |
-| `io::io_figma`                                | Decode Figma API JSON into a `Scene` (feature-gated: `--features figma`).                                                                              |
 | `io::io_svg`, `io::io_css`, `io::io_markdown` | Additional import/parsing helpers.                                                                                                                     |
 
 ### Test fixtures
