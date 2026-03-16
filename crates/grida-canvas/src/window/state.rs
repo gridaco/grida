@@ -28,14 +28,18 @@ pub struct RasterSurfaceState {
 
 impl RasterSurfaceState {
     pub fn new(width: i32, height: i32) -> Self {
+        let w = width.max(1);
+        let h = height.max(1);
         let surface =
-            skia_safe::surfaces::raster_n32_premul((width, height)).expect("raster surface");
+            skia_safe::surfaces::raster_n32_premul((w, h)).expect("raster surface");
         Self { surface }
     }
 
     pub fn resize(&mut self, width: i32, height: i32) {
+        let w = width.max(1);
+        let h = height.max(1);
         self.surface =
-            skia_safe::surfaces::raster_n32_premul((width, height)).expect("raster surface");
+            skia_safe::surfaces::raster_n32_premul((w, h)).expect("raster surface");
     }
 
     pub fn surface_mut_ptr(&mut self) -> *mut Surface {

@@ -21,6 +21,11 @@ pub fn export_node_as_svg(
     let width = rect.width;
     let height = rect.height;
 
+    // Guard against degenerate dimensions: a zero-area surface cannot be created.
+    if width < 1.0 || height < 1.0 {
+        return None;
+    }
+
     // Create SVG canvas
     let bounds = SkRect::from_wh(width, height);
     let canvas = svg::Canvas::new(bounds, None);

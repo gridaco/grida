@@ -31,6 +31,12 @@ pub fn export_node_as_image(
     rect: Rectangle,
     format: ExportAsImage,
 ) -> Option<Exported> {
+    // Guard against degenerate dimensions: a zero-area surface cannot be created.
+    // This can occur when the node has zero or sub-pixel render bounds.
+    if size.width < 1.0 || size.height < 1.0 {
+        return None;
+    }
+
     let skfmt: EncodedImageFormat = format.clone().into();
 
     // Create camera with original bounds to determine world-space view

@@ -40,6 +40,55 @@ async function renderDocToPng(opts: { docPath: string; nodeId: string }) {
 }
 
 describe("raster export (node)", () => {
+  it("exportNodeAs: throws a descriptive error for unknown node IDs (no WASM abort)", async () => {
+    // Regression test for: https://github.com/gridaco/grida/issues/585
+    // Previously, calling exportNodeAs with a node that has no geometry caused
+    // a WASM panic and process abort.
+    const canvas = await createCanvas({
+      backend: "raster",
+      width: 256,
+      height: 256,
+      useEmbeddedFonts: false,
+    });
+
+    // Load a minimal scene (no nodes inside the scene root)
+    const doc = {
+      version: "0.91.0-beta+20260311",
+      document: {
+        nodes: {
+          main: {
+            type: "scene",
+            id: "main",
+            name: "main",
+            active: true,
+            locked: false,
+            constraints: { children: "multiple" },
+            guides: [],
+            edges: [],
+            background_color: { r: 0.96, g: 0.96, b: 0.96, a: 1 },
+          },
+        },
+        links: { main: [] },
+        scenes_ref: ["main"],
+        bitmaps: {},
+        images: {},
+        properties: {},
+      },
+    };
+    canvas.loadScene(JSON.stringify(doc));
+
+    // Exporting an unknown node should throw a clear JavaScript error,
+    // NOT abort the WASM process.
+    expect(() =>
+      canvas.exportNodeAs("nonexistent-node-id", {
+        format: "PNG",
+        constraints: { type: "none", value: 1 },
+      })
+    ).toThrowError(/nonexistent-node-id/);
+
+    canvas.dispose();
+  }, 30_000);
+
   it("createCanvas: creates a raster backend and exports PNG", async () => {
     const { canvas, data } = await renderDocToPng({
       docPath: "example/rectangle.grida1",

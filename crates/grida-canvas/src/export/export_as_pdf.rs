@@ -19,15 +19,20 @@ pub fn export_node_as_pdf(
     rect: Rectangle,
     _options: ExportAsPDF,
 ) -> Option<Exported> {
+    // Calculate page size based on the node bounds
+    let width = rect.width;
+    let height = rect.height;
+
+    // Guard against degenerate dimensions.
+    if width < 1.0 || height < 1.0 {
+        return None;
+    }
+
     // Create a PDF document in memory
     let mut cursor = Cursor::new(Vec::new());
 
     // Create PDF document
     let doc = pdf::new_document(&mut cursor, None);
-
-    // Calculate page size based on the node bounds
-    let width = rect.width;
-    let height = rect.height;
 
     // Begin a new page
     let mut page = doc.begin_page(SkSize::new(width, height), None);

@@ -368,6 +368,25 @@ export class Scene {
     data: Uint8Array;
   } {
     this._assertAlive();
+
+    // Pre-flight: verify the node exists in the geometry cache.
+    // This surfaces a clear error rather than a WASM abort when the caller
+    // passes a node ID that has not been loaded into the scene, or when the
+    // node's render bounds are degenerate (zero or sub-pixel dimensions).
+    const bbox = this.getNodeAbsoluteBoundingBox(id);
+    if (bbox === null) {
+      throw new Error(
+        `exportNodeAs: node "${id}" was not found in the scene. ` +
+          `Ensure the scene has been loaded and the node ID is correct.`
+      );
+    }
+    if (bbox.width <= 0 || bbox.height <= 0) {
+      throw new Error(
+        `exportNodeAs: node "${id}" has degenerate bounds ` +
+          `(${bbox.width}×${bbox.height}). The node has no renderable area.`
+      );
+    }
+
     const [id_ptr, id_len] = this._alloc_string(id);
     const [fmt_ptr, fmt_len] = this._alloc_string(JSON.stringify(format));
     const outptr = this.module._export_node_as(

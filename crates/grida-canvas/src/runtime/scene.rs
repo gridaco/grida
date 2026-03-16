@@ -150,8 +150,12 @@ impl Backend {
     }
 
     pub fn init_raster_surface(width: i32, height: i32) -> *mut Surface {
+        // Clamp to at least 1×1: raster_n32_premul returns None for non-positive
+        // dimensions and would cause a panic, which aborts the WASM process.
+        let w = width.max(1);
+        let h = height.max(1);
         let surface =
-            surfaces::raster_n32_premul((width, height)).expect("Failed to create raster surface");
+            surfaces::raster_n32_premul((w, h)).expect("Failed to create raster surface");
         Box::into_raw(Box::new(surface))
     }
 }
