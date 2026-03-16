@@ -1,19 +1,19 @@
+use crate::cache::compositor::LayerImageCache;
 use crate::node::schema::{NodeId, Scene};
-use crate::runtime::camera::Camera2D;
+use crate::runtime::effect_tree::EffectTree;
 use crate::runtime::font_repository::FontRepository;
 use crate::{
     cache::{
         geometry::GeometryCache,
         paragraph::ParagraphCache,
         picture::{PictureCache, PictureCacheStrategy},
-        tile::ImageTileCache,
         vector_path::VectorPathCache,
     },
     painter::layer::{Layer, LayerList},
 };
 use math2::{rect::Rectangle, vector2::Vector2};
 use rstar::{RTree, RTreeObject, AABB};
-use skia_safe::{Picture, Surface};
+use skia_safe::Picture;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexedLayer {
@@ -35,7 +35,11 @@ pub struct SceneCache {
     pub layers: LayerList,
     pub geometry: GeometryCache,
     pub picture: PictureCache,
-    pub tile: ImageTileCache,
+    /// Per-node layer compositing cache (replaces tile cache).
+    pub compositor: LayerImageCache,
+    /// Effect tree identifying subtrees that need render surfaces.
+    /// Built from the scene graph during `update_effect_tree()`.
+    pub effect_tree: EffectTree,
     pub paragraph: std::cell::RefCell<ParagraphCache>,
     pub path: std::cell::RefCell<VectorPathCache>,
     pub layer_index: RTree<IndexedLayer>,
@@ -48,7 +52,8 @@ impl SceneCache {
             layers: LayerList::default(),
             geometry: GeometryCache::new(),
             picture: PictureCache::new(),
-            tile: ImageTileCache::new(),
+            compositor: LayerImageCache::default(),
+            effect_tree: EffectTree::empty(),
             paragraph: std::cell::RefCell::new(ParagraphCache::new()),
             path: std::cell::RefCell::new(VectorPathCache::new()),
             layer_index: RTree::new(),
@@ -79,6 +84,13 @@ impl SceneCache {
             Some(layout_result),
             viewport_size,
         );
+    }
+
+    /// Rebuild the effect tree from the scene graph.
+    /// This identifies which subtrees need render surfaces for effects
+    /// (opacity isolation, blend mode, blur, shadows, clip, mask).
+    pub fn update_effect_tree(&mut self, scene: &Scene) {
+        self.effect_tree = EffectTree::build(&scene.graph);
     }
 
     pub fn update_layers(&mut self, scene: &Scene) {
@@ -125,6 +137,7 @@ impl SceneCache {
         self.picture.invalidate();
         self.paragraph.borrow_mut().invalidate();
         self.path.borrow_mut().invalidate();
+        self.compositor.invalidate_all();
     }
 
     /// Return a picture for a specific node if cached.
@@ -187,19 +200,4 @@ impl SceneCache {
             .collect()
     }
 
-    /// Update raster tile cache using the given camera and surface.
-    pub fn update_tiles(&mut self, camera: &Camera2D, surface: &mut Surface, partial: bool) {
-        let width = surface.width() as f32;
-        let height = surface.height() as f32;
-        let index = &self.layer_index;
-        let intersects = |rect: Rectangle| {
-            let env = AABB::from_corners(
-                [rect.x, rect.y],
-                [rect.x + rect.width, rect.y + rect.height],
-            );
-            index.locate_in_envelope_intersecting(&env).next().is_some()
-        };
-        self.tile
-            .update_tiles(camera, width, height, surface, partial, intersects);
-    }
 }
