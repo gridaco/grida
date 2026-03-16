@@ -455,7 +455,7 @@ fn scene_shadow_container() -> Scene {
         let r = ((col * 7) % 256) as u8;
         let g = ((row * 11) % 256) as u8;
         let b = (((col + row) * 5) % 256) as u8;
-        pairs.push((id, rect(x, y, cell, cell, solid(r, g, b, 255))));
+        pairs.push((id, rect_absolute(x, y, cell, cell, solid(r, g, b, 255))));
         children_ids.push(id);
     }
 
@@ -529,13 +529,151 @@ fn scene_blur_container() -> Scene {
         let r = ((col * 13) % 256) as u8;
         let g = ((row * 7) % 256) as u8;
         let b = 180;
-        pairs.push((id, rect(x, y, cell, cell, solid(r, g, b, 255))));
+        pairs.push((id, rect_absolute(x, y, cell, cell, solid(r, g, b, 255))));
         children_ids.push(id);
     }
 
     let mut links = HashMap::new();
     links.insert(container_id, children_ids);
     build_scene("bench-blur-container", None, pairs, links, vec![container_id])
+}
+
+/// 1000 individually-blurred rects inside a plain container (no container effects).
+/// This proves the bottleneck is per-node effects, not the absence of a container.
+/// Should perform the same as blur-grid (~7 fps).
+fn scene_blur_children_in_container() -> Scene {
+    let child_count: usize = 1000;
+    let cols: usize = 40;
+    let cell = 50.0_f32;
+    let gap = 10.0_f32;
+
+    let container_w = cols as f32 * (cell + gap);
+    let container_h = child_count.div_ceil(cols) as f32 * (cell + gap);
+
+    let container = Node::Container(ContainerNodeRec {
+        active: true,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::PassThrough,
+        mask: None,
+        rotation: 0.0,
+        position: LayoutPositioningBasis::Inset(EdgeInsets {
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 0.0,
+        }),
+        layout_container: LayoutContainerStyle::default(),
+        layout_dimensions: LayoutDimensionStyle {
+            layout_target_width: Some(container_w),
+            layout_target_height: Some(container_h),
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
+            layout_target_aspect_ratio: None,
+        },
+        layout_child: None,
+        corner_radius: RectangularCornerRadius::default(),
+        corner_smoothing: CornerSmoothing(0.0),
+        fills: Paints::new(vec![solid(240, 240, 240, 255)]),
+        strokes: Paints::new(vec![]),
+        stroke_style: StrokeStyle::default(),
+        stroke_width: StrokeWidth::None,
+        effects: LayerEffects::default(), // NO effects on container
+        clip: false,
+    });
+
+    let container_id: u64 = 1;
+    let mut pairs: Vec<(u64, Node)> = vec![(container_id, container)];
+    let mut children_ids: Vec<u64> = Vec::with_capacity(child_count);
+
+    for i in 0..child_count {
+        let id = (i + 2) as u64;
+        let col = i % cols;
+        let row = i / cols;
+        let x = col as f32 * (cell + gap);
+        let y = row as f32 * (cell + gap);
+        let r = ((col * 13) % 256) as u8;
+        let g = ((row * 7) % 256) as u8;
+        let b = 180;
+        let effects = LayerEffects {
+            blur: Some(FeLayerBlur {
+                active: true,
+                blur: FeBlur::Gaussian(FeGaussianBlur {
+                    radius: 3.0 + (col % 5) as f32,
+                }),
+            }),
+            ..LayerEffects::default()
+        };
+        pairs.push((
+            id,
+            rect_absolute_with_effects(x, y, cell, cell, solid(r, g, b, 255), effects),
+        ));
+        children_ids.push(id);
+    }
+
+    let mut links = HashMap::new();
+    links.insert(container_id, children_ids);
+    build_scene(
+        "bench-blur-children-in-container",
+        None,
+        pairs,
+        links,
+        vec![container_id],
+    )
+}
+
+/// Opacity grid: 5 000 rects with fill only, varying opacity (0.1–0.9).
+/// Exercises the save_layer path for per-node opacity.
+fn scene_opacity_fill_only() -> Scene {
+    let cols = 100;
+    let rows = 50;
+    let cell = 24.0_f32;
+    let gap = 2.0_f32;
+
+    let mut nodes = Vec::with_capacity(cols * rows);
+    for row in 0..rows {
+        for col in 0..cols {
+            let x = col as f32 * (cell + gap);
+            let y = row as f32 * (cell + gap);
+            let r = ((col * 5) % 256) as u8;
+            let g = ((row * 5) % 256) as u8;
+            let b = (((col + row) * 3) % 256) as u8;
+            let opacity = 0.1 + ((col + row) % 9) as f32 * 0.1; // 0.1 to 0.9
+            nodes.push(rect_opacity(x, y, cell, cell, solid(r, g, b, 255), opacity));
+        }
+    }
+    flat_scene("bench-opacity-fill-only", nodes)
+}
+
+/// Opacity grid: 5 000 rects with fill + stroke, varying opacity (0.1–0.9).
+/// This is the critical case: fill+stroke overlap makes per-paint alpha
+/// technically incorrect, but the save_layer cost is 39-60x higher.
+fn scene_opacity_fill_stroke() -> Scene {
+    let cols = 100;
+    let rows = 50;
+    let cell = 24.0_f32;
+    let gap = 2.0_f32;
+
+    let mut nodes = Vec::with_capacity(cols * rows);
+    for row in 0..rows {
+        for col in 0..cols {
+            let x = col as f32 * (cell + gap);
+            let y = row as f32 * (cell + gap);
+            let r = ((col * 7) % 256) as u8;
+            let g = ((row * 7) % 256) as u8;
+            let b = (((col + row) * 5) % 256) as u8;
+            let opacity = 0.1 + ((col + row) % 9) as f32 * 0.1;
+            nodes.push(rect_opacity_fill_stroke(
+                x, y, cell, cell,
+                solid(r, g, b, 255),
+                solid(0, 0, 0, 255),
+                2.0,
+                opacity,
+            ));
+        }
+    }
+    flat_scene("bench-opacity-fill-stroke", nodes)
 }
 
 fn main() {
@@ -552,6 +690,9 @@ fn main() {
         ("bench-mixed-effects", scene_mixed_effects()),
         ("bench-shadow-container", scene_shadow_container()),
         ("bench-blur-container", scene_blur_container()),
+        ("bench-blur-children-in-container", scene_blur_children_in_container()),
+        ("bench-opacity-fill-only", scene_opacity_fill_only()),
+        ("bench-opacity-fill-stroke", scene_opacity_fill_stroke()),
     ];
 
     let total_nodes: usize = scenes

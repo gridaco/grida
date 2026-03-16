@@ -109,8 +109,8 @@ fn main() {
     }
 
     struct BenchResult {
-        name: &'static str,
-        count: usize,
+        _name: &'static str,
+        _count: usize,
         avg_frame_us: f64,
         per_rect_us: f64,
     }
@@ -148,8 +148,8 @@ fn main() {
         let per_rect = avg_us / count as f64;
 
         BenchResult {
-            name,
-            count,
+            _name: name,
+            _count: count,
             avg_frame_us: avg_us,
             per_rect_us: per_rect,
         }

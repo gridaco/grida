@@ -28,7 +28,6 @@ fn main() {
     use cg::window::headless::HeadlessGpu;
     use skia_safe::{
         canvas::SrcRectConstraint, Color, ImageInfo, Paint, Rect, Surface,
-        SamplingOptions, FilterMode, MipmapMode,
     };
     use std::time::Instant;
 

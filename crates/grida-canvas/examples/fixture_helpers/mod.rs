@@ -1,4 +1,5 @@
 //! Shared helpers for fixture generators.
+#![allow(dead_code)]
 
 pub use std::collections::HashMap;
 
@@ -402,6 +403,96 @@ pub fn rect_with_effects(x: f32, y: f32, w: f32, h: f32, fill: Paint, effects: L
         stroke_style: StrokeStyle::default(),
         stroke_width: StrokeWidth::None,
         effects,
+        layout_child: None,
+    })
+}
+
+/// Rectangle with effects and absolute positioning (for use inside containers).
+pub fn rect_absolute_with_effects(x: f32, y: f32, w: f32, h: f32, fill: Paint, effects: LayerEffects) -> Node {
+    Node::Rectangle(RectangleNodeRec {
+        active: true,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::PassThrough,
+        mask: None,
+        transform: AffineTransform::from_box_center(x, y, w, h, 0.0),
+        size: Size { width: w, height: h },
+        corner_radius: RectangularCornerRadius::default(),
+        corner_smoothing: CornerSmoothing(0.0),
+        fills: Paints::new(vec![fill]),
+        strokes: Paints::new(vec![]),
+        stroke_style: StrokeStyle::default(),
+        stroke_width: StrokeWidth::None,
+        effects,
+        layout_child: Some(LayoutChildStyle {
+            layout_grow: 0.0,
+            layout_positioning: LayoutPositioning::Absolute,
+        }),
+    })
+}
+
+/// Rectangle with absolute positioning (for use inside containers).
+pub fn rect_absolute(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
+    Node::Rectangle(RectangleNodeRec {
+        active: true,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::PassThrough,
+        mask: None,
+        transform: AffineTransform::from_box_center(x, y, w, h, 0.0),
+        size: Size { width: w, height: h },
+        corner_radius: RectangularCornerRadius::default(),
+        corner_smoothing: CornerSmoothing(0.0),
+        fills: Paints::new(vec![fill]),
+        strokes: Paints::new(vec![]),
+        stroke_style: StrokeStyle::default(),
+        stroke_width: StrokeWidth::None,
+        effects: LayerEffects::default(),
+        layout_child: Some(LayoutChildStyle {
+            layout_grow: 0.0,
+            layout_positioning: LayoutPositioning::Absolute,
+        }),
+    })
+}
+
+/// Rectangle with opacity and one fill.
+pub fn rect_opacity(x: f32, y: f32, w: f32, h: f32, fill: Paint, opacity: f32) -> Node {
+    Node::Rectangle(RectangleNodeRec {
+        active: true,
+        opacity,
+        blend_mode: LayerBlendMode::PassThrough,
+        mask: None,
+        transform: AffineTransform::from_box_center(x, y, w, h, 0.0),
+        size: Size { width: w, height: h },
+        corner_radius: RectangularCornerRadius::default(),
+        corner_smoothing: CornerSmoothing(0.0),
+        fills: Paints::new(vec![fill]),
+        strokes: Paints::new(vec![]),
+        stroke_style: StrokeStyle::default(),
+        stroke_width: StrokeWidth::None,
+        effects: LayerEffects::default(),
+        layout_child: None,
+    })
+}
+
+/// Rectangle with opacity, fill, and stroke.
+pub fn rect_opacity_fill_stroke(
+    x: f32, y: f32, w: f32, h: f32,
+    fill: Paint, stroke: Paint,
+    stroke_width: f32, opacity: f32,
+) -> Node {
+    Node::Rectangle(RectangleNodeRec {
+        active: true,
+        opacity,
+        blend_mode: LayerBlendMode::PassThrough,
+        mask: None,
+        transform: AffineTransform::from_box_center(x, y, w, h, 0.0),
+        size: Size { width: w, height: h },
+        corner_radius: RectangularCornerRadius::default(),
+        corner_smoothing: CornerSmoothing(0.0),
+        fills: Paints::new(vec![fill]),
+        strokes: Paints::new(vec![stroke]),
+        stroke_style: StrokeStyle::default(),
+        stroke_width: StrokeWidth::Uniform(stroke_width),
+        effects: LayerEffects::default(),
         layout_child: None,
     })
 }
