@@ -33,6 +33,15 @@ When writing or updating **user-facing docs**, prefer **universal routing** link
   - Example: `https://grida.co/_/connect/channels`
 - **If you add a new user-facing page** that should be linkable from docs, make sure it’s registered in **universal routing** so the `/_/…` alias resolves correctly. See `docs/wg/platform/universal-docs-routing.md`.
 
+## Linking rules
+
+- **Never link outside `/docs`** from docs markdown files. Links like
+  `../../../crates/...` or `../../packages/...` break when docs are
+  hosted on Docusaurus (only `/docs/**` is deployed). Instead, reference
+  external paths as inline code: `` `crates/grida-canvas/examples/foo.rs` ``.
+- Links **within `/docs`** (relative paths between docs pages) are fine.
+- Links to **external URLs** (`https://...`) are fine.
+
 ## Conventions
 
 ### `_history/` directories (unlisted docs)

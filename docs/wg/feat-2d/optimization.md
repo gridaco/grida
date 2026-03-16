@@ -9,8 +9,10 @@ rendering (target: 60+ fps with large design documents including effects).
 
 Related:
 
-- [Skia GPU Primitives Benchmark](./skia-gpu-primitives-benchmark.md) — measured Skia primitive costs
+- Skia GPU Primitives Benchmark — see `crates/grida-canvas/examples/skia_bench/BENCHMARK.md`
 - [Chromium Compositor Research](../research/chromium/index.md) — reference architecture
+- Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_effects.rs` — effect cost ranking
+- Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_opacity.rs` — opacity proof
 
 ---
 
@@ -63,18 +65,142 @@ Related:
 
    **What triggers a render surface:**
 
-   | Condition                                | Rationale                                                |
-   | ---------------------------------------- | -------------------------------------------------------- |
-   | Opacity < 1.0 with 2+ visible children   | Per-child alpha would double-blend overlaps              |
-   | Blend mode other than Normal/PassThrough | Blend reads from content behind — must flatten first     |
-   | Layer blur                               | Filter applied to composited group, not individual nodes |
-   | Backdrop blur / liquid glass             | Reads from content below in z-order                      |
-   | Clip path                                | Applied to composited output                             |
-   | Mask                                     | Composited then masked as a unit                         |
-   | Shadows (optimization)                   | Cache the shadow result for the group                    |
+   | Condition                                | Rationale                                                 |
+   | ---------------------------------------- | --------------------------------------------------------- |
+   | Opacity `< 1.0` with 2+ visible children | Per-child alpha would double-blend overlaps (see item 6b) |
+   | Blend mode other than Normal/PassThrough | Blend reads from content behind — must flatten first      |
+   | Layer blur                               | Filter applied to composited group, not individual nodes  |
+   | Backdrop blur / liquid glass             | Reads from content below in z-order                       |
+   | Clip path                                | Applied to composited output                              |
+   | Mask                                     | Composited then masked as a unit                          |
+   | Shadows (optimization)                   | Cache the shadow result for the group                     |
 
    **Nodes without these properties draw directly** — no render surface
    overhead.
+
+6b. **Per-Paint Alpha for Opacity (Avoid `save_layer` When Possible)**
+
+    `save_layer` is the most expensive non-filter operation in Skia. It
+    allocates an offscreen GPU texture, draws content into it, and
+    composites it back — a fixed ~57-60 µs overhead per call regardless
+    of content complexity. For opacity on nodes, this cost is avoidable
+    in some cases.
+
+    Note: `save_layer_alpha(bounds, alpha)` and `SaveLayerRec` with an
+    alpha paint are identical — Skia's `saveLayerAlphaf` internally
+    creates a paint and calls `saveLayer`. There is no fast path.
+
+    **The optimization:** instead of wrapping a node's draws in
+    `save_layer(alpha)`, bake the opacity directly into the final
+    `SkPaint`'s alpha channel. This eliminates the offscreen texture
+    entirely.
+
+    **Measured impact (Apple M2 Pro, 1000 nodes):**
+
+    | Node complexity       | `save_layer` | per-paint alpha | Speedup | Frame saved |
+    | --------------------- | ------------ | --------------- | ------- | ----------- |
+    | 1 fill                | 58.6 ms      | 0.4 ms          | 153x    | 58.2 ms     |
+    | fill + stroke         | 58.7 ms      | 1.5 ms          | 39x     | 57.2 ms     |
+    | 2 fills + stroke      | 59.4 ms      | 1.7 ms          | 34x     | 57.7 ms     |
+    | 3 fills + 2 strokes   | 60.6 ms      | 4.1 ms          | 15x     | 56.5 ms     |
+    | rrect fill+stroke (AA)| 60.1 ms      | 1.0 ms          | 60x     | 59.1 ms     |
+
+    At 1000 nodes, per-paint alpha saves ~57 ms/frame — the difference
+    between 17 fps and 60+ fps.
+
+    **Scaling behavior:** the speedup grows super-linearly at high node
+    counts. At 5000 fill+stroke nodes, per-paint is **93x** faster (vs
+    39x at 1000) because `save_layer` cost increases from FBO pool
+    pressure (~57 µs at 100 nodes → ~135 µs at 5000 nodes), while
+    per-paint stays flat.
+
+    Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_opacity.rs`
+
+    ### Correctness caveats
+
+    Per-paint alpha produces correct results **only when the node's draw
+    calls do not overlap on the canvas.** When draws overlap, per-paint
+    alpha double-blends at the intersection — the overlapping pixels
+    receive opacity twice instead of once.
+
+    In our painter, a single leaf node can issue up to 4 draw calls:
+
+    1. `draw_fills` — one `draw_path` (multiple fills are composed into
+       a single shader via `sk_paint_stack`, so this is always one call)
+    2. `draw_noise_effects` — draws noise layers on top of fills
+    3. `draw_stroke_path` — one `draw_path` (same `sk_paint_stack` logic)
+    4. `draw_stroke_decorations` — draws markers at stroke endpoints
+
+    The overlap relationships:
+
+    | Draw A | Draw B | Overlap? | Double-blend visible? |
+    | ------ | ------ | -------- | --------------------- |
+    | Fills (single draw) | — | No overlap | N/A — always safe |
+    | Fills | Stroke | Yes — inner half of stroke covers fill | Yes at low opacity / thick stroke |
+    | Fills | Noise | Yes — noise covers fills entirely | **Always visible** — wrong blending |
+    | Stroke | Markers | Yes — markers at stroke endpoints | Subtle but present |
+
+    ### When per-paint alpha is safe (no visual difference)
+
+    - **Fills only, no stroke, no noise** — one draw call, zero overlap.
+    - **Stroke only, no fill** — one draw call, zero overlap.
+    - Multiple fills with no stroke/noise — `sk_paint_stack` composes
+      them into one shader, so still one draw call.
+
+    ### When per-paint alpha is visually wrong
+
+    - **Fills + noise** — noise composites over fills. Per-paint alpha
+      would alpha-blend fills, then alpha-blend noise on top. The noise
+      layer sees pre-multiplied-alpha fills underneath, producing wrong
+      color math. **Never use per-paint alpha with noise.**
+    - **Fills + stroke at low opacity** — the inner half of the stroke
+      overlaps the fill. At opacity 0.3 with a 10px stroke, the overlap
+      band is visibly darker than the surroundings. The artifact scales
+      with `stroke_width * (1 - opacity)`.
+    - **Any draw with non-SrcOver blend mode on individual paints** —
+      per-paint alpha changes the blend input, producing different
+      compositing results than whole-node alpha.
+
+    ### When per-paint alpha is technically wrong but acceptable
+
+    - **Fills + stroke at high opacity (>0.8)** — the double-blend at
+      the stroke/fill boundary is `opacity^2` vs `opacity`. At 0.9,
+      that's 0.81 vs 0.9 — a 10% difference in a thin band. Typically
+      imperceptible.
+    - **Fills + stroke with thin stroke (1-2px)** — the overlap band
+      is sub-pixel to 2px. Hard to see at any opacity.
+
+    ### Decision rule for implementation
+
+    ```text
+    can_use_per_paint_alpha(node):
+      if node has noise effects     → NO  (always wrong)
+      if node has fills AND strokes → MAYBE (see below)
+      if node has only fills        → YES
+      if node has only strokes      → YES
+
+    fill+stroke heuristic:
+      if stroke_width <= 2.0        → YES (overlap band too thin to see)
+      if opacity >= 0.85            → YES (double-blend delta < 13%)
+      otherwise                     → NO  (use save_layer)
+    ```
+
+    ### Current state in codebase
+
+    `with_opacity()` in `painter.rs:202` uses **unbounded**
+    `save_layer_alpha(None, ...)` for ALL nodes with `opacity < 1.0`.
+    The per-paint alpha optimization is **not implemented**. Even when
+    `save_layer` is needed, the missing bounds make it worse (allocates
+    a full-canvas offscreen instead of a tight rect).
+
+    ### Implementation priority
+
+    1. **Fills-only or strokes-only nodes** — safe, no heuristic needed,
+       large speedup. Majority of typical document nodes.
+    2. **Pass bounds to remaining `save_layer` calls** — even when
+       `save_layer` is still needed, bounded is cheaper than unbounded.
+    3. **Fill+stroke with heuristic** — optional, requires threshold
+       tuning, smaller win (most of the cost is already in tier 1).
 
 7. **Per-Node Image Cache (for Expensive Effect Nodes)**
 
@@ -148,12 +274,15 @@ Related:
     - Precompute common values like DPI × Zoom × ViewMatrix.
 
 12. **Tight Bounds for `save_layer` Operations**
-    - Always provide explicit bounds to `save_layer` calls.
+    - First: avoid `save_layer` entirely when possible (see item 6b).
+    - When required: always provide explicit bounds.
     - Unbounded `save_layer` creates full-canvas offscreen buffers (~100x
       larger than necessary).
     - Compute tight bounds including effect expansion (shadow offset +
       spread + 3x blur radius).
     - Critical for blend mode isolation and render surface sizing.
+    - Each `save_layer` has a fixed ~57-60 µs overhead (measured).
+      At scale, this dominates frame time.
 
 13. **Text & Path Caching**
     - Cache laid-out paragraphs keyed by content hash + font generation.
@@ -173,17 +302,20 @@ Not all effects can be cached in isolation. The critical distinction:
 
 **Self-contained** (safe to cache):
 
-| Effect                         | Notes                                                  |
-| ------------------------------ | ------------------------------------------------------ |
-| Fills (solid, gradient, image) | Pure paint operations                                  |
-| Strokes (all variants)         | Computed from path + stroke params                     |
-| Drop shadows                   | Extends bounds — cached image must include expansion   |
-| Inner shadows                  | Clipped to shape; operates on own content only         |
-| Noise effects                  | Blends with fills within same surface                  |
-| Layer blur                     | `save_layer` with image filter — reads own buffer only |
-| Opacity                        | Standard alpha compositing                             |
-| Clip paths                     | Restricts visible area                                 |
-| Mask groups                    | Self-contained, cached as a unit                       |
+| Effect                               | Notes                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Fills (solid, gradient, image)       | Pure paint operations                                                                       |
+| Strokes (all variants)               | Computed from path + stroke params                                                          |
+| Drop shadows                         | Extends bounds — cached image must include expansion                                        |
+| Inner shadows                        | Clipped to shape; operates on own content only                                              |
+| Noise effects                        | Blends with fills within same surface                                                       |
+| Layer blur                           | `save_layer` with image filter — reads own buffer only                                      |
+| Opacity (fills-only or strokes-only) | Per-paint alpha — no `save_layer` needed (item 6b)                                          |
+| Opacity (fills + noise)              | Requires `save_layer` — noise compositing is wrong without isolation                        |
+| Opacity (fills + stroke)             | `save_layer` for correctness; per-paint acceptable if thin stroke or high opacity (item 6b) |
+| Opacity (2+ overlapping children)    | Requires `save_layer` via render surface (item 6)                                           |
+| Clip paths                           | Restricts visible area                                                                      |
+| Mask groups                          | Self-contained, cached as a unit                                                            |
 
 **Context-dependent** (must draw live):
 

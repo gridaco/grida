@@ -35,5 +35,5 @@ cargo run -p cg --example skia_bench_opacity --features native-gl-context --rele
 
 Findings are documented in:
 
-- `docs/wg/feat-2d/skia-gpu-primitives-benchmark.md`
+- [BENCHMARK.md](./BENCHMARK.md) — full measured results and analysis
 - `docs/wg/feat-2d/optimization.md` (item 6b, item 7)

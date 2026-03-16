@@ -6,7 +6,7 @@ title: "Skia GPU Primitives Benchmark"
 
 Platform: Apple M2 Pro, Metal 4.1, 1000x1000 viewport, `--release`
 
-Measured with `bench_skia_primitives.rs` (headless GPU, no window overhead).
+Measured with `skia_bench_primitives.rs` (headless GPU, no window overhead).
 
 ---
 
@@ -113,7 +113,7 @@ Large static groups:
 ## Benchmark reproduction
 
 ```bash
-cargo run -p cg --example bench_skia_primitives --features native-gl-context --release
+cargo run -p cg --example skia_bench_primitives --features native-gl-context --release
 ```
 
 ---
@@ -337,210 +337,174 @@ because the node's base geometry may be visible. But a shadow that extends
 
 **Verdict:** Pure optimization, no correctness issues.
 
-#### 4. Effect batching / atlas (medium impact, complex)
+#### 4. Effect batching / atlas — VALIDATED
 
 Instead of one texture per node, pack multiple cached node images into a
 single large texture (texture atlas). Blit sub-regions with `draw_image_rect`
+source rect. Same-texture batching -> 0.3 us/blit.
 
-- source rect. Same-texture batching → 0.3 µs/blit.
+**Microbenchmark results** (Apple M2 Pro, Metal, release, headless GPU,
+200 iterations after 50 warmup):
 
-For 2000 nodes in a 4096x4096 atlas, each 32x32:
+Static blits (no camera transform):
 
-- Fits 128×128 = 16384 nodes → 1 texture
-- 2000 blits of same texture = 600 µs (vs 4800 µs with different textures)
+| Node size | Count | Separate (us) | Atlas (us) | Speedup |
+| --------- | ----- | ------------- | ---------- | ------- |
+| 32x32     | 1000  | 2801          | 233        | 12.0x   |
+| 32x32     | 2000  | 15503         | 444        | 34.9x   |
+| 64x64     | 1000  | 980           | 137        | 7.2x    |
+| 64x64     | 2000  | 3116          | 281        | 11.1x   |
+| 100x100   | 1000  | 504           | 95         | 5.3x    |
+
+Pan simulation (camera translates each frame, different destination
+positions every frame, includes `flush_and_submit`):
+
+| Node size | Count | Separate (us) | Atlas (us) | Speedup |
+| --------- | ----- | ------------- | ---------- | ------- |
+| 64x64     | 1000  | 727           | 118        | 6.2x    |
+| 32x32     | 2000  | 8463          | 364        | 23.2x   |
+| 100x100   | 1000  | 408           | 89         | 4.6x    |
+
+Full compositor simulation (pan + per-node opacity + per-node blend mode,
+64x64, 1000 nodes):
+
+| Mode     | Total (us) | us/blit | FPS  | Speedup |
+| -------- | ---------- | ------- | ---- | ------- |
+| separate | 2329       | 2.3     | 429  | 1.0x    |
+| atlas    | 747        | 0.7     | 1339 | 3.1x    |
+
+**Key findings:**
+
+1. Atlas sub-rect blits perform identically to same-texture blits. Skia
+   batches them the same way.
+2. The speedup scales super-linearly with count. At 2000 nodes (32x32),
+   the atlas is 35x faster. This matches the non-linear GPU pipeline stall
+   behavior observed in the blur-grid benchmark.
+3. The advantage holds under pan (changing destination positions every
+   frame). The GPU doesn't cache frame output — the atlas advantage comes
+   purely from texture bind state, not position coherence.
+4. Per-node opacity/blend breaks some batching (the full compositor
+   simulation is 3.1x, not 6x), but the atlas still wins decisively.
+5. Atlas performance matches same-texture performance almost exactly,
+   confirming the hypothesis: texture switching is the bottleneck, and
+   the atlas eliminates it.
 
 **Correctness:** Fully correct — atlas is just a storage optimization.
 Blending is applied per-quad in the blit paint.
 
-**Verdict:** Medium complexity. Requires packing algorithm and atlas
-management. Worth it when per-node caching is the chosen strategy.
+**Verdict:** Validated. The atlas approach is worth implementing for the
+per-node compositor. Expected real-world impact on blur-grid: the
+compositing phase (`gpu_flush`) drops from ~137ms to ~10-20ms. Combined
+with effect LOD (Phase 4), per-node blur scenes during pan should reach
+30-60 fps.
 
-#### 5. Solid color / trivial node optimization (low impact, simple)
+Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_atlas.rs`
 
-Detect nodes where the entire render output is a single solid color.
-Replace the draw with a single `draw_rect`. Skip SkPicture replay entirely.
+#### 5. Downscale during interaction
 
-Chromium does this with `kMaxOpsToAnalyze = 5`.
+Render to a smaller offscreen during pan/zoom, then upscale to the
+display with bilinear filtering. Reduces pixel count proportionally.
 
-**Verdict:** Simple, small impact for most scenes.
+**Microbenchmark results** (Apple M2 Pro, Metal, release, headless GPU,
+200 iterations after 50 warmup, 1000 blits of 64x64 sources):
 
-### What "just works" and what needs design decisions
+Atlas blits (same texture) at varying target surface sizes:
 
-| Item                           | Just works?                         | Design decision needed?                     |
-| ------------------------------ | ----------------------------------- | ------------------------------------------- |
-| Per-node SkPicture cache       | Yes — already working               | No                                          |
-| Per-node SkImage for effects   | Yes — working for &lt;100 nodes     | No                                          |
-| LOD during interaction         | Yes — pure quality trade-off        | Yes: how much degradation is acceptable     |
-| Viewport effect culling        | Yes — pure optimization             | No                                          |
-| Texture atlas                  | Yes — storage optimization          | No                                          |
-| Container-level caching        | **Partially** — clipped+Normal only | Yes: what to do with non-clipped containers |
-| Backdrop blur                  | **No** — must always live-draw      | Constraint: accept this                     |
-| Non-Normal blend vs background | **No** — must live-draw at root     | Constraint: accept this                     |
+| Target    | Time (us) | FPS  | us/blit |
+| --------- | --------- | ---- | ------- |
+| 2000x2000 | 405       | 2469 | 0.4     |
+| 1000x1000 | 398       | 2513 | 0.4     |
+| 500x500   | 377       | 2653 | 0.4     |
+| 250x250   | 380       | 2632 | 0.4     |
+| 100x100   | 373       | 2681 | 0.4     |
 
----
+Separate-texture blits at varying target surface sizes:
 
-## Chromium's Render Surface Model — The Real Solution
+| Target    | Time (us) | FPS | us/blit |
+| --------- | --------- | --- | ------- |
+| 2000x2000 | 8045      | 124 | 8.0     |
+| 1000x1000 | 8101      | 123 | 8.1     |
+| 500x500   | 8263      | 121 | 8.3     |
+| 250x250   | 8343      | 120 | 8.3     |
+| 100x100   | 8392      | 119 | 8.4     |
 
-The second research round revealed the actual mechanism Chromium uses.
-It's not tiling per se — it's **render surfaces (render passes)**.
+Plain draw_rect (no textures) at varying target sizes:
 
-### How Chromium solves every "hard" case
+| Target    | Time (us) | FPS  | us/blit |
+| --------- | --------- | ---- | ------- |
+| 2000x2000 | 297       | 3367 | 0.3     |
+| 1000x1000 | 335       | 2985 | 0.3     |
+| 500x500   | 306       | 3268 | 0.3     |
+| 250x250   | 303       | 3300 | 0.3     |
+| 100x100   | 316       | 3165 | 0.3     |
 
-Chromium's compositor has an **effect tree**. Every node in the effect tree
-that has a "hard" property (blend mode, filter, opacity with children,
-backdrop-filter, clip-path, etc.) gets a **render surface** — its own
-offscreen GPU texture.
+Live blur (save_layer + gaussian blur filter, 100 nodes):
 
-The pipeline:
+| Target    | Time (us) | FPS | us/blur | vs 2000x2000 |
+| --------- | --------- | --- | ------- | ------------ |
+| 2000x2000 | 21117     | 47  | 211.2   | 1.0x         |
+| 1000x1000 | 15676     | 64  | 156.8   | 1.3x         |
+| 500x500   | 15834     | 63  | 158.3   | 1.3x         |
+| 250x250   | 13762     | 73  | 137.6   | 1.5x         |
+| 100x100   | 10362     | 97  | 103.6   | **2.0x**     |
 
-```
-1. Effect tree analysis → identify which nodes need render surfaces
-2. Build render passes in dependency order (leaves first)
-3. Draw passes:
-   - Each pass: draw all children (tiles, quads) into offscreen texture
-   - Apply filter to the entire texture (not per-tile)
-   - Composite into parent pass with blend mode + opacity
-   - For backdrop-filter: saveLayer with backdrop reads parent pass content
-4. Root pass → screen
-```
+Live drop shadow (save_layer + drop_shadow filter, 100 nodes):
 
-**This solves every case:**
+| Target    | Time (us) | FPS | us/shadow | vs 2000x2000 |
+| --------- | --------- | --- | --------- | ------------ |
+| 2000x2000 | 46532     | 21  | 465.3     | 1.0x         |
+| 1000x1000 | 28244     | 35  | 282.4     | 1.6x         |
+| 500x500   | 25721     | 39  | 257.2     | 1.8x         |
+| 250x250   | 16950     | 59  | 169.5     | **2.7x**     |
+| 100x100   | 16524     | 61  | 165.2     | **2.8x**     |
 
-| Problem                      | Chromium's mechanism                                                     |
-| ---------------------------- | ------------------------------------------------------------------------ |
-| Blur/shadow crosses boundary | Filter applied to entire render surface, not per-tile                    |
-| Blend mode vs background     | Surface composited into parent with blend mode applied to entire content |
-| Backdrop blur reads behind   | `saveLayer` with backdrop filter reads parent pass pixels                |
-| Opacity with children        | Opacity applied to entire surface, not per-child                         |
-| Clip-path                    | Applied to entire surface output                                         |
+Mixed geometry (1000 rounded rects + strokes, no effects):
 
-**Key insight**: Effects are NEVER applied per-tile or per-node at the
-compositing level. They are applied to the **entire render surface** as a
-post-process when that surface is composited into its parent.
+| Target    | Time (us) | FPS  | us/node |
+| --------- | --------- | ---- | ------- |
+| 2000x2000 | 786       | 1272 | 0.8     |
+| 1000x1000 | 745       | 1342 | 0.7     |
+| 500x500   | 764       | 1309 | 0.8     |
+| 250x250   | 756       | 1323 | 0.8     |
+| 100x100   | 771       | 1297 | 0.8     |
 
-### What triggers a render surface (~20 reasons)
+**Key findings:**
 
-From `cc/trees/property_tree_builder.cc:334-431`:
+1. **Blits and plain geometry: zero impact from target size.**
+   Atlas blits, separate-texture blits, plain rects, and rounded rects
+   - strokes all produce identical frame times regardless of target
+     surface size. The M2 Pro GPU is not fill-rate-bound at these
+     workloads (small rects, simple shaders).
 
-- Any CSS filter (blur, drop-shadow, etc.)
-- Backdrop filter
-- Blend mode other than Normal (SrcOver)
-- Opacity < 1.0 with 2+ drawing descendants
-- 3D transform flattening
-- Clip-path
-- Mask
-- Copy request (screenshot)
+2. **Live effects: significant impact from target size.**
+   Gaussian blur at 100x100 is **2.0x faster** than at 2000x2000.
+   Drop shadow at 250x250 is **2.7x faster** than at 2000x2000.
+   Skia's image filter pipeline allocates offscreen FBOs proportional
+   to the filtered region. Smaller canvas = smaller save_layer FBOs
+   = fewer fragment shader invocations for the blur kernel.
 
-**Simple nodes do NOT get render surfaces.** A `<div>` with `box-shadow`
-is painted into its parent's tiles. Only the cases where per-tile/per-quad
-handling is incorrect get isolated.
+3. **The scaling is sub-linear.** Reducing from 2000x2000 to 100x100
+   (400x fewer pixels) only gives 2-3x speedup on effects. This is
+   because the GPU's fixed per-operation overhead (FBO allocation,
+   filter dispatch, state changes) dominates over pixel fill at small
+   sizes. There is a floor cost per save_layer regardless of size.
 
-### How this maps to Grida
+4. **Geometry without effects: no impact.** 1000 rounded rects +
+   strokes render at ~760us regardless of target size. The vertex
+   processing and rasterization are not fill-rate-bound at this scale.
 
-Grida's `save_layer` in the Painter already implements the same concept:
+5. The atlas vs separate texture difference (0.4 vs 8.0 us/blit, 20x)
+   remains the dominant factor for compositor blits, constant across
+   all target sizes.
 
-- `with_blendmode()` → `canvas.save_layer()` with blend
-- `with_opacity()` → `canvas.save_layer_alpha()`
-- Layer blur → `SaveLayerRec` with `image_filter`
-- Backdrop blur → `SaveLayerRec` with `.backdrop()`
+**Conclusion:** Interaction downscaling is effective for scenes with
+**live effect draws** (blur, shadow via save_layer). A 0.5x scale
+gives ~1.3-1.6x speedup on effects. A 0.25x scale gives ~2-3x. It
+does NOT help compositor blit workloads or plain geometry. The
+optimization is worth keeping as a general strategy for live-draw
+heavy frames, but it will not help compositor-cached scenes.
 
-**Skia's `save_layer` IS a render surface.** We are already using the same
-mechanism Chromium uses. The difference is that Chromium pre-computes the
-render surface tree once and caches/reuses it, while Grida re-creates the
-`save_layer` stack every frame.
-
-### The actual gap: Chromium caches the TILE CONTENT, not the effect output
-
-Chromium's caching model:
-
-```
-Tiles (rasterized content, no effects) ← CACHED as GPU textures
-  ↓
-Render surface (applies effects to tiles as a group) ← NOT cached
-  ↓
-Parent render surface
-  ↓
-Screen
-```
-
-Tiles contain raw painted content WITHOUT effects. Effects are applied at
-compositing time by the render surface. This means:
-
-- On pan: tiles shift, render surface re-composites (effects re-run)
-- On idle: same cost as active (no "stable frame" quality difference)
-- On content change: only affected tiles re-rasterize
-
-Chromium does NOT cache the effect output. It re-applies blur/shadow filters
-every frame via the render surface. The reason it's fast enough: Chromium's
-tile rasterization is on worker threads, and the effect application happens
-in the display compositor (viz) which is highly optimized.
-
-### Why Chromium is fast with effects and Grida is not
-
-| Factor             | Chromium                                            | Grida                          |
-| ------------------ | --------------------------------------------------- | ------------------------------ |
-| Tile rasterization | Worker threads (32 concurrent)                      | Main thread                    |
-| Effect application | viz SkiaRenderer (single optimized pass)            | Per-node save_layer in Painter |
-| Draw call batching | viz batches by texture                              | No batching                    |
-| Tiling             | Tiles contain raw content, effects applied to group | No tiling                      |
-| SkPicture          | Uses DisplayItemList (more efficient)               | Uses SkPicture per-node        |
-
-The single biggest factor: **Chromium rasterizes tiles on 32 worker threads.**
-Even at 220µs per shadow, 32 threads process 2000 shadows in ~14ms.
-Grida does it on 1 thread → 440ms.
-
----
-
-## Revised Actionable Items
-
-### Tier 1: Immediate wins (no architecture change)
-
-**1a. Effect LOD during interaction.**
-During pan/zoom, reduce effect quality. Use SkPicture variant keys to
-record two versions: full-quality and fast. Switch on `stable` flag.
-
-- Shadows: reduce blur radius to 0 (sharp shadow, still visible)
-- Blur: reduce radius by 4x
-- Expected improvement: 10-50x for effect-heavy scenes during interaction
-
-**1b. Viewport effect bounds culling.**
-Skip `save_layer` + effect filter for nodes whose expanded effect bounds
-are entirely outside the viewport. Currently effects are processed for
-all visible nodes even when the effect expansion is offscreen.
-
-### Tier 2: Medium-term (targeted architecture work)
-
-**2a. Worker-thread rasterization for SkPicture.**
-Move `draw_layer()` calls (or SkPicture recordings) to worker threads.
-The recorded Pictures can be replayed on the main thread's GPU canvas.
-This directly addresses the single-thread bottleneck.
-
-**2b. Group-level render surface caching.**
-Cache the output of `save_layer` groups (containers with effects) as GPU
-textures. Invalidate when any child changes. This is the render surface
-equivalent of Chromium's tiling — cache the composited result, not
-individual nodes.
-
-Correct for:
-
-- Containers with clip:true
-- Groups where no child has backdrop-filter
-- Groups where blend mode is Normal against external content
-
-### Tier 3: Long-term (full architecture)
-
-**3a. Tile-based rasterization.**
-Divide the scene into a viewport tile grid. Each tile is rasterized into
-a GPU texture containing all nodes that overlap it. Effects within a tile
-are rendered correctly because the tile contains full context.
-
-Cross-tile effects: handled by expanding tile bounds (Chromium does this
-with `ExpandClipForPixelMovingFilter`).
-
-**3b. Effect tree / render surface tree.**
-Build an explicit effect tree from the scene graph. Pre-compute which
-subtrees need render surfaces. Cache the tree structure and only recompute
-when the scene changes.
+Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_downscale.rs`
 
 ## Related
 
