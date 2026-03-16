@@ -277,6 +277,15 @@ impl Renderer {
 
     #[inline]
     fn draw_layers_with_scene_cache(&mut self, canvas: &Canvas, plan: &FramePlan) -> usize {
+        self.draw_layers_with_scene_cache_skip(canvas, plan, None)
+    }
+
+    fn draw_layers_with_scene_cache_skip(
+        &mut self,
+        canvas: &Canvas,
+        plan: &FramePlan,
+        promoted_skip: Option<&std::collections::HashSet<NodeId>>,
+    ) -> usize {
         // Select effect quality based on frame stability.
         // Unstable (interactive) frames use reduced effects for performance.
         // Stable (settled) frames use full quality.
@@ -295,6 +304,11 @@ impl Renderer {
             &self.scene_cache,
             policy,
         );
+        let painter = if let Some(skip) = promoted_skip {
+            painter.with_promoted_skip(skip)
+        } else {
+            painter
+        };
         painter.draw_layer_list(&self.scene_cache.layers);
         painter.cache_picture_hits()
     }
@@ -1161,6 +1175,8 @@ impl Renderer {
         // eliminates GPU texture switching). Individual-backed nodes use
         // per-node texture blits as fallback.
         let mut layer_image_cache_hits = 0usize;
+        let promoted_set: std::collections::HashSet<NodeId> =
+            plan.promoted.iter().copied().collect();
         if !plan.promoted.is_empty() {
             for id in &plan.promoted {
                 if let Some(layer_img) = self.scene_cache.compositor.get(id) {
@@ -1207,10 +1223,16 @@ impl Renderer {
         }
 
         // Draw live (non-promoted) layers via the Painter.
+        // Promoted nodes are skipped — they were already blitted above.
         // Skip entirely when all visible nodes are promoted — no live work needed.
         let has_live_work = plan.regions.iter().any(|(_, indices)| !indices.is_empty());
+        let promoted_skip = if promoted_set.is_empty() {
+            None
+        } else {
+            Some(&promoted_set)
+        };
         let cache_picture_used = if has_live_work {
-            self.draw_layers_with_scene_cache(canvas, plan)
+            self.draw_layers_with_scene_cache_skip(canvas, plan, promoted_skip)
         } else {
             0
         };
@@ -1268,6 +1290,8 @@ impl Renderer {
 
         // Blit promoted (compositor-cached) nodes.
         let mut layer_image_cache_hits = 0usize;
+        let promoted_set: std::collections::HashSet<NodeId> =
+            plan.promoted.iter().copied().collect();
         for id in &plan.promoted {
             if let Some(layer_img) = self.scene_cache.compositor.get(id) {
                 let b = &layer_img.local_bounds;
@@ -1305,9 +1329,15 @@ impl Renderer {
         }
 
         // Draw live (non-promoted) layers at reduced resolution.
+        // Promoted nodes are skipped — they were already blitted above.
         let has_live_work = plan.regions.iter().any(|(_, indices)| !indices.is_empty());
+        let promoted_skip = if promoted_set.is_empty() {
+            None
+        } else {
+            Some(&promoted_set)
+        };
         let cache_picture_used = if has_live_work {
-            self.draw_layers_with_scene_cache(off_canvas, plan)
+            self.draw_layers_with_scene_cache_skip(off_canvas, plan, promoted_skip)
         } else {
             0
         };

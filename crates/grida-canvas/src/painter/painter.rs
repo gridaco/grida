@@ -35,6 +35,9 @@ pub struct Painter<'a> {
     cache_hits: RefCell<usize>,
     policy: RenderPolicy,
     variant_key: u64,
+    /// Node IDs that are handled by the compositor and should be skipped
+    /// during live drawing to avoid double-rendering.
+    promoted_skip: Option<&'a std::collections::HashSet<NodeId>>,
 }
 
 impl<'a> Painter<'a> {
@@ -82,7 +85,16 @@ impl<'a> Painter<'a> {
             cache_hits: RefCell::new(0),
             policy,
             variant_key,
+            promoted_skip: None,
         }
+    }
+
+    /// Set the promoted-skip set. Nodes in this set will be skipped during
+    /// `draw_render_commands` because they are blitted from the compositor
+    /// cache instead.
+    pub fn with_promoted_skip(mut self, skip: &'a std::collections::HashSet<NodeId>) -> Self {
+        self.promoted_skip = Some(skip);
+        self
     }
 
     #[cfg(test)]
@@ -1478,6 +1490,12 @@ impl<'a> Painter<'a> {
         for command in commands {
             match command {
                 PainterRenderCommand::Draw(layer) => {
+                    // Skip nodes that are drawn via the compositor cache.
+                    if let Some(skip) = self.promoted_skip {
+                        if skip.contains(layer.id()) {
+                            continue;
+                        }
+                    }
                     // Prefer cached picture if available
                     if let Some(scene_cache) = self.scene_cache {
                         if let Some(pic) =
