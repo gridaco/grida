@@ -81,10 +81,6 @@ name = "bench_viewport_culling"
 harness = false
 
 [[bench]]
-name = "bench_pan"
-harness = false
-
-[[bench]]
 name = "bench_camera"
 harness = false
 
