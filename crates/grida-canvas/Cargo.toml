@@ -84,7 +84,56 @@ harness = false
 name = "bench_viewport_culling"
 harness = false
 
+[[bench]]
+name = "bench_pan"
+harness = false
+
 [[example]]
 name = "headless_gpu"
 required-features = ["native-gl-context"]
+
+# ── Skia GPU microbenchmarks (examples/skia_bench/) ──────────────
+# Raw Skia measurements, no engine involvement.
+# Run: cargo run -p cg --example skia_bench_<name> --features native-gl-context --release
+
+[[example]]
+name = "skia_bench_primitives"
+path = "examples/skia_bench/skia_bench_primitives.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_effects"
+path = "examples/skia_bench/skia_bench_effects.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_opacity"
+path = "examples/skia_bench/skia_bench_opacity.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_downscale"
+path = "examples/skia_bench/skia_bench_downscale.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_atlas"
+path = "examples/skia_bench/skia_bench_atlas.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_tiling"
+path = "examples/skia_bench/skia_bench_tiling.rs"
+
+[[example]]
+name = "skia_bench_srcset"
+path = "examples/skia_bench/skia_bench_srcset.rs"
+
+[[example]]
+name = "skia_bench_cache_image"
+path = "examples/skia_bench/skia_bench_cache_image.rs"
+
+[[example]]
+name = "skia_bench_cache_text"
+path = "examples/skia_bench/skia_bench_cache_text.rs"
 
