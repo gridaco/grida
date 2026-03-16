@@ -4,11 +4,13 @@
   "description": "Figma I/O for Grida Canvas",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "fig2grida": "tsx fig2grida.ts"
   },
   "dependencies": {
     "@grida/cmath": "workspace:*",
     "@grida/color": "workspace:*",
+    "@grida/io": "workspace:*",
     "@grida/vn": "workspace:*",
     "base64-js": "^1.5.1",
     "fflate": "^0.8.2",
