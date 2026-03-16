@@ -1583,7 +1583,6 @@ dependencies = [
  "cg",
  "clap",
  "dify",
- "figma-api",
  "futures",
  "gl",
  "glob",

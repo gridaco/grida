@@ -14,9 +14,6 @@ Rust-native dev runtime for [`cg`](../grida-canvas). It bundles the desktop wini
 # render a local .grida/.json
 cargo run -p grida-dev -- scene path/to/scene.grida
 
-# render via Figma (API/local/archive)
-cargo run -p grida-dev -- figma --file-key ... --api-key ... --scene-index 0
-
 # convert & render an SVG
 cargo run -p grida-dev -- svg path/to/asset.svg --title "My SVG"
 

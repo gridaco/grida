@@ -13,7 +13,6 @@ Rust-native dev runtime for `cg` that bundles the winit/Skia host, CLI devtools,
 
 ```bash
 cargo run -p grida-dev -- scene <path-or-url>
-cargo run -p grida-dev -- figma --file-key ... --api-key ... --scene-index 0
 cargo run -p grida-dev -- svg path/to/file.svg --title "My SVG"
 cargo run -p grida-dev -- benchmark --size 400
 cargo run -p grida-dev -- sample
