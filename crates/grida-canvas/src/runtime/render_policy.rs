@@ -29,6 +29,32 @@ pub enum EffectsPolicy {
     Disabled,
 }
 
+/// Effect rendering quality level.
+///
+/// Controls the fidelity of expensive GPU effects (blur, shadows, noise).
+/// `Full` is used for stable frames (user is idle); `Reduced` is used for
+/// unstable frames (active interaction: pan, zoom, drag) to maintain
+/// interactive frame rates.
+///
+/// Both quality levels can be cached simultaneously under different
+/// `variant_key` values, so switching between them doesn't cause a cache
+/// miss storm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum EffectQuality {
+    /// Full-quality effects. Used for stable (settled) frames.
+    #[default]
+    Full,
+    /// Reduced-quality effects for interactive performance.
+    ///
+    /// - Shadows: blur radius → 0 (sharp offset shadow, still visible)
+    /// - Inner shadows: skipped entirely
+    /// - Layer blur: radius / 4
+    /// - Noise: skipped entirely
+    /// - Backdrop blur: radius / 4
+    /// - Liquid glass: kept (context-dependent)
+    Reduced,
+}
+
 /// Whether compositing state (opacity, blend modes, clip/masks) is applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CompositingPolicy {
@@ -63,6 +89,7 @@ impl Hash for OutlineStyle {
 /// - `content`: controls fills/strokes vs forced outlines.
 /// - `effects`: controls whether effects are applied.
 /// - `compositing`: controls whether opacity/blend/masks/clips are applied.
+/// - `effect_quality`: controls the fidelity of expensive GPU effects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RenderPolicy {
     pub content: ContentPolicy,
@@ -72,6 +99,9 @@ pub struct RenderPolicy {
     ///
     /// This is intended for debugging/inspection (e.g. outline mode).
     pub ignore_clips_content: bool,
+    /// Quality level for expensive GPU effects (blur, shadow, noise).
+    /// `Full` for stable frames, `Reduced` for interactive frames.
+    pub effect_quality: EffectQuality,
 }
 
 impl RenderPolicy {
@@ -84,6 +114,7 @@ impl RenderPolicy {
         effects: EffectsPolicy::Enabled,
         compositing: CompositingPolicy::Enabled,
         ignore_clips_content: false,
+        effect_quality: EffectQuality::Full,
     };
 
     /// Convenience preset used by the editor feature \"Show outlines\".
@@ -96,7 +127,16 @@ impl RenderPolicy {
         compositing: CompositingPolicy::Disabled,
         // Wireframe is primarily used for inspection; by default, ignore clips.
         ignore_clips_content: true,
+        effect_quality: EffectQuality::Full,
     };
+
+    /// Return a copy of this policy with reduced effect quality.
+    /// Used for unstable (interactive) frames.
+    #[inline]
+    pub fn with_reduced_effects(mut self) -> Self {
+        self.effect_quality = EffectQuality::Reduced;
+        self
+    }
 
     /// True only for the default renderer behavior (full fills/strokes + effects + compositing).
     #[inline]
@@ -139,9 +179,10 @@ impl RenderPolicy {
         }
     }
 
-    /// Tile caching is only correct/beneficial for the standard pipeline today.
+    /// Layer compositing cache is only correct/beneficial for the standard
+    /// pipeline (same logic as tile cache — only standard rendering uses caching).
     #[inline]
-    pub fn allows_tile_cache(&self) -> bool {
+    pub fn allows_layer_compositing(&self) -> bool {
         self.is_default()
     }
 
@@ -256,6 +297,7 @@ impl RenderPolicy {
             effects,
             compositing,
             ignore_clips_content,
+            effect_quality: EffectQuality::Full,
         }
     }
 

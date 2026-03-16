@@ -1,6 +1,6 @@
 use crate::cg::types::TextAlignVertical;
 use crate::devtools::{
-    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, tile_overlay,
+    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay,
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
@@ -49,8 +49,8 @@ pub trait ApplicationApi {
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult>;
 
-    /// Enable or disable caching of raster tiles.
-    fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
+    /// Enable or disable per-node layer compositing cache.
+    fn runtime_renderer_set_layer_compositing(&mut self, enable: bool);
 
     /// Configure Pixel Preview scale.
     ///
@@ -441,8 +441,8 @@ impl ApplicationApi for UnknownTargetApplication {
         None
     }
 
-    fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
-        self.renderer.set_cache_tile(cache);
+    fn runtime_renderer_set_layer_compositing(&mut self, enable: bool) {
+        self.renderer.set_layer_compositing(enable);
     }
 
     fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {
@@ -973,10 +973,17 @@ impl UnknownTargetApplication {
         let __sleep_time = __sleep_start.elapsed();
 
         let __total_frame_time = __frame_start.elapsed();
+        let camera_label = match stats.frame.camera_change {
+            crate::runtime::camera::CameraChangeKind::None => "none",
+            crate::runtime::camera::CameraChangeKind::PanOnly => "pan",
+            crate::runtime::camera::CameraChangeKind::ZoomOnly => "zoom",
+            crate::runtime::camera::CameraChangeKind::PanAndZoom => "pan+zoom",
+        };
         let stat_string = format!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | res: {} | img: {} | fnt: {}",
+            "fps*: {:.0} | t: {:.2}ms | cam: {} | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | comp: {:?} ({:?} hit, {:.1}KB) | live: {:?} | res: {} | img: {} | fnt: {}",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
+            camera_label,
             stats.total_duration.as_secs_f64() * 1000.0,
             stats.flush_duration.as_secs_f64() * 1000.0,
             overlay_time.as_secs_f64() * 1000.0,
@@ -987,8 +994,10 @@ impl UnknownTargetApplication {
             stats.draw.cache_picture_size,
             stats.draw.cache_picture_used,
             stats.draw.cache_geometry_size,
-            stats.draw.tiles_total,
-            stats.draw.tiles_used,
+            stats.draw.layer_image_cache_size,
+            stats.draw.layer_image_cache_hits,
+            stats.draw.layer_image_cache_bytes as f64 / 1024.0,
+            stats.draw.live_draw_count,
             self.renderer.resources.len(),
             self.renderer.images.len(),
             self.renderer.fonts.len(),
@@ -1046,13 +1055,6 @@ impl UnknownTargetApplication {
                     deco,
                     &self.renderer.camera,
                     self.renderer.get_cache(),
-                );
-            }
-            if self.devtools_rendering_show_tiles {
-                tile_overlay::TileOverlay::draw(
-                    &canvas,
-                    &self.renderer.camera,
-                    self.renderer.get_cache().tile.tiles(),
                 );
             }
             if self.devtools_rendering_show_ruler {

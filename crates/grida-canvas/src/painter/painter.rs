@@ -1,6 +1,9 @@
 use super::effects_noise;
 use super::geometry::*;
-use super::layer::{Layer, LayerList, PainterMaskGroup, PainterPictureLayer, PainterRenderCommand};
+use super::layer::{
+    Layer, LayerList, PainterMaskGroup, PainterPictureLayer, PainterRenderCommand,
+    PainterRenderSurface,
+};
 use super::paint;
 use super::shadow;
 use super::text_stroke;
@@ -85,6 +88,72 @@ impl<'a> Painter<'a> {
     #[cfg(test)]
     pub fn path_cache(&self) -> &RefCell<VectorPathCache> {
         &self.path_cache
+    }
+
+    // ============================
+    // === Effect Quality (LOD) ==
+    // ============================
+
+    /// Returns true if using reduced effect quality (interactive frames).
+    #[inline]
+    fn is_reduced_quality(&self) -> bool {
+        self.policy.effect_quality
+            == crate::runtime::render_policy::EffectQuality::Reduced
+    }
+
+    /// Reduce effects for interactive (unstable) frames.
+    ///
+    /// - Drop shadows: blur → 0 (sharp offset, still visible)
+    /// - Inner shadows: removed entirely
+    /// - Layer blur: radius / 4
+    /// - Noise: removed entirely
+    /// - Backdrop blur: radius / 4
+    /// - Liquid glass: kept (context-dependent, can't skip cleanly)
+    fn reduce_effects(effects: &LayerEffects) -> LayerEffects {
+        LayerEffects {
+            shadows: effects
+                .shadows
+                .iter()
+                .filter_map(|s| match s {
+                    FilterShadowEffect::DropShadow(ds) => {
+                        Some(FilterShadowEffect::DropShadow(FeShadow {
+                            blur: 0.0,
+                            ..*ds
+                        }))
+                    }
+                    // Skip inner shadows entirely — they're expensive and
+                    // subtle enough that their absence isn't noticeable during
+                    // fast interaction.
+                    FilterShadowEffect::InnerShadow(_) => None,
+                })
+                .collect(),
+            blur: effects.blur.as_ref().map(|b| FeLayerBlur {
+                active: b.active,
+                blur: Self::reduce_blur(&b.blur),
+            }),
+            backdrop_blur: effects.backdrop_blur.as_ref().map(|b| FeBackdropBlur {
+                active: b.active,
+                blur: Self::reduce_blur(&b.blur),
+            }),
+            // Skip noise entirely — it's expensive and purely decorative.
+            noises: Vec::new(),
+            // Keep glass — it's context-dependent and visually essential.
+            glass: effects.glass.clone(),
+        }
+    }
+
+    /// Reduce a blur effect's radius by 4× for interactive frames.
+    fn reduce_blur(blur: &FeBlur) -> FeBlur {
+        match blur {
+            FeBlur::Gaussian(g) => FeBlur::Gaussian(FeGaussianBlur {
+                radius: g.radius / 4.0,
+            }),
+            FeBlur::Progressive(p) => FeBlur::Progressive(FeProgressiveBlur {
+                radius: p.radius / 4.0,
+                radius2: p.radius2 / 4.0,
+                ..*p
+            }),
+        }
     }
 
     // ============================
@@ -762,6 +831,15 @@ impl<'a> Painter<'a> {
         shape: &PainterShape,
         draw_content: F,
     ) {
+        // Apply effect quality reduction for interactive frames.
+        let reduced;
+        let effects = if self.is_reduced_quality() {
+            reduced = Self::reduce_effects(effects);
+            &reduced
+        } else {
+            effects
+        };
+
         let apply_effects = || {
             // 1. Drop shadows (before everything)
             for shadow in &effects.shadows {
@@ -1415,7 +1493,241 @@ impl<'a> Painter<'a> {
                 PainterRenderCommand::MaskGroup(group) => {
                     self.draw_mask_group_or_passthrough(group)
                 }
+                PainterRenderCommand::RenderSurface(surface) => {
+                    self.draw_render_surface(surface)
+                }
             }
+        }
+    }
+
+    /// Draw a render surface: composites children into an offscreen buffer,
+    /// then applies surface-level effects (shadows, blur) to the result.
+    ///
+    /// This is the core Phase 3 optimization. Instead of applying expensive
+    /// effects per-child (N × 220µs), we draw all children as simple geometry
+    /// into a surface, then apply the effect once (1 × 220µs).
+    fn draw_render_surface(&self, surface: &PainterRenderSurface) {
+        let canvas = self.canvas;
+
+        // Apply effect quality reduction for interactive frames.
+        let reduced;
+        let effects = if self.is_reduced_quality() {
+            reduced = Self::reduce_effects(&surface.effects);
+            &reduced
+        } else {
+            &surface.effects
+        };
+
+        // Build the draw-children closure.
+        let draw_content = || {
+            // Draw the container's own layer (background fills/strokes).
+            if let Some(ref own_layer) = surface.own_layer {
+                self.draw_layer(own_layer);
+            }
+            // Draw children into the same surface.
+            self.draw_render_commands(&surface.children);
+        };
+
+        // Apply the surface-level effects. The effect ordering mirrors
+        // draw_shape_with_effects but operates on the entire subtree:
+        //
+        //   1. Outer wrapper: blend mode isolation (if not PassThrough)
+        //   2. Outer wrapper: layer blur (wraps everything)
+        //   3. Drop shadows (drawn via save_layer with drop_shadow filter)
+        //   4. Content (draw_content)
+        //   5. Inner shadows (clipped to surface bounds)
+        //   6. Opacity (applied when compositing into parent)
+
+        // Compute surface bounds in Skia Rect (world space).
+        let bounds = Rect::from_xywh(
+            surface.bounds.x,
+            surface.bounds.y,
+            surface.bounds.width,
+            surface.bounds.height,
+        );
+
+        // Blend mode isolation wraps everything.
+        let apply_blendmode = |f: &dyn Fn()| {
+            match surface.blend_mode {
+                LayerBlendMode::PassThrough => f(),
+                LayerBlendMode::Blend(blend_mode) => {
+                    let mut paint = SkPaint::default();
+                    paint.set_blend_mode(blend_mode.into());
+                    let layer_rec = SaveLayerRec::default().bounds(&bounds).paint(&paint);
+                    canvas.save_layer(&layer_rec);
+                    f();
+                    canvas.restore();
+                }
+            }
+        };
+
+        apply_blendmode(&|| {
+            // Opacity isolation: wrap the entire surface in a save_layer_alpha
+            // so the composited result is drawn with the surface opacity.
+            let apply_opacity = |f: &dyn Fn()| {
+                if surface.opacity < 1.0 {
+                    canvas.save_layer_alpha(bounds, (surface.opacity * 255.0) as u32);
+                    f();
+                    canvas.restore();
+                } else {
+                    f();
+                }
+            };
+
+            apply_opacity(&|| {
+                // Layer blur wraps everything (shadows + content + inner shadows).
+                let apply_blur = |f: &dyn Fn()| {
+                    if let Some(ref layer_blur) = effects.blur {
+                        self.with_layer_blur(&layer_blur.blur, bounds, f);
+                    } else {
+                        f();
+                    }
+                };
+
+                apply_blur(&|| {
+                    let has_drop_shadows = effects.shadows.iter().any(|s| {
+                        matches!(s, FilterShadowEffect::DropShadow(_))
+                    });
+                    let has_inner_shadows = effects.shadows.iter().any(|s| {
+                        matches!(s, FilterShadowEffect::InnerShadow(_))
+                    });
+
+                    if has_drop_shadows {
+                        // For drop shadows on a render surface, we use Skia's
+                        // drop_shadow image filter on a save_layer. This draws
+                        // both the shadow AND the source in one pass.
+                        //
+                        // For multiple drop shadows, we chain them: each shadow
+                        // wraps the previous via nested save_layers.
+                        let drop_shadows: Vec<&FeShadow> = effects
+                            .shadows
+                            .iter()
+                            .filter_map(|s| match s {
+                                FilterShadowEffect::DropShadow(ds) => Some(ds),
+                                _ => None,
+                            })
+                            .collect();
+
+                        // Apply drop shadows from outermost to innermost.
+                        // The outermost shadow wraps everything, including other
+                        // shadows + content.
+                        let mut save_count = 0;
+                        for ds in &drop_shadows {
+                            let filter = Self::drop_shadow_with_source_filter(ds);
+                            if let Some(filter) = filter {
+                                let mut paint = SkPaint::default();
+                                paint.set_image_filter(filter);
+                                let expansion = ds.blur * 3.0
+                                    + ds.spread.abs()
+                                    + ds.dx.abs()
+                                    + ds.dy.abs();
+                                let expanded = bounds.with_outset((expansion, expansion));
+                                canvas.save_layer(
+                                    &SaveLayerRec::default()
+                                        .bounds(&expanded)
+                                        .paint(&paint),
+                                );
+                                save_count += 1;
+                            }
+                        }
+
+                        // Draw content inside all shadow layers.
+                        draw_content();
+
+                        // Restore all shadow layers.
+                        for _ in 0..save_count {
+                            canvas.restore();
+                        }
+                    } else {
+                        // No drop shadows — draw content directly.
+                        draw_content();
+                    }
+
+                    // Inner shadows applied after content, clipped to surface bounds.
+                    if has_inner_shadows {
+                        for shadow_effect in &effects.shadows {
+                            if let FilterShadowEffect::InnerShadow(is) = shadow_effect {
+                                // For render surface inner shadows, clip to the surface
+                                // bounds and draw an inner shadow rect.
+                                let inner_filter = shadow::inner_shadow_image_filter(is);
+                                let mut shadow_paint = SkPaint::default();
+                                shadow_paint.set_image_filter(inner_filter);
+                                shadow_paint.set_anti_alias(true);
+                                canvas.save();
+                                canvas.clip_rect(bounds, None, true);
+                                canvas.draw_rect(bounds, &shadow_paint);
+                                canvas.restore();
+                            }
+                        }
+                    }
+                });
+            });
+        });
+    }
+
+    /// Create a drop shadow image filter that includes both the shadow AND the
+    /// source content (unlike `drop_shadow_only` which draws only the shadow).
+    fn drop_shadow_with_source_filter(shadow: &FeShadow) -> Option<skia_safe::ImageFilter> {
+        let color: skia_safe::Color = shadow.color.into();
+        if shadow.spread != 0.0 {
+            // With spread: dilate/erode -> blur -> offset, then merge with source
+            let morph = if shadow.spread > 0.0 {
+                skia_safe::image_filters::dilate(
+                    (shadow.spread, shadow.spread),
+                    None,
+                    None,
+                )
+            } else {
+                skia_safe::image_filters::erode(
+                    (-shadow.spread, -shadow.spread),
+                    None,
+                    None,
+                )
+            };
+
+            let blurred = if shadow.blur > 0.0 {
+                skia_safe::image_filters::blur(
+                    (shadow.blur, shadow.blur),
+                    None,
+                    morph,
+                    None,
+                )
+            } else {
+                morph
+            };
+
+            let offset = skia_safe::image_filters::offset(
+                (shadow.dx, shadow.dy),
+                blurred,
+                None,
+            );
+
+            // Colorize: use color_filter to tint the shadow
+            let color_matrix = skia_safe::color_filters::blend(
+                color,
+                skia_safe::BlendMode::SrcIn,
+            );
+            let colorized = color_matrix.and_then(|cf| {
+                skia_safe::image_filters::color_filter(cf, offset, None)
+            });
+
+            // Merge shadow + source (None = passthrough source)
+            colorized.and_then(|shadow_layer| {
+                skia_safe::image_filters::merge(
+                    [Some(shadow_layer), None].into_iter(),
+                    None,
+                )
+            })
+        } else {
+            // Fast path: use Skia's built-in drop_shadow (draws shadow + source)
+            skia_safe::image_filters::drop_shadow(
+                (shadow.dx, shadow.dy),
+                (shadow.blur, shadow.blur),
+                color,
+                None,
+                None,
+                None,
+            )
         }
     }
 
@@ -1473,6 +1785,9 @@ impl<'a> Painter<'a> {
                     let mut temp_path = builder.detach();
                     self.collect_mask_paths_for_masks(&group.mask_commands, &mut temp_path);
                     builder = PathBuilder::new_path(&temp_path);
+                }
+                PainterRenderCommand::RenderSurface(_) => {
+                    // Render surfaces don't contribute mask paths
                 }
             }
         }

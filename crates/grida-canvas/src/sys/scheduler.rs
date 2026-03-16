@@ -39,6 +39,14 @@ impl FrameScheduler {
         self
     }
 
+    /// Disable frame pacing entirely (uncapped FPS).
+    /// Useful for benchmarking raw render throughput.
+    pub fn with_no_limit(mut self) -> Self {
+        self.target_frame_time = Duration::ZERO;
+        self.max_frame_time = None;
+        self
+    }
+
     /// Records the most recent frame duration for smoothing.
     #[cfg(not(target_arch = "wasm32"))]
     fn record_frame_duration(&mut self, duration: Duration) {

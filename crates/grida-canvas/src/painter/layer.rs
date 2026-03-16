@@ -80,6 +80,42 @@ pub enum PainterPictureLayer {
 pub enum PainterRenderCommand {
     Draw(PainterPictureLayer),
     MaskGroup(PainterMaskGroup),
+    /// A render surface: draws children into an offscreen buffer, then applies
+    /// surface-level effects (shadows, blur) to the composited result.
+    ///
+    /// This is the core optimization from Phase 3 of the renderer rewrite.
+    /// Instead of applying expensive effects per-child (N × 220µs), we draw
+    /// all children as simple geometry into a surface, then apply the effect
+    /// once (1 × 220µs).
+    RenderSurface(PainterRenderSurface),
+}
+
+/// A render surface that composites children before applying effects.
+///
+/// Created during `LayerList::from_scene()` when the effect tree identifies
+/// a container/group node that needs a render surface for effects.
+#[derive(Debug, Clone)]
+pub struct PainterRenderSurface {
+    /// The node ID of the container/group that owns this surface.
+    pub id: NodeId,
+    /// World-space bounds of the surface (union of all children + effect expansion).
+    pub bounds: Rectangle,
+    /// World transform of the surface owner.
+    pub transform: AffineTransform,
+    /// Opacity of the surface (applied when compositing into parent).
+    pub opacity: f32,
+    /// Blend mode of the surface (applied when compositing into parent).
+    pub blend_mode: LayerBlendMode,
+    /// Effects to apply to the composited surface content.
+    /// These are the container-level effects that triggered the render surface.
+    pub effects: LayerEffects,
+    /// Clip path from ancestor containers (if any).
+    pub clip_path: Option<skia_safe::Path>,
+    /// The container's own draw command (its background fills/strokes).
+    /// Drawn first, before children, inside the render surface.
+    pub own_layer: Option<PainterPictureLayer>,
+    /// Child commands to draw into the surface before applying effects.
+    pub children: Vec<PainterRenderCommand>,
 }
 
 #[derive(Debug, Clone)]
@@ -269,6 +305,35 @@ impl LayerList {
         }
     }
 
+    /// Split effects into surface-level effects and per-node effects.
+    ///
+    /// Surface-level effects (shadows, layer blur) are applied to the entire
+    /// composited subtree via a render surface. Per-node effects (backdrop blur,
+    /// glass, noise) remain on the container's own draw layer.
+    ///
+    /// Returns `(surface_effects, own_effects)`.
+    fn split_surface_effects(effects: &LayerEffects) -> (LayerEffects, LayerEffects) {
+        let surface = LayerEffects {
+            shadows: effects.shadows.clone(),
+            blur: effects.blur.clone(),
+            // Backdrop blur is context-dependent — stays per-node
+            backdrop_blur: None,
+            // Glass is context-dependent — stays per-node
+            glass: None,
+            // Noise is composited onto fills — stays per-node
+            noises: Vec::new(),
+        };
+        let own = LayerEffects {
+            // Shadows and blur moved to surface level
+            shadows: Vec::new(),
+            blur: None,
+            backdrop_blur: effects.backdrop_blur.clone(),
+            glass: effects.glass.clone(),
+            noises: effects.noises.clone(),
+        };
+        (surface, own)
+    }
+
     /// Computes stroke geometry for rectangular shapes with support for per-side widths.
     ///
     /// This handles both uniform and per-side stroke widths for rectangular shapes.
@@ -408,6 +473,31 @@ impl LayerList {
                     &size,
                     &shape,
                 );
+
+                // Check if the effect tree marks this container for a render surface.
+                let effect_node = scene_cache.effect_tree.get(id);
+                let use_render_surface = effect_node
+                    .map(|en| {
+                        en.has_reason(
+                            crate::runtime::effect_tree::RenderSurfaceReason::Shadow,
+                        ) || en.has_reason(
+                            crate::runtime::effect_tree::RenderSurfaceReason::LayerBlur,
+                        )
+                    })
+                    .unwrap_or(false);
+
+                let all_effects = Self::filter_active_effects(&n.effects);
+
+                // Split effects: surface-level effects go to the RenderSurface,
+                // remaining effects stay on the container's own layer.
+                let (surface_effects, own_effects) = if use_render_surface {
+                    Self::split_surface_effects(&all_effects)
+                } else {
+                    (LayerEffects::default(), all_effects)
+                };
+
+                let clip_path = Self::compute_clip_path(id, graph, scene_cache);
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -415,10 +505,10 @@ impl LayerList {
                         opacity,
                         blend_mode: n.blend_mode,
                         transform,
-                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
+                        clip_path: clip_path.clone(),
                     },
                     shape,
-                    effects: Self::filter_active_effects(&n.effects),
+                    effects: own_effects,
                     strokes: Self::filter_visible_paints(&n.strokes),
                     fills: Self::filter_visible_paints(&n.fills),
                     stroke_path,
@@ -430,14 +520,41 @@ impl LayerList {
                     id: id.clone(),
                     layer: layer.clone(),
                 });
-                let mut commands = vec![PainterRenderCommand::Draw(layer)];
+
                 let children = graph.get_children(id).map(|c| c.as_slice()).unwrap_or(&[]);
                 let child_commands =
                     Self::build_render_commands(children, graph, scene_cache, opacity, out);
-                commands.extend(child_commands);
-                FlattenResult {
-                    commands,
-                    mask: n.mask,
+
+                if use_render_surface {
+                    // Wrap the container's own layer + children in a RenderSurface.
+                    // The surface-level effects (shadows, blur) are applied to the
+                    // composited result instead of per-child.
+                    let render_bounds = scene_cache
+                        .geometry()
+                        .get_render_bounds(id)
+                        .unwrap_or(bounds);
+                    let surface = PainterRenderSurface {
+                        id: id.clone(),
+                        bounds: render_bounds,
+                        transform,
+                        opacity,
+                        blend_mode: n.blend_mode,
+                        effects: surface_effects,
+                        clip_path,
+                        own_layer: Some(layer),
+                        children: child_commands,
+                    };
+                    FlattenResult {
+                        commands: vec![PainterRenderCommand::RenderSurface(surface)],
+                        mask: n.mask,
+                    }
+                } else {
+                    let mut commands = vec![PainterRenderCommand::Draw(layer)];
+                    commands.extend(child_commands);
+                    FlattenResult {
+                        commands,
+                        mask: n.mask,
+                    }
                 }
             }
             Node::InitialContainer(_) => {
