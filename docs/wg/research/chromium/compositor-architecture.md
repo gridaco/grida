@@ -41,7 +41,7 @@ content is always consistent.
 
 ## The Frame Pipeline
 
-```
+```text
 Main Thread:
   Blink paint → DisplayItemList → RecordingSource.Update()
   RecordingSource.CreateRasterSource() → RasterSource (immutable)

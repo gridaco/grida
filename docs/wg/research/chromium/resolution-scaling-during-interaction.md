@@ -39,7 +39,7 @@ produces lower-quality frames as an emergent property of three mechanisms:
 Every frame, `PictureLayerImpl::UpdateIdealScales()` computes the scale at
 which the layer would ideally be rasterized:
 
-```
+```text
 ideal_device_scale  = device_scale_factor()
 ideal_page_scale    = current_page_scale_factor()  (if affected by page scale)
 ideal_contents_scale = screen-space transform scale components

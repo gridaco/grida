@@ -65,7 +65,7 @@ With tile size T and border B=1, the inner (non-overlapping) stride is
 
 Number of tiles along an axis:
 
-```
+```text
 num_tiles = max(1, 1 + (total_size - 3) / (T - 2))
 ```
 
@@ -105,7 +105,7 @@ from the ideal tiling, it falls back to the next tiling.
 
 The pipeline:
 
-```
+```text
 Main thread:  Paint -> DisplayItemList -> RecordingSource (mutable)
 Commit:       RecordingSource -> RasterSource (immutable, thread-safe)
 Worker:       RasterSource::PlaybackToCanvas() -> tile GPU texture
@@ -164,7 +164,7 @@ batch them into a single draw call.
 
 The draw path:
 
-```
+```text
 TileDrawQuad
   -> ScopedSkImageBuilder (locks GPU resource, creates SkImage)
   -> AddQuadToBatch (accumulates into batched_quads_)
@@ -212,7 +212,7 @@ one matrix entry in the batch.
 
 ### Invalidation Flow
 
-```
+```text
 Content change
   -> RecordingSource::SetNeedsDisplayRect(rect)
   -> InvalidationRegion accumulates rects (max 256, then coalesces to bbox)
