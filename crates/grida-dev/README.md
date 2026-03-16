@@ -20,7 +20,7 @@ cargo run -p grida-dev -- figma --file-key ... --api-key ... --scene-index 0
 # convert & render an SVG
 cargo run -p grida-dev -- svg path/to/asset.svg --title "My SVG"
 
-# stress-test rendering with an NxN grid
+# stress-test rendering with an NxN grid (windowed)
 cargo run -p grida-dev -- benchmark --size 400
 
 # load the built-in sample scene
@@ -29,6 +29,29 @@ cargo run -p grida-dev -- sample
 # open the drop-target master window (drag .grida/.svg/.png/.jpg/.webp)
 cargo run -p grida-dev -- master
 ```
+
+### Headless GPU Benchmark
+
+The `bench` subcommand runs a headless GPU benchmark (no window) and prints per-frame timing stats. Use it to measure rendering performance reliably.
+
+> **Always use `--release` for benchmarks.** Debug builds are ~20-30x slower
+> due to missing optimizations and cannot produce meaningful performance data.
+
+```bash
+# benchmark a .grida file
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida
+
+# synthetic NxN grid (default 100x100 = 10K nodes)
+cargo run -p grida-dev --release -- bench --size 100
+
+# all nodes visible (large viewport)
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida --width 5000 --height 5000
+
+# control frame count
+cargo run -p grida-dev --release -- bench --frames 500
+```
+
+Output includes avg/p50/p95/p99 frame times, display list size, live draw count, and compositor cache hits.
 
 ### Native Examples
 

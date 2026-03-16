@@ -48,6 +48,19 @@ cargo build
 cargo run --example <example-name>
 ```
 
+### Performance benchmarking
+
+> **Always use `--release` for benchmarks.** Debug builds are ~20-30× slower
+> and produce meaningless performance data.
+
+```sh
+# headless GPU benchmark (via grida-dev)
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida
+
+# headless GPU example (cg only, requires native-gl-context feature)
+cargo run -p cg --example headless_gpu --features native-gl-context --release
+```
+
 ## Tools
 
 ### `tool_io_grida` - Grida File Validator

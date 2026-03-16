@@ -423,9 +423,9 @@ export class Scene {
     this._free_string(ptr, len);
   }
 
-  runtime_renderer_set_cache_tile(enable: boolean) {
+  runtime_renderer_set_layer_compositing(enable: boolean) {
     this._assertAlive();
-    this.module._runtime_renderer_set_cache_tile(this.appptr, enable);
+    this.module._runtime_renderer_set_layer_compositing(this.appptr, enable);
   }
 
   runtime_renderer_set_pixel_preview_scale(scale: number) {

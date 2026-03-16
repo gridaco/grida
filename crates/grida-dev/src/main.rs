@@ -53,18 +53,45 @@ enum Command {
     Figma(FigmaArgs),
     /// Convert and render an SVG.
     Svg(SvgArgs),
-    /// Generate a synthetic benchmark grid.
+    /// Generate a synthetic benchmark grid (windowed).
     Benchmark {
         /// Grid dimension (renders N x N rectangles).
         #[arg(long = "size", default_value_t = 400)]
         size: u32,
     },
+    /// Headless GPU benchmark — no window, prints per-frame stats.
+    /// Accepts either a `.grida` file or `--size N` for a synthetic grid.
+    Bench(BenchArgs),
     /// Render the built-in sample scene.
     Sample,
     /// Open an empty scene and replace it when files are dropped onto the window.
     Master,
     /// Run SVG reftests against W3C SVG 1.1 Test Suite.
     Reftest(reftest::ReftestArgs),
+}
+
+#[derive(Args, Debug)]
+struct BenchArgs {
+    /// Path to a `.grida` file (optional; uses synthetic grid if omitted).
+    path: Option<String>,
+    /// Grid dimension when no file is given (renders N x N rectangles).
+    #[arg(long = "size", default_value_t = 100)]
+    size: u32,
+    /// Scene index to benchmark (0-based). Use --list-scenes to see available.
+    #[arg(long = "scene", default_value_t = 0)]
+    scene_index: usize,
+    /// List available scene names and exit.
+    #[arg(long = "list-scenes", default_value_t = false)]
+    list_scenes: bool,
+    /// Number of pan frames to measure.
+    #[arg(long = "frames", default_value_t = 200)]
+    frames: u32,
+    /// Viewport width.
+    #[arg(long = "width", default_value_t = 1000)]
+    width: i32,
+    /// Viewport height.
+    #[arg(long = "height", default_value_t = 1000)]
+    height: i32,
 }
 
 #[derive(Args, Debug)]
@@ -116,11 +143,213 @@ async fn main() -> Result<()> {
         Command::Sample => {
             run_demo_window(build_sample_scene()).await;
         }
+        Command::Bench(args) => run_bench(args).await?,
         Command::Master => run_master().await?,
         Command::Reftest(args) => reftest::run(args).await?,
         #[allow(unreachable_patterns)]
         _ => unreachable!("Unhandled command variant"),
     }
+    Ok(())
+}
+
+async fn run_bench(args: BenchArgs) -> Result<()> {
+    use cg::runtime::camera::Camera2D;
+    use cg::runtime::scene::{Backend, FrameFlushResult, Renderer};
+    use cg::window::headless::HeadlessGpu;
+    use std::time::Instant;
+
+    let scenes = if let Some(ref path) = args.path {
+        load_scenes_from_source(path).await?
+    } else {
+        vec![build_benchmark_scene(args.size)]
+    };
+
+    if args.list_scenes {
+        println!("Available scenes ({}):", scenes.len());
+        for (i, s) in scenes.iter().enumerate() {
+            println!("  [{}] {} ({} nodes)", i, s.name, s.graph.node_count());
+        }
+        return Ok(());
+    }
+
+    if args.scene_index >= scenes.len() {
+        return Err(anyhow!(
+            "scene index {} out of range (0..{}). Use --list-scenes.",
+            args.scene_index,
+            scenes.len()
+        ));
+    }
+
+    let scene = scenes.into_iter().nth(args.scene_index).unwrap();
+    let node_count = scene.graph.node_count();
+
+    let mut gpu = HeadlessGpu::new(args.width, args.height)
+        .map_err(|e| anyhow!("GPU init failed: {e}"))?;
+    gpu.print_gl_info();
+
+    let mut renderer = gpu.create_renderer();
+    renderer.load_scene(scene);
+
+    // Fit camera so all content is visible — same as windowed demo.
+    renderer.fit_camera_to_scene();
+
+    let cam_rect = renderer.camera.rect();
+    println!("Loaded scene: {} nodes", node_count);
+    println!(
+        "Camera: zoom={:.4} viewport=({:.0}x{:.0})",
+        renderer.camera.get_zoom(),
+        cam_rect.width,
+        cam_rect.height,
+    );
+    println!(
+        "Viewport: {}x{}, frames: {}\n",
+        args.width, args.height, args.frames
+    );
+
+    // Warm up: stable frame first (populates compositor cache), then
+    // unstable pan frames to fill picture/geometry caches.
+    renderer.queue_stable();
+    let _ = renderer.flush();
+    for _ in 0..10 {
+        renderer.camera.translate(1.0, 0.0);
+        renderer.queue_unstable();
+        let _ = renderer.flush();
+    }
+
+    // Count nodes with effects for diagnostics.
+    let effects_count = renderer
+        .scene
+        .as_ref()
+        .map(|s| {
+            s.graph
+                .nodes_iter()
+                .filter(|(_, node)| match node {
+                    cg::node::schema::Node::Rectangle(r) => r.effects.has_expensive_effects(),
+                    cg::node::schema::Node::Ellipse(e) => e.effects.has_expensive_effects(),
+                    _ => false,
+                })
+                .count()
+        })
+        .unwrap_or(0);
+
+    let comp_stats = renderer.get_cache().compositor.stats();
+    println!(
+        "Nodes with effects: {}  Compositor: {} promoted, {:.1} KB",
+        effects_count,
+        comp_stats.promoted_count,
+        comp_stats.memory_bytes as f64 / 1024.0,
+    );
+
+    // --- Pan benchmark ---
+    println!("=== Pan benchmark ({} frames) ===", args.frames);
+    let pan_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(args.frames as usize);
+    let mut internal_render_us = Vec::with_capacity(args.frames as usize);
+    let mut internal_flush_us = Vec::with_capacity(args.frames as usize);
+    let mut internal_draw_us = Vec::with_capacity(args.frames as usize);
+    let mut total_dl = 0usize;
+    let mut total_live = 0usize;
+    let mut total_comp_hits = 0usize;
+    let mut internal_compositor_us = Vec::with_capacity(args.frames as usize);
+    let mut internal_mid_flush_us = Vec::with_capacity(args.frames as usize);
+
+    for i in 0..args.frames {
+        let dx = if i % 2 == 0 { 5.0 } else { -5.0 };
+        renderer.camera.translate(dx, 0.0);
+        renderer.queue_unstable();
+        let frame_start = Instant::now();
+        if let FrameFlushResult::OK(stats) = renderer.flush() {
+            let ft = frame_start.elapsed();
+            frame_times.push(ft);
+            internal_render_us.push(stats.total_duration.as_micros() as u64);
+            internal_flush_us.push(stats.flush_duration.as_micros() as u64);
+            internal_draw_us.push(stats.draw.painter_duration.as_micros() as u64);
+            internal_compositor_us.push(stats.compositor_duration.as_micros() as u64);
+            internal_mid_flush_us.push(stats.mid_flush_duration.as_micros() as u64);
+            total_dl += stats.frame.display_list_size_estimated;
+            total_live += stats.draw.live_draw_count;
+            total_comp_hits += stats.draw.layer_image_cache_hits;
+        }
+    }
+    let pan_wall = pan_start.elapsed();
+
+    frame_times.sort();
+    let n = frame_times.len();
+    let p50 = frame_times[n / 2];
+    let p95 = frame_times[n * 95 / 100];
+    let p99 = frame_times[n * 99 / 100];
+    let avg = pan_wall / n as u32;
+    let fps = 1_000_000.0 / avg.as_micros() as f64;
+
+    let avg_render = internal_render_us.iter().sum::<u64>() / n as u64;
+    let avg_flush = internal_flush_us.iter().sum::<u64>() / n as u64;
+    let avg_draw = internal_draw_us.iter().sum::<u64>() / n as u64;
+    let avg_compositor = internal_compositor_us.iter().sum::<u64>() / n as u64;
+    let avg_mid_flush = internal_mid_flush_us.iter().sum::<u64>() / n as u64;
+
+    println!(
+        "  avg: {:>7} us ({:>6.1} fps)",
+        avg.as_micros(),
+        fps
+    );
+    println!(
+        "  p50: {:>7} us  p95: {:>7} us  p99: {:>7} us",
+        p50.as_micros(),
+        p95.as_micros(),
+        p99.as_micros()
+    );
+    println!(
+        "  draw: {} us  mid_flush(draw GPU): {} us  compositor: {} us  end_flush: {} us",
+        avg_draw, avg_mid_flush, avg_compositor, avg_flush
+    );
+    println!(
+        "  dl: {}  live: {}  comp_hits: {}  wall: {:.1} ms",
+        total_dl / n,
+        total_live / n,
+        total_comp_hits / n,
+        pan_wall.as_secs_f64() * 1000.0
+    );
+
+    // --- Zoom benchmark ---
+    println!("\n=== Zoom benchmark ({} frames) ===", args.frames);
+    renderer.camera.set_zoom(1.0);
+    let zoom_start = Instant::now();
+    let mut zoom_times = Vec::with_capacity(args.frames as usize);
+    let mut z = 1.0f32;
+    let mut zdir = 1;
+
+    for _ in 0..args.frames {
+        z += zdir as f32 * 0.02;
+        if z > 2.0 || z < 0.5 {
+            zdir = -zdir;
+        }
+        renderer.camera.set_zoom(z);
+        renderer.queue_unstable();
+        let frame_start = Instant::now();
+        if let FrameFlushResult::OK(_) = renderer.flush() {
+            zoom_times.push(frame_start.elapsed());
+        }
+    }
+    let zoom_wall = zoom_start.elapsed();
+
+    zoom_times.sort();
+    let zn = zoom_times.len();
+    let zp50 = zoom_times[zn / 2];
+    let zp95 = zoom_times[zn * 95 / 100];
+    let zavg = zoom_wall / zn as u32;
+    let zfps = 1_000_000.0 / zavg.as_micros() as f64;
+
+    println!(
+        "  avg: {:>7.1} us ({:>6.1} fps)  p50: {:>7.1} us  p95: {:>7.1} us  wall: {:.1} ms",
+        zavg.as_micros(),
+        zfps,
+        zp50.as_micros(),
+        zp95.as_micros(),
+        zoom_wall.as_secs_f64() * 1000.0
+    );
+
+    drop(renderer);
+    println!("\nDone.");
     Ok(())
 }
 

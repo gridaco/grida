@@ -18,7 +18,21 @@ cargo run -p grida-dev -- svg path/to/file.svg --title "My SVG"
 cargo run -p grida-dev -- benchmark --size 400
 cargo run -p grida-dev -- sample
 cargo run -p grida-dev -- master
+
+# Headless GPU benchmark (no window, prints per-frame stats)
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida
+cargo run -p grida-dev --release -- bench --size 100
 ```
+
+## Performance measurement
+
+> **Always use `--release` for benchmarks and performance testing.**
+> Debug builds are ~20-30× slower and produce meaningless performance data.
+
+Use the `bench` subcommand for headless GPU measurement. It reports
+avg/p50/p95/p99 frame latencies without window/vsync overhead.
+
+Do **not** draw conclusions from debug-mode frame rates.
 
 ## Notes
 

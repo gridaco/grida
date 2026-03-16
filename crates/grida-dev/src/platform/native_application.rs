@@ -11,7 +11,7 @@ use glutin::{
     prelude::GlSurface,
     surface::{Surface as GlutinSurface, WindowSurface},
 };
-use math2::{rect, rect::Rectangle};
+
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -322,42 +322,5 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
 }
 
 fn fit_camera_to_scene(renderer: &mut cg::runtime::scene::Renderer) {
-    let Some(scene) = renderer.scene.as_ref() else {
-        return;
-    };
-
-    let geometry = renderer.get_cache().geometry();
-    let mut union: Option<Rectangle> = None;
-    for root in scene.graph.roots() {
-        if let Some(bounds) = geometry.get_world_bounds(&root) {
-            union = Some(match union {
-                Some(existing) => rect::union(&[existing, bounds]),
-                None => bounds,
-            });
-        }
-    }
-
-    let Some(bounds) = union else {
-        return;
-    };
-
-    let padding = 64.0;
-    let padded = Rectangle {
-        x: bounds.x - padding,
-        y: bounds.y - padding,
-        width: (bounds.width + padding * 2.0).max(1.0),
-        height: (bounds.height + padding * 2.0).max(1.0),
-    };
-
-    let viewport = renderer.camera.get_size();
-    let zoom_x = viewport.width / padded.width.max(1.0);
-    let zoom_y = viewport.height / padded.height.max(1.0);
-    let target_zoom = zoom_x.min(zoom_y) * 0.98;
-    if target_zoom.is_finite() && target_zoom > 0.0 {
-        renderer.camera.set_zoom(target_zoom);
-    }
-
-    let center_x = padded.x + padded.width * 0.5;
-    let center_y = padded.y + padded.height * 0.5;
-    renderer.camera.set_center(center_x, center_y);
+    renderer.fit_camera_to_scene();
 }
