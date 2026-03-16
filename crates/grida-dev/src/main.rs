@@ -153,8 +153,7 @@ async fn main() -> Result<()> {
 }
 
 async fn run_bench(args: BenchArgs) -> Result<()> {
-    use cg::runtime::camera::Camera2D;
-    use cg::runtime::scene::{Backend, FrameFlushResult, Renderer};
+    use cg::runtime::scene::FrameFlushResult;
     use cg::window::headless::HeadlessGpu;
     use std::time::Instant;
 
@@ -281,7 +280,7 @@ async fn run_bench(args: BenchArgs) -> Result<()> {
     let avg = pan_wall / n as u32;
     let fps = 1_000_000.0 / avg.as_micros() as f64;
 
-    let avg_render = internal_render_us.iter().sum::<u64>() / n as u64;
+    let _avg_render = internal_render_us.iter().sum::<u64>() / n as u64;
     let avg_flush = internal_flush_us.iter().sum::<u64>() / n as u64;
     let avg_draw = internal_draw_us.iter().sum::<u64>() / n as u64;
     let avg_compositor = internal_compositor_us.iter().sum::<u64>() / n as u64;

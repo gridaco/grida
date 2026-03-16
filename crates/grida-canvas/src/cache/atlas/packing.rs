@@ -434,7 +434,7 @@ mod tests {
     #[test]
     fn compact_reclaims_trailing_empty_shelves() {
         let mut p = ShelfPacker::new(256, 256);
-        let a = p.allocate(256, 50).unwrap(); // shelf 0
+        let _a = p.allocate(256, 50).unwrap(); // shelf 0
         let b = p.allocate(256, 60).unwrap(); // shelf 1
         let c = p.allocate(256, 40).unwrap(); // shelf 2
 
