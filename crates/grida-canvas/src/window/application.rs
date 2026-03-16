@@ -977,7 +977,8 @@ impl UnknownTargetApplication {
         let camera_label = match stats.frame.camera_change {
             crate::runtime::camera::CameraChangeKind::None => "none",
             crate::runtime::camera::CameraChangeKind::PanOnly => "pan",
-            crate::runtime::camera::CameraChangeKind::ZoomOnly => "zoom",
+            crate::runtime::camera::CameraChangeKind::ZoomIn => "zoom-in",
+            crate::runtime::camera::CameraChangeKind::ZoomOut => "zoom-out",
             crate::runtime::camera::CameraChangeKind::PanAndZoom => "pan+zoom",
         };
         let stat_string = format!(

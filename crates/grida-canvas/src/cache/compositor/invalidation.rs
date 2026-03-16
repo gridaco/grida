@@ -48,8 +48,11 @@ pub fn apply_invalidation(cache: &mut LayerImageCache, event: InvalidationEvent)
             cache.invalidate(&parent_id);
         }
         InvalidationEvent::ZoomChanged => {
-            // All images were rasterized at the old density.
-            cache.invalidate_all();
+            // All images were rasterized at the old density. Mark as
+            // stale (not dirty) — they remain valid for GPU-stretched
+            // blitting and are progressively re-rasterized within the
+            // per-frame budget.
+            cache.mark_all_stale();
         }
         InvalidationEvent::FontLoaded | InvalidationEvent::ImageLoaded => {
             // Conservative: mark everything dirty. A more targeted
@@ -110,14 +113,21 @@ mod tests {
     }
 
     #[test]
-    fn zoom_changed_invalidates_all() {
+    fn zoom_changed_marks_stale_not_dirty() {
         let mut cache = LayerImageCache::new(1024 * 1024);
         ins(&mut cache, 1, 10, 10);
         ins(&mut cache, 2, 10, 10);
 
         apply_invalidation(&mut cache, InvalidationEvent::ZoomChanged);
-        assert!(cache.get(&1).is_none());
-        assert!(cache.get(&2).is_none());
+        // Stale entries are still returned by get() — they are valid
+        // for GPU-stretched blitting.
+        let e1 = cache.get(&1).unwrap();
+        assert!(e1.stale);
+        assert!(!e1.dirty);
+        let e2 = cache.get(&2).unwrap();
+        assert!(e2.stale);
+        assert!(!e2.dirty);
+        assert_eq!(cache.stale_count(), 2);
     }
 
     #[test]

@@ -18,9 +18,13 @@ pub enum CameraChangeKind {
     /// Only translation changed; zoom (scale) remained constant.
     /// This is the most common interaction (hand-tool drag, scroll-wheel pan).
     PanOnly,
-    /// Only zoom changed; translation remained constant.
-    /// Rare in practice — most zoom gestures also shift the focal point.
-    ZoomOnly,
+    /// Zoom increased (viewport shrinks into existing content).
+    /// Cached content is a spatial superset — only pixel density changed.
+    /// The cheapest zoom path: no new content discovery needed.
+    ZoomIn,
+    /// Zoom decreased (viewport expands, new content appears at edges).
+    /// Some newly visible nodes may lack cache entries entirely.
+    ZoomOut,
     /// Both translation and zoom changed (e.g. pinch gesture, scroll-wheel
     /// zoom at cursor which adjusts translation to keep the focal point fixed).
     PanAndZoom,
@@ -30,7 +34,7 @@ impl CameraChangeKind {
     /// Returns `true` when zoom (scale) changed between frames.
     #[inline]
     pub fn zoom_changed(self) -> bool {
-        matches!(self, Self::ZoomOnly | Self::PanAndZoom)
+        matches!(self, Self::ZoomIn | Self::ZoomOut | Self::PanAndZoom)
     }
 
     /// Returns `true` when translation changed between frames.
@@ -312,7 +316,15 @@ impl Camera2D {
         match (pan_changed, zoom_changed) {
             (false, false) => CameraChangeKind::None,
             (true, false) => CameraChangeKind::PanOnly,
-            (false, true) => CameraChangeKind::ZoomOnly,
+            (false, true) => {
+                let current_zoom = self.get_zoom();
+                let prev_zoom = 1.0 / self.prev_transform.get_scale_x();
+                if current_zoom > prev_zoom {
+                    CameraChangeKind::ZoomIn
+                } else {
+                    CameraChangeKind::ZoomOut
+                }
+            }
             (true, true) => CameraChangeKind::PanAndZoom,
         }
     }
@@ -408,14 +420,27 @@ mod tests {
     }
 
     #[test]
-    fn test_change_kind_zoom_only() {
+    fn test_change_kind_zoom_in() {
         let mut camera = Camera2D::new(Size {
             width: 100.0,
             height: 100.0,
         });
         camera.set_zoom(2.0);
-        // set_zoom preserves translation, so this should be ZoomOnly.
-        assert_eq!(camera.change_kind(), CameraChangeKind::ZoomOnly);
+        // set_zoom preserves translation; zoom increased → ZoomIn.
+        assert_eq!(camera.change_kind(), CameraChangeKind::ZoomIn);
+        assert!(!camera.change_kind().pan_changed());
+        assert!(camera.change_kind().zoom_changed());
+    }
+
+    #[test]
+    fn test_change_kind_zoom_out() {
+        let mut camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+        camera.set_zoom(0.5);
+        // set_zoom preserves translation; zoom decreased → ZoomOut.
+        assert_eq!(camera.change_kind(), CameraChangeKind::ZoomOut);
         assert!(!camera.change_kind().pan_changed());
         assert!(camera.change_kind().zoom_changed());
     }

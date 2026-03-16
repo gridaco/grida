@@ -44,7 +44,16 @@ pub struct LayerImage {
     /// Frame number when this image was last used (for LRU eviction).
     pub last_used_frame: u64,
     /// Whether this image needs re-rasterization (content changed).
+    /// Dirty entries are NOT returned by `get()` — they have invalid content.
     pub dirty: bool,
+    /// Whether this image was captured at a different zoom than the current
+    /// camera zoom. Stale entries are still valid for blitting with a
+    /// compensating scale transform (GPU texture stretch). They are
+    /// progressively re-rasterized within the per-frame budget.
+    ///
+    /// Distinct from `dirty`: stale entries have correct content at the
+    /// wrong zoom density. Dirty entries have invalid content entirely.
+    pub stale: bool,
 }
 
 impl LayerImage {
@@ -82,6 +91,8 @@ pub struct LayerImageCacheStats {
     pub memory_bytes: usize,
     /// Number of dirty (pending re-rasterization) entries.
     pub dirty_count: usize,
+    /// Number of stale (zoom mismatch, still drawable) entries.
+    pub stale_count: usize,
     /// Number of atlas-backed entries.
     pub atlas_backed: usize,
     /// Number of individually-backed entries.
@@ -129,6 +140,10 @@ impl LayerImageCache {
 
     /// Get a cached layer image for a node, if it exists and is not dirty.
     ///
+    /// Returns stale entries (wrong zoom density but valid content) — the
+    /// caller is expected to blit them with a compensating scale transform.
+    /// Does NOT return dirty entries (invalid content).
+    ///
     /// Also updates the `last_used_frame` for LRU tracking.
     pub fn get(&mut self, id: &NodeId) -> Option<&LayerImage> {
         let frame = self.frame_counter;
@@ -142,6 +157,7 @@ impl LayerImageCache {
     }
 
     /// Get a cached layer image without updating LRU (read-only peek).
+    /// Returns stale entries but not dirty entries.
     pub fn peek(&self, id: &NodeId) -> Option<&LayerImage> {
         self.images.get(id).filter(|e| !e.dirty)
     }
@@ -179,6 +195,7 @@ impl LayerImageCache {
                 blend_mode,
                 last_used_frame: self.frame_counter,
                 dirty: false,
+                stale: false,
             },
         );
 
@@ -222,6 +239,7 @@ impl LayerImageCache {
                 blend_mode,
                 last_used_frame: self.frame_counter,
                 dirty: false,
+                stale: false,
             },
         );
     }
@@ -240,6 +258,30 @@ impl LayerImageCache {
         for entry in self.images.values_mut() {
             entry.dirty = true;
         }
+    }
+
+    /// Mark all cached images as stale (zoom mismatch, still drawable).
+    ///
+    /// Stale entries remain valid for GPU-stretched blitting — the draw
+    /// path applies a compensating scale transform. They are progressively
+    /// re-rasterized within the per-frame budget by `update_compositor()`.
+    pub fn mark_all_stale(&mut self) {
+        for entry in self.images.values_mut() {
+            if !entry.dirty {
+                entry.stale = true;
+            }
+        }
+    }
+
+    /// Returns true when there are stale entries that could benefit from
+    /// re-rasterization at the current zoom density.
+    pub fn has_stale(&self) -> bool {
+        self.images.values().any(|e| e.stale && !e.dirty)
+    }
+
+    /// Number of stale (but not dirty) entries.
+    pub fn stale_count(&self) -> usize {
+        self.images.values().filter(|e| e.stale && !e.dirty).count()
     }
 
     /// Remove a specific node's cached image entirely.
@@ -332,6 +374,7 @@ impl LayerImageCache {
             hits: 0,
             memory_bytes: self.memory_used,
             dirty_count: self.images.values().filter(|e| e.dirty).count(),
+            stale_count: self.images.values().filter(|e| e.stale && !e.dirty).count(),
             atlas_backed,
             individual_backed,
         }
@@ -345,6 +388,11 @@ impl LayerImageCache {
     /// Iterate over all dirty entries that need re-rasterization.
     pub fn dirty_entries(&self) -> impl Iterator<Item = (&NodeId, &LayerImage)> {
         self.images.iter().filter(|(_, e)| e.dirty)
+    }
+
+    /// Iterate over all stale (but not dirty) entries.
+    pub fn stale_entries(&self) -> impl Iterator<Item = (&NodeId, &LayerImage)> {
+        self.images.iter().filter(|(_, e)| e.stale && !e.dirty)
     }
 
     /// Check if a node is currently promoted (has a cache entry, dirty or not).

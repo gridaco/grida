@@ -723,7 +723,15 @@ impl Renderer {
             let effective_layer_compositing = self.config.layer_compositing
                 && self.config.render_policy.allows_layer_compositing();
             if effective_layer_compositing {
-                self.update_compositor(surface);
+                if frame.stable {
+                    // Stable frame: re-rasterize all stale entries at the
+                    // final zoom density without a time budget.
+                    self.update_compositor_stable(surface);
+                } else {
+                    // Unstable frame: budgeted re-rasterization. Stale
+                    // entries stay GPU-stretched until their turn comes.
+                    self.update_compositor(surface);
+                }
             }
         }
         let compositor_duration = compositor_start.elapsed();
@@ -819,11 +827,16 @@ impl Renderer {
         // downstream stages (tile cache, LOD selection, etc.) can branch on it.
         let camera_change = self.camera.change_kind();
 
-        // Invalidate compositor cache when zoom changes — cached images were
-        // rasterized at the previous zoom density and need re-capture.
+        // On zoom change, mark compositor cache entries as stale (not dirty).
+        // Stale entries remain valid for GPU-stretched blitting — the draw
+        // path applies a compensating scale transform. They are progressively
+        // re-rasterized within the per-frame time budget by update_compositor().
+        //
+        // Previous behavior: invalidate_all() + atlas.clear() caused full
+        // re-rasterization of all promoted nodes in a single frame, producing
+        // 94-146ms frames (6-10 fps) on effects-heavy scenes.
         if camera_change.zoom_changed() && self.config.layer_compositing {
-            self.scene_cache.compositor.invalidate_all();
-            self.compositor_atlas.clear();
+            self.scene_cache.compositor.mark_all_stale();
         }
 
         // Always compute the latest frame plan so that a subsequent flush uses up-to-date state,
@@ -1469,10 +1482,27 @@ impl Renderer {
     /// sub-region as a GPU-resident `SkImage`.  No per-node surface
     /// allocation.
     ///
-    /// All eligible visible nodes are rasterised in one pass — no per-frame
-    /// cap.  Like Chromium's compositor, the goal is to front-load the cost
-    /// once so that subsequent pan frames are pure blits.
+    /// Eligible visible nodes are rasterised within a per-frame time budget
+    /// during unstable (interactive) frames, and without limit on stable
+    /// (settled) frames. Stale entries (zoom mismatch) are blitted with
+    /// GPU texture stretching until re-rasterized.
     fn update_compositor(&mut self, parent_surface: &mut Surface) {
+        self.update_compositor_inner(parent_surface, false);
+    }
+
+    /// Variant called on stable frames — no time budget, all stale entries
+    /// are re-rasterized to achieve full quality at the final zoom.
+    fn update_compositor_stable(&mut self, parent_surface: &mut Surface) {
+        self.update_compositor_inner(parent_surface, true);
+    }
+
+    /// Core compositor update logic.
+    ///
+    /// When `force_all` is true (stable frame), all stale/dirty entries are
+    /// re-rasterized without a time budget. When false (unstable/interactive
+    /// frame), re-rasterization is capped to `ZOOM_RERASTER_BUDGET` to keep
+    /// frame times low.
+    fn update_compositor_inner(&mut self, parent_surface: &mut Surface, force_all: bool) {
         use crate::cache::compositor::promotion;
 
         let zoom = self.camera.get_zoom();
@@ -1497,6 +1527,17 @@ impl Renderer {
         let visible_set: std::collections::HashSet<usize> =
             visible_indices.into_iter().collect();
 
+        // Time budget for stale re-rasterization during interactive frames.
+        // 8ms leaves headroom within a 16ms frame budget (60fps target).
+        const ZOOM_RERASTER_BUDGET: std::time::Duration =
+            std::time::Duration::from_micros(8000);
+        let budget_start = std::time::Instant::now();
+
+        // Zoom scale bucket ratio — only re-rasterize when the zoom drift
+        // exceeds this threshold. Within the bucket, the GPU stretch is
+        // visually acceptable.
+        const RASTER_ZOOM_RATIO: f32 = 1.5;
+
         for (idx, entry) in self.scene_cache.layers.layers.iter().enumerate() {
             if !visible_set.contains(&idx) {
                 continue;
@@ -1504,11 +1545,39 @@ impl Renderer {
 
             let id = entry.id;
 
-            // Already cached, clean, same zoom → skip.
+            // Decide whether this node needs (re-)rasterization.
+            //
+            //  State        | Unstable frame          | Stable frame (force_all)
+            //  -------------|-------------------------|-------------------------
+            //  Fresh        | skip                    | skip
+            //  Stale+bucket | skip (stretch OK)       | re-raster (full quality)
+            //  Stale+beyond | re-raster (within budget)| re-raster
+            //  Dirty        | re-raster               | re-raster
+            //  Missing      | raster (new entry)      | raster (new entry)
             if let Some(img) = self.scene_cache.compositor.peek(&id) {
-                if !img.dirty && (img.zoom - zoom).abs() < f32::EPSILON {
+                if !img.dirty && !img.stale {
+                    // Completely fresh — nothing to do.
                     continue;
                 }
+                if img.stale && !img.dirty {
+                    // Guard against zero/degenerate cached zoom.
+                    let ratio = if img.zoom > f32::EPSILON {
+                        zoom / img.zoom
+                    } else {
+                        f32::MAX
+                    };
+                    let bucket_min = 1.0 / RASTER_ZOOM_RATIO;
+                    let within_bucket = (bucket_min..=RASTER_ZOOM_RATIO).contains(&ratio);
+                    if within_bucket && !force_all {
+                        // GPU stretch is visually acceptable — skip.
+                        continue;
+                    }
+                }
+            }
+
+            // Check time budget for interactive frames.
+            if !force_all && budget_start.elapsed() >= ZOOM_RERASTER_BUDGET {
+                break; // Budget exhausted — remaining stale nodes stay stretched.
             }
 
             let Some(render_bounds) = self.scene_cache.geometry.get_render_bounds(&id) else {

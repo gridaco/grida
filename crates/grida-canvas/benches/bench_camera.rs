@@ -16,7 +16,7 @@
 //! ## Camera operations
 //!
 //!   - **pan**: pure translation, no zoom change (`CameraChangeKind::PanOnly`)
-//!   - **zoom**: pure zoom change at viewport center (`CameraChangeKind::ZoomOnly`)
+//!   - **zoom**: pure zoom change at viewport center (`CameraChangeKind::ZoomIn`/`ZoomOut`)
 //!   - **pinch_zoom**: zoom-at-cursor — changes both zoom and translation
 //!     simultaneously (`CameraChangeKind::PanAndZoom`), the most common
 //!     real-world zoom gesture
