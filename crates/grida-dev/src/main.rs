@@ -9,9 +9,7 @@ use cg::svg::pack;
 use cg::window::application::{HostEvent, HostEventCallback};
 use clap::{Args, Parser, Subcommand};
 use futures::channel::mpsc;
-use grida_dev::platform::native_demo::{
-    run_demo_window, run_demo_window_multi, run_demo_window_with_drop,
-};
+use grida_dev::platform::native_demo::run_demo_window_with_drop;
 mod grida_file;
 mod reftest;
 use image::image_dimensions;
@@ -20,39 +18,31 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::fs as async_fs;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use winit::event_loop::EventLoopProxy;
 
 #[derive(Parser, Debug)]
 #[command(
     name = "grida-dev",
     version,
-    about = "Rust-native dev runtime for previewing grida-canvas scenes with winit."
+    about = "Rust-native dev runtime for previewing grida-canvas scenes with winit.\n\n\
+             Opens an interactive window. Optionally pass a file path or URL to load it\n\
+             immediately. Drop files onto the window at any time to replace the scene.\n\n\
+             Supported formats: .grida, .grida1, .svg, .png, .jpg, .jpeg, .webp"
 )]
 struct Cli {
+    /// File path or URL to load on startup (optional).
+    file: Option<String>,
+
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Render a `.grida` / JSON scene from disk or URL.
-    Scene(SceneArgs),
-    /// Convert and render an SVG.
-    Svg(SvgArgs),
-    /// Generate a synthetic benchmark grid (windowed).
-    Benchmark {
-        /// Grid dimension (renders N x N rectangles).
-        #[arg(long = "size", default_value_t = 400)]
-        size: u32,
-    },
     /// Headless GPU benchmark — no window, prints per-frame stats.
     /// Accepts either a `.grida` file or `--size N` for a synthetic grid.
     Bench(BenchArgs),
-    /// Render the built-in sample scene.
-    Sample,
-    /// Open an empty scene and replace it when files are dropped onto the window.
-    Master,
     /// Run SVG reftests against W3C SVG 1.1 Test Suite.
     Reftest(reftest::ReftestArgs),
 }
@@ -81,41 +71,13 @@ struct BenchArgs {
     height: i32,
 }
 
-#[derive(Args, Debug)]
-struct SceneArgs {
-    /// Path or URL to a `.grida` / JSON scene.
-    path: String,
-}
-
-#[derive(Args, Debug)]
-struct SvgArgs {
-    /// Path to an SVG file to convert/render.
-    path: PathBuf,
-    /// Optional scene title.
-    #[arg(long = "title")]
-    title: Option<String>,
-    /// Optional background color in hex (e.g. `#1F1F1F` or `#FFFFFFFF`).
-    #[arg(long = "background")]
-    background: Option<String>,
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Scene(args) => run_scene(&args.path).await?,
-        Command::Svg(args) => run_svg(args).await?,
-        Command::Benchmark { size } => {
-            run_demo_window(build_benchmark_scene(size)).await;
-        }
-        Command::Sample => {
-            run_demo_window(build_sample_scene()).await;
-        }
-        Command::Bench(args) => run_bench(args).await?,
-        Command::Master => run_master().await?,
-        Command::Reftest(args) => reftest::run(args).await?,
-        #[allow(unreachable_patterns)]
-        _ => unreachable!("Unhandled command variant"),
+        Some(Command::Bench(args)) => run_bench(args).await?,
+        Some(Command::Reftest(args)) => reftest::run(args).await?,
+        None => run_interactive(cli.file).await?,
     }
     Ok(())
 }
@@ -326,76 +288,58 @@ async fn run_bench(args: BenchArgs) -> Result<()> {
     Ok(())
 }
 
-async fn run_scene(source: &str) -> Result<()> {
-    let scenes = load_scenes_from_source(source).await?;
-    if scenes.is_empty() {
-        return Err(anyhow!("no scenes decoded from source: {source}"));
-    }
-    if scenes.len() > 1 {
-        println!("Loaded {} scenes (PageUp/PageDown to switch)", scenes.len());
-        run_demo_window_multi(scenes).await;
+async fn run_interactive(file: Option<String>) -> Result<()> {
+    // Load initial scenes from the CLI argument (file path or URL), if given.
+    let initial_scenes = if let Some(ref source) = file {
+        load_scenes_from_source(source).await?
     } else {
-        run_demo_window(scenes.into_iter().next().unwrap()).await;
-    }
-    Ok(())
-}
-
-async fn run_svg(args: SvgArgs) -> Result<()> {
-    let svg_source = async_fs::read_to_string(&args.path)
-        .await
-        .with_context(|| format!("failed to read SVG file {}", args.path.display()))?;
-
-    let graph =
-        pack::from_svg_str(&svg_source).map_err(|err| anyhow!("failed to convert SVG: {err}"))?;
-
-    let scene_name = args.title.unwrap_or_else(|| {
-        args.path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "SVG Scene".to_string())
-    });
-
-    let background_color = args
-        .background
-        .as_deref()
-        .and_then(parse_hex_color)
-        .or(Some(CGColor::from_u32(0xF8F8F8FF)));
-
-    let scene = Scene {
-        name: scene_name,
-        graph,
-        background_color,
+        vec![build_empty_scene()]
     };
 
-    run_demo_window(scene).await;
-    Ok(())
-}
+    let first = initial_scenes
+        .first()
+        .cloned()
+        .expect("at least one scene");
 
-async fn run_master() -> Result<()> {
-    let initial_scene = build_empty_scene();
     let (drop_tx, drop_rx) = unbounded_channel::<PathBuf>();
+    let (scenes_tx, scenes_rx) = unbounded_channel::<Vec<Scene>>();
     let drop_rx = Arc::new(Mutex::new(Some(drop_rx)));
 
+    // Seed the scenes channel with the initial set so the window picks them
+    // up on the first tick (enables PageUp/PageDown for multi-scene files).
+    if initial_scenes.len() > 1 {
+        let _ = scenes_tx.send(initial_scenes);
+    }
+
     run_demo_window_with_drop(
-        initial_scene,
+        first,
         move |_renderer, tx, _font_tx, proxy| {
             let mut guard = drop_rx.lock().expect("drop rx mutex poisoned");
             let drop_rx = guard.take().expect("drop receiver already taken");
-            start_master_drop_task(drop_rx, tx.clone(), proxy.clone());
+            start_master_drop_task(drop_rx, tx.clone(), proxy.clone(), scenes_tx);
         },
         drop_tx,
+        scenes_rx,
     )
     .await;
 
     Ok(())
 }
 
-async fn load_scene_from_source(source: &str) -> Result<Scene> {
-    let bytes = read_source_bytes(source).await?;
-    grida_file::decode(&bytes)
-}
-
 async fn load_scenes_from_source(source: &str) -> Result<Vec<Scene>> {
+    // If it looks like a local file with a known extension, route by type.
+    if !is_url(source) {
+        let path = Path::new(source);
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            match ext.to_ascii_lowercase().as_str() {
+                "svg" => return scene_from_svg_path(path).map(|s| vec![s]),
+                "png" | "jpg" | "jpeg" | "webp" => {
+                    return scene_from_raster_path(path).map(|s| vec![s])
+                }
+                _ => {} // fall through to grida/json decoding
+            }
+        }
+    }
     let bytes = read_source_bytes(source).await?;
     grida_file::decode_all(&bytes)
 }
@@ -413,65 +357,6 @@ async fn read_source_bytes(source: &str) -> Result<Vec<u8>> {
         async_fs::read(source)
             .await
             .with_context(|| format!("failed to read scene file at {source}"))
-    }
-}
-
-fn build_sample_scene() -> Scene {
-    let nf = NodeFactory::new();
-
-    let mut hero = nf.create_rectangle_node();
-    hero.transform = AffineTransform::new(120.0, 120.0, 0.0);
-    hero.size = Size {
-        width: 420.0,
-        height: 300.0,
-    };
-    hero.corner_radius = RectangularCornerRadius::circular(32.0);
-    hero.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor::from_rgb(74, 108, 247),
-        blend_mode: BlendMode::default(),
-        active: true,
-    })]);
-
-    let mut accent = nf.create_rectangle_node();
-    accent.transform = AffineTransform::new(380.0, 260.0, -12.0);
-    accent.size = Size {
-        width: 220.0,
-        height: 120.0,
-    };
-    accent.corner_radius = RectangularCornerRadius::circular(24.0);
-    accent.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor::from_rgb(253, 158, 115),
-        blend_mode: BlendMode::default(),
-        active: true,
-    })]);
-
-    let mut pill = nf.create_rectangle_node();
-    pill.transform = AffineTransform::new(200.0, 40.0, 0.0);
-    pill.size = Size {
-        width: 300.0,
-        height: 60.0,
-    };
-    pill.corner_radius = RectangularCornerRadius::circular(30.0);
-    pill.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor::from_rgb(34, 34, 34),
-        blend_mode: BlendMode::default(),
-        active: true,
-    })]);
-
-    let mut graph = SceneGraph::new();
-    graph.append_children(
-        vec![
-            Node::Rectangle(hero),
-            Node::Rectangle(accent),
-            Node::Rectangle(pill),
-        ],
-        Parent::Root,
-    );
-
-    Scene {
-        name: "grida-dev sample".to_string(),
-        graph,
-        background_color: Some(CGColor::from_rgb(245, 246, 255)),
     }
 }
 
@@ -514,26 +399,6 @@ fn is_url(path: &str) -> bool {
     path.starts_with("http://") || path.starts_with("https://")
 }
 
-fn parse_hex_color(input: &str) -> Option<CGColor> {
-    let s = input.trim().strip_prefix('#').unwrap_or(input.trim());
-    match s.len() {
-        6 => {
-            let r = u8::from_str_radix(&s[0..2], 16).ok()?;
-            let g = u8::from_str_radix(&s[2..4], 16).ok()?;
-            let b = u8::from_str_radix(&s[4..6], 16).ok()?;
-            Some(CGColor::from_rgb(r, g, b))
-        }
-        8 => {
-            let r = u8::from_str_radix(&s[0..2], 16).ok()?;
-            let g = u8::from_str_radix(&s[2..4], 16).ok()?;
-            let b = u8::from_str_radix(&s[4..6], 16).ok()?;
-            let a = u8::from_str_radix(&s[6..8], 16).ok()?;
-            Some(CGColor::from_rgba(r, g, b, a))
-        }
-        _ => None,
-    }
-}
-
 fn build_empty_scene() -> Scene {
     Scene {
         name: "Drop a file to begin".to_string(),
@@ -542,7 +407,7 @@ fn build_empty_scene() -> Scene {
     }
 }
 
-async fn load_master_scene_from_path(path: &Path) -> Result<Scene> {
+async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -550,9 +415,9 @@ async fn load_master_scene_from_path(path: &Path) -> Result<Scene> {
         .ok_or_else(|| anyhow!("Dropped file has no extension: {}", path.display()))?;
 
     match ext.as_str() {
-        "grida" | "json" => load_scene_from_source(&path.to_string_lossy()).await,
-        "svg" => scene_from_svg_path(path),
-        "png" | "jpg" | "jpeg" | "webp" => scene_from_raster_path(path),
+        "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
+        "svg" => scene_from_svg_path(path).map(|s| vec![s]),
+        "png" | "jpg" | "jpeg" | "webp" => scene_from_raster_path(path).map(|s| vec![s]),
         other => Err(anyhow!(
             "Unsupported dropped file type ({}): {}",
             other,
@@ -606,27 +471,32 @@ fn start_master_drop_task(
     mut drop_rx: UnboundedReceiver<PathBuf>,
     image_tx: mpsc::UnboundedSender<ImageMessage>,
     proxy: EventLoopProxy<HostEvent>,
+    scenes_tx: UnboundedSender<Vec<Scene>>,
 ) {
     tokio::spawn(async move {
         while let Some(path) = drop_rx.recv().await {
-            match load_master_scene_from_path(&path).await {
-                Ok(scene) => {
-                    let scene_for_loader = scene.clone();
-                    if proxy.send_event(HostEvent::LoadScene(scene)).is_err() {
-                        panic!("failed to send LoadScene event");
+            match load_master_scenes_from_path(&path).await {
+                Ok(scenes) => {
+                    let scenes_for_loader = scenes.clone();
+                    if scenes_tx.send(scenes).is_err() {
+                        eprintln!("failed to send scenes to window");
+                        continue;
                     }
 
-                    let tx_clone = image_tx.clone();
-                    let proxy_clone = proxy.clone();
-                    let event_cb: HostEventCallback = Arc::new(move |event: HostEvent| {
-                        let _ = proxy_clone.send_event(event);
-                    });
+                    // Load images for all scenes in the background.
+                    for scene in scenes_for_loader {
+                        let tx_clone = image_tx.clone();
+                        let proxy_clone = proxy.clone();
+                        let event_cb: HostEventCallback = Arc::new(move |event: HostEvent| {
+                            let _ = proxy_clone.send_event(event);
+                        });
 
-                    tokio::spawn(async move {
-                        load_scene_images(&scene_for_loader, tx_clone, event_cb).await;
-                    });
+                        tokio::spawn(async move {
+                            load_scene_images(&scene, tx_clone, event_cb).await;
+                        });
+                    }
                 }
-                Err(err) => panic!("Failed to load dropped file {}: {err}", path.display()),
+                Err(err) => eprintln!("Failed to load dropped file {}: {err}", path.display()),
             }
         }
     });
