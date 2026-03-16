@@ -13,14 +13,17 @@ material when designing rendering systems that face similar problems.
 
 ## Documents
 
-| Document                                                     | Scope                                                            |
-| ------------------------------------------------------------ | ---------------------------------------------------------------- |
-| [glossary.md](./glossary.md)                                 | Key terms and concepts                                           |
-| [compositor-architecture.md](./compositor-architecture.md)   | Overall compositor pipeline                                      |
-| [render-surfaces.md](./render-surfaces.md)                   | Render surfaces, effect isolation, blend modes, backdrop filters |
-| [tiling-and-rasterization.md](./tiling-and-rasterization.md) | Tile grid, rasterization pipeline, GPU raster                    |
-| [memory-and-priority.md](./memory-and-priority.md)           | Memory budgets, tile priority, eviction                          |
-| [interaction-and-quality.md](./interaction-and-quality.md)   | Scroll/zoom behavior, checkerboarding, LOD during interaction    |
+| Document                                                                               | Scope                                                                     |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [glossary.md](./glossary.md)                                                           | Key terms and concepts                                                    |
+| [compositor-architecture.md](./compositor-architecture.md)                             | Overall compositor pipeline                                               |
+| [render-surfaces.md](./render-surfaces.md)                                             | Render surfaces, effect isolation, blend modes, backdrop filters          |
+| [tiling-and-rasterization.md](./tiling-and-rasterization.md)                           | Tile grid, rasterization pipeline, GPU raster                             |
+| [tiling-deep-dive.md](./tiling-deep-dive.md)                                           | Tiling source deep dive: sizing, drawing, invalidation, memory            |
+| [memory-and-priority.md](./memory-and-priority.md)                                     | Memory budgets, tile priority, eviction                                   |
+| [interaction-and-quality.md](./interaction-and-quality.md)                             | Scroll/zoom behavior, checkerboarding, LOD during interaction             |
+| [resolution-scaling-during-interaction.md](./resolution-scaling-during-interaction.md) | Source-level: pinch-zoom raster scale, stale-tile reuse, CoverageIterator |
+| [effect-optimizations.md](./effect-optimizations.md)                                   | Effect optimization: filter demotion, render pass bypass, damage tracking |
 
 ## Source locations
 
