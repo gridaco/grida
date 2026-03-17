@@ -88,10 +88,26 @@ impl LayoutEngine {
 
         // Build and compute layout for each root subtree
         for root_id in &roots {
-            if let Some(root_taffy_id) = self.build_taffy_subtree(root_id, graph, viewport_size) {
+            let mut extra_roots = Vec::new();
+            if let Some(root_taffy_id) =
+                self.build_taffy_subtree(root_id, graph, viewport_size, &mut extra_roots)
+            {
                 // Compute layout with viewport as available space
                 let _ = self.tree.compute_layout(
                     root_taffy_id,
+                    taffy::Size {
+                        width: AvailableSpace::Definite(viewport_size.width),
+                        height: AvailableSpace::Definite(viewport_size.height),
+                    },
+                    text_measure.as_mut(),
+                );
+            }
+
+            // Compute layout for Taffy subtrees discovered under non-Taffy
+            // parents (e.g. Containers nested under Group/BooleanOperation).
+            for extra_taffy_id in extra_roots {
+                let _ = self.tree.compute_layout(
+                    extra_taffy_id,
                     taffy::Size {
                         width: AvailableSpace::Definite(viewport_size.width),
                         height: AvailableSpace::Definite(viewport_size.height),
@@ -224,20 +240,37 @@ impl LayoutEngine {
     /// This universal method handles all node types without switch-case logic.
     /// Each node gets an appropriate Taffy style based on its type and properties.
     ///
-    /// Nodes without layout_child support are skipped from Taffy tree but still
-    /// get layout results created manually from their schema.
+    /// Nodes without layout_child support (Group, BooleanOperation) are skipped
+    /// from the Taffy tree themselves but their children are still visited so
+    /// that Taffy-capable descendants (e.g. Containers) receive proper flex
+    /// layout instead of only schema fallbacks. Any Taffy subtrees discovered
+    /// under non-Taffy parents are collected in `extra_roots` so the caller
+    /// can compute layout for them.
     fn build_taffy_subtree(
         &mut self,
         node_id: &NodeId,
         graph: &SceneGraph,
         viewport_size: Size,
+        extra_roots: &mut Vec<taffy::NodeId>,
     ) -> Option<taffy::NodeId> {
         let node = graph.get_node(node_id).ok()?;
 
-        // Nodes that don't participate in Taffy layout (Vector, SVGPath, Group, etc.)
-        // are skipped and get manual layout results created in extract_all_layouts()
+        // Nodes that don't participate in Taffy layout (Group, BooleanOperation)
+        // are skipped themselves, but we still recurse into their children so
+        // Taffy-capable descendants get proper layout computation.
         if !Self::should_participate_in_taffy(node) {
-            return None; // Skip Taffy, use manual layout result from schema
+            if let Some(children) = graph.get_children(node_id) {
+                for child_id in children {
+                    if let Some(taffy_id) =
+                        self.build_taffy_subtree(child_id, graph, viewport_size, extra_roots)
+                    {
+                        // This child forms an independent Taffy subtree root
+                        // under a non-Taffy parent; collect it for layout computation.
+                        extra_roots.push(taffy_id);
+                    }
+                }
+            }
+            return None; // This node itself is not in the Taffy tree
         }
 
         // Get style for this node (universal mapping)
@@ -264,7 +297,9 @@ impl LayoutEngine {
                 // Build children recursively, filtering out those that shouldn't participate
                 let taffy_children: Vec<taffy::NodeId> = children
                     .iter()
-                    .filter_map(|child_id| self.build_taffy_subtree(child_id, graph, viewport_size))
+                    .filter_map(|child_id| {
+                        self.build_taffy_subtree(child_id, graph, viewport_size, extra_roots)
+                    })
                     .collect();
 
                 // Create parent with children

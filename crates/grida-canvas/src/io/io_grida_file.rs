@@ -127,6 +127,15 @@ impl fmt::Display for DecodeError {
     }
 }
 
+impl std::error::Error for DecodeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            DecodeError::Fbs(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
 impl From<io_grida_fbs::FbsDecodeError> for DecodeError {
     fn from(e: io_grida_fbs::FbsDecodeError) -> Self {
         DecodeError::Fbs(e)
@@ -136,6 +145,11 @@ impl From<io_grida_fbs::FbsDecodeError> for DecodeError {
 // ─────────────────────────────────────────────────────────────────────────────
 // ZIP extraction
 // ─────────────────────────────────────────────────────────────────────────────
+
+/// Hard limit on the uncompressed size of `document.grida` inside a ZIP
+/// archive. Protects against zip bombs and absurd allocations.
+/// Set to 8 GiB (2³³) — design files with many embedded images can be large.
+const MAX_UNCOMPRESSED_SIZE: u64 = 1 << 33; // 8 GiB
 
 fn extract_fbs_from_zip(bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {
     let cursor = Cursor::new(bytes);
@@ -149,9 +163,32 @@ fn extract_fbs_from_zip(bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {
     let mut doc = archive
         .by_name("document.grida")
         .map_err(|e| DecodeError::Zip(format!("missing document.grida: {e}")))?;
-    let mut fbs_bytes = Vec::with_capacity(doc.size() as usize);
-    doc.read_to_end(&mut fbs_bytes)
+
+    // Reject files whose announced uncompressed size exceeds the limit.
+    let announced_size = doc.size();
+    if announced_size > MAX_UNCOMPRESSED_SIZE {
+        return Err(DecodeError::Zip(format!(
+            "document.grida uncompressed size ({announced_size} bytes) exceeds limit ({MAX_UNCOMPRESSED_SIZE} bytes)"
+        )));
+    }
+
+    // Use a bounded reader to guard against actual data exceeding the limit
+    // (the announced size may be smaller than the real content in a crafted ZIP).
+    let alloc_hint = std::cmp::min(announced_size, MAX_UNCOMPRESSED_SIZE) as usize;
+    let mut fbs_bytes = Vec::with_capacity(alloc_hint);
+    // Read::take() on a mutable reference avoids consuming `doc`.
+    (&mut doc)
+        .take(MAX_UNCOMPRESSED_SIZE + 1)
+        .read_to_end(&mut fbs_bytes)
         .map_err(|e| DecodeError::Zip(format!("read document.grida: {e}")))?;
+
+    if fbs_bytes.len() as u64 > MAX_UNCOMPRESSED_SIZE {
+        return Err(DecodeError::Zip(format!(
+            "document.grida actual size ({} bytes) exceeds limit ({MAX_UNCOMPRESSED_SIZE} bytes)",
+            fbs_bytes.len()
+        )));
+    }
+
     Ok(fbs_bytes)
 }
 

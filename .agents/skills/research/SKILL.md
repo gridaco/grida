@@ -30,7 +30,7 @@ Before touching any external repo, check what Grida already knows.
 
 ### 1. Check existing research
 
-```
+```text
 docs/wg/research/chromium/   # 15 docs covering the full compositor pipeline
 ├── index.md                  # START HERE — topic map
 ├── glossary.md               ├── compositor-architecture.md

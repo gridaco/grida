@@ -118,6 +118,17 @@ fn main() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 fn inspect_json(bytes: &[u8], cli: &Cli) {
+    // --list-scenes and --scene are FBS/ZIP-only features; reject them for
+    // legacy JSON input to avoid silent misuse.
+    if cli.list_scenes {
+        eprintln!("error: --list-scenes is not supported for legacy JSON files (single scene only).");
+        std::process::exit(1);
+    }
+    if cli.scene_index.is_some() {
+        eprintln!("error: --scene is not supported for legacy JSON files (single scene only).");
+        std::process::exit(1);
+    }
+
     let content = match std::str::from_utf8(bytes) {
         Ok(s) => s,
         Err(e) => {

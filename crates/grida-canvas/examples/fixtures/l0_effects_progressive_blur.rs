@@ -65,6 +65,25 @@ pub fn build() -> Scene {
         ..LayerEffects::default()
     });
 
+    // Background content behind the backdrop card so FeBackdropBlur samples
+    // real pixels. Uses a contrasting fill to make the blur visually apparent.
+    let backdrop_bg = Node::Rectangle(RectangleNodeRec {
+        active: true,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::PassThrough,
+        mask: None,
+        transform: AffineTransform::from_box_center(gap * 3.0, 0.0, 200.0, 200.0, 0.0),
+        size: Size { width: 200.0, height: 200.0 },
+        corner_radius: RectangularCornerRadius::default(),
+        corner_smoothing: CornerSmoothing(0.0),
+        fills: Paints::new(vec![solid(220, 59, 59, 255)]),
+        strokes: Paints::new(vec![]),
+        stroke_style: StrokeStyle::default(),
+        stroke_width: StrokeWidth::None,
+        effects: LayerEffects::default(),
+        layout_child: None,
+    });
+
     // Backdrop progressive blur: center clear → edges blurred
     let backdrop = effect_rect(gap * 3.0, LayerEffects {
         backdrop_blur: Some(FeBackdropBlur {
@@ -81,6 +100,6 @@ pub fn build() -> Scene {
 
     flat_scene(
         "L0 Effects Progressive Blur",
-        vec![layer_tl_br, layer_top_bottom, layer_both, backdrop],
+        vec![layer_tl_br, layer_top_bottom, layer_both, backdrop_bg, backdrop],
     )
 }
