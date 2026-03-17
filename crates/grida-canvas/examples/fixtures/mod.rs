@@ -2,6 +2,11 @@
 //!
 //! Re-exports shared helpers from `fixture_helpers` so that
 //! `use super::*;` in each L0 module resolves correctly.
+//!
+//! Multiple example binaries share this module but each only uses a subset of
+//! the sub-modules, so unused warnings are expected and suppressed here.
+
+#![allow(dead_code)]
 
 pub use crate::fixture_helpers::*;
 
@@ -27,3 +32,4 @@ pub mod l0_type;
 pub mod l0_type_features;
 pub mod l0_type_fvar;
 pub mod l0_vector;
+pub mod cover;
