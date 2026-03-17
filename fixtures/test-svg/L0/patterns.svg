@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+    <title>Patterns</title>
+    <desc>L0 test fixture for patterns</desc>
+    <!-- Background -->
+    <rect width="800" height="600" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+    </style>
+
+    <defs>
+        <!-- 1. Basic Pattern (patternUnits="objectBoundingBox",
+        patternContentUnits="userSpaceOnUse") -->
+        <!-- width/height 0.2 means 20% of the bounding box -->
+        <pattern id="pat-basic" width="0.2" height="0.2">
+            <rect width="10" height="10" fill="red"/>
+            <circle cx="15" cy="15" r="5" fill="blue"/>
+        </pattern>
+
+        <!-- 2. patternUnits="userSpaceOnUse" -->
+        <!-- width/height are in absolute coordinates -->
+        <pattern id="pat-user-space" width="40" height="40" patternUnits="userSpaceOnUse">
+            <rect width="20" height="20" fill="green"/>
+            <circle cx="30" cy="30" r="10" fill="orange"/>
+        </pattern>
+
+        <!-- 3. patternContentUnits="objectBoundingBox" -->
+        <!-- Content coordinates are relative to the bounding box (0 to 1) -->
+        <pattern id="pat-content-bbox" width="0.2" height="0.2"
+            patternContentUnits="objectBoundingBox">
+            <rect width="0.1" height="0.1" fill="purple"/>
+            <circle cx="0.15" cy="0.15" r="0.05" fill="cyan"/>
+        </pattern>
+
+        <!-- 4. patternTransform -->
+        <pattern id="pat-transform" width="40" height="40" patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45) scale(1.5)">
+            <rect width="20" height="20" fill="magenta"/>
+            <rect x="20" y="20" width="20" height="20" fill="yellow"/>
+        </pattern>
+    </defs>
+
+    <!-- 1. Basic Pattern -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">Default (patternUnits=bbox, contentUnits=user)</text>
+        <rect width="150" height="100" fill="url(#pat-basic)" stroke="black"/>
+        <rect x="170" y="0" width="100" height="150" fill="url(#pat-basic)" stroke="black"/>
+    </g>
+
+    <!-- 2. User Space Pattern -->
+    <g transform="translate(400, 50)">
+        <text x="0" y="-10" class="label">patternUnits="userSpaceOnUse"</text>
+        <!-- The pattern tile size is fixed (40x40) regardless of the rect size -->
+        <rect width="150" height="100" fill="url(#pat-user-space)" stroke="black"/>
+        <!-- Notice how the pattern aligns with the user space origin, not the rect's top-left -->
+        <rect x="170" y="20" width="100" height="150" fill="url(#pat-user-space)" stroke="black"/>
+    </g>
+
+    <!-- 3. Content BBox Pattern -->
+    <g transform="translate(50, 300)">
+        <text x="0" y="-10" class="label">patternContentUnits="objectBoundingBox"</text>
+        <!-- The content scales with the rect -->
+        <rect width="150" height="100" fill="url(#pat-content-bbox)" stroke="black"/>
+        <rect x="170" y="0" width="100" height="150" fill="url(#pat-content-bbox)" stroke="black"/>
+    </g>
+
+    <!-- 4. Pattern Transform -->
+    <g transform="translate(400, 300)">
+        <text x="0" y="-10" class="label">patternTransform="rotate(45) scale(1.5)"</text>
+        <rect width="200" height="150" fill="url(#pat-transform)" stroke="black"/>
+    </g>
+
+</svg>
