@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+    <!-- Background -->
+    <rect width="400" height="400" fill="#ffffff"/>
+
+    <!-- Reference grid -->
+    <path d="M 200 0 L 200 400 M 0 100 L 400 100 M 0 200 L 400 200 M 0 300 L 400 300"
+        stroke="#eeeeee" stroke-width="1"/>
+
+    <!-- Origin markers -->
+    <circle cx="200" cy="100" r="3" fill="red"/>
+    <circle cx="200" cy="200" r="3" fill="red"/>
+    <circle cx="200" cy="300" r="3" fill="red"/>
+
+    <!-- Text inside a translated group -->
+    <g transform="translate(200, 100)">
+        <text x="0" y="0" font-size="16" fill="#000000" font-family="monospace">translated</text>
+    </g>
+
+    <!-- Text inside a rotated+translated group -->
+    <g transform="translate(200, 200)">
+        <g transform="rotate(30)">
+            <text x="0" y="0" font-size="16" fill="#000000" font-family="monospace">rotated</text>
+        </g>
+    </g>
+
+    <!-- Text inside a scaled+translated group -->
+    <g transform="translate(200, 300)">
+        <g transform="scale(1.5, 1.5)">
+            <text x="0" y="0" font-size="16" fill="#000000" font-family="monospace">scaled</text>
+        </g>
+    </g>
+
+    <!-- Text inside a skewed group -->
+    <g transform="translate(50, 100)">
+        <circle cx="0" cy="0" r="3" fill="blue"/>
+        <g transform="skewX(20)">
+            <text x="0" y="0" font-size="16" fill="#000000" font-family="monospace">skewX</text>
+        </g>
+    </g>
+
+    <!-- Text inside a matrix transformed group -->
+    <g transform="translate(50, 200)">
+        <circle cx="0" cy="0" r="3" fill="blue"/>
+        <g transform="matrix(0.866, 0.5, -0.5, 0.866, 0, 0)">
+            <text x="0" y="0" font-size="16" fill="#000000" font-family="monospace">matrix</text>
+        </g>
+    </g>
+
+    <!-- Deeply nested transformations -->
+    <g transform="translate(50, 300)">
+        <circle cx="0" cy="0" r="3" fill="blue"/>
+        <g transform="rotate(-15)">
+            <g transform="scale(1.2)">
+                <g transform="translate(10, 10)">
+                    <text x="0" y="0" font-size="16" fill="#000000" font-family="monospace">nested</text>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

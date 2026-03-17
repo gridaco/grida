@@ -391,22 +391,50 @@ impl GeometryCache {
                 );
 
                 const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
-                let width = layout
-                    .map(|l| l.width)
-                    .unwrap_or_else(|| measurements.max_width)
-                    .max(MIN_SIZE_DIRTY_HACK);
-                let height = layout
-                    .map(|l| l.height)
-                    .unwrap_or_else(|| n.height.unwrap_or(measurements.height))
-                    .max(MIN_SIZE_DIRTY_HACK);
 
-                let (x, y) = if let Some(l) = layout {
-                    (l.x, l.y)
+                // Check if this node's parent is a layout container.
+                // Same logic as the leaf-node branch: only use layout
+                // results for position when the parent actually provides
+                // a layout context. Under Group parents the layout
+                // result is synthetic and must not override the full
+                // schema transform.
+                let parent_is_layout_container = parent_id
+                    .as_ref()
+                    .and_then(|pid| graph.get_node(pid).ok())
+                    .map(|parent_node| {
+                        matches!(
+                            parent_node,
+                            Node::Container(_) | Node::InitialContainer(_)
+                        )
+                    })
+                    .unwrap_or(false);
+
+                let (local_transform, width, height) = if parent_is_layout_container {
+                    let width = layout
+                        .map(|l| l.width)
+                        .unwrap_or_else(|| measurements.max_width)
+                        .max(MIN_SIZE_DIRTY_HACK);
+                    let height = layout
+                        .map(|l| l.height)
+                        .unwrap_or_else(|| n.height.unwrap_or(measurements.height))
+                        .max(MIN_SIZE_DIRTY_HACK);
+                    let (x, y) = if let Some(l) = layout {
+                        (l.x, l.y)
+                    } else {
+                        (n.transform.x(), n.transform.y())
+                    };
+                    (AffineTransform::new(x, y, n.transform.rotation()), width, height)
                 } else {
-                    (n.transform.x(), n.transform.y())
+                    let width = layout
+                        .map(|l| l.width)
+                        .unwrap_or_else(|| measurements.max_width)
+                        .max(MIN_SIZE_DIRTY_HACK);
+                    let height = layout
+                        .map(|l| l.height)
+                        .unwrap_or_else(|| n.height.unwrap_or(measurements.height))
+                        .max(MIN_SIZE_DIRTY_HACK);
+                    (n.transform, width, height)
                 };
-
-                let local_transform = AffineTransform::new(x, y, n.transform.rotation());
                 let local_bounds = Rectangle {
                     x: 0.0,
                     y: 0.0,
@@ -457,24 +485,56 @@ impl GeometryCache {
                     _ => unreachable!("Has dedicated case above"),
                 };
 
-                // Position and size resolution:
-                // - If layout result exists: Use computed position/size (participating in flex layout)
-                // - If no layout result: Use schema transform (no layout engine, or non-participating nodes)
-                let (x, y, width, height) =
-                    if let Some(result) = layout_result.and_then(|r| r.get(id)) {
-                        // Has computed layout: use layout position and size
-                        (result.x, result.y, result.width, result.height)
-                    } else {
-                        // No layout: use schema transform
-                        (
-                            rec_transform.x(),
-                            rec_transform.y(),
-                            schema_width,
-                            schema_height,
+                // Check if this node's parent is a layout container (Container
+                // or ICB). Only those parents provide meaningful layout results
+                // (computed flex/block positions). Nodes under Group or
+                // BooleanOperation parents have no containing layout box, so
+                // their layout results are synthetic fallbacks — use the full
+                // schema transform directly to preserve scale, skew, and
+                // arbitrary matrix components (e.g. from SVG imports).
+                let parent_is_layout_container = parent_id
+                    .as_ref()
+                    .and_then(|pid| graph.get_node(pid).ok())
+                    .map(|parent_node| {
+                        matches!(
+                            parent_node,
+                            Node::Container(_) | Node::InitialContainer(_)
                         )
-                    };
+                    })
+                    .unwrap_or(false);
 
-                let local_transform = AffineTransform::new(x, y, rec_transform.rotation());
+                let (local_transform, width, height) = if parent_is_layout_container {
+                    // Parent is a layout container: use layout result for
+                    // position/size (flex/absolute layout), with rotation
+                    // from the schema transform.
+                    let (x, y, width, height) =
+                        if let Some(result) = layout_result.and_then(|r| r.get(id)) {
+                            (result.x, result.y, result.width, result.height)
+                        } else {
+                            (
+                                rec_transform.x(),
+                                rec_transform.y(),
+                                schema_width,
+                                schema_height,
+                            )
+                        };
+                    (AffineTransform::new(x, y, rec_transform.rotation()), width, height)
+                } else {
+                    // Parent is NOT a layout container (Group,
+                    // BooleanOperation, or root): use the full schema
+                    // transform. This preserves scale, skew, and arbitrary
+                    // matrix entries that don't fit the (x, y, rotation)
+                    // decomposition.
+                    let width = layout_result
+                        .and_then(|r| r.get(id))
+                        .map(|l| l.width)
+                        .unwrap_or(schema_width);
+                    let height = layout_result
+                        .and_then(|r| r.get(id))
+                        .map(|l| l.height)
+                        .unwrap_or(schema_height);
+                    (rec_transform, width, height)
+                };
 
                 let local_bounds = Rectangle {
                     x: 0.0,
