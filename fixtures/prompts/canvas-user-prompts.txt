@@ -247,6 +247,32 @@ the colors clash, pick something that works better
 i don't like the font, suggest something else
 it looks broken on mobile preview
 
+// --- single vector / svg illustration ---
+design a minimalist logo for a tech startup, just a geometric shape
+create a flat illustration of a mountain landscape for a hero section
+draw a cute ghost character for a 404 page
+design a badge for a "top contributor" award
+create a geometric pattern that can be used as a background
+design a simple map pin icon with a star inside
+draw a battery charging indicator with a lightning bolt
+create an illustration of a rocket launching for an empty state
+design a simple coffee cup icon for a cafe menu
+draw a minimalist outline of a cat for a pet store logo
+create a stylized sun icon for a weather app
+design a simple shopping cart icon with a plus sign
+draw a minimalist house icon for a real estate app
+create a flat illustration of a laptop with code on the screen
+design a simple calendar icon showing the 15th
+design a promotional poster for a summer music festival with a retro synthwave aesthetic
+create a single presentation slide explaining the water cycle with a diagram
+design a modern certificate of achievement for a coding bootcamp
+create a flyer for a neighborhood block party with a map and schedule
+design a social media infographic showing 5 tips for better sleep
+create a detailed architectural floor plan of a small studio apartment
+design a typographic poster featuring a famous quote with bold, overlapping letters
+create an isometric illustration of a cozy bedroom setup
+design a complex mandala pattern with intricate geometric details
+
 // ===========================================
 // PROJECT-SCOPED / LONG-RUNNING / BIG TASKS
 // ===========================================
