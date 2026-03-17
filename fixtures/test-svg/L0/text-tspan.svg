@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+    <title>Text and TSpan</title>
+    <desc>L0 test fixture for text and tspan layout behaviors</desc>
+    <!-- Background -->
+    <rect width="800" height="800" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+        .text-sample { font-family: sans-serif; font-size: 20px; fill: black; }
+        .ref-line { stroke: red; stroke-width: 1; stroke-dasharray: 2 2; }
+        .ref-dot { fill: red; r: 3; }
+    </style>
+
+    <!-- 1. Multiline Text using x and dy -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">1. Multiline (x=0, dy="1.2em")</text>
+        <line x1="0" y1="0" x2="0" y2="100" class="ref-line"/>
+
+        <text x="0" y="20" class="text-sample">
+            <tspan x="0">Line 1: The standard way</tspan>
+            <tspan x="0" dy="1.2em">Line 2: to do multiline</tspan>
+            <tspan x="0" dy="1.2em">Line 3: in SVG 1.1</tspan>
+        </text>
+    </g>
+
+    <!-- 2. Relative Positioning (dx, dy) -->
+    <g transform="translate(400, 50)">
+        <text x="0" y="-10" class="label">2. Relative Positioning (dx, dy)</text>
+
+        <text x="0" y="20" class="text-sample"> Normal text, then <tspan dx="20" dy="-10"
+                fill="blue">jump up</tspan>
+            <tspan dx="20" dy="20" fill="green">and down</tspan>
+        </text>
+
+        <!-- Staircase effect using continuous dy -->
+        <text x="0" y="70" class="text-sample">
+            <tspan>S</tspan>
+            <tspan dy="5">t</tspan>
+            <tspan dy="5">a</tspan>
+            <tspan dy="5">i</tspan>
+            <tspan dy="5">r</tspan>
+            <tspan dy="5">s</tspan>
+        </text>
+    </g>
+
+    <!-- 3. Absolute Positioning Lists (x="...", y="...") -->
+    <g transform="translate(50, 250)">
+        <text x="0" y="-10" class="label">3. Per-character positioning (x="10 30 60 100")</text>
+
+        <!-- The first 4 characters get specific X coordinates, the rest follow normally -->
+        <text x="0 30 70 120" y="20" class="text-sample">W I D E text</text>
+
+        <!-- Both x and y lists -->
+        <text x="0 20 40 60 80" y="60 50 60 50 60" class="text-sample">Bouncy!</text>
+    </g>
+
+    <!-- 4. Baseline Shifts (Superscript / Subscript) -->
+    <g transform="translate(400, 250)">
+        <text x="0" y="-10" class="label">4. Baseline Shift</text>
+        <line x1="0" y1="20" x2="200" y2="20" class="ref-line"/>
+
+        <text x="0" y="20" class="text-sample"> E = mc<tspan baseline-shift="super"
+                font-size="0.7em">2</tspan>
+        </text>
+
+        <line x1="0" y1="60" x2="200" y2="60" class="ref-line"/>
+        <text x="0" y="60" class="text-sample"> H<tspan baseline-shift="sub" font-size="0.7em">2</tspan>
+            O </text>
+    </g>
+
+    <!-- 5. Style Inheritance and Overrides -->
+    <g transform="translate(50, 400)">
+        <text x="0" y="-10" class="label">5. Style Inheritance</text>
+
+        <!-- Parent defines fill and font-weight -->
+        <text x="0" y="20" class="text-sample" fill="purple" font-weight="bold"> Bold Purple <tspan
+                fill="orange"> (Orange Override) </tspan>
+            <tspan font-weight="normal"> (Normal
+                Weight) </tspan> Back to Bold Purple </text>
+    </g>
+
+    <!-- 6. Nested TSpans -->
+    <g transform="translate(50, 550)">
+        <text x="0" y="-10" class="label">6. Nested &lt;tspan&gt;</text>
+
+        <text x="0" y="20" class="text-sample"> Level 0 <tspan fill="blue"> Level 1 <tspan
+                    font-style="italic">
+                    Level 2
+                </tspan> Level 1 again </tspan>
+        </text>
+    </g>
+
+</svg>
