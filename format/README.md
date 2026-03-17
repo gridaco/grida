@@ -61,6 +61,11 @@ python3 bin/activate-flatc -- --rust -o /tmp/grida-fbs-gen/rust format/grida.fbs
 >
 > **Contributor workflow**: after editing `grida.fbs`, run `pnpm build` (or the individual `prebuild` scripts in each package) to regenerate bindings, then commit the updated generated files alongside your schema change.
 
+## References
+
+- [Adobe Photoshop File Format Specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/) — PSD/PSB structure, image resources, layer and mask info; useful when comparing or aligning design-tool format concepts.
+- [Figma .fig (Kiwi) format](../.ref/figma/README.md) — In-repo: extracted Kiwi schema (`fig.kiwi`) and tooling for Figma’s binary `.fig` format; see `/.ref/figma/`.
+
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md).

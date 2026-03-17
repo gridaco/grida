@@ -88,7 +88,10 @@ impl LayoutEngine {
 
         // Build and compute layout for each root subtree
         for root_id in &roots {
-            if let Some(root_taffy_id) = self.build_taffy_subtree(root_id, graph, viewport_size) {
+            let mut extra_roots = Vec::new();
+            if let Some(root_taffy_id) =
+                self.build_taffy_subtree(root_id, graph, viewport_size, &mut extra_roots)
+            {
                 // Compute layout with viewport as available space
                 let _ = self.tree.compute_layout(
                     root_taffy_id,
@@ -98,10 +101,27 @@ impl LayoutEngine {
                     },
                     text_measure.as_mut(),
                 );
-
-                // Extract all computed layouts
-                self.extract_all_layouts(root_id, graph);
             }
+
+            // Compute layout for Taffy subtrees discovered under non-Taffy
+            // parents (e.g. Containers nested under Group/BooleanOperation).
+            for extra_taffy_id in extra_roots {
+                let _ = self.tree.compute_layout(
+                    extra_taffy_id,
+                    taffy::Size {
+                        width: AvailableSpace::Definite(viewport_size.width),
+                        height: AvailableSpace::Definite(viewport_size.height),
+                    },
+                    text_measure.as_mut(),
+                );
+            }
+
+            // Extract layouts for ALL roots, including those that don't participate
+            // in Taffy (e.g. BooleanOperation, Group). extract_all_layouts() handles
+            // non-Taffy nodes by creating manual layout results from schema data.
+            // Without this, descendants of non-Taffy root nodes would be orphaned
+            // from layout results, causing panics in GeometryCache.
+            self.extract_all_layouts(root_id, graph);
         }
 
         &self.result
@@ -220,20 +240,37 @@ impl LayoutEngine {
     /// This universal method handles all node types without switch-case logic.
     /// Each node gets an appropriate Taffy style based on its type and properties.
     ///
-    /// Nodes without layout_child support are skipped from Taffy tree but still
-    /// get layout results created manually from their schema.
+    /// Nodes without layout_child support (Group, BooleanOperation) are skipped
+    /// from the Taffy tree themselves but their children are still visited so
+    /// that Taffy-capable descendants (e.g. Containers) receive proper flex
+    /// layout instead of only schema fallbacks. Any Taffy subtrees discovered
+    /// under non-Taffy parents are collected in `extra_roots` so the caller
+    /// can compute layout for them.
     fn build_taffy_subtree(
         &mut self,
         node_id: &NodeId,
         graph: &SceneGraph,
         viewport_size: Size,
+        extra_roots: &mut Vec<taffy::NodeId>,
     ) -> Option<taffy::NodeId> {
         let node = graph.get_node(node_id).ok()?;
 
-        // Nodes that don't participate in Taffy layout (Vector, SVGPath, Group, etc.)
-        // are skipped and get manual layout results created in extract_all_layouts()
+        // Nodes that don't participate in Taffy layout (Group, BooleanOperation)
+        // are skipped themselves, but we still recurse into their children so
+        // Taffy-capable descendants get proper layout computation.
         if !Self::should_participate_in_taffy(node) {
-            return None; // Skip Taffy, use manual layout result from schema
+            if let Some(children) = graph.get_children(node_id) {
+                for child_id in children {
+                    if let Some(taffy_id) =
+                        self.build_taffy_subtree(child_id, graph, viewport_size, extra_roots)
+                    {
+                        // This child forms an independent Taffy subtree root
+                        // under a non-Taffy parent; collect it for layout computation.
+                        extra_roots.push(taffy_id);
+                    }
+                }
+            }
+            return None; // This node itself is not in the Taffy tree
         }
 
         // Get style for this node (universal mapping)
@@ -260,7 +297,9 @@ impl LayoutEngine {
                 // Build children recursively, filtering out those that shouldn't participate
                 let taffy_children: Vec<taffy::NodeId> = children
                     .iter()
-                    .filter_map(|child_id| self.build_taffy_subtree(child_id, graph, viewport_size))
+                    .filter_map(|child_id| {
+                        self.build_taffy_subtree(child_id, graph, viewport_size, extra_roots)
+                    })
                     .collect();
 
                 // Create parent with children
@@ -1474,5 +1513,209 @@ mod tests {
             layout.y, 250.0,
             "Vector should be positioned at transform.y"
         );
+    }
+
+    /// Test: Root-level BooleanOperation with Container descendants
+    ///
+    /// Reproduces the panic from geometry.rs:307:
+    /// "Container must have layout result when layout engine is used"
+    ///
+    /// BooleanOperation nodes don't participate in Taffy layout, so when one is
+    /// a scene root, build_taffy_subtree() returns None. Previously, compute()
+    /// would skip extract_all_layouts() entirely for that root, leaving all
+    /// descendant containers without layout results.
+    #[test]
+    fn test_root_boolean_operation_with_container_descendants() {
+        use crate::vectornetwork::*;
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Root: BooleanOperation (does NOT participate in Taffy)
+        let boolean_node = BooleanPathOperationNodeRec {
+            active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
+            transform: Some(AffineTransform::new(10.0, 20.0, 0.0)),
+            op: BooleanPathOperation::Union,
+            corner_radius: None,
+            fills: Paints::default(),
+            strokes: Paints::default(),
+            stroke_style: StrokeStyle::default(),
+            stroke_width: SingularStrokeWidth(None),
+        };
+        let bool_id = graph.append_child(Node::BooleanOperation(boolean_node), Parent::Root);
+
+        // Child 1: Container (must get layout result)
+        let mut container = nf.create_container_node();
+        container.layout_dimensions.layout_target_width = Some(200.0);
+        container.layout_dimensions.layout_target_height = Some(100.0);
+        let container_id =
+            graph.append_child(Node::Container(container), Parent::NodeId(bool_id));
+
+        // Grandchild: Rectangle inside the container
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 50.0,
+            height: 50.0,
+        };
+        let rect_id = graph.append_child(Node::Rectangle(rect), Parent::NodeId(container_id));
+
+        // Child 2: Another Container nested deeper
+        let mut container2 = nf.create_container_node();
+        container2.layout_dimensions.layout_target_width = Some(80.0);
+        container2.layout_dimensions.layout_target_height = Some(60.0);
+        let container2_id =
+            graph.append_child(Node::Container(container2), Parent::NodeId(container_id));
+
+        // Great-grandchild: Vector inside container2
+        let vector_node = VectorNodeRec {
+            active: true,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            effects: LayerEffects::default(),
+            transform: AffineTransform::new(0.0, 0.0, 0.0),
+            network: VectorNetwork {
+                vertices: vec![(0.0, 0.0), (30.0, 0.0), (30.0, 30.0)],
+                segments: vec![
+                    VectorNetworkSegment::ab(0, 1),
+                    VectorNetworkSegment::ab(1, 2),
+                    VectorNetworkSegment::ab(2, 0),
+                ],
+                regions: vec![],
+            },
+            corner_radius: 0.0,
+            fills: Paints::default(),
+            strokes: Paints::default(),
+            stroke_width: 0.0,
+            stroke_width_profile: None,
+            stroke_align: StrokeAlign::Inside,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
+            stroke_dash_array: None,
+            marker_start_shape: StrokeMarkerPreset::default(),
+            marker_end_shape: StrokeMarkerPreset::default(),
+            layout_child: None,
+        };
+        let vector_id =
+            graph.append_child(Node::Vector(vector_node), Parent::NodeId(container2_id));
+
+        let scene = Scene {
+            name: "Root boolean with container descendants".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        // This used to panic: containers under a non-taffy root had no layout results
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+            None,
+        );
+
+        // All nodes must have layout results
+        assert!(
+            result.get(&bool_id).is_some(),
+            "Root BooleanOperation must have layout result"
+        );
+        assert!(
+            result.get(&container_id).is_some(),
+            "Container under BooleanOperation must have layout result"
+        );
+        assert!(
+            result.get(&rect_id).is_some(),
+            "Rectangle under Container must have layout result"
+        );
+        assert!(
+            result.get(&container2_id).is_some(),
+            "Nested Container must have layout result"
+        );
+        assert!(
+            result.get(&vector_id).is_some(),
+            "Vector under nested Container must have layout result"
+        );
+
+        // Verify the BooleanOperation gets schema position
+        let bool_layout = result.get(&bool_id).unwrap();
+        assert_eq!(bool_layout.x, 10.0, "BooleanOperation x from transform");
+        assert_eq!(bool_layout.y, 20.0, "BooleanOperation y from transform");
+
+        // Verify container dimensions from schema
+        let container_layout = result.get(&container_id).unwrap();
+        assert_eq!(container_layout.width, 200.0);
+        assert_eq!(container_layout.height, 100.0);
+
+        let container2_layout = result.get(&container2_id).unwrap();
+        assert_eq!(container2_layout.width, 80.0);
+        assert_eq!(container2_layout.height, 60.0);
+    }
+
+    /// Test: Root-level Group with Container descendants
+    ///
+    /// Same scenario as BooleanOperation — Group also doesn't participate in Taffy.
+    #[test]
+    fn test_root_group_with_container_descendants() {
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Root: Group (does NOT participate in Taffy)
+        let group = nf.create_group_node();
+        let group_id = graph.append_child(Node::Group(group), Parent::Root);
+
+        // Child: Container
+        let mut container = nf.create_container_node();
+        container.layout_dimensions.layout_target_width = Some(150.0);
+        container.layout_dimensions.layout_target_height = Some(75.0);
+        let container_id =
+            graph.append_child(Node::Container(container), Parent::NodeId(group_id));
+
+        // Grandchild: Rectangle
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 40.0,
+            height: 40.0,
+        };
+        let rect_id = graph.append_child(Node::Rectangle(rect), Parent::NodeId(container_id));
+
+        let scene = Scene {
+            name: "Root group with container descendants".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+            None,
+        );
+
+        // All nodes must have layout results
+        assert!(
+            result.get(&group_id).is_some(),
+            "Root Group must have layout result"
+        );
+        assert!(
+            result.get(&container_id).is_some(),
+            "Container under Group must have layout result"
+        );
+        assert!(
+            result.get(&rect_id).is_some(),
+            "Rectangle under Container must have layout result"
+        );
+
+        let container_layout = result.get(&container_id).unwrap();
+        assert_eq!(container_layout.width, 150.0);
+        assert_eq!(container_layout.height, 75.0);
     }
 }
