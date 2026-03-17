@@ -73,7 +73,7 @@
         <text x="0" y="-10" class="label">5. Style Inheritance</text>
 
         <!-- Parent defines fill and font-weight -->
-        <text x="0" y="20" class="text-sample" fill="purple" font-weight="bold"> Bold Purple <tspan
+        <text x="0" y="20" class="text-sample" style="fill: purple;" font-weight="bold"> Bold Purple <tspan
                 fill="orange"> (Orange Override) </tspan>
             <tspan font-weight="normal"> (Normal
                 Weight) </tspan> Back to Bold Purple </text>

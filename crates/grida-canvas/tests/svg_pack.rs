@@ -1015,6 +1015,185 @@ fn pack_gradient_transform_rotation_preserved() {
 }
 
 // ---------------------------------------------------------------------------
+// Text import model tests (chunk-per-TextSpan)
+// ---------------------------------------------------------------------------
+
+/// Multiline text via `<tspan x="0" dy="1.2em">` should produce a Group
+/// containing multiple TextSpan children, each with a distinct Y position.
+/// The TextSpan nodes must NOT overlap (each successive line should be
+/// further down the page).
+#[test]
+fn pack_text_multiline_tspan_produces_group_with_ordered_y() {
+    use cg::node::schema::Node;
+    use cg::svg::pack;
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+      <text x="10" y="30" font-size="20" fill="black">
+        <tspan x="10">Line one</tspan>
+        <tspan x="10" dy="1.2em">Line two</tspan>
+        <tspan x="10" dy="1.2em">Line three</tspan>
+      </text>
+    </svg>"##;
+
+    let graph = pack::from_svg_str(svg).expect("should parse");
+
+    // Collect all TextSpan nodes and their schema transforms
+    fn collect_text_spans(
+        graph: &cg::node::scene_graph::SceneGraph,
+        id: &cg::node::schema::NodeId,
+        out: &mut Vec<(String, f32)>, // (text, transform y)
+    ) {
+        let node = graph.get_node(id).expect("node");
+        if let Node::TextSpan(n) = node {
+            out.push((n.text.clone(), n.transform.y()));
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                collect_text_spans(graph, child_id, out);
+            }
+        }
+    }
+
+    let mut spans = Vec::new();
+    for r in graph.roots() {
+        collect_text_spans(&graph, r, &mut spans);
+    }
+
+    assert!(
+        spans.len() >= 3,
+        "expected at least 3 TextSpan nodes (one per line), got {}",
+        spans.len()
+    );
+
+    // Each successive span should have a larger Y (further down)
+    for i in 1..spans.len() {
+        assert!(
+            spans[i].1 > spans[i - 1].1,
+            "line {} ({:?}, y={:.1}) should be below line {} ({:?}, y={:.1})",
+            i,
+            spans[i].0,
+            spans[i].1,
+            i - 1,
+            spans[i - 1].0,
+            spans[i - 1].1,
+        );
+    }
+}
+
+/// A `<text>` with multiple styled `<tspan>`s in a single line should produce
+/// a single TextSpan (since they belong to one chunk with no absolute
+/// repositioning). The text content should be the full concatenated string.
+#[test]
+fn pack_text_inline_tspans_single_chunk() {
+    use cg::node::schema::Node;
+    use cg::svg::pack;
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+      <text x="10" y="30" font-size="20" fill="black">
+        Hello <tspan fill="red">world</tspan> end
+      </text>
+    </svg>"##;
+
+    let graph = pack::from_svg_str(svg).expect("should parse");
+
+    fn collect_text_spans(
+        graph: &cg::node::scene_graph::SceneGraph,
+        id: &cg::node::schema::NodeId,
+        out: &mut Vec<String>,
+    ) {
+        let node = graph.get_node(id).expect("node");
+        if let Node::TextSpan(n) = node {
+            out.push(n.text.clone());
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                collect_text_spans(graph, child_id, out);
+            }
+        }
+    }
+
+    let mut spans = Vec::new();
+    for r in graph.roots() {
+        collect_text_spans(&graph, r, &mut spans);
+    }
+
+    // Inline tspans within one chunk → single TextSpan with all text
+    assert_eq!(
+        spans.len(),
+        1,
+        "inline tspans in one chunk should produce 1 TextSpan, got {} ({:?})",
+        spans.len(),
+        spans
+    );
+
+    // The text should contain all the words
+    let text = &spans[0];
+    assert!(text.contains("Hello"), "text should contain 'Hello': {text}");
+    assert!(text.contains("world"), "text should contain 'world': {text}");
+    assert!(text.contains("end"), "text should contain 'end': {text}");
+}
+
+/// Multi-chunk text (3+ lines) should produce a Group node containing
+/// TextSpan children, not bare TextSpan siblings.
+#[test]
+fn pack_text_multichunk_creates_group_parent() {
+    use cg::node::schema::Node;
+    use cg::svg::pack;
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+      <text x="10" y="30" font-size="20" fill="black">
+        <tspan x="10">First</tspan>
+        <tspan x="10" dy="1.2em">Second</tspan>
+        <tspan x="10" dy="1.2em">Third</tspan>
+      </text>
+    </svg>"##;
+
+    let graph = pack::from_svg_str(svg).expect("should parse");
+
+    // Find the first Group node that is NOT the root Container
+    fn find_text_group(
+        graph: &cg::node::scene_graph::SceneGraph,
+        id: &cg::node::schema::NodeId,
+    ) -> Option<cg::node::schema::NodeId> {
+        let node = graph.get_node(id).expect("node");
+        if let Node::Group(_) = node {
+            // Check if it has TextSpan children
+            if let Some(children) = graph.get_children(id) {
+                let has_text_child = children.iter().any(|cid| {
+                    matches!(graph.get_node(cid), Ok(Node::TextSpan(_)))
+                });
+                if has_text_child {
+                    return Some(*id);
+                }
+            }
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                if let Some(found) = find_text_group(graph, child_id) {
+                    return Some(found);
+                }
+            }
+        }
+        None
+    }
+
+    let group_id = graph
+        .roots()
+        .iter()
+        .find_map(|r| find_text_group(&graph, r))
+        .expect("multi-chunk text should create a Group with TextSpan children");
+
+    let children = graph
+        .get_children(&group_id)
+        .expect("group should have children");
+    assert!(
+        children.len() >= 3,
+        "text Group should have >= 3 TextSpan children, got {}",
+        children.len()
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Bulk fixture tests — use `tool_svg_batch` for large external corpora
 // e.g. cargo run --release --example tool_svg_batch -- fixtures/local/oxygen-icons-5.116.0/scalable
 // ---------------------------------------------------------------------------

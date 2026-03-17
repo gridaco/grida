@@ -149,6 +149,15 @@ fn convert_path(path: &usvg::Path, parent_world: &CGTransform2D) -> Result<IRSVG
     })
 }
 
+/// Convert a usvg `Text` into our IR representation.
+///
+/// Model: `<text>` → Group, each **chunk** → TextSpan child.
+/// See `docs/wg/feat-svg/text-import.md` for rationale.
+///
+/// A chunk is created by usvg at every absolute `x`/`y` reposition.
+/// Each chunk has a resolved position and a single text string.
+/// Inline style variation within a chunk is lost — we take the first
+/// visible span's style.
 fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVGTextNode, String> {
     let abs: CGTransform2D = text.abs_transform().into();
     let relative = extract_relative_transform(parent_world, &abs);
@@ -159,6 +168,7 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
         combined_text.push_str(chunk.text());
     }
 
+    // Global fill/stroke: first visible span across all chunks.
     let fill = text.chunks().iter().find_map(|chunk| {
         chunk
             .spans()
@@ -176,41 +186,67 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
             .map(SVGStrokeAttributes::from)
     });
 
+    // One IR span per chunk (not per usvg span).
+    //
+    // Resolve chunk positions by replicating usvg's layout logic:
+    //   x = chunk.x.unwrap_or(last_x)
+    //   y = chunk.y.unwrap_or(last_y)
+    // Then accumulate dx/dy offsets per-codepoint from text.dx()/text.dy().
+    let dx_list = text.dx();
+    let dy_list = text.dy();
+    let mut last_x: f32 = 0.0;
+    let mut last_y: f32 = 0.0;
+    let mut char_offset: usize = 0;
+
     let mut spans = Vec::new();
     for chunk in text.chunks() {
-        let offset_x = chunk.x().unwrap_or(0.0);
-        let offset_y = chunk.y().unwrap_or(0.0);
-        let chunk_text = chunk.text();
-        for span in chunk.spans() {
-            if !span.is_visible() {
-                continue;
-            }
-            let start = span.start();
-            let end = span.end().min(chunk_text.len());
-            if start >= end {
-                continue;
-            }
-            let span_slice = &chunk_text[start..end];
-            if span_slice.trim().is_empty() {
-                continue;
-            }
-            let mut span_affine: AffineTransform = relative.into();
-            if offset_x != 0.0 || offset_y != 0.0 {
-                span_affine.translate(offset_x, offset_y);
-            }
+        let chunk_text = chunk.text().trim();
 
-            let span_fill = span.fill().map(SVGFillAttributes::from);
-            let span_stroke = span.stroke().map(SVGStrokeAttributes::from);
+        // Resolve absolute position, falling back to last cursor position.
+        let mut x = chunk.x().unwrap_or(last_x);
+        let mut y = chunk.y().unwrap_or(last_y);
 
-            spans.push(IRSVGTextSpanNode {
-                transform: CGTransform2D::from(span_affine),
-                text: span_slice.to_string(),
-                fill: span_fill,
-                stroke: span_stroke,
-                font_size: Some(span.font_size().get()),
-                anchor: chunk.anchor().into(),
-            });
+        // Apply dx/dy for the first codepoint of this chunk (the relative
+        // offset that usvg stores on text.dx()/text.dy(), not on the chunk).
+        if let Some(&dx) = dx_list.get(char_offset) {
+            x += dx;
         }
+        if let Some(&dy) = dy_list.get(char_offset) {
+            y += dy;
+        }
+
+        // Advance char_offset past this chunk's codepoints.
+        let chunk_chars = chunk.text().chars().count();
+        char_offset += chunk_chars;
+
+        // Update cursor for next chunk (simplified: advance x by 0 since
+        // we don't have glyph advance data; keep y as resolved).
+        last_x = x;
+        last_y = y;
+
+        if chunk_text.is_empty() {
+            continue;
+        }
+
+        let mut chunk_affine: AffineTransform = relative.into();
+        if x != 0.0 || y != 0.0 {
+            chunk_affine.translate(x, y);
+        }
+
+        // Style from first visible span in this chunk.
+        let first_visible = chunk.spans().iter().find(|s| s.is_visible());
+        let chunk_fill = first_visible.and_then(|s| s.fill()).map(SVGFillAttributes::from);
+        let chunk_stroke = first_visible.and_then(|s| s.stroke()).map(SVGStrokeAttributes::from);
+        let font_size = first_visible.map(|s| s.font_size().get());
+
+        spans.push(IRSVGTextSpanNode {
+            transform: CGTransform2D::from(chunk_affine),
+            text: chunk_text.to_string(),
+            fill: chunk_fill,
+            stroke: chunk_stroke,
+            font_size,
+            anchor: chunk.anchor().into(),
+        });
     }
 
     Ok(IRSVGTextNode {
