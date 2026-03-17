@@ -219,6 +219,39 @@ over a stripe pattern (same approach as `golden_liquid_glass.rs`).
 
 ---
 
+## L0-effects-progressive-blur
+
+Progressive blur (gradient-varying blur radius) as both layer blur and backdrop blur.
+
+```text
+scene "L0 Effects Progressive Blur"
+├─ rectangle 200×200  layer progressive blur: top-left clear → bottom-right blurred (radius 0→20)
+├─ rectangle 200×200  layer progressive blur: top clear → bottom blurred (radius 0→30)
+├─ rectangle 200×200  layer progressive blur: left→right, both ends blurred (radius 5→25)
+└─ rectangle 200×200  backdrop progressive blur: center clear → edges blurred (radius 0→15)
+```
+
+**Exercises:** FeProgressiveBlur (start, end, radius, radius2), FeLayerBlur with Progressive variant, FeBackdropBlur with Progressive variant, varying gradient directions.
+
+---
+
+## L0-strokes-varwidth
+
+Variable-width stroke profiles on vector paths with different taper and width patterns.
+
+```text
+scene "L0 Strokes VarWidth"
+├─ vector  S-curve, taper profile (thick start → thin end, 2 stops)
+├─ vector  S-curve, reverse taper (thin start → thick end, 2 stops)
+├─ vector  S-curve, bulge profile (thin → thick → thin, 3 stops)
+├─ vector  S-curve, multi-stop profile (irregular widths, 4 stops)
+└─ vector  S-curve, uniform profile (constant width, 2 stops)
+```
+
+**Exercises:** VarWidthProfile (base, stops), WidthStop (u, r), taper, reverse taper, bulge, multi-stop, uniform fallback.
+
+---
+
 ## L0-type
 
 Core typography: font sizes, weights, alignment, decoration, spacing, transforms, stroke, effects.
@@ -351,16 +384,31 @@ scene "L0 Layout Flex"
 
 ## L0-layout-transform
 
-Rotation and affine transforms on containers and shapes.
+Comprehensive affine transform coverage: rotations at key angles, custom transform origins, nested container+child composition, and non-rectangular shape rotations.
 
 ```text
 scene "L0 Layout Transform"
-├─ container  200×150  rotated 90°, Cartesian at (300, 50), blue fill
-├─ rectangle  120×80   rotated 45°, at (50, 50), red fill
-└─ line       200px    rotated 45°, at (400, 200), black stroke 2px
+├─ rectangle 100×60  rotation=0° (identity baseline)
+├─ rectangle 100×60  rotation=15° (small angle)
+├─ rectangle 100×60  rotation=45°
+├─ rectangle 100×60  rotation=90°
+├─ rectangle 100×60  rotation=180° (flip)
+├─ rectangle 100×60  rotation=270° (≡ -90°)
+├─ ellipse   120×60  rotation=30°
+├─ line      150px   rotation=60°
+├─ line      150px   rotation=330° (≡ -30°)
+├─ rectangle 100×60  rotation=45°, origin=CENTER (default)
+├─ rectangle 100×60  rotation=45°, origin=TOP_LEFT (0,0)
+├─ rectangle 100×60  rotation=45°, origin=BOTTOM_RIGHT (1,1)
+├─ container 200×120 rotation=90°, Cartesian position
+│  └─ rectangle 80×50  child (inherits parent rotation)
+├─ container 200×120 rotation=30°, Cartesian position
+│  └─ rectangle 80×50  rotation=45° (world rotation=75°)
+└─ container 120×120 rotation=45°, Inset position, corner_radius=12, clip=true
+   └─ rectangle 100×100 child (clipped by rotated container)
 ```
 
-**Exercises:** Container rotation, shape rotation via AffineTransform, line rotation.
+**Exercises:** Rotation at 0/15/45/90/180/270°, ellipse rotation, line rotation (positive and negative angles), custom transform origin via `from_box()` (center, top-left, bottom-right), container rotation with child (inherited transform), nested rotation composition (30°+45°=75°), rotated container with Inset positioning, clipped rotated container.
 
 ---
 

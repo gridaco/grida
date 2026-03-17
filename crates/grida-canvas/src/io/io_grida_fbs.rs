@@ -29,11 +29,12 @@ use crate::cg::{
     color::CGColor,
     fe::{
         FeBackdropBlur, FeBlur, FeGaussianBlur, FeLayerBlur, FeLiquidGlass, FeNoiseEffect,
-        FeShadow, FilterShadowEffect, NoiseEffectColors,
+        FeProgressiveBlur, FeShadow, FilterShadowEffect, NoiseEffectColors,
     },
     stroke_dasharray::StrokeDashArray,
     stroke_width::{RectangularStrokeWidth, SingularStrokeWidth, StrokeWidth},
     tilemode::TileMode,
+    varwidth,
     types::{
         Axis, BlendMode, BooleanPathOperation, CGPoint, ContainerClipFlag, CornerSmoothing,
         CrossAxisAlignment, EdgeInsets, FontWeight, GradientStop, ImageFilters, ImagePaint,
@@ -679,10 +680,59 @@ fn decode_paints_vec(
 // Effects decoding
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Decode a blur union (currently always Gaussian) from the FBS blur payload.
-fn decode_fe_blur(gaussian: Option<fbs::FeGaussianBlur<'_>>) -> FeBlur {
+/// Decode the `FeBlur` union from an `FeLayerBlur` or `FeBackdropBlur` table.
+///
+/// Checks the `blur_type` discriminant first; falls back to Gaussian if
+/// the variant is unrecognised or the payload is missing.
+fn decode_fe_blur_from_layer(lb: &fbs::FeLayerBlur<'_>) -> FeBlur {
+    match lb.blur_type() {
+        fbs::FeBlur::FeProgressiveBlur => {
+            if let Some(p) = lb.blur_as_fe_progressive_blur() {
+                return decode_progressive_blur(&p);
+            }
+        }
+        _ => {}
+    }
+    // Default / Gaussian path
     FeBlur::Gaussian(FeGaussianBlur {
-        radius: gaussian.map(|g| g.radius()).unwrap_or(0.0),
+        radius: lb
+            .blur_as_fe_gaussian_blur()
+            .map(|g| g.radius())
+            .unwrap_or(0.0),
+    })
+}
+
+fn decode_fe_blur_from_backdrop(bb: &fbs::FeBackdropBlur<'_>) -> FeBlur {
+    match bb.blur_type() {
+        fbs::FeBlur::FeProgressiveBlur => {
+            if let Some(p) = bb.blur_as_fe_progressive_blur() {
+                return decode_progressive_blur(&p);
+            }
+        }
+        _ => {}
+    }
+    FeBlur::Gaussian(FeGaussianBlur {
+        radius: bb
+            .blur_as_fe_gaussian_blur()
+            .map(|g| g.radius())
+            .unwrap_or(0.0),
+    })
+}
+
+fn decode_progressive_blur(p: &fbs::FeProgressiveBlur<'_>) -> FeBlur {
+    let start = p
+        .start()
+        .map(|a| Alignment(a.x(), a.y()))
+        .unwrap_or(Alignment(0.0, 0.0));
+    let end = p
+        .end()
+        .map(|a| Alignment(a.x(), a.y()))
+        .unwrap_or(Alignment(0.0, 0.0));
+    FeBlur::Progressive(FeProgressiveBlur {
+        start,
+        end,
+        radius: p.radius(),
+        radius2: p.radius2(),
     })
 }
 
@@ -696,14 +746,14 @@ fn decode_layer_effects(effects: Option<fbs::LayerEffects<'_>>) -> LayerEffects 
 
     if let Some(lb) = effects.fe_blur() {
         out.blur = Some(FeLayerBlur {
-            blur: decode_fe_blur(lb.blur_as_fe_gaussian_blur()),
+            blur: decode_fe_blur_from_layer(&lb),
             active: lb.active(),
         });
     }
 
     if let Some(bb) = effects.fe_backdrop_blur() {
         out.backdrop_blur = Some(FeBackdropBlur {
-            blur: decode_fe_blur(bb.blur_as_fe_gaussian_blur()),
+            blur: decode_fe_blur_from_backdrop(&bb),
             active: bb.active(),
         });
     }
@@ -828,14 +878,33 @@ enum_map!(decode_text_align_vertical, encode_text_align_vertical, fbs::TextAlign
     Top, Center, Bottom,
 });
 
-/// Decode a `StrokeGeometryTrait` into `(StrokeStyle, f32 stroke_width)`.
-fn decode_stroke_geometry_trait(sg: Option<fbs::StrokeGeometryTrait<'_>>) -> (StrokeStyle, f32) {
+/// Decode a `StrokeGeometryTrait` into `(StrokeStyle, f32, Option<VarWidthProfile>)`.
+fn decode_stroke_geometry_trait(
+    sg: Option<fbs::StrokeGeometryTrait<'_>>,
+) -> (StrokeStyle, f32, Option<varwidth::VarWidthProfile>) {
     let sg = match sg {
         Some(s) => s,
-        None => return (StrokeStyle::default(), 0.0),
+        None => return (StrokeStyle::default(), 0.0, None),
     };
     let style = decode_stroke_style_from_fbs(sg.stroke_style());
-    (style, sg.stroke_width())
+    let profile = sg.stroke_width_profile().map(|p| {
+        let stops = p
+            .stops()
+            .map(|stops_vec| {
+                (0..stops_vec.len())
+                    .map(|i| {
+                        let s = stops_vec.get(i);
+                        varwidth::WidthStop { u: s.u(), r: s.r() }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        varwidth::VarWidthProfile {
+            base: sg.stroke_width() * 0.5,
+            stops,
+        }
+    });
+    (style, sg.stroke_width(), profile)
 }
 
 /// Decode a `RectangularStrokeGeometryTrait` into `(StrokeStyle, StrokeWidth)`.
@@ -1394,7 +1463,8 @@ fn decode_vector_node(
     vn: &fbs::VectorNode<'_>,
 ) -> Node {
     let sl = decode_shape_layout(layer, lc.rotation_cos_sin);
-    let (stroke_style, stroke_width_f32) = decode_stroke_geometry_trait(vn.stroke_geometry());
+    let (stroke_style, stroke_width_f32, stroke_width_profile) =
+        decode_stroke_geometry_trait(vn.stroke_geometry());
 
     Node::Vector(VectorNodeRec {
         active: lc.active,
@@ -1407,7 +1477,7 @@ fn decode_vector_node(
         fills: decode_paints_vec(vn.fill_paints()),
         strokes: decode_paints_vec(vn.stroke_paints()),
         stroke_width: stroke_width_f32,
-        stroke_width_profile: None,
+        stroke_width_profile,
         stroke_align: stroke_style.stroke_align,
         stroke_cap: stroke_style.stroke_cap,
         stroke_join: stroke_style.stroke_join,
@@ -1487,7 +1557,8 @@ fn decode_boolean_operation_node(
         .corner_radius()
         .and_then(|cr| cr.corner_radius())
         .map(|r| r.rx());
-    let (stroke_style, stroke_width_f32) = decode_stroke_geometry_trait(bon.stroke_geometry());
+    let (stroke_style, stroke_width_f32, _profile) =
+        decode_stroke_geometry_trait(bon.stroke_geometry());
 
     Node::BooleanOperation(BooleanPathOperationNodeRec {
         active: lc.active,
@@ -2248,6 +2319,34 @@ fn encode_affine_to_cg_transform(t: &AffineTransform) -> fbs::CGTransform2D {
 // Effects encoding
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Encode an `FeBlur` variant into its FBS union discriminant + payload.
+fn encode_fe_blur<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    blur: &FeBlur,
+) -> (fbs::FeBlur, flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+    match blur {
+        FeBlur::Gaussian(g) => {
+            let offset =
+                fbs::FeGaussianBlur::create(fbb, &fbs::FeGaussianBlurArgs { radius: g.radius });
+            (fbs::FeBlur::FeGaussianBlur, offset.as_union_value())
+        }
+        FeBlur::Progressive(p) => {
+            let fbs_start = fbs::Alignment::new(p.start.0, p.start.1);
+            let fbs_end = fbs::Alignment::new(p.end.0, p.end.1);
+            let offset = fbs::FeProgressiveBlur::create(
+                fbb,
+                &fbs::FeProgressiveBlurArgs {
+                    start: Some(&fbs_start),
+                    end: Some(&fbs_end),
+                    radius: p.radius,
+                    radius2: p.radius2,
+                },
+            );
+            (fbs::FeBlur::FeProgressiveBlur, offset.as_union_value())
+        }
+    }
+}
+
 fn encode_layer_effects<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     effects: &LayerEffects,
@@ -2262,22 +2361,20 @@ fn encode_layer_effects<'a, A: flatbuffers::Allocator + 'a>(
     }
 
     let blur_offset = effects.blur.as_ref().map(|lb| {
-        let radius = match &lb.blur { FeBlur::Gaussian(g) => g.radius, _ => 0.0 };
-        let gaussian = fbs::FeGaussianBlur::create(fbb, &fbs::FeGaussianBlurArgs { radius });
+        let (blur_type, blur_union) = encode_fe_blur(fbb, &lb.blur);
         fbs::FeLayerBlur::create(fbb, &fbs::FeLayerBlurArgs {
             active: lb.active,
-            blur_type: fbs::FeBlur::FeGaussianBlur,
-            blur: Some(gaussian.as_union_value()),
+            blur_type,
+            blur: Some(blur_union),
         })
     });
 
     let backdrop_blur_offset = effects.backdrop_blur.as_ref().map(|bb| {
-        let radius = match &bb.blur { FeBlur::Gaussian(g) => g.radius, _ => 0.0 };
-        let gaussian = fbs::FeGaussianBlur::create(fbb, &fbs::FeGaussianBlurArgs { radius });
+        let (blur_type, blur_union) = encode_fe_blur(fbb, &bb.blur);
         fbs::FeBackdropBlur::create(fbb, &fbs::FeBackdropBlurArgs {
             active: bb.active,
-            blur_type: fbs::FeBlur::FeGaussianBlur,
-            blur: Some(gaussian.as_union_value()),
+            blur_type,
+            blur: Some(blur_union),
         })
     });
 
@@ -2628,19 +2725,40 @@ fn make_node_slot<'a, A: flatbuffers::Allocator + 'a>(
     )
 }
 
-/// Create a `StrokeGeometryTrait` from a `StrokeStyle` and a scalar width.
+/// Create a `StrokeGeometryTrait` from a `StrokeStyle`, scalar width, and
+/// optional variable-width profile.
 fn encode_stroke_geometry<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     ss: &StrokeStyle,
     width: f32,
+    profile: Option<&varwidth::VarWidthProfile>,
 ) -> flatbuffers::WIPOffset<fbs::StrokeGeometryTrait<'a>> {
     let stroke_style_offset = encode_stroke_style(fbb, ss);
+    let profile_offset = profile.map(|p| {
+        let stop_offsets: Vec<_> = p
+            .stops
+            .iter()
+            .map(|s| {
+                fbs::VariableWidthStop::create(
+                    fbb,
+                    &fbs::VariableWidthStopArgs { u: s.u, r: s.r },
+                )
+            })
+            .collect();
+        let stops_vec = fbb.create_vector(&stop_offsets);
+        fbs::VariableWidthProfile::create(
+            fbb,
+            &fbs::VariableWidthProfileArgs {
+                stops: Some(stops_vec),
+            },
+        )
+    });
     fbs::StrokeGeometryTrait::create(
         fbb,
         &fbs::StrokeGeometryTraitArgs {
             stroke_style: Some(stroke_style_offset),
             stroke_width: width,
-            stroke_width_profile: None,
+            stroke_width_profile: profile_offset,
         },
     )
 }
@@ -2972,7 +3090,7 @@ fn encode_line_node<'a, A: flatbuffers::Allocator + 'a>(
         stroke_join: StrokeJoin::Miter,
         stroke_miter_limit: r.stroke_miter_limit,
         stroke_dash_array: r.stroke_dash_array.clone(),
-    }, r.stroke_width);
+    }, r.stroke_width, None);
 
     let stroke_offsets = encode_paints(fbb, &r.strokes);
 
@@ -3021,7 +3139,7 @@ fn encode_vector_node<'a, A: flatbuffers::Allocator + 'a>(
         stroke_join: r.stroke_join,
         stroke_miter_limit: r.stroke_miter_limit,
         stroke_dash_array: r.stroke_dash_array.clone(),
-    }, r.stroke_width);
+    }, r.stroke_width, r.stroke_width_profile.as_ref());
 
     let fill_offsets = encode_paints(fbb, &r.fills);
     let stroke_offsets = encode_paints(fbb, &r.strokes);
@@ -3084,7 +3202,7 @@ fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
         stroke_join: StrokeJoin::Miter,
         stroke_miter_limit: StrokeMiterLimit::default(),
         stroke_dash_array: None,
-    }, r.stroke_width);
+    }, r.stroke_width, None);
 
     let props = fbs::TextSpanNodeProperties::create(fbb, &fbs::TextSpanNodePropertiesArgs {
         text: Some(text_str), text_style: Some(text_style),
@@ -3139,7 +3257,7 @@ fn encode_boolean_operation_node<'a, A: flatbuffers::Allocator + 'a>(
         cr_trait
     });
 
-    let sg = encode_stroke_geometry(fbb, &r.stroke_style, r.stroke_width.0.unwrap_or(0.0));
+    let sg = encode_stroke_geometry(fbb, &r.stroke_style, r.stroke_width.0.unwrap_or(0.0), None);
     let fill_offsets = encode_paints(fbb, &r.fills);
     let stroke_offsets = encode_paints(fbb, &r.strokes);
 

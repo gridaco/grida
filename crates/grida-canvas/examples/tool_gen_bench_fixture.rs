@@ -623,6 +623,46 @@ fn scene_blur_children_in_container() -> Scene {
     )
 }
 
+/// Progressive-blurred rectangles (1 000 nodes).
+/// Each has a layer progressive blur with varying gradient directions.
+fn scene_progressive_blur_grid() -> Scene {
+    let cols = 40;
+    let rows = 25;
+    let cell = 50.0_f32;
+    let gap = 10.0_f32;
+
+    let mut nodes = Vec::with_capacity(cols * rows);
+    for row in 0..rows {
+        for col in 0..cols {
+            let x = col as f32 * (cell + gap);
+            let y = row as f32 * (cell + gap);
+            let r = ((col * 11) % 256) as u8;
+            let g = ((row * 9) % 256) as u8;
+            let b = 160;
+
+            // Rotate gradient direction per node for variety
+            let angle = (col + row) as f32 * 0.3;
+            let sx = angle.cos();
+            let sy = angle.sin();
+
+            let effects = LayerEffects {
+                blur: Some(FeLayerBlur {
+                    active: true,
+                    blur: FeBlur::Progressive(FeProgressiveBlur {
+                        start: Alignment(-sx, -sy),
+                        end: Alignment(sx, sy),
+                        radius: 0.0,
+                        radius2: 8.0 + (col % 8) as f32 * 2.0,
+                    }),
+                }),
+                ..LayerEffects::default()
+            };
+            nodes.push(rect_with_effects(x, y, cell, cell, solid(r, g, b, 255), effects));
+        }
+    }
+    flat_scene("bench-progressive-blur-grid", nodes)
+}
+
 /// Opacity grid: 5 000 rects with fill only, varying opacity (0.1–0.9).
 /// Exercises the save_layer path for per-node opacity.
 fn scene_opacity_fill_only() -> Scene {
@@ -691,6 +731,7 @@ fn main() {
         ("bench-shadow-container", scene_shadow_container()),
         ("bench-blur-container", scene_blur_container()),
         ("bench-blur-children-in-container", scene_blur_children_in_container()),
+        ("bench-progressive-blur-grid", scene_progressive_blur_grid()),
         ("bench-opacity-fill-only", scene_opacity_fill_only()),
         ("bench-opacity-fill-stroke", scene_opacity_fill_stroke()),
     ];
