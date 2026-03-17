@@ -90,6 +90,27 @@ impl LayerEffects {
         self
     }
 
+    /// Returns true if this layer has any active effects that are expensive
+    /// to paint (shadows, blurs, noise, glass).  Simple fill/stroke-only
+    /// nodes return false.
+    pub fn has_expensive_effects(&self) -> bool {
+        if self.blur.as_ref().is_some_and(|b| b.active) {
+            return true;
+        }
+        // Note: backdrop_blur is context-dependent and excluded from
+        // compositing by the promotion heuristic, so we don't count it here.
+        if self.shadows.iter().any(|s| s.active()) {
+            return true;
+        }
+        if self.glass.as_ref().is_some_and(|g| g.active) {
+            return true;
+        }
+        if self.noises.iter().any(|n| n.active) {
+            return true;
+        }
+        false
+    }
+
     /// Convert a list of filter effects into a layer effects object.
     /// if multiple effects that is not supported, the last effect will be used.
     pub fn from_array(effects: Vec<FilterEffect>) -> Self {
@@ -897,6 +918,92 @@ impl Node {
             Node::Image(n) => n.mask,
             Node::Error(_) => None,
         }
+    }
+
+    /// Returns the node's opacity (0.0–1.0).
+    /// `InitialContainer` has no opacity field and returns 1.0.
+    pub fn opacity(&self) -> f32 {
+        match self {
+            Node::InitialContainer(_) => 1.0,
+            Node::Container(n) => n.opacity,
+            Node::Error(n) => n.opacity,
+            Node::Group(n) => n.opacity,
+            Node::Rectangle(n) => n.opacity,
+            Node::Ellipse(n) => n.opacity,
+            Node::Polygon(n) => n.opacity,
+            Node::RegularPolygon(n) => n.opacity,
+            Node::RegularStarPolygon(n) => n.opacity,
+            Node::Line(n) => n.opacity,
+            Node::TextSpan(n) => n.opacity,
+            Node::Path(n) => n.opacity,
+            Node::Vector(n) => n.opacity,
+            Node::BooleanOperation(n) => n.opacity,
+            Node::Image(n) => n.opacity,
+        }
+    }
+
+    /// Returns the node's blend mode.
+    /// `InitialContainer` and `Error` default to `PassThrough`.
+    pub fn blend_mode(&self) -> LayerBlendMode {
+        match self {
+            Node::InitialContainer(_) => LayerBlendMode::PassThrough,
+            Node::Error(_) => LayerBlendMode::PassThrough,
+            Node::Container(n) => n.blend_mode,
+            Node::Group(n) => n.blend_mode,
+            Node::Rectangle(n) => n.blend_mode,
+            Node::Ellipse(n) => n.blend_mode,
+            Node::Polygon(n) => n.blend_mode,
+            Node::RegularPolygon(n) => n.blend_mode,
+            Node::RegularStarPolygon(n) => n.blend_mode,
+            Node::Line(n) => n.blend_mode,
+            Node::TextSpan(n) => n.blend_mode,
+            Node::Path(n) => n.blend_mode,
+            Node::Vector(n) => n.blend_mode,
+            Node::BooleanOperation(n) => n.blend_mode,
+            Node::Image(n) => n.blend_mode,
+        }
+    }
+
+    /// Returns the node's effects, if it has any.
+    /// `InitialContainer`, `Error`, and `Group` have no effects.
+    pub fn effects(&self) -> Option<&LayerEffects> {
+        match self {
+            Node::InitialContainer(_) => None,
+            Node::Error(_) => None,
+            Node::Group(_) => None,
+            Node::Container(n) => Some(&n.effects),
+            Node::Rectangle(n) => Some(&n.effects),
+            Node::Ellipse(n) => Some(&n.effects),
+            Node::Polygon(n) => Some(&n.effects),
+            Node::RegularPolygon(n) => Some(&n.effects),
+            Node::RegularStarPolygon(n) => Some(&n.effects),
+            Node::Line(n) => Some(&n.effects),
+            Node::TextSpan(n) => Some(&n.effects),
+            Node::Path(n) => Some(&n.effects),
+            Node::Vector(n) => Some(&n.effects),
+            Node::BooleanOperation(n) => Some(&n.effects),
+            Node::Image(n) => Some(&n.effects),
+        }
+    }
+
+    /// Returns the container clip flag if this node is a Container.
+    /// Only containers can clip their descendants.
+    pub fn clips_content(&self) -> bool {
+        match self {
+            Node::Container(n) => n.clip,
+            _ => false,
+        }
+    }
+
+    /// Returns true if this node is a container type that can have children.
+    pub fn is_container_like(&self) -> bool {
+        matches!(
+            self,
+            Node::InitialContainer(_)
+                | Node::Container(_)
+                | Node::Group(_)
+                | Node::BooleanOperation(_)
+        )
     }
 }
 

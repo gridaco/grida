@@ -1,6 +1,55 @@
 use crate::node::schema::Size;
 use math2::{quantize, rect, rect::Rectangle, transform::AffineTransform, vector2};
 
+/// Classifies what changed between two consecutive camera states.
+///
+/// This classification enables downstream rendering stages to take the cheapest
+/// path for each frame. In particular, `PanOnly` unlocks a class of
+/// optimizations that are impossible when scale is also changing: cached rasters
+/// remain pixel-perfect, tile grids stay stable, and LOD/mipmap recomputation
+/// can be skipped entirely.
+///
+/// Computed once per frame via [`Camera2D::change_kind`] and threaded through
+/// the rendering pipeline so every stage can branch on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CameraChangeKind {
+    /// No camera change occurred between frames.
+    None,
+    /// Only translation changed; zoom (scale) remained constant.
+    /// This is the most common interaction (hand-tool drag, scroll-wheel pan).
+    PanOnly,
+    /// Zoom increased (viewport shrinks into existing content).
+    /// Cached content is a spatial superset — only pixel density changed.
+    /// The cheapest zoom path: no new content discovery needed.
+    ZoomIn,
+    /// Zoom decreased (viewport expands, new content appears at edges).
+    /// Some newly visible nodes may lack cache entries entirely.
+    ZoomOut,
+    /// Both translation and zoom changed (e.g. pinch gesture, scroll-wheel
+    /// zoom at cursor which adjusts translation to keep the focal point fixed).
+    PanAndZoom,
+}
+
+impl CameraChangeKind {
+    /// Returns `true` when zoom (scale) changed between frames.
+    #[inline]
+    pub fn zoom_changed(self) -> bool {
+        matches!(self, Self::ZoomIn | Self::ZoomOut | Self::PanAndZoom)
+    }
+
+    /// Returns `true` when translation changed between frames.
+    #[inline]
+    pub fn pan_changed(self) -> bool {
+        matches!(self, Self::PanOnly | Self::PanAndZoom)
+    }
+
+    /// Returns `true` when any camera property changed.
+    #[inline]
+    pub fn any_changed(self) -> bool {
+        !matches!(self, Self::None)
+    }
+}
+
 /// A 2D camera that defines how world-space content is projected onto the screen.
 ///
 /// The camera is defined by a transform and a logical viewport size. The transform represents
@@ -246,6 +295,50 @@ impl Camera2D {
         self.get_zoom() != 1.0 / self.prev_transform.get_scale_x()
     }
 
+    /// Returns `true` when translation changed between the current and previous
+    /// transform (i.e. the camera panned).
+    pub fn has_pan_changed(&self) -> bool {
+        let (cx, cy) = (self.transform.x(), self.transform.y());
+        let (px, py) = (self.prev_transform.x(), self.prev_transform.y());
+        cx != px || cy != py
+    }
+
+    /// Classify the camera change that occurred between `prev_transform` and
+    /// the current `transform`.
+    ///
+    /// This is the primary mechanism for enabling pan-only optimizations
+    /// throughout the rendering pipeline. Call once per frame, then thread the
+    /// result through `frame()`, `flush()`, and `draw()`.
+    pub fn change_kind(&self) -> CameraChangeKind {
+        let zoom_changed = self.has_zoom_changed();
+        let pan_changed = self.has_pan_changed();
+
+        match (pan_changed, zoom_changed) {
+            (false, false) => CameraChangeKind::None,
+            (true, false) => CameraChangeKind::PanOnly,
+            (false, true) => {
+                let current_zoom = self.get_zoom();
+                let prev_zoom = 1.0 / self.prev_transform.get_scale_x();
+                if current_zoom > prev_zoom {
+                    CameraChangeKind::ZoomIn
+                } else {
+                    CameraChangeKind::ZoomOut
+                }
+            }
+            (true, true) => CameraChangeKind::PanAndZoom,
+        }
+    }
+
+    /// Returns the world-space pan delta between the current and previous
+    /// camera position. Useful for computing exposed strips during blit-scroll
+    /// and for overlay fast-path translation.
+    pub fn pan_delta(&self) -> (f32, f32) {
+        (
+            self.transform.x() - self.prev_transform.x(),
+            self.transform.y() - self.prev_transform.y(),
+        )
+    }
+
     /// Set the transform directly. This will update the previous transform.
     pub fn set_transform(&mut self, transform: AffineTransform) -> bool {
         self.before_change();
@@ -302,5 +395,80 @@ mod tests {
         assert_eq!(camera.get_prev_transform(), &original_transform);
         assert_eq!(camera.get_transform(), &new_transform);
         assert!(camera.has_transform_changed());
+    }
+
+    #[test]
+    fn test_change_kind_none() {
+        let camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+        // No change has occurred.
+        assert_eq!(camera.change_kind(), CameraChangeKind::None);
+    }
+
+    #[test]
+    fn test_change_kind_pan_only() {
+        let mut camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+        camera.translate(10.0, 20.0);
+        assert_eq!(camera.change_kind(), CameraChangeKind::PanOnly);
+        assert!(camera.change_kind().pan_changed());
+        assert!(!camera.change_kind().zoom_changed());
+    }
+
+    #[test]
+    fn test_change_kind_zoom_in() {
+        let mut camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+        camera.set_zoom(2.0);
+        // set_zoom preserves translation; zoom increased → ZoomIn.
+        assert_eq!(camera.change_kind(), CameraChangeKind::ZoomIn);
+        assert!(!camera.change_kind().pan_changed());
+        assert!(camera.change_kind().zoom_changed());
+    }
+
+    #[test]
+    fn test_change_kind_zoom_out() {
+        let mut camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+        camera.set_zoom(0.5);
+        // set_zoom preserves translation; zoom decreased → ZoomOut.
+        assert_eq!(camera.change_kind(), CameraChangeKind::ZoomOut);
+        assert!(!camera.change_kind().pan_changed());
+        assert!(camera.change_kind().zoom_changed());
+    }
+
+    #[test]
+    fn test_change_kind_pan_and_zoom() {
+        let mut camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+        // set_zoom_at with an off-center anchor changes both zoom and
+        // translation to keep the anchor point fixed on screen.
+        // Using [75, 75] ensures the translation compensation is non-zero.
+        camera.set_zoom_at(2.0, [75.0, 75.0]);
+        assert_eq!(camera.change_kind(), CameraChangeKind::PanAndZoom);
+        assert!(camera.change_kind().pan_changed());
+        assert!(camera.change_kind().zoom_changed());
+    }
+
+    #[test]
+    fn test_pan_delta() {
+        let mut camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+        camera.translate(5.0, -3.0);
+        let (dx, dy) = camera.pan_delta();
+        assert!((dx - 5.0).abs() < f32::EPSILON);
+        assert!((dy - (-3.0)).abs() < f32::EPSILON);
     }
 }

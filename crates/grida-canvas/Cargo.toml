@@ -46,10 +46,6 @@ pulldown-cmark = "0.13.0"
 async-trait = "0.1"
 futures = "0.3.31"
 
-# testing
-# (+3mb@opt-level=3 +1.7mb@opt-level=z wasm32-unknown-emscripten)
-figma-api = { version = "0.31.4", optional = true }
-
 # native GL context creation (headless GPU rendering, CLI, SDK)
 glutin = { version = "0.32.0", optional = true }
 raw-window-handle = { version = "0.6.0", optional = true }
@@ -60,7 +56,6 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 
 [features]
 default = []
-figma = ["figma-api"]
 web = []
 native-clock-tick = []
 native-gl-context = ["dep:glutin", "dep:raw-window-handle"]
@@ -71,6 +66,7 @@ clap = { version = "4.5.39", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rendiff = "0.2"
 imgref = "1.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [[bench]]
 name = "bench_rectangles"
@@ -84,7 +80,56 @@ harness = false
 name = "bench_viewport_culling"
 harness = false
 
+[[bench]]
+name = "bench_camera"
+harness = false
+
 [[example]]
 name = "headless_gpu"
 required-features = ["native-gl-context"]
+
+# ── Skia GPU microbenchmarks (examples/skia_bench/) ──────────────
+# Raw Skia measurements, no engine involvement.
+# Run: cargo run -p cg --example skia_bench_<name> --features native-gl-context --release
+
+[[example]]
+name = "skia_bench_primitives"
+path = "examples/skia_bench/skia_bench_primitives.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_effects"
+path = "examples/skia_bench/skia_bench_effects.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_opacity"
+path = "examples/skia_bench/skia_bench_opacity.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_downscale"
+path = "examples/skia_bench/skia_bench_downscale.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_atlas"
+path = "examples/skia_bench/skia_bench_atlas.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_tiling"
+path = "examples/skia_bench/skia_bench_tiling.rs"
+
+[[example]]
+name = "skia_bench_srcset"
+path = "examples/skia_bench/skia_bench_srcset.rs"
+
+[[example]]
+name = "skia_bench_cache_image"
+path = "examples/skia_bench/skia_bench_cache_image.rs"
+
+[[example]]
+name = "skia_bench_cache_text"
+path = "examples/skia_bench/skia_bench_cache_text.rs"
 

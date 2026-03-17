@@ -1,296 +1,345 @@
 use anyhow::{anyhow, Context, Result};
 use cg::cg::prelude::*;
 use cg::cg::types::ResourceRef;
-use cg::helpers::webfont_helper::{find_font_files, load_webfonts_metadata};
-use cg::io::io_figma::FigmaConverter;
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::{Node, Scene, Size};
-use cg::resources::{load_font, load_scene_images, FontMessage, ImageMessage};
+use cg::resources::{load_scene_images, ImageMessage};
 use cg::svg::pack;
 use cg::window::application::{HostEvent, HostEventCallback};
 use clap::{Args, Parser, Subcommand};
-use figma_api::apis::{
-    configuration::{ApiKey, Configuration},
-    files_api::{get_file, get_image_fills},
-};
 use futures::channel::mpsc;
-use futures::future::join_all;
-use grida_dev::platform::native_demo::{
-    run_demo_window, run_demo_window_multi, run_demo_window_with, run_demo_window_with_drop,
-};
+use grida_dev::platform::native_demo::run_demo_window_with_drop;
 mod grida_file;
 mod reftest;
 use image::image_dimensions;
 use math2::transform::AffineTransform;
-use reqwest;
-use serde_json;
-use std::collections::HashMap;
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::fs as async_fs;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use winit::event_loop::EventLoopProxy;
 
 #[derive(Parser, Debug)]
 #[command(
     name = "grida-dev",
     version,
-    about = "Rust-native dev runtime for previewing grida-canvas scenes with winit."
+    about = "Rust-native dev runtime for previewing grida-canvas scenes with winit.\n\n\
+             Opens an interactive window. Optionally pass a file path or URL to load it\n\
+             immediately. Drop files onto the window at any time to replace the scene.\n\n\
+             Supported formats: .grida, .grida1, .svg, .png, .jpg, .jpeg, .webp"
 )]
 struct Cli {
+    /// File path or URL to load on startup (optional).
+    file: Option<String>,
+
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Render a `.grida` / JSON scene from disk or URL.
-    Scene(SceneArgs),
-    /// Load a scene from Figma (API, archive, or local JSON export).
-    Figma(FigmaArgs),
-    /// Convert and render an SVG.
-    Svg(SvgArgs),
-    /// Generate a synthetic benchmark grid.
-    Benchmark {
-        /// Grid dimension (renders N x N rectangles).
-        #[arg(long = "size", default_value_t = 400)]
-        size: u32,
-    },
-    /// Render the built-in sample scene.
-    Sample,
-    /// Open an empty scene and replace it when files are dropped onto the window.
-    Master,
+    /// Headless GPU benchmark — no window, prints per-frame stats.
+    /// Accepts either a `.grida` file or `--size N` for a synthetic grid.
+    Bench(BenchArgs),
     /// Run SVG reftests against W3C SVG 1.1 Test Suite.
     Reftest(reftest::ReftestArgs),
 }
 
 #[derive(Args, Debug)]
-struct SceneArgs {
-    /// Path or URL to a `.grida` / JSON scene.
-    path: String,
-}
-
-#[derive(Args, Debug, Clone)]
-struct FigmaArgs {
-    #[arg(long = "file-key")]
-    file_key: Option<String>,
-    #[arg(long = "api-key")]
-    api_key: Option<String>,
-    #[arg(long = "scene-index", default_value_t = 0)]
+struct BenchArgs {
+    /// Path to a `.grida` file (optional; uses synthetic grid if omitted).
+    path: Option<String>,
+    /// Grid dimension when no file is given (renders N x N rectangles).
+    #[arg(long = "size", default_value_t = 100)]
+    size: u32,
+    /// Scene index to benchmark (0-based). Use --list-scenes to see available.
+    #[arg(long = "scene", default_value_t = 0)]
     scene_index: usize,
-    #[arg(long = "no-image", default_value_t = false)]
-    no_image: bool,
-    #[arg(long = "file")]
-    file: Option<String>,
-    #[arg(long = "images")]
-    images_dir: Option<String>,
-    #[arg(long = "archive-dir")]
-    archive_dir: Option<String>,
-}
-
-#[derive(Args, Debug)]
-struct SvgArgs {
-    /// Path to an SVG file to convert/render.
-    path: PathBuf,
-    /// Optional scene title.
-    #[arg(long = "title")]
-    title: Option<String>,
-    /// Optional background color in hex (e.g. `#1F1F1F` or `#FFFFFFFF`).
-    #[arg(long = "background")]
-    background: Option<String>,
+    /// List available scene names and exit.
+    #[arg(long = "list-scenes", default_value_t = false)]
+    list_scenes: bool,
+    /// Number of pan frames to measure.
+    #[arg(long = "frames", default_value_t = 200)]
+    frames: u32,
+    /// Viewport width.
+    #[arg(long = "width", default_value_t = 1000)]
+    width: i32,
+    /// Viewport height.
+    #[arg(long = "height", default_value_t = 1000)]
+    height: i32,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Scene(args) => run_scene(&args.path).await?,
-        Command::Figma(args) => run_figma(args).await?,
-        Command::Svg(args) => run_svg(args).await?,
-        Command::Benchmark { size } => {
-            run_demo_window(build_benchmark_scene(size)).await;
-        }
-        Command::Sample => {
-            run_demo_window(build_sample_scene()).await;
-        }
-        Command::Master => run_master().await?,
-        Command::Reftest(args) => reftest::run(args).await?,
-        #[allow(unreachable_patterns)]
-        _ => unreachable!("Unhandled command variant"),
+        Some(Command::Bench(args)) => run_bench(args).await?,
+        Some(Command::Reftest(args)) => reftest::run(args).await?,
+        None => run_interactive(cli.file).await?,
     }
     Ok(())
 }
 
-async fn run_scene(source: &str) -> Result<()> {
-    let scenes = load_scenes_from_source(source).await?;
-    if scenes.is_empty() {
-        return Err(anyhow!("no scenes decoded from source: {source}"));
-    }
-    if scenes.len() > 1 {
-        println!("Loaded {} scenes (PageUp/PageDown to switch)", scenes.len());
-        run_demo_window_multi(scenes).await;
+async fn run_bench(args: BenchArgs) -> Result<()> {
+    use cg::runtime::scene::FrameFlushResult;
+    use cg::window::headless::HeadlessGpu;
+    use std::time::Instant;
+
+    let scenes = if let Some(ref path) = args.path {
+        load_scenes_from_source(path).await?
     } else {
-        run_demo_window(scenes.into_iter().next().unwrap()).await;
-    }
-    Ok(())
-}
-
-async fn run_figma(args: FigmaArgs) -> Result<()> {
-    let (scene, converter) = load_figma_scene(&args).await?;
-
-    println!("Rendering scene: {}", scene.name);
-    println!("Number of roots: {}", scene.graph.roots().len());
-    println!("Total nodes in graph: {}", scene.graph.node_count());
-
-    let webfonts_metadata = load_webfonts_metadata().await.map_err(|err| anyhow!(err))?;
-    let font_files = find_font_files(&webfonts_metadata, &converter.get_discovered_fonts());
-    println!("\nFound {} matching font files:", font_files.len());
-    for font_file in &font_files {
-        println!("Font: {} ({})", font_file.family, font_file.postscript_name);
-        println!("  Style: {}", font_file.style);
-        println!("  URL: {}", font_file.url);
-        println!();
-    }
-
-    let scene_for_loader = scene.clone();
-    let font_files_for_loader = font_files.clone();
-    let figma_args = args.clone();
-
-    run_demo_window_with(scene, move |_renderer, tx, font_tx, proxy| {
-        println!("📸 Initializing image loader...");
-        let should_load_images = !figma_args.no_image
-            && (figma_args.file.is_none()
-                || figma_args.images_dir.is_some()
-                || figma_args.archive_dir.is_some());
-        if should_load_images {
-            println!("🔄 Starting to load scene images in background...");
-            let scene_for_images = scene_for_loader.clone();
-            let tx_clone = tx.clone();
-            let image_event_cb: HostEventCallback = {
-                let proxy_clone = proxy.clone();
-                Arc::new(move |event: HostEvent| {
-                    let _ = proxy_clone.send_event(event);
-                })
-            };
-            tokio::spawn(async move {
-                load_scene_images(&scene_for_images, tx_clone, image_event_cb).await;
-                println!("✅ Scene images loading completed in background");
-            });
-        } else {
-            if figma_args.no_image {
-                println!("⏭️ Skipping image loading as --no-image flag is set");
-            } else if figma_args.file.is_some()
-                && figma_args.images_dir.is_none()
-                && figma_args.archive_dir.is_none()
-            {
-                println!(
-                    "⏭️ Skipping image loading (local file without --images directory or --archive-dir)"
-                );
-            }
-        }
-
-        println!("📝 Initializing font loader...");
-        println!("🔄 Starting to load scene fonts in background...");
-        let font_files_clone = font_files_for_loader.clone();
-        let font_tx_clone = font_tx.clone();
-        let font_event_cb: HostEventCallback = {
-            let proxy_clone = proxy.clone();
-            Arc::new(move |event: HostEvent| {
-                let _ = proxy_clone.send_event(event);
-            })
-        };
-        tokio::spawn(async move {
-            let futures: Vec<_> = font_files_clone
-                .into_iter()
-                .map(|font_file| {
-                    let font_tx = font_tx_clone.clone();
-                    let event_cb = font_event_cb.clone();
-                    async move {
-                        let family = font_file.family;
-                        let url = font_file.url;
-                        let postscript_name = font_file.postscript_name;
-                        println!("Loading font: {} ({})", family, postscript_name);
-                        if let Ok(data) = load_font(&url).await {
-                            let msg = FontMessage {
-                                family: family.clone(),
-                                style: None,
-                                data: data.clone(),
-                            };
-                            let _ = font_tx.unbounded_send(msg.clone());
-                            event_cb(HostEvent::FontLoaded(msg));
-                            println!("✅ Font loaded: {} ({})", family, postscript_name);
-                        }
-                    }
-                })
-                .collect();
-            join_all(futures).await;
-            println!("✅ Scene fonts loading completed in background");
-        });
-    })
-    .await;
-
-    Ok(())
-}
-
-async fn run_svg(args: SvgArgs) -> Result<()> {
-    let svg_source = async_fs::read_to_string(&args.path)
-        .await
-        .with_context(|| format!("failed to read SVG file {}", args.path.display()))?;
-
-    let graph =
-        pack::from_svg_str(&svg_source).map_err(|err| anyhow!("failed to convert SVG: {err}"))?;
-
-    let scene_name = args.title.unwrap_or_else(|| {
-        args.path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "SVG Scene".to_string())
-    });
-
-    let background_color = args
-        .background
-        .as_deref()
-        .and_then(parse_hex_color)
-        .or(Some(CGColor::from_u32(0xF8F8F8FF)));
-
-    let scene = Scene {
-        name: scene_name,
-        graph,
-        background_color,
+        vec![build_benchmark_scene(args.size)]
     };
 
-    run_demo_window(scene).await;
+    if args.list_scenes {
+        println!("Available scenes ({}):", scenes.len());
+        for (i, s) in scenes.iter().enumerate() {
+            println!("  [{}] {} ({} nodes)", i, s.name, s.graph.node_count());
+        }
+        return Ok(());
+    }
+
+    if args.scene_index >= scenes.len() {
+        return Err(anyhow!(
+            "scene index {} out of range (0..{}). Use --list-scenes.",
+            args.scene_index,
+            scenes.len()
+        ));
+    }
+
+    let scene = scenes.into_iter().nth(args.scene_index).unwrap();
+    let node_count = scene.graph.node_count();
+
+    let mut gpu = HeadlessGpu::new(args.width, args.height)
+        .map_err(|e| anyhow!("GPU init failed: {e}"))?;
+    gpu.print_gl_info();
+
+    let mut renderer = gpu.create_renderer();
+    renderer.load_scene(scene);
+
+    // Fit camera so all content is visible — same as windowed demo.
+    renderer.fit_camera_to_scene();
+
+    let cam_rect = renderer.camera.rect();
+    println!("Loaded scene: {} nodes", node_count);
+    println!(
+        "Camera: zoom={:.4} viewport=({:.0}x{:.0})",
+        renderer.camera.get_zoom(),
+        cam_rect.width,
+        cam_rect.height,
+    );
+    println!(
+        "Viewport: {}x{}, frames: {}\n",
+        args.width, args.height, args.frames
+    );
+
+    // Warm up: stable frame first (populates compositor cache), then
+    // unstable pan frames to fill picture/geometry caches.
+    renderer.queue_stable();
+    let _ = renderer.flush();
+    for _ in 0..10 {
+        renderer.camera.translate(1.0, 0.0);
+        renderer.queue_unstable();
+        let _ = renderer.flush();
+    }
+
+    // Count nodes with effects for diagnostics.
+    let effects_count = renderer
+        .scene
+        .as_ref()
+        .map(|s| {
+            s.graph
+                .nodes_iter()
+                .filter(|(_, node)| match node {
+                    cg::node::schema::Node::Rectangle(r) => r.effects.has_expensive_effects(),
+                    cg::node::schema::Node::Ellipse(e) => e.effects.has_expensive_effects(),
+                    _ => false,
+                })
+                .count()
+        })
+        .unwrap_or(0);
+
+    let comp_stats = renderer.get_cache().compositor.stats();
+    println!(
+        "Nodes with effects: {}  Compositor: {} promoted, {:.1} KB",
+        effects_count,
+        comp_stats.promoted_count,
+        comp_stats.memory_bytes as f64 / 1024.0,
+    );
+
+    // --- Pan benchmark ---
+    println!("=== Pan benchmark ({} frames) ===", args.frames);
+    let pan_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(args.frames as usize);
+    let mut internal_render_us = Vec::with_capacity(args.frames as usize);
+    let mut internal_flush_us = Vec::with_capacity(args.frames as usize);
+    let mut internal_draw_us = Vec::with_capacity(args.frames as usize);
+    let mut total_dl = 0usize;
+    let mut total_live = 0usize;
+    let mut total_comp_hits = 0usize;
+    let mut internal_compositor_us = Vec::with_capacity(args.frames as usize);
+    let mut internal_mid_flush_us = Vec::with_capacity(args.frames as usize);
+
+    for i in 0..args.frames {
+        let dx = if i % 2 == 0 { 5.0 } else { -5.0 };
+        renderer.camera.translate(dx, 0.0);
+        renderer.queue_unstable();
+        let frame_start = Instant::now();
+        if let FrameFlushResult::OK(stats) = renderer.flush() {
+            let ft = frame_start.elapsed();
+            frame_times.push(ft);
+            internal_render_us.push(stats.total_duration.as_micros() as u64);
+            internal_flush_us.push(stats.flush_duration.as_micros() as u64);
+            internal_draw_us.push(stats.draw.painter_duration.as_micros() as u64);
+            internal_compositor_us.push(stats.compositor_duration.as_micros() as u64);
+            internal_mid_flush_us.push(stats.mid_flush_duration.as_micros() as u64);
+            total_dl += stats.frame.display_list_size_estimated;
+            total_live += stats.draw.live_draw_count;
+            total_comp_hits += stats.draw.layer_image_cache_hits;
+        }
+    }
+    let pan_wall = pan_start.elapsed();
+
+    if frame_times.is_empty() {
+        return Err(anyhow!(
+            "no benchmark samples collected, cannot compute summary"
+        ));
+    }
+
+    frame_times.sort();
+    let n = frame_times.len();
+    let p50 = frame_times[n / 2];
+    let p95 = frame_times[n * 95 / 100];
+    let p99 = frame_times[n * 99 / 100];
+    let avg = pan_wall / n as u32;
+    let fps = 1_000_000.0 / avg.as_micros() as f64;
+
+    let _avg_render = internal_render_us.iter().sum::<u64>() / n as u64;
+    let avg_flush = internal_flush_us.iter().sum::<u64>() / n as u64;
+    let avg_draw = internal_draw_us.iter().sum::<u64>() / n as u64;
+    let avg_compositor = internal_compositor_us.iter().sum::<u64>() / n as u64;
+    let avg_mid_flush = internal_mid_flush_us.iter().sum::<u64>() / n as u64;
+
+    println!(
+        "  avg: {:>7} us ({:>6.1} fps)",
+        avg.as_micros(),
+        fps
+    );
+    println!(
+        "  p50: {:>7} us  p95: {:>7} us  p99: {:>7} us",
+        p50.as_micros(),
+        p95.as_micros(),
+        p99.as_micros()
+    );
+    println!(
+        "  draw: {} us  mid_flush(draw GPU): {} us  compositor: {} us  end_flush: {} us",
+        avg_draw, avg_mid_flush, avg_compositor, avg_flush
+    );
+    println!(
+        "  dl: {}  live: {}  comp_hits: {}  wall: {:.1} ms",
+        total_dl / n,
+        total_live / n,
+        total_comp_hits / n,
+        pan_wall.as_secs_f64() * 1000.0
+    );
+
+    // --- Zoom benchmark ---
+    println!("\n=== Zoom benchmark ({} frames) ===", args.frames);
+    renderer.camera.set_zoom(1.0);
+    let zoom_start = Instant::now();
+    let mut zoom_times = Vec::with_capacity(args.frames as usize);
+    let mut z = 1.0f32;
+    let mut zdir = 1;
+
+    for _ in 0..args.frames {
+        z += zdir as f32 * 0.02;
+        if z > 2.0 || z < 0.5 {
+            zdir = -zdir;
+        }
+        renderer.camera.set_zoom(z);
+        renderer.queue_unstable();
+        let frame_start = Instant::now();
+        if let FrameFlushResult::OK(_) = renderer.flush() {
+            zoom_times.push(frame_start.elapsed());
+        }
+    }
+    let zoom_wall = zoom_start.elapsed();
+
+    zoom_times.sort();
+    let zn = zoom_times.len();
+    let zp50 = zoom_times[zn / 2];
+    let zp95 = zoom_times[zn * 95 / 100];
+    let zavg = zoom_wall / zn as u32;
+    let zfps = 1_000_000.0 / zavg.as_micros() as f64;
+
+    println!(
+        "  avg: {:>7.1} us ({:>6.1} fps)  p50: {:>7.1} us  p95: {:>7.1} us  wall: {:.1} ms",
+        zavg.as_micros(),
+        zfps,
+        zp50.as_micros(),
+        zp95.as_micros(),
+        zoom_wall.as_secs_f64() * 1000.0
+    );
+
+    drop(renderer);
+    println!("\nDone.");
     Ok(())
 }
 
-async fn run_master() -> Result<()> {
-    let initial_scene = build_empty_scene();
+async fn run_interactive(file: Option<String>) -> Result<()> {
+    // Load initial scenes from the CLI argument (file path or URL), if given.
+    let initial_scenes = if let Some(ref source) = file {
+        load_scenes_from_source(source).await?
+    } else {
+        vec![build_empty_scene()]
+    };
+
+    let first = initial_scenes
+        .first()
+        .cloned()
+        .expect("at least one scene");
+
     let (drop_tx, drop_rx) = unbounded_channel::<PathBuf>();
+    let (scenes_tx, scenes_rx) = unbounded_channel::<Vec<Scene>>();
     let drop_rx = Arc::new(Mutex::new(Some(drop_rx)));
 
+    // Seed the scenes channel with the initial set so the window picks them
+    // up on the first tick (enables PageUp/PageDown for multi-scene files).
+    if initial_scenes.len() > 1 {
+        let _ = scenes_tx.send(initial_scenes);
+    }
+
     run_demo_window_with_drop(
-        initial_scene,
+        first,
         move |_renderer, tx, _font_tx, proxy| {
             let mut guard = drop_rx.lock().expect("drop rx mutex poisoned");
             let drop_rx = guard.take().expect("drop receiver already taken");
-            start_master_drop_task(drop_rx, tx.clone(), proxy.clone());
+            start_master_drop_task(drop_rx, tx.clone(), proxy.clone(), scenes_tx);
         },
         drop_tx,
+        scenes_rx,
     )
     .await;
 
     Ok(())
 }
 
-async fn load_scene_from_source(source: &str) -> Result<Scene> {
-    let bytes = read_source_bytes(source).await?;
-    grida_file::decode(&bytes)
-}
-
 async fn load_scenes_from_source(source: &str) -> Result<Vec<Scene>> {
+    // If it looks like a local file with a known extension, route by type.
+    if !is_url(source) {
+        let path = Path::new(source);
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            match ext.to_ascii_lowercase().as_str() {
+                "svg" => return scene_from_svg_path(path).map(|s| vec![s]),
+                "png" | "jpg" | "jpeg" | "webp" => {
+                    return scene_from_raster_path(path).map(|s| vec![s])
+                }
+                _ => {} // fall through to grida/json decoding
+            }
+        }
+    }
     let bytes = read_source_bytes(source).await?;
     grida_file::decode_all(&bytes)
 }
@@ -308,228 +357,6 @@ async fn read_source_bytes(source: &str) -> Result<Vec<u8>> {
         async_fs::read(source)
             .await
             .with_context(|| format!("failed to read scene file at {source}"))
-    }
-}
-
-async fn load_figma_scene(args: &FigmaArgs) -> Result<(Scene, FigmaConverter)> {
-    let resolved_api_key = args
-        .api_key
-        .as_deref()
-        .map(String::from)
-        .or_else(|| env::var("X_FIGMA_TOKEN").ok());
-
-    let file = if let Some(archive_dir) = args.archive_dir.as_deref() {
-        let archive_path = Path::new(archive_dir);
-        if !archive_path.exists() {
-            anyhow::bail!("Archive directory does not exist: {archive_dir}");
-        }
-        if !archive_path.is_dir() {
-            anyhow::bail!("Archive path is not a directory: {archive_dir}");
-        }
-
-        let document_path = archive_path.join("document.json");
-        if !document_path.exists() {
-            anyhow::bail!("Required document.json not found in archive: {archive_dir}");
-        }
-
-        let file_content = fs::read_to_string(&document_path)
-            .with_context(|| format!("failed to read {}", document_path.display()))?;
-        serde_json::from_str(&file_content)
-            .with_context(|| format!("failed to parse {}", document_path.display()))?
-    } else if let Some(file_path) = args.file.as_deref() {
-        let file_content =
-            fs::read_to_string(file_path).with_context(|| format!("failed to read {file_path}"))?;
-        serde_json::from_str(&file_content)
-            .with_context(|| format!("failed to parse {file_path}"))?
-    } else {
-        let file_key = args.file_key.as_deref().ok_or_else(|| {
-            anyhow!("file-key is required when not using --file or --archive-dir")
-        })?;
-        let api_key = resolved_api_key.as_deref().ok_or_else(|| {
-            anyhow!(
-                "api-key is required when not using --file or --archive-dir. \
-                 Provide it via --api-key flag or X_FIGMA_TOKEN environment variable"
-            )
-        })?;
-
-        let configuration = create_figma_configuration(api_key);
-        get_file(
-            &configuration,
-            file_key,
-            None,
-            None,
-            None,
-            Some("paths"),
-            None,
-            None,
-        )
-        .await?
-    };
-
-    let images = load_scene_images_from_source(args).await?;
-    let mut converter = FigmaConverter::new().with_image_urls(images);
-
-    let document = converter
-        .convert_document(&file.document)
-        .map_err(|err| anyhow!(err))?;
-
-    let scene = document
-        .get(args.scene_index)
-        .cloned()
-        .ok_or_else(|| anyhow!("scene-index {} out of bounds", args.scene_index))?;
-
-    Ok((scene, converter))
-}
-
-async fn load_scene_images_from_source(args: &FigmaArgs) -> Result<HashMap<String, String>> {
-    let resolved_api_key = args
-        .api_key
-        .as_deref()
-        .map(String::from)
-        .or_else(|| env::var("X_FIGMA_TOKEN").ok());
-
-    if args.no_image {
-        println!("Skipping image loading (--no-image flag)");
-        return Ok(HashMap::new());
-    }
-
-    if let Some(archive_dir) = args.archive_dir.as_deref() {
-        let images_path = Path::new(archive_dir).join("images");
-        if images_path.exists() && images_path.is_dir() {
-            let mut images = HashMap::new();
-            for entry in fs::read_dir(&images_path)? {
-                let entry = entry?;
-                let path = entry.path();
-                if path.is_file() {
-                    let key = path
-                        .file_stem()
-                        .ok_or_else(|| anyhow!("invalid filename: {:?}", path))?
-                        .to_string_lossy()
-                        .to_string();
-                    let url = path.to_string_lossy().to_string();
-                    images.insert(key, url);
-                }
-            }
-            println!("Loaded {} images from archive directory", images.len());
-            return Ok(images);
-        } else {
-            println!("No images directory found in archive, skipping image loading");
-            return Ok(HashMap::new());
-        }
-    }
-
-    if let Some(images_dir) = args.images_dir.as_deref() {
-        let mut images = HashMap::new();
-        for entry in fs::read_dir(images_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file() {
-                let key = path
-                    .file_stem()
-                    .ok_or_else(|| anyhow!("invalid filename: {:?}", path))?
-                    .to_string_lossy()
-                    .to_string();
-                let url = path.to_string_lossy().to_string();
-                images.insert(key, url);
-            }
-        }
-        println!("Loaded {} images from directory", images.len());
-        return Ok(images);
-    }
-
-    if args.file.is_some() {
-        println!("Skipping image loading (local file without --images directory)");
-        return Ok(HashMap::new());
-    }
-
-    let file_key = args
-        .file_key
-        .as_deref()
-        .ok_or_else(|| anyhow!("file-key is required when not using --file or --archive-dir"))?;
-    let api_key = resolved_api_key.as_deref().ok_or_else(|| {
-        anyhow!(
-            "api-key is required when not using --file or --archive-dir. \
-             Provide it via --api-key flag or X_FIGMA_TOKEN environment variable"
-        )
-    })?;
-
-    println!("Loading images from Figma API");
-    let configuration = create_figma_configuration(api_key);
-    let images_response = get_image_fills(&configuration, file_key).await?;
-    Ok(images_response.meta.images)
-}
-
-fn create_figma_configuration(api_key: &str) -> Configuration {
-    Configuration {
-        base_path: "https://api.figma.com".to_string(),
-        user_agent: None,
-        client: reqwest::Client::new(),
-        basic_auth: None,
-        oauth_access_token: None,
-        bearer_access_token: None,
-        api_key: Some(ApiKey {
-            key: api_key.to_string(),
-            prefix: None,
-        }),
-    }
-}
-
-fn build_sample_scene() -> Scene {
-    let nf = NodeFactory::new();
-
-    let mut hero = nf.create_rectangle_node();
-    hero.transform = AffineTransform::new(120.0, 120.0, 0.0);
-    hero.size = Size {
-        width: 420.0,
-        height: 300.0,
-    };
-    hero.corner_radius = RectangularCornerRadius::circular(32.0);
-    hero.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor::from_rgb(74, 108, 247),
-        blend_mode: BlendMode::default(),
-        active: true,
-    })]);
-
-    let mut accent = nf.create_rectangle_node();
-    accent.transform = AffineTransform::new(380.0, 260.0, -12.0);
-    accent.size = Size {
-        width: 220.0,
-        height: 120.0,
-    };
-    accent.corner_radius = RectangularCornerRadius::circular(24.0);
-    accent.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor::from_rgb(253, 158, 115),
-        blend_mode: BlendMode::default(),
-        active: true,
-    })]);
-
-    let mut pill = nf.create_rectangle_node();
-    pill.transform = AffineTransform::new(200.0, 40.0, 0.0);
-    pill.size = Size {
-        width: 300.0,
-        height: 60.0,
-    };
-    pill.corner_radius = RectangularCornerRadius::circular(30.0);
-    pill.fills = Paints::new([Paint::Solid(SolidPaint {
-        color: CGColor::from_rgb(34, 34, 34),
-        blend_mode: BlendMode::default(),
-        active: true,
-    })]);
-
-    let mut graph = SceneGraph::new();
-    graph.append_children(
-        vec![
-            Node::Rectangle(hero),
-            Node::Rectangle(accent),
-            Node::Rectangle(pill),
-        ],
-        Parent::Root,
-    );
-
-    Scene {
-        name: "grida-dev sample".to_string(),
-        graph,
-        background_color: Some(CGColor::from_rgb(245, 246, 255)),
     }
 }
 
@@ -572,26 +399,6 @@ fn is_url(path: &str) -> bool {
     path.starts_with("http://") || path.starts_with("https://")
 }
 
-fn parse_hex_color(input: &str) -> Option<CGColor> {
-    let s = input.trim().strip_prefix('#').unwrap_or(input.trim());
-    match s.len() {
-        6 => {
-            let r = u8::from_str_radix(&s[0..2], 16).ok()?;
-            let g = u8::from_str_radix(&s[2..4], 16).ok()?;
-            let b = u8::from_str_radix(&s[4..6], 16).ok()?;
-            Some(CGColor::from_rgb(r, g, b))
-        }
-        8 => {
-            let r = u8::from_str_radix(&s[0..2], 16).ok()?;
-            let g = u8::from_str_radix(&s[2..4], 16).ok()?;
-            let b = u8::from_str_radix(&s[4..6], 16).ok()?;
-            let a = u8::from_str_radix(&s[6..8], 16).ok()?;
-            Some(CGColor::from_rgba(r, g, b, a))
-        }
-        _ => None,
-    }
-}
-
 fn build_empty_scene() -> Scene {
     Scene {
         name: "Drop a file to begin".to_string(),
@@ -600,7 +407,7 @@ fn build_empty_scene() -> Scene {
     }
 }
 
-async fn load_master_scene_from_path(path: &Path) -> Result<Scene> {
+async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -608,9 +415,9 @@ async fn load_master_scene_from_path(path: &Path) -> Result<Scene> {
         .ok_or_else(|| anyhow!("Dropped file has no extension: {}", path.display()))?;
 
     match ext.as_str() {
-        "grida" | "json" => load_scene_from_source(&path.to_string_lossy()).await,
-        "svg" => scene_from_svg_path(path),
-        "png" | "jpg" | "jpeg" | "webp" => scene_from_raster_path(path),
+        "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
+        "svg" => scene_from_svg_path(path).map(|s| vec![s]),
+        "png" | "jpg" | "jpeg" | "webp" => scene_from_raster_path(path).map(|s| vec![s]),
         other => Err(anyhow!(
             "Unsupported dropped file type ({}): {}",
             other,
@@ -664,27 +471,32 @@ fn start_master_drop_task(
     mut drop_rx: UnboundedReceiver<PathBuf>,
     image_tx: mpsc::UnboundedSender<ImageMessage>,
     proxy: EventLoopProxy<HostEvent>,
+    scenes_tx: UnboundedSender<Vec<Scene>>,
 ) {
     tokio::spawn(async move {
         while let Some(path) = drop_rx.recv().await {
-            match load_master_scene_from_path(&path).await {
-                Ok(scene) => {
-                    let scene_for_loader = scene.clone();
-                    if proxy.send_event(HostEvent::LoadScene(scene)).is_err() {
-                        panic!("failed to send LoadScene event");
+            match load_master_scenes_from_path(&path).await {
+                Ok(scenes) => {
+                    let scenes_for_loader = scenes.clone();
+                    if scenes_tx.send(scenes).is_err() {
+                        eprintln!("failed to send scenes to window");
+                        continue;
                     }
 
-                    let tx_clone = image_tx.clone();
-                    let proxy_clone = proxy.clone();
-                    let event_cb: HostEventCallback = Arc::new(move |event: HostEvent| {
-                        let _ = proxy_clone.send_event(event);
-                    });
+                    // Load images for all scenes in the background.
+                    for scene in scenes_for_loader {
+                        let tx_clone = image_tx.clone();
+                        let proxy_clone = proxy.clone();
+                        let event_cb: HostEventCallback = Arc::new(move |event: HostEvent| {
+                            let _ = proxy_clone.send_event(event);
+                        });
 
-                    tokio::spawn(async move {
-                        load_scene_images(&scene_for_loader, tx_clone, event_cb).await;
-                    });
+                        tokio::spawn(async move {
+                            load_scene_images(&scene, tx_clone, event_cb).await;
+                        });
+                    }
                 }
-                Err(err) => panic!("Failed to load dropped file {}: {err}", path.display()),
+                Err(err) => eprintln!("Failed to load dropped file {}: {err}", path.display()),
             }
         }
     });

@@ -119,8 +119,7 @@ async fn main() {
     let scene = create_flex_demo_scene();
 
     native_demo::run_demo_window_with(scene, |renderer, _tx, _font_tx, _proxy| {
-        // Disable tile caching for smoother resize
-        renderer.set_cache_tile(false);
+        renderer.set_layer_compositing(true);
     })
     .await;
 }

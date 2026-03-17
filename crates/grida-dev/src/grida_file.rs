@@ -67,6 +67,7 @@ fn extract_fbs_from_zip(bytes: &[u8]) -> Result<Vec<u8>> {
 ///
 /// If the file contains multiple scenes, only the first is returned.
 /// Use [`decode_all`] to get all scenes.
+#[allow(dead_code)]
 pub fn decode(bytes: &[u8]) -> Result<Scene> {
     decode_all(bytes)?
         .into_iter()

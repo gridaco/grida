@@ -11,11 +11,11 @@ use glutin::{
     prelude::GlSurface,
     surface::{Surface as GlutinSurface, WindowSurface},
 };
-use math2::{rect, rect::Rectangle};
+
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::Key;
 use winit::{
@@ -96,6 +96,8 @@ pub struct NativeApplication {
     pub(crate) image_tx: Option<mpsc::UnboundedSender<ImageMessage>>,
     /// Host event callback for notifying the event loop of image load completion.
     pub(crate) event_cb: Option<HostEventCallback>,
+    /// Receives replacement scene lists from the drop task (for multi-scene pagination).
+    pub(crate) scenes_rx: Option<UnboundedReceiver<Vec<Scene>>>,
 }
 
 impl NativeApplication {
@@ -113,6 +115,7 @@ impl NativeApplication {
             cg::runtime::scene::RendererOptions::default(),
             None,
             false,
+            None,
         )
     }
 
@@ -124,6 +127,7 @@ impl NativeApplication {
         options: cg::runtime::scene::RendererOptions,
         file_drop_tx: Option<UnboundedSender<PathBuf>>,
         fit_scene_on_load: bool,
+        scenes_rx: Option<UnboundedReceiver<Vec<Scene>>>,
     ) -> (Self, EventLoop<HostEvent>) {
         let WinitResult {
             state,
@@ -170,6 +174,7 @@ impl NativeApplication {
             scene_index: 0,
             image_tx: None,
             event_cb: None,
+            scenes_rx,
         };
 
         std::thread::spawn(move || loop {
@@ -297,6 +302,31 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: HostEvent) {
         match event {
             HostEvent::Tick => {
+                // Poll for new scenes from the drop task.
+                if let Some(rx) = &mut self.scenes_rx {
+                    if let Ok(scenes) = rx.try_recv() {
+                        if let Some(first) = scenes.first().cloned() {
+                            let total = scenes.len();
+                            self.scenes = scenes;
+                            self.scene_index = 0;
+
+                            let title = if total > 1 {
+                                format!("[1/{}] {}", total, first.name)
+                            } else {
+                                first.name.clone()
+                            };
+
+                            let renderer = self.app.renderer_mut();
+                            renderer.load_scene(first);
+                            if self.fit_scene_on_load {
+                                fit_camera_to_scene(renderer);
+                            }
+                            renderer.queue_unstable();
+                            self.window.set_title(&title);
+                            self.window.request_redraw();
+                        }
+                    }
+                }
                 self.app.tick_with_current_time();
             }
             HostEvent::RedrawRequest => self.window.request_redraw(),
@@ -322,42 +352,5 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
 }
 
 fn fit_camera_to_scene(renderer: &mut cg::runtime::scene::Renderer) {
-    let Some(scene) = renderer.scene.as_ref() else {
-        return;
-    };
-
-    let geometry = renderer.get_cache().geometry();
-    let mut union: Option<Rectangle> = None;
-    for root in scene.graph.roots() {
-        if let Some(bounds) = geometry.get_world_bounds(&root) {
-            union = Some(match union {
-                Some(existing) => rect::union(&[existing, bounds]),
-                None => bounds,
-            });
-        }
-    }
-
-    let Some(bounds) = union else {
-        return;
-    };
-
-    let padding = 64.0;
-    let padded = Rectangle {
-        x: bounds.x - padding,
-        y: bounds.y - padding,
-        width: (bounds.width + padding * 2.0).max(1.0),
-        height: (bounds.height + padding * 2.0).max(1.0),
-    };
-
-    let viewport = renderer.camera.get_size();
-    let zoom_x = viewport.width / padded.width.max(1.0);
-    let zoom_y = viewport.height / padded.height.max(1.0);
-    let target_zoom = zoom_x.min(zoom_y) * 0.98;
-    if target_zoom.is_finite() && target_zoom > 0.0 {
-        renderer.camera.set_zoom(target_zoom);
-    }
-
-    let center_x = padded.x + padded.width * 0.5;
-    let center_y = padded.y + padded.height * 0.5;
-    renderer.camera.set_center(center_x, center_y);
+    renderer.fit_camera_to_scene();
 }

@@ -11,24 +11,43 @@ Rust-native dev runtime for [`cg`](../grida-canvas). It bundles the desktop wini
 ## Usage
 
 ```bash
-# render a local .grida/.json
-cargo run -p grida-dev -- scene path/to/scene.grida
+# open an empty window — drop files onto it to load them
+cargo run -p grida-dev
 
-# render via Figma (API/local/archive)
-cargo run -p grida-dev -- figma --file-key ... --api-key ... --scene-index 0
+# open with a file (any supported format)
+cargo run -p grida-dev -- path/to/scene.grida
+cargo run -p grida-dev -- icon.svg
+cargo run -p grida-dev -- photo.png
 
-# convert & render an SVG
-cargo run -p grida-dev -- svg path/to/asset.svg --title "My SVG"
-
-# stress-test rendering with an NxN grid
-cargo run -p grida-dev -- benchmark --size 400
-
-# load the built-in sample scene
-cargo run -p grida-dev -- sample
-
-# open the drop-target master window (drag .grida/.svg/.png/.jpg/.webp)
-cargo run -p grida-dev -- master
+# open with a remote URL
+cargo run -p grida-dev -- https://example.com/scene.grida
 ```
+
+Supported formats: `.grida`, `.grida1` (JSON), `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`.
+Multi-scene files support **PageUp/PageDown** pagination. Drop new files at any time to replace the scene.
+
+### Headless GPU Benchmark
+
+The `bench` subcommand runs a headless GPU benchmark (no window) and prints per-frame timing stats. Use it to measure rendering performance reliably.
+
+> **Always use `--release` for benchmarks.** Debug builds are ~20-30x slower
+> due to missing optimizations and cannot produce meaningful performance data.
+
+```bash
+# benchmark a .grida file
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida
+
+# synthetic NxN grid (default 100x100 = 10K nodes)
+cargo run -p grida-dev --release -- bench --size 100
+
+# all nodes visible (large viewport)
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida --width 5000 --height 5000
+
+# control frame count
+cargo run -p grida-dev --release -- bench --frames 500
+```
+
+Output includes avg/p50/p95/p99 frame times, display list size, live draw count, and compositor cache hits.
 
 ### Native Examples
 
@@ -46,5 +65,5 @@ Examples live under `crates/grida-dev/examples/*` (with the CLI now covering the
 - Remote scenes use `reqwest`; stay online or stick to local files.
 - Image/font assets referenced with `http(s)://` URLs are loaded asynchronously inside `cg`.
 - `run_demo_window` currently opens a fixed 1080×1080 window; customize it in `cg` if needed.
-- `master` replaces the in-flight scene whenever a supported file is dropped; unsupported drops panic loudly so you can fix converters.
+- The interactive window accepts file drops at any time; multi-scene files support PageUp/PageDown pagination.
 - This crate is intentionally `publish = false`—it will gain CLI subcommands/devtools over time (inspector GUIs, perf capture, etc.).

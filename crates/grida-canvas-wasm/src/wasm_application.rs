@@ -614,13 +614,13 @@ pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
 }
 
 #[no_mangle]
-/// js::_runtime_renderer_set_cache_tile
-pub unsafe extern "C" fn runtime_renderer_set_cache_tile(
+/// js::_runtime_renderer_set_layer_compositing
+pub unsafe extern "C" fn runtime_renderer_set_layer_compositing(
     app: *mut UnknownTargetApplication,
     enabled: bool,
 ) {
     if let Some(app) = app.as_mut() {
-        app.runtime_renderer_set_cache_tile(enabled);
+        app.runtime_renderer_set_layer_compositing(enabled);
     }
 }
 

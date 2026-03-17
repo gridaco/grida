@@ -3060,7 +3060,7 @@ export class Editor
       locateFile: locateFile,
     }).then((factory) => {
       const surface = factory.createWebGLCanvasSurface(el);
-      surface.runtime_renderer_set_cache_tile(false);
+      surface.runtime_renderer_set_layer_compositing(true);
       // surface.setDebug(this.debug);
       // surface.setVerbose(this.debug);
       this.__bind_wasm_surface(surface);

@@ -212,7 +212,12 @@ pub fn decode_all(bytes: &[u8]) -> Result<Vec<Scene>, FbsDecodeError> {
 }
 
 fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
-    let grida_file = flatbuffers::root::<fbs::GridaFile>(bytes)?;
+    let opts = flatbuffers::VerifierOptions {
+        max_tables: usize::MAX,
+        max_depth: 1024,
+        ..Default::default()
+    };
+    let grida_file = flatbuffers::root_with_opts::<fbs::GridaFile>(&opts, bytes)?;
     let document = grida_file
         .document()
         .ok_or(FbsDecodeError::MissingDocument)?;

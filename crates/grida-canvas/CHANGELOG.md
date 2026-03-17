@@ -48,7 +48,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Public APIs**: Continue accepting/returning `String` IDs with automatic conversion
 - **IO Layer**:
   - `.grida` files: `IdConverter` handles string → u64 conversion with mapping storage
-  - Figma files: `FigmaConverter` generates u64 IDs from Figma string IDs
 
 ### Removed
 

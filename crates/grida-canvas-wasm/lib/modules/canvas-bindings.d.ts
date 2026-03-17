@@ -172,7 +172,7 @@ declare namespace canvas {
       show: boolean
     ): void;
 
-    _runtime_renderer_set_cache_tile(
+    _runtime_renderer_set_layer_compositing(
       state: GridaCanvasApplicationPtr,
       enabled: boolean
     ): void;

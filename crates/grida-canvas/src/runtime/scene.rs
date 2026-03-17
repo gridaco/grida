@@ -1,7 +1,7 @@
-use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
 use crate::cg::prelude::*;
 use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::Painter;
+use crate::runtime::camera::CameraChangeKind;
 use crate::runtime::counter::FrameCounter;
 use crate::runtime::render_policy::RenderPolicy;
 use crate::sk;
@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-use math2::{self, rect, region};
+use math2::{self, rect};
 use skia_safe::{
     surfaces, Canvas, FilterMode, Image, MipmapMode, Paint as SkPaint, Picture, PictureRecorder,
     Rect, SamplingOptions, Surface,
@@ -91,15 +91,16 @@ fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
     set
 }
 
-/// Type alias for tile information in frame planning
-pub type FramePlanTileInfo = RegionTileInfo;
-
 #[derive(Clone)]
 pub struct FramePlan {
     pub stable: bool,
-    /// cached tile keys with blur information
-    pub tiles: Vec<FramePlanTileInfo>,
-    /// regions with their intersecting indices
+    /// What kind of camera change triggered this frame.
+    /// Used by downstream stages to take optimized paths (e.g. skip tile
+    /// invalidation when only panning, skip LOD recomputation, etc.).
+    pub camera_change: CameraChangeKind,
+    /// Node IDs that will be drawn via cached layer images (compositor blit).
+    pub promoted: Vec<NodeId>,
+    /// regions with their intersecting indices (live-drawn nodes only)
     pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
     pub display_list_duration: Duration,
     pub display_list_size_estimated: usize,
@@ -111,8 +112,14 @@ pub struct DrawResult {
     pub cache_picture_used: usize,
     pub cache_picture_size: usize,
     pub cache_geometry_size: usize,
-    pub tiles_total: usize,
-    pub tiles_used: usize,
+    /// Total number of promoted nodes in the layer compositing cache.
+    pub layer_image_cache_size: usize,
+    /// Number of nodes drawn via cached layer image (cache hits).
+    pub layer_image_cache_hits: usize,
+    /// Estimated memory usage of the layer compositing cache in bytes.
+    pub layer_image_cache_bytes: usize,
+    /// Number of nodes drawn live (not from cache).
+    pub live_draw_count: usize,
 }
 
 pub enum FrameFlushResult {
@@ -129,6 +136,10 @@ pub struct FrameFlushStats {
     pub frame_duration: Duration,
     pub flush_duration: Duration,
     pub total_duration: Duration,
+    /// Time spent in update_compositor (CPU-side capture/skip logic).
+    pub compositor_duration: Duration,
+    /// GPU flush after draw, before compositor (isolates draw GPU cost).
+    pub mid_flush_duration: Duration,
 }
 
 /// Choice of GPU vs. raster backend
@@ -142,6 +153,11 @@ impl Backend {
         match self {
             Backend::GL(ptr) | Backend::Raster(ptr) => *ptr,
         }
+    }
+
+    /// Returns true when the backend is GPU-accelerated (GL).
+    pub fn is_gpu(&self) -> bool {
+        matches!(self, Backend::GL(_))
     }
 
     pub fn new_from_raster(width: i32, height: i32) -> Self {
@@ -176,6 +192,10 @@ impl RendererWindowContext {
 /// ---------------------------------------------------------------------------
 /// Renderer: manages backend, DPI, camera, and iterates over scene children
 /// ---------------------------------------------------------------------------
+/// Maximum dimension for the shared compositor offscreen surface.
+/// Nodes larger than this in either axis are skipped for compositing.
+const COMPOSITOR_SURFACE_SIZE: i32 = 4096;
+
 pub struct Renderer {
     pub backend: Backend,
     pub scene: Option<Scene>,
@@ -196,6 +216,20 @@ pub struct Renderer {
     layout_engine: crate::layout::engine::LayoutEngine,
     /// Window/viewport context - source of truth for viewport state
     pub window_context: RendererWindowContext,
+    /// Shared GPU surface reused for all compositor node captures.
+    /// Lazily created from the parent surface on first use.
+    /// One allocation, reused across all nodes and all frames.
+    compositor_surface: Option<Surface>,
+    /// Texture atlas for batch-friendly compositor blitting.
+    /// Packs per-node cached images into shared large textures so that
+    /// compositing uses same-texture sub-rect draws instead of switching
+    /// between thousands of individual GPU textures.
+    compositor_atlas: cache::atlas::atlas_set::AtlasSet,
+    /// Cached downscale surface for interaction rendering.
+    /// Reused across frames to avoid GPU texture allocation per frame.
+    downscale_surface: Option<Surface>,
+    /// Dimensions of the cached downscale surface (to detect size changes).
+    downscale_dims: (i32, i32),
 }
 
 impl Renderer {
@@ -217,16 +251,25 @@ impl Renderer {
     }
 
     #[inline]
-    fn prefill_picture_cache_for_plan(&mut self, plan: &FramePlan) {
-        let variant_key = self.config.render_policy.variant_key();
+    fn prefill_picture_cache_for_plan(
+        &mut self,
+        plan: &FramePlan,
+        policy: RenderPolicy,
+    ) {
+        let variant_key = policy.variant_key();
         // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
         for (_region, indices) in &plan.regions {
             for idx in indices {
                 if let Some(entry) = self.scene_cache.layers.layers.get(*idx).cloned() {
                     let id = entry.id;
-                    let _ = self.with_recording_cached(&id, variant_key, |painter| {
-                        painter.draw_layer(&entry.layer);
-                    });
+                    let _ = self.with_recording_cached_with_policy(
+                        &id,
+                        variant_key,
+                        policy,
+                        |painter| {
+                            painter.draw_layer(&entry.layer);
+                        },
+                    );
                 }
             }
         }
@@ -234,15 +277,38 @@ impl Renderer {
 
     #[inline]
     fn draw_layers_with_scene_cache(&mut self, canvas: &Canvas, plan: &FramePlan) -> usize {
-        self.prefill_picture_cache_for_plan(plan);
+        self.draw_layers_with_scene_cache_skip(canvas, plan, None)
+    }
+
+    fn draw_layers_with_scene_cache_skip(
+        &mut self,
+        canvas: &Canvas,
+        plan: &FramePlan,
+        promoted_skip: Option<&std::collections::HashSet<NodeId>>,
+    ) -> usize {
+        // Select effect quality based on frame stability.
+        // Unstable (interactive) frames use reduced effects for performance.
+        // Stable (settled) frames use full quality.
+        let policy = if plan.stable {
+            self.config.render_policy
+        } else {
+            self.config.render_policy.with_reduced_effects()
+        };
+
+        self.prefill_picture_cache_for_plan(plan, policy);
 
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,
             &self.images,
             &self.scene_cache,
-            self.config.render_policy,
+            policy,
         );
+        let painter = if let Some(skip) = promoted_skip {
+            painter.with_promoted_skip(skip)
+        } else {
+            painter
+        };
         painter.draw_layer_list(&self.scene_cache.layers);
         painter.cache_picture_hits()
     }
@@ -299,6 +365,12 @@ impl Renderer {
             config: RuntimeRendererConfig::default(),
             layout_engine: crate::layout::engine::LayoutEngine::new(),
             window_context: RendererWindowContext::new(viewport_size),
+            compositor_surface: None,
+            compositor_atlas: cache::atlas::atlas_set::AtlasSet::new(
+                cache::atlas::atlas_set::AtlasSetConfig::default(),
+            ),
+            downscale_surface: None,
+            downscale_dims: (0, 0),
         }
     }
 
@@ -354,6 +426,16 @@ impl Renderer {
                         update_commands(&mut group.mask_commands, node_id, text);
                         update_commands(&mut group.content_commands, node_id, text);
                     }
+                    PainterRenderCommand::RenderSurface(ref mut surface) => {
+                        if let Some(ref mut own_layer) = surface.own_layer {
+                            if let PainterPictureLayer::Text(ref mut tl) = own_layer {
+                                if tl.base.id == node_id {
+                                    tl.text = text.to_owned();
+                                }
+                            }
+                        }
+                        update_commands(&mut surface.children, node_id, text);
+                    }
                 }
             }
         }
@@ -369,6 +451,11 @@ impl Renderer {
         // Invalidate the picture cache for this node so the Painter
         // doesn't use a stale cached picture.
         self.scene_cache.picture.invalidate_node(node_id);
+
+        // Invalidate the compositor layer image for this node.
+        self.scene_cache.compositor.invalidate(&node_id);
+        // Free the atlas slot — it will be re-allocated on next capture.
+        self.compositor_atlas.free_node(&node_id);
     }
 
     pub fn canvas(&self) -> &Canvas {
@@ -427,12 +514,90 @@ impl Renderer {
         self.images.get_size(&rid)
     }
 
-    /// Enable or disable the image tile cache.
-    pub fn set_cache_tile(&mut self, enable: bool) {
-        self.config.cache_tile = enable;
+    /// Enable or disable the per-node layer compositing cache.
+    ///
+    /// Layer compositing requires a GPU backend — offscreen surfaces share
+    /// the GL context so cached images stay in VRAM.  On a raster backend
+    /// the setting is accepted but silently ignored at render time.
+    pub fn set_layer_compositing(&mut self, enable: bool) {
+        self.config.layer_compositing = enable;
         if !enable {
-            self.scene_cache.tile.clear_all();
+            self.scene_cache.compositor.clear();
+            self.compositor_atlas.clear();
         }
+    }
+
+    /// Set the render scale for interaction (unstable) frames.
+    ///
+    /// During active pan/zoom, the scene is rendered at this fraction of
+    /// the display resolution, then upscaled with bilinear filtering.
+    ///
+    /// - `1.0` or `0.0`: disabled (full resolution)
+    /// - `0.5`: quarter pixels (recommended default)
+    /// - `0.25`: 1/16th pixels (aggressive, very blurry during interaction)
+    ///
+    /// Stable frames always render at full resolution regardless of this setting.
+    pub fn set_interaction_render_scale(&mut self, scale: f32) {
+        self.config.interaction_render_scale = scale.clamp(0.0, 1.0);
+    }
+
+    /// Enable or disable the compositor texture atlas.
+    ///
+    /// When enabled, per-node cached images are packed into shared atlas
+    /// textures for batch-friendly GPU compositing (fewer texture switches).
+    /// When disabled, each cached node uses an individual GPU texture.
+    ///
+    /// Only effective when layer compositing is also enabled.
+    pub fn set_compositor_atlas(&mut self, enable: bool) {
+        self.config.compositor_atlas = enable;
+        if !enable {
+            // Move atlas-backed entries back to dirty so they get
+            // re-captured as individual textures on the next frame.
+            self.scene_cache.compositor.invalidate_all();
+            self.compositor_atlas.clear();
+        }
+    }
+
+    /// Adjust the camera to fit the entire scene content in view with padding.
+    pub fn fit_camera_to_scene(&mut self) {
+        let Some(scene) = self.scene.as_ref() else {
+            return;
+        };
+
+        let geometry = self.scene_cache.geometry();
+        let mut union: Option<rect::Rectangle> = None;
+        for root in scene.graph.roots() {
+            if let Some(bounds) = geometry.get_world_bounds(&root) {
+                union = Some(match union {
+                    Some(existing) => rect::union(&[existing, bounds]),
+                    None => bounds,
+                });
+            }
+        }
+
+        let Some(bounds) = union else {
+            return;
+        };
+
+        let padding = 64.0;
+        let padded = rect::Rectangle {
+            x: bounds.x - padding,
+            y: bounds.y - padding,
+            width: (bounds.width + padding * 2.0).max(1.0),
+            height: (bounds.height + padding * 2.0).max(1.0),
+        };
+
+        let viewport = self.camera.get_size();
+        let zoom_x = viewport.width / padded.width.max(1.0);
+        let zoom_y = viewport.height / padded.height.max(1.0);
+        let target_zoom = zoom_x.min(zoom_y) * 0.98;
+        if target_zoom.is_finite() && target_zoom > 0.0 {
+            self.camera.set_zoom(target_zoom);
+        }
+
+        let center_x = padded.x + padded.width * 0.5;
+        let center_y = padded.y + padded.height * 0.5;
+        self.camera.set_center(center_x, center_y);
     }
 
     /// Configure pixel preview scale.
@@ -495,14 +660,81 @@ impl Renderer {
 
         let width = surface.width() as f32;
         let height = surface.height() as f32;
-        let mut canvas = surface.canvas();
-        let draw = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
-        let effective_cache_tile = self.config.cache_tile && self.config.render_policy.allows_tile_cache();
-        if effective_cache_tile && frame.stable {
-            // if !self.camera.has_zoom_changed() {}
-            self.scene_cache.update_tiles(&self.camera, surface, true);
+        // Reuse or create a downscaled offscreen for interaction rendering.
+        let interaction_scale = self.config.interaction_render_scale;
+        let use_downscale = !frame.stable
+            && interaction_scale > 0.0
+            && interaction_scale < 1.0;
+        if use_downscale {
+            let sw = (width * interaction_scale).ceil() as i32;
+            let sh = (height * interaction_scale).ceil() as i32;
+            if sw > 0 && sh > 0 && (sw, sh) != self.downscale_dims {
+                // Size changed — recreate the surface.
+                let info = skia_safe::ImageInfo::new_n32_premul((sw, sh), None);
+                self.downscale_surface = surface.new_surface(&info);
+                self.downscale_dims = (sw, sh);
+            }
         }
+
+        // Take ownership of the downscale surface temporarily to avoid
+        // double-mutable-borrow with self.draw().
+        let mut ds_taken = if use_downscale {
+            self.downscale_surface.take()
+        } else {
+            None
+        };
+
+        let mut canvas = surface.canvas();
+        let draw = self.draw(
+            &mut canvas,
+            &frame,
+            scene.background_color,
+            width,
+            height,
+            ds_taken.as_mut(),
+        );
+
+        // Put it back for reuse next frame.
+        if ds_taken.is_some() {
+            self.downscale_surface = ds_taken;
+        }
+
+        // Layer compositing cache: capture (or re-capture) node images.
+        //
+        // GPU-only: offscreen surfaces share the GL context so cached
+        // SkImages live in VRAM. On a CPU/raster backend the extra copy
+        // would be strictly slower than direct painting, so we skip it.
+        //
+        // Runs on every frame — the method itself is cheap when all entries
+        // are already cached and clean.  Rasterisation only happens for nodes
+        // that are new or dirty (zoom change, content edit, etc.).
+        // Mid-frame flush: isolate draw vs compositor GPU work.
+        let mid_flush_start = Instant::now();
+        if let Some(mut gr_context) = surface.recording_context() {
+            if let Some(mut direct_context) = gr_context.as_direct_context() {
+                direct_context.flush_and_submit();
+            }
+        }
+        let mid_flush_duration = mid_flush_start.elapsed();
+
+        let compositor_start = Instant::now();
+        if self.backend.is_gpu() {
+            let effective_layer_compositing = self.config.layer_compositing
+                && self.config.render_policy.allows_layer_compositing();
+            if effective_layer_compositing {
+                if frame.stable {
+                    // Stable frame: re-rasterize all stale entries at the
+                    // final zoom density without a time budget.
+                    self.update_compositor_stable(surface);
+                } else {
+                    // Unstable frame: budgeted re-rasterization. Stale
+                    // entries stay GPU-stretched until their turn comes.
+                    self.update_compositor(surface);
+                }
+            }
+        }
+        let compositor_duration = compositor_start.elapsed();
 
         let frame_duration = start.elapsed();
 
@@ -520,6 +752,8 @@ impl Renderer {
             frame_duration,
             flush_duration,
             total_duration: frame_duration + flush_duration,
+            compositor_duration,
+            mid_flush_duration,
         };
 
         self.fc.flush();
@@ -579,15 +813,31 @@ impl Renderer {
                 viewport_size,
             );
 
-            // 3. Build layers
+            // 3. Build effect tree (identifies render surface boundaries)
+            self.scene_cache.update_effect_tree(scene);
+
+            // 4. Build layers
             self.scene_cache.update_layers(scene);
         }
         self.queue_stable();
     }
 
     fn queue(&mut self, stable: bool) {
-        // let deps_camera_changed = self.camera.changed();
-        // TODO: check for dependencies
+        // Classify camera change *before* building the frame plan so that
+        // downstream stages (tile cache, LOD selection, etc.) can branch on it.
+        let camera_change = self.camera.change_kind();
+
+        // On zoom change, mark compositor cache entries as stale (not dirty).
+        // Stale entries remain valid for GPU-stretched blitting — the draw
+        // path applies a compensating scale transform. They are progressively
+        // re-rasterized within the per-frame time budget by update_compositor().
+        //
+        // Previous behavior: invalidate_all() + atlas.clear() caused full
+        // re-rasterization of all promoted nodes in a single frame, producing
+        // 94-146ms frames (6-10 fps) on effects-heavy scenes.
+        if camera_change.zoom_changed() && self.config.layer_compositing {
+            self.scene_cache.compositor.mark_all_stale();
+        }
 
         // Always compute the latest frame plan so that a subsequent flush uses up-to-date state,
         // even if a previous frame is already pending.
@@ -596,6 +846,7 @@ impl Renderer {
             rect.unwrap_or(rect::Rectangle::empty()),
             self.camera.get_zoom(),
             stable,
+            camera_change,
         ));
 
         // Only request a redraw if there isn't already one pending.
@@ -618,6 +869,9 @@ impl Renderer {
     /// Clear the cached scene picture.
     pub fn invalidate_cache(&mut self) {
         self.scene_cache.invalidate();
+        // Also invalidate all compositor layer images so they re-rasterize.
+        self.scene_cache.compositor.invalidate_all();
+        self.compositor_atlas.clear();
     }
 
     /// Rebuild scene caches after scene geometry has changed.
@@ -648,7 +902,10 @@ impl Renderer {
                 viewport_size,
             );
 
-            // 3. Rebuild layers
+            // 3. Rebuild effect tree
+            self.scene_cache.update_effect_tree(scene);
+
+            // 4. Rebuild layers
             self.scene_cache.update_layers(scene);
         }
     }
@@ -661,9 +918,19 @@ impl Renderer {
         self.window_context.viewport_size = Size { width, height };
     }
 
+    #[allow(dead_code)]
     fn with_recording(
         &self,
         bounds: &rect::Rectangle,
+        draw: impl FnOnce(&Painter),
+    ) -> Option<Picture> {
+        self.with_recording_with_policy(bounds, self.config.render_policy, draw)
+    }
+
+    fn with_recording_with_policy(
+        &self,
+        bounds: &rect::Rectangle,
+        policy: RenderPolicy,
         draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
         let mut recorder = PictureRecorder::new();
@@ -679,16 +946,32 @@ impl Renderer {
             &self.fonts,
             &self.images,
             &self.scene_cache,
-            self.config.render_policy,
+            policy,
         );
         draw(&painter);
         recorder.finish_recording_as_picture(None)
     }
 
+    #[cfg(test)]
     fn with_recording_cached(
         &mut self,
         id: &NodeId,
         variant_key: u64,
+        draw: impl FnOnce(&Painter),
+    ) -> Option<Picture> {
+        self.with_recording_cached_with_policy(
+            id,
+            variant_key,
+            self.config.render_policy,
+            draw,
+        )
+    }
+
+    fn with_recording_cached_with_policy(
+        &mut self,
+        id: &NodeId,
+        variant_key: u64,
+        policy: RenderPolicy,
         draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
         if let Some(pic) = self
@@ -702,7 +985,7 @@ impl Renderer {
         let Some(bounds) = self.scene_cache.geometry.get_render_bounds(&id) else {
             return None;
         };
-        let pic = self.with_recording(&bounds, draw);
+        let pic = self.with_recording_with_policy(&bounds, policy, draw);
 
         if let Some(pic) = &pic {
             self.scene_cache
@@ -713,47 +996,55 @@ impl Renderer {
     }
 
     /// Plan the frame for rendering.
-    /// Arguments:
-    /// - bounds: the bounding rect to be rendered (in world space)
-    /// - zoom: the current zoom level
-    fn frame(&self, bounds: rect::Rectangle, zoom: f32, stable: bool) -> FramePlan {
+    ///
+    /// # Arguments
+    /// - `bounds`: the bounding rect to be rendered (in world space)
+    /// - `zoom`: the current zoom level
+    /// - `stable`: whether this is a stable (high quality) or unstable (fast) frame
+    /// - `camera_change`: classification of what changed in the camera transform
+    fn frame(
+        &self,
+        bounds: rect::Rectangle,
+        _zoom: f32,
+        stable: bool,
+        camera_change: CameraChangeKind,
+    ) -> FramePlan {
         let __start = Instant::now();
 
-        let strategy = if stable {
-            ImageTileCacheResolutionStrategy::Default
-        } else {
-            ImageTileCacheResolutionStrategy::ForceCache
-        };
+        let painter_region = vec![bounds];
 
-        let effective_cache_tile = self.config.cache_tile && self.config.render_policy.allows_tile_cache();
-        let (visible_tiles, tile_rects) = if effective_cache_tile {
-            let region_tiles = self
-                .scene_cache
-                .tile
-                .get_region_tiles(&bounds, zoom, strategy);
-            (
-                region_tiles.tiles().to_vec(),
-                region_tiles.tile_rects().to_vec(),
-            )
-        } else {
-            (Vec::new(), Vec::new())
-        };
+        let effective_layer_compositing = self.config.layer_compositing
+            && self.config.render_policy.allows_layer_compositing();
 
-        let painter_region = if stable || !effective_cache_tile {
-            vec![bounds]
-        } else {
-            region::difference(bounds, &tile_rects)
-        };
-
+        let mut promoted_ids: Vec<NodeId> = Vec::new();
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
         for rect in painter_region {
             let mut indices = self.scene_cache.intersects(rect);
 
-            // TODO: sort is expensive
+            // TODO: sort is expensive — consider incremental visible-set
+            // update (item 19) for pan-only frames where the entering/exiting
+            // sets are tiny.
             indices.sort();
 
-            regions.push((rect, indices));
+            if effective_layer_compositing {
+                // Separate promoted (cached) nodes from live-drawn nodes.
+                let mut live_indices = Vec::new();
+                for &idx in &indices {
+                    if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                        if self.scene_cache.compositor.peek(&entry.id).is_some() {
+                            promoted_ids.push(entry.id);
+                        } else {
+                            live_indices.push(idx);
+                        }
+                    }
+                }
+                if !live_indices.is_empty() {
+                    regions.push((rect, live_indices));
+                }
+            } else {
+                regions.push((rect, indices));
+            }
         }
 
         let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
@@ -761,10 +1052,10 @@ impl Renderer {
         let __ll_duration = __start.elapsed();
 
         FramePlan {
-            stable: stable,
-            tiles: visible_tiles,
+            stable,
+            camera_change,
+            promoted: promoted_ids,
             regions,
-            // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,
             display_list_size_estimated: ll_len,
         }
@@ -775,6 +1066,7 @@ impl Renderer {
     /// - plan: the frame plan
     /// - width: the width of the canvas
     /// - height: the height of the canvas
+    /// - downscale_surface: pre-created offscreen for interaction downscaling (None = full res)
     fn draw(
         &mut self,
         canvas: &Canvas,
@@ -782,13 +1074,13 @@ impl Renderer {
         background_color: Option<CGColor>,
         width: f32,
         height: f32,
+        downscale_surface: Option<&mut Surface>,
     ) -> DrawResult {
         let __before_paint = Instant::now();
 
         let zoom = self.camera.get_zoom();
         let pixel_preview_scale = self.config.pixel_preview_scale;
         let pixel_preview_strategy = self.config.pixel_preview_strategy;
-        let effective_cache_tile = self.config.cache_tile && self.config.render_policy.allows_tile_cache();
 
         // Pixel Preview: render the scene at a reduced internal resolution, then
         // scale up with nearest-neighbor sampling.
@@ -850,10 +1142,32 @@ impl Renderer {
                     cache_picture_used,
                     cache_picture_size: self.scene_cache.picture.len(),
                     cache_geometry_size: self.scene_cache.geometry.len(),
-                    tiles_total: self.scene_cache.tile.tiles().len(),
-                    tiles_used: 0,
+                    layer_image_cache_size: 0,
+                    layer_image_cache_hits: 0,
+                    layer_image_cache_bytes: 0,
+                    live_draw_count: 0,
                 };
             }
+        }
+
+        // --- Interaction render scale: downscale unstable frames ---
+        // During active interaction, render at reduced resolution into a
+        // pre-created offscreen surface, then upscale to the display canvas
+        // with bilinear filtering. This reduces ALL GPU work proportionally.
+        if let Some(offscreen) = downscale_surface {
+            let scale = self.config.interaction_render_scale;
+            let scaled_w = offscreen.width();
+            let scaled_h = offscreen.height();
+            let result = self.draw_to_offscreen_and_upscale(
+                canvas, offscreen, plan, background_color,
+                width, height,
+                scaled_w, scaled_h,
+                scale,
+            );
+            if let Some(r) = result {
+                return r;
+            }
+            // Fallback: draw at full resolution below.
         }
 
         canvas.clear(skia_safe::Color::TRANSPARENT);
@@ -865,57 +1179,217 @@ impl Renderer {
         // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // Always draw via command pipeline. Tiles are drawn first (as a backdrop),
-        // then the full command stream composes the final result.
-
-        if effective_cache_tile {
-            // draw image cache tiles
-            for tk in plan.tiles.iter() {
-                let tile_at_zoom = self.scene_cache.tile.get_tile(&tk.key);
-                if let Some(tile_at_zoom) = tile_at_zoom {
-                    let image = &tile_at_zoom.image;
-                    let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
-                    let r = tk.rect;
-                    let dst = Rect::from_xywh(r.x, r.y, r.width, r.height);
+        // Draw promoted nodes from the layer compositing cache.
+        // Each cached image is blitted at its world-space render bounds.
+        // The camera view matrix (already applied to canvas) handles zoom.
+        // Opacity and blend mode are stored in LayerImage at capture time.
+        //
+        // Atlas-backed nodes use same-texture sub-rect draws (batch-friendly,
+        // eliminates GPU texture switching). Individual-backed nodes use
+        // per-node texture blits as fallback.
+        let mut layer_image_cache_hits = 0usize;
+        let promoted_set: std::collections::HashSet<NodeId> =
+            plan.promoted.iter().copied().collect();
+        if !plan.promoted.is_empty() {
+            for id in &plan.promoted {
+                if let Some(layer_img) = self.scene_cache.compositor.get(id) {
+                    let b = &layer_img.local_bounds;
+                    let dst = Rect::from_xywh(b.x, b.y, b.width, b.height);
                     let mut paint = SkPaint::default();
-
-                    // Apply adaptive blur filter when the tile was captured at a lower zoom level
-                    // (lower resolution) than the current view
-                    if tk.blur && tk.blur_radius > 0.0 {
-                        let blur_filter = skia_safe::image_filters::blur(
-                            (tk.blur_radius, tk.blur_radius),
-                            None,
-                            None,
-                            None,
-                        );
-                        paint.set_image_filter(blur_filter);
+                    if layer_img.opacity < 1.0 {
+                        paint.set_alpha_f(layer_img.opacity);
                     }
+                    let cg_blend: crate::cg::types::BlendMode = layer_img.blend_mode.into();
+                    let sk_blend: skia_safe::BlendMode = cg_blend.into();
+                    paint.set_blend_mode(sk_blend);
 
-                    canvas.draw_image_rect(
-                        image,
-                        Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
-                        dst,
-                        &paint,
-                    );
+                    if layer_img.is_atlas_backed() {
+                        // Atlas path: same-texture sub-rect blit.
+                        if let Some((atlas_image, src_rect)) =
+                            self.compositor_atlas.get_image_and_src_rect(id)
+                        {
+                            canvas.draw_image_rect(
+                                atlas_image,
+                                Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
+                                dst,
+                                &paint,
+                            );
+                        }
+                    } else if let Some(img) = layer_img.individual_image() {
+                        // Individual texture path.
+                        let src = Rect::new(
+                            0.0,
+                            0.0,
+                            img.width() as f32,
+                            img.height() as f32,
+                        );
+                        canvas.draw_image_rect(
+                            img,
+                            Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                            dst,
+                            &paint,
+                        );
+                    }
+                    layer_image_cache_hits += 1;
                 }
             }
         }
 
-        let cache_picture_used = self.draw_layers_with_scene_cache(canvas, plan);
+        // Draw live (non-promoted) layers via the Painter.
+        // Promoted nodes are skipped — they were already blitted above.
+        // Skip entirely when all visible nodes are promoted — no live work needed.
+        let has_live_work = plan.regions.iter().any(|(_, indices)| !indices.is_empty());
+        let promoted_skip = if promoted_set.is_empty() {
+            None
+        } else {
+            Some(&promoted_set)
+        };
+        let cache_picture_used = if has_live_work {
+            self.draw_layers_with_scene_cache_skip(canvas, plan, promoted_skip)
+        } else {
+            0
+        };
 
         let __painter_duration = __before_paint.elapsed();
 
         canvas.restore();
+
+        let compositor_stats = self.scene_cache.compositor.stats();
 
         DrawResult {
             painter_duration: __painter_duration,
             cache_picture_used,
             cache_picture_size: self.scene_cache.picture.len(),
             cache_geometry_size: self.scene_cache.geometry.len(),
-            tiles_total: self.scene_cache.tile.tiles().len(),
-            tiles_used: if effective_cache_tile { plan.tiles.len() } else { 0 },
+            layer_image_cache_size: compositor_stats.promoted_count,
+            layer_image_cache_hits,
+            layer_image_cache_bytes: compositor_stats.memory_bytes,
+            live_draw_count: plan.regions.iter().map(|(_, indices)| indices.len()).sum(),
         }
         //
+    }
+
+    /// Render the scene into a pre-created downscaled offscreen, then
+    /// upscale to the display canvas with bilinear filtering.
+    fn draw_to_offscreen_and_upscale(
+        &mut self,
+        canvas: &Canvas,
+        offscreen: &mut Surface,
+        plan: &FramePlan,
+        background_color: Option<CGColor>,
+        display_w: f32,
+        display_h: f32,
+        scaled_w: i32,
+        scaled_h: i32,
+        scale: f32,
+    ) -> Option<DrawResult> {
+        let __before_paint = Instant::now();
+        let off_canvas = offscreen.canvas();
+
+        // Clear and draw background at reduced resolution.
+        off_canvas.clear(skia_safe::Color::TRANSPARENT);
+        Self::clear_and_paint_background(
+            off_canvas,
+            background_color,
+            scaled_w as f32,
+            scaled_h as f32,
+        );
+
+        off_canvas.save();
+
+        // Scale down the camera transform to match reduced resolution.
+        off_canvas.scale((scale, scale));
+        off_canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
+
+        // Blit promoted (compositor-cached) nodes.
+        let mut layer_image_cache_hits = 0usize;
+        let promoted_set: std::collections::HashSet<NodeId> =
+            plan.promoted.iter().copied().collect();
+        for id in &plan.promoted {
+            if let Some(layer_img) = self.scene_cache.compositor.get(id) {
+                let b = &layer_img.local_bounds;
+                let dst = Rect::from_xywh(b.x, b.y, b.width, b.height);
+                let mut paint = SkPaint::default();
+                if layer_img.opacity < 1.0 {
+                    paint.set_alpha_f(layer_img.opacity);
+                }
+                let cg_blend: crate::cg::types::BlendMode = layer_img.blend_mode.into();
+                let sk_blend: skia_safe::BlendMode = cg_blend.into();
+                paint.set_blend_mode(sk_blend);
+
+                if layer_img.is_atlas_backed() {
+                    if let Some((atlas_image, src_rect)) =
+                        self.compositor_atlas.get_image_and_src_rect(id)
+                    {
+                        off_canvas.draw_image_rect(
+                            atlas_image,
+                            Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
+                            dst,
+                            &paint,
+                        );
+                    }
+                } else if let Some(img) = layer_img.individual_image() {
+                    let src = Rect::new(0.0, 0.0, img.width() as f32, img.height() as f32);
+                    off_canvas.draw_image_rect(
+                        img,
+                        Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                        dst,
+                        &paint,
+                    );
+                }
+                layer_image_cache_hits += 1;
+            }
+        }
+
+        // Draw live (non-promoted) layers at reduced resolution.
+        // Promoted nodes are skipped — they were already blitted above.
+        let has_live_work = plan.regions.iter().any(|(_, indices)| !indices.is_empty());
+        let promoted_skip = if promoted_set.is_empty() {
+            None
+        } else {
+            Some(&promoted_set)
+        };
+        let cache_picture_used = if has_live_work {
+            self.draw_layers_with_scene_cache_skip(off_canvas, plan, promoted_skip)
+        } else {
+            0
+        };
+
+        off_canvas.restore();
+
+        // Upscale to display canvas with bilinear filtering.
+        let image = offscreen.image_snapshot();
+        canvas.clear(skia_safe::Color::TRANSPARENT);
+        let sampling = skia_safe::SamplingOptions::new(
+            skia_safe::FilterMode::Linear,
+            skia_safe::MipmapMode::None,
+        );
+        let mut paint = SkPaint::default();
+        paint.set_anti_alias(false);
+        canvas.draw_image_rect_with_sampling_options(
+            &image,
+            Some((
+                &Rect::from_wh(scaled_w as f32, scaled_h as f32),
+                skia_safe::canvas::SrcRectConstraint::Fast,
+            )),
+            Rect::new(0.0, 0.0, display_w, display_h),
+            sampling,
+            &paint,
+        );
+
+        let __painter_duration = __before_paint.elapsed();
+        let compositor_stats = self.scene_cache.compositor.stats();
+
+        Some(DrawResult {
+            painter_duration: __painter_duration,
+            cache_picture_used,
+            cache_picture_size: self.scene_cache.picture.len(),
+            cache_geometry_size: self.scene_cache.geometry.len(),
+            layer_image_cache_size: compositor_stats.promoted_count,
+            layer_image_cache_hits,
+            layer_image_cache_bytes: compositor_stats.memory_bytes,
+            live_draw_count: plan.regions.iter().map(|(_, indices)| indices.len()).sum(),
+        })
     }
 
     /// Draw the scene to the canvas.
@@ -968,8 +1442,10 @@ impl Renderer {
             cache_picture_used: 0,
             cache_picture_size: 0,
             cache_geometry_size: 0,
-            tiles_total: 0,
-            tiles_used: 0,
+            layer_image_cache_size: 0,
+            layer_image_cache_hits: 0,
+            layer_image_cache_bytes: 0,
+            live_draw_count: 0,
         }
         //
     }
@@ -980,7 +1456,8 @@ impl Renderer {
         let width = surface.width() as f32;
         let height = surface.height() as f32;
         let mut canvas = surface.canvas();
-        let frame = self.frame(self.camera.rect(), 1.0, true);
+        // Export/snapshot: not an interactive frame, so no camera change.
+        let frame = self.frame(self.camera.rect(), 1.0, true, CameraChangeKind::None);
         let _ = self.draw_nocache(&mut canvas, &frame, None, width, height);
 
         surface.image_snapshot()
@@ -989,9 +1466,291 @@ impl Renderer {
     /// Render the current scene onto the provided canvas. This is useful for
     /// exporting the scene using alternate backends such as PDF.
     pub fn render_to_canvas(&self, canvas: &Canvas, width: f32, height: f32) {
-        let frame = self.frame(self.camera.rect(), 1.0, true);
+        // Export: not an interactive frame, so no camera change.
+        let frame = self.frame(self.camera.rect(), 1.0, true, CameraChangeKind::None);
         let background = self.scene.as_ref().and_then(|s| s.background_color);
         let _ = self.draw_nocache(canvas, &frame, background, width, height);
+    }
+
+    /// Capture (or re-capture) layer images for promoted nodes.
+    ///
+    /// Called every frame when layer compositing is enabled (GPU only).
+    /// A **single shared GPU surface** (`self.compositor_surface`) is reused
+    /// for all node captures — one FBO allocation, amortised across all
+    /// nodes and all frames.  For each eligible node the surface is cleared,
+    /// the node is drawn, and `image_snapshot_with_bounds` grabs the
+    /// sub-region as a GPU-resident `SkImage`.  No per-node surface
+    /// allocation.
+    ///
+    /// Eligible visible nodes are rasterised within a per-frame time budget
+    /// during unstable (interactive) frames, and without limit on stable
+    /// (settled) frames. Stale entries (zoom mismatch) are blitted with
+    /// GPU texture stretching until re-rasterized.
+    fn update_compositor(&mut self, parent_surface: &mut Surface) {
+        self.update_compositor_inner(parent_surface, false);
+    }
+
+    /// Variant called on stable frames — no time budget, all stale entries
+    /// are re-rasterized to achieve full quality at the final zoom.
+    fn update_compositor_stable(&mut self, parent_surface: &mut Surface) {
+        self.update_compositor_inner(parent_surface, true);
+    }
+
+    /// Core compositor update logic.
+    ///
+    /// When `force_all` is true (stable frame), all stale/dirty entries are
+    /// re-rasterized without a time budget. When false (unstable/interactive
+    /// frame), re-rasterization is capped to `ZOOM_RERASTER_BUDGET` to keep
+    /// frame times low.
+    fn update_compositor_inner(&mut self, parent_surface: &mut Surface, force_all: bool) {
+        use crate::cache::compositor::promotion;
+
+        let zoom = self.camera.get_zoom();
+
+        self.scene_cache.compositor.tick_frame();
+
+        // --- Lazily allocate or reuse the shared offscreen surface ---------
+        if self.compositor_surface.is_none() {
+            let info = skia_safe::ImageInfo::new_n32_premul(
+                (COMPOSITOR_SURFACE_SIZE, COMPOSITOR_SURFACE_SIZE),
+                None,
+            );
+            self.compositor_surface = parent_surface.new_surface(&info);
+            if self.compositor_surface.is_none() {
+                return; // GPU surface creation failed — skip compositing
+            }
+        }
+
+        // Only process layers visible in the current viewport.
+        let viewport_rect = self.camera.rect();
+        let visible_indices = self.scene_cache.intersects(viewport_rect);
+        let visible_set: std::collections::HashSet<usize> =
+            visible_indices.into_iter().collect();
+
+        // Time budget for stale re-rasterization during interactive frames.
+        // 8ms leaves headroom within a 16ms frame budget (60fps target).
+        const ZOOM_RERASTER_BUDGET: std::time::Duration =
+            std::time::Duration::from_micros(8000);
+        let budget_start = std::time::Instant::now();
+
+        // Zoom scale bucket ratio — only re-rasterize when the zoom drift
+        // exceeds this threshold. Within the bucket, the GPU stretch is
+        // visually acceptable.
+        const RASTER_ZOOM_RATIO: f32 = 1.5;
+
+        for (idx, entry) in self.scene_cache.layers.layers.iter().enumerate() {
+            if !visible_set.contains(&idx) {
+                continue;
+            }
+
+            let id = entry.id;
+
+            // Decide whether this node needs (re-)rasterization.
+            //
+            //  State        | Unstable frame          | Stable frame (force_all)
+            //  -------------|-------------------------|-------------------------
+            //  Fresh        | skip                    | skip
+            //  Stale+bucket | skip (stretch OK)       | re-raster (full quality)
+            //  Stale+beyond | re-raster (within budget)| re-raster
+            //  Dirty        | re-raster               | re-raster
+            //  Missing      | raster (new entry)      | raster (new entry)
+            if let Some(img) = self.scene_cache.compositor.peek(&id) {
+                if !img.dirty && !img.stale {
+                    // Completely fresh — nothing to do.
+                    continue;
+                }
+                if img.stale && !img.dirty {
+                    // Guard against zero/degenerate cached zoom.
+                    let ratio = if img.zoom > f32::EPSILON {
+                        zoom / img.zoom
+                    } else {
+                        f32::MAX
+                    };
+                    let bucket_min = 1.0 / RASTER_ZOOM_RATIO;
+                    let within_bucket = (bucket_min..=RASTER_ZOOM_RATIO).contains(&ratio);
+                    if within_bucket && !force_all {
+                        // GPU stretch is visually acceptable — skip.
+                        continue;
+                    }
+                }
+            }
+
+            // Check time budget for interactive frames.
+            if !force_all && budget_start.elapsed() >= ZOOM_RERASTER_BUDGET {
+                break; // Budget exhausted — remaining stale nodes stay stretched.
+            }
+
+            let Some(render_bounds) = self.scene_cache.geometry.get_render_bounds(&id) else {
+                continue;
+            };
+
+            let screen_area = render_bounds.width * zoom * render_bounds.height * zoom;
+            let memory_available = self.scene_cache.compositor.has_budget();
+
+            let status = promotion::should_promote(
+                &entry.layer,
+                &render_bounds,
+                screen_area,
+                false,
+                memory_available,
+            );
+
+            if !status.is_promoted() {
+                if self.scene_cache.compositor.is_promoted(&id) {
+                    self.scene_cache.compositor.remove(&id);
+                    self.compositor_atlas.free_node(&id);
+                }
+                continue;
+            }
+
+            // Compute pixel dimensions in screen space by applying zoom
+            // so cached images match the actual display resolution.
+            let pixel_width = (render_bounds.width * zoom).ceil() as i32;
+            let pixel_height = (render_bounds.height * zoom).ceil() as i32;
+
+            if pixel_width <= 0 || pixel_height <= 0 {
+                continue;
+            }
+
+            // Skip nodes larger than the shared surface.
+            if pixel_width > COMPOSITOR_SURFACE_SIZE || pixel_height > COMPOSITOR_SURFACE_SIZE {
+                continue;
+            }
+
+            let base = match &entry.layer {
+                crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
+                crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
+                crate::painter::layer::PainterPictureLayer::Vector(v) => &v.base,
+            };
+            let node_opacity = base.opacity;
+            let node_blend = base.blend_mode;
+
+            // --- Atlas path: pack into shared texture for batch-friendly blitting ---
+            if self.config.compositor_atlas {
+                // Create the atlas page surface upfront (before borrowing self).
+                let needs_new_page = !self.compositor_atlas.has_node(&id) && {
+                    // Check if any existing page can fit this node.
+                    let can_fit = (0..self.compositor_atlas.page_count()).any(|i| {
+                        self.compositor_atlas
+                            .page(i as u32)
+                            .and_then(|p| {
+                                // Peek at whether allocation would succeed without mutating.
+                                // We can't call allocate yet, so check size constraints.
+                                if pixel_width as u32 <= p.width()
+                                    && pixel_height as u32 <= p.height()
+                                {
+                                    Some(())
+                                } else {
+                                    None
+                                }
+                            })
+                            .is_some()
+                    });
+                    !can_fit
+                };
+
+                let new_page_surface = if needs_new_page {
+                    let cfg = cache::atlas::atlas_set::AtlasSetConfig::default();
+                    let info = skia_safe::ImageInfo::new_n32_premul(
+                        (cfg.page_width as i32, cfg.page_height as i32),
+                        None,
+                    );
+                    parent_surface.new_surface(&info)
+                } else {
+                    None
+                };
+
+                let atlas_ok = self
+                    .compositor_atlas
+                    .allocate(id, pixel_width as u32, pixel_height as u32, |w, h| {
+                        // This closure is only called when a new page is needed.
+                        // We pre-created the surface above to avoid the borrow conflict.
+                        if let Some(s) = new_page_surface {
+                            Some(s)
+                        } else {
+                            // Shouldn't reach here if our needs_new_page check was correct,
+                            // but fall back to creating from the compositor surface.
+                            let info = skia_safe::ImageInfo::new_n32_premul(
+                                (w as i32, h as i32),
+                                None,
+                            );
+                            self.compositor_surface.as_mut().and_then(|cs| cs.new_surface(&info))
+                        }
+                    })
+                    .is_some();
+
+                if atlas_ok {
+                    let entry_layer = entry.layer.clone();
+                    let fonts = &self.fonts;
+                    let images = &self.images;
+                    let scene_cache = &self.scene_cache;
+                    let policy = self.config.render_policy;
+                    self.compositor_atlas.draw_into_slot(&id, |slot_canvas| {
+                        slot_canvas.clear(skia_safe::Color::TRANSPARENT);
+                        // Scale to match the zoom-scaled pixel dimensions of
+                        // the atlas slot, then translate so the node's
+                        // world-space render bounds start at the origin.
+                        slot_canvas.scale((zoom, zoom));
+                        slot_canvas.translate((-render_bounds.x, -render_bounds.y));
+                        let painter = Painter::new_with_scene_cache(
+                            slot_canvas, fonts, images, scene_cache, policy,
+                        );
+                        painter.draw_layer(&entry_layer);
+                    });
+
+                    self.scene_cache.compositor.insert_atlas(
+                        id,
+                        pixel_width as u32,
+                        pixel_height as u32,
+                        zoom,
+                        render_bounds,
+                        node_opacity,
+                        node_blend,
+                    );
+                    continue;
+                }
+                // Atlas allocation failed — fall through to individual capture.
+            }
+
+            // --- Individual texture path: snapshot into per-node SkImage ---
+            {
+                let offscreen = self.compositor_surface.as_mut().unwrap();
+                let off_canvas = offscreen.canvas();
+
+                off_canvas.restore_to_count(0);
+                off_canvas.save();
+                off_canvas.clip_rect(
+                    Rect::from_wh(pixel_width as f32, pixel_height as f32),
+                    None,
+                    None,
+                );
+                off_canvas.clear(skia_safe::Color::TRANSPARENT);
+                // Scale to match the zoom-scaled pixel dimensions of
+                // the capture surface, then translate so the node's
+                // world-space render bounds start at the origin.
+                off_canvas.scale((zoom, zoom));
+                off_canvas.translate((-render_bounds.x, -render_bounds.y));
+
+                let painter = Painter::new_with_scene_cache(
+                    off_canvas,
+                    &self.fonts,
+                    &self.images,
+                    &self.scene_cache,
+                    self.config.render_policy,
+                );
+                painter.draw_layer(&entry.layer);
+
+                off_canvas.restore();
+
+                let bounds = skia_safe::IRect::from_wh(pixel_width, pixel_height);
+                if let Some(image) = offscreen.image_snapshot_with_bounds(bounds) {
+                    self.scene_cache.compositor.insert(
+                        id, image, zoom, render_bounds, node_opacity, node_blend,
+                    );
+                }
+            }
+        }
+
     }
 }
 
@@ -1032,7 +1791,7 @@ mod tests {
             }),
         );
         renderer.load_scene(scene);
-        renderer.queue_unstable();
+        renderer.queue_stable();
         renderer.flush();
 
         let bounds = renderer
@@ -1107,6 +1866,62 @@ mod tests {
                 .into_iter()
                 .collect::<Vec<_>>(),
             vec!["MissingFont".to_string()]
+        );
+
+        renderer.free();
+    }
+
+    /// Verify that layer compositing is silently skipped on a raster (CPU)
+    /// backend — the config is accepted but the compositor stays empty.
+    #[test]
+    fn layer_compositing_skipped_on_raster_backend() {
+        let nf = NodeFactory::new();
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 200.0,
+            height: 200.0,
+        };
+
+        let mut graph = SceneGraph::new();
+        graph.append_child(Node::Rectangle(rect), Parent::Root);
+
+        let scene = Scene {
+            name: "compositor_raster_test".into(),
+            graph,
+            background_color: None,
+        };
+
+        let mut renderer = Renderer::new(
+            Backend::new_from_raster(500, 500),
+            None,
+            Camera2D::new(Size {
+                width: 500.0,
+                height: 500.0,
+            }),
+        );
+        renderer.set_layer_compositing(true);
+        renderer.load_scene(scene);
+
+        assert!(!renderer.backend.is_gpu(), "test requires raster backend");
+
+        // Two stable frames — compositor must stay empty on CPU.
+        renderer.queue_stable();
+        let _ = renderer.flush();
+        renderer.queue_stable();
+        let result = renderer.flush();
+
+        let stats = match result {
+            FrameFlushResult::OK(s) => s,
+            other => panic!("Expected OK, got {:?}", std::mem::discriminant(&other)),
+        };
+
+        assert_eq!(
+            stats.draw.layer_image_cache_size, 0,
+            "compositor must not populate on raster backend"
+        );
+        assert_eq!(
+            stats.draw.layer_image_cache_hits, 0,
+            "no hits expected on raster backend"
         );
 
         renderer.free();

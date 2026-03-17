@@ -224,8 +224,8 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.to_vector_network(id)
     }
 
-    fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
-        self.base.runtime_renderer_set_cache_tile(cache);
+    fn runtime_renderer_set_layer_compositing(&mut self, enable: bool) {
+        self.base.runtime_renderer_set_layer_compositing(enable);
     }
 
     fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {
