@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">
+    <title>Use Defs</title>
+    <desc>L0 test fixture for use-defs</desc>
+    <!-- Background -->
+    <rect width="800" height="400" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+    </style>
+
+    <defs>
+        <!-- A shape with no fill/stroke defined (inherits from <use>) -->
+        <rect id="base-rect" width="50" height="50"/>
+
+        <!-- A shape with hardcoded fill (cannot be overridden by <use>) -->
+        <circle id="hardcoded-circle" cx="25" cy="25" r="25" fill="red"/>
+
+        <!-- A complex group -->
+        <g id="complex-group">
+            <rect width="50" height="50" fill="blue"/>
+            <circle cx="25" cy="25" r="15" fill="yellow"/>
+        </g>
+    </defs>
+
+    <!-- 1. Basic Instancing -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">Basic &lt;use&gt; (inherits attributes)</text>
+        <use href="#base-rect" x="0" y="0" fill="purple"/>
+        <use href="#base-rect" x="60" y="0" fill="orange" stroke="black" stroke-width="2"/>
+    </g>
+
+    <!-- 2. Hardcoded Attributes -->
+    <g transform="translate(250, 50)">
+        <text x="0" y="-10" class="label">Hardcoded attributes (cannot override)</text>
+        <!-- The fill="green" here is ignored because the circle in <defs> has fill="red" -->
+        <use href="#hardcoded-circle" x="0" y="0" fill="green"/>
+        <!-- But we can add new attributes like stroke -->
+        <use href="#hardcoded-circle" x="60" y="0" stroke="black" stroke-width="4"/>
+    </g>
+
+    <!-- 3. Instancing Groups -->
+    <g transform="translate(450, 50)">
+        <text x="0" y="-10" class="label">Instancing &lt;g&gt; elements</text>
+        <use href="#complex-group" x="0" y="0"/>
+        <!-- We can also transform the instances -->
+        <use href="#complex-group" x="60" y="0" transform="rotate(45 85 25)"/>
+    </g>
+
+    <!-- 4. Chained Instancing -->
+    <defs>
+        <use id="chained-use" href="#base-rect" fill="cyan"/>
+    </defs>
+    <g transform="translate(50, 200)">
+        <text x="0" y="-10" class="label">Chained &lt;use&gt; (use referencing use)</text>
+        <use href="#chained-use" x="0" y="0"/>
+        <use href="#chained-use" x="60" y="0" stroke="red" stroke-width="2"/>
+    </g>
+
+</svg>

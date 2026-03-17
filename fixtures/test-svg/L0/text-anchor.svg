@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+    <title>Text Anchor</title>
+    <desc>L0 test fixture for text-anchor</desc>
+    <!-- Background -->
+    <rect width="600" height="600" fill="#ffffff"/>
+
+    <style>
+        .ref-line { stroke: red; stroke-width: 1; stroke-dasharray: 4 4; }
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+        .text-sample { font-family: sans-serif; font-size: 24px; fill: black; }
+        .anchor-pt { fill: red; r: 3; }
+    </style>
+
+    <!-- 1. Basic text-anchor -->
+    <g transform="translate(0, 50)">
+        <text x="10" y="0" class="label">1. Basic text-anchor</text>
+        <line x1="300" y1="10" x2="300" y2="130" class="ref-line"/>
+
+        <text x="300" y="40" class="text-sample" text-anchor="start">start (default)</text>
+        <circle cx="300" cy="40" class="anchor-pt"/>
+
+        <text x="300" y="80" class="text-sample" text-anchor="middle">middle</text>
+        <circle cx="300" cy="80" class="anchor-pt"/>
+
+        <text x="300" y="120" class="text-sample" text-anchor="end">end</text>
+        <circle cx="300" cy="120" class="anchor-pt"/>
+    </g>
+
+    <!-- 2. text-anchor with direction="rtl" -->
+    <!-- In RTL, "start" aligns to the right of the anchor, and "end" aligns to the left -->
+    <g transform="translate(0, 220)">
+        <text x="10" y="0" class="label">2. text-anchor with direction="rtl"</text>
+        <line x1="300" y1="10" x2="300" y2="130" class="ref-line"/>
+
+        <text x="300" y="40" class="text-sample" text-anchor="start" direction="rtl"
+            unicode-bidi="bidi-override">start (RTL)</text>
+        <circle cx="300" cy="40" class="anchor-pt"/>
+
+        <text x="300" y="80" class="text-sample" text-anchor="middle" direction="rtl"
+            unicode-bidi="bidi-override">middle (RTL)</text>
+        <circle cx="300" cy="80" class="anchor-pt"/>
+
+        <text x="300" y="120" class="text-sample" text-anchor="end" direction="rtl"
+            unicode-bidi="bidi-override">end (RTL)</text>
+        <circle cx="300" cy="120" class="anchor-pt"/>
+    </g>
+
+    <!-- 3. text-anchor with tspans -->
+    <!-- text-anchor inherits to tspans, but each tspan calculates its alignment based on its own
+    absolute x coordinate -->
+    <g transform="translate(0, 390)">
+        <text x="10" y="0" class="label">3. text-anchor with tspan (absolute x)</text>
+        <line x1="300" y1="10" x2="300" y2="100" class="ref-line"/>
+
+        <text class="text-sample" text-anchor="middle">
+            <tspan x="300" y="40">Line 1 (middle)</tspan>
+            <tspan x="300" y="80">Line 2 is longer (middle)</tspan>
+        </text>
+        <circle cx="300" cy="40" class="anchor-pt"/>
+        <circle cx="300" cy="80" class="anchor-pt"/>
+    </g>
+
+    <!-- 4. text-anchor with transformations -->
+    <g transform="translate(0, 520)">
+        <text x="10" y="0" class="label">4. text-anchor with transform</text>
+        <g transform="translate(300, 40) rotate(-15)">
+            <line x1="0" y1="-20" x2="0" y2="20" class="ref-line"/>
+            <text x="0" y="0" class="text-sample" text-anchor="middle">rotated middle</text>
+            <circle cx="0" cy="0" class="anchor-pt"/>
+        </g>
+    </g>
+</svg>

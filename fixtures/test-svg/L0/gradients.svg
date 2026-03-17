@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+    <title>Gradients</title>
+    <desc>L0 test fixture for gradients</desc>
+    <!-- Background -->
+    <rect width="800" height="600" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+    </style>
+
+    <defs>
+        <!-- Linear Gradients -->
+        <linearGradient id="lin-horiz" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="red"/>
+            <stop offset="100%" stop-color="blue"/>
+        </linearGradient>
+
+        <linearGradient id="lin-vert" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="green"/>
+            <stop offset="50%" stop-color="yellow"/>
+            <stop offset="100%" stop-color="red"/>
+        </linearGradient>
+
+        <linearGradient id="lin-angle" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="purple"/>
+            <stop offset="100%" stop-color="orange"/>
+        </linearGradient>
+
+        <!-- Radial Gradients -->
+        <radialGradient id="rad-center" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="white"/>
+            <stop offset="100%" stop-color="black"/>
+        </radialGradient>
+
+        <radialGradient id="rad-offset" cx="50%" cy="50%" r="50%" fx="25%" fy="25%">
+            <stop offset="0%" stop-color="yellow"/>
+            <stop offset="100%" stop-color="red"/>
+        </radialGradient>
+
+        <!-- Spread Methods -->
+        <linearGradient id="spread-pad" x1="20%" y1="0%" x2="80%" y2="0%" spreadMethod="pad">
+            <stop offset="0%" stop-color="red"/>
+            <stop offset="100%" stop-color="blue"/>
+        </linearGradient>
+
+        <linearGradient id="spread-reflect" x1="20%" y1="0%" x2="80%" y2="0%" spreadMethod="reflect">
+            <stop offset="0%" stop-color="red"/>
+            <stop offset="100%" stop-color="blue"/>
+        </linearGradient>
+
+        <linearGradient id="spread-repeat" x1="20%" y1="0%" x2="80%" y2="0%" spreadMethod="repeat">
+            <stop offset="0%" stop-color="red"/>
+            <stop offset="100%" stop-color="blue"/>
+        </linearGradient>
+
+        <!-- User Space On Use -->
+        <linearGradient id="user-space" x1="50" y1="400" x2="250" y2="400"
+            gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="cyan"/>
+            <stop offset="100%" stop-color="magenta"/>
+        </linearGradient>
+    </defs>
+
+    <!-- 1. Linear Gradients -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">Linear (Horizontal)</text>
+        <rect width="150" height="100" fill="url(#lin-horiz)"/>
+    </g>
+    <g transform="translate(250, 50)">
+        <text x="0" y="-10" class="label">Linear (Vertical, 3 stops)</text>
+        <rect width="150" height="100" fill="url(#lin-vert)"/>
+    </g>
+    <g transform="translate(450, 50)">
+        <text x="0" y="-10" class="label">Linear (Diagonal)</text>
+        <rect width="150" height="100" fill="url(#lin-angle)"/>
+    </g>
+
+    <!-- 2. Radial Gradients -->
+    <g transform="translate(50, 200)">
+        <text x="0" y="-10" class="label">Radial (Centered)</text>
+        <rect width="150" height="100" fill="url(#rad-center)"/>
+    </g>
+    <g transform="translate(250, 200)">
+        <text x="0" y="-10" class="label">Radial (Offset Focal Point)</text>
+        <rect width="150" height="100" fill="url(#rad-offset)"/>
+    </g>
+
+    <!-- 3. Spread Methods -->
+    <g transform="translate(50, 350)">
+        <text x="0" y="-10" class="label">spreadMethod="pad" (default)</text>
+        <rect width="150" height="50" fill="url(#spread-pad)"/>
+    </g>
+    <g transform="translate(250, 350)">
+        <text x="0" y="-10" class="label">spreadMethod="reflect"</text>
+        <rect width="150" height="50" fill="url(#spread-reflect)"/>
+    </g>
+    <g transform="translate(450, 350)">
+        <text x="0" y="-10" class="label">spreadMethod="repeat"</text>
+        <rect width="150" height="50" fill="url(#spread-repeat)"/>
+    </g>
+
+    <!-- 4. Gradient Units -->
+    <g transform="translate(50, 450)">
+        <text x="0" y="-10" class="label">gradientUnits="userSpaceOnUse"</text>
+        <!-- The gradient is defined in absolute coordinates (50 to 250), so moving the rect changes
+        how it's painted -->
+        <rect x="0" y="0" width="100" height="50" fill="url(#user-space)"/>
+        <rect x="100" y="0" width="100" height="50" fill="url(#user-space)"/>
+    </g>
+
+</svg>

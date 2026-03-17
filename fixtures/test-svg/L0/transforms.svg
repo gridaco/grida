@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" width="480" height="480">
+    <title>Transforms</title>
+    <desc>L0 test fixture for transforms</desc>
     <rect x="0" y="0" width="480" height="480" fill="#0f172a"/>
 
     <!-- Canonical row: no transform -->

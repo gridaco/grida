@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+    <title>Transforms Nested</title>
+    <desc>L0 test fixture for transforms-nested</desc>
     <!-- Root background -->
     <rect x="0" y="0" width="500" height="500" fill="#f8fafc"/>
 

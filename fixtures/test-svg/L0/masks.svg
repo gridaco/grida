@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">
+    <title>Masks</title>
+    <desc>L0 test fixture for masks</desc>
+    <!-- Background -->
+    <rect width="800" height="400" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+        .bg-pattern { fill: url(#checker); }
+    </style>
+
+    <defs>
+        <pattern id="checker" width="20" height="20" patternUnits="userSpaceOnUse">
+            <rect width="10" height="10" fill="#ccc"/>
+            <rect x="10" y="10" width="10" height="10" fill="#ccc"/>
+        </pattern>
+
+        <!-- Luminance Mask (White = opaque, Black = transparent) -->
+        <mask id="lum-mask">
+            <!-- Background of mask is transparent (black) -->
+            <rect x="0" y="0" width="150" height="150" fill="black"/>
+            <!-- White circle is opaque -->
+            <circle cx="75" cy="75" r="50" fill="white"/>
+            <!-- Gray rectangle is semi-transparent -->
+            <rect x="25" y="65" width="100" height="20" fill="gray"/>
+        </mask>
+
+        <!-- Alpha Mask (Opacity = opaque, Transparent = transparent) -->
+        <mask id="alpha-mask" mask-type="alpha">
+            <rect x="0" y="0" width="150" height="150" fill="red" fill-opacity="0"/>
+            <circle cx="75" cy="75" r="50" fill="blue" fill-opacity="1"/>
+            <rect x="25" y="65" width="100" height="20" fill="green" fill-opacity="0.5"/>
+        </mask>
+
+        <!-- Gradient Mask -->
+        <linearGradient id="mask-grad">
+            <stop offset="0%" stop-color="white"/>
+            <stop offset="100%" stop-color="black"/>
+        </linearGradient>
+        <mask id="grad-mask">
+            <rect width="150" height="150" fill="url(#mask-grad)"/>
+        </mask>
+    </defs>
+
+    <!-- 1. Luminance Masking (Default) -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">Luminance Mask (White=1, Black=0)</text>
+        <rect width="150" height="150" class="bg-pattern"/>
+        <rect width="150" height="150" fill="blue" mask="url(#lum-mask)"/>
+    </g>
+
+    <!-- 2. Alpha Masking -->
+    <g transform="translate(250, 50)">
+        <text x="0" y="-10" class="label">Alpha Mask (mask-type="alpha")</text>
+        <rect width="150" height="150" class="bg-pattern"/>
+        <rect width="150" height="150" fill="red" mask="url(#alpha-mask)"/>
+    </g>
+
+    <!-- 3. Gradient Masking -->
+    <g transform="translate(450, 50)">
+        <text x="0" y="-10" class="label">Gradient Mask (Smooth fade)</text>
+        <rect width="150" height="150" class="bg-pattern"/>
+        <circle cx="75" cy="75" r="75" fill="purple" mask="url(#grad-mask)"/>
+    </g>
+
+</svg>

@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+    <title>Text In Transformed Group</title>
+    <desc>L0 test fixture for text-in-transformed-group</desc>
     <!-- Background -->
     <rect width="400" height="400" fill="#ffffff"/>
 
