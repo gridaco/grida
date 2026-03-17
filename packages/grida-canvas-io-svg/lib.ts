@@ -259,34 +259,94 @@ export namespace iosvg {
       }
 
       case "text": {
-        const { transform, text_content, fill: textFillAttr, spans, bounds } =
-          node;
+        const {
+          transform,
+          text_content,
+          fill: textFillAttr,
+          spans,
+          bounds,
+        } = node;
         const textPosition = map.extractTranslation(transform);
-
-        const fontSize =
-          spans.length > 0 && spans[0].font_size != null
-            ? spans[0].font_size
-            : 16;
-
         const { paint: textFill } = map.fill(textFillAttr);
 
+        // Helper to build a TextNode from span (chunk) data.
+        // Uses the text element's bounds width so the text box is wide
+        // enough for single-line content (the factory default of 100px
+        // is too narrow and causes unwanted wrapping).
+        const makeTextSpan = (
+          spanData: svgtypes.ir.IRSVGTextSpanNode,
+          spanName: string,
+          fallbackFill: cg.Paint | undefined
+        ): grida.program.nodes.TextNodePrototype => {
+          const spanPosition = map.extractTranslation(spanData.transform);
+          const fontSize = spanData.font_size ?? 16;
+          const { paint: spanFill } = map.fill(spanData.fill);
+
+          return {
+            type: "tspan",
+            name: spanName,
+            text: spanData.text,
+            font_size: fontSize,
+            font_weight: 400,
+            font_kerning: true,
+            text_decoration_line: "none",
+            text_align: "left",
+            text_align_vertical: "top",
+            layout_positioning: "absolute",
+            layout_inset_left: spanPosition.left,
+            layout_inset_top: spanPosition.top,
+            layout_target_width: undefined,
+            layout_target_height: undefined,
+            fill: spanFill ?? fallbackFill,
+          } satisfies grida.program.nodes.TextNodePrototype;
+        };
+
+        if (spans.length <= 1) {
+          // Single chunk or no spans: create one TextNode
+          if (spans.length === 1) {
+            return makeTextSpan(spans[0], name, textFill);
+          }
+
+          // Fallback: no spans, use text_content
+          const fontSize = 16;
+          return {
+            type: "tspan",
+            name: name,
+            text: text_content,
+            font_size: fontSize,
+            font_weight: 400,
+            font_kerning: true,
+            text_decoration_line: "none",
+            text_align: "left",
+            text_align_vertical: "top",
+            layout_positioning: "absolute",
+            layout_inset_left: textPosition.left,
+            layout_inset_top: textPosition.top,
+            layout_target_width: undefined,
+            layout_target_height: undefined,
+            fill: textFill,
+          } satisfies grida.program.nodes.TextNodePrototype;
+        }
+
+        // Multiple chunks: create a Group containing TextNode children.
+        // Each span in the IR represents one chunk with its own position.
+        // Strip the text-level transform from each chunk since the group
+        // carries it (same logic as pack.rs).
+        const children = spans
+          .map((span, index) =>
+            makeTextSpan(span, `${name}_line_${index}`, textFill)
+          )
+          .filter(Boolean) as grida.program.nodes.NodePrototype[];
+
         return {
-          type: "tspan",
+          type: "group",
           name: name,
-          text: text_content,
-          font_size: fontSize,
-          font_weight: 400,
-          font_kerning: true,
-          text_decoration_line: "none",
-          text_align: "left",
-          text_align_vertical: "top",
           layout_positioning: "absolute",
           layout_inset_left: textPosition.left,
           layout_inset_top: textPosition.top,
-          layout_target_width: bounds.width,
-          layout_target_height: bounds.height,
-          fill: textFill,
-        } satisfies grida.program.nodes.TextNodePrototype;
+          opacity: 1,
+          children: children,
+        } satisfies grida.program.nodes.GroupNodePrototype;
       }
 
       case "image": {

@@ -240,7 +240,7 @@ describe("iosvg.convert", () => {
   // text and image nodes — currently silently skipped
   // -------------------------------------------------------------------------
 
-  it("converts text nodes to tspan prototypes with bounds", () => {
+  it("converts single-span text to tspan prototype", () => {
     const ir: svgtypes.ir.IRSVGInitialContainerNode = {
       width: 200,
       height: 200,
@@ -253,7 +253,7 @@ describe("iosvg.convert", () => {
           stroke: null,
           spans: [
             {
-              transform: identity,
+              transform: translate(10, 40),
               text: "Hello",
               fill: solidFill(0, 0, 0),
               stroke: null,
@@ -271,12 +271,63 @@ describe("iosvg.convert", () => {
     expect(textNode.type).toBe("tspan");
     expect(textNode.text).toBe("Hello");
     expect(textNode.font_size).toBe(24);
-    expect(textNode.layout_inset_left).toBe(10);
-    expect(textNode.layout_inset_top).toBe(40);
-    expect(textNode.layout_target_width).toBe(120);
-    expect(textNode.layout_target_height).toBe(30);
     expect(textNode.fill).toBeDefined();
     expect(textNode.fill.type).toBe("solid");
+  });
+
+  it("converts multi-span text to group with tspan children", () => {
+    const ir: svgtypes.ir.IRSVGInitialContainerNode = {
+      width: 400,
+      height: 400,
+      children: [
+        {
+          kind: "text",
+          transform: translate(0, 0),
+          text_content: "Line 1Line 2Line 3",
+          fill: solidFill(0, 0, 0),
+          stroke: null,
+          spans: [
+            {
+              transform: translate(10, 30),
+              text: "Line 1",
+              fill: solidFill(0, 0, 0),
+              stroke: null,
+              font_size: 20,
+              anchor: "start" as svgtypes.SVGTextAnchor,
+            },
+            {
+              transform: translate(10, 54),
+              text: "Line 2",
+              fill: solidFill(255, 0, 0),
+              stroke: null,
+              font_size: 20,
+              anchor: "start" as svgtypes.SVGTextAnchor,
+            },
+            {
+              transform: translate(10, 78),
+              text: "Line 3",
+              fill: solidFill(0, 0, 255),
+              stroke: null,
+              font_size: 20,
+              anchor: "start" as svgtypes.SVGTextAnchor,
+            },
+          ],
+          bounds: { x: 10, y: 10, width: 200, height: 80 },
+        },
+      ],
+    };
+    const result = iosvg.convert(ir);
+    const group = (result as any).children[0];
+    expect(group.type).toBe("group");
+    expect(group.children).toHaveLength(3);
+    expect(group.children[0].type).toBe("tspan");
+    expect(group.children[0].text).toBe("Line 1");
+    expect(group.children[1].text).toBe("Line 2");
+    expect(group.children[2].text).toBe("Line 3");
+    // Each child should have its own position
+    expect(group.children[0].layout_inset_top).toBe(30);
+    expect(group.children[1].layout_inset_top).toBe(54);
+    expect(group.children[2].layout_inset_top).toBe(78);
   });
 
   it("converts text node with default font size when spans are empty", () => {
@@ -301,8 +352,9 @@ describe("iosvg.convert", () => {
     expect(textNode.type).toBe("tspan");
     expect(textNode.text).toBe("No spans");
     expect(textNode.font_size).toBe(16);
-    expect(textNode.layout_target_width).toBe(80);
-    expect(textNode.layout_target_height).toBe(20);
+    // Text nodes auto-size — no explicit width/height
+    expect(textNode.layout_target_width).toBeUndefined();
+    expect(textNode.layout_target_height).toBeUndefined();
   });
 
   it("skips image nodes (returns null, filtered out)", () => {
