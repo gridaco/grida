@@ -2,13 +2,15 @@
 name: cg-reftest
 description: >
   Guides design and review of computer-graphics rendering tests for the
-  cg crate. Covers the distinction between reftests (independent oracle)
-  and golden/snapshot regression tests (previously accepted output).
+  cg crate. Covers the distinction between reftests (independent oracle),
+  golden/snapshot regression tests (previously accepted output), and
+  observation-based probe tests (pixel/color assertions without vision).
   Use when adding, reviewing, or debugging visual comparison tests,
-  pixel diffs, golden image generators, or SVG reftest suites.
+  pixel diffs, golden image generators, SVG reftest suites, or designing
+  fixtures that can be verified programmatically by probing pixel values.
   Relevant paths: crates/grida-canvas/tests/, crates/grida-canvas/goldens/,
   crates/grida-canvas/examples/golden_*, crates/grida-dev/src/reftest/,
-  docs/wg/feat-svg/testing.md.
+  fixtures/test-svg/, docs/wg/feat-svg/testing.md.
 ---
 
 # CG Rendering Tests — Reftests & Golden Tests
@@ -19,7 +21,8 @@ How to design, name, and review visual rendering tests in this repo.
 
 - Adding a new pixel-comparison test to `crates/grida-canvas/`
 - Reviewing a PR that adds or updates golden images
-- Deciding whether a test should be a reftest or a golden test
+- Deciding whether a test should be a reftest, golden test, or probe test
+- Designing a fixture that can be verified without vision input
 - Investigating a flaky or platform-dependent visual test
 - Setting up tolerance thresholds for image diff
 - Writing honest PR descriptions for rendering changes
@@ -40,6 +43,8 @@ Use these terms precisely. Misusing them erodes trust in test results.
 | **Pixel diff**                     | Byte-level comparison of two raster images. A single differing channel value is a failure (at zero tolerance).                                                                                                                                                      |
 | **Perceptual diff**                | Comparison in a perceptual color space (e.g. YIQ via the `dify` crate). Weights differences by human visual sensitivity. More forgiving than raw pixel diff but still quantifiable.                                                                                 |
 | **Tolerance / fuzz**               | A configured threshold below which pixel differences are ignored. Expressed as a histogram threshold (rendiff) or a YIQ distance (dify). Required when rasterization is non-deterministic across platforms.                                                         |
+| **Probe test**                     | A test that asserts correctness by reading pixel values at specific coordinates in the rendered output. Requires a purpose-built fixture with a minimal color palette and documented probe points. No full-image comparison needed.                                 |
+| **Probe-friendly fixture**         | A fixture explicitly designed for probe testing: minimal colors, no decorative elements, shapes at known coordinates. Often accompanied by a `.probe.json` file declaring expected pixel values at specific points.                                                 |
 
 ---
 
@@ -48,11 +53,17 @@ Use these terms precisely. Misusing them erodes trust in test results.
 ```
 independent oracle exists?
   ├─ YES → reftest    (measures correctness against external truth)
-  └─ NO  → golden test (detects regression against own prior output)
+  └─ NO
+      ├─ fixture is probe-friendly? (minimal palette, known coords)
+      │   ├─ YES → probe test  (assert pixel values at specific points — no vision needed)
+      │   └─ NO  → golden test (detects regression against own prior output)
+      └─ (when in doubt → golden test)
 ```
 
-This is the only distinction that matters. Everything else — the diff
-algorithm, the tolerance, the CI integration — is implementation detail.
+The reftest/golden distinction is about whether an external oracle
+exists. The probe test is orthogonal — it is about whether the fixture
+is simple enough that correctness reduces to reading a few pixel values,
+avoiding full-image comparison entirely.
 
 ---
 
@@ -95,14 +106,18 @@ The current golden infrastructure:
   `crates/grida-canvas/tests/flatten_rendiff.rs`, which is a self-referential
   test (shape path vs. its VN equivalent), not a golden comparison.
 
+### Probe tests — vision-free verification
+
+Use when correctness reduces to **"is pixel at (x,y) the expected
+color?"** — layout, transforms, clipping, visibility. Requires
+purpose-built fixtures (see "Observation-Based Probe Testing" below).
+
 ### Hybrid strategy
 
-Use standardized formats (SVG) to harden renderer correctness first.
-Once the low-level pipeline is correct against external oracles, add
-native-format goldens for regression coverage of features that have
-no spec.
+Priority: reftest failures > probe test failures > golden updates.
 
-Priority: fix reftest failures before updating goldens.
+Harden with reftests (SVG/spec) first, add probe tests for coordinate-math
+behaviors (layout, transforms, clipping), fall back to goldens for the rest.
 
 ---
 
@@ -141,6 +156,66 @@ test or parameterize explicitly.
 - Do not depend on locale, timezone, or environment variables.
 - Do not compare text layout output pixel-for-pixel unless you
   control the exact font binary and shaper version.
+
+---
+
+## Observation-Based Probe Testing
+
+Many rendering behaviors (layout, transforms, paint, clipping) can be
+verified by **reading pixel values at known coordinates** instead of
+diffing entire images. This avoids vision input entirely — a probe test
+is just a boolean: "is pixel (x,y) the expected color?"
+
+This works when the fixture is **purpose-built**: minimal palette,
+no decorative noise, shapes at round coordinates. It breaks down when
+the fixture is complex, uses gradients/filters/text, or wasn't authored
+with probing in mind.
+
+### Design rules
+
+1. **≤ 3 solid colors.** e.g. black shape, white background, red marker.
+2. **No labels, gridlines, or gradients** unless that's the behavior under test.
+3. **Round coordinates.** Document expected probe points in the fixture.
+4. **Probe interior pixels** (not edges) to avoid AA ambiguity.
+5. **One concept per fixture.** Don't mix translate + rotate.
+
+### Trust boundary
+
+- **Reliable:** purpose-built probe fixtures with ≤ 4 solid colors.
+- **Unreliable:** existing L0 fixtures (too many colors, labels, overlapping
+  shapes), anything with gradients/filters/text. Don't retroactively probe
+  fixtures not designed for it.
+
+### Conventions
+
+- **Path:** `fixtures/test-svg/probe/<behavior>-probe.svg`
+- **Probe metadata:** XML comment in the SVG:
+
+```xml
+<!-- probe: (150,150)=#ff0000 (50,50)=#ffffff -->
+```
+
+- **Machine-readable (optional):** `.probe.json` alongside the SVG:
+
+```json
+{
+  "surface": [300, 300],
+  "probes": [
+    {
+      "x": 150,
+      "y": 150,
+      "expected": "#ff0000",
+      "label": "translated square center"
+    },
+    { "x": 50, "y": 50, "expected": "#ffffff", "label": "origin now empty" }
+  ]
+}
+```
+
+### Future tooling
+
+- **Color census:** count distinct colors (AA-clustered) to validate fixture simplicity.
+- **Probe harness:** assert `.probe.json` points against rendered PNG (channel-wise ±3 tolerance).
 
 ---
 
@@ -227,6 +302,7 @@ Comparisons against them are **regression tests**, not reftests.
 | Comparison against W3C/spec reference PNG   | reftest, reference test                     | snapshot test              |
 | Comparison against our own prior output     | golden test, regression test, snapshot test | reftest                    |
 | Two internal paths compared for equivalence | equivalence test, pixel-comparison test     | reftest                    |
+| Pixel value asserted at known coordinates   | probe test, observation test                | reftest, golden test       |
 | Any image comparison (generic)              | visual comparison, image diff               | reftest (unless it is one) |
 
 In PR titles:
@@ -251,6 +327,8 @@ chore: regenerate snapshots    ← (why? what changed?)
 | Calling every image comparison a "reftest"                     | Inflates confidence. Reviewers assume external validation when there is none.                           | Use correct terminology (see table above).                                                                     |
 | Auto-regenerating all goldens in CI                            | Silently accepts regressions.                                                                           | Fail the build on mismatch. Require manual review and explicit commit.                                         |
 | Giant fixture scenes that test many features at once           | A single pixel change anywhere fails the test. Impossible to diagnose.                                  | One behavior per test. Minimal fixtures.                                                                       |
+| Probing complex multi-color fixtures                           | AA/gradients/overlaps produce unpredictable pixels.                                                     | Only probe purpose-built fixtures (≤4 solid colors, documented points).                                        |
+| Retroactively probing L0 fixtures                              | Not designed for it; results untrustworthy.                                                             | Author new fixtures in `fixtures/test-svg/probe/`.                                                             |
 | Tolerance so high it hides real bugs                           | e.g. allowing 20% pixel mismatch "because fonts differ"                                                 | Fix the determinism problem (bundle fonts, pin backend). Lower the threshold.                                  |
 | Goldens generated on a developer laptop with different Skia/OS | CI will always fail, leading to threshold inflation or disabled tests.                                  | Generate goldens in the same environment CI uses, or document the environment and accept controlled tolerance. |
 | Committing golden updates without code changes                 | Suggests the golden drifted due to environment, not intentional improvement. Investigate.               | Find the root cause. Pin the environment or fix the non-determinism.                                           |
@@ -291,6 +369,25 @@ In a PR: _"Updated `progressive_blur` golden — blur kernel changed from
 3-pass box to 2-pass Gaussian. Visual diff reviewed: smoother falloff at
 edges, no unrelated changes."_
 
+### Probe test — transform verification without vision
+
+```xml
+<!-- fixtures/test-svg/probe/translate-probe.svg -->
+<!-- probe: (150,150)=#ff0000 (50,50)=#ffffff -->
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300">
+  <rect width="300" height="300" fill="#ffffff"/>
+  <g transform="translate(100, 100)">
+    <rect width="100" height="100" fill="#ff0000"/>
+  </g>
+</svg>
+```
+
+```rust
+let img = render_svg("fixtures/test-svg/probe/translate-probe.svg", 300, 300);
+assert_eq!(img.pixel_at(150, 150), Color::RED);   // translated center
+assert_eq!(img.pixel_at(50, 50), Color::WHITE);    // origin now empty
+```
+
 ### Self-consistency test — flatten pipeline equivalence
 
 ```rust
@@ -315,13 +412,15 @@ corner radius. Verifies VN path equivalence, not external correctness."_
 
 Use this when adding or reviewing rendering tests.
 
-- [ ] **Correct category.** Is this a reftest, golden test, or equivalence test? Is it labeled correctly in code comments, test names, and PR description?
+- [ ] **Correct category.** Is this a reftest, golden test, probe test, or equivalence test? Is it labeled correctly in code comments, test names, and PR description?
 - [ ] **Minimal fixture.** Does the test use the simplest scene that exercises the behavior?
 - [ ] **One behavior.** Does each test verify a single rendering behavior?
 - [ ] **Deterministic.** Are fonts bundled? Is the surface size explicit? Is there a fixed seed for procedural content?
 - [ ] **Threshold justified.** If tolerance is non-zero, is there a comment explaining why?
 - [ ] **Golden diff reviewed.** If golden images changed, has each change been visually inspected and explained?
 - [ ] **No bulk golden regeneration.** Were goldens updated individually with stated reasons?
+- [ ] **Probe feasibility.** For layout/transform/clip — could this be a probe test instead of a golden?
+- [ ] **Probe fixture valid.** If probe test: ≤4 colors, points inside boundaries (not AA edges), probe metadata present.
 - [ ] **Edge cases.** Are zero-size, empty, and degenerate inputs tested?
 - [ ] **Environment documented.** If goldens are platform-sensitive, is the generation environment stated?
 - [ ] **Honest wording.** Does the PR title/description use correct terminology?
