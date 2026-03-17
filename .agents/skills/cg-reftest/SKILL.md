@@ -42,7 +42,10 @@ Use these terms precisely. Misusing them erodes trust in test results.
 | **Render regression test**         | Any test whose purpose is to detect _unintended changes_ in rendering output. Golden tests are regression tests. Reftests are correctness tests.                                                                                                                    |
 | **Pixel diff**                     | Byte-level comparison of two raster images. A single differing channel value is a failure (at zero tolerance).                                                                                                                                                      |
 | **Perceptual diff**                | Comparison in a perceptual color space (e.g. YIQ via the `dify` crate). Weights differences by human visual sensitivity. More forgiving than raw pixel diff but still quantifiable.                                                                                 |
+| **rendiff**                        | Rust crate (`rendiff` v0.2) for histogram-based pixel diffing. Computes a per-channel difference histogram; thresholds are expressed as `[(max_diff, max_count), ...]` pairs. Used in `flatten_rendiff.rs` for equivalence tests. Dep in `crates/grida-canvas/`.    |
+| **dify**                           | Rust crate for perceptual image comparison in YIQ color space. Used by `grida-dev reftest` for SVG reftests. Supports `--threshold` and `--aa` (anti-aliasing detection) flags.                                                                                     |
 | **Tolerance / fuzz**               | A configured threshold below which pixel differences are ignored. Expressed as a histogram threshold (rendiff) or a YIQ distance (dify). Required when rasterization is non-deterministic across platforms.                                                         |
+| **Data test**                      | A test that asserts on the scene graph or computed values directly — no rendering needed. E.g. bounding box, resolved transform matrix, computed style. The cheapest possible assertion.                                                                             |
 | **Probe test**                     | A test that asserts correctness by reading pixel values at specific coordinates in the rendered output. Requires a purpose-built fixture with a minimal color palette and documented probe points. No full-image comparison needed.                                 |
 | **Probe-friendly fixture**         | A fixture explicitly designed for probe testing: minimal colors, no decorative elements, shapes at known coordinates. Often accompanied by a `.probe.json` file declaring expected pixel values at specific points.                                                 |
 
@@ -51,23 +54,37 @@ Use these terms precisely. Misusing them erodes trust in test results.
 ## The Core Decision Rule
 
 ```
-independent oracle exists?
-  ├─ YES → reftest    (measures correctness against external truth)
-  └─ NO
-      ├─ fixture is probe-friendly? (minimal palette, known coords)
-      │   ├─ YES → probe test  (assert pixel values at specific points — no vision needed)
-      │   └─ NO  → golden test (detects regression against own prior output)
-      └─ (when in doubt → golden test)
+can correctness be asserted without rendering?
+  ├─ YES → data test  (assert on scene graph, computed values, bounding boxes)
+  └─ NO  → need pixels
+      ├─ independent oracle exists?
+      │   ├─ YES → reftest         (compare against external truth)
+      │   └─ NO
+      │       ├─ probe-friendly fixture? (minimal palette, known coords)
+      │       │   ├─ YES → probe test  (read pixel values at specific points)
+      │       │   └─ NO  → golden test (diff against prior accepted output)
+      │       └─ (when in doubt → golden test)
 ```
 
-The reftest/golden distinction is about whether an external oracle
-exists. The probe test is orthogonal — it is about whether the fixture
-is simple enough that correctness reduces to reading a few pixel values,
-avoiding full-image comparison entirely.
+Prefer the cheapest method that still validates the behavior. Data tests
+are free (no render), probe tests are cheap (render but no diff), golden
+tests and reftests are expensive (full image comparison).
 
 ---
 
 ## When to Use Each
+
+### Data tests — no render needed
+
+Use when the behavior can be verified on the **data model directly**:
+
+- Computed bounding boxes, resolved transform matrices, layout positions.
+- Scene graph structure (parent/child, ordering, visibility flags).
+- Style resolution (computed fill, stroke, opacity values).
+- Path math (point-on-curve, intersection, winding number).
+
+If the assertion doesn't need pixels, don't render. Data tests are
+instant, deterministic, and platform-independent.
 
 ### Reftests — spec-backed or standard formats
 
@@ -114,10 +131,10 @@ purpose-built fixtures (see "Observation-Based Probe Testing" below).
 
 ### Hybrid strategy
 
-Priority: reftest failures > probe test failures > golden updates.
+Priority: data test > reftest > probe test > golden test.
 
-Harden with reftests (SVG/spec) first, add probe tests for coordinate-math
-behaviors (layout, transforms, clipping), fall back to goldens for the rest.
+Assert on data when possible, use reftests for spec-backed formats, add
+probe tests for coordinate-math behaviors, fall back to goldens for the rest.
 
 ---
 
@@ -299,6 +316,7 @@ Comparisons against them are **regression tests**, not reftests.
 
 | What it is                                  | Call it                                     | Do NOT call it             |
 | ------------------------------------------- | ------------------------------------------- | -------------------------- |
+| Assertion on scene graph / computed values  | data test, unit test                        | reftest, golden test       |
 | Comparison against W3C/spec reference PNG   | reftest, reference test                     | snapshot test              |
 | Comparison against our own prior output     | golden test, regression test, snapshot test | reftest                    |
 | Two internal paths compared for equivalence | equivalence test, pixel-comparison test     | reftest                    |
@@ -412,7 +430,8 @@ corner radius. Verifies VN path equivalence, not external correctness."_
 
 Use this when adding or reviewing rendering tests.
 
-- [ ] **Correct category.** Is this a reftest, golden test, probe test, or equivalence test? Is it labeled correctly in code comments, test names, and PR description?
+- [ ] **Correct category.** Is this a data test, reftest, probe test, golden test, or equivalence test? Labeled correctly?
+- [ ] **Render necessary?** Could this be a data test instead? If the assertion is on layout/transform/style values, skip rendering.
 - [ ] **Minimal fixture.** Does the test use the simplest scene that exercises the behavior?
 - [ ] **One behavior.** Does each test verify a single rendering behavior?
 - [ ] **Deterministic.** Are fonts bundled? Is the surface size explicit? Is there a fixed seed for procedural content?
