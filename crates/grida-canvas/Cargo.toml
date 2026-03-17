@@ -42,6 +42,12 @@ usvg = { path = "../../third_party/usvg" }
 # (+0.25mb wasm32-unknown-emscripten@opt-level=3)
 pulldown-cmark = "0.13.0"
 
+# .grida ZIP file support
+# "deflate" enables both read (flate2) and write (zopfli) paths; there is no
+# read-only feature in zip v2.  Adds ~3 small crates (zopfli, bumpalo,
+# simd-adler32) — all pure Rust, wasm-safe, and eliminated by LTO if unused.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
 # toolings
 async-trait = "0.1"
 futures = "0.3.31"
@@ -132,4 +138,8 @@ path = "examples/skia_bench/skia_bench_cache_image.rs"
 [[example]]
 name = "skia_bench_cache_text"
 path = "examples/skia_bench/skia_bench_cache_text.rs"
+
+# ── IO tools ─────────────────────────────────────────────────────
+[[example]]
+name = "tool_io_grida"
 
