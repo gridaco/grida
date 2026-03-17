@@ -37,12 +37,14 @@ use crate::cg::{
     varwidth,
     types::{
         Axis, BlendMode, BooleanPathOperation, CGPoint, ContainerClipFlag, CornerSmoothing,
-        CrossAxisAlignment, EdgeInsets, FontWeight, GradientStop, ImageFilters, ImagePaint,
-        ImagePaintFit, LayerBlendMode, LayerMaskType, LayoutGap, LayoutMode, LayoutPositioning,
-        LayoutWrap, LinearGradientPaint, MainAxisAlignment, Paint, Paints, RadialGradientPaint,
+        CrossAxisAlignment, DiamondGradientPaint, EdgeInsets, FontFeature, FontOpticalSizing,
+        FontVariation, FontWeight, GradientStop, ImageFilters, ImagePaint, ImagePaintFit,
+        LayerBlendMode, LayerMaskType, LayoutGap, LayoutMode, LayoutPositioning, LayoutWrap,
+        LinearGradientPaint, MainAxisAlignment, Paint, Paints, RadialGradientPaint,
         RectangularCornerRadius, ResourceRef, SolidPaint, StrokeAlign, StrokeCap, StrokeJoin,
         StrokeMarkerPreset, StrokeMiterLimit, SweepGradientPaint, TextAlign, TextAlignVertical,
-        TextStyleRec,
+        TextDecorationLine, TextDecorationRec, TextDecorationStyle, TextLetterSpacing,
+        TextLineHeight, TextStyleRec, TextTransform, TextWordSpacing,
     },
 };
 use crate::node::{
@@ -571,7 +573,7 @@ fn decode_paint_item(item: &fbs::PaintStackItem<'_>) -> Option<Paint> {
                 active: lgp.active(),
                 xy1,
                 xy2,
-                tile_mode: TileMode::default(),
+                tile_mode: decode_tile_mode(lgp.tile_mode()),
                 transform,
                 stops,
                 opacity: lgp.opacity(),
@@ -591,7 +593,7 @@ fn decode_paint_item(item: &fbs::PaintStackItem<'_>) -> Option<Paint> {
                 stops,
                 opacity: rgp.opacity(),
                 blend_mode: decode_blend_mode(rgp.blend_mode()),
-                tile_mode: TileMode::default(),
+                tile_mode: decode_tile_mode(rgp.tile_mode()),
             }))
         }
         fbs::Paint::SweepGradientPaint => {
@@ -607,6 +609,21 @@ fn decode_paint_item(item: &fbs::PaintStackItem<'_>) -> Option<Paint> {
                 stops,
                 opacity: sgp.opacity(),
                 blend_mode: decode_blend_mode(sgp.blend_mode()),
+            }))
+        }
+        fbs::Paint::DiamondGradientPaint => {
+            let dgp = item.paint_as_diamond_gradient_paint()?;
+            let stops = dgp.stops().map(decode_gradient_stops).unwrap_or_default();
+            let transform = dgp
+                .transform()
+                .map(decode_fbs_transform)
+                .unwrap_or_default();
+            Some(Paint::DiamondGradient(DiamondGradientPaint {
+                active: dgp.active(),
+                transform,
+                stops,
+                opacity: dgp.opacity(),
+                blend_mode: decode_blend_mode(dgp.blend_mode()),
             }))
         }
         fbs::Paint::ImagePaint => {
@@ -631,7 +648,15 @@ fn decode_paint_item(item: &fbs::PaintStackItem<'_>) -> Option<Paint> {
                 fit,
                 opacity: ip.opacity(),
                 blend_mode: decode_blend_mode(ip.blend_mode()),
-                filters: ImageFilters::default(),
+                filters: ip.filters().map(|f| ImageFilters {
+                    exposure: f.exposure(),
+                    contrast: f.contrast(),
+                    saturation: f.saturation(),
+                    temperature: f.temperature(),
+                    tint: f.tint(),
+                    highlights: f.highlights(),
+                    shadows: f.shadows(),
+                }).unwrap_or_default(),
             }))
         }
         _ => None,
@@ -877,6 +902,18 @@ enum_map!(decode_text_align, encode_text_align, fbs::TextAlign, TextAlign, TextA
 enum_map!(decode_text_align_vertical, encode_text_align_vertical, fbs::TextAlignVertical, TextAlignVertical, TextAlignVertical::Top, {
     Top, Center, Bottom,
 });
+enum_map!(decode_tile_mode, encode_tile_mode, fbs::TileMode, TileMode, TileMode::Clamp, {
+    Clamp, Repeated, Mirror, Decal,
+});
+enum_map!(decode_text_transform, encode_text_transform, fbs::TextTransform, TextTransform, TextTransform::None, {
+    None, Uppercase, Lowercase, Capitalize,
+});
+enum_map!(decode_text_decoration_line, encode_text_decoration_line, fbs::TextDecorationLine, TextDecorationLine, TextDecorationLine::None, {
+    None, Underline, Overline, LineThrough,
+});
+enum_map!(decode_text_decoration_style, encode_text_decoration_style, fbs::TextDecorationStyle, TextDecorationStyle, TextDecorationStyle::Solid, {
+    Solid, Double, Dotted, Dashed, Wavy,
+});
 
 /// Decode a `StrokeGeometryTrait` into `(StrokeStyle, f32, Option<VarWidthProfile>)`.
 fn decode_stroke_geometry_trait(
@@ -1053,7 +1090,10 @@ fn decode_layout_dimension_style(ls: &fbs::LayoutStyle<'_>) -> LayoutDimensionSt
         layout_max_width: None,
         layout_min_height: None,
         layout_max_height: None,
-        layout_target_aspect_ratio: None,
+        layout_target_aspect_ratio: dim
+            .as_ref()
+            .and_then(|d| d.layout_target_aspect_ratio())
+            .map(|s| (s.width(), s.height())),
     }
 }
 
@@ -1338,14 +1378,29 @@ fn decode_basic_shape_node(
             transform: sl.transform,
             size: sl.size,
             corner_radius,
-            corner_smoothing: CornerSmoothing::default(),
+            corner_smoothing: CornerSmoothing(bsn.corner_smoothing()),
             fills,
             strokes,
             stroke_style,
-            stroke_width: if stroke_width_f32 == 0.0 {
-                StrokeWidth::None
-            } else {
-                StrokeWidth::Uniform(stroke_width_f32)
+            stroke_width: {
+                if let Some(rsw) = bsn.rectangular_stroke_width() {
+                    let top = rsw.stroke_top_width();
+                    let right = rsw.stroke_right_width();
+                    let bottom = rsw.stroke_bottom_width();
+                    let left = rsw.stroke_left_width();
+                    if top == right && right == bottom && bottom == left {
+                        if top == 0.0 { StrokeWidth::None } else { StrokeWidth::Uniform(top) }
+                    } else {
+                        StrokeWidth::Rectangular(RectangularStrokeWidth {
+                            stroke_top_width: top, stroke_right_width: right,
+                            stroke_bottom_width: bottom, stroke_left_width: left,
+                        })
+                    }
+                } else if stroke_width_f32 == 0.0 {
+                    StrokeWidth::None
+                } else {
+                    StrokeWidth::Uniform(stroke_width_f32)
+                }
             },
             effects: lc.effects.clone(),
             layout_child: lc.layout_child.clone(),
@@ -1381,8 +1436,10 @@ fn decode_basic_shape_node(
                 inner_radius,
                 start_angle,
                 angle,
-                // corner_radius is not in the FBS schema; defaults to None
-                corner_radius: None,
+                corner_radius: {
+                    let cr = bsn.corner_radius();
+                    if cr == 0.0 { None } else { Some(cr) }
+                },
                 effects: lc.effects.clone(),
                 layout_child: lc.layout_child.clone(),
             })
@@ -1473,7 +1530,7 @@ fn decode_vector_node(
         mask: lc.mask,
         transform: sl.transform,
         network: decode_vector_network(vn.vector_network_data()),
-        corner_radius: 0.0,
+        corner_radius: vn.corner_radius().and_then(|cr| cr.corner_radius()).map(|r| r.rx()).unwrap_or(0.0),
         fills: decode_paints_vec(vn.fill_paints()),
         strokes: decode_paints_vec(vn.stroke_paints()),
         stroke_width: stroke_width_f32,
@@ -1600,6 +1657,66 @@ fn decode_text_span_node(
         .map(|ts| {
             let mut rec = TextStyleRec::from_font(ts.font_family(), ts.font_size());
             rec.font_weight = FontWeight(ts.font_weight().value());
+            rec.font_style_italic = ts.font_style_italic();
+            rec.font_kerning = ts.font_kerning();
+            let fw = ts.font_width();
+            rec.font_width = if fw == 0.0 { None } else { Some(fw) };
+            rec.text_transform = decode_text_transform(ts.text_transform());
+            rec.font_optical_sizing = ts
+                .font_optical_sizing()
+                .map(|fos| match fos.kind() {
+                    fbs::FontOpticalSizingKind::None => FontOpticalSizing::None,
+                    fbs::FontOpticalSizingKind::Fixed => FontOpticalSizing::Fixed(fos.value()),
+                    _ => FontOpticalSizing::Auto,
+                })
+                .unwrap_or(FontOpticalSizing::Auto);
+            rec.text_decoration = ts.text_decoration().map(|td| TextDecorationRec {
+                text_decoration_line: decode_text_decoration_line(td.text_decoration_line()),
+                text_decoration_color: td.text_decoration_color().map(|c| decode_rgba32f_to_cg_color(c)),
+                text_decoration_style: Some(decode_text_decoration_style(td.text_decoration_style())),
+                text_decoration_skip_ink: Some(td.text_decoration_skip_ink()),
+                text_decoration_thickness: {
+                    let t = td.text_decoration_thickness();
+                    if t == 0.0 { None } else { Some(t) }
+                },
+            });
+            rec.letter_spacing = ts.letter_spacing().map(|td| {
+                match td.kind() {
+                    fbs::TextDimensionKind::Factor => TextLetterSpacing::Factor(td.value().unwrap_or(0.0)),
+                    _ => TextLetterSpacing::Fixed(td.value().unwrap_or(0.0)),
+                }
+            }).unwrap_or_default();
+            rec.word_spacing = ts.word_spacing().map(|td| {
+                match td.kind() {
+                    fbs::TextDimensionKind::Factor => TextWordSpacing::Factor(td.value().unwrap_or(0.0)),
+                    _ => TextWordSpacing::Fixed(td.value().unwrap_or(0.0)),
+                }
+            }).unwrap_or_default();
+            rec.line_height = ts.line_height().map(|td| {
+                match td.kind() {
+                    fbs::TextDimensionKind::Normal => TextLineHeight::Normal,
+                    fbs::TextDimensionKind::Factor => TextLineHeight::Factor(td.value().unwrap_or(1.0)),
+                    _ => TextLineHeight::Fixed(td.value().unwrap_or(0.0)),
+                }
+            }).unwrap_or_default();
+            rec.font_features = ts.font_features().map(|ff| {
+                (0..ff.len()).filter_map(|i| {
+                    let f = ff.get(i);
+                    f.open_type_feature_tag().map(|tag| FontFeature {
+                        tag: String::from_utf8_lossy(&[tag.a(), tag.b(), tag.c(), tag.d()]).into_owned(),
+                        value: f.open_type_feature_value(),
+                    })
+                }).collect()
+            });
+            rec.font_variations = ts.font_variations().map(|fv| {
+                (0..fv.len()).map(|i| {
+                    let v = fv.get(i);
+                    FontVariation {
+                        axis: v.variation_axis().to_owned(),
+                        value: v.variation_value(),
+                    }
+                }).collect()
+            });
             rec
         })
         .unwrap_or_else(|| TextStyleRec::from_font("Inter", 14.0));
@@ -1644,8 +1761,8 @@ fn decode_text_span_node(
         text_style,
         text_align,
         text_align_vertical,
-        max_lines: None,
-        ellipsis: None,
+        max_lines: props.as_ref().map(|p| p.max_lines()).and_then(|v| if v == 0 { None } else { Some(v as usize) }),
+        ellipsis: props.as_ref().and_then(|p| p.ellipsis()).map(|s| s.to_owned()),
         fills: fill_paints,
         strokes: stroke_paints,
         stroke_width,
@@ -2189,7 +2306,7 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                 opacity: lg.opacity,
                 blend_mode: encode_blend_mode(lg.blend_mode),
                 transform: Some(&transform),
-                ..Default::default()
+                tile_mode: encode_tile_mode(lg.tile_mode),
             });
             Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
                 paint_type: fbs::Paint::LinearGradientPaint,
@@ -2205,7 +2322,7 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                 opacity: rg.opacity,
                 blend_mode: encode_blend_mode(rg.blend_mode),
                 transform: Some(&transform),
-                ..Default::default()
+                tile_mode: encode_tile_mode(rg.tile_mode),
             });
             Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
                 paint_type: fbs::Paint::RadialGradientPaint,
@@ -2242,6 +2359,11 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
             };
             let alignment = fbs::Alignment::new(ip.alignement.0, ip.alignement.1);
             let (fit_type, fit_value) = encode_image_paint_fit(fbb, &ip.fit);
+            let fbs_filters = fbs::ImageFilters::new(
+                ip.filters.exposure, ip.filters.contrast, ip.filters.saturation,
+                ip.filters.temperature, ip.filters.tint, ip.filters.highlights,
+                ip.filters.shadows,
+            );
             let ip_offset = fbs::ImagePaint::create(fbb, &fbs::ImagePaintArgs {
                 active: ip.active,
                 image_type: image_ref_offset.0,
@@ -2252,14 +2374,28 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                 fit: Some(fit_value),
                 opacity: ip.opacity,
                 blend_mode: encode_blend_mode(ip.blend_mode),
-                ..Default::default()
+                filters: Some(&fbs_filters),
             });
             Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
                 paint_type: fbs::Paint::ImagePaint,
                 paint: Some(ip_offset.as_union_value()),
             }))
         }
-        _ => None,
+        Paint::DiamondGradient(dg) => {
+            let stops = encode_gradient_stops(fbb, &dg.stops);
+            let transform = encode_affine_to_cg_transform(&dg.transform);
+            let dgp = fbs::DiamondGradientPaint::create(fbb, &fbs::DiamondGradientPaintArgs {
+                active: dg.active,
+                stops: Some(stops),
+                opacity: dg.opacity,
+                blend_mode: encode_blend_mode(dg.blend_mode),
+                transform: Some(&transform),
+            });
+            Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
+                paint_type: fbs::Paint::DiamondGradientPaint,
+                paint: Some(dgp.as_union_value()),
+            }))
+        }
     }
 }
 
@@ -2313,6 +2449,61 @@ fn encode_affine_to_cg_transform(t: &AffineTransform) -> fbs::CGTransform2D {
         t.matrix[1][1], // m11 = d
         t.matrix[1][2], // m12 = ty
     )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Text dimension encoding helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn encode_text_dimension_from_letter_spacing<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ls: &TextLetterSpacing,
+) -> Option<flatbuffers::WIPOffset<fbs::TextDimension<'a>>> {
+    let (kind, value) = match ls {
+        TextLetterSpacing::Fixed(v) => {
+            if *v == 0.0 { return None; }
+            (fbs::TextDimensionKind::Fixed, *v)
+        }
+        TextLetterSpacing::Factor(v) => (fbs::TextDimensionKind::Factor, *v),
+    };
+    Some(fbs::TextDimension::create(fbb, &fbs::TextDimensionArgs {
+        kind,
+        value: Some(value),
+    }))
+}
+
+fn encode_text_dimension_from_word_spacing<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ws: &TextWordSpacing,
+) -> Option<flatbuffers::WIPOffset<fbs::TextDimension<'a>>> {
+    let (kind, value) = match ws {
+        TextWordSpacing::Fixed(v) => {
+            if *v == 0.0 { return None; }
+            (fbs::TextDimensionKind::Fixed, *v)
+        }
+        TextWordSpacing::Factor(v) => (fbs::TextDimensionKind::Factor, *v),
+    };
+    Some(fbs::TextDimension::create(fbb, &fbs::TextDimensionArgs {
+        kind,
+        value: Some(value),
+    }))
+}
+
+fn encode_text_dimension_from_line_height<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    lh: &TextLineHeight,
+) -> Option<flatbuffers::WIPOffset<fbs::TextDimension<'a>>> {
+    match lh {
+        TextLineHeight::Normal => None,
+        TextLineHeight::Fixed(v) => Some(fbs::TextDimension::create(fbb, &fbs::TextDimensionArgs {
+            kind: fbs::TextDimensionKind::Fixed,
+            value: Some(*v),
+        })),
+        TextLineHeight::Factor(v) => Some(fbs::TextDimension::create(fbb, &fbs::TextDimensionArgs {
+            kind: fbs::TextDimensionKind::Factor,
+            value: Some(*v),
+        })),
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2530,14 +2721,24 @@ fn encode_dimensions<'a, A: flatbuffers::Allocator + 'a>(
     w: Option<f32>,
     h: Option<f32>,
 ) -> flatbuffers::WIPOffset<fbs::LayoutDimensionStyle<'a>> {
+    encode_dimensions_with_aspect(fbb, w, h, None)
+}
+
+fn encode_dimensions_with_aspect<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    w: Option<f32>,
+    h: Option<f32>,
+    aspect_ratio: Option<(f32, f32)>,
+) -> flatbuffers::WIPOffset<fbs::LayoutDimensionStyle<'a>> {
     let dim_w = encode_dim_px(fbb, w);
     let dim_h = encode_dim_px(fbb, h);
+    let ar = aspect_ratio.map(|(aw, ah)| fbs::CGSize::new(aw, ah));
     fbs::LayoutDimensionStyle::create(
         fbb,
         &fbs::LayoutDimensionStyleArgs {
             layout_target_width: dim_w,
             layout_target_height: dim_h,
-            layout_target_aspect_ratio: None,
+            layout_target_aspect_ratio: ar.as_ref(),
         },
     )
 }
@@ -2694,7 +2895,7 @@ fn encode_container_layout<'a, A: flatbuffers::Allocator + 'a>(
         },
     ));
 
-    let dims = encode_dimensions(fbb, dimensions.layout_target_width, dimensions.layout_target_height);
+    let dims = encode_dimensions_with_aspect(fbb, dimensions.layout_target_width, dimensions.layout_target_height, dimensions.layout_target_aspect_ratio);
     let child = encode_layout_child_style(fbb, layout_child);
     fbs::LayoutStyle::create(
         fbb,
@@ -2981,10 +3182,10 @@ fn encode_basic_shape_node<'a, A: flatbuffers::Allocator + 'a>(
     let fill_offsets = encode_paints(fbb, fills);
     let stroke_offsets = encode_paints(fbb, strokes);
 
-    // Corner radius (scalar for polygon/star, rectangular for rectangle)
+    // Corner radius (scalar for polygon/star/ellipse, rectangular for rectangle)
     let scalar_cr = match &fields {
         BasicShapeFields::Rectangle(r) => r.corner_radius.tl.rx,
-        BasicShapeFields::Ellipse(_) => 0.0,
+        BasicShapeFields::Ellipse(e) => e.corner_radius.unwrap_or(0.0),
         BasicShapeFields::RegularPolygon(p) => p.corner_radius,
         BasicShapeFields::RegularStarPolygon(s) => s.corner_radius,
     };
@@ -3043,6 +3244,18 @@ fn encode_basic_shape_node<'a, A: flatbuffers::Allocator + 'a>(
         }
     };
 
+    // Corner smoothing (only meaningful for rectangles)
+    let corner_smoothing = match &fields {
+        BasicShapeFields::Rectangle(r) => r.corner_smoothing.0,
+        _ => 0.0,
+    };
+
+    // Rectangular stroke width (only for rectangles)
+    let rect_sw = match &fields {
+        BasicShapeFields::Rectangle(r) => encode_rectangular_stroke_width(&r.stroke_width),
+        _ => None,
+    };
+
     let bsn = fbs::BasicShapeNode::create(fbb, &fbs::BasicShapeNodeArgs {
         node: Some(sys), layer: Some(layer),
         type_: node_type, shape_type, shape: Some(shape_offset),
@@ -3050,6 +3263,8 @@ fn encode_basic_shape_node<'a, A: flatbuffers::Allocator + 'a>(
         stroke_style: Some(stroke_style_offset), stroke_width: stroke_width_f32,
         rectangular_corner_radius: rect_cr.as_ref(),
         stroke_paints: stroke_offsets,
+        corner_smoothing,
+        rectangular_stroke_width: rect_sw.as_ref(),
         ..Default::default()
     });
 
@@ -3183,13 +3398,68 @@ fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
     );
 
     // Text style
-    let font_family_str = fbb.create_string(&r.text_style.font_family);
-    let font_weight = fbs::FontWeight::new(r.text_style.font_weight.0);
+    let ts = &r.text_style;
+    let font_family_str = fbb.create_string(&ts.font_family);
+    let font_weight = fbs::FontWeight::new(ts.font_weight.0);
+    let fbs_font_optical_sizing = match ts.font_optical_sizing {
+        FontOpticalSizing::Auto => fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::Auto, 0.0),
+        FontOpticalSizing::None => fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::None, 0.0),
+        FontOpticalSizing::Fixed(v) => fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::Fixed, v),
+    };
+    let text_decoration_offset = ts.text_decoration.as_ref().map(|td| {
+        let color = td.text_decoration_color.as_ref().map(|c| encode_color_to_rgba32f(c));
+        fbs::TextDecorationRec::create(fbb, &fbs::TextDecorationRecArgs {
+            text_decoration_line: encode_text_decoration_line(td.text_decoration_line),
+            text_decoration_style: encode_text_decoration_style(td.text_decoration_style.unwrap_or_default()),
+            text_decoration_skip_ink: td.text_decoration_skip_ink.unwrap_or(true),
+            text_decoration_thickness: td.text_decoration_thickness.unwrap_or(0.0),
+            text_decoration_color: color.as_ref(),
+        })
+    });
+    let letter_spacing_offset = encode_text_dimension_from_letter_spacing(fbb, &ts.letter_spacing);
+    let word_spacing_offset = encode_text_dimension_from_word_spacing(fbb, &ts.word_spacing);
+    let line_height_offset = encode_text_dimension_from_line_height(fbb, &ts.line_height);
+    let font_features_offset = ts.font_features.as_ref().map(|features| {
+        let items: Vec<_> = features.iter().map(|f| {
+            let bytes = f.tag.as_bytes();
+            let tag = fbs::OpenTypeFeatureTag::new(
+                *bytes.first().unwrap_or(&0),
+                *bytes.get(1).unwrap_or(&0),
+                *bytes.get(2).unwrap_or(&0),
+                *bytes.get(3).unwrap_or(&0),
+            );
+            fbs::FontFeature::create(fbb, &fbs::FontFeatureArgs {
+                open_type_feature_tag: Some(&tag),
+                open_type_feature_value: f.value,
+            })
+        }).collect();
+        fbb.create_vector(&items)
+    });
+    let font_variations_offset = ts.font_variations.as_ref().map(|variations| {
+        let items: Vec<_> = variations.iter().map(|v| {
+            let axis_str = fbb.create_string(&v.axis);
+            fbs::FontVariation::create(fbb, &fbs::FontVariationArgs {
+                variation_axis: Some(axis_str),
+                variation_value: v.value,
+            })
+        }).collect();
+        fbb.create_vector(&items)
+    });
     let text_style = fbs::TextStyleRec::create(fbb, &fbs::TextStyleRecArgs {
         font_family: Some(font_family_str),
-        font_size: r.text_style.font_size,
+        font_size: ts.font_size,
         font_weight: Some(&font_weight),
-        ..Default::default()
+        font_style_italic: ts.font_style_italic,
+        font_kerning: ts.font_kerning,
+        font_width: ts.font_width.unwrap_or(0.0),
+        font_optical_sizing: Some(&fbs_font_optical_sizing),
+        text_transform: encode_text_transform(ts.text_transform),
+        text_decoration: text_decoration_offset,
+        letter_spacing: letter_spacing_offset,
+        word_spacing: word_spacing_offset,
+        line_height: line_height_offset,
+        font_features: font_features_offset,
+        font_variations: font_variations_offset,
     });
 
     let text_str = fbb.create_string(&r.text);
@@ -3204,13 +3474,15 @@ fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
         stroke_dash_array: None,
     }, r.stroke_width, None);
 
+    let ellipsis_offset = r.ellipsis.as_ref().map(|s| fbb.create_string(s));
     let props = fbs::TextSpanNodeProperties::create(fbb, &fbs::TextSpanNodePropertiesArgs {
         text: Some(text_str), text_style: Some(text_style),
         text_align: encode_text_align(r.text_align),
         text_align_vertical: encode_text_align_vertical(r.text_align_vertical),
         fill_paints: fill_offsets, stroke_paints: stroke_offsets,
         stroke_geometry: Some(sg),
-        ..Default::default()
+        max_lines: r.max_lines.map(|v| v as u32).unwrap_or(0),
+        ellipsis: ellipsis_offset,
     });
 
     let tn = fbs::TextSpanNode::create(fbb, &fbs::TextSpanNodeArgs {
