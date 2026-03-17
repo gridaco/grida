@@ -145,13 +145,13 @@ impl Default for SVGStrokeAttributes {
 }
 
 impl SVGFillAttributes {
-    pub fn into_paint_with_opacity(&self, bounds: Option<(f32, f32)>) -> Paint {
+    pub fn into_paint_with_opacity(&self, bounds: Option<(f32, f32, f32, f32)>) -> Paint {
         svg_paint_with_opacity(&self.paint, self.fill_opacity, bounds)
     }
 }
 
 impl SVGStrokeAttributes {
-    pub fn into_paint_with_opacity(&self, bounds: Option<(f32, f32)>) -> Paint {
+    pub fn into_paint_with_opacity(&self, bounds: Option<(f32, f32, f32, f32)>) -> Paint {
         svg_paint_with_opacity(&self.paint, self.stroke_opacity, bounds)
     }
 }
@@ -161,7 +161,7 @@ impl SVGStrokeAttributes {
 ///
 /// SVG allows opacity on fill/stroke independently of paints; our runtime stores
 /// opacity within each `Paint`. This function is the bridging layer.
-fn svg_paint_with_opacity(paint: &SVGPaint, opacity: f32, bounds: Option<(f32, f32)>) -> Paint {
+fn svg_paint_with_opacity(paint: &SVGPaint, opacity: f32, bounds: Option<(f32, f32, f32, f32)>) -> Paint {
     match paint {
         SVGPaint::Solid(solid) => Paint::Solid(SolidPaint {
             active: true,
@@ -176,7 +176,7 @@ fn svg_paint_with_opacity(paint: &SVGPaint, opacity: f32, bounds: Option<(f32, f
 fn svg_linear_gradient_to_paint(
     linear: &SVGLinearGradientPaint,
     opacity: f32,
-    bounds: Option<(f32, f32)>,
+    bounds: Option<(f32, f32, f32, f32)>,
 ) -> Paint {
     let xy1 = Alignment::from_uv(Uv(linear.x1, linear.y1));
     let xy2 = Alignment::from_uv(Uv(linear.x2, linear.y2));
@@ -198,7 +198,7 @@ fn svg_linear_gradient_to_paint(
 fn svg_radial_gradient_to_paint(
     radial: &SVGRadialGradientPaint,
     opacity: f32,
-    bounds: Option<(f32, f32)>,
+    bounds: Option<(f32, f32, f32, f32)>,
 ) -> Paint {
     if (radial.fx - radial.cx).abs() > f32::EPSILON || (radial.fy - radial.cy).abs() > f32::EPSILON
     {
@@ -243,17 +243,43 @@ fn radial_gradient_alignment_transform(center: (f32, f32), radius: f32) -> Affin
     translate.compose(&scale).compose(&baseline)
 }
 
-fn normalize_gradient_transform(transform: &mut AffineTransform, bounds: Option<(f32, f32)>) {
-    if let Some((width, height)) = bounds {
+/// Undo the `from_bbox` transform that usvg bakes into gradient transforms
+/// via `to_user_coordinates`.
+///
+/// usvg resolves `objectBoundingBox` gradients by post-concatenating
+/// `from_bbox(rect)` = `[width, 0, x, 0, height, y]` onto the
+/// `gradientTransform`. Our paint model expects the gradient transform
+/// in UV [0,1] space (the painter applies `scale(shape_w, shape_h)`
+/// at render time), so we multiply by `from_bbox_inv` to undo it:
+///
+///   from_bbox_inv = [1/w, 0, -x/w, 0, 1/h, -y/h]
+///
+/// The previous implementation only divided by (w, h), ignoring the
+/// bbox origin (x, y). This caused gradients to be offset when the
+/// shape had a non-zero position.
+fn normalize_gradient_transform(
+    transform: &mut AffineTransform,
+    bounds: Option<(f32, f32, f32, f32)>,
+) {
+    if let Some((x, y, width, height)) = bounds {
         if width > f32::EPSILON && height > f32::EPSILON {
+            // Apply from_bbox_inv = [1/w, 0, -x/w, 0, 1/h, -y/h]
+            // as a left-multiply: result = from_bbox_inv * transform
             let inv_w = 1.0 / width;
             let inv_h = 1.0 / height;
-            transform.matrix[0][0] *= inv_w;
-            transform.matrix[0][1] *= inv_w;
-            transform.matrix[0][2] *= inv_w;
-            transform.matrix[1][0] *= inv_h;
-            transform.matrix[1][1] *= inv_h;
-            transform.matrix[1][2] *= inv_h;
+            let m = &transform.matrix;
+            let new_m00 = inv_w * m[0][0];
+            let new_m01 = inv_w * m[0][1];
+            let new_m02 = inv_w * m[0][2] - x * inv_w;
+            let new_m10 = inv_h * m[1][0];
+            let new_m11 = inv_h * m[1][1];
+            let new_m12 = inv_h * m[1][2] - y * inv_h;
+            transform.matrix[0][0] = new_m00;
+            transform.matrix[0][1] = new_m01;
+            transform.matrix[0][2] = new_m02;
+            transform.matrix[1][0] = new_m10;
+            transform.matrix[1][1] = new_m11;
+            transform.matrix[1][2] = new_m12;
         }
     }
 }

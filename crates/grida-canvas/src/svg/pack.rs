@@ -91,7 +91,7 @@ impl SceneBuilder {
         });
         node.stroke_style.stroke_align = StrokeAlign::Center;
 
-        let gradient_bounds = Some((path.bounds.width, path.bounds.height));
+        let gradient_bounds = Some((path.bounds.x, path.bounds.y, path.bounds.width, path.bounds.height));
 
         if let Some(fill) = &path.fill {
             node.fills = Paints::new([fill.into_paint_with_opacity(gradient_bounds)]);

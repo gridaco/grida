@@ -905,6 +905,116 @@ fn pack_text_in_transformed_group_world_positions() {
 }
 
 // ---------------------------------------------------------------------------
+// Gradient transform tests
+// ---------------------------------------------------------------------------
+
+/// Verify that a `gradientTransform="rotate(45)"` on a non-square rect
+/// produces a gradient whose effective rotation is preserved.
+///
+/// In the Grida paint model the painter computes:
+///   shader_matrix = scale(shape_w, shape_h) * gradient.transform
+///
+/// For a 45° rotated gradient the final shader matrix should be equivalent to
+///   scale(shape_w, shape_h) * rotate(45°)
+/// meaning `gradient.transform ≈ rotate(45°)` regardless of shape dimensions.
+///
+/// A non-square rect (200×100) exposes the bug because dividing the rotation
+/// matrix by different width/height distorts the rotation angle.
+#[test]
+fn pack_gradient_transform_rotation_preserved() {
+    use cg::cg::types::Paint;
+    use cg::node::schema::Node;
+    use cg::svg::pack;
+    use math2::transform::AffineTransform;
+
+    // Non-square rect at a non-zero position. The gradient is rotated 45°.
+    // The rect at x=50, y=30 gets path-normalized to origin, but the
+    // gradient transform includes the bbox origin from usvg's
+    // to_user_coordinates. If normalize_gradient_transform doesn't
+    // account for this offset, the gradient will be shifted.
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+      <defs>
+        <linearGradient id="g1" gradientTransform="rotate(45, 0.5, 0.5)">
+          <stop offset="0" stop-color="red"/>
+          <stop offset="1" stop-color="blue"/>
+        </linearGradient>
+      </defs>
+      <rect x="50" y="30" width="200" height="100" fill="url(#g1)"/>
+    </svg>"##;
+
+    let graph = pack::from_svg_str(svg).expect("should parse");
+
+    // Find the first Path node and extract the gradient paint
+    fn find_first_gradient(
+        graph: &cg::node::scene_graph::SceneGraph,
+        id: &cg::node::schema::NodeId,
+    ) -> Option<AffineTransform> {
+        let node = graph.get_node(id).ok()?;
+        if let Node::Path(n) = node {
+            for paint in n.fills.iter() {
+                if let Paint::LinearGradient(g) = paint {
+                    return Some(g.transform);
+                }
+            }
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                if let Some(t) = find_first_gradient(graph, child_id) {
+                    return Some(t);
+                }
+            }
+        }
+        None
+    }
+
+    let gradient_transform = graph
+        .roots()
+        .iter()
+        .find_map(|r| find_first_gradient(&graph, r))
+        .expect("should find a gradient paint");
+
+    // The gradient transform should be rotate(45°, 0.5, 0.5) in UV space,
+    // regardless of the rect's position in the SVG. The rect's x/y position
+    // must not leak into the gradient transform — the shape is path-normalized
+    // to origin and its position is stored in the node transform.
+    //
+    // rotate(45°, 0.5, 0.5) = translate(0.5, 0.5) * rotate(45°) * translate(-0.5, -0.5)
+    //   m00 = cos(45) ≈ 0.7071
+    //   m01 = -sin(45) ≈ -0.7071
+    //   m02 = 0.5 - 0.5*cos45 + 0.5*sin45 ≈ 0.5
+    //   m10 = sin(45) ≈ 0.7071
+    //   m11 = cos(45) ≈ 0.7071
+    //   m12 = 0.5 - 0.5*sin45 - 0.5*cos45 ≈ -0.2071
+    let m = gradient_transform.matrix;
+
+    let approx = |a: f32, b: f32| (a - b).abs() < 0.01;
+    let cos45: f32 = std::f32::consts::FRAC_1_SQRT_2;
+    let expected_tx: f32 = 0.5 - 0.5 * cos45 + 0.5 * cos45; // ≈ 0.5
+    let expected_ty: f32 = 0.5 - 0.5 * cos45 - 0.5 * cos45; // ≈ -0.2071
+
+    // Rotation components
+    assert!(approx(m[0][0], cos45), "m00 should be cos(45)≈0.707, got {:.4}", m[0][0]);
+    assert!(approx(m[1][1], cos45), "m11 should be cos(45)≈0.707, got {:.4}", m[1][1]);
+    assert!(approx(m[0][1], -cos45), "m01 should be -sin(45)≈-0.707, got {:.4}", m[0][1]);
+    assert!(approx(m[1][0], cos45), "m10 should be sin(45)≈0.707, got {:.4}", m[1][0]);
+
+    // Translation: must NOT include rect's x/y position (50, 30).
+    // Should be pure rotate(45, 0.5, 0.5) translation.
+    assert!(
+        approx(m[0][2], expected_tx),
+        "gradient tx should be {:.4} (no bbox offset), got {:.4}",
+        expected_tx,
+        m[0][2]
+    );
+    assert!(
+        approx(m[1][2], expected_ty),
+        "gradient ty should be {:.4} (no bbox offset), got {:.4}",
+        expected_ty,
+        m[1][2]
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Bulk fixture tests — use `tool_svg_batch` for large external corpora
 // e.g. cargo run --release --example tool_svg_batch -- fixtures/local/oxygen-icons-5.116.0/scalable
 // ---------------------------------------------------------------------------
