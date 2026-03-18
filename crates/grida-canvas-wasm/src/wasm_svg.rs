@@ -8,7 +8,7 @@ use super::_internal::*;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use cg::io::io_svg::{svg_optimize, svg_pack};
+use cg::io::io_svg::{svg_optimize, svg_pack, svg_to_grida_bytes};
 
 // ====================================================================================================
 // #region: WASM Response Structs
@@ -114,6 +114,47 @@ pub unsafe extern "C" fn grida_svg_pack(svg: *const c_char) -> *mut c_char {
         Err(error) => CString::new(WasmErrorResponse::new(error).to_json().unwrap())
             .unwrap()
             .into_raw(),
+    }
+}
+
+/// Parse SVG and return `.grida` FlatBuffers bytes.
+///
+/// Returns a pointer to a length-prefixed buffer:
+///   bytes[0..4] = u32 LE payload length
+///   bytes[4..4+len] = FBS payload
+///
+/// Returns 0 (null) on error.
+/// The JS side must free the pointer with `Module._deallocate(ptr, 4 + len)`.
+///
+/// js::_grida_svg_to_document
+#[no_mangle]
+pub unsafe extern "C" fn grida_svg_to_document(svg: *const c_char) -> *mut u8 {
+    let result = (|| -> Result<Vec<u8>, String> {
+        if svg.is_null() {
+            return Err("svg cannot be null".to_string());
+        }
+        let svg_str = CStr::from_ptr(svg)
+            .to_str()
+            .map_err(|e| format!("Invalid UTF-8: {}", e))?;
+        if svg_str.is_empty() {
+            return Err("svg cannot be empty".to_string());
+        }
+        svg_to_grida_bytes(svg_str)
+    })();
+
+    match result {
+        Ok(bytes) => {
+            let total = 4 + bytes.len();
+            let ptr = super::_internal::allocate(total);
+            if ptr.is_null() {
+                return std::ptr::null_mut();
+            }
+            let len = bytes.len() as u32;
+            std::ptr::copy_nonoverlapping(len.to_le_bytes().as_ptr(), ptr, 4);
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.add(4), bytes.len());
+            ptr
+        }
+        Err(_error) => std::ptr::null_mut(),
     }
 }
 

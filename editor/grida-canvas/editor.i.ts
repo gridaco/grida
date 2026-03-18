@@ -2700,20 +2700,28 @@ export namespace editor.api {
   }
 
   /**
-   * interface for svg optimizer/parser/importer
+   * Interface for SVG optimizer/parser/importer.
    *
-   * grida has 2 svg module:
-   * 1. @grida/io-svg (js) (DEPRECATED)
-   * 2. @grida/canvas-wasm (rust)
-   *
+   * All SVG processing is done in Rust via @grida/canvas-wasm.
+   * The primary import path is `svgToDocument` which produces
+   * an IPackedSceneDocument directly from the Rust pipeline.
    */
   export interface IDocumentSVGInterfaceProvider {
     /**
-     * optimize the svg string
-     * @param svg input svg string
+     * Optimize the SVG string (CSS resolution, normalization).
      */
     svgOptimize(svg: string): string | null;
+
+    /**
+     * Parse SVG into intermediate IR (used by dev tools for inspection).
+     */
     svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
+
+    /**
+     * Parse SVG and return `.grida` FlatBuffers bytes.
+     * The caller decodes via `io.GRID.decode()` to get an IPackedSceneDocument.
+     */
+    svgToDocument(svg: string): Uint8Array | null;
   }
 
   /**
@@ -2783,10 +2791,8 @@ export namespace editor.api {
     toVectorNetwork(node_id: string): vn.FlattenResult | null;
   }
 
-  export interface IDocumentSVGInterfaceActions {
-    svgOptimize(svg: string): string | null;
-    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
-  }
+  export interface IDocumentSVGInterfaceActions
+    extends IDocumentSVGInterfaceProvider {}
 
   export interface IDocumentMarkdownInterfaceActions {
     markdownToHtml(markdown: string): string | null;

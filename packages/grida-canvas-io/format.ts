@@ -2270,15 +2270,28 @@ export namespace format {
         }
 
         /**
-         * Decodes LinearGradientPaint.
+         * Decodes LinearGradientPaint (with xy1/xy2 endpoints).
          */
         export function linearGradient(
           paintValue: unknown
         ): cg.LinearGradientPaint {
-          return decodeGradientPaint(
-            paintValue as fbs.LinearGradientPaint,
-            "linear_gradient"
-          );
+          const lg = paintValue as fbs.LinearGradientPaint;
+          const xy1Obj = lg.xy1();
+          const xy2Obj = lg.xy2();
+          return {
+            type: "linear_gradient" as const,
+            stops: decodeGradientStops(lg),
+            transform: decodeGradientTransform(lg.transform()),
+            blend_mode: styling.decode.blendMode(lg.blendMode()),
+            opacity: lg.opacity(),
+            active: lg.active(),
+            xy1: xy1Obj
+              ? ([xy1Obj.x(), xy1Obj.y()] as [number, number])
+              : ([0, 0.5] as [number, number]),
+            xy2: xy2Obj
+              ? ([xy2Obj.x(), xy2Obj.y()] as [number, number])
+              : ([1, 0.5] as [number, number]),
+          };
         }
 
         /**

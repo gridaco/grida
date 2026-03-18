@@ -32,7 +32,7 @@ import grida from "@grida/schema";
 import tree from "@grida/tree";
 import vn from "@grida/vn";
 import cg from "@grida/cg";
-import iosvg from "@grida/io-svg";
+
 import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import assert from "assert";
@@ -704,35 +704,61 @@ class EditorDocumentStore
   public async createNodeFromSvg(
     svg: string
   ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
-    const id = this.idgen.next();
-
-    const packed = await this.svg.svgPack(svg);
-    if (!packed) {
-      throw new Error("Failed to pack SVG");
+    const bytes = this.svg.svgToDocument(svg);
+    if (!bytes) {
+      throw new Error("Failed to convert SVG to .grida bytes");
     }
 
-    const svgData = packed.svg;
+    // Decode FBS bytes into the editor's full document model
+    const fullDoc = io.GRID.decode(bytes);
 
-    let result = await iosvg.convert(svgData, {
-      name: "svg",
-      currentColor: kolor.colorformats.RGBA32F.BLACK,
-    });
-    if (result) {
-      result = result as grida.program.nodes.i.ILayoutTrait;
+    // Extract the first scene's children (the actual SVG content roots)
+    const sceneId = fullDoc.scenes_ref[0];
+    const sceneChildren = fullDoc.links[sceneId] ?? [];
 
-      // Use explicit scene-level target for programmatic SVG node creation
-      this.insert(
-        {
-          id: id,
-          prototype: result,
-        },
-        this.mstate.scene_id ?? null
+    // Remove the scene node itself — we're inserting into the editor's
+    // existing scene, not creating a new one.
+    const { [sceneId]: _sceneNode, ...contentNodes } = fullDoc.nodes;
+    const { [sceneId]: _sceneLinks, ...contentLinks } = fullDoc.links;
+
+    // Remap all IDs to avoid conflicts with existing document nodes.
+    // The FBS file contains placeholder IDs from the Rust encoder;
+    // each import must get fresh IDs from the editor's generator.
+    const idgen = this.idgen;
+    const { graph: remapped, roots: remappedRoots } =
+      tree.graph.remapKeys<grida.program.nodes.Node>(
+        { nodes: contentNodes, links: contentLinks },
+        sceneChildren,
+        () => idgen.next()
       );
 
-      return this.getNodeById<grida.program.nodes.ContainerNode>(id);
-    } else {
-      throw new Error("Failed to convert SVG");
+    const packedDoc: grida.program.document.IPackedSceneDocument = {
+      nodes: remapped.nodes,
+      links: remapped.links,
+      images: {},
+      bitmaps: {},
+      properties: {},
+      scene: {
+        type: "scene",
+        id: "tmp",
+        name: "svg",
+        children_refs: remappedRoots,
+        guides: [],
+        edges: [],
+        constraints: { children: "multiple" },
+      },
+    };
+
+    const ids = this.insert(
+      { document: packedDoc },
+      this.mstate.scene_id ?? null
+    );
+
+    const rootId = ids[0];
+    if (!rootId) {
+      throw new Error("SVG import produced no nodes");
     }
+    return this.getNodeById<grida.program.nodes.ContainerNode>(rootId);
   }
 
   public createImageNode(
@@ -3836,6 +3862,13 @@ export class Editor
       throw new Error("SVG interface provider is not bound");
     }
     return this.svgProvider.svgPack(svg);
+  }
+
+  public svgToDocument(svg: string): Uint8Array | null {
+    if (!this.svgProvider) {
+      throw new Error("SVG interface provider is not bound");
+    }
+    return this.svgProvider.svgToDocument(svg);
   }
 
   // #endregion IDocumentSVGInterfaceActions implementation

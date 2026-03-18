@@ -1194,6 +1194,234 @@ fn pack_text_multichunk_creates_group_parent() {
 }
 
 // ---------------------------------------------------------------------------
+// SVG → .grida FBS roundtrip
+// ---------------------------------------------------------------------------
+
+/// Verify that group transforms survive FBS roundtrip — the full affine
+/// matrix (including scale/skew) must be preserved, not just rotation.
+#[test]
+fn svg_to_grida_fbs_group_transform_roundtrip() {
+    use cg::io::io_grida_fbs;
+    use cg::io::io_svg::svg_to_grida_bytes;
+    use cg::node::schema::Node;
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+      <g transform="translate(100, 50)">
+        <g transform="scale(0.8, 1.2)">
+          <g transform="rotate(30)">
+            <rect width="50" height="50" fill="red"/>
+          </g>
+        </g>
+      </g>
+    </svg>"##;
+
+    let bytes = svg_to_grida_bytes(svg).expect("should encode");
+    let scene = io_grida_fbs::decode(&bytes).expect("should decode");
+
+    // Collect all group transforms
+    let mut group_transforms = Vec::new();
+    for (_, node) in scene.graph.nodes_iter() {
+        if let Node::Group(g) = node {
+            if let Some(t) = &g.transform {
+                group_transforms.push(t.clone());
+            }
+        }
+    }
+
+    // Should have 3 groups with transforms: translate, scale, rotate
+    assert!(
+        group_transforms.len() >= 3,
+        "expected 3 groups with transforms, got {}",
+        group_transforms.len()
+    );
+
+    // Check that at least one has non-trivial scale (m00 != 1 or m11 != 1)
+    let has_scale = group_transforms.iter().any(|t| {
+        let m00 = t.matrix[0][0];
+        let m11 = t.matrix[1][1];
+        (m00 - 1.0).abs() > 0.01 || (m11 - 1.0).abs() > 0.01
+    });
+    assert!(
+        has_scale,
+        "at least one group should have scale transform, but all have identity-like diagonals"
+    );
+
+    // Check that at least one has non-zero translation
+    let has_translate = group_transforms.iter().any(|t| {
+        t.matrix[0][2].abs() > 0.1 || t.matrix[1][2].abs() > 0.1
+    });
+    assert!(
+        has_translate,
+        "at least one group should have translation"
+    );
+}
+
+/// Verify that `svg_to_grida_bytes` → `decode` roundtrip preserves
+/// gradient transforms faithfully (full 2x3 matrix, not just rotation).
+#[test]
+fn svg_to_grida_fbs_gradient_transform_roundtrip() {
+    use cg::io::io_grida_fbs;
+    use cg::io::io_svg::svg_to_grida_bytes;
+    use cg::node::schema::Node;
+
+    // Rect at non-zero position with a 45° rotated gradient
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+      <defs>
+        <linearGradient id="g1" gradientTransform="rotate(45, 0.5, 0.5)">
+          <stop offset="0" stop-color="red"/>
+          <stop offset="1" stop-color="blue"/>
+        </linearGradient>
+      </defs>
+      <rect x="50" y="30" width="200" height="100" fill="url(#g1)"/>
+    </svg>"##;
+
+    let bytes = svg_to_grida_bytes(svg).expect("should encode");
+    let scene = io_grida_fbs::decode(&bytes).expect("should decode");
+
+    // Find the vector node (rect → path → vector after FBS roundtrip)
+    let vector = scene
+        .graph
+        .nodes_iter()
+        .find_map(|(_, n)| match n {
+            Node::Vector(v) => Some(v),
+            _ => None,
+        })
+        .expect("should have a vector node");
+
+    // The gradient fill should have a rotation transform
+    let fill = &vector.fills.as_slice()[0];
+    let gradient = match fill {
+        cg::cg::types::Paint::LinearGradient(lg) => lg,
+        _ => panic!("expected linear gradient, got {:?}", fill),
+    };
+
+    let m = &gradient.transform.matrix;
+    let cos45: f32 = std::f32::consts::FRAC_1_SQRT_2;
+    let approx = |a: f32, b: f32| (a - b).abs() < 0.01;
+
+    // Gradient transform should be rotate(45°, 0.5, 0.5) in UV space
+    assert!(
+        approx(m[0][0], cos45) && approx(m[1][1], cos45),
+        "diagonal should be cos(45°), got [{:.4}, {:.4}]",
+        m[0][0],
+        m[1][1]
+    );
+    assert!(
+        approx(m[0][1], -cos45) && approx(m[1][0], cos45),
+        "off-diagonal should be ±sin(45°), got [{:.4}, {:.4}]",
+        m[0][1],
+        m[1][0]
+    );
+}
+
+/// Verify that `svg_to_grida_bytes` produces valid FBS bytes that can be
+/// decoded back into a Scene with the expected structure.
+#[test]
+fn svg_to_grida_fbs_roundtrip() {
+    use cg::io::io_grida_fbs;
+    use cg::io::io_svg::svg_to_grida_bytes;
+    use cg::node::schema::Node;
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+      <rect x="10" y="20" width="80" height="60" fill="red"/>
+      <g transform="translate(100, 50)">
+        <circle cx="0" cy="0" r="30" fill="blue"/>
+      </g>
+      <text x="10" y="180" font-size="16" fill="black">hello</text>
+    </svg>"##;
+
+    let bytes = svg_to_grida_bytes(svg).expect("svg_to_grida_bytes should succeed");
+
+    // Must be a valid FBS buffer (starts with valid FlatBuffer, has "GRID" identifier)
+    assert!(bytes.len() > 8, "FBS buffer too small: {} bytes", bytes.len());
+
+    // Decode back into a Scene
+    let scene = io_grida_fbs::decode(&bytes).expect("FBS decode should succeed");
+
+    // The scene graph should have roots
+    let roots = scene.graph.roots();
+    assert!(!roots.is_empty(), "decoded scene should have root nodes");
+
+    // Count node types
+    let mut vector_count = 0;
+    let mut group_count = 0;
+    let mut text_count = 0;
+    let mut container_count = 0;
+    for (_id, node) in scene.graph.nodes_iter() {
+        match node {
+            Node::Vector(_) => vector_count += 1,
+            Node::Group(_) => group_count += 1,
+            Node::TextSpan(_) => text_count += 1,
+            Node::Container(_) => container_count += 1,
+            _ => {}
+        }
+    }
+
+    // SVG has: 1 container (<svg>), 1 group (<g>), 2 vectors (rect + circle
+    // converted from Path → Vector during FBS encode), 1 text span
+    assert!(
+        container_count >= 1,
+        "should have at least 1 container, got {}",
+        container_count
+    );
+    assert!(
+        vector_count >= 2,
+        "should have at least 2 vectors (rect + circle), got {}",
+        vector_count
+    );
+    assert!(
+        group_count >= 1,
+        "should have at least 1 group, got {}",
+        group_count
+    );
+    assert!(
+        text_count >= 1,
+        "should have at least 1 text span, got {}",
+        text_count
+    );
+}
+
+/// Minimal SVG — the kind a browser drag-drop would produce.
+#[test]
+fn svg_to_grida_fbs_minimal() {
+    use cg::io::io_grida_fbs;
+    use cg::io::io_svg::svg_to_grida_bytes;
+
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z" fill="black"/></svg>"#;
+
+    let bytes = svg_to_grida_bytes(svg).expect("minimal SVG should encode");
+    assert!(bytes.len() > 8);
+    let scene = io_grida_fbs::decode(&bytes).expect("should decode");
+    assert!(!scene.graph.roots().is_empty());
+}
+
+/// SVG with only groups (no paths/text) — should still produce valid FBS.
+#[test]
+fn svg_to_grida_fbs_groups_only() {
+    use cg::io::io_grida_fbs;
+    use cg::io::io_svg::svg_to_grida_bytes;
+
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><g transform="translate(10,20)"><g transform="rotate(45)"/></g></svg>"#;
+
+    let bytes = svg_to_grida_bytes(svg).expect("groups-only SVG should encode");
+    let scene = io_grida_fbs::decode(&bytes).expect("should decode");
+    assert!(!scene.graph.roots().is_empty());
+}
+
+/// Empty SVG — should still produce valid FBS (just a container).
+#[test]
+fn svg_to_grida_fbs_empty() {
+    use cg::io::io_grida_fbs;
+    use cg::io::io_svg::svg_to_grida_bytes;
+
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>"#;
+
+    let bytes = svg_to_grida_bytes(svg).expect("empty SVG should encode");
+    let scene = io_grida_fbs::decode(&bytes).expect("should decode");
+    assert!(!scene.graph.roots().is_empty());
+}
+
+// ---------------------------------------------------------------------------
 // Bulk fixture tests — use `tool_svg_batch` for large external corpora
 // e.g. cargo run --release --example tool_svg_batch -- fixtures/local/oxygen-icons-5.116.0/scalable
 // ---------------------------------------------------------------------------

@@ -62,6 +62,10 @@ pub enum JSONPaint {
     LinearGradient {
         id: Option<String>,
         transform: Option<CGTransform2D>,
+        /// Gradient start point in UV [0,1] space.
+        xy1: Option<[f32; 2]>,
+        /// Gradient end point in UV [0,1] space.
+        xy2: Option<[f32; 2]>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -393,6 +397,8 @@ impl From<Option<JSONPaint>> for Paint {
             }),
             Some(JSONPaint::LinearGradient {
                 transform,
+                xy1,
+                xy2,
                 stops,
                 opacity,
                 blend_mode,
@@ -401,8 +407,12 @@ impl From<Option<JSONPaint>> for Paint {
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::LinearGradient(LinearGradientPaint {
-                    xy1: Alignment::CENTER_LEFT,
-                    xy2: Alignment::CENTER_RIGHT,
+                    xy1: xy1
+                        .map(|[x, y]| Alignment::from_uv(Uv(x, y)))
+                        .unwrap_or(Alignment::CENTER_LEFT),
+                    xy2: xy2
+                        .map(|[x, y]| Alignment::from_uv(Uv(x, y)))
+                        .unwrap_or(Alignment::CENTER_RIGHT),
                     tile_mode: TileMode::Clamp,
                     transform: transform
                         .map(|t| t.into())

@@ -103,4 +103,46 @@ export class SVGAPI {
       }
     }
   }
+
+  /**
+   * Parse SVG and return `.grida` FlatBuffers bytes.
+   *
+   * This replaces the two-step pipeline (pack → JS convert) with a
+   * single Rust call that produces the FBS binary directly.
+   *
+   * @returns Uint8Array of FBS bytes, or null on error
+   */
+  toDocument(svg: string): Uint8Array | null {
+    let svgPtr: number | null = null;
+    let svgLen: number | null = null;
+    try {
+      [svgPtr, svgLen] = this._alloc_string(svg);
+      const resultPtr = this.module._grida_svg_to_document(svgPtr);
+      if (resultPtr === 0) return null;
+
+      // Read length-prefixed buffer: first 4 bytes = u32 LE length
+      const heap = new Uint8Array(
+        (this.module as any).HEAPU8.buffer as ArrayBuffer
+      );
+      const len =
+        heap[resultPtr] |
+        (heap[resultPtr + 1] << 8) |
+        (heap[resultPtr + 2] << 16) |
+        (heap[resultPtr + 3] << 24);
+      // Copy the FBS bytes out of WASM memory
+      const bytes = new Uint8Array(len);
+      bytes.set(heap.subarray(resultPtr + 4, resultPtr + 4 + len));
+
+      // Free the WASM allocation (4 bytes length prefix + payload)
+      this.module._deallocate(resultPtr, 4 + len);
+
+      return bytes;
+    } catch (error) {
+      return null;
+    } finally {
+      if (svgPtr !== null && svgLen !== null) {
+        this._free_string(svgPtr, svgLen);
+      }
+    }
+  }
 }

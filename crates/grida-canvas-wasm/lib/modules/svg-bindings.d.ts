@@ -182,5 +182,16 @@ export namespace svg {
     _grida_svg_optimize(svg: CPtr): CPtr;
 
     _grida_svg_pack(sgv: CPtr): CPtr;
+
+    /**
+     * Parse SVG and return `.grida` FlatBuffers bytes.
+     *
+     * Returns a pointer to a length-prefixed buffer (u32 LE length + FBS
+     * bytes), or null on error.
+     *
+     * @param svg - Pointer to input SVG string (null-terminated C string)
+     * @returns Pointer to length-prefixed FBS buffer, or 0 (null) on error
+     */
+    _grida_svg_to_document(svg: CPtr): CPtr;
   }
 }
