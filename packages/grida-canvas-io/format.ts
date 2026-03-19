@@ -2530,11 +2530,12 @@ export namespace format {
       function createStrokeStyle(
         builder: Builder,
         strokeCap: cg.StrokeCap | undefined,
-        strokeJoin: cg.StrokeJoin | undefined
+        strokeJoin: cg.StrokeJoin | undefined,
+        strokeDashArray?: number[]
       ): flatbuffers.Offset {
         const dashArrayOffset = fbs.StrokeStyle.createStrokeDashArrayVector(
           builder,
-          []
+          strokeDashArray ?? []
         );
         fbs.StrokeStyle.startStrokeStyle(builder);
         fbs.StrokeStyle.addStrokeCap(
@@ -2560,12 +2561,14 @@ export namespace format {
           stroke_width?: number;
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
+          stroke_dash_array?: number[];
         }>
       ): flatbuffers.Offset {
         const strokeStyleOffset = createStrokeStyle(
           builder,
           node.stroke_cap,
-          node.stroke_join
+          node.stroke_join,
+          node.stroke_dash_array
         );
 
         // Create VariableWidthProfile (empty for now)
@@ -3009,6 +3012,7 @@ export namespace format {
         stroke_width: number;
         stroke_cap: cg.StrokeCap;
         stroke_join: cg.StrokeJoin;
+        stroke_dash_array?: number[];
       } {
         if (!trait) {
           return {
@@ -3026,10 +3030,23 @@ export namespace format {
           ? styling.decode.strokeJoin(strokeStyle.strokeJoin())
           : "miter";
 
+        // Decode dash array
+        let stroke_dash_array: number[] | undefined;
+        if (strokeStyle) {
+          const len = strokeStyle.strokeDashArrayLength();
+          if (len > 0) {
+            stroke_dash_array = [];
+            for (let i = 0; i < len; i++) {
+              stroke_dash_array.push(strokeStyle.strokeDashArray(i)!);
+            }
+          }
+        }
+
         return {
           stroke_width: trait.strokeWidth() ?? 0,
           stroke_cap: cap,
           stroke_join: join,
+          ...(stroke_dash_array ? { stroke_dash_array } : {}),
         };
       }
 
@@ -5325,6 +5342,9 @@ export namespace format {
               enums.STROKE_MARKER_PRESET_DECODE.get(n.markerEndShape()) ??
               "none",
             vector_network: vectorNetwork,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.VectorNode;
         }
@@ -5387,7 +5407,12 @@ export namespace format {
         }
 
         /**
-         * Decodes GroupNode (fallback).
+         * Decodes GroupNode.
+         *
+         * NOTE: The FBS `post_layout_transform` may carry a full affine
+         * matrix (scale, skew) for SVG-imported groups. The TS SDK model
+         * currently only supports rotation — scale/skew are lost here.
+         * The data is preserved in the FBS file for future use.
          */
         export function group(
           n: fbs.GroupNode,
@@ -5427,7 +5452,9 @@ export namespace format {
         const m10 = transform.m10();
         const m00 = transform.m00();
         const rotationRad = Math.atan2(m10, m00);
-        return (rotationRad * 180) / Math.PI;
+        const degrees = (rotationRad * 180) / Math.PI;
+        // Snap near-zero to exactly 0 to avoid epsilon noise
+        return Math.abs(degrees) < 1e-5 ? 0 : degrees;
       }
 
       /**
