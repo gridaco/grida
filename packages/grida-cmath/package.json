@@ -65,6 +65,7 @@
   "scripts": {
     "build": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts",
     "dev": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   }
 }

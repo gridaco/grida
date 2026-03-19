@@ -1,7 +1,12 @@
 {
   "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "moduleResolution": "node"
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true
   },
   "exclude": ["dist"]
 }

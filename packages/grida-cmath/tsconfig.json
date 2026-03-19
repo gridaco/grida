@@ -1,8 +1,18 @@
 {
   "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "noImplicitAny": true,
-    "strict": true
+    "strict": true,
+    "skipLibCheck": true,
+    "types": [
+      "vitest/globals",
+      "node"
+    ]
   },
-  "exclude": ["dist"]
+  "exclude": [
+    "dist"
+  ]
 }

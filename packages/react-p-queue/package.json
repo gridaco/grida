@@ -32,7 +32,8 @@
   "scripts": {
     "build": "tsup index.tsx --format cjs,esm --dts",
     "dev": "tsup index.tsx --format cjs,esm --dts --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "p-queue": "^7.4.1"

@@ -3,5 +3,8 @@
   "private": true,
   "dependencies": {
     "type-fest": "^4.41.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
   }
 }
