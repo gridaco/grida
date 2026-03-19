@@ -426,13 +426,13 @@ export namespace editor.config {
    * In practice, the final threshold often scales inversely with the current zoom level:
    *
    * ```ts
-   * const threshold = Math.ceil(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR / zoom);
+   * const threshold = Math.ceil(DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR / zoom);
    * ```
    *
    * At higher zoom levels, the threshold becomes smaller for more precise snapping;
    * at lower zoom levels, it grows for a smoother user experience.
    */
-  export const DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR = 5;
+  export const DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR = 5;
 
   export const DEFAULT_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
   export const DEFAULT_CANVAS_TRANSFORM_SCALE_MAX = 256;

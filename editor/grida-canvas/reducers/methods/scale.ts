@@ -275,7 +275,7 @@ function self_update_gesture_resize_scale(
       origin,
       rawMovement,
       threshold(
-        editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+        editor.config.DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR,
         draft.transform
       ),
       {
@@ -668,7 +668,7 @@ function self_update_gesture_parametric_scale(
       origin,
       rawMovement,
       threshold(
-        editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+        editor.config.DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR,
         draft.transform
       ),
       {

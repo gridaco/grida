@@ -527,7 +527,7 @@ export function on_drag_gesture_curve(
     { points: anchor_points, guides: scene.guides },
     adj_movement,
     threshold(
-      editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+      editor.config.DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR,
       draft.transform
     ),
     should_snap
@@ -644,7 +644,7 @@ export function on_drag_gesture_translate_vector_controls(
     { points: anchor_points, guides: scene.guides },
     adj_movement,
     threshold(
-      editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+      editor.config.DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR,
       draft.transform
     ),
     should_snap
