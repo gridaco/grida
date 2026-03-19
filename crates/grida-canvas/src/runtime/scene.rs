@@ -866,6 +866,130 @@ impl Renderer {
         self.queue(true);
     }
 
+    /// Mark compositor entries as stale on zoom change.
+    ///
+    /// Called by the application's `frame()` method when the camera zoom
+    /// changed. Separated from `queue()` so that the new `FrameLoop`-based
+    /// path can prepare the renderer without building a full plan eagerly.
+    pub fn invalidate_compositor_on_zoom(&mut self) {
+        if self.config.layer_compositing {
+            self.scene_cache.compositor.mark_all_stale();
+        }
+    }
+
+    /// Build a frame plan without queuing it on the renderer.
+    ///
+    /// Used by the application's unified `frame()` entry point, which
+    /// handles frame scheduling through `FrameLoop` rather than the
+    /// legacy `FrameCounter`-based path.
+    pub fn build_frame_plan(
+        &self,
+        bounds: rect::Rectangle,
+        zoom: f32,
+        stable: bool,
+        camera_change: CameraChangeKind,
+    ) -> FramePlan {
+        self.frame(bounds, zoom, stable, camera_change)
+    }
+
+    /// Flush a caller-provided plan: draw + GPU submit + compositor update.
+    ///
+    /// Returns `Some(stats)` on success, `None` if no scene is loaded.
+    /// Unlike the legacy `flush()`, this does NOT consult `FrameCounter`
+    /// — the caller (via `FrameLoop`) already decided to render.
+    pub fn flush_with_plan(&mut self, plan: FramePlan) -> Option<FrameFlushStats> {
+        let start = Instant::now();
+
+        let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) else {
+            return None;
+        };
+
+        let surface = unsafe { &mut *self.backend.get_surface() };
+        let scene = unsafe { &*scene_ptr };
+
+        let width = surface.width() as f32;
+        let height = surface.height() as f32;
+
+        // Reuse or create a downscaled offscreen for interaction rendering.
+        let interaction_scale = self.config.interaction_render_scale;
+        let use_downscale =
+            !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
+        if use_downscale {
+            let sw = (width * interaction_scale).ceil() as i32;
+            let sh = (height * interaction_scale).ceil() as i32;
+            if sw > 0 && sh > 0 && (sw, sh) != self.downscale_dims {
+                let info = skia_safe::ImageInfo::new_n32_premul((sw, sh), None);
+                self.downscale_surface = surface.new_surface(&info);
+                self.downscale_dims = (sw, sh);
+            }
+        }
+
+        let mut ds_taken = if use_downscale {
+            self.downscale_surface.take()
+        } else {
+            None
+        };
+
+        let mut canvas = surface.canvas();
+        let draw = self.draw(
+            &mut canvas,
+            &plan,
+            scene.background_color,
+            width,
+            height,
+            ds_taken.as_mut(),
+        );
+
+        if ds_taken.is_some() {
+            self.downscale_surface = ds_taken;
+        }
+
+        // Mid-frame flush
+        let mid_flush_start = Instant::now();
+        if let Some(mut gr_context) = surface.recording_context() {
+            if let Some(mut direct_context) = gr_context.as_direct_context() {
+                direct_context.flush_and_submit();
+            }
+        }
+        let mid_flush_duration = mid_flush_start.elapsed();
+
+        // Compositor update
+        let compositor_start = Instant::now();
+        if self.backend.is_gpu() {
+            let effective = self.config.layer_compositing
+                && self.config.render_policy.allows_layer_compositing();
+            if effective {
+                if plan.stable {
+                    self.update_compositor_stable(surface);
+                } else {
+                    self.update_compositor(surface);
+                }
+            }
+        }
+        let compositor_duration = compositor_start.elapsed();
+
+        let frame_duration = start.elapsed();
+
+        // Final GPU flush
+        let flush_start = Instant::now();
+        if let Some(mut gr_context) = surface.recording_context() {
+            if let Some(mut direct_context) = gr_context.as_direct_context() {
+                direct_context.flush_and_submit();
+            }
+        }
+        let flush_duration = flush_start.elapsed();
+
+        Some(FrameFlushStats {
+            frame: plan,
+            draw,
+            frame_duration,
+            flush_duration,
+            total_duration: frame_duration + flush_duration,
+            compositor_duration,
+            mid_flush_duration,
+        })
+    }
+
     /// Clear the cached scene picture.
     pub fn invalidate_cache(&mut self) {
         self.scene_cache.invalidate();

@@ -10,8 +10,8 @@ use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
+use crate::runtime::frame_loop::{FrameLoop, FrameQuality};
 use crate::sys::clock;
-use crate::sys::scheduler;
 use crate::sys::timer::TimerMgr;
 use crate::text;
 use crate::vectornetwork::VectorNetwork;
@@ -152,7 +152,6 @@ pub struct UnknownTargetApplication {
     pub(crate) clock: clock::EventLoopClock,
     pub(crate) timer: TimerMgr,
     pub(crate) clipboard: Clipboard,
-    pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) request_redraw: crate::runtime::scene::RequestRedrawCallback,
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::AnySurfaceState,
@@ -175,10 +174,8 @@ pub struct UnknownTargetApplication {
     pub(crate) devtools_rendering_show_stats: bool,
     pub(crate) devtools_rendering_show_hit_overlay: bool,
     pub(crate) devtools_rendering_show_ruler: bool,
-    pub(crate) queue_stable_debounce_millis: u64,
-
-    /// timer id for debouncing stable frame queues
-    queue_stable_timer: Option<crate::sys::timer::TimerId>,
+    /// Unified frame lifecycle controller.
+    frame_loop: FrameLoop,
 
     /// Bidirectional mapping between user string IDs and internal u64 IDs
     /// Maintained across scene loads to enable API calls with string IDs
@@ -592,7 +589,7 @@ impl UnknownTargetApplication {
         state: super::state::AnySurfaceState,
         backend: Backend,
         camera: Camera2D,
-        target_fps: u32,
+        _target_fps: u32,
         #[cfg(not(target_arch = "wasm32"))] image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         #[cfg(not(target_arch = "wasm32"))] font_rx: mpsc::UnboundedReceiver<FontMessage>,
         request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
@@ -621,7 +618,6 @@ impl UnknownTargetApplication {
             image_rx,
             #[cfg(not(target_arch = "wasm32"))]
             font_rx,
-            scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
             devtools_selection: None,
@@ -633,8 +629,7 @@ impl UnknownTargetApplication {
             devtools_rendering_show_hit_overlay: debug,
             devtools_rendering_show_ruler: debug,
             timer: TimerMgr::new(),
-            queue_stable_timer: None,
-            queue_stable_debounce_millis: 50,
+            frame_loop: FrameLoop::new(),
             id_mapping: std::collections::HashMap::new(),
             id_mapping_reverse: std::collections::HashMap::new(),
             running: true,
@@ -767,27 +762,124 @@ impl UnknownTargetApplication {
     }
 
     fn queue(&mut self) {
-        self.renderer.queue_unstable();
+        // Invalidate the frame loop — it will handle unstable/stable
+        // scheduling automatically via poll()/complete().
+        let now = self.clock.now();
+        self.frame_loop.invalidate(now);
 
-        if let Some(id) = self.queue_stable_timer.take() {
-            self.timer.cancel(id);
+        // Legacy path: also eager-queue an unstable frame on the renderer
+        // so that the existing `redraw()` flow continues to work when
+        // hosts call the old `redraw()` entry point.
+        self.renderer.queue_unstable();
+    }
+
+    /// Unified frame entry point.
+    ///
+    /// Called once per host frame (e.g. from RAF on WASM, RedrawRequested on
+    /// native). The engine decides whether to produce pixels and at what
+    /// quality. Returns `true` if a frame was rendered.
+    pub fn frame(&mut self, time: f64) -> bool {
+        // 1. Advance host clock
+        self.clock.tick(time);
+
+        // 2. Fire non-frame timers (text blink, etc.)
+        //    Timer callbacks may call invalidate() on the frame loop — that's
+        //    fine, invalidate() just sets flags.
+        self.timer.tick(self.clock.now());
+
+        // Drive the text-edit clock from the host's wall time.
+        #[cfg(target_arch = "wasm32")]
+        grida_text_edit::time::Instant::set_micros((time * 1000.0) as u64);
+
+        // 3. Process async resources (native only)
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.process_image_queue();
+            self.process_font_queue();
         }
 
-        let renderer_ptr: *mut Renderer = &mut self.renderer;
-        self.queue_stable_timer = Some(self.timer.set_timeout(
-            std::time::Duration::from_millis(self.queue_stable_debounce_millis),
-            move || unsafe {
-                (*renderer_ptr).queue_stable();
-            },
-        ));
+        // 4. Poll frame loop — should we render?
+        let now = self.clock.now();
+        let quality = match self.frame_loop.poll(now) {
+            Some(q) => q,
+            None => return false, // idle
+        };
 
-        // TODO: can't use debounce - let's try this later
-        // self.debounce(
-        //     std::time::Duration::from_millis(100),
-        //     || self.renderer.queue_stable(),
-        //     false,
-        //     true,
-        // );
+        // 5. Build plan + render
+        let __frame_start = std::time::Instant::now();
+
+        // Prepare camera change for the renderer
+        let camera_change = self.renderer.camera.change_kind();
+        if camera_change.zoom_changed() {
+            self.renderer.invalidate_compositor_on_zoom();
+        }
+
+        // Promote to stable quality when the camera didn't change — there is
+        // no reason to render at reduced resolution for non-camera
+        // invalidations (hit-test highlight, scene edits, etc.).
+        let stable = quality == FrameQuality::Stable || !camera_change.any_changed();
+
+        // Build frame plan lazily
+        let rect = self.renderer.camera.rect();
+        let zoom = self.renderer.camera.get_zoom();
+        let plan = self.renderer.build_frame_plan(rect, zoom, stable, camera_change);
+
+        // Consume the camera change so the next frame sees None
+        // (unless a new mutation occurs before then).
+        self.renderer.camera.consume_change();
+
+        // Flush (draw + GPU submit)
+        let stats = self.renderer.flush_with_plan(plan);
+
+        // 6. Stats bookkeeping — update *before* the overlay so the overlay
+        //    always shows the current frame's data (not the previous frame's).
+        //    This matters for the stable frame: it's the last frame before idle,
+        //    so the overlay text it paints is what the user sees until the next
+        //    interaction.
+        let __render_time = __frame_start.elapsed();
+        if let Some(ref stats) = stats {
+            let camera_label = match stats.frame.camera_change {
+                crate::runtime::camera::CameraChangeKind::None => "none",
+                crate::runtime::camera::CameraChangeKind::PanOnly => "pan",
+                crate::runtime::camera::CameraChangeKind::ZoomIn => "zoom-in",
+                crate::runtime::camera::CameraChangeKind::ZoomOut => "zoom-out",
+                crate::runtime::camera::CameraChangeKind::PanAndZoom => "pan+zoom",
+            };
+            let stat_string = format!(
+                "fps*: {:.0} | t: {:.2}ms | cam: {} | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | comp: {:?} ({:?} hit, {:.1}KB) | live: {:?} | res: {} | img: {} | fnt: {}",
+                1.0 / __render_time.as_secs_f64(),
+                __render_time.as_secs_f64() * 1000.0,
+                camera_label,
+                stats.total_duration.as_secs_f64() * 1000.0,
+                stats.flush_duration.as_secs_f64() * 1000.0,
+                stats.frame_duration.as_secs_f64() * 1000.0,
+                stats.frame.display_list_duration.as_secs_f64() * 1000.0,
+                stats.frame.display_list_size_estimated,
+                stats.draw.painter_duration.as_secs_f64() * 1000.0,
+                stats.draw.cache_picture_size,
+                stats.draw.cache_picture_used,
+                stats.draw.cache_geometry_size,
+                stats.draw.layer_image_cache_size,
+                stats.draw.layer_image_cache_hits,
+                stats.draw.layer_image_cache_bytes as f64 / 1024.0,
+                stats.draw.live_draw_count,
+                self.renderer.resources.len(),
+                self.renderer.images.len(),
+                self.renderer.fonts.len(),
+            );
+            self.verbose(&stat_string);
+            self.last_stats = Some(stat_string);
+        }
+
+        // 7. Draw devtools overlays (uses the just-updated last_stats)
+        let _overlay_time = self.draw_and_flush_devtools_overlay();
+
+        // 8. Complete frame in the loop
+        self.frame_loop.complete(quality);
+
+        self.last_frame_time = __frame_start;
+
+        true
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -969,10 +1061,6 @@ impl UnknownTargetApplication {
 
         let overlay_time = self.draw_and_flush_devtools_overlay();
 
-        let __sleep_start = std::time::Instant::now();
-        self.scheduler.sleep_to_maintain_fps();
-        let __sleep_time = __sleep_start.elapsed();
-
         let __total_frame_time = __frame_start.elapsed();
         let camera_label = match stats.frame.camera_change {
             crate::runtime::camera::CameraChangeKind::None => "none",
@@ -1021,7 +1109,7 @@ impl UnknownTargetApplication {
             let surface = self.state.surface_mut();
             let canvas = surface.canvas();
             if self.devtools_rendering_show_fps {
-                fps_overlay::FpsMeter::draw(&canvas, self.scheduler.average_fps());
+                fps_overlay::FpsMeter::draw(&canvas, self.clock.hz() as f32);
             }
             if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {

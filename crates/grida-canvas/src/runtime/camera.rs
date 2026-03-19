@@ -80,8 +80,10 @@ pub struct Camera2D {
     /// Maximum allowed zoom value
     pub max_zoom: f32,
 
-    /// The last time the camera was changed.
-    pub t: std::time::Instant,
+    /// The last time the camera was changed (host-time, milliseconds).
+    /// Uses `f64` instead of `std::time::Instant` to work correctly on
+    /// WASM where inter-frame scheduling must use host-provided time.
+    pub t: f64,
 }
 
 impl Camera2D {
@@ -115,7 +117,7 @@ impl Camera2D {
             },
             min_zoom: f32::MIN,
             max_zoom: f32::MAX,
-            t: std::time::Instant::now(),
+            t: 0.0,
             prev_transform: transform,
             prev_quantized_camera_transform: None,
         }
@@ -131,7 +133,7 @@ impl Camera2D {
             min_zoom,
             max_zoom,
             prev_quantized_camera_transform: None,
-            t: std::time::Instant::now(),
+            t: 0.0,
         };
         c.set_zoom(1.0);
         c
@@ -151,8 +153,10 @@ impl Camera2D {
         };
         if changed {
             self.prev_quantized_camera_transform = Some(quantized);
-
-            self.t = std::time::Instant::now();
+            // Note: `t` is no longer set here. The application should call
+            // `camera.set_time(clock.now())` after mutating the camera, so
+            // that inter-frame scheduling uses host-provided time (required
+            // for correct WASM behavior).
         }
         changed
     }
@@ -243,6 +247,12 @@ impl Camera2D {
         t.compose(&inv)
     }
 
+    /// Set the host-time timestamp (ms) for this camera change.
+    /// Should be called by the application after mutating the camera.
+    pub fn set_time(&mut self, now: f64) {
+        self.t = now;
+    }
+
     pub fn get_size(&self) -> &Size {
         &self.size
     }
@@ -301,6 +311,17 @@ impl Camera2D {
         let (cx, cy) = (self.transform.x(), self.transform.y());
         let (px, py) = (self.prev_transform.x(), self.prev_transform.y());
         cx != px || cy != py
+    }
+
+    /// Consume the pending camera change, resetting `prev_transform` to match
+    /// the current `transform`. After this call, [`change_kind`](Self::change_kind)
+    /// will return [`CameraChangeKind::None`] until the next mutation.
+    ///
+    /// This must be called once per frame **after** the change has been
+    /// processed (plan built, compositor invalidated, etc.) so that subsequent
+    /// frames don't see stale deltas.
+    pub fn consume_change(&mut self) {
+        self.prev_transform = self.transform.clone();
     }
 
     /// Classify the camera change that occurred between `prev_transform` and
