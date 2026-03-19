@@ -596,6 +596,11 @@ export namespace iofigma {
 
       /**
        * Positioning properties - IPositioning
+       *
+       * When `size` and `relativeTransform` are absent (e.g. Figma REST API
+       * responses fetched without the `geometry=paths` query parameter), falls
+       * back to `absoluteBoundingBox` for dimensions and computes insets from
+       * absolute positions relative to the parent node's absolute bounding box.
        */
       function positioning_trait(
         node:
@@ -603,7 +608,9 @@ export namespace iofigma {
           | {
               relativeTransform?: any;
               size?: any;
-            }
+              absoluteBoundingBox?: any;
+            },
+        parent?: { absoluteBoundingBox?: { x: number; y: number } | null } | null
       ): Pick<
         grida.program.nodes.ContainerNode,
         | "layout_positioning"
@@ -613,8 +620,15 @@ export namespace iofigma {
         | "layout_target_height"
         | "layout_target_aspect_ratio"
       > {
-        const szx = node.size?.x ?? 0;
-        const szy = node.size?.y ?? 0;
+        // Fallback: REST API without geometry=paths omits `size` and
+        // `relativeTransform`; use absoluteBoundingBox as the source of truth.
+        const absBox = (node as any).absoluteBoundingBox as
+          | { x: number; y: number; width: number; height: number }
+          | null
+          | undefined;
+
+        const szx = node.size?.x ?? absBox?.width ?? 0;
+        const szy = node.size?.y ?? absBox?.height ?? 0;
 
         // Align spec: use REST `preserveRatio` as the canonical flag.
         const constrained =
@@ -627,10 +641,26 @@ export namespace iofigma {
           ? cmath.aspectRatio(tar?.x ?? szx, tar?.y ?? szy, 1000)
           : undefined;
 
+        let inset_left: number;
+        let inset_top: number;
+        if (node.relativeTransform != null) {
+          inset_left = node.relativeTransform[0][2];
+          inset_top = node.relativeTransform[1][2];
+        } else if (absBox != null) {
+          // Compute relative position from absolute bounding boxes.
+          // When there is no parent, the node sits at origin in the exported scene.
+          const parentAbsBox = parent?.absoluteBoundingBox;
+          inset_left = absBox.x - (parentAbsBox?.x ?? absBox.x);
+          inset_top = absBox.y - (parentAbsBox?.y ?? absBox.y);
+        } else {
+          inset_left = 0;
+          inset_top = 0;
+        }
+
         return {
           layout_positioning: "absolute" as const,
-          layout_inset_left: node.relativeTransform?.[0][2] ?? 0,
-          layout_inset_top: node.relativeTransform?.[1][2] ?? 0,
+          layout_inset_left: inset_left,
+          layout_inset_top: inset_top,
           layout_target_width: szx,
           layout_target_height: szy,
           layout_target_aspect_ratio,
@@ -1384,7 +1414,7 @@ export namespace iofigma {
                 opacity: 1,
                 blendMode: "PASS_THROUGH",
               }),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...style_trait({}),
@@ -1404,7 +1434,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...style_trait({
@@ -1426,7 +1456,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               type: "group",
             } satisfies grida.program.nodes.GroupNode;
           }
@@ -1435,16 +1465,38 @@ export namespace iofigma {
             const figma_constraints_horizontal = node.constraints?.horizontal;
             const figma_constraints_vertical = node.constraints?.vertical;
 
-            const fixedwidth = node.size!.x;
-            const fixedheight = node.size!.y;
+            // Fallback for REST API without geometry=paths: use absoluteBoundingBox
+            const textAbsBox = node.absoluteBoundingBox;
+            const parentAbsBox = parent?.absoluteBoundingBox;
 
-            const fixedleft = node.relativeTransform![0][2];
-            const fixedtop = node.relativeTransform![1][2];
-            const fixedright = parent?.size
-              ? parent.size.x - fixedleft - fixedwidth
+            const fixedwidth =
+              node.size?.x ?? textAbsBox?.width ?? 0;
+            const fixedheight =
+              node.size?.y ?? textAbsBox?.height ?? 0;
+
+            let fixedleft: number;
+            let fixedtop: number;
+            if (node.relativeTransform != null) {
+              fixedleft = node.relativeTransform[0][2];
+              fixedtop = node.relativeTransform[1][2];
+            } else if (textAbsBox != null) {
+              fixedleft = textAbsBox.x - (parentAbsBox?.x ?? textAbsBox.x);
+              fixedtop = textAbsBox.y - (parentAbsBox?.y ?? textAbsBox.y);
+            } else {
+              fixedleft = 0;
+              fixedtop = 0;
+            }
+
+            // Compute right/bottom insets using parent size (prefer size, fall back to absBox)
+            const parentWidth =
+              parent?.size?.x ?? parentAbsBox?.width;
+            const parentHeight =
+              parent?.size?.y ?? parentAbsBox?.height;
+            const fixedright = parentWidth != null
+              ? parentWidth - fixedleft - fixedwidth
               : undefined;
-            const fixedbottom = parent?.size
-              ? parent.size.y - fixedtop - fixedheight
+            const fixedbottom = parentHeight != null
+              ? parentHeight - fixedtop - fixedheight
               : undefined;
 
             const constraints = {
@@ -1511,7 +1563,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...corner_radius_trait(node),
@@ -1523,7 +1575,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...arc_data_trait(node),
@@ -1535,7 +1587,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
@@ -1544,6 +1596,24 @@ export namespace iofigma {
             } satisfies grida.program.nodes.BooleanPathOperationNode;
           }
           case "LINE": {
+            // Fallback for REST API without geometry=paths: use absoluteBoundingBox
+            const lineAbsBox = (node as any).absoluteBoundingBox as
+              | { x: number; y: number; width: number; height: number }
+              | null
+              | undefined;
+            const lineParentAbsBox = parent?.absoluteBoundingBox;
+            let lineLeft: number;
+            let lineTop: number;
+            if (node.relativeTransform != null) {
+              lineLeft = node.relativeTransform[0][2];
+              lineTop = node.relativeTransform[1][2];
+            } else if (lineAbsBox != null) {
+              lineLeft = lineAbsBox.x - (lineParentAbsBox?.x ?? lineAbsBox.x);
+              lineTop = lineAbsBox.y - (lineParentAbsBox?.y ?? lineAbsBox.y);
+            } else {
+              lineLeft = 0;
+              lineTop = 0;
+            }
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -1551,9 +1621,9 @@ export namespace iofigma {
               ...effects_trait(node.effects),
               type: "line",
               layout_positioning: "absolute",
-              layout_inset_left: node.relativeTransform![0][2],
-              layout_inset_top: node.relativeTransform![1][2],
-              layout_target_width: node.size!.x,
+              layout_inset_left: lineLeft,
+              layout_inset_top: lineTop,
+              layout_target_width: node.size?.x ?? lineAbsBox?.width ?? 0,
               layout_target_height: 0,
             } satisfies grida.program.nodes.LineNode;
           }
@@ -1588,7 +1658,7 @@ export namespace iofigma {
                   return {
                     id: gridaId,
                     ...base_node_trait(node),
-                    ...positioning_trait(node),
+                    ...positioning_trait(node, parent),
                     ...fills_trait(node.fills, context, imageRefsUsed),
                     ...stroke_trait(node, context, imageRefsUsed),
                     ...corner_radius_trait(node),
@@ -1606,7 +1676,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               type: "group",
             } satisfies grida.program.nodes.GroupNode;
           }
@@ -1627,7 +1697,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...corner_radius_trait(node),
@@ -1640,7 +1710,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
@@ -1653,7 +1723,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node),
+              ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
