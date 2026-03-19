@@ -30,7 +30,8 @@
   },
   "scripts": {
     "build": "tsup index.ts --format cjs,esm --dts",
-    "dev": "tsup index.ts --format cjs,esm --dts --watch"
+    "dev": "tsup index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@grida/color": "workspace:*"

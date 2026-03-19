@@ -17,7 +17,8 @@
     "lint": "eslint --ext .ts,.tsx .",
     "make": "electron-forge make",
     "package": "electron-forge package",
-    "publish:prerelease": "electron-forge publish"
+    "publish:prerelease": "electron-forge publish",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "clsx": "^2.1.1",
