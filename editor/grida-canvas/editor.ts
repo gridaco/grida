@@ -732,6 +732,14 @@ class EditorDocumentStore
         () => idgen.next()
       );
 
+    // Ensure root nodes are absolutely positioned so they're draggable
+    for (const rootId of remappedRoots) {
+      const node = remapped.nodes[rootId];
+      if (node && "layout_positioning" in node) {
+        node.layout_positioning = "absolute";
+      }
+    }
+
     const packedDoc: grida.program.document.IPackedSceneDocument = {
       nodes: remapped.nodes,
       links: remapped.links,
