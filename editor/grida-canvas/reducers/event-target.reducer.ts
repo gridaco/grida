@@ -672,7 +672,7 @@ function __self_evt_on_drag(
           ),
           m,
           threshold(
-            editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+            editor.config.DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR,
             draft.transform
           )
         );
