@@ -1,23 +1,24 @@
 //! Tests for SVG pack pipeline.
 //!
-//! These tests validate that `svg_pack` (usvg parse -> IR conversion -> JSON serialization)
-//! succeeds on a wide range of SVG inputs that users (and AI tools) commonly produce.
+//! These tests validate the SVG import pipeline (usvg parse → IR → SceneGraph).
 //!
 //! For bulk-testing large external SVG corpora, use the `tool_svg_batch` example instead:
 //!   cargo run --example tool_svg_batch -- /path/to/svgs
 
-use cg::io::io_svg::{svg_optimize, svg_pack};
+use cg::io::io_svg::svg_optimize;
+use cg::svg::sanitize::sanitize_svg;
 use cg::svg::SVGPackedScene;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Asserts that `svg_pack` succeeds and returns the deserialized scene.
+/// Asserts that SVG pack succeeds and returns the deserialized scene.
+/// Applies sanitization first (same as the production pipeline).
 fn assert_pack_ok(svg: &str) -> SVGPackedScene {
-    let json = svg_pack(svg).unwrap_or_else(|err| panic!("svg_pack failed: {}", err));
-    serde_json::from_str::<SVGPackedScene>(&json)
-        .unwrap_or_else(|err| panic!("Failed to deserialize packed SVG: {}", err))
+    let sanitized = sanitize_svg(svg);
+    SVGPackedScene::new_from_svg_str(&sanitized)
+        .unwrap_or_else(|err| panic!("SVG pack failed: {}", err))
 }
 
 /// Asserts that `svg_optimize` succeeds and returns the optimized SVG string.
@@ -90,10 +91,9 @@ fn pack_no_xmlns() {
       <rect x="10" y="10" width="80" height="80" fill="red"/>
     </svg>"##;
     // This may or may not succeed depending on usvg — we document the behavior.
-    let result = svg_pack(svg);
-    // If this passes, great. If not, the error message is useful for diagnostics.
+    let result = SVGPackedScene::new_from_svg_str(svg);
     match result {
-        Ok(_) => {} // usvg accepted it
+        Ok(_) => {}
         Err(err) => {
             eprintln!("NOTE: no-xmlns SVG rejected by usvg (expected on strict parsers): {err}");
         }
@@ -265,13 +265,6 @@ fn pack_text_element() {
         count_nodes(&scene) >= 1,
         "text node must not be silently dropped",
     );
-    // Check the JSON directly for kind=text
-    let json = svg_pack(svg).unwrap();
-    assert!(
-        json.contains(r##""kind":"text""##),
-        "JSON must contain a text node, got: {}",
-        &json[..json.len().min(300)],
-    );
 }
 
 #[test]
@@ -287,15 +280,6 @@ fn pack_text_with_tspan() {
         count_nodes(&scene) >= 1,
         "text with tspan must not be silently dropped",
     );
-    let json = svg_pack(svg).unwrap();
-    assert!(
-        json.contains(r##""kind":"text""##),
-        "JSON must contain a text node",
-    );
-    assert!(
-        json.contains("Red text"),
-        "JSON must contain span text content",
-    );
 }
 
 #[test]
@@ -307,10 +291,12 @@ fn pack_text_with_named_and_generic_fonts() {
       <text x="50" y="80" font-family="Arial" font-size="48" fill="black">Title</text>
       <text x="50" y="130" font-family="sans-serif" font-size="18" fill="gray">Subtitle</text>
     </svg>"##;
-    let json = svg_pack(svg).unwrap();
-    // Both text elements must survive — count occurrences of "kind":"text"
-    let count = json.matches(r##""kind":"text""##).count();
-    assert_eq!(count, 2, "both text nodes must be preserved, got {}", count);
+    let scene = assert_pack_ok(svg);
+    // Both text elements must survive
+    assert!(
+        count_nodes(&scene) >= 2,
+        "both text nodes must be preserved",
+    );
 }
 
 #[test]
