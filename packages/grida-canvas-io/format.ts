@@ -1026,14 +1026,15 @@ export namespace format {
           );
         }
 
-        fbs.LayerTrait.startLayerTrait(builder);
-
-        // Field order: parent (required), opacity, blend_mode, mask_type, effects, layout, post_layout_transform, post_layout_transform_origin
-
         // 1. Parent (required field — use empty reference for root nodes)
+        // Must be created before startLayerTrait; FlatBuffers forbids createString inside an object block.
         if (parentReferenceOffset === undefined) {
           parentReferenceOffset = structs.parentReference(builder, "", "");
         }
+
+        fbs.LayerTrait.startLayerTrait(builder);
+
+        // Field order: parent (required), opacity, blend_mode, mask_type, effects, layout, post_layout_transform, post_layout_transform_origin
         fbs.LayerTrait.addParent(builder, parentReferenceOffset);
 
         // 2. Opacity
