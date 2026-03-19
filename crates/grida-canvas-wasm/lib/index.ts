@@ -6,10 +6,8 @@ import {
   type AddImageWithIdResult,
   type TextEditCommand,
 } from "./modules/canvas";
-import { svgtypes } from "./modules/svg-bindings";
 export {
   type Scene,
-  type svgtypes,
   type CreateImageResourceResult,
   type AddImageWithIdResult,
   type TextEditCommand,

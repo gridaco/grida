@@ -15,7 +15,7 @@ import grida from "@grida/schema";
 import kolor from "@grida/color";
 import tree from "@grida/tree";
 import type { io } from "@grida/io";
-import type { svgtypes } from "@grida/io-svg";
+
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -2711,11 +2711,6 @@ export namespace editor.api {
      * Optimize the SVG string (CSS resolution, normalization).
      */
     svgOptimize(svg: string): string | null;
-
-    /**
-     * Parse SVG into intermediate IR (used by dev tools for inspection).
-     */
-    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
 
     /**
      * Parse SVG and return `.grida` FlatBuffers bytes.

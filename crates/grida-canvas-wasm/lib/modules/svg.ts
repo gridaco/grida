@@ -2,7 +2,7 @@
 // #region: High-Level JavaScript Wrapper Functions
 // ====================================================================================================
 
-import type { svg, svgtypes } from "./svg-bindings";
+import type { svg } from "./svg-bindings";
 
 export class SVGAPI {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
@@ -66,29 +66,6 @@ export class SVGAPI {
       const result = JSON.parse(resultJson) as svg.SVGOptimizeResponse;
 
       return result;
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          message: error instanceof Error ? error.message : String(error),
-        },
-      };
-    } finally {
-      // Always clean up allocated memory
-      if (svgPtr !== null && svgLen !== null) {
-        this._free_string(svgPtr, svgLen);
-      }
-    }
-  }
-
-  pack(svg: string): svg.SVGPackResponse {
-    let svgPtr: number | null = null;
-    let svgLen: number | null = null;
-    try {
-      [svgPtr, svgLen] = this._alloc_string(svg);
-      const resultPtr = this.module._grida_svg_pack(svgPtr);
-      const resultJson = this._string_from_wasm(resultPtr);
-      return JSON.parse(resultJson);
     } catch (error) {
       return {
         success: false,

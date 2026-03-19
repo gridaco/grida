@@ -2,22 +2,13 @@ use crate::io::io_grida_fbs;
 use crate::node::schema::*;
 use crate::svg::pack;
 use crate::svg::sanitize::sanitize_svg;
-use crate::svg::{into_tree, SVGPackedScene};
+use crate::svg::into_tree;
 use std::collections::HashMap;
 
 type ErrorMessageString = String;
-type JsonString = String;
 type SvgString = String;
 
-pub fn svg_pack(svg_source: &str) -> Result<JsonString, ErrorMessageString> {
-    let sanitized = sanitize_svg(svg_source);
-    let scene = SVGPackedScene::new_from_svg_str(&sanitized)?;
-    serde_json::to_string(&scene).map_err(|err| err.to_string())
-}
-
 /// Parse SVG and return a `.grida` FlatBuffers binary.
-///
-/// This replaces the two-step pipeline (WASM `svg_pack` → JS `iosvg.convert`)
 /// with a single Rust function that produces the final `.grida` document
 /// directly, using the same FBS codec the editor already understands.
 pub fn svg_to_grida_bytes(svg_source: &str) -> Result<Vec<u8>, ErrorMessageString> {

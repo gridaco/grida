@@ -8,7 +8,7 @@ import { animateTransformTo } from "./animation";
 import { EditorFollowPlugin } from "./plugins/follow";
 import { DocumentFontManager } from "./font-manager";
 import { DocumentHistoryManager } from "./history-manager";
-import init, { svgtypes, type Scene } from "@grida/canvas-wasm";
+import init, { type Scene } from "@grida/canvas-wasm";
 import locateFile from "./backends/wasm-locate-file";
 import {
   NoopDefaultExportInterfaceProvider,
@@ -3853,15 +3853,6 @@ export class Editor
     ensureStroke: boolean = false
   ) {
     this.doc.swapFillAndStroke(node_id, ensureStroke);
-  }
-
-  public svgPack(
-    svg: string
-  ): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null {
-    if (!this.svgProvider) {
-      throw new Error("SVG interface provider is not bound");
-    }
-    return this.svgProvider.svgPack(svg);
   }
 
   public svgToDocument(svg: string): Uint8Array | null {
