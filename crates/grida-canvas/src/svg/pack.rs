@@ -129,14 +129,12 @@ impl SceneBuilder {
                 text.fill.as_ref(),
                 text.stroke.as_ref(),
                 None,
-                &text.bounds,
                 SVGTextAnchor::Start,
                 parent,
             );
         }
 
         if text.spans.len() == 1 {
-            // Single chunk — no need for a wrapping group.
             let span = &text.spans[0];
             return self.append_text_span_node(
                 span.transform.into(),
@@ -144,7 +142,6 @@ impl SceneBuilder {
                 span.fill.as_ref().or(text.fill.as_ref()),
                 span.stroke.as_ref().or(text.stroke.as_ref()),
                 span.font_size,
-                &text.bounds,
                 span.anchor,
                 parent,
             );
@@ -178,7 +175,6 @@ impl SceneBuilder {
                 span.fill.as_ref().or(text.fill.as_ref()),
                 span.stroke.as_ref().or(text.stroke.as_ref()),
                 span.font_size,
-                &text.bounds,
                 span.anchor,
                 group_parent.clone(),
             )?;
@@ -193,7 +189,6 @@ impl SceneBuilder {
         fill: Option<&SVGFillAttributes>,
         stroke: Option<&SVGStrokeAttributes>,
         font_size: Option<f32>,
-        bounds: &CGRect,
         anchor: SVGTextAnchor,
         parent: Parent,
     ) -> Result<(), String> {
@@ -203,13 +198,11 @@ impl SceneBuilder {
 
         let mut node = self.factory.create_text_span_node();
         let mut adjusted_transform = transform;
-        let mut anchor_shift = 0.0;
-        match anchor {
-            SVGTextAnchor::Start => {}
-            SVGTextAnchor::Middle => anchor_shift = bounds.width * 0.5,
-            SVGTextAnchor::End => anchor_shift = bounds.width,
-        }
-        adjusted_transform.translate(-anchor_shift, 0.0);
+        // NOTE: text-anchor shift is intentionally skipped here. We don't
+        // have per-span width from usvg, and using the whole <text> bounds
+        // would shift every chunk by the wrong amount. The chunk's x/y
+        // from usvg already accounts for the anchor via resolved positions.
+        let _ = anchor;
         if let Some(size) = font_size {
             // FIXME(svg text): baseline -> top-left conversion needs proper font metrics.
             adjusted_transform.translate(0.0, -size);

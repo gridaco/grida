@@ -105,6 +105,22 @@ impl GeometryCache {
         cache
     }
 
+    /// Check if a node's parent is a layout container (Container or ICB).
+    /// Only layout containers provide meaningful layout results; Group and
+    /// BooleanOperation parents produce synthetic fallbacks.
+    fn is_layout_container_parent(
+        parent_id: &Option<NodeId>,
+        graph: &SceneGraph,
+    ) -> bool {
+        parent_id
+            .as_ref()
+            .and_then(|pid| graph.get_node(pid).ok())
+            .map(|parent_node| {
+                matches!(parent_node, Node::Container(_) | Node::InitialContainer(_))
+            })
+            .unwrap_or(false)
+    }
+
     fn build_recursive(
         id: &NodeId,
         graph: &SceneGraph,
@@ -392,22 +408,8 @@ impl GeometryCache {
 
                 const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
 
-                // Check if this node's parent is a layout container.
-                // Same logic as the leaf-node branch: only use layout
-                // results for position when the parent actually provides
-                // a layout context. Under Group parents the layout
-                // result is synthetic and must not override the full
-                // schema transform.
-                let parent_is_layout_container = parent_id
-                    .as_ref()
-                    .and_then(|pid| graph.get_node(pid).ok())
-                    .map(|parent_node| {
-                        matches!(
-                            parent_node,
-                            Node::Container(_) | Node::InitialContainer(_)
-                        )
-                    })
-                    .unwrap_or(false);
+                let parent_is_layout_container =
+                    Self::is_layout_container_parent(&parent_id, graph);
 
                 let (local_transform, width, height) = if parent_is_layout_container {
                     let width = layout
@@ -488,20 +490,8 @@ impl GeometryCache {
                 // Check if this node's parent is a layout container (Container
                 // or ICB). Only those parents provide meaningful layout results
                 // (computed flex/block positions). Nodes under Group or
-                // BooleanOperation parents have no containing layout box, so
-                // their layout results are synthetic fallbacks — use the full
-                // schema transform directly to preserve scale, skew, and
-                // arbitrary matrix components (e.g. from SVG imports).
-                let parent_is_layout_container = parent_id
-                    .as_ref()
-                    .and_then(|pid| graph.get_node(pid).ok())
-                    .map(|parent_node| {
-                        matches!(
-                            parent_node,
-                            Node::Container(_) | Node::InitialContainer(_)
-                        )
-                    })
-                    .unwrap_or(false);
+                let parent_is_layout_container =
+                    Self::is_layout_container_parent(&parent_id, graph);
 
                 let (local_transform, width, height) = if parent_is_layout_container {
                     // Parent is a layout container: use layout result for

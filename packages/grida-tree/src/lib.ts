@@ -2379,20 +2379,20 @@ export namespace tree {
         keyMap[oldKey] = keygen(oldKey);
       }
 
-      // 2. Remap nodes
+      // 2. Remap nodes (shallow-copy to avoid mutating input)
       const nodes: Record<tree.Key, T> = {};
       for (const [oldKey, node] of Object.entries(subgraph.nodes)) {
         const newKey = keyMap[oldKey]!;
-        // If the node has an `id` property, update it
+        let mapped = node as T;
         if (
           node &&
           typeof node === "object" &&
           "id" in (node as Record<string, unknown>) &&
           typeof (node as Record<string, unknown>).id === "string"
         ) {
-          (node as Record<string, unknown>).id = newKey;
+          mapped = { ...(node as any), id: newKey } as T;
         }
-        nodes[newKey] = node as T;
+        nodes[newKey] = mapped;
       }
 
       // 3. Remap links

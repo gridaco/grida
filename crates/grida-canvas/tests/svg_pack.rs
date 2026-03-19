@@ -90,14 +90,14 @@ fn pack_no_xmlns() {
     let svg = r##"<svg width="100" height="100" viewBox="0 0 100 100">
       <rect x="10" y="10" width="80" height="80" fill="red"/>
     </svg>"##;
-    // This may or may not succeed depending on usvg — we document the behavior.
-    let result = SVGPackedScene::new_from_svg_str(svg);
-    match result {
-        Ok(_) => {}
-        Err(err) => {
-            eprintln!("NOTE: no-xmlns SVG rejected by usvg (expected on strict parsers): {err}");
-        }
-    }
+    // Production pipeline sanitizes first; test the same path.
+    let sanitized = sanitize_svg(svg);
+    let result = SVGPackedScene::new_from_svg_str(&sanitized);
+    assert!(
+        result.is_ok(),
+        "no-xmlns SVG should be accepted after sanitization: {:?}",
+        result.err()
+    );
 }
 
 #[test]

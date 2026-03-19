@@ -92,31 +92,28 @@ export class SVGAPI {
   toDocument(svg: string): Uint8Array | null {
     let svgPtr: number | null = null;
     let svgLen: number | null = null;
+    let resultPtr: number = 0;
+    let resultLen: number = 0;
     try {
       [svgPtr, svgLen] = this._alloc_string(svg);
-      const resultPtr = this.module._grida_svg_to_document(svgPtr);
+      resultPtr = this.module._grida_svg_to_document(svgPtr);
       if (resultPtr === 0) return null;
 
-      // Read length-prefixed buffer: first 4 bytes = u32 LE length
-      const heap = new Uint8Array(
-        (this.module as any).HEAPU8.buffer as ArrayBuffer
-      );
-      const len =
+      const heap: Uint8Array = this.module.HEAPU8;
+      resultLen =
         heap[resultPtr] |
         (heap[resultPtr + 1] << 8) |
         (heap[resultPtr + 2] << 16) |
         (heap[resultPtr + 3] << 24);
-      // Copy the FBS bytes out of WASM memory
-      const bytes = new Uint8Array(len);
-      bytes.set(heap.subarray(resultPtr + 4, resultPtr + 4 + len));
-
-      // Free the WASM allocation (4 bytes length prefix + payload)
-      this.module._deallocate(resultPtr, 4 + len);
-
+      const bytes = new Uint8Array(resultLen);
+      bytes.set(heap.subarray(resultPtr + 4, resultPtr + 4 + resultLen));
       return bytes;
     } catch (error) {
       return null;
     } finally {
+      if (resultPtr !== 0) {
+        this.module._deallocate(resultPtr, 4 + resultLen);
+      }
       if (svgPtr !== null && svgLen !== null) {
         this._free_string(svgPtr, svgLen);
       }

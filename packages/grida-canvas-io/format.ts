@@ -2286,12 +2286,13 @@ export namespace format {
             blend_mode: styling.decode.blendMode(lg.blendMode()),
             opacity: lg.opacity(),
             active: lg.active(),
+            // Alignment space: CENTER_LEFT=(-1,0), CENTER_RIGHT=(1,0)
             xy1: xy1Obj
               ? ([xy1Obj.x(), xy1Obj.y()] as [number, number])
-              : ([0, 0.5] as [number, number]),
+              : ([-1, 0] as [number, number]),
             xy2: xy2Obj
               ? ([xy2Obj.x(), xy2Obj.y()] as [number, number])
-              : ([1, 0.5] as [number, number]),
+              : ([1, 0] as [number, number]),
           };
         }
 

@@ -743,9 +743,9 @@ class EditorDocumentStore
     const packedDoc: grida.program.document.IPackedSceneDocument = {
       nodes: remapped.nodes,
       links: remapped.links,
-      images: {},
-      bitmaps: {},
-      properties: {},
+      images: fullDoc.images ?? {},
+      bitmaps: fullDoc.bitmaps ?? {},
+      properties: fullDoc.properties ?? {},
       scene: {
         type: "scene",
         id: "tmp",
@@ -757,12 +757,14 @@ class EditorDocumentStore
       },
     };
 
-    const ids = this.insert(
+    this.insert(
       { document: packedDoc },
       this.mstate.scene_id ?? null
     );
 
-    const rootId = ids[0];
+    // Use the first remapped root (the SVG container) — this is
+    // deterministic from the remap, unlike insert()'s return order.
+    const rootId = remappedRoots[0];
     if (!rootId) {
       throw new Error("SVG import produced no nodes");
     }

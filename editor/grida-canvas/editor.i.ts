@@ -2703,8 +2703,9 @@ export namespace editor.api {
    * Interface for SVG optimizer/parser/importer.
    *
    * All SVG processing is done in Rust via @grida/canvas-wasm.
-   * The primary import path is `svgToDocument` which produces
-   * an IPackedSceneDocument directly from the Rust pipeline.
+   * The primary import path is `svgToDocument` which returns
+   * `.grida` FlatBuffers bytes (Uint8Array). Callers decode
+   * via `io.GRID.decode()` to get a Document.
    */
   export interface IDocumentSVGInterfaceProvider {
     /**

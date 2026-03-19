@@ -1,3 +1,7 @@
+---
+format: md
+---
+
 # SVG Text Import Model
 
 Status: **Active** — describes the current import strategy.
@@ -50,7 +54,7 @@ Neither fits our goal of retaining editable text.
 
 ### The mapping
 
-```
+```text
 SVG                         Grida Scene Graph
 ─────────────────────────   ─────────────────────────────
 <text>                  →   GroupNodeRec (inherits text's transform)
