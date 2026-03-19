@@ -1030,10 +1030,11 @@ export namespace format {
 
         // Field order: parent (required), opacity, blend_mode, mask_type, effects, layout, post_layout_transform, post_layout_transform_origin
 
-        // 1. Parent (required field)
-        if (parentReferenceOffset !== undefined) {
-          fbs.LayerTrait.addParent(builder, parentReferenceOffset);
+        // 1. Parent (required field — use empty reference for root nodes)
+        if (parentReferenceOffset === undefined) {
+          parentReferenceOffset = structs.parentReference(builder, "", "");
         }
+        fbs.LayerTrait.addParent(builder, parentReferenceOffset);
 
         // 2. Opacity
         const nodeWithOpacity = node as grida.program.nodes.Node &
