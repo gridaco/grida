@@ -40,7 +40,6 @@
     "@grida/fonts": "workspace:*",
     "@grida/io": "workspace:*",
     "@grida/io-figma": "workspace:*",
-    "@grida/io-svg": "workspace:*",
     "@grida/mixed-properties": "workspace:*",
     "@grida/number-input": "workspace:*",
     "@grida/pixel-grid": "workspace:*",

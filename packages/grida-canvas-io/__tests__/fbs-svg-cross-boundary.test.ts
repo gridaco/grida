@@ -12,7 +12,7 @@
  *   pnpm vitest run fbs-cross-boundary
  */
 import { describe, it, expect } from "vitest";
-import { format } from "../../grida-canvas-io/format";
+import { format } from "../format";
 import fs from "fs";
 import path from "path";
 

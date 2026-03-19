@@ -378,9 +378,6 @@ importers:
       '@grida/io-figma':
         specifier: workspace:*
         version: link:../packages/grida-canvas-io-figma
-      '@grida/io-svg':
-        specifier: workspace:*
-        version: link:../packages/grida-canvas-io-svg
       '@grida/mixed-properties':
         specifier: workspace:*
         version: link:../packages/grida-mixed-properties
@@ -1103,25 +1100,6 @@ importers:
       '@figma/rest-api-spec':
         specifier: 0.36.0
         version: 0.36.0
-      '@grida/cg':
-        specifier: workspace:*
-        version: link:../grida-canvas-cg
-      '@grida/schema':
-        specifier: workspace:*
-        version: link:../grida-canvas-schema
-
-  packages/grida-canvas-io-svg:
-    dependencies:
-      '@grida/color':
-        specifier: workspace:*
-        version: link:../grida-canvas-color
-      '@grida/vn':
-        specifier: workspace:*
-        version: link:../grida-canvas-vn
-    devDependencies:
-      '@grida/canvas-wasm':
-        specifier: workspace:*
-        version: link:../../crates/grida-canvas-wasm
       '@grida/cg':
         specifier: workspace:*
         version: link:../grida-canvas-cg
