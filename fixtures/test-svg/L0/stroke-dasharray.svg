@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+    <title>Stroke Dasharray</title>
+    <desc>L0 test fixture for stroke-dasharray</desc>
+    <!-- Background -->
+    <rect width="600" height="600" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+        .grid { stroke: #eee; stroke-width: 1; }
+    </style>
+
+    <!-- 1. Basic Dash Arrays -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">1. Basic stroke-dasharray</text>
+
+        <!-- Even number of values: dash, gap, dash, gap... -->
+        <path d="M 0 10 L 300 10" stroke="black" stroke-width="4" stroke-dasharray="10, 5"/>
+        <text x="320" y="15" class="label">10, 5</text>
+
+        <!-- Odd number of values: gets repeated to become even (10,5,20 -> 10,5,20,10,5,20) -->
+        <path d="M 0 40 L 300 40" stroke="black" stroke-width="4" stroke-dasharray="10, 5, 20"/>
+        <text x="320" y="45" class="label">10, 5, 20 (odd length)</text>
+
+        <!-- Single value: dash and gap are the same (10 -> 10,10) -->
+        <path d="M 0 70 L 300 70" stroke="black" stroke-width="4" stroke-dasharray="10"/>
+        <text x="320" y="75" class="label">10 (single value)</text>
+    </g>
+
+    <!-- 2. Dash Offset -->
+    <g transform="translate(50, 200)">
+        <text x="0" y="-10" class="label">2. stroke-dashoffset</text>
+
+        <!-- Baseline -->
+        <path d="M 0 10 L 300 10" stroke="#ccc" stroke-width="4" stroke-dasharray="20, 10"/>
+        <text x="320" y="15" class="label">offset: 0 (reference)</text>
+
+        <!-- Positive offset shifts the pattern to the left (starts further into the pattern) -->
+        <path d="M 0 40 L 300 40" stroke="black" stroke-width="4" stroke-dasharray="20, 10"
+            stroke-dashoffset="10"/>
+        <text x="320" y="45" class="label">offset: 10</text>
+
+        <!-- Negative offset shifts the pattern to the right -->
+        <path d="M 0 70 L 300 70" stroke="black" stroke-width="4" stroke-dasharray="20, 10"
+            stroke-dashoffset="-10"/>
+        <text x="320" y="75" class="label">offset: -10</text>
+    </g>
+
+    <!-- 3. Dashes with Caps -->
+    <g transform="translate(50, 350)">
+        <text x="0" y="-10" class="label">3. Dashes with stroke-linecap</text>
+
+        <!-- Caps are applied to EVERY dash segment -->
+        <path d="M 0 10 L 300 10" stroke="black" stroke-width="10" stroke-dasharray="15, 20"
+            stroke-linecap="butt"/>
+        <text x="320" y="15" class="label">butt</text>
+
+        <path d="M 0 40 L 300 40" stroke="black" stroke-width="10" stroke-dasharray="15, 20"
+            stroke-linecap="round"/>
+        <text x="320" y="45" class="label">round</text>
+
+        <path d="M 0 70 L 300 70" stroke="black" stroke-width="10" stroke-dasharray="15, 20"
+            stroke-linecap="square"/>
+        <text x="320" y="75" class="label">square</text>
+    </g>
+
+    <!-- 4. Dashes on Complex Paths -->
+    <g transform="translate(50, 500)">
+        <text x="0" y="-10" class="label">4. Dashes on Curves and Corners</text>
+
+        <!-- Dashes wrap around corners and curves continuously -->
+        <path d="M 0 0 L 50 50 L 100 0 C 150 0, 150 50, 200 50 A 25 25 0 0 0 250 50"
+            fill="none" stroke="black" stroke-width="4" stroke-dasharray="10, 5"/>
+    </g>
+
+</svg>

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+    <title>Clip Paths</title>
+    <desc>L0 test fixture for clip-paths</desc>
+    <!-- Background -->
+    <rect width="600" height="400" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+    </style>
+
+    <defs>
+        <!-- Star path -->
+        <path id="star"
+            d="M 50 0 L 65 40 L 100 40 L 70 60 L 80 100 L 50 75 L 20 100 L 30 60 L 0 40 L 35 40 Z"/>
+
+        <!-- Clip paths with different rules -->
+        <clipPath id="evenodd-clip">
+            <use href="#star" clip-rule="evenodd"/>
+        </clipPath>
+
+        <clipPath id="nonzero-clip">
+            <use href="#star" clip-rule="nonzero"/>
+        </clipPath>
+
+        <!-- Complex clip path (multiple shapes) -->
+        <clipPath id="complex-clip">
+            <circle cx="25" cy="25" r="25"/>
+            <circle cx="75" cy="75" r="25"/>
+            <rect x="25" y="25" width="50" height="50"/>
+        </clipPath>
+    </defs>
+
+    <!-- 1. Clip Rules -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">clip-path (nonzero)</text>
+        <rect x="0" y="0" width="100" height="100" fill="orange" clip-path="url(#nonzero-clip)"/>
+        <!-- Outline to show the original shape -->
+        <use href="#star" fill="none" stroke="#ccc" stroke-width="1"/>
+    </g>
+
+    <g transform="translate(200, 50)">
+        <text x="0" y="-10" class="label">clip-path (evenodd)</text>
+        <rect x="0" y="0" width="100" height="100" fill="green" clip-path="url(#evenodd-clip)"/>
+        <!-- Outline to show the original shape -->
+        <use href="#star" fill="none" stroke="#ccc" stroke-width="1"/>
+    </g>
+
+    <!-- 2. Complex Clip Path -->
+    <g transform="translate(350, 50)">
+        <text x="0" y="-10" class="label">Multiple shapes in clipPath</text>
+        <!-- A gradient or patterned background would be better, but we'll use a striped group -->
+        <g clip-path="url(#complex-clip)">
+            <rect x="0" y="0" width="100" height="100" fill="blue"/>
+            <rect x="0" y="0" width="100" height="20" fill="lightblue"/>
+            <rect x="0" y="40" width="100" height="20" fill="lightblue"/>
+            <rect x="0" y="80" width="100" height="20" fill="lightblue"/>
+        </g>
+        <!-- Outlines to show the original shapes -->
+        <circle cx="25" cy="25" r="25" fill="none" stroke="#ccc" stroke-width="1"/>
+        <circle cx="75" cy="75" r="25" fill="none" stroke="#ccc" stroke-width="1"/>
+        <rect x="25" y="25" width="50" height="50" fill="none" stroke="#ccc" stroke-width="1"/>
+    </g>
+
+    <!-- 3. Clipping a Group -->
+    <g transform="translate(50, 200)">
+        <text x="0" y="-10" class="label">Clipping a &lt;g&gt; element</text>
+        <g clip-path="url(#star)">
+            <circle cx="30" cy="30" r="40" fill="red"/>
+            <circle cx="70" cy="70" r="40" fill="blue"/>
+        </g>
+        <use href="#star" fill="none" stroke="#ccc" stroke-width="1"/>
+    </g>
+
+</svg>

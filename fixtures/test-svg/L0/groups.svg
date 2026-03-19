@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+    <title>Groups</title>
+    <desc>L0 test fixture for groups</desc>
     <!-- Root background -->
     <rect x="0" y="0" width="400" height="300" fill="#0f172a"/>
 

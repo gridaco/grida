@@ -1,4 +1,6 @@
 <svg width="440" height="140" xmlns="http://www.w3.org/2000/svg">
+  <title>Filters Fediffuselighting</title>
+  <desc>L0 test fixture for filters-feDiffuseLighting</desc>
   <!-- No light is applied -->
   <text text-anchor="middle" x="60" y="22">No Light</text>
   <circle cx="60" cy="80" r="50" fill="green"/>

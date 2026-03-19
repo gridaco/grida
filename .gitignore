@@ -216,3 +216,4 @@ __pycache__/
 
 # AI & Tooling
 *.plan.md
+*.todo.md

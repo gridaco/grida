@@ -785,6 +785,19 @@ export namespace cg {
 
   export type LinearGradientPaint = {
     type: "linear_gradient";
+
+    /**
+     * Gradient start point in UV [0,1] space.
+     * @default [0, 0.5] (center-left)
+     */
+    xy1?: [number, number];
+
+    /**
+     * Gradient end point in UV [0,1] space.
+     * @default [1, 0.5] (center-right)
+     */
+    xy2?: [number, number];
+
     transform: AffineTransform;
     stops: Array<GradientStop>;
 

@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <title>Paint Linear Gradient 01</title>
+  <desc>L0 test fixture for paint-linear-gradient-01</desc>
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1" gradientTransform="rotate(30)">
       <stop offset="0%" stop-color="#ff0040"/>

@@ -40,13 +40,26 @@ fn handle_window_event(
         WindowEvent::PinchGesture { delta, .. } => ApplicationCommand::ZoomDelta {
             delta: *delta as f32,
         },
-        WindowEvent::MouseWheel { delta, .. } => match delta {
-            MouseScrollDelta::PixelDelta(delta) => ApplicationCommand::Pan {
-                tx: -(delta.x as f32),
-                ty: -(delta.y as f32),
-            },
-            _ => ApplicationCommand::None,
-        },
+        WindowEvent::MouseWheel { delta, .. } => {
+            if modifiers.super_key() || modifiers.control_key() {
+                // Cmd+scroll (macOS) or Ctrl+scroll → zoom, same as pinch
+                let dy = match delta {
+                    MouseScrollDelta::PixelDelta(d) => d.y as f32,
+                    MouseScrollDelta::LineDelta(_, y) => *y * 16.0,
+                };
+                let sensitivity: f32 = 0.002;
+                let zoom_delta = dy * sensitivity;
+                ApplicationCommand::ZoomDelta { delta: zoom_delta }
+            } else {
+                match delta {
+                    MouseScrollDelta::PixelDelta(delta) => ApplicationCommand::Pan {
+                        tx: -(delta.x as f32),
+                        ty: -(delta.y as f32),
+                    },
+                    _ => ApplicationCommand::None,
+                }
+            }
+        }
         _ => ApplicationCommand::None,
     }
 }

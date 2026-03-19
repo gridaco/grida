@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+    <title>Texts</title>
+    <desc>L0 test fixture for texts</desc>
     <rect x="0" y="0" width="400" height="600" fill="#0f172a"/>
 
     <g transform="translate(32 56)" fill="#e2e8f0">

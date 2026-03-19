@@ -14,14 +14,14 @@ import {
   StandaloneDocumentEditor,
   ViewportRoot,
 } from "@/grida-canvas-react";
-import grida from "@grida/schema";
-import { v4 } from "uuid";
+
+
 import { useFilePicker } from "use-file-picker";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useHotkeys } from "react-hotkeys-hook";
 import { editor } from "@/grida-canvas";
-import iosvg from "@grida/io-svg";
+import { io } from "@grida/io";
 import Link from "next/link";
 import { useEditor } from "@/grida-canvas-react";
 import { WithSize } from "@/grida-canvas-react/viewport/size";
@@ -258,50 +258,30 @@ function useIOSVGDocument(
   raw: string | undefined,
   editorInstance: GridaEditor
 ) {
-  const [conversion, setConversion] = useState<any>();
-  const [packedSceneJson, setPackedSceneJson] = useState<string>();
+  const [documentJson, setDocumentJson] = useState<string>();
 
   useEffect(() => {
     if (!raw) {
-      setConversion(undefined);
-      setPackedSceneJson(undefined);
+      setDocumentJson(undefined);
       return;
     }
 
-    const packed = editorInstance.svgPack(raw);
-
-    if (!packed) {
-      setConversion(undefined);
-      setPackedSceneJson(undefined);
+    const bytes = editorInstance.svgToDocument(raw);
+    if (!bytes) {
+      setDocumentJson(undefined);
       return;
     }
 
-    // Store packed scene JSON for display
-    setPackedSceneJson(JSON.stringify(packed, null, 2));
+    const doc = io.GRID.decode(bytes);
+    setDocumentJson(JSON.stringify(doc, null, 2));
 
-    // Use convert with the WASM-resolved SVG tree
-    const result = iosvg.convert(packed.svg, {
-      name: "SVG",
-    });
-
-    if (result) {
-      const doc =
-        grida.program.nodes.factory.packed_scene_document_to_full_document(
-          grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-            result,
-            () => v4()
-          )
-        );
-
-      editorInstance.commands.reset(
-        editor.state.init({
-          editable: true,
-          document: doc,
-        })
-      );
-    }
-    setConversion(result);
+    editorInstance.commands.reset(
+      editor.state.init({
+        editable: true,
+        document: doc,
+      })
+    );
   }, [raw, editorInstance]);
 
-  return { result: conversion, packedScene: packedSceneJson };
+  return { result: documentJson, packedScene: documentJson };
 }

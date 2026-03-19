@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+    <title>Transforms Nested</title>
+    <desc>L0 test fixture for transforms-nested</desc>
+    <!-- Root background -->
+    <rect x="0" y="0" width="500" height="500" fill="#f8fafc"/>
+
+    <!-- Grid to show base coordinate system -->
+    <g stroke="#e2e8f0" stroke-width="1">
+        <line x1="0" y1="250" x2="500" y2="250"/>
+        <line x1="250" y1="0" x2="250" y2="500"/>
+    </g>
+
+    <!-- Deeply nested transform test -->
+    <!-- Level 1: Translate to center -->
+    <g id="level-1-translate" transform="translate(250, 250)">
+        <rect x="-100" y="-100" width="200" height="200" fill="none" stroke="#ef4444"
+            stroke-width="2" stroke-dasharray="4"/>
+        <text x="-95" y="-85" fill="#ef4444" font-family="monospace" font-size="12">L1:
+            translate(250,250)</text>
+
+        <!-- Level 2: Rotate -->
+        <g id="level-2-rotate" transform="rotate(30)">
+            <rect x="-80" y="-80" width="160" height="160" fill="none" stroke="#f59e0b"
+                stroke-width="2" stroke-dasharray="4"/>
+            <text x="-75" y="-65" fill="#f59e0b" font-family="monospace" font-size="12">L2:
+                rotate(30)</text>
+
+            <!-- Level 3: Scale -->
+            <g id="level-3-scale" transform="scale(0.8, 1.2)">
+                <rect x="-60" y="-60" width="120" height="120" fill="none" stroke="#10b981"
+                    stroke-width="2" stroke-dasharray="4"/>
+                <text x="-55" y="-45" fill="#10b981" font-family="monospace" font-size="12">L3:
+                    scale(0.8,1.2)</text>
+
+                <!-- Level 4: Skew -->
+                <g id="level-4-skew" transform="skewX(-15) skewY(10)">
+                    <rect x="-40" y="-40" width="80" height="80" fill="none" stroke="#3b82f6"
+                        stroke-width="2" stroke-dasharray="4"/>
+                    <text x="-35" y="-25" fill="#3b82f6" font-family="monospace" font-size="12">L4:
+                        skew</text>
+
+                    <!-- Level 5: Matrix -->
+                    <g id="level-5-matrix" transform="matrix(1, 0.2, -0.2, 1, 10, -10)">
+                        <rect x="-20" y="-20" width="40" height="40" fill="#8b5cf6" opacity="0.8"/>
+                        <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+                        <text x="-15" y="0" fill="#ffffff" font-family="monospace" font-size="8">L5</text>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+
+    <!-- Multiple independent nested groups -->
+    <g transform="translate(100, 100)">
+        <circle cx="0" cy="0" r="20" fill="#cbd5e1"/>
+        <g transform="translate(40, 0)">
+            <circle cx="0" cy="0" r="15" fill="#94a3b8"/>
+            <g transform="translate(30, 0)">
+                <circle cx="0" cy="0" r="10" fill="#64748b"/>
+                <g transform="translate(20, 0)">
+                    <circle cx="0" cy="0" r="5" fill="#475569"/>
+                </g>
+            </g>
+        </g>
+    </g>
+
+</svg>

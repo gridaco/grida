@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="300" height="180">
+    <title>Filters Femorphology</title>
+    <desc>L0 test fixture for filters-feMorphology</desc>
     <style>
         text {
         font-family: "Geist", sans-serif;

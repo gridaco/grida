@@ -1,7 +1,7 @@
 import cmath from "@grida/cmath";
 import type { editor } from "..";
 import type { Editor } from "../editor";
-import type { Scene, svgtypes } from "@grida/canvas-wasm";
+import type { Scene } from "@grida/canvas-wasm";
 import type vn from "@grida/vn";
 import type grida from "@grida/schema";
 import type { types } from "@grida/canvas-wasm";
@@ -181,10 +181,10 @@ export class CanvasWasmSVGInterfaceProvider
     return null;
   }
 
-  svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null {
-    const res = this.surface.svgkit.pack(svg);
-    if (res.success) return res.data;
-    return null;
+  svgToDocument(
+    svg: string
+  ): Uint8Array | null {
+    return this.surface.svgkit.toDocument(svg);
   }
 }
 

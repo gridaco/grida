@@ -18716,7 +18716,12 @@ impl ::core::fmt::Debug for CanvasDocument<'_> {
 pub enum GridaFileOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
-/// Top-level wrapper (allows future multi-document bundles, signatures, etc.)
+/// Top-level root for all use cases: `.grida` files, single-scene transfers
+/// (SVG import, clipboard), and future IPC payloads.
+///
+/// FBS has no native multi-root-type support, so we keep one root type and
+/// one codec path. Introduce a new root table only when a genuinely
+/// different payload shape is needed.
 pub struct GridaFile<'a> {
   pub _tab: ::flatbuffers::Table<'a>,
 }

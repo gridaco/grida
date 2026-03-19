@@ -1276,13 +1276,29 @@ fn decode_group_node(
     layer: &fbs::LayerTrait<'_>,
     _gn: &fbs::GroupNode<'_>,
 ) -> Node {
-    let sl = decode_shape_layout(layer, lc.rotation_cos_sin);
+    // Groups carry a full affine transform (not just rotation).
+    // Read the full matrix from post_layout_transform and compose
+    // with the layout position.
+    let layout = layer.layout();
+    let (x, y) = layout.as_ref().map(decode_layout_xy).unwrap_or((0.0, 0.0));
+
+    let transform = if let Some(plt) = layer.post_layout_transform() {
+        let mut t = decode_fbs_transform(&plt);
+        // The layout position (x, y) is stored separately; fold it into
+        // the transform's translation component.
+        t.matrix[0][2] = x;
+        t.matrix[1][2] = y;
+        t
+    } else {
+        AffineTransform::new(x, y, 0.0)
+    };
+
     Node::Group(GroupNodeRec {
         active: lc.active,
         opacity: lc.opacity,
         blend_mode: lc.blend_mode,
         mask: lc.mask,
-        transform: Some(sl.transform),
+        transform: Some(transform),
     })
 }
 
@@ -2072,6 +2088,41 @@ fn encode_node<'a, A: flatbuffers::Allocator + 'a>(
         Node::TextSpan(r) => encode_text_span_node(fbb, r, node_id, parent_id, position),
         Node::BooleanOperation(r) => {
             encode_boolean_operation_node(fbb, r, node_id, parent_id, position)
+        }
+        // Path nodes store raw SVG path data; convert to VectorNode for FBS
+        Node::Path(r) => {
+            if let Some(sk_path) = skia_safe::path::Path::from_svg(&r.data) {
+                let network = crate::vectornetwork::VectorNetwork::from(&sk_path);
+                let vn_rec = VectorNodeRec {
+                    active: r.active,
+                    opacity: r.opacity,
+                    blend_mode: r.blend_mode,
+                    mask: r.mask,
+                    transform: r.transform,
+                    layout_child: r.layout_child.clone(),
+                    fills: r.fills.clone(),
+                    strokes: r.strokes.clone(),
+                    stroke_width: r.stroke_width.value_or_zero(),
+                    stroke_width_profile: None,
+                    stroke_align: r.stroke_style.stroke_align,
+                    stroke_cap: r.stroke_style.stroke_cap,
+                    stroke_join: r.stroke_style.stroke_join,
+                    stroke_miter_limit: r.stroke_style.stroke_miter_limit,
+                    stroke_dash_array: r.stroke_style.stroke_dash_array.clone(),
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    corner_radius: 0.0,
+                    effects: LayerEffects::default(),
+                    network,
+                };
+                encode_vector_node(fbb, &vn_rec, node_id, parent_id, position)
+            } else {
+                // Invalid path data — encode as unknown
+                let sys = encode_system_node_trait(fbb, node_id, "", true, false);
+                let un =
+                    fbs::UnknownNode::create(fbb, &fbs::UnknownNodeArgs { node: Some(sys) });
+                make_node_slot(fbb, fbs::Node::UnknownNode, un.as_union_value())
+            }
         }
         // Fallback: encode as UnknownNode
         _ => {
@@ -3089,7 +3140,10 @@ fn encode_group_node<'a, A: flatbuffers::Allocator + 'a>(
         Some(t) => (t.x(), t.y()),
         None => (0.0, 0.0),
     };
-    let plt = r.transform.as_ref().and_then(affine_to_rotation_transform);
+    // Groups carry the full affine transform (scale, skew, rotation) — not
+    // just rotation like shape nodes. Encode the full matrix so SVG-imported
+    // transforms (e.g. scale(0.8, 1.2)) survive the roundtrip.
+    let plt = r.transform.as_ref().map(|t| encode_affine_to_cg_transform(t));
 
     let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
     let layout = encode_shape_layout(fbb, x, y, None, None, &None);

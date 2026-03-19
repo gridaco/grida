@@ -91,7 +91,7 @@ impl SceneBuilder {
         });
         node.stroke_style.stroke_align = StrokeAlign::Center;
 
-        let gradient_bounds = Some((path.bounds.width, path.bounds.height));
+        let gradient_bounds = Some((path.bounds.x, path.bounds.y, path.bounds.width, path.bounds.height));
 
         if let Some(fill) = &path.fill {
             node.fills = Paints::new([fill.into_paint_with_opacity(gradient_bounds)]);
@@ -117,33 +117,69 @@ impl SceneBuilder {
         Ok(())
     }
 
+    /// Append a `<text>` element as a Group containing one TextSpan per chunk.
+    ///
+    /// See `docs/wg/feat-svg/text-import.md` for the model.
     fn append_text(&mut self, text: &IRSVGTextNode, parent: Parent) -> Result<(), String> {
         if text.spans.is_empty() {
-            self.append_text_span_node(
+            // Fallback: no chunks resolved — use combined text as a single span.
+            return self.append_text_span_node(
                 text.transform.into(),
                 text.text_content.as_str(),
                 text.fill.as_ref(),
                 text.stroke.as_ref(),
                 None,
-                &text.bounds,
                 SVGTextAnchor::Start,
                 parent,
-            )
-        } else {
-            for span in &text.spans {
-                self.append_text_span_node(
-                    span.transform.into(),
-                    span.text.as_str(),
-                    span.fill.as_ref().or(text.fill.as_ref()),
-                    span.stroke.as_ref().or(text.stroke.as_ref()),
-                    span.font_size,
-                    &text.bounds,
-                    span.anchor,
-                    parent.clone(),
-                )?;
-            }
-            Ok(())
+            );
         }
+
+        if text.spans.len() == 1 {
+            let span = &text.spans[0];
+            return self.append_text_span_node(
+                span.transform.into(),
+                span.text.as_str(),
+                span.fill.as_ref().or(text.fill.as_ref()),
+                span.stroke.as_ref().or(text.stroke.as_ref()),
+                span.font_size,
+                span.anchor,
+                parent,
+            );
+        }
+
+        // Multiple chunks → create a Group for the <text>, with each
+        // chunk as a TextSpan child.
+        let mut group = self.factory.create_group_node();
+        group.transform = Some(text.transform.into());
+        let group_id = self.graph.append_child(Node::Group(group), parent);
+        let group_parent = Parent::NodeId(group_id);
+
+        for span in &text.spans {
+            // Each chunk's transform already includes the text's relative
+            // transform (applied in convert_text). Since the group also
+            // carries the text transform, we need to strip it from each
+            // chunk to avoid double-application. The chunk transform is
+            // `text_relative * translate(chunk_x, chunk_y)`, so the local
+            // transform relative to the group is just `translate(chunk_x, chunk_y)`.
+            let text_affine: AffineTransform = text.transform.into();
+            let span_affine: AffineTransform = span.transform.into();
+            let local = if let Some(inv) = text_affine.inverse() {
+                inv.compose(&span_affine)
+            } else {
+                span_affine
+            };
+
+            self.append_text_span_node(
+                local,
+                span.text.as_str(),
+                span.fill.as_ref().or(text.fill.as_ref()),
+                span.stroke.as_ref().or(text.stroke.as_ref()),
+                span.font_size,
+                span.anchor,
+                group_parent.clone(),
+            )?;
+        }
+        Ok(())
     }
 
     fn append_text_span_node(
@@ -153,7 +189,6 @@ impl SceneBuilder {
         fill: Option<&SVGFillAttributes>,
         stroke: Option<&SVGStrokeAttributes>,
         font_size: Option<f32>,
-        bounds: &CGRect,
         anchor: SVGTextAnchor,
         parent: Parent,
     ) -> Result<(), String> {
@@ -163,13 +198,11 @@ impl SceneBuilder {
 
         let mut node = self.factory.create_text_span_node();
         let mut adjusted_transform = transform;
-        let mut anchor_shift = 0.0;
-        match anchor {
-            SVGTextAnchor::Start => {}
-            SVGTextAnchor::Middle => anchor_shift = bounds.width * 0.5,
-            SVGTextAnchor::End => anchor_shift = bounds.width,
-        }
-        adjusted_transform.translate(-anchor_shift, 0.0);
+        // NOTE: text-anchor shift is intentionally skipped here. We don't
+        // have per-span width from usvg, and using the whole <text> bounds
+        // would shift every chunk by the wrong amount. The chunk's x/y
+        // from usvg already accounts for the anchor via resolved positions.
+        let _ = anchor;
         if let Some(size) = font_size {
             // FIXME(svg text): baseline -> top-left conversion needs proper font metrics.
             adjusted_transform.translate(0.0, -size);

@@ -45,6 +45,9 @@ enum Command {
     Bench(BenchArgs),
     /// Run SVG reftests against W3C SVG 1.1 Test Suite.
     Reftest(reftest::ReftestArgs),
+    /// Convert SVG files to `.grida` for cross-boundary codec testing.
+    /// Output goes to `fixtures/test-svg/.generated/`.
+    SvgToGrida(SvgToGridaArgs),
 }
 
 #[derive(Args, Debug)]
@@ -77,9 +80,105 @@ async fn main() -> Result<()> {
     match cli.command {
         Some(Command::Bench(args)) => run_bench(args).await?,
         Some(Command::Reftest(args)) => reftest::run(args).await?,
+        Some(Command::SvgToGrida(args)) => run_svg_to_grida(args),
         None => run_interactive(cli.file).await?,
     }
     Ok(())
+}
+
+#[derive(Args, Debug)]
+struct SvgToGridaArgs {
+    /// Input directory containing SVG files. Defaults to `fixtures/test-svg/L0`.
+    path: Option<String>,
+    /// Recurse into subdirectories.
+    #[arg(short, long)]
+    recursive: bool,
+    /// Maximum number of SVGs to process.
+    #[arg(short = 'n', long)]
+    limit: Option<usize>,
+    /// Output directory. Defaults to `fixtures/test-svg/.generated`.
+    #[arg(short, long)]
+    output: Option<String>,
+}
+
+fn run_svg_to_grida(args: SvgToGridaArgs) {
+    use cg::io::io_svg::svg_to_grida_bytes;
+    use std::path::{Path, PathBuf};
+
+    let input_dir = PathBuf::from(
+        args.path
+            .as_deref()
+            .unwrap_or("fixtures/test-svg/L0"),
+    );
+    let output_dir = PathBuf::from(
+        args.output
+            .as_deref()
+            .unwrap_or("fixtures/test-svg/.generated"),
+    );
+
+    assert!(
+        input_dir.exists(),
+        "Input directory not found: {}",
+        input_dir.display()
+    );
+    std::fs::create_dir_all(&output_dir).expect("create output dir");
+
+    fn collect_svgs(dir: &Path, recursive: bool, out: &mut Vec<PathBuf>) {
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() && recursive {
+                collect_svgs(&path, true, out);
+            } else if path.extension().map(|e| e == "svg").unwrap_or(false) {
+                out.push(path);
+            }
+        }
+    }
+
+    let mut svgs = Vec::new();
+    collect_svgs(&input_dir, args.recursive, &mut svgs);
+    svgs.sort();
+    if let Some(n) = args.limit {
+        svgs.truncate(n);
+    }
+
+    eprintln!(
+        "Processing {} SVGs from {}",
+        svgs.len(),
+        input_dir.display()
+    );
+
+    let mut ok = 0u32;
+    let mut skip = 0u32;
+    for path in &svgs {
+        let name = path.file_stem().unwrap().to_string_lossy();
+        let svg = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("  SKIP {} — read: {}", name, e);
+                skip += 1;
+                continue;
+            }
+        };
+        match svg_to_grida_bytes(&svg) {
+            Ok(bytes) => {
+                let out = output_dir.join(format!("{}.grida", name));
+                std::fs::write(&out, &bytes).expect("write");
+                ok += 1;
+            }
+            Err(e) => {
+                eprintln!("  SKIP {} — {}", name, e);
+                skip += 1;
+            }
+        }
+    }
+    println!(
+        "\n{} converted, {} skipped → {}",
+        ok, skip, output_dir.display()
+    );
 }
 
 async fn run_bench(args: BenchArgs) -> Result<()> {

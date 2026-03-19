@@ -1026,14 +1026,16 @@ export namespace format {
           );
         }
 
+        // 1. Parent (required field — use empty reference for root nodes)
+        // Must be created before startLayerTrait; FlatBuffers forbids createString inside an object block.
+        if (parentReferenceOffset === undefined) {
+          parentReferenceOffset = structs.parentReference(builder, "", "");
+        }
+
         fbs.LayerTrait.startLayerTrait(builder);
 
         // Field order: parent (required), opacity, blend_mode, mask_type, effects, layout, post_layout_transform, post_layout_transform_origin
-
-        // 1. Parent (required field)
-        if (parentReferenceOffset !== undefined) {
-          fbs.LayerTrait.addParent(builder, parentReferenceOffset);
-        }
+        fbs.LayerTrait.addParent(builder, parentReferenceOffset);
 
         // 2. Opacity
         const nodeWithOpacity = node as grida.program.nodes.Node &
@@ -2270,15 +2272,29 @@ export namespace format {
         }
 
         /**
-         * Decodes LinearGradientPaint.
+         * Decodes LinearGradientPaint (with xy1/xy2 endpoints).
          */
         export function linearGradient(
           paintValue: unknown
         ): cg.LinearGradientPaint {
-          return decodeGradientPaint(
-            paintValue as fbs.LinearGradientPaint,
-            "linear_gradient"
-          );
+          const lg = paintValue as fbs.LinearGradientPaint;
+          const xy1Obj = lg.xy1();
+          const xy2Obj = lg.xy2();
+          return {
+            type: "linear_gradient" as const,
+            stops: decodeGradientStops(lg),
+            transform: decodeGradientTransform(lg.transform()),
+            blend_mode: styling.decode.blendMode(lg.blendMode()),
+            opacity: lg.opacity(),
+            active: lg.active(),
+            // Alignment space: CENTER_LEFT=(-1,0), CENTER_RIGHT=(1,0)
+            xy1: xy1Obj
+              ? ([xy1Obj.x(), xy1Obj.y()] as [number, number])
+              : ([-1, 0] as [number, number]),
+            xy2: xy2Obj
+              ? ([xy2Obj.x(), xy2Obj.y()] as [number, number])
+              : ([1, 0] as [number, number]),
+          };
         }
 
         /**
@@ -2517,11 +2533,12 @@ export namespace format {
       function createStrokeStyle(
         builder: Builder,
         strokeCap: cg.StrokeCap | undefined,
-        strokeJoin: cg.StrokeJoin | undefined
+        strokeJoin: cg.StrokeJoin | undefined,
+        strokeDashArray?: number[]
       ): flatbuffers.Offset {
         const dashArrayOffset = fbs.StrokeStyle.createStrokeDashArrayVector(
           builder,
-          []
+          strokeDashArray ?? []
         );
         fbs.StrokeStyle.startStrokeStyle(builder);
         fbs.StrokeStyle.addStrokeCap(
@@ -2547,12 +2564,14 @@ export namespace format {
           stroke_width?: number;
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
+          stroke_dash_array?: number[];
         }>
       ): flatbuffers.Offset {
         const strokeStyleOffset = createStrokeStyle(
           builder,
           node.stroke_cap,
-          node.stroke_join
+          node.stroke_join,
+          node.stroke_dash_array
         );
 
         // Create VariableWidthProfile (empty for now)
@@ -2996,6 +3015,7 @@ export namespace format {
         stroke_width: number;
         stroke_cap: cg.StrokeCap;
         stroke_join: cg.StrokeJoin;
+        stroke_dash_array?: number[];
       } {
         if (!trait) {
           return {
@@ -3013,10 +3033,23 @@ export namespace format {
           ? styling.decode.strokeJoin(strokeStyle.strokeJoin())
           : "miter";
 
+        // Decode dash array
+        let stroke_dash_array: number[] | undefined;
+        if (strokeStyle) {
+          const len = strokeStyle.strokeDashArrayLength();
+          if (len > 0) {
+            stroke_dash_array = [];
+            for (let i = 0; i < len; i++) {
+              stroke_dash_array.push(strokeStyle.strokeDashArray(i)!);
+            }
+          }
+        }
+
         return {
           stroke_width: trait.strokeWidth() ?? 0,
           stroke_cap: cap,
           stroke_join: join,
+          ...(stroke_dash_array ? { stroke_dash_array } : {}),
         };
       }
 
@@ -5312,6 +5345,9 @@ export namespace format {
               enums.STROKE_MARKER_PRESET_DECODE.get(n.markerEndShape()) ??
               "none",
             vector_network: vectorNetwork,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.VectorNode;
         }
@@ -5374,7 +5410,12 @@ export namespace format {
         }
 
         /**
-         * Decodes GroupNode (fallback).
+         * Decodes GroupNode.
+         *
+         * NOTE: The FBS `post_layout_transform` may carry a full affine
+         * matrix (scale, skew) for SVG-imported groups. The TS SDK model
+         * currently only supports rotation — scale/skew are lost here.
+         * The data is preserved in the FBS file for future use.
          */
         export function group(
           n: fbs.GroupNode,
@@ -5414,7 +5455,9 @@ export namespace format {
         const m10 = transform.m10();
         const m00 = transform.m00();
         const rotationRad = Math.atan2(m10, m00);
-        return (rotationRad * 180) / Math.PI;
+        const degrees = (rotationRad * 180) / Math.PI;
+        // Snap near-zero to exactly 0 to avoid epsilon noise
+        return Math.abs(degrees) < 1e-5 ? 0 : degrees;
       }
 
       /**

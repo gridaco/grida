@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="360" viewBox="0 0 240 360">
+  <title>Paint linear gradient vertical 01</title>
+  <desc>L0: vertical linear gradient (y-axis), three stops; full-rect fill.</desc>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7C3CFF"/>
+      <stop offset=".55" stop-color="#FF2D95"/>
+      <stop offset="1" stop-color="#0B0F1A"/>
+    </linearGradient>
+  </defs>
+  <rect width="240" height="360" fill="url(#g)"/>
+</svg>

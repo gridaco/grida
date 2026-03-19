@@ -1,6 +1,6 @@
 //! Batch SVG pack/optimize tester.
 //!
-//! Walks a directory (recursively) for `.svg` files and runs `svg_pack` and
+//! Walks a directory (recursively) for `.svg` files and runs SVG pack and
 //! `svg_optimize` on each one, reporting pass/fail with error details.
 //!
 //! ## Usage
@@ -27,7 +27,8 @@ use std::{
 
 use clap::Parser;
 
-use cg::io::io_svg::{svg_optimize, svg_pack};
+use cg::io::io_svg::svg_optimize;
+use cg::svg::sanitize::sanitize_svg;
 use cg::svg::SVGPackedScene;
 
 #[derive(Parser, Debug)]
@@ -48,7 +49,7 @@ struct Cli {
     #[arg(long)]
     no_optimize: bool,
 
-    /// Also test `svg_pack` on each file (the main pipeline).
+    /// Also test SVG pack on each file (the main pipeline).
     #[arg(long, default_value_t = true)]
     test_pack: bool,
 }
@@ -207,31 +208,26 @@ fn test_optimize(source: &str) -> StepResult {
 
 fn test_pack(source: &str, verbose: bool) -> StepResult {
     let start = Instant::now();
-    match svg_pack(source) {
-        Ok(json) => {
+    let sanitized = sanitize_svg(source);
+    match SVGPackedScene::new_from_svg_str(&sanitized) {
+        Ok(scene) => {
             let elapsed = start.elapsed().as_secs_f64() * 1000.0;
-            // Parse back to get stats
-            let info = match serde_json::from_str::<SVGPackedScene>(&json) {
-                Ok(scene) => {
-                    let stats = count_ir_nodes(&scene);
-                    if verbose {
-                        format!(
-                            "{}x{} | {} groups, {} paths, {} texts | {:.1}ms",
-                            scene.svg.width, scene.svg.height,
-                            stats.groups, stats.paths, stats.texts,
-                            elapsed,
-                        )
-                    } else {
-                        format!(
-                            "{}x{} nodes={} {:.1}ms",
-                            scene.svg.width,
-                            scene.svg.height,
-                            stats.total,
-                            elapsed,
-                        )
-                    }
-                }
-                Err(err) => format!("packed but failed to deserialize: {}", err),
+            let stats = count_ir_nodes(&scene);
+            let info = if verbose {
+                format!(
+                    "{}x{} | {} groups, {} paths, {} texts | {:.1}ms",
+                    scene.svg.width, scene.svg.height,
+                    stats.groups, stats.paths, stats.texts,
+                    elapsed,
+                )
+            } else {
+                format!(
+                    "{}x{} nodes={} {:.1}ms",
+                    scene.svg.width,
+                    scene.svg.height,
+                    stats.total,
+                    elapsed,
+                )
             };
             StepResult::Ok {
                 _elapsed_ms: elapsed,
