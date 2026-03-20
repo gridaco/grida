@@ -231,11 +231,15 @@ impl<'a> Painter<'a> {
         canvas.restore();
     }
 
-    /// If opacity < 1.0, wrap drawing in a save_layer_alpha; else draw directly.
-    pub fn with_opacity<F: FnOnce()>(&self, opacity: f32, f: F) {
+    /// If opacity < 1.0, wrap drawing in a bounded save_layer_alpha; else draw directly.
+    ///
+    /// Providing tight bounds limits the offscreen GPU buffer to the node's
+    /// actual extent instead of the full canvas (~100x smaller). See item 12
+    /// in `docs/wg/feat-2d/optimization.md`.
+    pub fn with_opacity<F: FnOnce()>(&self, opacity: f32, bounds: Option<&Rect>, f: F) {
         let canvas = self.canvas;
         if opacity < 1.0 {
-            canvas.save_layer_alpha(None, (opacity * 255.0) as u32);
+            canvas.save_layer_alpha(bounds.copied(), (opacity * 255.0) as u32);
             f();
             canvas.restore();
         } else {
@@ -1336,7 +1340,23 @@ impl<'a> Painter<'a> {
                             if can_fold_opacity {
                                 inner_draw();
                             } else {
-                                self.with_opacity(opacity, inner_draw);
+                                // Compute tight local bounds for the opacity
+                                // save_layer: shape rect expanded by stroke path.
+                                let mut local_bounds = shape.rect;
+                                if let Some(sp) = &shape_layer.stroke_path {
+                                    let sb = sp.bounds();
+                                    local_bounds = Rect::from_ltrb(
+                                        local_bounds.left().min(sb.left()),
+                                        local_bounds.top().min(sb.top()),
+                                        local_bounds.right().max(sb.right()),
+                                        local_bounds.bottom().max(sb.bottom()),
+                                    );
+                                }
+                                self.with_opacity(
+                                    opacity,
+                                    Some(&local_bounds),
+                                    inner_draw,
+                                );
                             }
                         };
                         self.with_optional_clip_path(clip_path.as_ref(), || {
@@ -1435,7 +1455,17 @@ impl<'a> Painter<'a> {
                             if text_can_fold {
                                 inner_text_draw();
                             } else {
-                                self.with_opacity(text_opacity, inner_text_draw);
+                                let text_bounds = Rect::from_xywh(
+                                    0.0,
+                                    y_offset,
+                                    layout_size.0,
+                                    container_height,
+                                );
+                                self.with_opacity(
+                                    text_opacity,
+                                    Some(&text_bounds),
+                                    inner_text_draw,
+                                );
                             }
                         };
 
@@ -1650,7 +1680,11 @@ impl<'a> Painter<'a> {
                             if vec_can_fold {
                                 inner_vec_draw();
                             } else {
-                                self.with_opacity(vec_opacity, inner_vec_draw);
+                                self.with_opacity(
+                                    vec_opacity,
+                                    Some(&shape.rect),
+                                    inner_vec_draw,
+                                );
                             }
                         };
                         self.with_optional_clip_path(clip_path.as_ref(), || {

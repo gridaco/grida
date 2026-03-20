@@ -165,46 +165,47 @@ Related:
       per-paint alpha changes the blend input, producing different
       compositing results than whole-node alpha.
 
-    ### When per-paint alpha is technically wrong but acceptable
+    ### Previously: heuristic-based tolerance (superseded)
 
-    - **Fills + stroke at high opacity (>0.8)** — the double-blend at
-      the stroke/fill boundary is `opacity^2` vs `opacity`. At 0.9,
-      that's 0.81 vs 0.9 — a 10% difference in a thin band. Typically
-      imperceptible.
-    - **Fills + stroke with thin stroke (1-2px)** — the overlap band
-      is sub-pixel to 2px. Hard to see at any opacity.
+    Before the non-overlapping fill path optimization, a heuristic allowed
+    per-paint alpha for thin strokes or high opacity. This has been
+    **replaced** by the exact PathOp::Difference approach, which eliminates
+    the overlap entirely and produces pixel-correct results at all opacities
+    and stroke widths. See `docs/wg/feat-2d/stroke-fill-opacity.md`.
 
     ### Decision rule for implementation
 
     ```text
     can_use_per_paint_alpha(node):
-      if node has noise effects     → NO  (always wrong)
-      if node has fills AND strokes → MAYBE (see below)
-      if node has only fills        → YES
-      if node has only strokes      → YES
-
-    fill+stroke heuristic:
-      if stroke_width <= 2.0        → YES (overlap band too thin to see)
-      if opacity >= 0.85            → YES (double-blend delta < 13%)
-      otherwise                     → NO  (use save_layer)
+      if node has noise effects       → NO  (always wrong)
+      if node has expensive effects   → NO  (shadows/blur need isolation)
+      if non-Normal blend mode        → NO  (need blend isolation)
+      if node has only fills          → YES (one draw call, no overlap)
+      if node has only strokes        → YES (one draw call, no overlap)
+      if node has fill + stroke:
+        if stroke_align == Outside    → YES (no geometric overlap)
+        if non_overlapping_fill_path  → YES (overlap eliminated by PathOp)
+        otherwise                     → NO  (PathOp failed, use save_layer)
     ```
+
+    See `docs/wg/feat-2d/stroke-fill-opacity.md` for the full spec.
 
     ### Current state in codebase
 
-    `with_opacity()` in `painter.rs:202` uses **unbounded**
-    `save_layer_alpha(None, ...)` for ALL nodes with `opacity < 1.0`.
-    The per-paint alpha optimization is **not implemented**. Even when
-    `save_layer` is needed, the missing bounds make it worse (allocates
-    a full-canvas offscreen instead of a tight rect).
+    **Implemented.** Per-paint alpha is used for all qualifying nodes:
+    fills-only, strokes-only, and fill+stroke with non-overlapping fill
+    paths. `with_opacity()` now passes tight local bounds when
+    `save_layer_alpha` is still required (effects needing opacity
+    isolation). See `docs/wg/feat-2d/stroke-fill-opacity.md`.
 
     ### Implementation priority
 
-    1. **Fills-only or strokes-only nodes** — safe, no heuristic needed,
-       large speedup. Majority of typical document nodes.
-    2. **Pass bounds to remaining `save_layer` calls** — even when
-       `save_layer` is still needed, bounded is cheaper than unbounded.
-    3. **Fill+stroke with heuristic** — optional, requires threshold
-       tuning, smaller win (most of the cost is already in tier 1).
+    1. ~~**Fills-only or strokes-only nodes**~~ — **done**. Safe, no heuristic
+       needed, large speedup. Majority of typical document nodes.
+    2. ~~**Pass bounds to remaining `save_layer` calls**~~ — **done**.
+       `with_opacity()` now computes `shape.rect ∪ stroke_path.bounds()`.
+    3. ~~**Fill+stroke with heuristic**~~ — **done**. Replaced by
+       non-overlapping fill path (PathOp::Difference). See stroke-fill-opacity.md.
 
 7. **Per-Node Image Cache (for Expensive Effect Nodes)**
 
@@ -344,6 +345,36 @@ Related:
     `draw_inner_shadow`, `render_noise_effect`, `with_clip`, `draw_backdrop_blur`,
     `draw_glass_effect`.
 
+11c. **Direct Color Paint for Single Solid Fills**
+
+    `sk_paint_stack` creates a `SkColorShader` and attaches it to the paint
+    even for the most common case: a single solid fill. The GPU backend
+    dispatches a shader program for any paint with a shader, even a trivial
+    color shader. Setting the color directly on the paint via
+    `paint.set_color()` gives Skia a simpler GPU code path.
+
+    The fast path fires when `paints.len() == 1` and the paint is
+    `Paint::Solid`. All other cases (gradients, images, multi-paint stacks)
+    fall through to the existing shader-blending path.
+
+    Applied to both `sk_paint_stack` and `sk_paint_stack_without_images`.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                        | Before      | After       | Delta   |
+    | ---------------------------- | ----------- | ----------- | ------- |
+    | flat grid (10K rects, pan)   | 10885 µs    | 9223 µs     | -15.3%  |
+    | opacity fill (5K, pan)       | 13906 µs    | 4296 µs     | -69.1%  |
+    | opacity fill+stroke (5K)     | 16416 µs    | 7462 µs     | -54.6%  |
+
+    The opacity scene improvements are amplified by the combined effect of
+    this optimization, per-paint-alpha opacity folding (item 6b), and
+    specialized primitive draw calls (item 11b). For fill-only nodes,
+    per-paint-alpha eliminates `save_layer` entirely; for fill+stroke
+    nodes with overlap, the non-overlapping fill path (PathOp::Difference)
+    achieves the same. Direct color paint further reduces per-draw overhead
+    by avoiding shader program dispatch for solid colors.
+
 12. **Tight Bounds for `save_layer` Operations**
     - First: avoid `save_layer` entirely when possible (see item 6b).
     - When required: always provide explicit bounds.
@@ -354,6 +385,12 @@ Related:
     - Critical for blend mode isolation and render surface sizing.
     - Each `save_layer` has a fixed ~57-60 µs overhead (measured).
       At scale, this dominates frame time.
+
+    **Current status:** `with_opacity()` now passes tight local bounds
+    (`shape.rect ∪ stroke_path.bounds()`) to `save_layer_alpha`. Previously
+    it passed `None` (unbounded, full-canvas offscreen). Blend mode isolation
+    (`with_blendmode`, `with_blendmode_and_opacity`) already used bounded
+    `save_layer` via `compute_blend_mode_bounds_with_stroke()`.
 
 13. **Text & Path Caching**
     - Cache laid-out paragraphs keyed by content hash + font generation.
@@ -373,20 +410,20 @@ Not all effects can be cached in isolation. The critical distinction:
 
 **Self-contained** (safe to cache):
 
-| Effect                               | Notes                                                                                       |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Fills (solid, gradient, image)       | Pure paint operations                                                                       |
-| Strokes (all variants)               | Computed from path + stroke params                                                          |
-| Drop shadows                         | Extends bounds — cached image must include expansion                                        |
-| Inner shadows                        | Clipped to shape; operates on own content only                                              |
-| Noise effects                        | Blends with fills within same surface                                                       |
-| Layer blur                           | `save_layer` with image filter — reads own buffer only                                      |
-| Opacity (fills-only or strokes-only) | Per-paint alpha — no `save_layer` needed (item 6b)                                          |
-| Opacity (fills + noise)              | Requires `save_layer` — noise compositing is wrong without isolation                        |
-| Opacity (fills + stroke)             | `save_layer` for correctness; per-paint acceptable if thin stroke or high opacity (item 6b) |
-| Opacity (2+ overlapping children)    | Requires `save_layer` via render surface (item 6)                                           |
-| Clip paths                           | Restricts visible area                                                                      |
-| Mask groups                          | Self-contained, cached as a unit                                                            |
+| Effect                               | Notes                                                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Fills (solid, gradient, image)       | Pure paint operations                                                                                               |
+| Strokes (all variants)               | Computed from path + stroke params                                                                                  |
+| Drop shadows                         | Extends bounds — cached image must include expansion                                                                |
+| Inner shadows                        | Clipped to shape; operates on own content only                                                                      |
+| Noise effects                        | Blends with fills within same surface                                                                               |
+| Layer blur                           | `save_layer` with image filter — reads own buffer only                                                              |
+| Opacity (fills-only or strokes-only) | Per-paint alpha — no `save_layer` needed (item 6b)                                                                  |
+| Opacity (fills + noise)              | Requires `save_layer` — noise compositing is wrong without isolation                                                |
+| Opacity (fills + stroke)             | Per-paint alpha via non-overlapping fill path (PathOp::Difference); `save_layer` fallback if PathOp fails (item 6b) |
+| Opacity (2+ overlapping children)    | Requires `save_layer` via render surface (item 6)                                                                   |
+| Clip paths                           | Restricts visible area                                                                                              |
+| Mask groups                          | Self-contained, cached as a unit                                                                                    |
 
 **Context-dependent** (must draw live):
 
