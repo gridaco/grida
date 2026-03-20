@@ -42,6 +42,7 @@ impl<'a> NodePainter<'a> {
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 self.painter.draw_fills(&shape, &node.fills);
                                 let stroke_width = node.render_bounds_stroke_width();
@@ -78,6 +79,7 @@ impl<'a> NodePainter<'a> {
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 // Use the single image fill directly - aligns with web development patterns
                                 // where <img> elements have one image source
@@ -121,6 +123,7 @@ impl<'a> NodePainter<'a> {
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 self.painter.draw_fills(&shape, &node.fills);
                                 self.painter.draw_strokes(
@@ -152,6 +155,7 @@ impl<'a> NodePainter<'a> {
                     &shape,
                     &node.effects,
                     &node.transform.matrix,
+                    None,
                     || {
                         self.painter.draw_strokes(
                             &shape,
@@ -193,6 +197,7 @@ impl<'a> NodePainter<'a> {
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 if !node.fills.is_empty() {
                                     self.painter.draw_fills(&shape, &node.fills);
@@ -240,6 +245,7 @@ impl<'a> NodePainter<'a> {
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 if !node.fills.is_empty() {
                                     self.painter.draw_fills(&shape, &node.fills);
@@ -278,6 +284,7 @@ impl<'a> NodePainter<'a> {
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 self.painter.draw_fills(&shape, &node.fills);
                                 self.painter.draw_strokes(
@@ -363,6 +370,7 @@ impl<'a> NodePainter<'a> {
                     &shape,
                     &node.effects,
                     &identity_transform,
+                    None,
                     || {
                         self.painter.draw_text_span(
                             &dummy_id,
@@ -459,6 +467,7 @@ impl<'a> NodePainter<'a> {
                                 &shape,
                                 &node.effects,
                                 &identity_transform,
+                                None,
                                 || {
                                     if !node.fills.is_empty() {
                                         self.painter.draw_fills(&shape, &node.fills);
@@ -551,6 +560,7 @@ impl<'a> NodePainter<'a> {
                                     &shape,
                                     &n.effects,
                                     &identity_transform,
+                                    None,
                                     || {
                                         // Paint fills first
                                         self.painter.draw_fills(&shape, &n.fills);

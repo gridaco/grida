@@ -1008,3 +1008,211 @@ fn normal_blend_elimination_pixel_accuracy() {
         &normal_alpha_path,
     );
 }
+
+/// Pixel-level accuracy test for the paint-alpha folding optimization with
+/// **both fills and strokes** at sub-unit opacity.
+///
+/// The paint-alpha fast path applies opacity independently to the fill paint
+/// and the stroke paint. For Inside strokes, the stroke geometry overlaps
+/// the fill area, so applying opacity independently yields a slightly
+/// different composite result compared to `save_layer_alpha` (which groups
+/// fill + stroke into one surface and then alpha-blends the whole surface).
+///
+/// Specifically, in the overlap region:
+/// - **save_layer_alpha**: fill and stroke compose opaquely on the offscreen
+///   surface, then the entire surface is blitted at `opacity`. The overlap
+///   region shows only the topmost paint (stroke) at `opacity`.
+/// - **paint-alpha folding**: fill is drawn at `opacity`, then stroke is drawn
+///   at `opacity` on top. The overlap region blends both, which can show
+///   a slight "fill bleed-through" artifact.
+///
+/// For Outside strokes, there is NO geometric overlap between fill and stroke,
+/// so the paint-alpha path should match save_layer_alpha exactly.
+///
+/// This test:
+/// 1. Outside strokes: verifies 0 pixel difference (exact match expected).
+/// 2. Inside strokes: measures the overlap artifact and asserts it is minimal.
+/// 3. Center strokes: measures the partial overlap artifact.
+#[test]
+fn fill_stroke_opacity_pixel_accuracy() {
+    let w = 120i32;
+    let h = 120i32;
+
+    // Helper: render a rect with fill + stroke at given opacity and stroke_align.
+    // `force_unfolded` = true adds an invisible active shadow to force the
+    // save_layer_alpha reference path (2+ save_layers, no paint-alpha folding).
+    let render = |stroke_align: StrokeAlign, opacity: f32, force_unfolded: bool| -> Vec<[u8; 4]> {
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 60.0,
+            height: 60.0,
+        };
+        rect.transform = math2::transform::AffineTransform::new(30.0, 30.0, 0.0);
+        rect.opacity = opacity;
+        rect.blend_mode = LayerBlendMode::Blend(BlendMode::Normal);
+        rect.set_fill(Paint::Solid(SolidPaint {
+            color: CGColor::from_rgba(255, 0, 0, 255), // red fill
+            blend_mode: BlendMode::Normal,
+            active: true,
+        }));
+        rect.strokes = Paints::new(vec![Paint::Solid(SolidPaint {
+            color: CGColor::from_rgba(0, 0, 255, 255), // blue stroke
+            blend_mode: BlendMode::Normal,
+            active: true,
+        })]);
+        rect.stroke_width = StrokeWidth::Uniform(8.0);
+        rect.stroke_style = StrokeStyle {
+            stroke_align,
+            stroke_cap: StrokeCap::default(),
+            stroke_join: StrokeJoin::default(),
+            stroke_miter_limit: StrokeMiterLimit::default(),
+            stroke_dash_array: None,
+        };
+
+        if force_unfolded {
+            // Invisible active shadow: forces needs_opacity_isolation() → true,
+            // which prevents can_fold_into_paint, falling back to save_layer_alpha.
+            rect.effects = LayerEffects {
+                shadows: vec![FilterShadowEffect::DropShadow(FeShadow {
+                    dx: 0.0,
+                    dy: 0.0,
+                    blur: 0.0,
+                    spread: 0.0,
+                    color: CGColor::from_rgba(0, 0, 0, 0), // fully transparent
+                    active: true,
+                })],
+                ..LayerEffects::default()
+            };
+        } else {
+            rect.effects = LayerEffects::default();
+        }
+
+        graph.append_child(Node::Rectangle(rect), Parent::Root);
+
+        let scene = Scene {
+            name: "fill_stroke_test".into(),
+            graph,
+            background_color: None,
+        };
+
+        let scene_cache = build_scene_cache(&scene);
+        let mut surface = make_surface(w, h);
+        surface.canvas().clear(skia_safe::Color::WHITE);
+
+        let store = make_store();
+        let fonts = FontRepository::new(store.clone());
+        let images = ImageRepository::new(store);
+        let policy = RenderPolicy::STANDARD;
+
+        let painter =
+            Painter::new_with_scene_cache(surface.canvas(), &fonts, &images, &scene_cache, policy);
+        painter.draw_layer_list(&scene_cache.layers);
+
+        surface_to_rgba(&mut surface, w, h)
+    };
+
+    let compare_with_report =
+        |label: &str, folded: &[[u8; 4]], reference: &[[u8; 4]], max_allowed_diff_pixels: usize| {
+            let mut max_diff = 0u8;
+            let mut diff_count = 0usize;
+            let mut diff_pixel_count = 0usize;
+
+            for (i, (a, b)) in folded.iter().zip(reference.iter()).enumerate() {
+                let mut pixel_differs = false;
+                for ch in 0..4 {
+                    let d = (a[ch] as i16 - b[ch] as i16).unsigned_abs() as u8;
+                    if d > max_diff {
+                        max_diff = d;
+                    }
+                    if d > 0 {
+                        diff_count += 1;
+                        pixel_differs = true;
+                    }
+                }
+                if pixel_differs {
+                    diff_pixel_count += 1;
+                    if diff_pixel_count <= 3 {
+                        let x = i % w as usize;
+                        let y = i / w as usize;
+                        eprintln!(
+                            "[{label}] diff pixel at ({x},{y}): folded={:?} reference={:?}",
+                            a, b
+                        );
+                    }
+                }
+            }
+
+            eprintln!(
+                "[{label}] Summary: {diff_pixel_count} differing pixels, \
+                 {diff_count} channel diffs, max_diff={max_diff}"
+            );
+
+            assert!(
+                diff_pixel_count <= max_allowed_diff_pixels,
+                "[{label}] Too many differing pixels: {diff_pixel_count} \
+                 (max allowed: {max_allowed_diff_pixels}). Max channel diff = {max_diff}."
+            );
+
+            // Even for allowed diffs, the max channel difference should be bounded.
+            // For Inside/Center strokes the overlap region can have up to ~64 diff
+            // due to independent alpha compositing vs grouped alpha compositing.
+            if diff_pixel_count > 0 {
+                assert!(
+                    max_diff <= 80,
+                    "[{label}] Channel difference too large: max_diff={max_diff} (allowed ≤ 80). \
+                     This suggests a rendering bug, not just an overlap artifact."
+                );
+            }
+        };
+
+    // ── Test 1: Outside strokes — NO overlap, should be exact match ──
+    let outside_folded = render(StrokeAlign::Outside, 0.5, false);
+    let outside_reference = render(StrokeAlign::Outside, 0.5, true);
+    compare_with_report(
+        "outside_stroke_opacity",
+        &outside_folded,
+        &outside_reference,
+        0, // exact match expected
+    );
+
+    // ── Test 2: Inside strokes — exact match via save_layer_alpha fallback ──
+    let inside_folded = render(StrokeAlign::Inside, 0.5, false);
+    let inside_reference = render(StrokeAlign::Inside, 0.5, true);
+    // Inside strokes fully overlap the fill. The painter detects this via
+    // stroke_overlaps_fill and falls back to save_layer_alpha (1 GPU surface)
+    // instead of paint-alpha folding, ensuring pixel-perfect output.
+    compare_with_report(
+        "inside_stroke_opacity",
+        &inside_folded,
+        &inside_reference,
+        0, // exact match: save_layer_alpha handles inside strokes correctly
+    );
+
+    // ── Test 3: Center strokes — exact match via save_layer_alpha fallback ──
+    let center_folded = render(StrokeAlign::Center, 0.5, false);
+    let center_reference = render(StrokeAlign::Center, 0.5, true);
+    // Center strokes partially overlap the fill (inner half). The painter
+    // detects this via stroke_overlaps_fill and falls back to save_layer_alpha.
+    // The save_layer bounds are expanded to include the stroke path geometry
+    // (via compute_blend_mode_bounds_with_stroke), so the outer half of
+    // Center strokes is not clipped. Per SVG/CSS spec and Chromium behavior.
+    compare_with_report(
+        "center_stroke_opacity",
+        &center_folded,
+        &center_reference,
+        0, // exact match: save_layer_alpha with expanded bounds handles center strokes
+    );
+
+    // ── Test 4: Verify visible pixels exist (sanity) ──
+    assert!(
+        has_visible_pixels(&outside_folded),
+        "Outside stroke folded path has no visible pixels"
+    );
+    assert!(
+        has_visible_pixels(&inside_folded),
+        "Inside stroke folded path has no visible pixels"
+    );
+}

@@ -252,6 +252,12 @@ impl<'a> Painter<'a> {
     /// - shape: Shape with bounds in LOCAL coordinates (0,0 based)
     /// - effects: Layer effects for drop shadow expansion
     /// - transform: Transform matrix to convert local bounds to world coordinates
+    /// - stroke_path: Optional stroke path for bounds expansion (Center/Outside strokes)
+    ///
+    /// When a stroke path extends beyond `shape.rect` (Center or Outside
+    /// alignment), the save_layer bounds must include the stroke geometry
+    /// to avoid clipping. Without this, `save_layer_alpha` would clip the
+    /// outer portion of Center/Outside strokes.
     ///
     /// # TODO: Move to Geometry Stage
     ///
@@ -261,13 +267,25 @@ impl<'a> Painter<'a> {
     /// redundant calculations during rendering. The geometry cache already computes `absolute_render_bounds`
     /// which includes effect expansion - blend mode isolation bounds could be added as a separate field
     /// or computed alongside render bounds.
-    fn compute_blend_mode_bounds(
+    fn compute_blend_mode_bounds_with_stroke(
         shape: &PainterShape,
         effects: &LayerEffects,
         transform: &[[f32; 3]; 2],
+        stroke_path: Option<&skia_safe::Path>,
     ) -> Rect {
         // Start with local bounds (0,0 based)
         let mut local_bounds = shape.rect;
+
+        // Expand for stroke path that extends beyond fill bounds
+        if let Some(path) = stroke_path {
+            let stroke_bounds = path.bounds();
+            local_bounds = Rect::from_ltrb(
+                local_bounds.left().min(stroke_bounds.left()),
+                local_bounds.top().min(stroke_bounds.top()),
+                local_bounds.right().max(stroke_bounds.right()),
+                local_bounds.bottom().max(stroke_bounds.bottom()),
+            );
+        }
 
         // Expand for drop shadows in local space (drawn inside blend mode isolation)
         for shadow in &effects.shadows {
@@ -344,6 +362,7 @@ impl<'a> Painter<'a> {
         shape: &PainterShape,
         effects: &LayerEffects,
         transform: &[[f32; 3]; 2],
+        stroke_path: Option<&skia_safe::Path>,
         f: F,
     ) {
         match layer_blend_mode {
@@ -356,7 +375,12 @@ impl<'a> Painter<'a> {
             }
             LayerBlendMode::Blend(blend_mode) => {
                 // Non-Normal blend modes (Multiply, Screen, etc.) need isolation.
-                let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
+                let bounds = Self::compute_blend_mode_bounds_with_stroke(
+                    shape,
+                    effects,
+                    transform,
+                    stroke_path,
+                );
 
                 let mut paint = SkPaint::default();
                 paint.set_blend_mode(blend_mode.into());
@@ -386,6 +410,7 @@ impl<'a> Painter<'a> {
         shape: &PainterShape,
         effects: &LayerEffects,
         transform: &[[f32; 3]; 2],
+        stroke_path: Option<&skia_safe::Path>,
         f: F,
     ) {
         match layer_blend_mode {
@@ -393,7 +418,12 @@ impl<'a> Painter<'a> {
                 // Normal (SrcOver) on a leaf node needs no blend isolation.
                 // Just apply opacity via save_layer_alpha if needed.
                 if opacity < 1.0 {
-                    let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
+                    let bounds = Self::compute_blend_mode_bounds_with_stroke(
+                        shape,
+                        effects,
+                        transform,
+                        stroke_path,
+                    );
                     self.canvas
                         .save_layer_alpha(bounds, (opacity * 255.0) as u32);
                     f();
@@ -404,7 +434,12 @@ impl<'a> Painter<'a> {
             }
             LayerBlendMode::Blend(blend_mode) => {
                 // Non-Normal blend modes need isolation.
-                let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
+                let bounds = Self::compute_blend_mode_bounds_with_stroke(
+                    shape,
+                    effects,
+                    transform,
+                    stroke_path,
+                );
 
                 let mut paint = SkPaint::default();
                 paint.set_blend_mode(blend_mode.into());
@@ -856,6 +891,32 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Draw fills using a custom path (instead of `shape.to_path()`) with opacity.
+    ///
+    /// Used for the non-overlapping fill path optimization: when stroke overlaps
+    /// fill (Inside/Center), we draw fills using a path with the stroke region
+    /// subtracted (PathOp::Difference). This eliminates the overlap, allowing
+    /// per-paint-alpha opacity folding without double-blending artifacts.
+    fn draw_path_fills_with_opacity(
+        &self,
+        path: &skia_safe::Path,
+        shape: &PainterShape,
+        fills: &[Paint],
+        opacity: f32,
+    ) {
+        if fills.is_empty() {
+            return;
+        }
+        if let Some(mut paint) = paint::sk_paint_stack(
+            fills,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            paint.set_alpha_f(paint.alpha_f() * opacity);
+            self.canvas.draw_path(path, &paint);
+        }
+    }
+
     pub fn draw_strokes(
         &self,
         shape: &PainterShape,
@@ -896,6 +957,28 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
         ) {
+            self.canvas.draw_path(stroke_path, &paint);
+        }
+    }
+
+    /// Draw stroke path with layer opacity baked into the paint alpha.
+    #[inline]
+    fn draw_stroke_path_with_opacity(
+        &self,
+        shape: &PainterShape,
+        stroke_path: &skia_safe::Path,
+        strokes: &[Paint],
+        opacity: f32,
+    ) {
+        if strokes.is_empty() {
+            return;
+        }
+        if let Some(mut paint) = paint::sk_paint_stack(
+            strokes,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            paint.set_alpha_f(paint.alpha_f() * opacity);
             self.canvas.draw_path(stroke_path, &paint);
         }
     }
@@ -1131,21 +1214,39 @@ impl<'a> Painter<'a> {
                 let opacity = shape_layer.base.opacity;
                 let can_fold_opacity = opacity < 1.0 && !effects.needs_opacity_isolation();
 
-                // Paint-alpha fast path: for fills-only leaf nodes with
+                // Paint-alpha fast path: for simple leaf nodes with
                 // PassThrough/Normal blend and no effects, fold opacity directly
-                // into the paint alpha — zero GPU surface allocations.
-                let has_strokes = shape_layer.stroke_path.is_some()
-                    && !shape_layer.strokes.is_empty();
+                // into each paint's alpha — zero GPU surface allocations.
+                //
+                // This eliminates save_layer_alpha, which is the #1 GPU bottleneck
+                // for semi-transparent scenes during panning.
+                //
+                // Per the SVG/CSS spec (and Chromium's implementation), node-level
+                // opacity requires group isolation: fill+stroke are drawn at full
+                // opacity into an offscreen surface, then composited at the node's
+                // opacity. Per-paint alpha is only spec-correct when there is no
+                // geometric overlap between fill and stroke.
+                //
+                // When stroke overlaps fill (Inside/Center), we use a pre-computed
+                // non-overlapping fill path (fill minus stroke via PathOp::Difference)
+                // to eliminate the overlap at zero GPU cost. If that path is
+                // unavailable (PathOp failed), we fall back to save_layer_alpha
+                // with bounds expanded to include the stroke path.
+                // See docs/wg/feat-2d/stroke-fill-opacity.md
                 let has_noises = !shape_layer.fills.is_empty() && !effects.noises.is_empty();
                 let is_simple_blend = matches!(
                     shape_layer.base.blend_mode,
                     LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal)
                 );
+                let has_stroke_fill_overlap = shape_layer.stroke_overlaps_fill
+                    && !shape_layer.fills.is_empty()
+                    && !shape_layer.strokes.is_empty();
+                let has_non_overlapping_fill = shape_layer.non_overlapping_fill_path.is_some();
                 let can_fold_into_paint = can_fold_opacity
                     && is_simple_blend
-                    && !has_strokes
                     && !has_noises
-                    && !effects.has_expensive_effects();
+                    && !effects.has_expensive_effects()
+                    && (!has_stroke_fill_overlap || has_non_overlapping_fill);
 
                 if can_fold_into_paint {
                     // Zero save_layers: opacity folded into paint alpha.
@@ -1154,11 +1255,32 @@ impl<'a> Painter<'a> {
                         let clip_path = &shape_layer.base.clip_path;
                         self.with_optional_clip_path(clip_path.as_ref(), || {
                             if self.policy.render_fills() {
-                                self.draw_fills_with_opacity(
-                                    shape,
-                                    &shape_layer.fills,
-                                    opacity,
-                                );
+                                // When stroke overlaps fill, use the pre-computed
+                                // non-overlapping fill path to avoid double-blending.
+                                if let Some(ref nof_path) = shape_layer.non_overlapping_fill_path {
+                                    self.draw_path_fills_with_opacity(
+                                        nof_path,
+                                        shape,
+                                        &shape_layer.fills,
+                                        opacity,
+                                    );
+                                } else {
+                                    self.draw_fills_with_opacity(
+                                        shape,
+                                        &shape_layer.fills,
+                                        opacity,
+                                    );
+                                }
+                            }
+                            if self.policy.render_strokes() {
+                                if let Some(path) = &shape_layer.stroke_path {
+                                    self.draw_stroke_path_with_opacity(
+                                        shape,
+                                        path,
+                                        &shape_layer.strokes,
+                                        opacity,
+                                    );
+                                }
                             }
                         });
                     });
@@ -1174,6 +1296,7 @@ impl<'a> Painter<'a> {
                             &shape_layer.shape,
                             effects,
                             &shape_layer.base.transform.matrix,
+                            shape_layer.stroke_path.as_ref(),
                             f,
                         );
                     } else {
@@ -1183,6 +1306,7 @@ impl<'a> Painter<'a> {
                             &shape_layer.shape,
                             effects,
                             &shape_layer.base.transform.matrix,
+                            shape_layer.stroke_path.as_ref(),
                             f,
                         );
                     }
@@ -1252,6 +1376,7 @@ impl<'a> Painter<'a> {
                             &text_layer.shape,
                             text_effects,
                             &text_layer.base.transform.matrix,
+                            None,
                             f,
                         );
                     } else {
@@ -1260,6 +1385,7 @@ impl<'a> Painter<'a> {
                             &text_layer.shape,
                             text_effects,
                             &text_layer.base.transform.matrix,
+                            None,
                             f,
                         );
                     }
@@ -1388,6 +1514,7 @@ impl<'a> Painter<'a> {
                             &vector_layer.shape,
                             vec_effects,
                             &vector_layer.base.transform.matrix,
+                            None,
                             f,
                         );
                     } else {
@@ -1396,6 +1523,7 @@ impl<'a> Painter<'a> {
                             &vector_layer.shape,
                             vec_effects,
                             &vector_layer.base.transform.matrix,
+                            None,
                             f,
                         );
                     }

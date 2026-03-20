@@ -78,6 +78,9 @@ struct BenchArgs {
     /// Blend mode: "passthrough" or "normal". Default: passthrough.
     #[arg(long = "blend", default_value = "passthrough")]
     blend: String,
+    /// Add strokes to synthetic shapes.
+    #[arg(long = "strokes", default_value_t = false)]
+    strokes: bool,
 }
 
 #[tokio::main]
@@ -200,7 +203,7 @@ async fn run_bench(args: BenchArgs) -> Result<()> {
     let scenes = if let Some(ref path) = args.path {
         load_scenes_from_source(path).await?
     } else {
-        vec![build_benchmark_scene(args.size, args.opacity, bench_blend)]
+        vec![build_benchmark_scene(args.size, args.opacity, bench_blend, args.strokes)]
     };
 
     if args.list_scenes {
@@ -470,7 +473,12 @@ async fn read_source_bytes(source: &str) -> Result<Vec<u8>> {
     }
 }
 
-fn build_benchmark_scene(grid: u32, opacity: f32, blend_mode: LayerBlendMode) -> Scene {
+fn build_benchmark_scene(
+    grid: u32,
+    opacity: f32,
+    blend_mode: LayerBlendMode,
+    with_strokes: bool,
+) -> Scene {
     let nf = NodeFactory::new();
     let mut graph = SceneGraph::new();
     let grid = grid.max(1);
@@ -496,12 +504,23 @@ fn build_benchmark_scene(grid: u32, opacity: f32, blend_mode: LayerBlendMode) ->
                 blend_mode: BlendMode::default(),
                 active: true,
             })]);
+            if with_strokes {
+                rect.strokes = Paints::new([Paint::Solid(SolidPaint {
+                    color: CGColor::from_rgb(50, 50, 50),
+                    blend_mode: BlendMode::default(),
+                    active: true,
+                })]);
+            }
             graph.append_child(Node::Rectangle(rect), Parent::Root);
         }
     }
 
+    let stroke_label = if with_strokes { "+strokes" } else { "" };
     Scene {
-        name: format!("Benchmark {}x{} (opacity={:.2})", grid, grid, opacity),
+        name: format!(
+            "Benchmark {}x{} (opacity={:.2}{})",
+            grid, grid, opacity, stroke_label
+        ),
         graph,
         background_color: Some(CGColor::from_rgb(250, 250, 250)),
     }

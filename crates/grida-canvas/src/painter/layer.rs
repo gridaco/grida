@@ -196,6 +196,30 @@ pub struct PainterPictureShapeLayer {
     pub marker_end_shape: StrokeMarkerPreset,
     /// Stroke width needed for decoration sizing.
     pub stroke_width: f32,
+    /// Whether the stroke geometry overlaps the fill area (Inside or Center).
+    /// When true AND both fills and strokes are present, the paint-alpha opacity
+    /// folding fast path cannot be used because applying opacity independently
+    /// to fill and stroke paints produces a visible compositing artifact in the
+    /// overlap region (double-blending, up to 64 channel diff).
+    ///
+    /// Per the SVG/CSS spec (and Chromium's implementation), node-level opacity
+    /// requires group isolation (save_layer): fill+stroke are drawn at full
+    /// opacity into an offscreen surface, then composited at the node's opacity.
+    /// Only Outside strokes have zero geometric overlap and can safely use
+    /// per-paint-alpha.
+    ///
+    /// See `docs/wg/feat-2d/stroke-fill-opacity.md`.
+    pub stroke_overlaps_fill: bool,
+    /// Pre-computed fill path with stroke region subtracted (PathOp::Difference).
+    ///
+    /// When stroke overlaps fill (Inside/Center) and both fills and strokes are
+    /// present, drawing this path instead of the full fill path eliminates the
+    /// overlap region. This allows per-paint-alpha opacity folding (zero GPU
+    /// surfaces) while producing output identical to `save_layer_alpha`.
+    ///
+    /// `None` when no overlap exists, or when PathOp fails on degenerate geometry.
+    /// In the `None` + overlap case, the painter falls back to `save_layer_alpha`.
+    pub non_overlapping_fill_path: Option<skia_safe::Path>,
 }
 
 #[derive(Debug, Clone)]
@@ -420,6 +444,30 @@ impl LayerList {
         self.layers.len()
     }
 
+    /// Compute a fill path with the stroke region subtracted (PathOp::Difference).
+    ///
+    /// Returns `Some(path)` when stroke overlaps fill and both are present.
+    /// The resulting path, drawn with per-paint-alpha opacity, produces output
+    /// identical to `save_layer_alpha` group isolation — zero overlap, zero
+    /// GPU surface allocations.
+    ///
+    /// Returns `None` if no overlap, fills/strokes are empty, or PathOp fails
+    /// (degenerate geometry). The painter falls back to `save_layer_alpha`.
+    fn compute_non_overlapping_fill_path(
+        shape: &PainterShape,
+        stroke_path: Option<&skia_safe::Path>,
+        stroke_overlaps_fill: bool,
+        fills: &Paints,
+        strokes: &Paints,
+    ) -> Option<skia_safe::Path> {
+        if !stroke_overlaps_fill || fills.is_empty() || strokes.is_empty() {
+            return None;
+        }
+        stroke_path.and_then(|sp| {
+            skia_safe::op(&shape.to_path(), sp, skia_safe::PathOp::Difference)
+        })
+    }
+
     fn flatten_node(
         id: &NodeId,
         graph: &SceneGraph,
@@ -508,6 +556,13 @@ impl LayerList {
                     (opacity, n.blend_mode)
                 };
 
+                let fills = Self::filter_visible_paints(&n.fills);
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                );
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -519,12 +574,14 @@ impl LayerList {
                     },
                     shape,
                     effects: own_effects,
-                    strokes: Self::filter_visible_paints(&n.strokes),
-                    fills: Self::filter_visible_paints(&n.fills),
+                    strokes,
+                    fills,
                     stroke_path,
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -599,6 +656,13 @@ impl LayerList {
                     } else {
                         None
                     };
+                    let fills = Self::filter_visible_paints(&n.fills);
+                    let strokes = Self::filter_visible_paints(&n.strokes);
+                    let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                    let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                        &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                    );
+
                     let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
                             id: id.clone(),
@@ -610,12 +674,14 @@ impl LayerList {
                         },
                         shape,
                         effects: Self::filter_active_effects(&n.effects),
-                        strokes: Self::filter_visible_paints(&n.strokes),
-                        fills: Self::filter_visible_paints(&n.fills),
+                        strokes,
+                        fills,
                         stroke_path,
                         marker_start_shape: StrokeMarkerPreset::None,
                         marker_end_shape: StrokeMarkerPreset::None,
                         stroke_width: 0.0,
+                        stroke_overlaps_fill,
+                        non_overlapping_fill_path,
                     });
                     out.push(LayerEntry {
                         id: id.clone(),
@@ -652,6 +718,13 @@ impl LayerList {
                     &n.size,
                     &shape,
                 );
+                let fills = Self::filter_visible_paints(&n.fills);
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                );
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -663,12 +736,14 @@ impl LayerList {
                     },
                     shape,
                     effects: Self::filter_active_effects(&n.effects),
-                    strokes: Self::filter_visible_paints(&n.strokes),
-                    fills: Self::filter_visible_paints(&n.fills),
+                    strokes,
+                    fills,
                     stroke_path,
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -699,6 +774,13 @@ impl LayerList {
                 } else {
                     None
                 };
+                let fills = Self::filter_visible_paints(&n.fills);
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                );
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -710,12 +792,14 @@ impl LayerList {
                     },
                     shape,
                     effects: Self::filter_active_effects(&n.effects),
-                    strokes: Self::filter_visible_paints(&n.strokes),
-                    fills: Self::filter_visible_paints(&n.fills),
+                    strokes,
+                    fills,
                     stroke_path,
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -746,6 +830,13 @@ impl LayerList {
                 } else {
                     None
                 };
+                let fills = Self::filter_visible_paints(&n.fills);
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                );
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -757,12 +848,14 @@ impl LayerList {
                     },
                     shape,
                     effects: Self::filter_active_effects(&n.effects),
-                    strokes: Self::filter_visible_paints(&n.strokes),
-                    fills: Self::filter_visible_paints(&n.fills),
+                    strokes,
+                    fills,
                     stroke_path,
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -793,6 +886,13 @@ impl LayerList {
                 } else {
                     None
                 };
+                let fills = Self::filter_visible_paints(&n.fills);
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                );
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -804,12 +904,14 @@ impl LayerList {
                     },
                     shape,
                     effects: Self::filter_active_effects(&n.effects),
-                    strokes: Self::filter_visible_paints(&n.strokes),
-                    fills: Self::filter_visible_paints(&n.fills),
+                    strokes,
+                    fills,
                     stroke_path,
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -840,6 +942,13 @@ impl LayerList {
                 } else {
                     None
                 };
+                let fills = Self::filter_visible_paints(&n.fills);
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                );
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -851,12 +960,14 @@ impl LayerList {
                     },
                     shape,
                     effects: Self::filter_active_effects(&n.effects),
-                    strokes: Self::filter_visible_paints(&n.strokes),
-                    fills: Self::filter_visible_paints(&n.fills),
+                    strokes,
+                    fills,
                     stroke_path,
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -927,6 +1038,8 @@ impl LayerList {
                     marker_start_shape: n.marker_start_shape,
                     marker_end_shape: n.marker_end_shape,
                     stroke_width: n.stroke_width,
+                    stroke_overlaps_fill: true,
+                    non_overlapping_fill_path: None,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -1021,6 +1134,13 @@ impl LayerList {
                 } else {
                     None
                 };
+                let fills = Self::filter_visible_paints(&n.fills);
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                );
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -1032,12 +1152,14 @@ impl LayerList {
                     },
                     shape,
                     effects: Self::filter_active_effects(&n.effects),
-                    strokes: Self::filter_visible_paints(&n.strokes),
-                    fills: Self::filter_visible_paints(&n.fills),
+                    strokes,
+                    fills,
                     stroke_path,
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -1108,6 +1230,15 @@ impl LayerList {
                 } else {
                     None
                 };
+                let fills = Self::filter_visible_paints(&Paints::new([Paint::Image(
+                    n.fill.clone(),
+                )]));
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill = !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape, stroke_path.as_ref(), stroke_overlaps_fill, &fills, &strokes,
+                );
+
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -1119,14 +1250,14 @@ impl LayerList {
                     },
                     shape,
                     effects: Self::filter_active_effects(&n.effects),
-                    strokes: Self::filter_visible_paints(&n.strokes),
-                    fills: Self::filter_visible_paints(&Paints::new([Paint::Image(
-                        n.fill.clone(),
-                    )])),
+                    strokes,
+                    fills,
                     stroke_path,
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -1160,6 +1291,8 @@ impl LayerList {
                     marker_start_shape: StrokeMarkerPreset::None,
                     marker_end_shape: StrokeMarkerPreset::None,
                     stroke_width: 0.0,
+                    stroke_overlaps_fill: false,
+                    non_overlapping_fill_path: None,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
