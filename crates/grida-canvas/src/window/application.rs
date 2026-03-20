@@ -819,6 +819,10 @@ impl UnknownTargetApplication {
         // invalidations (hit-test highlight, scene edits, etc.).
         let stable = quality == FrameQuality::Stable || !camera_change.any_changed();
 
+        // Warm the camera cache once per frame so view_matrix(), rect(), and
+        // screen_to_canvas_point() are essentially free for the rest of this frame.
+        self.renderer.camera.warm_cache();
+
         // Build frame plan lazily
         let rect = self.renderer.camera.rect();
         let zoom = self.renderer.camera.get_zoom();

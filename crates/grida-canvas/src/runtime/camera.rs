@@ -1,5 +1,5 @@
 use crate::node::schema::Size;
-use math2::{quantize, rect, rect::Rectangle, transform::AffineTransform, vector2};
+use math2::{quantize, rect::Rectangle, transform::AffineTransform, vector2};
 
 /// Classifies what changed between two consecutive camera states.
 ///
@@ -84,6 +84,22 @@ pub struct Camera2D {
     /// Uses `f64` instead of `std::time::Instant` to work correctly on
     /// WASM where inter-frame scheduling must use host-provided time.
     pub t: f64,
+
+    // ── Cached derived values ──────────────────────────────────────
+    // Avoids recomputing sqrt, inverse, atan2, sin_cos on every call.
+    // Invalidated automatically whenever the transform changes.
+
+    /// Cached zoom value (= 1 / scale_x). Updated on every zoom mutation.
+    /// Eliminates the `sqrt(a² + b²)` in `get_scale_x()` on every access.
+    cached_zoom: f32,
+
+    /// Cached view matrix. Invalidated on any transform or size change.
+    /// Eliminates repeated `inverse()` + `compose()` per frame.
+    cached_view_matrix: Option<AffineTransform>,
+
+    /// Cached inverse of the view matrix (= world_from_screen transform).
+    /// Computed alongside `cached_view_matrix`.
+    cached_view_matrix_inv: Option<AffineTransform>,
 }
 
 impl Camera2D {
@@ -120,6 +136,9 @@ impl Camera2D {
             t: 0.0,
             prev_transform: transform,
             prev_quantized_camera_transform: None,
+            cached_zoom: 1.0,
+            cached_view_matrix: None,
+            cached_view_matrix_inv: None,
         }
     }
 
@@ -134,6 +153,9 @@ impl Camera2D {
             max_zoom,
             prev_quantized_camera_transform: None,
             t: 0.0,
+            cached_zoom: 1.0,
+            cached_view_matrix: None,
+            cached_view_matrix_inv: None,
         };
         c.set_zoom(1.0);
         c
@@ -146,6 +168,10 @@ impl Camera2D {
     /// Sync the camera cache whenever the camera is changed.
     /// Returns true if the camera was changed.
     fn after_change(&mut self) -> bool {
+        // Invalidate cached derived values.
+        self.cached_view_matrix = None;
+        self.cached_view_matrix_inv = None;
+
         let quantized = self.quantized_transform();
         let changed = match self.prev_quantized_camera_transform {
             Some(prev) => prev != quantized,
@@ -179,9 +205,24 @@ impl Camera2D {
         let zoom = zoom.clamp(self.min_zoom, self.max_zoom);
         let tx = self.transform.x();
         let ty = self.transform.y();
-        let (s, c) = self.transform.rotation().sin_cos();
+        // Extract sin/cos directly from the matrix elements rather than going
+        // through atan2 → sin_cos. The current matrix is [[c*s, -s*s, tx], [s*s, c*s, ty]]
+        // where s = old_scale. We normalize by old_scale to recover (cos, sin).
+        let old_scale = 1.0 / self.cached_zoom;
+        let (sin, cos) = if old_scale > f32::EPSILON {
+            let inv_scale = 1.0 / old_scale;
+            (
+                self.transform.matrix[1][0] * inv_scale,
+                self.transform.matrix[0][0] * inv_scale,
+            )
+        } else {
+            // Fallback: degenerate scale, use atan2
+            self.transform.rotation().sin_cos()
+        };
         let scale = 1.0 / zoom;
-        self.transform.matrix = [[c * scale, -s * scale, tx], [s * scale, c * scale, ty]];
+        self.transform.matrix =
+            [[cos * scale, -sin * scale, tx], [sin * scale, cos * scale, ty]];
+        self.cached_zoom = zoom;
     }
 
     /// Set zoom factor (1 = 100%). Preserves rotation & translation.
@@ -203,20 +244,32 @@ impl Camera2D {
     }
 
     /// Get current zoom (1/scale).
+    ///
+    /// Returns the cached zoom value, avoiding the `sqrt(a² + b²)` that
+    /// `get_scale_x()` would require on every call.
+    #[inline]
     pub fn get_zoom(&self) -> f32 {
-        1.0 / self.transform.get_scale_x()
+        self.cached_zoom
     }
 
     /// Returns the camera transform quantized to the nearest visible pixel.
     pub fn quantized_transform(&self) -> AffineTransform {
-        let zoom = self.get_zoom();
+        let zoom = self.cached_zoom;
         let quant_zoom = quantize(zoom, Self::ZOOM_STEP);
 
-        // translate world-space camera position into screen space using
-        // the quantized zoom factor. This ensures snapping occurs in
-        // pixel space regardless of the zoom level or rotation.
-        let angle = self.transform.rotation();
-        let (sin, cos) = angle.sin_cos();
+        // Extract cos/sin directly from the matrix rather than going through
+        // atan2 → sin_cos. The matrix stores [[cos*scale, -sin*scale, ...], [sin*scale, cos*scale, ...]]
+        // where scale = 1/zoom.
+        let scale = 1.0 / zoom;
+        let (sin, cos) = if scale > f32::EPSILON {
+            let inv_scale = 1.0 / scale;
+            (
+                self.transform.matrix[1][0] * inv_scale,
+                self.transform.matrix[0][0] * inv_scale,
+            )
+        } else {
+            (0.0, 1.0)
+        };
 
         let tx = self.transform.x();
         let ty = self.transform.y();
@@ -236,15 +289,48 @@ impl Camera2D {
     }
 
     /// View matrix = center-screen translation × inverse(world→camera).
+    ///
+    /// Result is cached and reused until the next camera mutation.
+    #[inline]
     pub fn view_matrix(&self) -> AffineTransform {
-        let inv = self
-            .transform
-            .clone()
-            .inverse()
-            .unwrap_or_else(AffineTransform::identity);
-        let mut t = AffineTransform::identity();
-        t.translate(self.size.width * 0.5, self.size.height * 0.5);
-        t.compose(&inv)
+        if let Some(cached) = self.cached_view_matrix {
+            return cached;
+        }
+        self.compute_view_matrix()
+    }
+
+    /// Compute the view matrix without consulting the cache.
+    fn compute_view_matrix(&self) -> AffineTransform {
+        // For a camera transform [[a,c,tx],[b,d,ty]], the inverse is:
+        //   det = a*d - b*c
+        //   [[d/det, -c/det, -(d*tx - c*ty)/det],
+        //    [-b/det, a/det, (b*tx - a*ty)/det]]
+        // Then compose with translate(w/2, h/2).
+        //
+        // We inline the inverse + compose to avoid intermediate allocations
+        // and reduce FLOPs.
+        let [[a, c, tx], [b, d, ty]] = self.transform.matrix;
+        let det = a * d - b * c;
+        if det.abs() < f32::EPSILON {
+            return AffineTransform::identity();
+        }
+        let inv_det = 1.0 / det;
+        let ai = d * inv_det;
+        let bi = -b * inv_det;
+        let ci = -c * inv_det;
+        let di = a * inv_det;
+        let txi = -(ai * tx + ci * ty);
+        let tyi = -(bi * tx + di * ty);
+
+        let hw = self.size.width * 0.5;
+        let hh = self.size.height * 0.5;
+
+        // compose: translate(hw, hh) × inverse
+        // Result translation = hw + txi, hh + tyi
+        // (translate only affects tx/ty columns)
+        AffineTransform {
+            matrix: [[ai, ci, hw + txi], [bi, di, hh + tyi]],
+        }
     }
 
     /// Set the host-time timestamp (ms) for this camera change.
@@ -262,28 +348,83 @@ impl Camera2D {
         self.after_change();
     }
 
+    /// Populate the view-matrix cache so subsequent calls to `view_matrix()`,
+    /// `rect()`, and `screen_to_canvas_point()` within this frame are free.
+    ///
+    /// Call once at the start of each frame (before `draw()` / `frame()`).
+    pub fn warm_cache(&mut self) {
+        if self.cached_view_matrix.is_none() {
+            let vm = self.compute_view_matrix();
+            self.cached_view_matrix = Some(vm);
+            self.cached_view_matrix_inv = vm.inverse();
+        }
+    }
+
     /// World‐space rect currently visible.
+    ///
+    /// Computes the visible rectangle directly from the camera transform,
+    /// avoiding the double matrix inversion that the old implementation
+    /// performed (`view_matrix()` → `inverse()` → transform 4 corners).
+    ///
+    /// The inverse of `view_matrix()` is simply
+    /// `camera_transform × translate(-w/2, -h/2)`, which we compute inline.
     pub fn rect(&self) -> Rectangle {
-        let vp = Rectangle {
-            x: 0.0,
-            y: 0.0,
-            width: self.size.width,
-            height: self.size.height,
-        };
-        let inv = self
-            .view_matrix()
-            .inverse()
-            .unwrap_or_else(AffineTransform::identity);
-        rect::transform(vp, &inv)
+        // inverse(view_matrix) = transform × translate(-hw, -hh)
+        // For point (sx, sy) in screen space:
+        //   wx = a*(sx - hw) + c*(sy - hh) + tx
+        //   wy = b*(sx - hw) + d*(sy - hh) + ty
+        let [[a, c, tx], [b, d, ty]] = self.transform.matrix;
+        let hw = self.size.width * 0.5;
+        let hh = self.size.height * 0.5;
+
+        // Transform viewport corners (0,0), (w,0), (0,h), (w,h)
+        let cx0 = 0.0 - hw; // = -hw
+        let cy0 = 0.0 - hh; // = -hh
+        let cx1 = self.size.width - hw; // = hw
+        let cy1 = self.size.height - hh; // = hh
+
+        // Top-left: (cx0, cy0)
+        let x0 = a * cx0 + c * cy0 + tx;
+        let y0 = b * cx0 + d * cy0 + ty;
+        // Top-right: (cx1, cy0)
+        let x1 = a * cx1 + c * cy0 + tx;
+        let y1 = b * cx1 + d * cy0 + ty;
+        // Bottom-left: (cx0, cy1)
+        let x2 = a * cx0 + c * cy1 + tx;
+        let y2 = b * cx0 + d * cy1 + ty;
+        // Bottom-right: (cx1, cy1)
+        let x3 = a * cx1 + c * cy1 + tx;
+        let y3 = b * cx1 + d * cy1 + ty;
+
+        let min_x = x0.min(x1).min(x2).min(x3);
+        let min_y = y0.min(y1).min(y2).min(y3);
+        let max_x = x0.max(x1).max(x2).max(x3);
+        let max_y = y0.max(y1).max(y2).max(y3);
+
+        Rectangle {
+            x: min_x,
+            y: min_y,
+            width: max_x - min_x,
+            height: max_y - min_y,
+        }
     }
 
     /// Converts a screen-space point to canvas coordinates using the inverse view matrix.
+    ///
+    /// Uses the cached inverse when available, otherwise computes inline from
+    /// the camera transform (avoiding a full `view_matrix()` + `inverse()` pair).
     pub fn screen_to_canvas_point(&self, screen: vector2::Vector2) -> vector2::Vector2 {
-        let inv = self
-            .view_matrix()
-            .inverse()
-            .unwrap_or_else(AffineTransform::identity);
-        vector2::transform(screen, &inv)
+        if let Some(ref inv) = self.cached_view_matrix_inv {
+            return vector2::transform(screen, inv);
+        }
+        // Inline: inverse(view_matrix) applied to a single point.
+        // inverse(view_matrix) = transform × translate(-hw, -hh)
+        let [[a, c, tx], [b, d, ty]] = self.transform.matrix;
+        let hw = self.size.width * 0.5;
+        let hh = self.size.height * 0.5;
+        let sx = screen[0] - hw;
+        let sy = screen[1] - hh;
+        [a * sx + c * sy + tx, b * sx + d * sy + ty]
     }
 
     /// Get the current transform.
@@ -302,7 +443,17 @@ impl Camera2D {
     }
 
     pub fn has_zoom_changed(&self) -> bool {
-        self.get_zoom() != 1.0 / self.prev_transform.get_scale_x()
+        // Compare zoom values directly. The current zoom is cached;
+        // for the previous transform we still need scale extraction, but
+        // we avoid the sqrt by comparing scale_x² instead.
+        let prev_a = self.prev_transform.matrix[0][0];
+        let prev_b = self.prev_transform.matrix[1][0];
+        let prev_scale_sq = prev_a * prev_a + prev_b * prev_b;
+        let cur_scale = 1.0 / self.cached_zoom;
+        let cur_scale_sq = cur_scale * cur_scale;
+        // If scale² values differ, zoom changed. Use a relative epsilon
+        // to handle floating-point imprecision.
+        (prev_scale_sq - cur_scale_sq).abs() > f32::EPSILON * cur_scale_sq.max(1.0)
     }
 
     /// Returns `true` when translation changed between the current and previous
@@ -364,6 +515,8 @@ impl Camera2D {
     pub fn set_transform(&mut self, transform: AffineTransform) -> bool {
         self.before_change();
         self.transform = transform;
+        // Recompute cached zoom from the new transform's scale.
+        self.cached_zoom = 1.0 / self.transform.get_scale_x();
         self.after_change()
     }
 }
