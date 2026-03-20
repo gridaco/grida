@@ -275,6 +275,74 @@ impl Renderer {
         }
     }
 
+    /// Pre-extract blit data for all promoted nodes.
+    ///
+    /// Iterates through the promoted node list and extracts the image,
+    /// source rect, destination rect, opacity, and blend mode for each node.
+    /// The resulting map is passed to the Painter so it can blit promoted
+    /// nodes inline at their correct z-position in the render command tree.
+    fn build_promoted_blits(
+        &mut self,
+        plan: &FramePlan,
+    ) -> (
+        std::collections::HashMap<NodeId, crate::painter::PromotedBlit>,
+        usize,
+    ) {
+        let mut blits = std::collections::HashMap::new();
+        let mut cache_hits = 0usize;
+
+        for id in &plan.promoted {
+            if let Some(layer_img) = self.scene_cache.compositor.get(id) {
+                let b = &layer_img.local_bounds;
+                let dst_rect = Rect::from_xywh(b.x, b.y, b.width, b.height);
+                let opacity = layer_img.opacity;
+                let cg_blend: crate::cg::types::BlendMode = layer_img.blend_mode.into();
+                let sk_blend: skia_safe::BlendMode = cg_blend.into();
+
+                let blit = if layer_img.is_atlas_backed() {
+                    // Atlas path: same-texture sub-rect blit.
+                    if let Some((atlas_image, src_rect)) =
+                        self.compositor_atlas.get_image_and_src_rect(id)
+                    {
+                        Some(crate::painter::PromotedBlit {
+                            image: std::rc::Rc::new(atlas_image.clone()),
+                            src_rect,
+                            dst_rect,
+                            opacity,
+                            blend_mode: sk_blend,
+                        })
+                    } else {
+                        None
+                    }
+                } else if let Some(img) = layer_img.individual_image() {
+                    // Individual texture path.
+                    let src_rect = Rect::new(
+                        0.0,
+                        0.0,
+                        img.width() as f32,
+                        img.height() as f32,
+                    );
+                    Some(crate::painter::PromotedBlit {
+                        image: std::rc::Rc::clone(img),
+                        src_rect,
+                        dst_rect,
+                        opacity,
+                        blend_mode: sk_blend,
+                    })
+                } else {
+                    None
+                };
+
+                if let Some(blit) = blit {
+                    blits.insert(*id, blit);
+                    cache_hits += 1;
+                }
+            }
+        }
+
+        (blits, cache_hits)
+    }
+
     #[inline]
     fn draw_layers_with_scene_cache(&mut self, canvas: &Canvas, plan: &FramePlan) -> usize {
         self.draw_layers_with_scene_cache_skip(canvas, plan, None)
@@ -284,7 +352,7 @@ impl Renderer {
         &mut self,
         canvas: &Canvas,
         plan: &FramePlan,
-        promoted_skip: Option<&std::collections::HashSet<NodeId>>,
+        promoted_blits: Option<&std::collections::HashMap<NodeId, crate::painter::PromotedBlit>>,
     ) -> usize {
         // Select effect quality based on frame stability.
         // Unstable (interactive) frames use reduced effects for performance.
@@ -304,8 +372,8 @@ impl Renderer {
             &self.scene_cache,
             policy,
         );
-        let painter = if let Some(skip) = promoted_skip {
-            painter.with_promoted_skip(skip)
+        let painter = if let Some(blits) = promoted_blits {
+            painter.with_promoted_blits(blits)
         } else {
             painter
         };
@@ -1303,76 +1371,20 @@ impl Renderer {
         // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // Draw promoted nodes from the layer compositing cache.
-        // Each cached image is blitted at its world-space render bounds.
-        // The camera view matrix (already applied to canvas) handles zoom.
-        // Opacity and blend mode are stored in LayerImage at capture time.
-        //
-        // Atlas-backed nodes use same-texture sub-rect draws (batch-friendly,
-        // eliminates GPU texture switching). Individual-backed nodes use
-        // per-node texture blits as fallback.
-        let mut layer_image_cache_hits = 0usize;
-        let promoted_set: std::collections::HashSet<NodeId> =
-            plan.promoted.iter().copied().collect();
-        if !plan.promoted.is_empty() {
-            for id in &plan.promoted {
-                if let Some(layer_img) = self.scene_cache.compositor.get(id) {
-                    let b = &layer_img.local_bounds;
-                    let dst = Rect::from_xywh(b.x, b.y, b.width, b.height);
-                    let mut paint = SkPaint::default();
-                    if layer_img.opacity < 1.0 {
-                        paint.set_alpha_f(layer_img.opacity);
-                    }
-                    let cg_blend: crate::cg::types::BlendMode = layer_img.blend_mode.into();
-                    let sk_blend: skia_safe::BlendMode = cg_blend.into();
-                    paint.set_blend_mode(sk_blend);
+        // Build promoted blit map: pre-extract image data for compositor-
+        // cached nodes. The Painter will blit these inline at their correct
+        // z-position in the render command tree, preserving proper z-order
+        // when a live parent (e.g. Container with fills) has promoted children.
+        let (promoted_blits, layer_image_cache_hits) = self.build_promoted_blits(plan);
 
-                    if layer_img.is_atlas_backed() {
-                        // Atlas path: same-texture sub-rect blit.
-                        if let Some((atlas_image, src_rect)) =
-                            self.compositor_atlas.get_image_and_src_rect(id)
-                        {
-                            canvas.draw_image_rect(
-                                atlas_image,
-                                Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
-                                dst,
-                                &paint,
-                            );
-                        }
-                    } else if let Some(img) = layer_img.individual_image() {
-                        // Individual texture path.
-                        let src = Rect::new(
-                            0.0,
-                            0.0,
-                            img.width() as f32,
-                            img.height() as f32,
-                        );
-                        canvas.draw_image_rect(
-                            img,
-                            Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
-                            dst,
-                            &paint,
-                        );
-                    }
-                    layer_image_cache_hits += 1;
-                }
-            }
-        }
-
-        // Draw live (non-promoted) layers via the Painter.
-        // Promoted nodes are skipped — they were already blitted above.
-        // Skip entirely when all visible nodes are promoted — no live work needed.
-        let has_live_work = plan.regions.iter().any(|(_, indices)| !indices.is_empty());
-        let promoted_skip = if promoted_set.is_empty() {
+        // Draw all layers via the Painter with promoted nodes blitted inline.
+        let promoted_blits_ref = if promoted_blits.is_empty() {
             None
         } else {
-            Some(&promoted_set)
+            Some(&promoted_blits)
         };
-        let cache_picture_used = if has_live_work {
-            self.draw_layers_with_scene_cache_skip(canvas, plan, promoted_skip)
-        } else {
-            0
-        };
+        let cache_picture_used =
+            self.draw_layers_with_scene_cache_skip(canvas, plan, promoted_blits_ref);
 
         let __painter_duration = __before_paint.elapsed();
 
@@ -1425,59 +1437,15 @@ impl Renderer {
         off_canvas.scale((scale, scale));
         off_canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // Blit promoted (compositor-cached) nodes.
-        let mut layer_image_cache_hits = 0usize;
-        let promoted_set: std::collections::HashSet<NodeId> =
-            plan.promoted.iter().copied().collect();
-        for id in &plan.promoted {
-            if let Some(layer_img) = self.scene_cache.compositor.get(id) {
-                let b = &layer_img.local_bounds;
-                let dst = Rect::from_xywh(b.x, b.y, b.width, b.height);
-                let mut paint = SkPaint::default();
-                if layer_img.opacity < 1.0 {
-                    paint.set_alpha_f(layer_img.opacity);
-                }
-                let cg_blend: crate::cg::types::BlendMode = layer_img.blend_mode.into();
-                let sk_blend: skia_safe::BlendMode = cg_blend.into();
-                paint.set_blend_mode(sk_blend);
-
-                if layer_img.is_atlas_backed() {
-                    if let Some((atlas_image, src_rect)) =
-                        self.compositor_atlas.get_image_and_src_rect(id)
-                    {
-                        off_canvas.draw_image_rect(
-                            atlas_image,
-                            Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
-                            dst,
-                            &paint,
-                        );
-                    }
-                } else if let Some(img) = layer_img.individual_image() {
-                    let src = Rect::new(0.0, 0.0, img.width() as f32, img.height() as f32);
-                    off_canvas.draw_image_rect(
-                        img,
-                        Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
-                        dst,
-                        &paint,
-                    );
-                }
-                layer_image_cache_hits += 1;
-            }
-        }
-
-        // Draw live (non-promoted) layers at reduced resolution.
-        // Promoted nodes are skipped — they were already blitted above.
-        let has_live_work = plan.regions.iter().any(|(_, indices)| !indices.is_empty());
-        let promoted_skip = if promoted_set.is_empty() {
+        // Build promoted blit map and draw all layers with inline blitting.
+        let (promoted_blits, layer_image_cache_hits) = self.build_promoted_blits(plan);
+        let promoted_blits_ref = if promoted_blits.is_empty() {
             None
         } else {
-            Some(&promoted_set)
+            Some(&promoted_blits)
         };
-        let cache_picture_used = if has_live_work {
-            self.draw_layers_with_scene_cache_skip(off_canvas, plan, promoted_skip)
-        } else {
-            0
-        };
+        let cache_picture_used =
+            self.draw_layers_with_scene_cache_skip(off_canvas, plan, promoted_blits_ref);
 
         off_canvas.restore();
 

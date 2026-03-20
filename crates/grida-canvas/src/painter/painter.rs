@@ -22,7 +22,27 @@ use skia_safe::{
     Shader,
 };
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
+
+/// Pre-extracted blit data for a single promoted (compositor-cached) node.
+///
+/// Built before the draw pass so that the Painter can blit promoted nodes
+/// inline at their correct z-position in the render command tree, instead
+/// of batching all promoted blits before live draws (which breaks z-order
+/// when a live parent covers its promoted children).
+pub struct PromotedBlit {
+    /// The cached image to blit (either individual texture or atlas snapshot).
+    pub image: Rc<skia_safe::Image>,
+    /// Source rectangle within the image (full image for individual, sub-rect for atlas).
+    pub src_rect: Rect,
+    /// Destination rectangle in world coordinates (the node's render bounds).
+    pub dst_rect: Rect,
+    /// Opacity to apply when blitting.
+    pub opacity: f32,
+    /// Blend mode to apply when blitting.
+    pub blend_mode: skia_safe::BlendMode,
+}
 
 /// A painter that handles all drawing operations for nodes,
 /// with proper effect ordering and a layer‐blur/backdrop‐blur pipeline.
@@ -35,9 +55,10 @@ pub struct Painter<'a> {
     cache_hits: RefCell<usize>,
     policy: RenderPolicy,
     variant_key: u64,
-    /// Node IDs that are handled by the compositor and should be skipped
-    /// during live drawing to avoid double-rendering.
-    promoted_skip: Option<&'a std::collections::HashSet<NodeId>>,
+    /// Pre-extracted blit data for promoted (compositor-cached) nodes.
+    /// When present, promoted nodes are blitted inline at their correct
+    /// z-position instead of being skipped.
+    promoted_blits: Option<&'a HashMap<NodeId, PromotedBlit>>,
 }
 
 impl<'a> Painter<'a> {
@@ -85,15 +106,15 @@ impl<'a> Painter<'a> {
             cache_hits: RefCell::new(0),
             policy,
             variant_key,
-            promoted_skip: None,
+            promoted_blits: None,
         }
     }
 
-    /// Set the promoted-skip set. Nodes in this set will be skipped during
-    /// `draw_render_commands` because they are blitted from the compositor
-    /// cache instead.
-    pub fn with_promoted_skip(mut self, skip: &'a std::collections::HashSet<NodeId>) -> Self {
-        self.promoted_skip = Some(skip);
+    /// Set the promoted blit map. Nodes in this map will be blitted from
+    /// their pre-extracted compositor cache data at the correct z-position
+    /// in the render command tree, instead of being re-drawn live.
+    pub fn with_promoted_blits(mut self, blits: &'a HashMap<NodeId, PromotedBlit>) -> Self {
+        self.promoted_blits = Some(blits);
         self
     }
 
@@ -1490,9 +1511,26 @@ impl<'a> Painter<'a> {
         for command in commands {
             match command {
                 PainterRenderCommand::Draw(layer) => {
-                    // Skip nodes that are drawn via the compositor cache.
-                    if let Some(skip) = self.promoted_skip {
-                        if skip.contains(layer.id()) {
+                    // Blit promoted nodes from the compositor cache inline at
+                    // their correct z-position. This preserves z-order when a
+                    // live parent (e.g. Container with fills) has promoted
+                    // children (e.g. nodes with blur/shadow effects).
+                    if let Some(blits) = self.promoted_blits {
+                        if let Some(blit) = blits.get(layer.id()) {
+                            let mut paint = SkPaint::default();
+                            if blit.opacity < 1.0 {
+                                paint.set_alpha_f(blit.opacity);
+                            }
+                            paint.set_blend_mode(blit.blend_mode);
+                            self.canvas.draw_image_rect(
+                                &*blit.image,
+                                Some((
+                                    &blit.src_rect,
+                                    skia_safe::canvas::SrcRectConstraint::Fast,
+                                )),
+                                blit.dst_rect,
+                                &paint,
+                            );
                             continue;
                         }
                     }
