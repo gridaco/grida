@@ -461,19 +461,7 @@ impl<'a> Painter<'a> {
     pub fn with_clip<F: FnOnce()>(&self, shape: &PainterShape, f: F) {
         let canvas = self.canvas;
         canvas.save();
-
-        // Try to use the most efficient clipping method based on shape type
-        if let Some(rect) = shape.rect_shape {
-            // Simple rectangle - use clip_rect (fastest)
-            canvas.clip_rect(rect, None, true);
-        } else if let Some(rrect) = &shape.rrect {
-            // Rounded rectangle - use clip_rrect (faster than path)
-            canvas.clip_rrect(rrect, None, true);
-        } else {
-            // Complex shape - fall back to path clipping
-            canvas.clip_path(&shape.to_path(), None, true);
-        }
-
+        shape.clip_on_canvas(canvas);
         f();
         canvas.restore();
     }
@@ -746,7 +734,7 @@ impl<'a> Painter<'a> {
         if let Some(filter) = image_filter {
             // 1) Clip to the shape
             canvas.save();
-            canvas.clip_path(&shape.to_path(), None, true);
+            shape.clip_on_canvas(canvas);
 
             // 2) Use a SaveLayerRec with a backdrop filter so that everything behind is blurred
             let layer_rec = SaveLayerRec::default()
@@ -803,13 +791,7 @@ impl<'a> Painter<'a> {
         canvas.translate((bounds.x(), bounds.y()));
 
         // Clip using the most efficient method based on shape type
-        if let Some(rect) = shape.rect_shape {
-            canvas.clip_rect(rect, None, true);
-        } else if let Some(rrect) = &shape.rrect {
-            canvas.clip_rrect(rrect, None, true);
-        } else {
-            canvas.clip_path(&shape.to_path(), None, true);
-        }
+        shape.clip_on_canvas(canvas);
 
         // SaveLayer with backdrop captures background and applies filter
         // Use bounds relative to translated origin (0,0 based after translation)
@@ -866,7 +848,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
         ) {
-            self.canvas.draw_path(&shape.to_path(), &paint);
+            shape.draw_on_canvas(self.canvas, &paint);
         }
     }
 
@@ -887,7 +869,7 @@ impl<'a> Painter<'a> {
             self.images,
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
-            self.canvas.draw_path(&shape.to_path(), &paint);
+            shape.draw_on_canvas(self.canvas, &paint);
         }
     }
 

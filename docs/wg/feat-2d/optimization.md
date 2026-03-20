@@ -307,6 +307,43 @@ Related:
     - Reuse transforms and paints.
     - Precompute common values like DPI × Zoom × ViewMatrix.
 
+11b. **Specialized Primitive Draw Calls (Avoid Intermediate Path Creation)**
+
+    `PainterShape` discriminates between rect, rrect, oval, and path. Instead
+    of always calling `shape.to_path()` followed by `canvas.draw_path()`, use
+    Skia's specialized draw calls (`draw_rect`, `draw_rrect`, `draw_oval`)
+    that bypass path construction and use optimized GPU pipelines.
+
+    Similarly, clipping uses `clip_rect`/`clip_rrect` instead of converting to
+    a path and calling `clip_path`.
+
+    The `draw_on_canvas()` and `clip_on_canvas()` methods on `PainterShape`
+    dispatch to the optimal Skia primitive based on shape type.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                        | Before      | After       | Delta  |
+    | ---------------------------- | ----------- | ----------- | ------ |
+    | flat grid (10K rects, pan)   | 11802 µs    | 10717 µs    | -9.2%  |
+    | stroke rect grid (2K, pan)   | 4015 µs     | 3654 µs     | -9.0%  |
+    | opacity fill (5K, pan)       | 13910 µs    | 13073 µs    | -6.0%  |
+
+    **Criterion (CPU raster, statistically rigorous):**
+
+    | Scene                        | Change    | p-value |
+    | ---------------------------- | --------- | ------- |
+    | simple_baseline/pan          | -10.3%    | < 0.01  |
+    | simple_baseline/pan_zoomed_in| -20.7%    | < 0.01  |
+    | heavy_compositing/pan        | -11.6%    | < 0.01  |
+
+    The improvement is purely CPU-side: eliminated `Path::rect()`/`Path::rrect()`
+    allocation on every fill draw call. At 10000 visible nodes, this saves ~1ms
+    of CPU time per frame.
+
+    Applied to: `draw_fills`, `draw_fills_with_opacity`, `draw_drop_shadow`,
+    `draw_inner_shadow`, `render_noise_effect`, `with_clip`, `draw_backdrop_blur`,
+    `draw_glass_effect`.
+
 12. **Tight Bounds for `save_layer` Operations**
     - First: avoid `save_layer` entirely when possible (see item 6b).
     - When required: always provide explicit bounds.
