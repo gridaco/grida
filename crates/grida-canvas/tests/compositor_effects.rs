@@ -703,3 +703,168 @@ fn z_order_promoted_child_visible_above_container() {
         "Container background not drawn: white pixels = {white_pixel_count}"
     );
 }
+
+/// Pixel-level correctness test for the opacity folding optimization.
+///
+/// Verifies that rendering a semi-transparent rectangle (opacity=0.5) with
+/// `Blend(Normal)` and no effects (the "folded" save_layer path) produces
+/// pixel values that match the expected alpha-blending math.
+///
+/// On a white background, a red rectangle at 50% opacity should produce:
+///   R = 255*0.5 + 255*0.5 = 255
+///   G = 0*0.5   + 255*0.5 = 127–128
+///   B = 0*0.5   + 255*0.5 = 127–128
+///
+/// Additionally, we render a second scene with `opacity=1.0` and
+/// `PassThrough` using a 50% alpha fill color to produce equivalent output
+/// WITHOUT the folding path, and verify both produce matching pixels.
+#[test]
+fn opacity_folding_pixel_accuracy() {
+    let w = 100i32;
+    let h = 100i32;
+
+    // Helper: build a scene with a single rectangle and render via Painter.
+    let render_rect = |effects: LayerEffects| -> Vec<[u8; 4]> {
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 60.0,
+            height: 60.0,
+        };
+        rect.transform = math2::transform::AffineTransform::new(20.0, 20.0, 0.0);
+        rect.opacity = 0.5;
+        rect.blend_mode = LayerBlendMode::Blend(BlendMode::Normal);
+        rect.effects = effects;
+        rect.set_fill(Paint::Solid(SolidPaint {
+            color: CGColor::from_rgba(255, 0, 0, 255),
+            blend_mode: BlendMode::Normal,
+            active: true,
+        }));
+
+        graph.append_child(Node::Rectangle(rect), Parent::Root);
+
+        let scene = Scene {
+            name: "test".into(),
+            graph,
+            background_color: None,
+        };
+
+        let scene_cache = build_scene_cache(&scene);
+
+        let mut surface = make_surface(w, h);
+        let canvas = surface.canvas();
+        canvas.clear(skia_safe::Color::WHITE);
+
+        let store = make_store();
+        let fonts = FontRepository::new(store.clone());
+        let images = ImageRepository::new(store);
+        let policy = RenderPolicy::STANDARD;
+
+        let painter =
+            Painter::new_with_scene_cache(canvas, &fonts, &images, &scene_cache, policy);
+        painter.draw_layer_list(&scene_cache.layers);
+
+        surface_to_rgba(&mut surface, w, h)
+    };
+
+    // ── Scene A: folded path (opacity=0.5, Blend(Normal), NO effects) ──
+    // This exercises with_blendmode_and_opacity — 1 save_layer
+    let pixels_a = render_rect(LayerEffects::default());
+
+    // ── Scene B: unfolded path (opacity=0.5, Blend(Normal), WITH invisible shadow) ──
+    // The active shadow forces needs_opacity_isolation() → true,
+    // so the unfolded 2-save_layer path runs. The shadow itself is
+    // fully transparent (alpha=0) and zero-size, so it doesn't affect pixels.
+    let unfolded_effects = LayerEffects {
+        shadows: vec![FilterShadowEffect::DropShadow(FeShadow {
+            dx: 0.0,
+            dy: 0.0,
+            blur: 0.0,
+            spread: 0.0,
+            color: CGColor::from_rgba(0, 0, 0, 0), // fully transparent
+            active: true, // but active → forces unfolded path
+        })],
+        ..LayerEffects::default()
+    };
+    let pixels_b = render_rect(unfolded_effects);
+
+    // ── Verification 1: Check pixel math for Scene A ──
+    // Sample a pixel well inside the rectangle (center: 50, 50)
+    let center = pixels_a[50 * w as usize + 50];
+    // On a white bg, red@50% opacity should produce a tinted pixel.
+    // Exact channel order depends on platform (kN32 may be BGRA or RGBA),
+    // and surface_to_rgba applies a fixed swizzle. Rather than assuming
+    // channel identity, verify:
+    //   - At least one channel is high (~255) — the red or white contribution
+    //   - At least one channel is in the mid range (~127) — the blended channel
+    //   - Alpha is fully opaque
+    let channels = [center[0], center[1], center[2]];
+    let has_high = channels.iter().any(|&c| c > 200);
+    let has_mid = channels.iter().any(|&c| c > 100 && c < 160);
+    assert!(
+        has_high,
+        "Expected at least one high channel (>200) in center pixel: {:?}",
+        center
+    );
+    assert!(
+        has_mid,
+        "Expected at least one mid-range channel (100-160) in center pixel: {:?}",
+        center
+    );
+    assert!(
+        center[3] > 250,
+        "Center alpha should be fully opaque after compositing: {}",
+        center[3]
+    );
+
+    // Verify the center is NOT white (the rect is visible)
+    let is_white = channels.iter().all(|&c| c > 240);
+    assert!(
+        !is_white,
+        "Center pixel should not be white — rect must be visible: {:?}",
+        center
+    );
+
+    // ── Verification 2: Compare Scene A vs Scene B pixel-by-pixel ──
+    // Allow small rounding difference (opacity 0.5 vs alpha 128/255 ≈ 0.502)
+    let tolerance = 3u8;
+    let mut max_diff = 0u8;
+    let mut diff_count = 0usize;
+
+    for (i, (a, b)) in pixels_a.iter().zip(pixels_b.iter()).enumerate() {
+        for ch in 0..4 {
+            let d = (a[ch] as i16 - b[ch] as i16).unsigned_abs() as u8;
+            if d > max_diff {
+                max_diff = d;
+            }
+            if d > tolerance {
+                diff_count += 1;
+                if diff_count <= 5 {
+                    let x = i % w as usize;
+                    let y = i / w as usize;
+                    eprintln!(
+                        "Pixel diff at ({x},{y}) ch{ch}: folded={} reference={} diff={d}",
+                        a[ch], b[ch]
+                    );
+                }
+            }
+        }
+    }
+
+    assert_eq!(
+        diff_count, 0,
+        "Opacity folding produced different pixels vs reference! \
+         {diff_count} channel values differ by more than {tolerance}. \
+         Max diff = {max_diff}."
+    );
+
+    // ── Verification 3: Background pixels outside rect are pure white ──
+    let corner = pixels_a[5 * w as usize + 5]; // (5, 5) — well outside rect
+    assert!(
+        corner[0] > 250 && corner[1] > 250 && corner[2] > 250,
+        "Background should be white: {:?}",
+        corner
+    );
+}

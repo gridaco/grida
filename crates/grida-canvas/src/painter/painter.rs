@@ -362,6 +362,57 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Combined blend mode + opacity isolation in a single save_layer.
+    ///
+    /// When a node has no effects that require separate opacity isolation
+    /// (no shadows, blur, glass, or backdrop blur), we can merge the
+    /// opacity into the blend mode save_layer paint, eliminating one
+    /// GPU surface allocation per node.
+    ///
+    /// For PassThrough blend mode, falls back to save_layer_alpha with
+    /// bounds optimization.
+    fn with_blendmode_and_opacity<F: FnOnce()>(
+        &self,
+        layer_blend_mode: LayerBlendMode,
+        opacity: f32,
+        shape: &PainterShape,
+        effects: &LayerEffects,
+        transform: &[[f32; 3]; 2],
+        f: F,
+    ) {
+        match layer_blend_mode {
+            LayerBlendMode::PassThrough => {
+                if opacity < 1.0 {
+                    // Use bounds-based save_layer with alpha (more efficient
+                    // than unbounded save_layer_alpha).
+                    let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
+                    self.canvas
+                        .save_layer_alpha(bounds, (opacity * 255.0) as u32);
+                    f();
+                    self.canvas.restore();
+                } else {
+                    f();
+                }
+            }
+            LayerBlendMode::Blend(blend_mode) => {
+                let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
+
+                let mut paint = SkPaint::default();
+                paint.set_blend_mode(blend_mode.into());
+                // Merge opacity into the blend paint alpha — single GPU surface
+                // instead of nested save_layer(blend) + save_layer_alpha(opacity).
+                if opacity < 1.0 {
+                    paint.set_alpha_f(opacity);
+                }
+
+                let layer_rec = SaveLayerRec::default().bounds(&bounds).paint(&paint);
+                self.canvas.save_layer(&layer_rec);
+                f();
+                self.canvas.restore();
+            }
+        }
+    }
+
     /// Helper method to apply clipping to a region with optional corner radius
     pub fn with_clip<F: FnOnce()>(&self, shape: &PainterShape, f: F) {
         let canvas = self.canvas;
@@ -1046,124 +1097,180 @@ impl<'a> Painter<'a> {
     fn draw_layer_standard(&self, layer: &PainterPictureLayer) {
         match layer {
             PainterPictureLayer::Shape(shape_layer) => {
-                self.with_blendmode(
-                    shape_layer.base.blend_mode,
-                    &shape_layer.shape,
-                    &shape_layer.effects,
-                    &shape_layer.base.transform.matrix,
-                    || {
-                        self.with_transform(&shape_layer.base.transform.matrix, || {
-                            let shape = &shape_layer.shape;
-                            let effect_ref = &shape_layer.effects;
-                            let clip_path = &shape_layer.base.clip_path;
-                            let draw_content = || {
-                                self.with_opacity(shape_layer.base.opacity, || {
-                                    // 1. Fills
-                                    if self.policy.render_fills() {
-                                        self.draw_fills(shape, &shape_layer.fills);
+                // Fast path: when no effects need separate opacity isolation,
+                // merge opacity into the blend mode save_layer to eliminate
+                // one GPU surface allocation per node.
+                let effects = &shape_layer.effects;
+                let opacity = shape_layer.base.opacity;
+                let can_fold_opacity = opacity < 1.0 && !effects.needs_opacity_isolation();
 
-                                        // 2. Noise (only if fills are visible)
-                                        if !shape_layer.fills.is_empty()
-                                            && !effect_ref.noises.is_empty()
-                                        {
-                                            self.draw_noise_effects(shape, &effect_ref.noises);
-                                        }
+                let blend_wrapper = |f: &dyn Fn()| {
+                    if can_fold_opacity {
+                        // Merged path: single save_layer with blend + opacity
+                        self.with_blendmode_and_opacity(
+                            shape_layer.base.blend_mode,
+                            opacity,
+                            &shape_layer.shape,
+                            effects,
+                            &shape_layer.base.transform.matrix,
+                            f,
+                        );
+                    } else {
+                        // Standard path: separate blend + opacity save_layers
+                        self.with_blendmode(
+                            shape_layer.base.blend_mode,
+                            &shape_layer.shape,
+                            effects,
+                            &shape_layer.base.transform.matrix,
+                            f,
+                        );
+                    }
+                };
+
+                blend_wrapper(&|| {
+                    self.with_transform(&shape_layer.base.transform.matrix, || {
+                        let shape = &shape_layer.shape;
+                        let effect_ref = &shape_layer.effects;
+                        let clip_path = &shape_layer.base.clip_path;
+                        let draw_content = || {
+                            // When opacity was folded into the blend layer,
+                            // skip the inner save_layer_alpha.
+                            let inner_draw = || {
+                                // 1. Fills
+                                if self.policy.render_fills() {
+                                    self.draw_fills(shape, &shape_layer.fills);
+
+                                    // 2. Noise (only if fills are visible)
+                                    if !shape_layer.fills.is_empty()
+                                        && !effect_ref.noises.is_empty()
+                                    {
+                                        self.draw_noise_effects(shape, &effect_ref.noises);
                                     }
+                                }
 
-                                    // 3. Strokes
-                                    if self.policy.render_strokes() {
-                                        if let Some(path) = &shape_layer.stroke_path {
-                                            self.draw_stroke_path(
-                                                shape,
-                                                path,
-                                                &shape_layer.strokes,
-                                            );
-                                        }
-
-                                        // 4. Stroke decorations (markers at endpoints)
-                                        self.draw_stroke_decorations(
+                                // 3. Strokes
+                                if self.policy.render_strokes() {
+                                    if let Some(path) = &shape_layer.stroke_path {
+                                        self.draw_stroke_path(
                                             shape,
+                                            path,
                                             &shape_layer.strokes,
-                                            shape_layer.stroke_width,
-                                            shape_layer.marker_start_shape,
-                                            shape_layer.marker_end_shape,
                                         );
                                     }
-                                });
+
+                                    // 4. Stroke decorations (markers at endpoints)
+                                    self.draw_stroke_decorations(
+                                        shape,
+                                        &shape_layer.strokes,
+                                        shape_layer.stroke_width,
+                                        shape_layer.marker_start_shape,
+                                        shape_layer.marker_end_shape,
+                                    );
+                                }
                             };
-                            self.with_optional_clip_path(clip_path.as_ref(), || {
-                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            });
+                            if can_fold_opacity {
+                                inner_draw();
+                            } else {
+                                self.with_opacity(opacity, inner_draw);
+                            }
+                        };
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
                         });
-                    },
-                );
+                    });
+                });
             }
             PainterPictureLayer::Text(text_layer) => {
-                self.with_blendmode(
-                    text_layer.base.blend_mode,
-                    &text_layer.shape,
-                    &text_layer.effects,
-                    &text_layer.base.transform.matrix,
-                    || {
-                        self.with_transform(&text_layer.base.transform.matrix, || {
-                            let effects = &text_layer.effects;
-                            let clip_path = &text_layer.base.clip_path;
+                let text_effects = &text_layer.effects;
+                let text_opacity = text_layer.base.opacity;
+                let text_can_fold = text_opacity < 1.0 && !text_effects.needs_opacity_isolation();
 
-                            let paragraph = self.cached_paragraph(
-                                &text_layer.base.id,
-                                &text_layer.text,
-                                &text_layer.width,
-                                &text_layer.max_lines,
-                                &text_layer.ellipsis,
-                                &text_layer.fills,
-                                &text_layer.text_align,
-                                &text_layer.text_align_vertical,
-                                &text_layer.text_style,
-                            );
-                            let layout_size = {
-                                let para = paragraph.borrow();
-                                (para.max_width(), para.height())
-                            };
+                let text_blend_wrapper = |f: &dyn Fn()| {
+                    if text_can_fold {
+                        self.with_blendmode_and_opacity(
+                            text_layer.base.blend_mode,
+                            text_opacity,
+                            &text_layer.shape,
+                            text_effects,
+                            &text_layer.base.transform.matrix,
+                            f,
+                        );
+                    } else {
+                        self.with_blendmode(
+                            text_layer.base.blend_mode,
+                            &text_layer.shape,
+                            text_effects,
+                            &text_layer.base.transform.matrix,
+                            f,
+                        );
+                    }
+                };
 
-                            let layout_height = layout_size.1;
-                            let container_height = text_layer.height.unwrap_or(layout_height);
-                            let y_offset = match text_layer.height {
-                                Some(h) => match text_layer.text_align_vertical {
-                                    TextAlignVertical::Top => 0.0,
-                                    TextAlignVertical::Center => (h - layout_height) / 2.0,
-                                    TextAlignVertical::Bottom => h - layout_height,
-                                },
-                                None => 0.0,
-                            };
+                text_blend_wrapper(&|| {
+                    self.with_transform(&text_layer.base.transform.matrix, || {
+                        let effects = &text_layer.effects;
+                        let clip_path = &text_layer.base.clip_path;
 
-                            let draw_content = || {
-                                self.with_opacity(text_layer.base.opacity, || {
-                                    // Allow stroke-only text: paragraph paint may be empty, but we can still draw strokes.
-                                    if text_layer.fills.is_empty()
-                                        && (text_layer.strokes.is_empty()
-                                            || text_layer.stroke_width <= 0.0)
-                                    {
-                                        return;
-                                    }
-                                    self.draw_text_paragraph(
-                                        &paragraph,
-                                        if self.policy.render_strokes() {
-                                            &text_layer.strokes
-                                        } else {
-                                            &[]
-                                        },
-                                        if self.policy.render_strokes() {
-                                            text_layer.stroke_width
-                                        } else {
-                                            0.0
-                                        },
-                                        &text_layer.stroke_align,
-                                        (layout_size.0, container_height),
-                                        y_offset,
-                                        self.policy.render_fills(),
-                                    );
-                                });
+                        let paragraph = self.cached_paragraph(
+                            &text_layer.base.id,
+                            &text_layer.text,
+                            &text_layer.width,
+                            &text_layer.max_lines,
+                            &text_layer.ellipsis,
+                            &text_layer.fills,
+                            &text_layer.text_align,
+                            &text_layer.text_align_vertical,
+                            &text_layer.text_style,
+                        );
+                        let layout_size = {
+                            let para = paragraph.borrow();
+                            (para.max_width(), para.height())
+                        };
+
+                        let layout_height = layout_size.1;
+                        let container_height = text_layer.height.unwrap_or(layout_height);
+                        let y_offset = match text_layer.height {
+                            Some(h) => match text_layer.text_align_vertical {
+                                TextAlignVertical::Top => 0.0,
+                                TextAlignVertical::Center => (h - layout_height) / 2.0,
+                                TextAlignVertical::Bottom => h - layout_height,
+                            },
+                            None => 0.0,
+                        };
+
+                        let draw_content = || {
+                            let inner_text_draw = || {
+                                // Allow stroke-only text: paragraph paint may be empty, but we can still draw strokes.
+                                if text_layer.fills.is_empty()
+                                    && (text_layer.strokes.is_empty()
+                                        || text_layer.stroke_width <= 0.0)
+                                {
+                                    return;
+                                }
+                                self.draw_text_paragraph(
+                                    &paragraph,
+                                    if self.policy.render_strokes() {
+                                        &text_layer.strokes
+                                    } else {
+                                        &[]
+                                    },
+                                    if self.policy.render_strokes() {
+                                        text_layer.stroke_width
+                                    } else {
+                                        0.0
+                                    },
+                                    &text_layer.stroke_align,
+                                    (layout_size.0, container_height),
+                                    y_offset,
+                                    self.policy.render_fills(),
+                                );
                             };
+                            if text_can_fold {
+                                inner_text_draw();
+                            } else {
+                                self.with_opacity(text_opacity, inner_text_draw);
+                            }
+                        };
 
                             let apply_effects = || {
                                 if let Some(blur) = &effects.backdrop_blur {
@@ -1203,26 +1310,45 @@ impl<'a> Painter<'a> {
                                 }
                             };
 
-                            self.with_optional_clip_path(clip_path.as_ref(), || {
-                                draw_with_effects();
-                            });
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            draw_with_effects();
                         });
-                    },
-                );
+                    });
+                });
             }
             PainterPictureLayer::Vector(vector_layer) => {
-                self.with_blendmode(
-                    vector_layer.base.blend_mode,
-                    &vector_layer.shape,
-                    &vector_layer.effects,
-                    &vector_layer.base.transform.matrix,
-                    || {
-                        self.with_transform(&vector_layer.base.transform.matrix, || {
-                            let shape = &vector_layer.shape;
-                            let effect_ref = &vector_layer.effects;
-                            let clip_path = &vector_layer.base.clip_path;
-                            let draw_content = || {
-                                self.with_opacity(vector_layer.base.opacity, || {
+                let vec_effects = &vector_layer.effects;
+                let vec_opacity = vector_layer.base.opacity;
+                let vec_can_fold = vec_opacity < 1.0 && !vec_effects.needs_opacity_isolation();
+
+                let vec_blend_wrapper = |f: &dyn Fn()| {
+                    if vec_can_fold {
+                        self.with_blendmode_and_opacity(
+                            vector_layer.base.blend_mode,
+                            vec_opacity,
+                            &vector_layer.shape,
+                            vec_effects,
+                            &vector_layer.base.transform.matrix,
+                            f,
+                        );
+                    } else {
+                        self.with_blendmode(
+                            vector_layer.base.blend_mode,
+                            &vector_layer.shape,
+                            vec_effects,
+                            &vector_layer.base.transform.matrix,
+                            f,
+                        );
+                    }
+                };
+
+                vec_blend_wrapper(&|| {
+                    self.with_transform(&vector_layer.base.transform.matrix, || {
+                        let shape = &vector_layer.shape;
+                        let effect_ref = &vector_layer.effects;
+                        let clip_path = &vector_layer.base.clip_path;
+                        let draw_content = || {
+                            let inner_vec_draw = || {
                                     // Use VNPainter for vector network rendering
                                     let vn_painter =
                                     crate::vectornetwork::vn_painter::VNPainter::new_with_images(
@@ -1350,15 +1476,19 @@ impl<'a> Painter<'a> {
                                                 }
                                             }
                                         }
-                                    }
-                                });
+                                }
                             };
-                            self.with_optional_clip_path(clip_path.as_ref(), || {
-                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            });
+                            if vec_can_fold {
+                                inner_vec_draw();
+                            } else {
+                                self.with_opacity(vec_opacity, inner_vec_draw);
+                            }
+                        };
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
                         });
-                    },
-                );
+                    });
+                });
             }
         }
     }

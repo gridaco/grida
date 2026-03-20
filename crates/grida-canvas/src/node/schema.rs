@@ -90,6 +90,35 @@ impl LayerEffects {
         self
     }
 
+    /// Returns true if opacity must be isolated in a separate save_layer
+    /// because effects (shadows, blur, glass, backdrop blur) render outside
+    /// the opacity wrapper and should appear at full alpha.
+    ///
+    /// When false, opacity can be safely folded into a parent save_layer
+    /// or the paint alpha, eliminating a GPU surface allocation.
+    #[inline]
+    pub fn needs_opacity_isolation(&self) -> bool {
+        // Drop/inner shadows render outside opacity — they should appear at
+        // full opacity even when the shape content is semi-transparent.
+        if self.shadows.iter().any(|s| s.active()) {
+            return true;
+        }
+        // Layer blur wraps everything including content — opacity inside
+        // blur vs outside blur produces different results.
+        if self.blur.as_ref().is_some_and(|b| b.active) {
+            return true;
+        }
+        // Backdrop blur and glass read from content behind the node
+        // and render outside the opacity wrapper.
+        if self.backdrop_blur.as_ref().is_some_and(|b| b.active) {
+            return true;
+        }
+        if self.glass.as_ref().is_some_and(|g| g.active) {
+            return true;
+        }
+        false
+    }
+
     /// Returns true if this layer has any active effects that are expensive
     /// to paint (shadows, blurs, noise, glass).  Simple fill/stroke-only
     /// nodes return false.

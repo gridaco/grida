@@ -6,7 +6,33 @@ use cg::runtime::scene::{Backend, Renderer};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use math2::transform::AffineTransform;
 
+struct RectConfig {
+    opacity: f32,
+    blend_mode: LayerBlendMode,
+    with_effects: bool,
+}
+
+impl Default for RectConfig {
+    fn default() -> Self {
+        Self {
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::default(),
+            with_effects: false,
+        }
+    }
+}
+
 fn create_rectangles(count: usize, with_effects: bool) -> Scene {
+    create_rectangles_cfg(
+        count,
+        RectConfig {
+            with_effects,
+            ..Default::default()
+        },
+    )
+}
+
+fn create_rectangles_cfg(count: usize, cfg: RectConfig) -> Scene {
     let mut graph = SceneGraph::new();
 
     // Create rectangles
@@ -14,8 +40,8 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         .map(|_i| {
             Node::Rectangle(RectangleNodeRec {
                 active: true,
-                opacity: 1.0,
-                blend_mode: LayerBlendMode::default(),
+                opacity: cfg.opacity,
+                blend_mode: cfg.blend_mode,
                 mask: None,
                 transform: AffineTransform::identity(),
                 size: Size {
@@ -34,7 +60,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                     stroke_dash_array: None,
                 },
                 stroke_width: 1.0.into(),
-                effects: if with_effects {
+                effects: if cfg.with_effects {
                     LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                         dx: 2.0,
                         dy: 2.0,
@@ -229,5 +255,207 @@ fn bench_rectangles(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_rectangles);
+/// Benchmarks specifically targeting the save_layer opacity folding optimization.
+///
+/// Semi-transparent nodes (opacity < 1.0) with a non-PassThrough blend mode
+/// previously required **two** save_layers: one for blend isolation, one for
+/// opacity. With the opacity folding optimization, effectless semi-transparent
+/// nodes now merge opacity into the blend save_layer, eliminating one GPU
+/// surface allocation per node.
+fn bench_opacity_folding(c: &mut Criterion) {
+    let width = 1000;
+    let height = 1000;
+
+    let mut group = c.benchmark_group("opacity_folding");
+    group.sample_size(100);
+    group.measurement_time(std::time::Duration::from_secs(10));
+
+    // --- 1K nodes ---
+
+    // Baseline: opaque, no save_layer needed
+    group.bench_function("1k_opaque_passthrough", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(1_000),
+                RectConfig {
+                    opacity: 1.0,
+                    blend_mode: LayerBlendMode::default(),
+                    with_effects: false,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
+    // Optimized path: opacity folded into blend save_layer (1 save_layer)
+    group.bench_function("1k_semitransparent_normal", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(1_000),
+                RectConfig {
+                    opacity: 0.8,
+                    blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+                    with_effects: false,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
+    // Cannot fold: effects need separate opacity isolation (2+ save_layers)
+    group.bench_function("1k_semitransparent_normal_effects", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(1_000),
+                RectConfig {
+                    opacity: 0.8,
+                    blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+                    with_effects: true,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
+    // --- 10K nodes ---
+
+    group.bench_function("10k_opaque_passthrough", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(10_000),
+                RectConfig {
+                    opacity: 1.0,
+                    blend_mode: LayerBlendMode::default(),
+                    with_effects: false,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
+    group.bench_function("10k_semitransparent_normal", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(10_000),
+                RectConfig {
+                    opacity: 0.8,
+                    blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+                    with_effects: false,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
+    group.bench_function("10k_semitransparent_normal_effects", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(10_000),
+                RectConfig {
+                    opacity: 0.8,
+                    blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+                    with_effects: true,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
+    // --- PassThrough + opacity (save_layer_alpha path) ---
+
+    group.bench_function("10k_semitransparent_passthrough", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(10_000),
+                RectConfig {
+                    opacity: 0.8,
+                    blend_mode: LayerBlendMode::default(), // PassThrough
+                    with_effects: false,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_rectangles, bench_opacity_folding);
 criterion_main!(benches);
