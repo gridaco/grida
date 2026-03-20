@@ -72,6 +72,12 @@ struct BenchArgs {
     /// Viewport height.
     #[arg(long = "height", default_value_t = 1000)]
     height: i32,
+    /// Layer opacity for synthetic shapes (0.0–1.0). Default: 1.0 (opaque).
+    #[arg(long = "opacity", default_value_t = 1.0)]
+    opacity: f32,
+    /// Blend mode: "passthrough" or "normal". Default: passthrough.
+    #[arg(long = "blend", default_value = "passthrough")]
+    blend: String,
 }
 
 #[tokio::main]
@@ -186,10 +192,15 @@ async fn run_bench(args: BenchArgs) -> Result<()> {
     use cg::window::headless::HeadlessGpu;
     use std::time::Instant;
 
+    let bench_blend = match args.blend.as_str() {
+        "normal" => LayerBlendMode::Blend(BlendMode::Normal),
+        _ => LayerBlendMode::default(), // PassThrough
+    };
+
     let scenes = if let Some(ref path) = args.path {
         load_scenes_from_source(path).await?
     } else {
-        vec![build_benchmark_scene(args.size)]
+        vec![build_benchmark_scene(args.size, args.opacity, bench_blend)]
     };
 
     if args.list_scenes {
@@ -459,7 +470,7 @@ async fn read_source_bytes(source: &str) -> Result<Vec<u8>> {
     }
 }
 
-fn build_benchmark_scene(grid: u32) -> Scene {
+fn build_benchmark_scene(grid: u32, opacity: f32, blend_mode: LayerBlendMode) -> Scene {
     let nf = NodeFactory::new();
     let mut graph = SceneGraph::new();
     let grid = grid.max(1);
@@ -478,6 +489,8 @@ fn build_benchmark_scene(grid: u32) -> Scene {
                 width: size,
                 height: size,
             };
+            rect.opacity = opacity;
+            rect.blend_mode = blend_mode;
             rect.fills = Paints::new([Paint::Solid(SolidPaint {
                 color: CGColor::from_rgb(((x * 11) % 255) as u8, ((y * 7) % 255) as u8, 210),
                 blend_mode: BlendMode::default(),
@@ -488,7 +501,7 @@ fn build_benchmark_scene(grid: u32) -> Scene {
     }
 
     Scene {
-        name: format!("Benchmark {}x{}", grid, grid),
+        name: format!("Benchmark {}x{} (opacity={:.2})", grid, grid, opacity),
         graph,
         background_color: Some(CGColor::from_rgb(250, 250, 250)),
     }

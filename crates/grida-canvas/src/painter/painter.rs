@@ -835,6 +835,27 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Draw fills with layer opacity baked into the paint alpha.
+    ///
+    /// Eliminates the save_layer_alpha GPU surface allocation for fills-only
+    /// leaf nodes. The opacity is multiplied into the paint's alpha channel,
+    /// producing identical results to wrapping in save_layer_alpha when there
+    /// is only a single draw call (no strokes overlapping fills).
+    #[inline]
+    fn draw_fills_with_opacity(&self, shape: &PainterShape, fills: &[Paint], opacity: f32) {
+        if fills.is_empty() {
+            return;
+        }
+        if let Some(mut paint) = paint::sk_paint_stack(
+            fills,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            paint.set_alpha_f(paint.alpha_f() * opacity);
+            self.canvas.draw_path(&shape.to_path(), &paint);
+        }
+    }
+
     pub fn draw_strokes(
         &self,
         shape: &PainterShape,
@@ -1106,12 +1127,43 @@ impl<'a> Painter<'a> {
     fn draw_layer_standard(&self, layer: &PainterPictureLayer) {
         match layer {
             PainterPictureLayer::Shape(shape_layer) => {
-                // Fast path: when no effects need separate opacity isolation,
-                // merge opacity into the blend mode save_layer to eliminate
-                // one GPU surface allocation per node.
                 let effects = &shape_layer.effects;
                 let opacity = shape_layer.base.opacity;
                 let can_fold_opacity = opacity < 1.0 && !effects.needs_opacity_isolation();
+
+                // Paint-alpha fast path: for fills-only leaf nodes with
+                // PassThrough/Normal blend and no effects, fold opacity directly
+                // into the paint alpha — zero GPU surface allocations.
+                let has_strokes = shape_layer.stroke_path.is_some()
+                    && !shape_layer.strokes.is_empty();
+                let has_noises = !shape_layer.fills.is_empty() && !effects.noises.is_empty();
+                let is_simple_blend = matches!(
+                    shape_layer.base.blend_mode,
+                    LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal)
+                );
+                let can_fold_into_paint = can_fold_opacity
+                    && is_simple_blend
+                    && !has_strokes
+                    && !has_noises
+                    && !effects.has_expensive_effects();
+
+                if can_fold_into_paint {
+                    // Zero save_layers: opacity folded into paint alpha.
+                    self.with_transform(&shape_layer.base.transform.matrix, || {
+                        let shape = &shape_layer.shape;
+                        let clip_path = &shape_layer.base.clip_path;
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            if self.policy.render_fills() {
+                                self.draw_fills_with_opacity(
+                                    shape,
+                                    &shape_layer.fills,
+                                    opacity,
+                                );
+                            }
+                        });
+                    });
+                    return;
+                }
 
                 let blend_wrapper = |f: &dyn Fn()| {
                     if can_fold_opacity {
@@ -1142,8 +1194,6 @@ impl<'a> Painter<'a> {
                         let effect_ref = &shape_layer.effects;
                         let clip_path = &shape_layer.base.clip_path;
                         let draw_content = || {
-                            // When opacity was folded into the blend layer,
-                            // skip the inner save_layer_alpha.
                             let inner_draw = || {
                                 // 1. Fills
                                 if self.policy.render_fills() {

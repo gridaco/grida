@@ -992,4 +992,19 @@ fn normal_blend_elimination_pixel_accuracy() {
     );
     let passthrough_multi = render(LayerBlendMode::default(), 1.0, multi_fills);
     compare("opaque_multi_fill", &normal_multi, &passthrough_multi);
+
+    // Test 4: Semi-transparent with multiple fills (paint-alpha fast path)
+    // This exercises draw_fills_with_opacity (the new zero-save_layer path)
+    let multi_fills_2 = vec![red_fill.clone()];
+    let paint_alpha_path = render(LayerBlendMode::default(), 0.5, multi_fills_2.clone());
+    let normal_alpha_path = render(
+        LayerBlendMode::Blend(BlendMode::Normal),
+        0.5,
+        multi_fills_2,
+    );
+    compare(
+        "semitransparent_paint_alpha",
+        &paint_alpha_path,
+        &normal_alpha_path,
+    );
 }
