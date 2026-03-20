@@ -350,6 +350,32 @@ fn bench_opacity_folding(c: &mut Criterion) {
         })
     });
 
+    // Opaque + Normal blend — previously wasted a save_layer, now zero overhead
+    group.bench_function("1k_opaque_normal", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(1_000),
+                RectConfig {
+                    opacity: 1.0,
+                    blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+                    with_effects: false,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
     // --- 10K nodes ---
 
     group.bench_function("10k_opaque_passthrough", |b| {
@@ -367,6 +393,32 @@ fn bench_opacity_folding(c: &mut Criterion) {
                 RectConfig {
                     opacity: 1.0,
                     blend_mode: LayerBlendMode::default(),
+                    with_effects: false,
+                },
+            );
+            renderer.load_scene(scene);
+            renderer.queue_unstable();
+            renderer.flush();
+            renderer.free();
+        })
+    });
+
+    // Opaque + Normal blend at 10k — should match opaque_passthrough now
+    group.bench_function("10k_opaque_normal", |b| {
+        b.iter(|| {
+            let mut renderer = Renderer::new(
+                Backend::new_from_raster(width, height),
+                None,
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            let scene = create_rectangles_cfg(
+                black_box(10_000),
+                RectConfig {
+                    opacity: 1.0,
+                    blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
                     with_effects: false,
                 },
             );

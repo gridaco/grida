@@ -868,3 +868,128 @@ fn opacity_folding_pixel_accuracy() {
         corner
     );
 }
+
+/// Pixel-level correctness test for Normal blend mode save_layer elimination.
+///
+/// Verifies that `Blend(Normal)` on a leaf node (no save_layer, fast path)
+/// produces identical pixels to `PassThrough` (also no save_layer).
+/// Both should be equivalent since Normal = SrcOver and SrcOver is
+/// associative for leaf nodes with no children.
+///
+/// Tests multiple configurations:
+/// 1. Opaque rect (opacity=1.0) — both paths skip save_layer entirely
+/// 2. Semi-transparent rect (opacity=0.5) — exercises save_layer_alpha path
+/// 3. Multiple fills — verifies fill stacking is identical
+#[test]
+fn normal_blend_elimination_pixel_accuracy() {
+    let w = 100i32;
+    let h = 100i32;
+
+    // Helper: render a rect with specified blend mode and opacity
+    let render = |blend: LayerBlendMode, opacity: f32, fills: Vec<Paint>| -> Vec<[u8; 4]> {
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 60.0,
+            height: 60.0,
+        };
+        rect.transform = math2::transform::AffineTransform::new(20.0, 20.0, 0.0);
+        rect.opacity = opacity;
+        rect.blend_mode = blend;
+        rect.effects = LayerEffects::default();
+        rect.fills = Paints::new(fills);
+
+        graph.append_child(Node::Rectangle(rect), Parent::Root);
+
+        let scene = Scene {
+            name: "test".into(),
+            graph,
+            background_color: None,
+        };
+
+        let scene_cache = build_scene_cache(&scene);
+        let mut surface = make_surface(w, h);
+        surface.canvas().clear(skia_safe::Color::WHITE);
+
+        let store = make_store();
+        let fonts = FontRepository::new(store.clone());
+        let images = ImageRepository::new(store);
+        let policy = RenderPolicy::STANDARD;
+
+        let painter =
+            Painter::new_with_scene_cache(surface.canvas(), &fonts, &images, &scene_cache, policy);
+        painter.draw_layer_list(&scene_cache.layers);
+
+        surface_to_rgba(&mut surface, w, h)
+    };
+
+    let compare = |label: &str, a: &[[u8; 4]], b: &[[u8; 4]]| {
+        let mut max_diff = 0u8;
+        let mut diff_count = 0usize;
+        for (i, (pa, pb)) in a.iter().zip(b.iter()).enumerate() {
+            for ch in 0..4 {
+                let d = (pa[ch] as i16 - pb[ch] as i16).unsigned_abs() as u8;
+                if d > max_diff {
+                    max_diff = d;
+                }
+                if d > 0 {
+                    diff_count += 1;
+                    if diff_count <= 3 {
+                        let x = i % w as usize;
+                        let y = i / w as usize;
+                        eprintln!(
+                            "[{label}] diff at ({x},{y}) ch{ch}: normal={} passthrough={} diff={d}",
+                            pa[ch], pb[ch]
+                        );
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            diff_count, 0,
+            "[{label}] Normal blend produced different pixels vs PassThrough! \
+             {diff_count} values differ. Max diff = {max_diff}."
+        );
+    };
+
+    let red_fill = Paint::Solid(SolidPaint {
+        color: CGColor::from_rgba(255, 0, 0, 255),
+        blend_mode: BlendMode::Normal,
+        active: true,
+    });
+
+    // Test 1: Opaque single fill
+    let normal_opaque = render(
+        LayerBlendMode::Blend(BlendMode::Normal),
+        1.0,
+        vec![red_fill.clone()],
+    );
+    let passthrough_opaque = render(LayerBlendMode::default(), 1.0, vec![red_fill.clone()]);
+    compare("opaque_single_fill", &normal_opaque, &passthrough_opaque);
+
+    // Test 2: Semi-transparent single fill
+    let normal_semi = render(
+        LayerBlendMode::Blend(BlendMode::Normal),
+        0.5,
+        vec![red_fill.clone()],
+    );
+    let passthrough_semi = render(LayerBlendMode::default(), 0.5, vec![red_fill.clone()]);
+    compare("semitransparent_single_fill", &normal_semi, &passthrough_semi);
+
+    // Test 3: Multiple overlapping fills (red + semi-transparent blue)
+    let blue_semi = Paint::Solid(SolidPaint {
+        color: CGColor::from_rgba(0, 0, 255, 128),
+        blend_mode: BlendMode::Normal,
+        active: true,
+    });
+    let multi_fills = vec![red_fill.clone(), blue_semi];
+    let normal_multi = render(
+        LayerBlendMode::Blend(BlendMode::Normal),
+        1.0,
+        multi_fills.clone(),
+    );
+    let passthrough_multi = render(LayerBlendMode::default(), 1.0, multi_fills);
+    compare("opaque_multi_fill", &normal_multi, &passthrough_multi);
+}

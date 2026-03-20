@@ -324,10 +324,16 @@ impl<'a> Painter<'a> {
         )
     }
 
-    /// If blend mode is not PassThrough, wrap drawing in a bounds-optimized save_layer.
+    /// If blend mode is not PassThrough or Normal, wrap drawing in a bounds-optimized save_layer.
     ///
     /// Performance: Uses bounds-based save_layer to limit offscreen buffer size (~100x smaller).
-    /// Spec compliance: Preserves isolation semantics - all blend modes (including Normal) are isolated.
+    ///
+    /// **Normal blend mode fast path:** For leaf nodes (Shape, Text, Vector),
+    /// `Blend(Normal)` is mathematically equivalent to `PassThrough` because
+    /// SrcOver compositing is associative — drawing fills/strokes into an
+    /// offscreen then blitting with SrcOver produces identical results to
+    /// drawing directly. This method is only called for leaf nodes (not
+    /// containers), so we skip the save_layer entirely for Normal blend.
     ///
     /// Bounds safety: Includes drop shadows which extend beyond base shape bounds.
     ///
@@ -341,18 +347,20 @@ impl<'a> Painter<'a> {
         f: F,
     ) {
         match layer_blend_mode {
-            LayerBlendMode::PassThrough => {
-                // No isolation - draw directly (fast path)
+            LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal) => {
+                // No isolation needed — draw directly.
+                // Normal (SrcOver) on a leaf node is equivalent to PassThrough
+                // because there are no children whose blend modes could interact
+                // with content beneath the node.
                 f();
             }
             LayerBlendMode::Blend(blend_mode) => {
-                // Compute safe bounds in world coordinates (shape.rect is in local space)
+                // Non-Normal blend modes (Multiply, Screen, etc.) need isolation.
                 let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
 
                 let mut paint = SkPaint::default();
                 paint.set_blend_mode(blend_mode.into());
 
-                // Use bounds-based save_layer (much smaller than full canvas)
                 let layer_rec = SaveLayerRec::default().bounds(&bounds).paint(&paint);
 
                 self.canvas.save_layer(&layer_rec);
@@ -369,8 +377,8 @@ impl<'a> Painter<'a> {
     /// opacity into the blend mode save_layer paint, eliminating one
     /// GPU surface allocation per node.
     ///
-    /// For PassThrough blend mode, falls back to save_layer_alpha with
-    /// bounds optimization.
+    /// For PassThrough and Normal blend modes on leaf nodes, falls back to
+    /// save_layer_alpha with bounds optimization (no blend isolation needed).
     fn with_blendmode_and_opacity<F: FnOnce()>(
         &self,
         layer_blend_mode: LayerBlendMode,
@@ -381,10 +389,10 @@ impl<'a> Painter<'a> {
         f: F,
     ) {
         match layer_blend_mode {
-            LayerBlendMode::PassThrough => {
+            LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal) => {
+                // Normal (SrcOver) on a leaf node needs no blend isolation.
+                // Just apply opacity via save_layer_alpha if needed.
                 if opacity < 1.0 {
-                    // Use bounds-based save_layer with alpha (more efficient
-                    // than unbounded save_layer_alpha).
                     let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
                     self.canvas
                         .save_layer_alpha(bounds, (opacity * 255.0) as u32);
@@ -395,6 +403,7 @@ impl<'a> Painter<'a> {
                 }
             }
             LayerBlendMode::Blend(blend_mode) => {
+                // Non-Normal blend modes need isolation.
                 let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
 
                 let mut paint = SkPaint::default();
