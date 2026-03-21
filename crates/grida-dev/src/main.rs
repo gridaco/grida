@@ -1,20 +1,15 @@
-use anyhow::{anyhow, Context, Result};
-use cg::cg::prelude::*;
-use cg::cg::types::ResourceRef;
-use cg::node::factory::NodeFactory;
-use cg::node::scene_graph::{Parent, SceneGraph};
-use cg::node::schema::{Node, Scene, Size};
+use anyhow::{Context, Result};
+use cg::node::schema::Scene;
 use cg::resources::{load_scene_images, ImageMessage};
 use cg::svg::pack;
 use cg::window::application::{HostEvent, HostEventCallback};
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use futures::channel::mpsc;
 use grida_dev::platform::native_demo::run_demo_window_with_drop;
+mod bench;
 mod grida_file;
 mod reftest;
 use image::image_dimensions;
-use math2::transform::AffineTransform;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::fs as async_fs;
@@ -42,60 +37,48 @@ struct Cli {
 enum Command {
     /// Headless GPU benchmark — no window, prints per-frame stats.
     /// Accepts either a `.grida` file or `--size N` for a synthetic grid.
-    Bench(BenchArgs),
+    Bench(bench::BenchArgs),
     /// Run SVG reftests against W3C SVG 1.1 Test Suite.
     Reftest(reftest::ReftestArgs),
     /// Convert SVG files to `.grida` for cross-boundary codec testing.
     /// Output goes to `fixtures/test-svg/.generated/`.
     SvgToGrida(SvgToGridaArgs),
-}
-
-#[derive(Args, Debug)]
-struct BenchArgs {
-    /// Path to a `.grida` file (optional; uses synthetic grid if omitted).
-    path: Option<String>,
-    /// Grid dimension when no file is given (renders N x N rectangles).
-    #[arg(long = "size", default_value_t = 100)]
-    size: u32,
-    /// Scene index to benchmark (0-based). Use --list-scenes to see available.
-    #[arg(long = "scene", default_value_t = 0)]
-    scene_index: usize,
-    /// List available scene names and exit.
-    #[arg(long = "list-scenes", default_value_t = false)]
-    list_scenes: bool,
-    /// Number of pan frames to measure.
-    #[arg(long = "frames", default_value_t = 200)]
-    frames: u32,
-    /// Viewport width.
-    #[arg(long = "width", default_value_t = 1000)]
-    width: i32,
-    /// Viewport height.
-    #[arg(long = "height", default_value_t = 1000)]
-    height: i32,
-    /// Layer opacity for synthetic shapes (0.0–1.0). Default: 1.0 (opaque).
-    #[arg(long = "opacity", default_value_t = 1.0)]
-    opacity: f32,
-    /// Blend mode: "passthrough" or "normal". Default: passthrough.
-    #[arg(long = "blend", default_value = "passthrough")]
-    blend: String,
-    /// Add strokes to synthetic shapes.
-    #[arg(long = "strokes", default_value_t = false)]
-    strokes: bool,
+    /// Bulk benchmark — runs all scenes in all `.grida` files, outputs a compact JSON report.
+    /// Accepts a single `.grida` file or a directory (recursively finds `*.grida` files).
+    BenchReport(bench::BenchReportArgs),
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let loader = FileSceneLoader;
     match cli.command {
-        Some(Command::Bench(args)) => run_bench(args).await?,
+        Some(Command::Bench(args)) => bench::run_bench(args, loader).await?,
         Some(Command::Reftest(args)) => reftest::run(args).await?,
         Some(Command::SvgToGrida(args)) => run_svg_to_grida(args),
+        Some(Command::BenchReport(args)) => bench::run_bench_report(args, loader).await?,
         None => run_interactive(cli.file).await?,
     }
     Ok(())
 }
 
-#[derive(Args, Debug)]
+// ---------------------------------------------------------------------------
+// Scene loader — bridges main.rs file I/O into the bench module
+// ---------------------------------------------------------------------------
+
+struct FileSceneLoader;
+
+impl bench::runner::AsyncSceneLoader for FileSceneLoader {
+    async fn load(&self, source: &str) -> Result<Vec<Scene>> {
+        load_scenes_from_source(source).await
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SVG-to-Grida converter
+// ---------------------------------------------------------------------------
+
+#[derive(clap::Args, Debug)]
 struct SvgToGridaArgs {
     /// Input directory containing SVG files. Defaults to `fixtures/test-svg/L0`.
     path: Option<String>,
@@ -112,7 +95,6 @@ struct SvgToGridaArgs {
 
 fn run_svg_to_grida(args: SvgToGridaArgs) {
     use cg::io::io_svg::svg_to_grida_bytes;
-    use std::path::{Path, PathBuf};
 
     let input_dir = PathBuf::from(
         args.path
@@ -190,257 +172,11 @@ fn run_svg_to_grida(args: SvgToGridaArgs) {
     );
 }
 
-async fn run_bench(args: BenchArgs) -> Result<()> {
-    use cg::runtime::scene::FrameFlushResult;
-    use cg::window::headless::HeadlessGpu;
-    use std::time::Instant;
-
-    let bench_blend = match args.blend.as_str() {
-        "normal" => LayerBlendMode::Blend(BlendMode::Normal),
-        _ => LayerBlendMode::default(), // PassThrough
-    };
-
-    let scenes = if let Some(ref path) = args.path {
-        load_scenes_from_source(path).await?
-    } else {
-        vec![build_benchmark_scene(args.size, args.opacity, bench_blend, args.strokes)]
-    };
-
-    if args.list_scenes {
-        println!("Available scenes ({}):", scenes.len());
-        for (i, s) in scenes.iter().enumerate() {
-            println!("  [{}] {} ({} nodes)", i, s.name, s.graph.node_count());
-        }
-        return Ok(());
-    }
-
-    if args.scene_index >= scenes.len() {
-        return Err(anyhow!(
-            "scene index {} out of range (0..{}). Use --list-scenes.",
-            args.scene_index,
-            scenes.len()
-        ));
-    }
-
-    let scene = scenes.into_iter().nth(args.scene_index).unwrap();
-    let node_count = scene.graph.node_count();
-
-    let mut gpu = HeadlessGpu::new(args.width, args.height)
-        .map_err(|e| anyhow!("GPU init failed: {e}"))?;
-    gpu.print_gl_info();
-
-    let mut renderer = gpu.create_renderer();
-    renderer.load_scene(scene);
-
-    // Fit camera so all content is visible — same as windowed demo.
-    renderer.fit_camera_to_scene();
-
-    let cam_rect = renderer.camera.rect();
-    println!("Loaded scene: {} nodes", node_count);
-    println!(
-        "Camera: zoom={:.4} viewport=({:.0}x{:.0})",
-        renderer.camera.get_zoom(),
-        cam_rect.width,
-        cam_rect.height,
-    );
-    println!(
-        "Viewport: {}x{}, frames: {}\n",
-        args.width, args.height, args.frames
-    );
-
-    // Warm up: stable frame first (populates compositor cache), then
-    // unstable pan frames to fill picture/geometry caches.
-    renderer.queue_stable();
-    let _ = renderer.flush();
-    for _ in 0..10 {
-        renderer.camera.translate(1.0, 0.0);
-        renderer.queue_unstable();
-        let _ = renderer.flush();
-    }
-
-    // Count nodes with effects for diagnostics.
-    let effects_count = renderer
-        .scene
-        .as_ref()
-        .map(|s| {
-            s.graph
-                .nodes_iter()
-                .filter(|(_, node)| match node {
-                    cg::node::schema::Node::Rectangle(r) => r.effects.has_expensive_effects(),
-                    cg::node::schema::Node::Ellipse(e) => e.effects.has_expensive_effects(),
-                    _ => false,
-                })
-                .count()
-        })
-        .unwrap_or(0);
-
-    let comp_stats = renderer.get_cache().compositor.stats();
-    println!(
-        "Nodes with effects: {}  Compositor: {} promoted, {:.1} KB",
-        effects_count,
-        comp_stats.promoted_count,
-        comp_stats.memory_bytes as f64 / 1024.0,
-    );
-
-    // --- Pan benchmark ---
-    println!("=== Pan benchmark ({} frames) ===", args.frames);
-    let pan_start = Instant::now();
-    let mut frame_times = Vec::with_capacity(args.frames as usize);
-    let mut internal_render_us = Vec::with_capacity(args.frames as usize);
-    let mut internal_flush_us = Vec::with_capacity(args.frames as usize);
-    let mut internal_draw_us = Vec::with_capacity(args.frames as usize);
-    let mut total_dl = 0usize;
-    let mut total_live = 0usize;
-    let mut total_comp_hits = 0usize;
-    let mut internal_compositor_us = Vec::with_capacity(args.frames as usize);
-    let mut internal_mid_flush_us = Vec::with_capacity(args.frames as usize);
-
-    for i in 0..args.frames {
-        let dx = if i % 2 == 0 { 5.0 } else { -5.0 };
-        renderer.camera.translate(dx, 0.0);
-        renderer.queue_unstable();
-        let frame_start = Instant::now();
-        if let FrameFlushResult::OK(stats) = renderer.flush() {
-            let ft = frame_start.elapsed();
-            frame_times.push(ft);
-            internal_render_us.push(stats.total_duration.as_micros() as u64);
-            internal_flush_us.push(stats.flush_duration.as_micros() as u64);
-            internal_draw_us.push(stats.draw.painter_duration.as_micros() as u64);
-            internal_compositor_us.push(stats.compositor_duration.as_micros() as u64);
-            internal_mid_flush_us.push(stats.mid_flush_duration.as_micros() as u64);
-            total_dl += stats.frame.display_list_size_estimated;
-            total_live += stats.draw.live_draw_count;
-            total_comp_hits += stats.draw.layer_image_cache_hits;
-        }
-    }
-    let pan_wall = pan_start.elapsed();
-
-    if frame_times.is_empty() {
-        return Err(anyhow!(
-            "no benchmark samples collected, cannot compute summary"
-        ));
-    }
-
-    frame_times.sort();
-    let n = frame_times.len();
-    let p50 = frame_times[n / 2];
-    let p95 = frame_times[n * 95 / 100];
-    let p99 = frame_times[n * 99 / 100];
-    let avg = pan_wall / n as u32;
-    let fps = 1_000_000.0 / avg.as_micros() as f64;
-
-    let _avg_render = internal_render_us.iter().sum::<u64>() / n as u64;
-    let avg_flush = internal_flush_us.iter().sum::<u64>() / n as u64;
-    let avg_draw = internal_draw_us.iter().sum::<u64>() / n as u64;
-    let avg_compositor = internal_compositor_us.iter().sum::<u64>() / n as u64;
-    let avg_mid_flush = internal_mid_flush_us.iter().sum::<u64>() / n as u64;
-
-    println!(
-        "  avg: {:>7} us ({:>6.1} fps)",
-        avg.as_micros(),
-        fps
-    );
-    println!(
-        "  p50: {:>7} us  p95: {:>7} us  p99: {:>7} us",
-        p50.as_micros(),
-        p95.as_micros(),
-        p99.as_micros()
-    );
-    println!(
-        "  draw: {} us  mid_flush(draw GPU): {} us  compositor: {} us  end_flush: {} us",
-        avg_draw, avg_mid_flush, avg_compositor, avg_flush
-    );
-    println!(
-        "  dl: {}  live: {}  comp_hits: {}  wall: {:.1} ms",
-        total_dl / n,
-        total_live / n,
-        total_comp_hits / n,
-        pan_wall.as_secs_f64() * 1000.0
-    );
-
-    // --- Zoom benchmark ---
-    println!("\n=== Zoom benchmark ({} frames) ===", args.frames);
-    renderer.camera.set_zoom(1.0);
-    let zoom_start = Instant::now();
-    let mut zoom_times = Vec::with_capacity(args.frames as usize);
-    let mut z = 1.0f32;
-    let mut zdir = 1;
-
-    for _ in 0..args.frames {
-        z += zdir as f32 * 0.02;
-        if z > 2.0 || z < 0.5 {
-            zdir = -zdir;
-        }
-        renderer.camera.set_zoom(z);
-        renderer.queue_unstable();
-        let frame_start = Instant::now();
-        if let FrameFlushResult::OK(_) = renderer.flush() {
-            zoom_times.push(frame_start.elapsed());
-        }
-    }
-    let zoom_wall = zoom_start.elapsed();
-
-    zoom_times.sort();
-    let zn = zoom_times.len();
-    let zp50 = zoom_times[zn / 2];
-    let zp95 = zoom_times[zn * 95 / 100];
-    let zavg = zoom_wall / zn as u32;
-    let zfps = 1_000_000.0 / zavg.as_micros() as f64;
-
-    println!(
-        "  avg: {:>7.1} us ({:>6.1} fps)  p50: {:>7.1} us  p95: {:>7.1} us  wall: {:.1} ms",
-        zavg.as_micros(),
-        zfps,
-        zp50.as_micros(),
-        zp95.as_micros(),
-        zoom_wall.as_secs_f64() * 1000.0
-    );
-
-    drop(renderer);
-    println!("\nDone.");
-    Ok(())
-}
-
-async fn run_interactive(file: Option<String>) -> Result<()> {
-    // Load initial scenes from the CLI argument (file path or URL), if given.
-    let initial_scenes = if let Some(ref source) = file {
-        load_scenes_from_source(source).await?
-    } else {
-        vec![build_empty_scene()]
-    };
-
-    let first = initial_scenes
-        .first()
-        .cloned()
-        .expect("at least one scene");
-
-    let (drop_tx, drop_rx) = unbounded_channel::<PathBuf>();
-    let (scenes_tx, scenes_rx) = unbounded_channel::<Vec<Scene>>();
-    let drop_rx = Arc::new(Mutex::new(Some(drop_rx)));
-
-    // Seed the scenes channel with the initial set so the window picks them
-    // up on the first tick (enables PageUp/PageDown for multi-scene files).
-    if initial_scenes.len() > 1 {
-        let _ = scenes_tx.send(initial_scenes);
-    }
-
-    run_demo_window_with_drop(
-        first,
-        move |_renderer, tx, _font_tx, proxy| {
-            let mut guard = drop_rx.lock().expect("drop rx mutex poisoned");
-            let drop_rx = guard.take().expect("drop receiver already taken");
-            start_master_drop_task(drop_rx, tx.clone(), proxy.clone(), scenes_tx);
-        },
-        drop_tx,
-        scenes_rx,
-    )
-    .await;
-
-    Ok(())
-}
+// ---------------------------------------------------------------------------
+// Scene loading helpers (shared by interactive mode and FileSceneLoader)
+// ---------------------------------------------------------------------------
 
 async fn load_scenes_from_source(source: &str) -> Result<Vec<Scene>> {
-    // If it looks like a local file with a known extension, route by type.
     if !is_url(source) {
         let path = Path::new(source);
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
@@ -449,7 +185,7 @@ async fn load_scenes_from_source(source: &str) -> Result<Vec<Scene>> {
                 "png" | "jpg" | "jpeg" | "webp" => {
                     return scene_from_raster_path(path).map(|s| vec![s])
                 }
-                _ => {} // fall through to grida/json decoding
+                _ => {}
             }
         }
     }
@@ -473,64 +209,17 @@ async fn read_source_bytes(source: &str) -> Result<Vec<u8>> {
     }
 }
 
-fn build_benchmark_scene(
-    grid: u32,
-    opacity: f32,
-    blend_mode: LayerBlendMode,
-    with_strokes: bool,
-) -> Scene {
-    let nf = NodeFactory::new();
-    let mut graph = SceneGraph::new();
-    let grid = grid.max(1);
-    let size = 18.0f32;
-    let spacing = 6.0f32;
-
-    for y in 0..grid {
-        for x in 0..grid {
-            let mut rect = nf.create_rectangle_node();
-            rect.transform = AffineTransform::new(
-                40.0 + x as f32 * (size + spacing),
-                40.0 + y as f32 * (size + spacing),
-                0.0,
-            );
-            rect.size = Size {
-                width: size,
-                height: size,
-            };
-            rect.opacity = opacity;
-            rect.blend_mode = blend_mode;
-            rect.fills = Paints::new([Paint::Solid(SolidPaint {
-                color: CGColor::from_rgb(((x * 11) % 255) as u8, ((y * 7) % 255) as u8, 210),
-                blend_mode: BlendMode::default(),
-                active: true,
-            })]);
-            if with_strokes {
-                rect.strokes = Paints::new([Paint::Solid(SolidPaint {
-                    color: CGColor::from_rgb(50, 50, 50),
-                    blend_mode: BlendMode::default(),
-                    active: true,
-                })]);
-            }
-            graph.append_child(Node::Rectangle(rect), Parent::Root);
-        }
-    }
-
-    let stroke_label = if with_strokes { "+strokes" } else { "" };
-    Scene {
-        name: format!(
-            "Benchmark {}x{} (opacity={:.2}{})",
-            grid, grid, opacity, stroke_label
-        ),
-        graph,
-        background_color: Some(CGColor::from_rgb(250, 250, 250)),
-    }
-}
-
 fn is_url(path: &str) -> bool {
     path.starts_with("http://") || path.starts_with("https://")
 }
 
+// ---------------------------------------------------------------------------
+// Interactive windowed mode
+// ---------------------------------------------------------------------------
+
 fn build_empty_scene() -> Scene {
+    use cg::cg::prelude::CGColor;
+    use cg::node::scene_graph::SceneGraph;
     Scene {
         name: "Drop a file to begin".to_string(),
         graph: SceneGraph::new(),
@@ -538,30 +227,47 @@ fn build_empty_scene() -> Scene {
     }
 }
 
-async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|s| s.to_ascii_lowercase())
-        .ok_or_else(|| anyhow!("Dropped file has no extension: {}", path.display()))?;
+async fn run_interactive(file: Option<String>) -> Result<()> {
+    let initial_scenes = if let Some(ref source) = file {
+        load_scenes_from_source(source).await?
+    } else {
+        vec![build_empty_scene()]
+    };
 
-    match ext.as_str() {
-        "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
-        "svg" => scene_from_svg_path(path).map(|s| vec![s]),
-        "png" | "jpg" | "jpeg" | "webp" => scene_from_raster_path(path).map(|s| vec![s]),
-        other => Err(anyhow!(
-            "Unsupported dropped file type ({}): {}",
-            other,
-            path.display()
-        )),
+    let first = initial_scenes
+        .first()
+        .cloned()
+        .expect("at least one scene");
+
+    let (drop_tx, drop_rx) = unbounded_channel::<PathBuf>();
+    let (scenes_tx, scenes_rx) = unbounded_channel::<Vec<Scene>>();
+    let drop_rx = Arc::new(Mutex::new(Some(drop_rx)));
+
+    if initial_scenes.len() > 1 {
+        let _ = scenes_tx.send(initial_scenes);
     }
+
+    run_demo_window_with_drop(
+        first,
+        move |_renderer, tx, _font_tx, proxy| {
+            let mut guard = drop_rx.lock().expect("drop rx mutex poisoned");
+            let drop_rx = guard.take().expect("drop receiver already taken");
+            start_master_drop_task(drop_rx, tx.clone(), proxy.clone(), scenes_tx);
+        },
+        drop_tx,
+        scenes_rx,
+    )
+    .await;
+
+    Ok(())
 }
 
 fn scene_from_svg_path(path: &Path) -> Result<Scene> {
+    use cg::cg::prelude::CGColor;
     let svg_source =
-        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+        std::fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     let graph = pack::from_svg_str(&svg_source)
-        .map_err(|err| anyhow!("failed to convert SVG {}: {err}", path.display()))?;
+        .map_err(|err| anyhow::anyhow!("failed to convert SVG {}: {err}", path.display()))?;
 
     Ok(Scene {
         name: path
@@ -574,6 +280,11 @@ fn scene_from_svg_path(path: &Path) -> Result<Scene> {
 }
 
 fn scene_from_raster_path(path: &Path) -> Result<Scene> {
+    use cg::cg::prelude::CGColor;
+    use cg::cg::types::ResourceRef;
+    use cg::node::factory::NodeFactory;
+    use cg::node::scene_graph::{Parent, SceneGraph};
+    use cg::node::schema::{Node, Size};
     let (width, height) = image_dimensions(path)
         .with_context(|| format!("failed to read image dimensions {}", path.display()))?;
     let mut graph = SceneGraph::new();
@@ -598,6 +309,25 @@ fn scene_from_raster_path(path: &Path) -> Result<Scene> {
     })
 }
 
+async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .ok_or_else(|| anyhow::anyhow!("Dropped file has no extension: {}", path.display()))?;
+
+    match ext.as_str() {
+        "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
+        "svg" => scene_from_svg_path(path).map(|s| vec![s]),
+        "png" | "jpg" | "jpeg" | "webp" => scene_from_raster_path(path).map(|s| vec![s]),
+        other => Err(anyhow::anyhow!(
+            "Unsupported dropped file type ({}): {}",
+            other,
+            path.display()
+        )),
+    }
+}
+
 fn start_master_drop_task(
     mut drop_rx: UnboundedReceiver<PathBuf>,
     image_tx: mpsc::UnboundedSender<ImageMessage>,
@@ -614,7 +344,6 @@ fn start_master_drop_task(
                         continue;
                     }
 
-                    // Load images for all scenes in the background.
                     for scene in scenes_for_loader {
                         let tx_clone = image_tx.clone();
                         let proxy_clone = proxy.clone();
