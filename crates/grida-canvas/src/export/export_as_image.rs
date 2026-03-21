@@ -31,6 +31,13 @@ pub fn export_node_as_image(
     rect: Rectangle,
     format: ExportAsImage,
 ) -> Option<Exported> {
+    // Guard: Skia cannot create a raster surface with zero or negative dimensions.
+    let pixel_w = size.width as i32;
+    let pixel_h = size.height as i32;
+    if pixel_w <= 0 || pixel_h <= 0 {
+        return None;
+    }
+
     let skfmt: EncodedImageFormat = format.clone().into();
 
     // Create camera with original bounds to determine world-space view
@@ -39,7 +46,11 @@ pub fn export_node_as_image(
     // Scale the camera size to target resolution and adjust zoom to maintain same world-space view
     // When we increase the viewport size and zoom IN proportionally, we see the same world-space rect
     // but at higher resolution (scale = 2 means 2x zoom, 2x pixels, same world-space view)
-    let scale = size.width / rect.width;
+    let scale = if rect.width > 0.0 {
+        size.width / rect.width
+    } else {
+        1.0
+    };
     camera.set_size(Size {
         width: size.width,
         height: size.height,
@@ -48,7 +59,7 @@ pub fn export_node_as_image(
 
     let store = fonts.store();
     let mut r = Renderer::new_with_store(
-        Backend::new_from_raster(size.width as i32, size.height as i32),
+        Backend::new_from_raster(pixel_w, pixel_h),
         None,
         camera,
         store,

@@ -525,4 +525,111 @@ describe("@grida/refig (real render)", () => {
       renderer.dispose();
     }
   }, 60_000);
+
+  it(
+    "renders REST API doc without size/relativeTransform (issue-585 regression)",
+    async () => {
+      // Reproduces the exact node structure from the uploaded figma-file.json in
+      // https://github.com/gridaco/grida/issues/585.
+      // The Figma REST API GET /v1/files/:key response omits `size` and
+      // `relativeTransform` on every node. Previously, positioning_trait fell
+      // back to width=0/height=0 causing Backend::new_from_raster(0,0) to panic.
+      const figmaFileJson = {
+        document: {
+          id: "0:0",
+          type: "DOCUMENT",
+          name: "Test",
+          children: [
+            {
+              id: "0:1",
+              type: "CANVAS",
+              name: "Page 1",
+              children: [
+                {
+                  id: "1:97",
+                  name: "ws-intense-next-advertising-agency/",
+                  type: "FRAME",
+                  scrollBehavior: "SCROLLS",
+                  blendMode: "PASS_THROUGH",
+                  clipsContent: true,
+                  absoluteBoundingBox: {
+                    x: 38,
+                    y: -245,
+                    width: 420,
+                    height: 490,
+                  },
+                  absoluteRenderBounds: {
+                    x: 38,
+                    y: -245,
+                    width: 420,
+                    height: 490,
+                  },
+                  constraints: { vertical: "TOP", horizontal: "LEFT" },
+                  fills: [],
+                  strokes: [],
+                  strokeWeight: 1,
+                  strokeAlign: "INSIDE",
+                  effects: [],
+                  exportSettings: [],
+                  interactions: [],
+                  background: [],
+                  backgroundColor: { r: 0, g: 0, b: 0, a: 0 },
+                  // Intentionally absent: size, relativeTransform
+                  children: [
+                    {
+                      id: "1:113",
+                      name: "border",
+                      type: "RECTANGLE",
+                      scrollBehavior: "SCROLLS",
+                      blendMode: "PASS_THROUGH",
+                      absoluteBoundingBox: {
+                        x: 58,
+                        y: -217,
+                        width: 380,
+                        height: 462,
+                      },
+                      // null absoluteRenderBounds — exactly as in the reported file
+                      absoluteRenderBounds: null,
+                      constraints: { vertical: "TOP", horizontal: "LEFT" },
+                      fills: [
+                        {
+                          type: "SOLID",
+                          color: { r: 1, g: 1, b: 1, a: 1 },
+                          blendMode: "NORMAL",
+                          visible: true,
+                        },
+                      ],
+                      strokes: [],
+                      strokeWeight: 1,
+                      strokeAlign: "INSIDE",
+                      effects: [],
+                      cornerRadius: 0,
+                      exportSettings: [],
+                      interactions: [],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      const renderer = new FigmaRenderer(figmaFileJson as any, {
+        loadFigmaDefaultFonts: false,
+      });
+      try {
+        // This must not throw/panic — previously panicked with
+        // "Failed to create raster surface" because node bounds were 0x0
+        const result = await renderer.render("1:97", { format: "png" });
+        expectPng(result.data);
+
+        const outPath = join(TEST_OUTPUT_DIR, "issue-585-no-geometry.png");
+        writeFileSync(outPath, Buffer.from(result.data));
+      } finally {
+        renderer.dispose();
+      }
+    },
+    30_000
+  );
 });
