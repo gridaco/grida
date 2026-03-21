@@ -33,34 +33,64 @@ Before touching any code, build context by reading these sources in order:
    read whichever documents match the problem at hand.
 4. **Read existing benchmarks** — look in `crates/grida-canvas/benches/`
    to understand what is already measured and how.
-5. **Read `crates/grida-dev/src/main.rs`** — the `bench` subcommand shows
-   how GPU benchmarks work with real `.grida` scene files.
+5. **Read `crates/grida-dev/src/main.rs`** — the `bench` and `bench-report`
+   subcommands show how GPU benchmarks work with real `.grida` scene files.
+   `bench-report` is the bulk mode that outputs JSON across all fixtures.
 
 Use `grep` and `glob` to discover the current state of code rather than
 relying on hardcoded paths. File locations shift as the engine evolves.
 
 ### Key discovery queries
 
-| What you need | How to find it |
-|---|---|
-| The renderer entry point | `grep "struct Renderer" --include="*.rs"` in `crates/grida-canvas/src/` |
-| Camera change classification | `grep "enum CameraChangeKind" --include="*.rs"` |
-| How compositor cache works | `grep "struct LayerImage" --include="*.rs"` and read the containing module |
-| Promotion heuristics | `grep "fn should_promote" --include="*.rs"` |
-| Where zoom invalidation happens | `grep "zoom_changed\|mark_all_stale\|invalidate_all" --include="*.rs"` in `src/runtime/` |
-| Frame pipeline flow | Search for `fn queue\|fn flush\|fn draw\|fn frame` in the renderer file |
-| Benchmark fixture scenes | `--list-scenes` flag on `grida-dev bench` |
+| What you need                             | How to find it                                                                                      |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| The renderer entry point                  | `grep "struct Renderer" --include="*.rs"` in `crates/grida-canvas/src/`                             |
+| Camera change classification              | `grep "enum CameraChangeKind" --include="*.rs"`                                                     |
+| How compositor cache works                | `grep "struct LayerImage" --include="*.rs"` and read the containing module                          |
+| Promotion heuristics                      | `grep "fn should_promote" --include="*.rs"`                                                         |
+| Where zoom invalidation happens           | `grep "zoom_changed\|mark_all_stale\|invalidate_all" --include="*.rs"` in `src/runtime/`            |
+| Frame pipeline flow                       | Search for `fn queue\|fn flush\|fn draw\|fn frame` in the renderer file                             |
+| Benchmark fixture scenes                  | `--list-scenes` flag on `grida-dev bench`, or run `bench-report` on a directory                     |
 | Config toggles (compositing, atlas, etc.) | `grep "set_layer_compositing\|set_compositor_atlas\|set_interaction_render_scale" --include="*.rs"` |
-| Existing `.plan.md` proposals | `glob "docs/wg/feat-2d/*.plan.md"` |
+| Existing `.plan.md` proposals             | `glob "docs/wg/feat-2d/*.plan.md"`                                                                  |
 
 ---
 
-## The Two Benchmark Systems
+## The Benchmark Systems
 
-There are two complementary benchmarks. **Always use both** — they
-measure different things and a change that helps one can hurt the other.
+There are three complementary benchmarks. The bulk report is the
+recommended starting point; the single-scene bench and Criterion
+provide deeper investigation when needed.
 
-### 1. GPU benchmark (`grida-dev bench`)
+### 1. Bulk benchmark report (`grida-dev bench-report`)
+
+Runs all scenes in all `.grida` files and outputs a compact **JSON
+report**. Use this to establish baselines, detect regressions across
+the full fixture set, and identify which scenes/stages are slowest.
+
+```sh
+# All fixtures — recommended first step
+cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --output baseline.json
+
+# Single file
+cargo run -p grida-dev --release -- bench-report ./fixtures/test-grida/bench.grida --frames 200
+
+# Local fixtures for broader coverage
+cargo run -p grida-dev --release -- bench-report ./fixtures/local/ --frames 100 --output baseline-local.json
+```
+
+The JSON report contains per-scene results with:
+
+- `nodes`, `effects_nodes` — scene complexity
+- `pan.{avg_us, fps, p50_us, p95_us, p99_us}` — pan performance
+- `pan.{draw_us, mid_flush_us, compositor_us, flush_us}` — per-stage breakdown
+- `zoom.{avg_us, fps, p50_us, p95_us, p99_us}` — zoom performance
+- `errors[]` — files that failed to load
+
+Progress goes to stderr, JSON to stdout (or `--output path`). This
+keeps the JSON clean for programmatic consumption.
+
+### 2. Single-scene GPU benchmark (`grida-dev bench`)
 
 Runs real scene data on the actual GPU backend (Metal/GL). This is the
 ground truth for "does the user experience improve?"
@@ -105,13 +135,15 @@ of scenes, configs, and operations. The naming convention is
 
 ### When to use which
 
-| Question | Use |
-|---|---|
-| Is the optimization visible to users? | GPU bench |
-| Is the algorithm itself faster? | Criterion |
-| Is there a statistical regression? | Criterion (has CI) |
-| What's the real frame time with GPU overhead? | GPU bench |
-| Does a config toggle actually help? | Both (compare configs) |
+| Question                                      | Use                              |
+| --------------------------------------------- | -------------------------------- |
+| What's slow across all fixtures?              | Bulk report (`bench-report`)     |
+| Baseline before/after a change?               | Bulk report (save JSON, compare) |
+| Detailed investigation of one scene?          | Single-scene GPU bench           |
+| Is the algorithm itself faster?               | Criterion                        |
+| Is there a statistical regression?            | Criterion (has CI)               |
+| What's the real frame time with GPU overhead? | Single-scene GPU bench           |
+| Does a config toggle actually help?           | Both GPU benchmarks + Criterion  |
 
 ---
 
@@ -121,8 +153,14 @@ of scenes, configs, and operations. The naming convention is
 
 ### Step 1: Baseline
 
-Run both benchmarks on the relevant scenes BEFORE any changes. Copy
-the output somewhere — you'll compare against it.
+Run the bulk benchmark report BEFORE any changes. Save the JSON output
+so you can compare against it after the change.
+
+```sh
+cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --output baseline.json
+```
+
+For algorithmic changes, also run Criterion to get statistical baselines.
 
 ### Step 2: Implement
 
@@ -140,18 +178,24 @@ Run the same benchmarks AFTER the change. Compare the numbers.
 
 ### Step 4: Regression check
 
+Re-run the bulk benchmark report and compare against `baseline.json`.
+
+```sh
+cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --output after.json
+```
+
 A zoom optimization must not regress pan. An effects optimization must
-not regress non-effects scenes. Always run at least one scene from a
-different category than the one you optimized.
+not regress non-effects scenes. The bulk report covers all scenes
+automatically — compare the full set, not just the target.
 
 ### Step 5: Accept or iterate
 
-| Criterion | Required? |
-|---|---|
-| Target operation meets the fps goal | Yes |
-| Non-target operations within 5% of baseline | Yes |
-| All `cargo test -p cg` tests pass | Yes |
-| No new clippy warnings from changed files | Yes |
+| Criterion                                   | Required? |
+| ------------------------------------------- | --------- |
+| Target operation meets the fps goal         | Yes       |
+| Non-target operations within 5% of baseline | Yes       |
+| All `cargo test -p cg` tests pass           | Yes       |
+| No new clippy warnings from changed files   | Yes       |
 
 ---
 
@@ -263,6 +307,7 @@ section. Read it as a living catalog — items are added as new strategies
 are designed.
 
 The document is organized by category:
+
 - Transform & Geometry (items 1-3)
 - Rendering Pipeline (items 4-14)
 - Pan-Only Optimization (items 15-20)
@@ -313,7 +358,7 @@ Criterion runs on a CPU raster backend. It's excellent for measuring
 algorithmic cost and detecting regressions in pipeline logic. But it
 tells you nothing about GPU texture switching, GPU flush latency, or
 Metal/GL driver behavior. Don't conclude "compositing doesn't help"
-from Criterion results — it doesn't help on *raster*, which is expected.
+from Criterion results — it doesn't help on _raster_, which is expected.
 
 ### Timing overhead in budgeted loops
 
