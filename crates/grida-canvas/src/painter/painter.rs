@@ -1198,6 +1198,35 @@ impl<'a> Painter<'a> {
             PainterPictureLayer::Shape(shape_layer) => {
                 let effects = &shape_layer.effects;
                 let opacity = shape_layer.base.opacity;
+
+                // Trivial-node fast path: opacity=1.0, no effects, Normal/PassThrough blend.
+                // Skips the entire effects pipeline, blend wrapper, opacity wrapper,
+                // and all associated condition checks / closure creation.
+                // This is the most common case for simple fill/stroke nodes.
+                if opacity >= 1.0
+                    && effects.is_empty()
+                    && matches!(
+                        shape_layer.base.blend_mode,
+                        LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal)
+                    )
+                {
+                    self.with_transform(&shape_layer.base.transform.matrix, || {
+                        let shape = &shape_layer.shape;
+                        let clip_path = &shape_layer.base.clip_path;
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            if self.policy.render_fills() {
+                                self.draw_fills(shape, &shape_layer.fills);
+                            }
+                            if self.policy.render_strokes() {
+                                if let Some(path) = &shape_layer.stroke_path {
+                                    self.draw_stroke_path(shape, path, &shape_layer.strokes);
+                                }
+                            }
+                        });
+                    });
+                    return;
+                }
+
                 let can_fold_opacity = opacity < 1.0 && !effects.needs_opacity_isolation();
 
                 // Paint-alpha fast path: for simple leaf nodes with

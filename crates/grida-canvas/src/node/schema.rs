@@ -30,6 +30,18 @@ impl LayerEffects {
         Self::default()
     }
 
+    /// Returns true when there are no effects at all (no shadows, blur,
+    /// backdrop blur, glass, or noise). Used for fast-path dispatch
+    /// to skip the effects pipeline entirely for simple nodes.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.blur.is_none()
+            && self.backdrop_blur.is_none()
+            && self.glass.is_none()
+            && self.shadows.is_empty()
+            && self.noises.is_empty()
+    }
+
     /// Set layer blur effect
     pub fn blur(mut self, blur: impl Into<FeBlur>) -> Self {
         self.blur = Some(FeLayerBlur::from(blur.into()));

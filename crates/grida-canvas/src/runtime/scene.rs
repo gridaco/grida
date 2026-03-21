@@ -257,11 +257,25 @@ impl Renderer {
         policy: RenderPolicy,
     ) {
         let variant_key = policy.variant_key();
-        // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
+        // Prefill picture cache for visible layers so Painter can reuse pictures even with masks.
+        // Fast path: skip clone + recording when the picture is already cached (common case
+        // on cache-warm frames). The clone of LayerEntry is expensive because it deep-copies
+        // fills, strokes, effects, paths, etc.
         for (_region, indices) in &plan.regions {
             for idx in indices {
-                if let Some(entry) = self.scene_cache.layers.layers.get(*idx).cloned() {
+                if let Some(entry) = self.scene_cache.layers.layers.get(*idx) {
                     let id = entry.id;
+                    // Check cache before cloning — avoids expensive deep clone on cache hits.
+                    if self
+                        .scene_cache
+                        .picture
+                        .get_node_picture_variant(&id, variant_key)
+                        .is_some()
+                    {
+                        continue;
+                    }
+                    // Cache miss — clone and record.
+                    let entry = entry.clone();
                     let _ = self.with_recording_cached_with_policy(
                         &id,
                         variant_key,
@@ -1614,10 +1628,11 @@ impl Renderer {
         }
 
         // Only process layers visible in the current viewport.
+        // Iterate visible indices directly instead of building a HashSet
+        // and scanning all layers — avoids O(total_layers) iteration and
+        // HashSet allocation/lookup overhead.
         let viewport_rect = self.camera.rect();
         let visible_indices = self.scene_cache.intersects(viewport_rect);
-        let visible_set: std::collections::HashSet<usize> =
-            visible_indices.into_iter().collect();
 
         // Time budget for stale re-rasterization during interactive frames.
         // 8ms leaves headroom within a 16ms frame budget (60fps target).
@@ -1630,10 +1645,10 @@ impl Renderer {
         // visually acceptable.
         const RASTER_ZOOM_RATIO: f32 = 1.5;
 
-        for (idx, entry) in self.scene_cache.layers.layers.iter().enumerate() {
-            if !visible_set.contains(&idx) {
+        for idx in visible_indices {
+            let Some(entry) = self.scene_cache.layers.layers.get(idx) else {
                 continue;
-            }
+            };
 
             let id = entry.id;
 
