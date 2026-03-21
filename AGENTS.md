@@ -239,3 +239,18 @@ pnpm typecheck
 # run test (only packages and editor)
 pnpm turbo test --filter='./packages/*' --filter=editor
 ```
+
+## Worktree
+
+This project supports git worktrees. When working in a fresh worktree, run the following setup:
+
+```sh
+# 1. Initialize git submodules (e.g. emsdk for WASM builds)
+git submodule update --init
+
+# 2. Install node dependencies
+pnpm install
+```
+
+- **Cargo / Rust** works out of the box — the `target/` directory is resolved via relative paths and shared across worktrees.
+- **Rustup targets** (e.g. `wasm32-unknown-emscripten`) are installed globally and do not need per-worktree setup.
