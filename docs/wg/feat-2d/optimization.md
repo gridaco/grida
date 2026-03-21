@@ -451,6 +451,42 @@ Related:
     achieves the same. Direct color paint further reduces per-draw overhead
     by avoiding shader program dispatch for solid colors.
 
+11d. **Translate-Fold for Pure-Translation Transforms**
+
+    For the most common node type — fills-only with a pure-translation
+    transform (no rotation, scale, or skew) — the painter folds the
+    translation directly into the shape coordinates and draws with a single
+    Skia call. This eliminates `canvas.save()`, `canvas.concat(matrix)`, and
+    `canvas.restore()`, reducing the recorded SkPicture from 4 commands to 1
+    per qualifying node.
+
+    The optimization fires when:
+    - Transform is pure translation (`[[1,0,tx],[0,1,ty]]`)
+    - No clip path
+    - No stroke path (fills only)
+    - Trivial fast path conditions (opacity=1.0, no effects, Normal blend)
+
+    Also applied to the per-paint-alpha opacity path for fills-only nodes
+    with opacity < 1.0.
+
+    For rect shapes, coordinates are offset directly. For rrect and oval
+    shapes, `with_offset()` is used. Path shapes fall back to
+    `save/translate/draw/restore`.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                        | Before      | After       | Delta   |
+    | ---------------------------- | ----------- | ----------- | ------- |
+    | flat grid (10K rects, pan)   | 6882 µs     | 5455 µs     | -20.7%  |
+    | flat grid (10K rects, draw)  | 5538 µs     | 4228 µs     | -23.7%  |
+    | opacity fill (5K, pan)       | 2896 µs     | 2529 µs     | -12.7%  |
+    | opacity fill (5K, draw)      | 2311 µs     | 1899 µs     | -17.8%  |
+    | stroke rect (2K, pan)        | 2115 µs     | ~2250 µs    | ~0% (noise) |
+    | shadow grid (2K promoted)    | 1196 µs     | ~1218 µs    | ~0% (noise) |
+
+    Scenes with strokes or effects are unaffected — all their nodes bypass
+    the translate-fold path and use the existing `save/concat/restore`.
+
 12. **Tight Bounds for `save_layer` Operations**
     - First: avoid `save_layer` entirely when possible (see item 6b).
     - When required: always provide explicit bounds.

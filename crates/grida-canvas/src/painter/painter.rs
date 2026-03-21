@@ -856,6 +856,84 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Draw fills at pre-translated coordinates, avoiding canvas save/concat/restore.
+    ///
+    /// For pure-translation transforms, this pre-applies the translation to shape
+    /// coordinates and draws directly. Reduces the SkPicture from 4 commands
+    /// (save + concat + draw + restore) to 1 command (draw) per node.
+    #[inline]
+    fn draw_fills_translated(
+        &self,
+        shape: &PainterShape,
+        fills: &[Paint],
+        tx: f32,
+        ty: f32,
+    ) {
+        if fills.is_empty() {
+            return;
+        }
+        if let Some(paint) = paint::sk_paint_stack(
+            fills,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            self.draw_shape_at_offset(shape, &paint, tx, ty);
+        }
+    }
+
+    /// Draw fills at pre-translated coordinates with opacity baked into paint alpha.
+    #[inline]
+    fn draw_fills_translated_with_opacity(
+        &self,
+        shape: &PainterShape,
+        fills: &[Paint],
+        opacity: f32,
+        tx: f32,
+        ty: f32,
+    ) {
+        if fills.is_empty() {
+            return;
+        }
+        if let Some(mut paint) = paint::sk_paint_stack(
+            fills,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            paint.set_alpha_f(paint.alpha_f() * opacity);
+            self.draw_shape_at_offset(shape, &paint, tx, ty);
+        }
+    }
+
+    /// Draw a shape at an offset without canvas save/concat/restore.
+    ///
+    /// For rect, rrect, and oval shapes, translates coordinates directly.
+    /// For path shapes, falls back to save/translate/draw/restore.
+    #[inline]
+    fn draw_shape_at_offset(
+        &self,
+        shape: &PainterShape,
+        paint: &SkPaint,
+        tx: f32,
+        ty: f32,
+    ) {
+        if tx == 0.0 && ty == 0.0 {
+            shape.draw_on_canvas(self.canvas, paint);
+        } else if let Some(rect) = shape.rect_shape {
+            self.canvas.draw_rect(rect.with_offset((tx, ty)), paint);
+        } else if let Some(rrect) = &shape.rrect {
+            self.canvas
+                .draw_rrect(rrect.with_offset((tx, ty)), paint);
+        } else if let Some(oval) = &shape.oval {
+            self.canvas.draw_oval(oval.with_offset((tx, ty)), paint);
+        } else {
+            // Path: use save/translate/draw/restore
+            self.canvas.save();
+            self.canvas.translate((tx, ty));
+            shape.draw_on_canvas(self.canvas, paint);
+            self.canvas.restore();
+        }
+    }
+
     /// Draw fills with layer opacity baked into the paint alpha.
     ///
     /// Eliminates the save_layer_alpha GPU surface allocation for fills-only
@@ -1210,6 +1288,36 @@ impl<'a> Painter<'a> {
                         LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal)
                     )
                 {
+                    let m = &shape_layer.base.transform.matrix;
+
+                    // Translate-fold fast path: for pure-translation transforms with
+                    // no clip path and no strokes, pre-apply the translation to shape
+                    // coordinates instead of save/concat(matrix)/restore. This reduces
+                    // the recorded SkPicture from 4 commands to 1 per node.
+                    //
+                    // Only applies to fills-only nodes: when strokes are present, the
+                    // shared save/concat/restore wrapping both fills and strokes is
+                    // cheaper than splitting into separate draw + save/translate/restore.
+                    if shape_layer.base.clip_path.is_none()
+                        && shape_layer.stroke_path.is_none()
+                        && m[0][0] == 1.0
+                        && m[1][0] == 0.0
+                        && m[0][1] == 0.0
+                        && m[1][1] == 1.0
+                    {
+                        let tx = m[0][2];
+                        let ty = m[1][2];
+                        if self.policy.render_fills() {
+                            self.draw_fills_translated(
+                                &shape_layer.shape,
+                                &shape_layer.fills,
+                                tx,
+                                ty,
+                            );
+                        }
+                        return;
+                    }
+
                     self.with_transform(&shape_layer.base.transform.matrix, || {
                         let shape = &shape_layer.shape;
                         let clip_path = &shape_layer.base.clip_path;
@@ -1265,6 +1373,52 @@ impl<'a> Painter<'a> {
 
                 if can_fold_into_paint {
                     // Zero save_layers: opacity folded into paint alpha.
+                    let m = &shape_layer.base.transform.matrix;
+
+                    // Translate-fold: skip save/concat/restore for pure translations.
+                    if shape_layer.base.clip_path.is_none()
+                        && shape_layer.non_overlapping_fill_path.is_none()
+                        && m[0][0] == 1.0
+                        && m[1][0] == 0.0
+                        && m[0][1] == 0.0
+                        && m[1][1] == 1.0
+                    {
+                        let tx = m[0][2];
+                        let ty = m[1][2];
+                        if self.policy.render_fills() {
+                            self.draw_fills_translated_with_opacity(
+                                &shape_layer.shape,
+                                &shape_layer.fills,
+                                opacity,
+                                tx,
+                                ty,
+                            );
+                        }
+                        if self.policy.render_strokes() {
+                            if let Some(path) = &shape_layer.stroke_path {
+                                if tx == 0.0 && ty == 0.0 {
+                                    self.draw_stroke_path_with_opacity(
+                                        &shape_layer.shape,
+                                        path,
+                                        &shape_layer.strokes,
+                                        opacity,
+                                    );
+                                } else {
+                                    self.canvas.save();
+                                    self.canvas.translate((tx, ty));
+                                    self.draw_stroke_path_with_opacity(
+                                        &shape_layer.shape,
+                                        path,
+                                        &shape_layer.strokes,
+                                        opacity,
+                                    );
+                                    self.canvas.restore();
+                                }
+                            }
+                        }
+                        return;
+                    }
+
                     self.with_transform(&shape_layer.base.transform.matrix, || {
                         let shape = &shape_layer.shape;
                         let clip_path = &shape_layer.base.clip_path;
