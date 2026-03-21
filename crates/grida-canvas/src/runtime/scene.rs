@@ -1652,6 +1652,19 @@ impl Renderer {
 
             let id = entry.id;
 
+            // Fast skip: nodes without expensive effects will never be promoted.
+            // This avoids HashMap lookups (compositor.peek, geometry.get_render_bounds)
+            // and should_promote calls for simple fill/stroke nodes — the vast majority
+            // of nodes in typical scenes.
+            //
+            // Safety: effects don't change without rebuilding the layer list, and
+            // should_promote already returns NoExpensiveEffects for these nodes.
+            // De-promotion of previously-promoted nodes that lost effects is handled
+            // by scene rebuild (which invalidates the compositor).
+            if !promotion::has_promotable_effects(&entry.layer) {
+                continue;
+            }
+
             // Decide whether this node needs (re-)rasterization.
             //
             //  State        | Unstable frame          | Stable frame (force_all)

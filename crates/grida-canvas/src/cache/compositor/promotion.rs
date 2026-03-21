@@ -81,6 +81,16 @@ pub fn should_promote(
     PromotionStatus::Promoted
 }
 
+/// Returns true if the node has any effects that make it a candidate for
+/// compositor promotion (shadows, layer blur, noise).
+///
+/// This is a cheap check on struct fields (no HashMap lookups). Use it as
+/// an early filter before the full `should_promote` evaluation to skip
+/// nodes that will never be promoted.
+pub fn has_promotable_effects(layer: &PainterPictureLayer) -> bool {
+    has_expensive_effects(layer)
+}
+
 /// Returns true if the node has effects that are expensive to repaint
 /// (shadows, layer blur, noise).
 fn has_expensive_effects(layer: &PainterPictureLayer) -> bool {

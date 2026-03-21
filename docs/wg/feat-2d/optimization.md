@@ -258,6 +258,40 @@ Related:
 
     Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_atlas.rs`
 
+7c. **Compositor Early-Exit for Non-Promotable Nodes**
+
+    The compositor update loop iterates over all visible nodes each frame to
+    decide which nodes should be promoted to cached GPU textures. For nodes
+    without expensive effects (simple fill/stroke), this loop performs
+    unnecessary HashMap lookups (`compositor.peek`, `geometry.get_render_bounds`)
+    and `should_promote` calls — only to conclude the node is not promotable.
+
+    **The optimization:** check `has_promotable_effects()` (a cheap struct field
+    check on the LayerEffects fields) before any HashMap lookups. Nodes without
+    shadows, blur, noise, or glass skip the entire compositor evaluation.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                          | Compositor before | Compositor after | Delta   |
+    | ------------------------------ | ----------------- | ---------------- | ------- |
+    | flat grid (10K rects, pan)     | 941 µs            | 134 µs           | -85.8%  |
+    | stroke rect grid (2K, pan)     | 122 µs            | 18 µs            | -85.2%  |
+    | opacity fill (5K, pan)         | 346 µs            | 51 µs            | -85.3%  |
+    | opacity fill+stroke (5K, pan)  | 428 µs            | 74 µs            | -82.7%  |
+    | shadow grid (2K promoted, pan) | 38 µs             | 38 µs            | 0%      |
+
+    Total frame time improvement:
+
+    | Scene                        | Pan avg before | Pan avg after | Delta   |
+    | ---------------------------- | -------------- | ------------- | ------- |
+    | flat grid (10K rects)        | 7310 µs        | 6084 µs       | -16.8%  |
+    | opacity fill (5K)            | 3320 µs        | 2956 µs       | -11.0%  |
+    | opacity fill+stroke (5K)     | 6214 µs        | 5767 µs       | -7.2%   |
+    | shadow grid (2K promoted)    | 1233 µs        | 1224 µs       | 0%      |
+
+    Scenes with promoted nodes (shadow grid) are unaffected — all their visible
+    nodes have effects and still go through the full compositor path.
+
 8. **Dirty & Re-Cache Strategy**
    - Nodes marked dirty trigger re-recording of their `SkPicture`.
    - Render surfaces containing dirty children are re-composited.
