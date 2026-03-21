@@ -37,9 +37,18 @@ fn handle_window_event(
                 },
             ..
         } => handle_key_pressed(key, modifiers),
-        WindowEvent::PinchGesture { delta, .. } => ApplicationCommand::ZoomDelta {
-            delta: *delta as f32,
-        },
+        WindowEvent::PinchGesture { delta, .. } => {
+            // Deadzone: ignore tiny pinch deltas that macOS trackpads
+            // generate incidentally during two-finger scroll. Without this,
+            // every pan gesture registers as PanAndZoom, defeating pan-only
+            // optimizations (pan image cache, etc.).
+            let d = *delta as f32;
+            if d.abs() < 0.002 {
+                ApplicationCommand::None
+            } else {
+                ApplicationCommand::ZoomDelta { delta: d }
+            }
+        }
         WindowEvent::MouseWheel { delta, .. } => {
             if modifiers.super_key() || modifiers.control_key() {
                 // Cmd+scroll (macOS) or Ctrl+scroll → zoom, same as pinch
@@ -101,6 +110,9 @@ pub struct NativeApplication {
     pub(crate) modifiers: winit::keyboard::ModifiersState,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
     fit_scene_on_load: bool,
+    /// When >0, the next N ticks should request a redraw to produce a
+    /// settle frame (showing "none" after a gesture ends).
+    settle_countdown: u8,
     /// All scenes loaded from the file (for PageUp/PageDown switching).
     pub(crate) scenes: Vec<Scene>,
     /// Index of the currently displayed scene in `scenes`.
@@ -183,6 +195,7 @@ impl NativeApplication {
             modifiers: winit::keyboard::ModifiersState::default(),
             file_drop_tx,
             fit_scene_on_load,
+            settle_countdown: 0,
             scenes: Vec::new(),
             scene_index: 0,
             image_tx: None,
@@ -299,6 +312,12 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             _ => {
                 let is_copy_png = matches!(cmd, ApplicationCommand::TryCopyAsPNG);
                 let ok = self.app.command(cmd);
+                if ok {
+                    // Schedule a settle redraw ~50ms after the last interaction
+                    // so the overlay shows "none" when the gesture ends.
+                    // The 240Hz tick decrements the countdown (~12 ticks ≈ 50ms).
+                    self.settle_countdown = 12;
+                }
 
                 if ok && is_copy_png {
                     use std::io::Write;
@@ -341,6 +360,17 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                     }
                 }
                 self.app.tick_with_current_time();
+
+                // Settle frame: after the last interaction, request one more
+                // redraw so the overlay shows "none" and the renderer
+                // can capture a clean pan-image-cache snapshot.
+                if self.settle_countdown > 0 {
+                    self.settle_countdown -= 1;
+                    if self.settle_countdown == 0 {
+                        self.app.renderer_mut().queue_unstable();
+                        self.window.request_redraw();
+                    }
+                }
             }
             HostEvent::RedrawRequest => self.window.request_redraw(),
             HostEvent::FontLoaded(_f) => {

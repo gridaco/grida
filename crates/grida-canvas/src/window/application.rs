@@ -842,37 +842,7 @@ impl UnknownTargetApplication {
         //    interaction.
         let __render_time = __frame_start.elapsed();
         if let Some(ref stats) = stats {
-            let camera_label = match stats.frame.camera_change {
-                crate::runtime::camera::CameraChangeKind::None => "none",
-                crate::runtime::camera::CameraChangeKind::PanOnly => "pan",
-                crate::runtime::camera::CameraChangeKind::ZoomIn => "zoom-in",
-                crate::runtime::camera::CameraChangeKind::ZoomOut => "zoom-out",
-                crate::runtime::camera::CameraChangeKind::PanAndZoom => "pan+zoom",
-            };
-            let stat_string = format!(
-                "fps*: {:.0} | t: {:.2}ms | cam: {} | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | comp: {:?} ({:?} hit, {:.1}KB) | live: {:?} | res: {} | img: {} | fnt: {}",
-                1.0 / __render_time.as_secs_f64(),
-                __render_time.as_secs_f64() * 1000.0,
-                camera_label,
-                stats.total_duration.as_secs_f64() * 1000.0,
-                stats.flush_duration.as_secs_f64() * 1000.0,
-                stats.frame_duration.as_secs_f64() * 1000.0,
-                stats.frame.display_list_duration.as_secs_f64() * 1000.0,
-                stats.frame.display_list_size_estimated,
-                stats.draw.painter_duration.as_secs_f64() * 1000.0,
-                stats.draw.cache_picture_size,
-                stats.draw.cache_picture_used,
-                stats.draw.cache_geometry_size,
-                stats.draw.layer_image_cache_size,
-                stats.draw.layer_image_cache_hits,
-                stats.draw.layer_image_cache_bytes as f64 / 1024.0,
-                stats.draw.live_draw_count,
-                self.renderer.resources.len(),
-                self.renderer.images.len(),
-                self.renderer.fonts.len(),
-            );
-            self.verbose(&stat_string);
-            self.last_stats = Some(stat_string);
+            self.update_stats(stats, __render_time);
         }
 
         // 7. Draw devtools overlays (uses the just-updated last_stats)
@@ -1063,43 +1033,21 @@ impl UnknownTargetApplication {
             }
         };
 
-        let overlay_time = self.draw_and_flush_devtools_overlay();
+        // Consume the camera change so the next change_kind() returns None
+        // (unless a new mutation occurs). This must happen here (not in
+        // renderer.flush()) because on the web path both redraw() and frame()
+        // may run: consuming in flush() would eat the change before frame()
+        // sees it.  Completing the frame loop prevents frame() from rendering
+        // a redundant second frame for the same invalidation.
+        self.renderer.camera.consume_change();
+        self.frame_loop.complete(crate::runtime::frame_loop::FrameQuality::Unstable);
 
-        let __total_frame_time = __frame_start.elapsed();
-        let camera_label = match stats.frame.camera_change {
-            crate::runtime::camera::CameraChangeKind::None => "none",
-            crate::runtime::camera::CameraChangeKind::PanOnly => "pan",
-            crate::runtime::camera::CameraChangeKind::ZoomIn => "zoom-in",
-            crate::runtime::camera::CameraChangeKind::ZoomOut => "zoom-out",
-            crate::runtime::camera::CameraChangeKind::PanAndZoom => "pan+zoom",
-        };
-        let stat_string = format!(
-            "fps*: {:.0} | t: {:.2}ms | cam: {} | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | comp: {:?} ({:?} hit, {:.1}KB) | live: {:?} | res: {} | img: {} | fnt: {}",
-            1.0 / __total_frame_time.as_secs_f64(),
-            __total_frame_time.as_secs_f64() * 1000.0,
-            camera_label,
-            stats.total_duration.as_secs_f64() * 1000.0,
-            stats.flush_duration.as_secs_f64() * 1000.0,
-            overlay_time.as_secs_f64() * 1000.0,
-            stats.frame_duration.as_secs_f64() * 1000.0,
-            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
-            stats.frame.display_list_size_estimated,
-            stats.draw.painter_duration.as_secs_f64() * 1000.0,
-            stats.draw.cache_picture_size,
-            stats.draw.cache_picture_used,
-            stats.draw.cache_geometry_size,
-            stats.draw.layer_image_cache_size,
-            stats.draw.layer_image_cache_hits,
-            stats.draw.layer_image_cache_bytes as f64 / 1024.0,
-            stats.draw.live_draw_count,
-            self.renderer.resources.len(),
-            self.renderer.images.len(),
-            self.renderer.fonts.len(),
-        );
+        // Build stats string BEFORE the overlay so the overlay shows the
+        // current frame's data, not the previous frame's.
+        let __total_frame_time_pre = __frame_start.elapsed();
+        self.update_stats(&stats, __total_frame_time_pre);
 
-        self.verbose(&stat_string);
-
-        self.last_stats = Some(stat_string);
+        let _overlay_time = self.draw_and_flush_devtools_overlay();
 
         self.last_frame_time = __frame_start;
     }
@@ -1164,6 +1112,38 @@ impl UnknownTargetApplication {
             overlay_draw_time = __overlay_start.elapsed();
         }
         overlay_flush_time + overlay_draw_time
+    }
+
+    /// Format and store the frame stats string for the devtools overlay.
+    fn update_stats(
+        &mut self,
+        stats: &crate::runtime::scene::FrameFlushStats,
+        wall_time: std::time::Duration,
+    ) {
+        let s = format!(
+            "fps*: {:.0} | t: {:.2}ms | cam: {} | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | comp: {:?} ({:?} hit, {:.1}KB) | live: {:?} | res: {} | img: {} | fnt: {}",
+            1.0 / wall_time.as_secs_f64(),
+            wall_time.as_secs_f64() * 1000.0,
+            stats.frame.camera_change.label(),
+            stats.total_duration.as_secs_f64() * 1000.0,
+            stats.flush_duration.as_secs_f64() * 1000.0,
+            stats.frame_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_size_estimated,
+            stats.draw.painter_duration.as_secs_f64() * 1000.0,
+            stats.draw.cache_picture_size,
+            stats.draw.cache_picture_used,
+            stats.draw.cache_geometry_size,
+            stats.draw.layer_image_cache_size,
+            stats.draw.layer_image_cache_hits,
+            stats.draw.layer_image_cache_bytes as f64 / 1024.0,
+            stats.draw.live_draw_count,
+            self.renderer.resources.len(),
+            self.renderer.images.len(),
+            self.renderer.fonts.len(),
+        );
+        self.verbose(&s);
+        self.last_stats = Some(s);
     }
 
     /// Update the cursor position and run a debounced hit test.

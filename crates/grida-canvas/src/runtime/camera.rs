@@ -27,26 +27,40 @@ pub enum CameraChangeKind {
     ZoomOut,
     /// Both translation and zoom changed (e.g. pinch gesture, scroll-wheel
     /// zoom at cursor which adjusts translation to keep the focal point fixed).
-    PanAndZoom,
+    /// The boolean indicates zoom direction: `true` = zoom-in, `false` = zoom-out.
+    PanAndZoom(bool),
 }
 
 impl CameraChangeKind {
     /// Returns `true` when zoom (scale) changed between frames.
     #[inline]
     pub fn zoom_changed(self) -> bool {
-        matches!(self, Self::ZoomIn | Self::ZoomOut | Self::PanAndZoom)
+        matches!(self, Self::ZoomIn | Self::ZoomOut | Self::PanAndZoom(_))
     }
 
     /// Returns `true` when translation changed between frames.
     #[inline]
     pub fn pan_changed(self) -> bool {
-        matches!(self, Self::PanOnly | Self::PanAndZoom)
+        matches!(self, Self::PanOnly | Self::PanAndZoom(_))
     }
 
     /// Returns `true` when any camera property changed.
     #[inline]
     pub fn any_changed(self) -> bool {
         !matches!(self, Self::None)
+    }
+
+    /// Short human-readable label for debug overlays and stats strings.
+    #[inline]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::PanOnly => "pan",
+            Self::ZoomIn => "zoom-in",
+            Self::ZoomOut => "zoom-out",
+            Self::PanAndZoom(true) => "pan+zoom-in",
+            Self::PanAndZoom(false) => "pan+zoom-out",
+        }
     }
 }
 
@@ -443,17 +457,19 @@ impl Camera2D {
     }
 
     pub fn has_zoom_changed(&self) -> bool {
-        // Compare zoom values directly. The current zoom is cached;
-        // for the previous transform we still need scale extraction, but
-        // we avoid the sqrt by comparing scale_x² instead.
+        // Compare scale components of prev and current transforms directly.
+        // translate() only modifies [0][2] and [1][2], so the scale entries
+        // ([0][0], [0][1], [1][0], [1][1]) are bitwise identical after a
+        // pan-only change.
+        //
+        // Previous implementation compared prev matrix scale against
+        // cached_zoom, which diverged after repeated _set_zoom calls due
+        // to floating-point drift in the sin/cos extraction (cos²+sin² ≠ 1).
         let prev_a = self.prev_transform.matrix[0][0];
         let prev_b = self.prev_transform.matrix[1][0];
-        let prev_scale_sq = prev_a * prev_a + prev_b * prev_b;
-        let cur_scale = 1.0 / self.cached_zoom;
-        let cur_scale_sq = cur_scale * cur_scale;
-        // If scale² values differ, zoom changed. Use a relative epsilon
-        // to handle floating-point imprecision.
-        (prev_scale_sq - cur_scale_sq).abs() > f32::EPSILON * cur_scale_sq.max(1.0)
+        let cur_a = self.transform.matrix[0][0];
+        let cur_b = self.transform.matrix[1][0];
+        prev_a != cur_a || prev_b != cur_b
     }
 
     /// Returns `true` when translation changed between the current and previous
@@ -488,16 +504,18 @@ impl Camera2D {
         match (pan_changed, zoom_changed) {
             (false, false) => CameraChangeKind::None,
             (true, false) => CameraChangeKind::PanOnly,
-            (false, true) => {
+            (false, true) | (true, true) => {
                 let current_zoom = self.get_zoom();
                 let prev_zoom = 1.0 / self.prev_transform.get_scale_x();
-                if current_zoom > prev_zoom {
+                let zooming_in = current_zoom > prev_zoom;
+                if pan_changed {
+                    CameraChangeKind::PanAndZoom(zooming_in)
+                } else if zooming_in {
                     CameraChangeKind::ZoomIn
                 } else {
                     CameraChangeKind::ZoomOut
                 }
             }
-            (true, true) => CameraChangeKind::PanAndZoom,
         }
     }
 
@@ -629,7 +647,7 @@ mod tests {
         // translation to keep the anchor point fixed on screen.
         // Using [75, 75] ensures the translation compensation is non-zero.
         camera.set_zoom_at(2.0, [75.0, 75.0]);
-        assert_eq!(camera.change_kind(), CameraChangeKind::PanAndZoom);
+        assert_eq!(camera.change_kind(), CameraChangeKind::PanAndZoom(true));
         assert!(camera.change_kind().pan_changed());
         assert!(camera.change_kind().zoom_changed());
     }
@@ -644,5 +662,193 @@ mod tests {
         let (dx, dy) = camera.pan_delta();
         assert!((dx - 5.0).abs() < f32::EPSILON);
         assert!((dy - (-3.0)).abs() < f32::EPSILON);
+    }
+
+    // ---------------------------------------------------------------
+    // Sequences that simulate real gesture interactions.
+    // Each step mirrors what the app does: mutate camera → change_kind
+    // → consume_change (the queue+flush cycle).
+    // ---------------------------------------------------------------
+
+    /// Helper: simulate one queue+flush cycle on the legacy path.
+    /// Returns the CameraChangeKind that `queue()` would see.
+    fn sim_queue(camera: &mut Camera2D) -> CameraChangeKind {
+        let kind = camera.change_kind();
+        camera.consume_change();
+        kind
+    }
+
+    #[test]
+    fn sequence_pan_zoom_in_pan() {
+        // pan → zoom-in → pan  (user reports: correct, shows "pan")
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.translate(5.0, 0.0);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly);
+
+        c.set_zoom(2.0);
+        assert!(sim_queue(&mut c).zoom_changed());
+
+        c.translate(5.0, 0.0);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly,
+            "after zoom-in then pan, should be PanOnly");
+    }
+
+    #[test]
+    fn sequence_zoom_in_zoom_out_pan() {
+        // zoom-in → zoom-out → pan  (user reports: stuck at pan+zoom)
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.set_zoom(2.0);
+        let k = sim_queue(&mut c);
+        assert!(k.zoom_changed(), "zoom-in: {:?}", k);
+
+        c.set_zoom(0.5);
+        let k = sim_queue(&mut c);
+        assert!(k.zoom_changed(), "zoom-out: {:?}", k);
+
+        c.translate(5.0, 0.0);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly,
+            "after zoom-in + zoom-out + pan, should be PanOnly");
+    }
+
+    #[test]
+    fn sequence_set_zoom_at_center_then_pan() {
+        // set_zoom_at at viewport center → no translation shift → ZoomIn
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.set_zoom_at(2.0, [50.0, 50.0]);
+        let k = sim_queue(&mut c);
+        assert_eq!(k, CameraChangeKind::ZoomIn,
+            "zoom at center should be ZoomIn (no pan compensation)");
+
+        c.translate(5.0, 0.0);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly,
+            "after zoom-at-center + pan, should be PanOnly");
+    }
+
+    #[test]
+    fn sequence_set_zoom_at_off_center_then_pan() {
+        // set_zoom_at off-center → translation shifts → PanAndZoom
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.set_zoom_at(2.0, [75.0, 75.0]);
+        let k = sim_queue(&mut c);
+        assert!(matches!(k, CameraChangeKind::PanAndZoom(_)),
+            "zoom at off-center should be PanAndZoom, got: {:?}", k);
+
+        c.translate(5.0, 0.0);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly,
+            "after off-center pinch + pan, should be PanOnly");
+    }
+
+    #[test]
+    fn sequence_set_zoom_at_in_out_then_pan() {
+        // Pinch zoom in → pinch zoom out → pan
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.set_zoom_at(2.0, [50.0, 50.0]);
+        let _ = sim_queue(&mut c);
+
+        c.set_zoom_at(0.5, [50.0, 50.0]);
+        let _ = sim_queue(&mut c);
+
+        c.translate(5.0, 0.0);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly,
+            "after pinch-in + pinch-out + pan, should be PanOnly");
+    }
+
+    #[test]
+    fn sequence_zoom_out_is_not_pan_and_zoom() {
+        // Pure set_zoom (no focal point) should be ZoomOut, not PanAndZoom
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.set_zoom(0.5);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::ZoomOut,
+            "set_zoom(0.5) should be ZoomOut, not PanAndZoom");
+    }
+
+    #[test]
+    fn sequence_set_zoom_at_out_is_pan_and_zoom() {
+        // set_zoom_at always adjusts translation to keep focal point fixed,
+        // so it inherently produces PanAndZoom. This is correct behavior.
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.set_zoom_at(0.5, [75.0, 75.0]);
+        assert!(matches!(sim_queue(&mut c), CameraChangeKind::PanAndZoom(_)),
+            "set_zoom_at always changes both zoom and translation");
+    }
+
+    #[test]
+    fn sequence_consume_then_no_change() {
+        // After consume, change_kind should return None
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.translate(5.0, 0.0);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly);
+
+        // No mutation — should be None
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::None,
+            "after consume with no mutation, should be None");
+    }
+
+    #[test]
+    fn sequence_multiple_translates_before_queue() {
+        // Multiple translates before a single queue — should still be PanOnly
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.translate(5.0, 0.0);
+        c.translate(3.0, 0.0);
+        c.translate(-2.0, 0.0);
+        // Each translate calls before_change, so only the last delta is visible
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly);
+    }
+
+    #[test]
+    fn sequence_zoom_then_translate_before_queue() {
+        // Zoom then translate in same "frame" (before queue) — translate's
+        // before_change overwrites the zoom baseline, so only pan is visible
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        c.set_zoom(2.0);
+        c.translate(5.0, 0.0);
+        // translate's before_change saved post-zoom state; only pan delta visible
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly,
+            "zoom + translate before queue: translate's before_change hides the zoom");
+    }
+
+    #[test]
+    fn sequence_interleaved_zoom_pan_with_queue() {
+        // Interleaved zoom and pan WITH queue between each — simulates
+        // macOS sending PinchGesture + MouseWheel events, each triggering queue()
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        // Pinch event → zoom (at center → no translation change)
+        c.set_zoom_at(1.5, [50.0, 50.0]);
+        let k1 = sim_queue(&mut c);
+        assert_eq!(k1, CameraChangeKind::ZoomIn);
+
+        // Scroll event → pan (after consumed zoom)
+        c.translate(5.0, 0.0);
+        let k2 = sim_queue(&mut c);
+        assert_eq!(k2, CameraChangeKind::PanOnly,
+            "translate after consumed zoom should be PanOnly");
+    }
+
+    #[test]
+    fn sequence_rapid_zoom_at_oscillation_then_pan() {
+        // Simulate rapid pinch in/out (oscillating zoom) then pure pan
+        let mut c = Camera2D::new(Size { width: 100.0, height: 100.0 });
+
+        for i in 0..20 {
+            let z = if i % 2 == 0 { 1.5 } else { 0.8 };
+            c.set_zoom_at(z, [50.0, 50.0]);
+            let _ = sim_queue(&mut c);
+        }
+
+        // Now pure pan
+        c.translate(10.0, 0.0);
+        assert_eq!(sim_queue(&mut c), CameraChangeKind::PanOnly,
+            "after rapid zoom oscillation, pan should be PanOnly");
     }
 }

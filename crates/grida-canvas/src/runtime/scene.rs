@@ -20,8 +20,8 @@ use crate::{
 
 use math2::{self, rect};
 use skia_safe::{
-    surfaces, Canvas, FilterMode, Image, MipmapMode, Paint as SkPaint, Picture, PictureRecorder,
-    Rect, SamplingOptions, Surface,
+    surfaces, Canvas, Color, FilterMode, Image, MipmapMode, Paint as SkPaint, Picture,
+    PictureRecorder, Rect, SamplingOptions, Surface,
 };
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
@@ -224,6 +224,26 @@ impl RendererWindowContext {
 /// Nodes larger than this in either axis are skipped for compositing.
 const COMPOSITOR_SURFACE_SIZE: i32 = 4096;
 
+/// Maximum screen-space offset (in pixels) before the pan image cache is
+/// invalidated and a full re-draw is triggered. Beyond this threshold the
+/// exposed strips are too large for the blit-only fast path to look acceptable.
+const PAN_IMAGE_CACHE_MAX_OFFSET: f32 = 200.0;
+
+/// Cached GPU snapshot of the composited frame for pan-only fast path.
+///
+/// During pan-only camera changes (the most common interaction), the scene
+/// graph is static and zoom is constant — only the viewport translation
+/// changes. Instead of re-drawing every visible node each frame, we capture
+/// the composited frame as a GPU texture and blit it at the new camera
+/// offset. This replaces O(N) draw commands with a single texture blit.
+struct PanImageCache {
+    /// GPU texture snapshot of the composited frame.
+    image: Image,
+    /// View matrix translation components at capture time.
+    origin_tx: f32,
+    origin_ty: f32,
+}
+
 pub struct Renderer {
     pub backend: Backend,
     pub scene: Option<Scene>,
@@ -258,6 +278,9 @@ pub struct Renderer {
     downscale_surface: Option<Surface>,
     /// Dimensions of the cached downscale surface (to detect size changes).
     downscale_dims: (i32, i32),
+    /// Cached composited frame for pan-only fast path.
+    /// See [`PanImageCache`] for details.
+    pan_image_cache: Option<PanImageCache>,
 }
 
 impl Renderer {
@@ -481,6 +504,7 @@ impl Renderer {
             ),
             downscale_surface: None,
             downscale_dims: (0, 0),
+            pan_image_cache: None,
         }
     }
 
@@ -665,6 +689,7 @@ impl Renderer {
             // re-captured as individual textures on the next frame.
             self.scene_cache.compositor.invalidate_all();
             self.compositor_atlas.clear();
+            self.pan_image_cache = None;
         }
     }
 
@@ -750,37 +775,106 @@ impl Renderer {
 
     /// Render the queued frame if any and return the completed statistics.
     /// Intended to be called by the host when a redraw request is received.
+    ///
+    /// NOTE: camera `consume_change()` is NOT called here. The caller
+    /// (`app.redraw()` or `app.frame()`) is responsible for consuming
+    /// after rendering. Consuming here would eat the change before
+    /// `frame()` sees it on the web path, where both `redraw()` (called
+    /// by JS) and `frame()` (called by RAF) may run.
     pub fn flush(&mut self) -> FrameFlushResult {
         if !self.fc.has_pending() {
             return FrameFlushResult::NoPending;
         }
 
-        let Some(frame) = self.plan.take() else {
+        let Some(plan) = self.plan.take() else {
             return FrameFlushResult::NoFrame;
         };
 
+        if self.scene.is_none() {
+            return FrameFlushResult::NoScene;
+        }
+
+        let stats = self.render_frame(plan);
+
+        self.fc.flush();
+        self.plan = None;
+
+        FrameFlushResult::OK(stats)
+    }
+
+    /// Core rendering logic shared by `flush()` and `flush_with_plan()`.
+    ///
+    /// Assumes `self.scene` is `Some`. Panics otherwise.
+    fn render_frame(&mut self, plan: FramePlan) -> FrameFlushStats {
         let start = Instant::now();
 
-        let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) else {
-            return FrameFlushResult::NoScene;
-        };
-
+        let scene_ptr = self.scene.as_ref().unwrap() as *const Scene;
         let surface = unsafe { &mut *self.backend.get_surface() };
         let scene = unsafe { &*scene_ptr };
 
         let width = surface.width() as f32;
         let height = surface.height() as f32;
 
+        // --- Pan image cache fast path ---
+        // On pan-only frames with a valid cached composited frame and small
+        // offset, blit the cached GPU texture instead of re-drawing all
+        // nodes. This replaces O(N) draw commands + GPU rasterization with
+        // a single texture blit.
+        if plan.camera_change == CameraChangeKind::PanOnly && self.backend.is_gpu() {
+            if let Some(ref cache) = self.pan_image_cache {
+                let vm = self.camera.view_matrix();
+                let dx = vm.matrix[0][2] - cache.origin_tx;
+                let dy = vm.matrix[1][2] - cache.origin_ty;
+
+                if dx.abs() <= PAN_IMAGE_CACHE_MAX_OFFSET
+                    && dy.abs() <= PAN_IMAGE_CACHE_MAX_OFFSET
+                {
+                    let canvas = surface.canvas();
+                    if let Some(bg) = scene.background_color {
+                        canvas.clear(Color::from(bg));
+                    } else {
+                        canvas.clear(Color::TRANSPARENT);
+                    }
+                    canvas.draw_image(&cache.image, (dx, dy), None);
+
+                    let mid_flush_start = Instant::now();
+                    Self::gpu_flush(surface);
+                    let mid_flush_duration = mid_flush_start.elapsed();
+                    let frame_duration = start.elapsed();
+
+                    return FrameFlushStats {
+                        frame: plan,
+                        draw: DrawResult {
+                            painter_duration: Duration::ZERO,
+                            cache_picture_used: 0,
+                            cache_picture_size: self.scene_cache.picture.len(),
+                            cache_geometry_size: self.scene_cache.geometry.len(),
+                            layer_image_cache_size: 0,
+                            layer_image_cache_hits: 0,
+                            layer_image_cache_bytes: 0,
+                            live_draw_count: 0,
+                        },
+                        frame_duration,
+                        flush_duration: Duration::ZERO,
+                        total_duration: frame_duration,
+                        compositor_duration: Duration::ZERO,
+                        mid_flush_duration,
+                    };
+                }
+                // Offset too large — fall through to full re-draw below.
+            }
+        }
+
+        // --- Full draw path ---
+
         // Reuse or create a downscaled offscreen for interaction rendering.
         let interaction_scale = self.config.interaction_render_scale;
-        let use_downscale = !frame.stable
-            && interaction_scale > 0.0
-            && interaction_scale < 1.0;
+        let use_downscale =
+            !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
         if use_downscale {
             let sw = (width * interaction_scale).ceil() as i32;
             let sh = (height * interaction_scale).ceil() as i32;
             if sw > 0 && sh > 0 && (sw, sh) != self.downscale_dims {
-                // Size changed — recreate the surface.
                 let info = skia_safe::ImageInfo::new_n32_premul((sw, sh), None);
                 self.downscale_surface = surface.new_surface(&info);
                 self.downscale_dims = (sw, sh);
@@ -798,7 +892,7 @@ impl Renderer {
         let mut canvas = surface.canvas();
         let draw = self.draw(
             &mut canvas,
-            &frame,
+            &plan,
             scene.background_color,
             width,
             height,
@@ -810,37 +904,36 @@ impl Renderer {
             self.downscale_surface = ds_taken;
         }
 
-        // Layer compositing cache: capture (or re-capture) node images.
-        //
-        // GPU-only: offscreen surfaces share the GL context so cached
-        // SkImages live in VRAM. On a CPU/raster backend the extra copy
-        // would be strictly slower than direct painting, so we skip it.
-        //
-        // Runs on every frame — the method itself is cheap when all entries
-        // are already cached and clean.  Rasterisation only happens for nodes
-        // that are new or dirty (zoom change, content edit, etc.).
-        // Mid-frame flush: isolate draw vs compositor GPU work.
+        // Mid-frame GPU flush: isolate draw vs compositor GPU work.
         let mid_flush_start = Instant::now();
-        if let Some(mut gr_context) = surface.recording_context() {
-            if let Some(mut direct_context) = gr_context.as_direct_context() {
-                direct_context.flush_and_submit();
-            }
-        }
+        Self::gpu_flush(surface);
         let mid_flush_duration = mid_flush_start.elapsed();
 
+        // Capture composited frame for pan image cache.
+        // After mid_flush the surface has the complete rendered scene.
+        // Only capture on non-stable frames that didn't change zoom — zoom
+        // frames invalidate the cache on the next queue(), so capturing
+        // them wastes the snapshot.
+        if self.backend.is_gpu() && !plan.stable && !plan.camera_change.zoom_changed() {
+            let vm = self.camera.view_matrix();
+            let image = surface.image_snapshot();
+            self.pan_image_cache = Some(PanImageCache {
+                image,
+                origin_tx: vm.matrix[0][2],
+                origin_ty: vm.matrix[1][2],
+            });
+        }
+
+        // Compositor update (GPU-only).
         let compositor_start = Instant::now();
         if self.backend.is_gpu() {
-            let effective_layer_compositing = self.config.layer_compositing
+            let effective = self.config.layer_compositing
                 && self.config.render_policy.allows_layer_compositing();
-            if effective_layer_compositing {
-                if frame.stable {
-                    // Stable frame: re-rasterize all stale entries at the
-                    // final zoom density without a time budget.
-                    self.update_compositor_stable(surface, &frame.compositor_indices);
+            if effective {
+                if plan.stable {
+                    self.update_compositor_stable(surface, &plan.compositor_indices);
                 } else {
-                    // Unstable frame: budgeted re-rasterization. Stale
-                    // entries stay GPU-stretched until their turn comes.
-                    self.update_compositor(surface, &frame.compositor_indices);
+                    self.update_compositor(surface, &plan.compositor_indices);
                 }
             }
         }
@@ -848,28 +941,30 @@ impl Renderer {
 
         let frame_duration = start.elapsed();
 
+        // Final GPU flush.
         let flush_start = Instant::now();
-        if let Some(mut gr_context) = surface.recording_context() {
-            if let Some(mut direct_context) = gr_context.as_direct_context() {
-                direct_context.flush_and_submit();
-            }
-        }
+        Self::gpu_flush(surface);
         let flush_duration = flush_start.elapsed();
 
-        let stats = FrameFlushStats {
-            frame,
+        FrameFlushStats {
+            frame: plan,
             draw,
             frame_duration,
             flush_duration,
             total_duration: frame_duration + flush_duration,
             compositor_duration,
             mid_flush_duration,
-        };
+        }
+    }
 
-        self.fc.flush();
-        self.plan = None;
-
-        FrameFlushResult::OK(stats)
+    /// Submit pending GPU work on the surface's direct context (if any).
+    #[inline]
+    fn gpu_flush(surface: &mut Surface) {
+        if let Some(mut gr_context) = surface.recording_context() {
+            if let Some(mut direct_context) = gr_context.as_direct_context() {
+                direct_context.flush_and_submit();
+            }
+        }
     }
 
     /// Invoke the request redraw callback.
@@ -895,6 +990,7 @@ impl Renderer {
         self.scene = Some(scene);
 
         self.scene_cache = cache::scene::SceneCache::new();
+        self.pan_image_cache = None;
         if let Some(scene) = self.scene.as_ref() {
             let requested = collect_scene_font_families(scene);
             self.fonts.set_requested_families(requested.into_iter());
@@ -947,6 +1043,13 @@ impl Renderer {
         // 94-146ms frames (6-10 fps) on effects-heavy scenes.
         if camera_change.zoom_changed() && self.config.layer_compositing {
             self.scene_cache.compositor.mark_all_stale();
+        }
+
+        // Invalidate pan image cache when zoom changes or on stable frames.
+        // Zoom changes alter the pixel content (different scale/density).
+        // Stable frames should produce a full-quality render, not a cached blit.
+        if camera_change.zoom_changed() || stable {
+            self.pan_image_cache = None;
         }
 
         // Always compute the latest frame plan so that a subsequent flush uses up-to-date state,
@@ -1008,96 +1111,10 @@ impl Renderer {
     /// Unlike the legacy `flush()`, this does NOT consult `FrameCounter`
     /// — the caller (via `FrameLoop`) already decided to render.
     pub fn flush_with_plan(&mut self, plan: FramePlan) -> Option<FrameFlushStats> {
-        let start = Instant::now();
-
-        let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) else {
+        if self.scene.is_none() {
             return None;
-        };
-
-        let surface = unsafe { &mut *self.backend.get_surface() };
-        let scene = unsafe { &*scene_ptr };
-
-        let width = surface.width() as f32;
-        let height = surface.height() as f32;
-
-        // Reuse or create a downscaled offscreen for interaction rendering.
-        let interaction_scale = self.config.interaction_render_scale;
-        let use_downscale =
-            !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
-        if use_downscale {
-            let sw = (width * interaction_scale).ceil() as i32;
-            let sh = (height * interaction_scale).ceil() as i32;
-            if sw > 0 && sh > 0 && (sw, sh) != self.downscale_dims {
-                let info = skia_safe::ImageInfo::new_n32_premul((sw, sh), None);
-                self.downscale_surface = surface.new_surface(&info);
-                self.downscale_dims = (sw, sh);
-            }
         }
-
-        let mut ds_taken = if use_downscale {
-            self.downscale_surface.take()
-        } else {
-            None
-        };
-
-        let mut canvas = surface.canvas();
-        let draw = self.draw(
-            &mut canvas,
-            &plan,
-            scene.background_color,
-            width,
-            height,
-            ds_taken.as_mut(),
-        );
-
-        if ds_taken.is_some() {
-            self.downscale_surface = ds_taken;
-        }
-
-        // Mid-frame flush
-        let mid_flush_start = Instant::now();
-        if let Some(mut gr_context) = surface.recording_context() {
-            if let Some(mut direct_context) = gr_context.as_direct_context() {
-                direct_context.flush_and_submit();
-            }
-        }
-        let mid_flush_duration = mid_flush_start.elapsed();
-
-        // Compositor update
-        let compositor_start = Instant::now();
-        if self.backend.is_gpu() {
-            let effective = self.config.layer_compositing
-                && self.config.render_policy.allows_layer_compositing();
-            if effective {
-                if plan.stable {
-                    self.update_compositor_stable(surface, &plan.compositor_indices);
-                } else {
-                    self.update_compositor(surface, &plan.compositor_indices);
-                }
-            }
-        }
-        let compositor_duration = compositor_start.elapsed();
-
-        let frame_duration = start.elapsed();
-
-        // Final GPU flush
-        let flush_start = Instant::now();
-        if let Some(mut gr_context) = surface.recording_context() {
-            if let Some(mut direct_context) = gr_context.as_direct_context() {
-                direct_context.flush_and_submit();
-            }
-        }
-        let flush_duration = flush_start.elapsed();
-
-        Some(FrameFlushStats {
-            frame: plan,
-            draw,
-            frame_duration,
-            flush_duration,
-            total_duration: frame_duration + flush_duration,
-            compositor_duration,
-            mid_flush_duration,
-        })
+        Some(self.render_frame(plan))
     }
 
     /// Clear the cached scene picture.
@@ -1106,6 +1123,7 @@ impl Renderer {
         // Also invalidate all compositor layer images so they re-rasterize.
         self.scene_cache.compositor.invalidate_all();
         self.compositor_atlas.clear();
+        self.pan_image_cache = None;
     }
 
     /// Rebuild scene caches after scene geometry has changed.

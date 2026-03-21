@@ -571,10 +571,12 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
     Computed once per frame, threaded through the pipeline so every stage
     can take the cheapest path.
 
-    **Frame cost hierarchy:** `None < ZoomIn < PanOnly < ZoomOut < PanAndZoom`.
-    Zoom-in is cheaper than pan because no new spatial content enters the
-    viewport — only pixel density changes. Zoom-out is more expensive than
-    pan because new content appears in all four directions simultaneously.
+    **Frame cost hierarchy:** `None < PanOnly < ZoomIn < ZoomOut < PanAndZoom`.
+    With the pan image cache (item 16b), PanOnly is now the cheapest
+    non-idle frame — a single GPU texture blit (~20-200 µs regardless of
+    scene complexity). ZoomIn is next cheapest (cached content is a spatial
+    superset). ZoomOut is more expensive than zoom-in because new content
+    appears at all edges. PanAndZoom combines both costs.
 
 16. **Cached Content Reuse on Pan**
 
@@ -584,6 +586,78 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
     - The compositor blits cached textures at shifted positions.
     - Only live (non-cached) nodes need actual draw calls.
     - No re-rasterization, no geometry recomputation.
+
+16b. **Pan Image Cache (Whole-Frame GPU Texture Blit)**
+
+    The most aggressive pan optimization: capture the fully composited
+    frame as a GPU texture snapshot (`SkImage`) after the first draw, then
+    on subsequent pan-only frames, blit this single texture at the camera
+    offset instead of re-drawing all visible nodes.
+
+    This replaces the entire draw pipeline (CPU iteration over N nodes,
+    per-node SkPicture replay, GPU rasterization of all draw commands)
+    with a single `draw_image` call — one texture blit.
+
+    **How it works:**
+    1. After the draw phase and mid-flush GPU submit, `surface.image_snapshot()`
+       captures the composited frame as a GPU-resident `SkImage` (copy-on-write,
+       near-zero cost).
+    2. The view matrix translation at capture time is stored alongside.
+    3. On the next pan-only frame, the screen-space offset is computed from
+       the difference in view matrix translations.
+    4. The canvas is cleared (background color), and the cached image is
+       blitted at the computed offset. A single GPU flush processes the blit.
+    5. The draw phase, per-node picture replay, compositor update, and second
+       GPU flush are all skipped entirely.
+
+    **Cache invalidation:**
+    - Zoom change (pixel density changes)
+    - Scene mutation (load_scene, invalidate_cache)
+    - Stable frame (settle after interaction — full-quality re-draw)
+    - Offset exceeds threshold (200px — exposed strips too large)
+    - Config changes (compositor atlas toggle, render policy)
+
+    **Limitations & visual tradeoff:**
+    - **Exposed strips:** viewport edges show background color instead of
+      scene content when the camera moves past the cached image boundary.
+      For typical per-frame deltas (5-20px), the strips are narrow (~1-2%
+      of viewport). After the gesture settles, the stable frame re-draws
+      at full quality. This is the same tradeoff browsers make during
+      scroll (checkerboard/blank tiles filled asynchronously).
+    - **Cache is not refreshed on the fast path.** During sustained pan,
+      the cache builds up offset until it exceeds the 200px threshold,
+      then one full-cost frame re-draws and re-captures. In practice this
+      means ~4-20 fast frames per 1 slow frame, depending on pan velocity.
+    - GPU-only: the snapshot is a GPU texture; raster backends fall through
+      to the normal draw path.
+    - Zoom frames skip capture to avoid unnecessary copy-on-write overhead
+      (the cache would be invalidated immediately on the next frame anyway).
+
+    **Measured impact (Apple M2 Pro, GPU benchmark, 100 frames):**
+
+    Note: benchmark numbers below represent **cache-hit frames** — the
+    cache is primed during warmup, so all 100 measurement frames take the
+    fast path. Real-world pan mixes cache-hit (~20-200 µs) with periodic
+    cache-miss frames (same cost as "before"). The effective speedup
+    during a sustained pan gesture depends on how often the cache refreshes.
+
+    | Scene                        | Pan before  | Pan after (cache hit) | Cache hit cost |
+    | ---------------------------- | ----------- | --------------------- | -------------- |
+    | bench-backdrop-blur-grid     | 45,471 µs   | 24 µs                 | 1,895x         |
+    | [WWW] Design (10.5K nodes)   | 37,808 µs   | 55 µs                 | 687x           |
+    | bench-glass-grid             | 29,132 µs   | 29 µs                 | 1,005x         |
+    | Materials (6.5K nodes)       | 12,794 µs   | 23 µs                 | 556x           |
+    | bench-flat-grid (69K nodes)  | 6,469 µs    | 200 µs                | 32x            |
+    | bench-shadow-grid (promoted) | 1,534 µs    | 90 µs                 | 17x            |
+    | Icons (4.9K vectors)         | 1,763 µs    | 30 µs                 | 59x            |
+    The heaviest GPU-bound scenes (backdrop blur, glass, complex vectors)
+    saw the largest gains because the cache eliminates the GPU rasterization
+    that dominated their frame time (`mid_flush`).
+
+    **Chromium parallel:** Chromium's compositor tiles serve a similar role —
+    existing tiles are translated during scroll without re-rasterization.
+    Our approach is simpler (one full-frame texture vs. a tile grid) but
+    achieves the same effect for the common case of small pan deltas.
 
 17. **Incremental Visible-Set Update**
 
