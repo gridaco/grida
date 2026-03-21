@@ -1376,8 +1376,14 @@ impl<'a> Painter<'a> {
                     let m = &shape_layer.base.transform.matrix;
 
                     // Translate-fold: skip save/concat/restore for pure translations.
+                    // Fall through to the normal path when stroke markers are
+                    // present — draw_stroke_decorations requires the full
+                    // transform context.
+                    let has_markers = shape_layer.marker_start_shape.has_marker()
+                        || shape_layer.marker_end_shape.has_marker();
                     if shape_layer.base.clip_path.is_none()
                         && shape_layer.non_overlapping_fill_path.is_none()
+                        && !has_markers
                         && m[0][0] == 1.0
                         && m[1][0] == 0.0
                         && m[0][1] == 0.0
@@ -1450,6 +1456,13 @@ impl<'a> Painter<'a> {
                                         opacity,
                                     );
                                 }
+                                self.draw_stroke_decorations(
+                                    shape,
+                                    &shape_layer.strokes,
+                                    shape_layer.stroke_width,
+                                    shape_layer.marker_start_shape,
+                                    shape_layer.marker_end_shape,
+                                );
                             }
                         });
                     });

@@ -237,6 +237,10 @@ impl Camera2D {
         self.transform.matrix =
             [[cos * scale, -sin * scale, tx], [sin * scale, cos * scale, ty]];
         self.cached_zoom = zoom;
+        // Invalidate cached inverse so callers (e.g. set_zoom_at →
+        // screen_to_canvas_point) compute a fresh projection from the
+        // updated transform rather than using a stale cached value.
+        self.cached_view_matrix_inv = None;
     }
 
     /// Set zoom factor (1 = 100%). Preserves rotation & translation.
