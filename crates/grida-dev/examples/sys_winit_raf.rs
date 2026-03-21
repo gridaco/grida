@@ -1,4 +1,3 @@
-use cg::sys::scheduler;
 use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 use winit::{
@@ -21,7 +20,6 @@ struct App {
     window: Window,
     frame_count: u32,
     start_time: Instant,
-    scheduler: scheduler::FrameScheduler,
 }
 
 impl App {
@@ -49,8 +47,6 @@ impl ApplicationHandler for App {
             // Called once per frame when redraw is requested
             winit::event::WindowEvent::RedrawRequested => {
                 self.render(); // Simulate some frame rendering work
-
-                self.scheduler.sleep_to_maintain_fps(); // Apply pacing (no-op on wasm)
 
                 self.frame_count += 1;
 
@@ -84,12 +80,10 @@ fn main() {
 
     let now = Instant::now();
 
-    // Initialize application with both a target and max FPS
     let mut app = App {
         window,
         frame_count: 0,
         start_time: now,
-        scheduler: scheduler::FrameScheduler::new(u32::MAX).with_max_fps(u32::MAX),
     };
 
     // Start the app's event loop

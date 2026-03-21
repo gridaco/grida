@@ -21,8 +21,28 @@ use skia_safe::{
     canvas::SaveLayerRec, textlayout, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
     Shader,
 };
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
+
+/// Pre-extracted blit data for a single promoted (compositor-cached) node.
+///
+/// Built before the draw pass so that the Painter can blit promoted nodes
+/// inline at their correct z-position in the render command tree, instead
+/// of batching all promoted blits before live draws (which breaks z-order
+/// when a live parent covers its promoted children).
+pub struct PromotedBlit {
+    /// The cached image to blit (either individual texture or atlas snapshot).
+    pub image: Rc<skia_safe::Image>,
+    /// Source rectangle within the image (full image for individual, sub-rect for atlas).
+    pub src_rect: Rect,
+    /// Destination rectangle in world coordinates (the node's render bounds).
+    pub dst_rect: Rect,
+    /// Opacity to apply when blitting.
+    pub opacity: f32,
+    /// Blend mode to apply when blitting.
+    pub blend_mode: skia_safe::BlendMode,
+}
 
 /// A painter that handles all drawing operations for nodes,
 /// with proper effect ordering and a layer‐blur/backdrop‐blur pipeline.
@@ -32,12 +52,13 @@ pub struct Painter<'a> {
     images: &'a ImageRepository,
     path_cache: RefCell<VectorPathCache>,
     scene_cache: Option<&'a SceneCache>,
-    cache_hits: RefCell<usize>,
+    cache_hits: Cell<usize>,
     policy: RenderPolicy,
     variant_key: u64,
-    /// Node IDs that are handled by the compositor and should be skipped
-    /// during live drawing to avoid double-rendering.
-    promoted_skip: Option<&'a std::collections::HashSet<NodeId>>,
+    /// Pre-extracted blit data for promoted (compositor-cached) nodes.
+    /// When present, promoted nodes are blitted inline at their correct
+    /// z-position instead of being skipped.
+    promoted_blits: Option<&'a HashMap<NodeId, PromotedBlit>>,
 }
 
 impl<'a> Painter<'a> {
@@ -82,18 +103,18 @@ impl<'a> Painter<'a> {
             images,
             path_cache: RefCell::new(VectorPathCache::new()),
             scene_cache: Some(scene_cache), // Store reference to scene cache
-            cache_hits: RefCell::new(0),
+            cache_hits: Cell::new(0),
             policy,
             variant_key,
-            promoted_skip: None,
+            promoted_blits: None,
         }
     }
 
-    /// Set the promoted-skip set. Nodes in this set will be skipped during
-    /// `draw_render_commands` because they are blitted from the compositor
-    /// cache instead.
-    pub fn with_promoted_skip(mut self, skip: &'a std::collections::HashSet<NodeId>) -> Self {
-        self.promoted_skip = Some(skip);
+    /// Set the promoted blit map. Nodes in this map will be blitted from
+    /// their pre-extracted compositor cache data at the correct z-position
+    /// in the render command tree, instead of being re-drawn live.
+    pub fn with_promoted_blits(mut self, blits: &'a HashMap<NodeId, PromotedBlit>) -> Self {
+        self.promoted_blits = Some(blits);
         self
     }
 
@@ -210,11 +231,15 @@ impl<'a> Painter<'a> {
         canvas.restore();
     }
 
-    /// If opacity < 1.0, wrap drawing in a save_layer_alpha; else draw directly.
-    pub fn with_opacity<F: FnOnce()>(&self, opacity: f32, f: F) {
+    /// If opacity < 1.0, wrap drawing in a bounded save_layer_alpha; else draw directly.
+    ///
+    /// Providing tight bounds limits the offscreen GPU buffer to the node's
+    /// actual extent instead of the full canvas (~100x smaller). See item 12
+    /// in `docs/wg/feat-2d/optimization.md`.
+    pub fn with_opacity<F: FnOnce()>(&self, opacity: f32, bounds: Option<&Rect>, f: F) {
         let canvas = self.canvas;
         if opacity < 1.0 {
-            canvas.save_layer_alpha(None, (opacity * 255.0) as u32);
+            canvas.save_layer_alpha(bounds.copied(), (opacity * 255.0) as u32);
             f();
             canvas.restore();
         } else {
@@ -231,6 +256,12 @@ impl<'a> Painter<'a> {
     /// - shape: Shape with bounds in LOCAL coordinates (0,0 based)
     /// - effects: Layer effects for drop shadow expansion
     /// - transform: Transform matrix to convert local bounds to world coordinates
+    /// - stroke_path: Optional stroke path for bounds expansion (Center/Outside strokes)
+    ///
+    /// When a stroke path extends beyond `shape.rect` (Center or Outside
+    /// alignment), the save_layer bounds must include the stroke geometry
+    /// to avoid clipping. Without this, `save_layer_alpha` would clip the
+    /// outer portion of Center/Outside strokes.
     ///
     /// # TODO: Move to Geometry Stage
     ///
@@ -240,13 +271,25 @@ impl<'a> Painter<'a> {
     /// redundant calculations during rendering. The geometry cache already computes `absolute_render_bounds`
     /// which includes effect expansion - blend mode isolation bounds could be added as a separate field
     /// or computed alongside render bounds.
-    fn compute_blend_mode_bounds(
+    fn compute_blend_mode_bounds_with_stroke(
         shape: &PainterShape,
         effects: &LayerEffects,
         transform: &[[f32; 3]; 2],
+        stroke_path: Option<&skia_safe::Path>,
     ) -> Rect {
         // Start with local bounds (0,0 based)
         let mut local_bounds = shape.rect;
+
+        // Expand for stroke path that extends beyond fill bounds
+        if let Some(path) = stroke_path {
+            let stroke_bounds = path.bounds();
+            local_bounds = Rect::from_ltrb(
+                local_bounds.left().min(stroke_bounds.left()),
+                local_bounds.top().min(stroke_bounds.top()),
+                local_bounds.right().max(stroke_bounds.right()),
+                local_bounds.bottom().max(stroke_bounds.bottom()),
+            );
+        }
 
         // Expand for drop shadows in local space (drawn inside blend mode isolation)
         for shadow in &effects.shadows {
@@ -303,10 +346,16 @@ impl<'a> Painter<'a> {
         )
     }
 
-    /// If blend mode is not PassThrough, wrap drawing in a bounds-optimized save_layer.
+    /// If blend mode is not PassThrough or Normal, wrap drawing in a bounds-optimized save_layer.
     ///
     /// Performance: Uses bounds-based save_layer to limit offscreen buffer size (~100x smaller).
-    /// Spec compliance: Preserves isolation semantics - all blend modes (including Normal) are isolated.
+    ///
+    /// **Normal blend mode fast path:** For leaf nodes (Shape, Text, Vector),
+    /// `Blend(Normal)` is mathematically equivalent to `PassThrough` because
+    /// SrcOver compositing is associative — drawing fills/strokes into an
+    /// offscreen then blitting with SrcOver produces identical results to
+    /// drawing directly. This method is only called for leaf nodes (not
+    /// containers), so we skip the save_layer entirely for Normal blend.
     ///
     /// Bounds safety: Includes drop shadows which extend beyond base shape bounds.
     ///
@@ -317,23 +366,94 @@ impl<'a> Painter<'a> {
         shape: &PainterShape,
         effects: &LayerEffects,
         transform: &[[f32; 3]; 2],
+        stroke_path: Option<&skia_safe::Path>,
         f: F,
     ) {
         match layer_blend_mode {
-            LayerBlendMode::PassThrough => {
-                // No isolation - draw directly (fast path)
+            LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal) => {
+                // No isolation needed — draw directly.
+                // Normal (SrcOver) on a leaf node is equivalent to PassThrough
+                // because there are no children whose blend modes could interact
+                // with content beneath the node.
                 f();
             }
             LayerBlendMode::Blend(blend_mode) => {
-                // Compute safe bounds in world coordinates (shape.rect is in local space)
-                let bounds = Self::compute_blend_mode_bounds(shape, effects, transform);
+                // Non-Normal blend modes (Multiply, Screen, etc.) need isolation.
+                let bounds = Self::compute_blend_mode_bounds_with_stroke(
+                    shape,
+                    effects,
+                    transform,
+                    stroke_path,
+                );
 
                 let mut paint = SkPaint::default();
                 paint.set_blend_mode(blend_mode.into());
 
-                // Use bounds-based save_layer (much smaller than full canvas)
                 let layer_rec = SaveLayerRec::default().bounds(&bounds).paint(&paint);
 
+                self.canvas.save_layer(&layer_rec);
+                f();
+                self.canvas.restore();
+            }
+        }
+    }
+
+    /// Combined blend mode + opacity isolation in a single save_layer.
+    ///
+    /// When a node has no effects that require separate opacity isolation
+    /// (no shadows, blur, glass, or backdrop blur), we can merge the
+    /// opacity into the blend mode save_layer paint, eliminating one
+    /// GPU surface allocation per node.
+    ///
+    /// For PassThrough and Normal blend modes on leaf nodes, falls back to
+    /// save_layer_alpha with bounds optimization (no blend isolation needed).
+    fn with_blendmode_and_opacity<F: FnOnce()>(
+        &self,
+        layer_blend_mode: LayerBlendMode,
+        opacity: f32,
+        shape: &PainterShape,
+        effects: &LayerEffects,
+        transform: &[[f32; 3]; 2],
+        stroke_path: Option<&skia_safe::Path>,
+        f: F,
+    ) {
+        match layer_blend_mode {
+            LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal) => {
+                // Normal (SrcOver) on a leaf node needs no blend isolation.
+                // Just apply opacity via save_layer_alpha if needed.
+                if opacity < 1.0 {
+                    let bounds = Self::compute_blend_mode_bounds_with_stroke(
+                        shape,
+                        effects,
+                        transform,
+                        stroke_path,
+                    );
+                    self.canvas
+                        .save_layer_alpha(bounds, (opacity * 255.0) as u32);
+                    f();
+                    self.canvas.restore();
+                } else {
+                    f();
+                }
+            }
+            LayerBlendMode::Blend(blend_mode) => {
+                // Non-Normal blend modes need isolation.
+                let bounds = Self::compute_blend_mode_bounds_with_stroke(
+                    shape,
+                    effects,
+                    transform,
+                    stroke_path,
+                );
+
+                let mut paint = SkPaint::default();
+                paint.set_blend_mode(blend_mode.into());
+                // Merge opacity into the blend paint alpha — single GPU surface
+                // instead of nested save_layer(blend) + save_layer_alpha(opacity).
+                if opacity < 1.0 {
+                    paint.set_alpha_f(opacity);
+                }
+
+                let layer_rec = SaveLayerRec::default().bounds(&bounds).paint(&paint);
                 self.canvas.save_layer(&layer_rec);
                 f();
                 self.canvas.restore();
@@ -345,19 +465,7 @@ impl<'a> Painter<'a> {
     pub fn with_clip<F: FnOnce()>(&self, shape: &PainterShape, f: F) {
         let canvas = self.canvas;
         canvas.save();
-
-        // Try to use the most efficient clipping method based on shape type
-        if let Some(rect) = shape.rect_shape {
-            // Simple rectangle - use clip_rect (fastest)
-            canvas.clip_rect(rect, None, true);
-        } else if let Some(rrect) = &shape.rrect {
-            // Rounded rectangle - use clip_rrect (faster than path)
-            canvas.clip_rrect(rrect, None, true);
-        } else {
-            // Complex shape - fall back to path clipping
-            canvas.clip_path(&shape.to_path(), None, true);
-        }
-
+        shape.clip_on_canvas(canvas);
         f();
         canvas.restore();
     }
@@ -630,7 +738,7 @@ impl<'a> Painter<'a> {
         if let Some(filter) = image_filter {
             // 1) Clip to the shape
             canvas.save();
-            canvas.clip_path(&shape.to_path(), None, true);
+            shape.clip_on_canvas(canvas);
 
             // 2) Use a SaveLayerRec with a backdrop filter so that everything behind is blurred
             let layer_rec = SaveLayerRec::default()
@@ -687,13 +795,7 @@ impl<'a> Painter<'a> {
         canvas.translate((bounds.x(), bounds.y()));
 
         // Clip using the most efficient method based on shape type
-        if let Some(rect) = shape.rect_shape {
-            canvas.clip_rect(rect, None, true);
-        } else if let Some(rrect) = &shape.rrect {
-            canvas.clip_rrect(rrect, None, true);
-        } else {
-            canvas.clip_path(&shape.to_path(), None, true);
-        }
+        shape.clip_on_canvas(canvas);
 
         // SaveLayer with backdrop captures background and applies filter
         // Use bounds relative to translated origin (0,0 based after translation)
@@ -750,7 +852,132 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
         ) {
-            self.canvas.draw_path(&shape.to_path(), &paint);
+            shape.draw_on_canvas(self.canvas, &paint);
+        }
+    }
+
+    /// Draw fills at pre-translated coordinates, avoiding canvas save/concat/restore.
+    ///
+    /// For pure-translation transforms, this pre-applies the translation to shape
+    /// coordinates and draws directly. Reduces the SkPicture from 4 commands
+    /// (save + concat + draw + restore) to 1 command (draw) per node.
+    #[inline]
+    fn draw_fills_translated(
+        &self,
+        shape: &PainterShape,
+        fills: &[Paint],
+        tx: f32,
+        ty: f32,
+    ) {
+        if fills.is_empty() {
+            return;
+        }
+        if let Some(paint) = paint::sk_paint_stack(
+            fills,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            self.draw_shape_at_offset(shape, &paint, tx, ty);
+        }
+    }
+
+    /// Draw fills at pre-translated coordinates with opacity baked into paint alpha.
+    #[inline]
+    fn draw_fills_translated_with_opacity(
+        &self,
+        shape: &PainterShape,
+        fills: &[Paint],
+        opacity: f32,
+        tx: f32,
+        ty: f32,
+    ) {
+        if fills.is_empty() {
+            return;
+        }
+        if let Some(mut paint) = paint::sk_paint_stack(
+            fills,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            paint.set_alpha_f(paint.alpha_f() * opacity);
+            self.draw_shape_at_offset(shape, &paint, tx, ty);
+        }
+    }
+
+    /// Draw a shape at an offset without canvas save/concat/restore.
+    ///
+    /// For rect, rrect, and oval shapes, translates coordinates directly.
+    /// For path shapes, falls back to save/translate/draw/restore.
+    #[inline]
+    fn draw_shape_at_offset(
+        &self,
+        shape: &PainterShape,
+        paint: &SkPaint,
+        tx: f32,
+        ty: f32,
+    ) {
+        if tx == 0.0 && ty == 0.0 {
+            shape.draw_on_canvas(self.canvas, paint);
+        } else if let Some(rect) = shape.rect_shape {
+            self.canvas.draw_rect(rect.with_offset((tx, ty)), paint);
+        } else if let Some(rrect) = &shape.rrect {
+            self.canvas
+                .draw_rrect(rrect.with_offset((tx, ty)), paint);
+        } else if let Some(oval) = &shape.oval {
+            self.canvas.draw_oval(oval.with_offset((tx, ty)), paint);
+        } else {
+            // Path: use save/translate/draw/restore
+            self.canvas.save();
+            self.canvas.translate((tx, ty));
+            shape.draw_on_canvas(self.canvas, paint);
+            self.canvas.restore();
+        }
+    }
+
+    /// Draw fills with layer opacity baked into the paint alpha.
+    ///
+    /// Eliminates the save_layer_alpha GPU surface allocation for fills-only
+    /// leaf nodes. The opacity is multiplied into the paint's alpha channel,
+    /// producing identical results to wrapping in save_layer_alpha when there
+    /// is only a single draw call (no strokes overlapping fills).
+    #[inline]
+    fn draw_fills_with_opacity(&self, shape: &PainterShape, fills: &[Paint], opacity: f32) {
+        if fills.is_empty() {
+            return;
+        }
+        if let Some(mut paint) = paint::sk_paint_stack(
+            fills,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            paint.set_alpha_f(paint.alpha_f() * opacity);
+            shape.draw_on_canvas(self.canvas, &paint);
+        }
+    }
+
+    /// Draw fills using a custom path (instead of `shape.to_path()`) with opacity.
+    ///
+    /// Used for the non-overlapping fill path optimization: when stroke overlaps
+    /// fill (Inside/Center), we draw fills using a path with the stroke region
+    /// subtracted (PathOp::Difference). This eliminates the overlap, allowing
+    /// per-paint-alpha opacity folding without double-blending artifacts.
+    fn draw_path_fills_with_opacity(
+        &self,
+        path: &skia_safe::Path,
+        shape: &PainterShape,
+        fills: &[Paint],
+        opacity: f32,
+    ) {
+        if fills.is_empty() {
+            return;
+        }
+        if let Some(mut paint) = paint::sk_paint_stack(
+            fills,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            paint.set_alpha_f(paint.alpha_f() * opacity);
+            self.canvas.draw_path(path, &paint);
         }
     }
 
@@ -794,6 +1021,28 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
         ) {
+            self.canvas.draw_path(stroke_path, &paint);
+        }
+    }
+
+    /// Draw stroke path with layer opacity baked into the paint alpha.
+    #[inline]
+    fn draw_stroke_path_with_opacity(
+        &self,
+        shape: &PainterShape,
+        stroke_path: &skia_safe::Path,
+        strokes: &[Paint],
+        opacity: f32,
+    ) {
+        if strokes.is_empty() {
+            return;
+        }
+        if let Some(mut paint) = paint::sk_paint_stack(
+            strokes,
+            (shape.rect.width(), shape.rect.height()),
+            self.images,
+        ) {
+            paint.set_alpha_f(paint.alpha_f() * opacity);
             self.canvas.draw_path(stroke_path, &paint);
         }
     }
@@ -1025,124 +1274,396 @@ impl<'a> Painter<'a> {
     fn draw_layer_standard(&self, layer: &PainterPictureLayer) {
         match layer {
             PainterPictureLayer::Shape(shape_layer) => {
-                self.with_blendmode(
+                let effects = &shape_layer.effects;
+                let opacity = shape_layer.base.opacity;
+
+                // Trivial-node fast path: opacity=1.0, no effects, Normal/PassThrough blend.
+                // Skips the entire effects pipeline, blend wrapper, opacity wrapper,
+                // and all associated condition checks / closure creation.
+                // This is the most common case for simple fill/stroke nodes.
+                if opacity >= 1.0
+                    && effects.is_empty()
+                    && matches!(
+                        shape_layer.base.blend_mode,
+                        LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal)
+                    )
+                {
+                    let m = &shape_layer.base.transform.matrix;
+
+                    // Translate-fold fast path: for pure-translation transforms with
+                    // no clip path and no strokes, pre-apply the translation to shape
+                    // coordinates instead of save/concat(matrix)/restore. This reduces
+                    // the recorded SkPicture from 4 commands to 1 per node.
+                    //
+                    // Only applies to fills-only nodes: when strokes are present, the
+                    // shared save/concat/restore wrapping both fills and strokes is
+                    // cheaper than splitting into separate draw + save/translate/restore.
+                    if shape_layer.base.clip_path.is_none()
+                        && shape_layer.stroke_path.is_none()
+                        && m[0][0] == 1.0
+                        && m[1][0] == 0.0
+                        && m[0][1] == 0.0
+                        && m[1][1] == 1.0
+                    {
+                        let tx = m[0][2];
+                        let ty = m[1][2];
+                        if self.policy.render_fills() {
+                            self.draw_fills_translated(
+                                &shape_layer.shape,
+                                &shape_layer.fills,
+                                tx,
+                                ty,
+                            );
+                        }
+                        return;
+                    }
+
+                    self.with_transform(&shape_layer.base.transform.matrix, || {
+                        let shape = &shape_layer.shape;
+                        let clip_path = &shape_layer.base.clip_path;
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            if self.policy.render_fills() {
+                                self.draw_fills(shape, &shape_layer.fills);
+                            }
+                            if self.policy.render_strokes() {
+                                if let Some(path) = &shape_layer.stroke_path {
+                                    self.draw_stroke_path(shape, path, &shape_layer.strokes);
+                                }
+                            }
+                        });
+                    });
+                    return;
+                }
+
+                let can_fold_opacity = opacity < 1.0 && !effects.needs_opacity_isolation();
+
+                // Paint-alpha fast path: for simple leaf nodes with
+                // PassThrough/Normal blend and no effects, fold opacity directly
+                // into each paint's alpha — zero GPU surface allocations.
+                //
+                // This eliminates save_layer_alpha, which is the #1 GPU bottleneck
+                // for semi-transparent scenes during panning.
+                //
+                // Per the SVG/CSS spec (and Chromium's implementation), node-level
+                // opacity requires group isolation: fill+stroke are drawn at full
+                // opacity into an offscreen surface, then composited at the node's
+                // opacity. Per-paint alpha is only spec-correct when there is no
+                // geometric overlap between fill and stroke.
+                //
+                // When stroke overlaps fill (Inside/Center), we use a pre-computed
+                // non-overlapping fill path (fill minus stroke via PathOp::Difference)
+                // to eliminate the overlap at zero GPU cost. If that path is
+                // unavailable (PathOp failed), we fall back to save_layer_alpha
+                // with bounds expanded to include the stroke path.
+                // See docs/wg/feat-2d/stroke-fill-opacity.md
+                let has_noises = !shape_layer.fills.is_empty() && !effects.noises.is_empty();
+                let is_simple_blend = matches!(
                     shape_layer.base.blend_mode,
-                    &shape_layer.shape,
-                    &shape_layer.effects,
-                    &shape_layer.base.transform.matrix,
-                    || {
-                        self.with_transform(&shape_layer.base.transform.matrix, || {
-                            let shape = &shape_layer.shape;
-                            let effect_ref = &shape_layer.effects;
-                            let clip_path = &shape_layer.base.clip_path;
-                            let draw_content = || {
-                                self.with_opacity(shape_layer.base.opacity, || {
-                                    // 1. Fills
-                                    if self.policy.render_fills() {
-                                        self.draw_fills(shape, &shape_layer.fills);
+                    LayerBlendMode::PassThrough | LayerBlendMode::Blend(BlendMode::Normal)
+                );
+                let has_stroke_fill_overlap = shape_layer.stroke_overlaps_fill
+                    && !shape_layer.fills.is_empty()
+                    && !shape_layer.strokes.is_empty();
+                let has_non_overlapping_fill = shape_layer.non_overlapping_fill_path.is_some();
+                let can_fold_into_paint = can_fold_opacity
+                    && is_simple_blend
+                    && !has_noises
+                    && !effects.has_expensive_effects()
+                    && (!has_stroke_fill_overlap || has_non_overlapping_fill);
 
-                                        // 2. Noise (only if fills are visible)
-                                        if !shape_layer.fills.is_empty()
-                                            && !effect_ref.noises.is_empty()
-                                        {
-                                            self.draw_noise_effects(shape, &effect_ref.noises);
-                                        }
+                if can_fold_into_paint {
+                    // Zero save_layers: opacity folded into paint alpha.
+                    let m = &shape_layer.base.transform.matrix;
+
+                    // Translate-fold: skip save/concat/restore for pure translations.
+                    // Fall through to the normal path when stroke markers are
+                    // present — draw_stroke_decorations requires the full
+                    // transform context.
+                    let has_markers = shape_layer.marker_start_shape.has_marker()
+                        || shape_layer.marker_end_shape.has_marker();
+                    if shape_layer.base.clip_path.is_none()
+                        && shape_layer.non_overlapping_fill_path.is_none()
+                        && !has_markers
+                        && m[0][0] == 1.0
+                        && m[1][0] == 0.0
+                        && m[0][1] == 0.0
+                        && m[1][1] == 1.0
+                    {
+                        let tx = m[0][2];
+                        let ty = m[1][2];
+                        if self.policy.render_fills() {
+                            self.draw_fills_translated_with_opacity(
+                                &shape_layer.shape,
+                                &shape_layer.fills,
+                                opacity,
+                                tx,
+                                ty,
+                            );
+                        }
+                        if self.policy.render_strokes() {
+                            if let Some(path) = &shape_layer.stroke_path {
+                                if tx == 0.0 && ty == 0.0 {
+                                    self.draw_stroke_path_with_opacity(
+                                        &shape_layer.shape,
+                                        path,
+                                        &shape_layer.strokes,
+                                        opacity,
+                                    );
+                                } else {
+                                    self.canvas.save();
+                                    self.canvas.translate((tx, ty));
+                                    self.draw_stroke_path_with_opacity(
+                                        &shape_layer.shape,
+                                        path,
+                                        &shape_layer.strokes,
+                                        opacity,
+                                    );
+                                    self.canvas.restore();
+                                }
+                            }
+                        }
+                        return;
+                    }
+
+                    self.with_transform(&shape_layer.base.transform.matrix, || {
+                        let shape = &shape_layer.shape;
+                        let clip_path = &shape_layer.base.clip_path;
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            if self.policy.render_fills() {
+                                // When stroke overlaps fill, use the pre-computed
+                                // non-overlapping fill path to avoid double-blending.
+                                if let Some(ref nof_path) = shape_layer.non_overlapping_fill_path {
+                                    self.draw_path_fills_with_opacity(
+                                        nof_path,
+                                        shape,
+                                        &shape_layer.fills,
+                                        opacity,
+                                    );
+                                } else {
+                                    self.draw_fills_with_opacity(
+                                        shape,
+                                        &shape_layer.fills,
+                                        opacity,
+                                    );
+                                }
+                            }
+                            if self.policy.render_strokes() {
+                                if let Some(path) = &shape_layer.stroke_path {
+                                    self.draw_stroke_path_with_opacity(
+                                        shape,
+                                        path,
+                                        &shape_layer.strokes,
+                                        opacity,
+                                    );
+                                }
+                                self.draw_stroke_decorations(
+                                    shape,
+                                    &shape_layer.strokes,
+                                    shape_layer.stroke_width,
+                                    shape_layer.marker_start_shape,
+                                    shape_layer.marker_end_shape,
+                                );
+                            }
+                        });
+                    });
+                    return;
+                }
+
+                let blend_wrapper = |f: &dyn Fn()| {
+                    if can_fold_opacity {
+                        // Merged path: single save_layer with blend + opacity
+                        self.with_blendmode_and_opacity(
+                            shape_layer.base.blend_mode,
+                            opacity,
+                            &shape_layer.shape,
+                            effects,
+                            &shape_layer.base.transform.matrix,
+                            shape_layer.stroke_path.as_ref(),
+                            f,
+                        );
+                    } else {
+                        // Standard path: separate blend + opacity save_layers
+                        self.with_blendmode(
+                            shape_layer.base.blend_mode,
+                            &shape_layer.shape,
+                            effects,
+                            &shape_layer.base.transform.matrix,
+                            shape_layer.stroke_path.as_ref(),
+                            f,
+                        );
+                    }
+                };
+
+                blend_wrapper(&|| {
+                    self.with_transform(&shape_layer.base.transform.matrix, || {
+                        let shape = &shape_layer.shape;
+                        let effect_ref = &shape_layer.effects;
+                        let clip_path = &shape_layer.base.clip_path;
+                        let draw_content = || {
+                            let inner_draw = || {
+                                // 1. Fills
+                                if self.policy.render_fills() {
+                                    self.draw_fills(shape, &shape_layer.fills);
+
+                                    // 2. Noise (only if fills are visible)
+                                    if !shape_layer.fills.is_empty()
+                                        && !effect_ref.noises.is_empty()
+                                    {
+                                        self.draw_noise_effects(shape, &effect_ref.noises);
                                     }
+                                }
 
-                                    // 3. Strokes
-                                    if self.policy.render_strokes() {
-                                        if let Some(path) = &shape_layer.stroke_path {
-                                            self.draw_stroke_path(
-                                                shape,
-                                                path,
-                                                &shape_layer.strokes,
-                                            );
-                                        }
-
-                                        // 4. Stroke decorations (markers at endpoints)
-                                        self.draw_stroke_decorations(
+                                // 3. Strokes
+                                if self.policy.render_strokes() {
+                                    if let Some(path) = &shape_layer.stroke_path {
+                                        self.draw_stroke_path(
                                             shape,
+                                            path,
                                             &shape_layer.strokes,
-                                            shape_layer.stroke_width,
-                                            shape_layer.marker_start_shape,
-                                            shape_layer.marker_end_shape,
                                         );
                                     }
-                                });
+
+                                    // 4. Stroke decorations (markers at endpoints)
+                                    self.draw_stroke_decorations(
+                                        shape,
+                                        &shape_layer.strokes,
+                                        shape_layer.stroke_width,
+                                        shape_layer.marker_start_shape,
+                                        shape_layer.marker_end_shape,
+                                    );
+                                }
                             };
-                            self.with_optional_clip_path(clip_path.as_ref(), || {
-                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            });
+                            if can_fold_opacity {
+                                inner_draw();
+                            } else {
+                                // Compute tight local bounds for the opacity
+                                // save_layer: shape rect expanded by stroke path.
+                                let mut local_bounds = shape.rect;
+                                if let Some(sp) = &shape_layer.stroke_path {
+                                    let sb = sp.bounds();
+                                    local_bounds = Rect::from_ltrb(
+                                        local_bounds.left().min(sb.left()),
+                                        local_bounds.top().min(sb.top()),
+                                        local_bounds.right().max(sb.right()),
+                                        local_bounds.bottom().max(sb.bottom()),
+                                    );
+                                }
+                                self.with_opacity(
+                                    opacity,
+                                    Some(&local_bounds),
+                                    inner_draw,
+                                );
+                            }
+                        };
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
                         });
-                    },
-                );
+                    });
+                });
             }
             PainterPictureLayer::Text(text_layer) => {
-                self.with_blendmode(
-                    text_layer.base.blend_mode,
-                    &text_layer.shape,
-                    &text_layer.effects,
-                    &text_layer.base.transform.matrix,
-                    || {
-                        self.with_transform(&text_layer.base.transform.matrix, || {
-                            let effects = &text_layer.effects;
-                            let clip_path = &text_layer.base.clip_path;
+                let text_effects = &text_layer.effects;
+                let text_opacity = text_layer.base.opacity;
+                let text_can_fold = text_opacity < 1.0 && !text_effects.needs_opacity_isolation();
 
-                            let paragraph = self.cached_paragraph(
-                                &text_layer.base.id,
-                                &text_layer.text,
-                                &text_layer.width,
-                                &text_layer.max_lines,
-                                &text_layer.ellipsis,
-                                &text_layer.fills,
-                                &text_layer.text_align,
-                                &text_layer.text_align_vertical,
-                                &text_layer.text_style,
-                            );
-                            let layout_size = {
-                                let para = paragraph.borrow();
-                                (para.max_width(), para.height())
-                            };
+                let text_blend_wrapper = |f: &dyn Fn()| {
+                    if text_can_fold {
+                        self.with_blendmode_and_opacity(
+                            text_layer.base.blend_mode,
+                            text_opacity,
+                            &text_layer.shape,
+                            text_effects,
+                            &text_layer.base.transform.matrix,
+                            None,
+                            f,
+                        );
+                    } else {
+                        self.with_blendmode(
+                            text_layer.base.blend_mode,
+                            &text_layer.shape,
+                            text_effects,
+                            &text_layer.base.transform.matrix,
+                            None,
+                            f,
+                        );
+                    }
+                };
 
-                            let layout_height = layout_size.1;
-                            let container_height = text_layer.height.unwrap_or(layout_height);
-                            let y_offset = match text_layer.height {
-                                Some(h) => match text_layer.text_align_vertical {
-                                    TextAlignVertical::Top => 0.0,
-                                    TextAlignVertical::Center => (h - layout_height) / 2.0,
-                                    TextAlignVertical::Bottom => h - layout_height,
-                                },
-                                None => 0.0,
-                            };
+                text_blend_wrapper(&|| {
+                    self.with_transform(&text_layer.base.transform.matrix, || {
+                        let effects = &text_layer.effects;
+                        let clip_path = &text_layer.base.clip_path;
 
-                            let draw_content = || {
-                                self.with_opacity(text_layer.base.opacity, || {
-                                    // Allow stroke-only text: paragraph paint may be empty, but we can still draw strokes.
-                                    if text_layer.fills.is_empty()
-                                        && (text_layer.strokes.is_empty()
-                                            || text_layer.stroke_width <= 0.0)
-                                    {
-                                        return;
-                                    }
-                                    self.draw_text_paragraph(
-                                        &paragraph,
-                                        if self.policy.render_strokes() {
-                                            &text_layer.strokes
-                                        } else {
-                                            &[]
-                                        },
-                                        if self.policy.render_strokes() {
-                                            text_layer.stroke_width
-                                        } else {
-                                            0.0
-                                        },
-                                        &text_layer.stroke_align,
-                                        (layout_size.0, container_height),
-                                        y_offset,
-                                        self.policy.render_fills(),
-                                    );
-                                });
+                        let paragraph = self.cached_paragraph(
+                            &text_layer.base.id,
+                            &text_layer.text,
+                            &text_layer.width,
+                            &text_layer.max_lines,
+                            &text_layer.ellipsis,
+                            &text_layer.fills,
+                            &text_layer.text_align,
+                            &text_layer.text_align_vertical,
+                            &text_layer.text_style,
+                        );
+                        let layout_size = {
+                            let para = paragraph.borrow();
+                            (para.max_width(), para.height())
+                        };
+
+                        let layout_height = layout_size.1;
+                        let container_height = text_layer.height.unwrap_or(layout_height);
+                        let y_offset = match text_layer.height {
+                            Some(h) => match text_layer.text_align_vertical {
+                                TextAlignVertical::Top => 0.0,
+                                TextAlignVertical::Center => (h - layout_height) / 2.0,
+                                TextAlignVertical::Bottom => h - layout_height,
+                            },
+                            None => 0.0,
+                        };
+
+                        let draw_content = || {
+                            let inner_text_draw = || {
+                                // Allow stroke-only text: paragraph paint may be empty, but we can still draw strokes.
+                                if text_layer.fills.is_empty()
+                                    && (text_layer.strokes.is_empty()
+                                        || text_layer.stroke_width <= 0.0)
+                                {
+                                    return;
+                                }
+                                self.draw_text_paragraph(
+                                    &paragraph,
+                                    if self.policy.render_strokes() {
+                                        &text_layer.strokes
+                                    } else {
+                                        &[]
+                                    },
+                                    if self.policy.render_strokes() {
+                                        text_layer.stroke_width
+                                    } else {
+                                        0.0
+                                    },
+                                    &text_layer.stroke_align,
+                                    (layout_size.0, container_height),
+                                    y_offset,
+                                    self.policy.render_fills(),
+                                );
                             };
+                            if text_can_fold {
+                                inner_text_draw();
+                            } else {
+                                let text_bounds = Rect::from_xywh(
+                                    0.0,
+                                    y_offset,
+                                    layout_size.0,
+                                    container_height,
+                                );
+                                self.with_opacity(
+                                    text_opacity,
+                                    Some(&text_bounds),
+                                    inner_text_draw,
+                                );
+                            }
+                        };
 
                             let apply_effects = || {
                                 if let Some(blur) = &effects.backdrop_blur {
@@ -1182,26 +1703,47 @@ impl<'a> Painter<'a> {
                                 }
                             };
 
-                            self.with_optional_clip_path(clip_path.as_ref(), || {
-                                draw_with_effects();
-                            });
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            draw_with_effects();
                         });
-                    },
-                );
+                    });
+                });
             }
             PainterPictureLayer::Vector(vector_layer) => {
-                self.with_blendmode(
-                    vector_layer.base.blend_mode,
-                    &vector_layer.shape,
-                    &vector_layer.effects,
-                    &vector_layer.base.transform.matrix,
-                    || {
-                        self.with_transform(&vector_layer.base.transform.matrix, || {
-                            let shape = &vector_layer.shape;
-                            let effect_ref = &vector_layer.effects;
-                            let clip_path = &vector_layer.base.clip_path;
-                            let draw_content = || {
-                                self.with_opacity(vector_layer.base.opacity, || {
+                let vec_effects = &vector_layer.effects;
+                let vec_opacity = vector_layer.base.opacity;
+                let vec_can_fold = vec_opacity < 1.0 && !vec_effects.needs_opacity_isolation();
+
+                let vec_blend_wrapper = |f: &dyn Fn()| {
+                    if vec_can_fold {
+                        self.with_blendmode_and_opacity(
+                            vector_layer.base.blend_mode,
+                            vec_opacity,
+                            &vector_layer.shape,
+                            vec_effects,
+                            &vector_layer.base.transform.matrix,
+                            None,
+                            f,
+                        );
+                    } else {
+                        self.with_blendmode(
+                            vector_layer.base.blend_mode,
+                            &vector_layer.shape,
+                            vec_effects,
+                            &vector_layer.base.transform.matrix,
+                            None,
+                            f,
+                        );
+                    }
+                };
+
+                vec_blend_wrapper(&|| {
+                    self.with_transform(&vector_layer.base.transform.matrix, || {
+                        let shape = &vector_layer.shape;
+                        let effect_ref = &vector_layer.effects;
+                        let clip_path = &vector_layer.base.clip_path;
+                        let draw_content = || {
+                            let inner_vec_draw = || {
                                     // Use VNPainter for vector network rendering
                                     let vn_painter =
                                     crate::vectornetwork::vn_painter::VNPainter::new_with_images(
@@ -1329,15 +1871,23 @@ impl<'a> Painter<'a> {
                                                 }
                                             }
                                         }
-                                    }
-                                });
+                                }
                             };
-                            self.with_optional_clip_path(clip_path.as_ref(), || {
-                                self.draw_shape_with_effects(effect_ref, shape, draw_content);
-                            });
+                            if vec_can_fold {
+                                inner_vec_draw();
+                            } else {
+                                self.with_opacity(
+                                    vec_opacity,
+                                    Some(&shape.rect),
+                                    inner_vec_draw,
+                                );
+                            }
+                        };
+                        self.with_optional_clip_path(clip_path.as_ref(), || {
+                            self.draw_shape_with_effects(effect_ref, shape, draw_content);
                         });
-                    },
-                );
+                    });
+                });
             }
         }
     }
@@ -1490,9 +2040,26 @@ impl<'a> Painter<'a> {
         for command in commands {
             match command {
                 PainterRenderCommand::Draw(layer) => {
-                    // Skip nodes that are drawn via the compositor cache.
-                    if let Some(skip) = self.promoted_skip {
-                        if skip.contains(layer.id()) {
+                    // Blit promoted nodes from the compositor cache inline at
+                    // their correct z-position. This preserves z-order when a
+                    // live parent (e.g. Container with fills) has promoted
+                    // children (e.g. nodes with blur/shadow effects).
+                    if let Some(blits) = self.promoted_blits {
+                        if let Some(blit) = blits.get(layer.id()) {
+                            let mut paint = SkPaint::default();
+                            if blit.opacity < 1.0 {
+                                paint.set_alpha_f(blit.opacity);
+                            }
+                            paint.set_blend_mode(blit.blend_mode);
+                            self.canvas.draw_image_rect(
+                                &*blit.image,
+                                Some((
+                                    &blit.src_rect,
+                                    skia_safe::canvas::SrcRectConstraint::Fast,
+                                )),
+                                blit.dst_rect,
+                                &paint,
+                            );
                             continue;
                         }
                     }
@@ -1502,7 +2069,7 @@ impl<'a> Painter<'a> {
                             scene_cache.get_node_picture_variant(layer.id(), self.variant_key)
                         {
                             self.canvas.draw_picture(pic, None, None);
-                            *self.cache_hits.borrow_mut() += 1;
+                            self.cache_hits.set(self.cache_hits.get() + 1);
                             continue;
                         }
                     }
@@ -1857,7 +2424,7 @@ impl<'a> Painter<'a> {
                 if let Some(pic) = scene_cache.get_node_picture_variant(&entry.id, self.variant_key)
                 {
                     self.canvas.draw_picture(pic, None, None);
-                    *self.cache_hits.borrow_mut() += 1;
+                    self.cache_hits.set(self.cache_hits.get() + 1);
                     continue;
                 }
             }
@@ -1866,6 +2433,6 @@ impl<'a> Painter<'a> {
     }
 
     pub fn cache_picture_hits(&self) -> usize {
-        *self.cache_hits.borrow()
+        self.cache_hits.get()
     }
 }

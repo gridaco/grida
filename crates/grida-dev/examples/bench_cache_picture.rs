@@ -1,4 +1,4 @@
-use cg::sys::scheduler::FrameScheduler;
+use std::collections::VecDeque;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},
@@ -221,8 +221,7 @@ fn main() {
     let mut last_fps_time = Instant::now();
     let mut last_frame_time = Instant::now();
 
-    // Create frame scheduler with 120 FPS target and 144 FPS max
-    let mut scheduler = FrameScheduler::new(120).with_max_fps(144);
+    let mut fps_samples: VecDeque<std::time::Duration> = VecDeque::with_capacity(60);
 
     // Enable pre-present notification for better frame timing
     window.pre_present_notify();
@@ -269,18 +268,26 @@ fn main() {
                     eprintln!("Error swapping buffers: {:?}", e);
                 }
 
-                // Frame timing and pacing
+                // Frame timing
                 let frame_time = now.duration_since(last_frame_time);
-                scheduler.sleep_to_maintain_fps();
+                if fps_samples.len() == 60 { fps_samples.pop_front(); }
+                fps_samples.push_back(frame_time);
                 last_frame_time = now;
 
                 // FPS calculation
                 frame_count += 1;
                 if now.duration_since(last_fps_time).as_secs_f32() >= 1.0 {
+                    let avg_fps = if fps_samples.is_empty() {
+                        0.0
+                    } else {
+                        let total: std::time::Duration = fps_samples.iter().copied().sum();
+                        let avg = total / fps_samples.len() as u32;
+                        1_000_000.0 / avg.as_micros() as f64
+                    };
                     println!(
-                        "FPS: {} (Target: {:.1}, Frame Time: {:.2}ms)",
+                        "FPS: {} (Avg: {:.1}, Frame Time: {:.2}ms)",
                         frame_count,
-                        scheduler.average_fps(),
+                        avg_fps,
                         frame_time.as_secs_f32() * 1000.0
                     );
                     frame_count = 0;

@@ -97,7 +97,11 @@ unsafe extern "C" fn request_animation_frame_callback_unknown_target(
             return false;
         }
 
-        app.tick(time);
+        // Use the unified frame() entry point — this drives the clock,
+        // timers, and the FrameLoop (poll → flush → complete) in one call.
+        // This fixes the web-host stable-frame bug: after pan/zoom stops,
+        // FrameLoop::poll() returns Stable once the debounce expires.
+        app.frame(time);
     }
     true
 }

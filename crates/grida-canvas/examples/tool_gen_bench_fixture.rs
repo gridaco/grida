@@ -95,15 +95,23 @@ fn scene_mixed_heavy() -> Scene {
     flat_scene("bench-mixed-heavy", nodes)
 }
 
-/// Wide container with 10 000 child rectangles.
+/// Single wide container with 10 000 absolutely positioned child rectangles.
+///
+/// Children use `rect_absolute` so Taffy places them on the explicit grid (same pattern as
+/// `bench-blur-container`). Without `LayoutPositioning::Absolute`, `LayoutMode::Normal` would
+/// stack them in block flow and ignore transform-based cell coordinates.
+///
+/// `clip: true` on the container exercises clipping against a tight bounds rect that matches
+/// the grid extent (last row/column edges, no extra slack gap).
 fn scene_wide_container() -> Scene {
     let child_count: usize = 10_000;
     let cols: usize = 100;
     let cell = 20.0_f32;
     let gap = 2.0_f32;
+    let rows = child_count.div_ceil(cols);
 
-    let container_w = cols as f32 * (cell + gap);
-    let container_h = child_count.div_ceil(cols) as f32 * (cell + gap);
+    let container_w = cols as f32 * cell + (cols - 1).max(0) as f32 * gap;
+    let container_h = rows as f32 * cell + (rows - 1).max(0) as f32 * gap;
 
     let container = Node::Container(ContainerNodeRec {
         active: true,
@@ -151,7 +159,7 @@ fn scene_wide_container() -> Scene {
         let r = ((i * 13) % 256) as u8;
         let g = ((i * 7) % 256) as u8;
         let b = ((i * 3) % 256) as u8;
-        pairs.push((id, rect(x, y, cell, cell, solid(r, g, b, 255))));
+        pairs.push((id, rect_absolute(x, y, cell, cell, solid(r, g, b, 255))));
         children_ids.push(id);
     }
 
@@ -271,6 +279,91 @@ fn scene_text_heavy() -> Scene {
     flat_scene("bench-text-heavy", nodes)
 }
 
+/// Text spans with stroke (3 000 nodes).
+fn scene_text_stroke_heavy() -> Scene {
+    let count = 3000;
+    let cols = 20;
+    let row_h = 28.0_f32;
+    let col_w = 200.0_f32;
+
+    let mut nodes = Vec::with_capacity(count);
+    for i in 0..count {
+        let col = i % cols;
+        let row = i / cols;
+        let x = col as f32 * col_w;
+        let y = row as f32 * row_h;
+        let weight = if i % 3 == 0 { 700 } else { 400 };
+        let size = 12.0 + (i % 5) as f32 * 2.0;
+        let stroke_w = 1.0 + (i % 3) as f32;
+        nodes.push(Node::TextSpan(TextSpanNodeRec {
+            active: true,
+            transform: AffineTransform::new(x, y, 0.0),
+            width: None,
+            height: None,
+            layout_child: None,
+            text: format!("Stroke text #{i}"),
+            text_style: {
+                let mut ts = TextStyleRec::from_font("Inter", size);
+                ts.font_weight = FontWeight(weight);
+                ts
+            },
+            text_align: TextAlign::Left,
+            text_align_vertical: TextAlignVertical::Top,
+            max_lines: None,
+            ellipsis: None,
+            fills: Paints::new(vec![solid(30, 30, 40, 255)]),
+            strokes: Paints::new(vec![solid(255, 140, 0, 255)]),
+            stroke_width: stroke_w,
+            stroke_align: StrokeAlign::Center,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::PassThrough,
+            mask: None,
+            effects: LayerEffects::default(),
+        }));
+    }
+    flat_scene("bench-text-stroke-heavy", nodes)
+}
+
+/// Filled rectangles with uniform stroke (2 000 nodes).
+fn scene_stroke_rect_grid() -> Scene {
+    let cols = 50;
+    let rows = 40;
+    let cell = 40.0_f32;
+    let gap = 8.0_f32;
+
+    let mut nodes = Vec::with_capacity(cols * rows);
+    for row in 0..rows {
+        for col in 0..cols {
+            let x = col as f32 * (cell + gap);
+            let y = row as f32 * (cell + gap);
+            let r = ((col * 7) % 256) as u8;
+            let g = ((row * 11) % 256) as u8;
+            let b = (((col + row) * 5) % 256) as u8;
+            let sw = 1.0 + (col % 4) as f32;
+            nodes.push(Node::Rectangle(RectangleNodeRec {
+                active: true,
+                opacity: 1.0,
+                blend_mode: LayerBlendMode::PassThrough,
+                mask: None,
+                transform: AffineTransform::from_box_center(x, y, cell, cell, 0.0),
+                size: Size {
+                    width: cell,
+                    height: cell,
+                },
+                corner_radius: RectangularCornerRadius::default(),
+                corner_smoothing: CornerSmoothing(0.0),
+                fills: Paints::new(vec![solid(r, g, b, 230)]),
+                strokes: Paints::new(vec![solid(20, 20, 30, 255)]),
+                stroke_style: StrokeStyle::default(),
+                stroke_width: StrokeWidth::Uniform(sw),
+                effects: LayerEffects::default(),
+                layout_child: None,
+            }));
+        }
+    }
+    flat_scene("bench-stroke-rect-grid", nodes)
+}
+
 /// Drop-shadow rectangles (2 000 nodes).
 /// Each has a drop shadow — the primary target for layer compositing cache.
 fn scene_shadow_grid() -> Scene {
@@ -291,7 +384,7 @@ fn scene_shadow_grid() -> Scene {
                 dx: 4.0,
                 dy: 4.0,
                 blur: 8.0,
-                spread: 0.0,
+                spread: 4.0,
                 color: CGColor::from_rgba(0, 0, 0, 80),
                 active: true,
             });
@@ -384,84 +477,6 @@ fn scene_mixed_effects() -> Scene {
         }
     }
     flat_scene("bench-mixed-effects", nodes)
-}
-
-/// Container with drop shadow wrapping 2000 plain child rects.
-/// This exercises the render surface optimization: the shadow is applied
-/// ONCE to the composited subtree, not 2000 times.
-///
-/// Compare with `scene_shadow_grid` where each rect has its own shadow.
-fn scene_shadow_container() -> Scene {
-    let child_count: usize = 2000;
-    let cols: usize = 50;
-    let cell = 40.0_f32;
-    let gap = 20.0_f32;
-
-    let container_w = cols as f32 * (cell + gap);
-    let container_h = child_count.div_ceil(cols) as f32 * (cell + gap);
-
-    let shadow_effects = LayerEffects::new().drop_shadow(FeShadow {
-        dx: 4.0,
-        dy: 4.0,
-        blur: 8.0,
-        spread: 0.0,
-        color: CGColor::from_rgba(0, 0, 0, 80),
-        active: true,
-    });
-
-    let container = Node::Container(ContainerNodeRec {
-        active: true,
-        opacity: 1.0,
-        blend_mode: LayerBlendMode::PassThrough,
-        mask: None,
-        rotation: 0.0,
-        position: LayoutPositioningBasis::Inset(EdgeInsets {
-            top: 0.0,
-            right: 0.0,
-            bottom: 0.0,
-            left: 0.0,
-        }),
-        layout_container: LayoutContainerStyle::default(),
-        layout_dimensions: LayoutDimensionStyle {
-            layout_target_width: Some(container_w),
-            layout_target_height: Some(container_h),
-            layout_min_width: None,
-            layout_max_width: None,
-            layout_min_height: None,
-            layout_max_height: None,
-            layout_target_aspect_ratio: None,
-        },
-        layout_child: None,
-        corner_radius: RectangularCornerRadius::default(),
-        corner_smoothing: CornerSmoothing(0.0),
-        fills: Paints::new(vec![solid(245, 245, 245, 255)]),
-        strokes: Paints::new(vec![]),
-        stroke_style: StrokeStyle::default(),
-        stroke_width: StrokeWidth::None,
-        effects: shadow_effects,
-        clip: false,
-    });
-
-    let container_id: u64 = 1;
-    let mut pairs: Vec<(u64, Node)> = vec![(container_id, container)];
-    let mut children_ids: Vec<u64> = Vec::with_capacity(child_count);
-
-    for i in 0..child_count {
-        let id = (i + 2) as u64;
-        let col = i % cols;
-        let row = i / cols;
-        let x = col as f32 * (cell + gap);
-        let y = row as f32 * (cell + gap);
-        let r = ((col * 7) % 256) as u8;
-        let g = ((row * 11) % 256) as u8;
-        let b = (((col + row) * 5) % 256) as u8;
-        pairs.push((id, rect_absolute(x, y, cell, cell, solid(r, g, b, 255))));
-        children_ids.push(id);
-    }
-
-    let mut links = HashMap::new();
-    links.insert(container_id, children_ids);
-    build_scene("bench-shadow-container", None, pairs, links, vec![container_id])
 }
 
 /// Container with layer blur wrapping 1000 plain child rects.
@@ -623,11 +638,11 @@ fn scene_blur_children_in_container() -> Scene {
     )
 }
 
-/// Progressive-blurred rectangles (1 000 nodes).
+/// Progressive-blurred rectangles (~300 nodes).
 /// Each has a layer progressive blur with varying gradient directions.
 fn scene_progressive_blur_grid() -> Scene {
-    let cols = 40;
-    let rows = 25;
+    let cols = 20;
+    let rows = 15;
     let cell = 50.0_f32;
     let gap = 10.0_f32;
 
@@ -652,7 +667,7 @@ fn scene_progressive_blur_grid() -> Scene {
                         start: Alignment(-sx, -sy),
                         end: Alignment(sx, sy),
                         radius: 0.0,
-                        radius2: 8.0 + (col % 8) as f32 * 2.0,
+                        radius2: 6.0 + (col % 4) as f32 * 2.0,
                     }),
                 }),
                 ..LayerEffects::default()
@@ -661,6 +676,204 @@ fn scene_progressive_blur_grid() -> Scene {
         }
     }
     flat_scene("bench-progressive-blur-grid", nodes)
+}
+
+/// High-contrast vertical stripes under semi-transparent panels with backdrop blur.
+/// Stripes span the full grid so blur visibly smears fine detail; roots list stripes first.
+fn scene_backdrop_blur_grid() -> Scene {
+    let cols = 20;
+    let rows = 15;
+    let cell = 52.0_f32;
+    let gap = 8.0_f32;
+
+    let grid_w = cols as f32 * cell + (cols - 1).max(0) as f32 * gap;
+    let grid_h = rows as f32 * cell + (rows - 1).max(0) as f32 * gap;
+    let stripe_w = 14.0_f32;
+    let n_stripes = ((grid_w / stripe_w).ceil() as usize).max(1);
+
+    let mut pairs: Vec<(u64, Node)> = Vec::with_capacity(n_stripes + cols * rows);
+    let mut roots: Vec<u64> = Vec::with_capacity(n_stripes + cols * rows);
+    let mut id: u64 = 1;
+
+    for i in 0..n_stripes {
+        let left = i as f32 * stripe_w;
+        if left >= grid_w {
+            break;
+        }
+        let w = stripe_w.min(grid_w - left);
+        let cx = left + w * 0.5;
+        let cy = grid_h * 0.5;
+        // Slate / rose stripes — high contrast so backdrop blur is obvious.
+        let fill = if i % 2 == 0 {
+            solid(15, 23, 42, 255)
+        } else {
+            solid(244, 63, 94, 255)
+        };
+        pairs.push((id, rect(cx, cy, w, grid_h, fill)));
+        roots.push(id);
+        id += 1;
+    }
+
+    for row in 0..rows {
+        for col in 0..cols {
+            let x = col as f32 * (cell + gap);
+            let y = row as f32 * (cell + gap);
+            let blur = 4.0 + (col % 5) as f32;
+            let effects = LayerEffects::new().backdrop_blur(blur);
+            pairs.push((
+                id,
+                rect_with_effects(
+                    x,
+                    y,
+                    cell,
+                    cell,
+                    solid(255, 255, 255, 72),
+                    effects,
+                ),
+            ));
+            roots.push(id);
+            id += 1;
+        }
+    }
+
+    build_scene(
+        "bench-backdrop-blur-grid",
+        None,
+        pairs,
+        HashMap::new(),
+        roots,
+    )
+}
+
+/// Rectangles with procedural noise overlay (500 nodes).
+fn scene_noise_grid() -> Scene {
+    let cols = 25;
+    let rows = 20;
+    let cell = 44.0_f32;
+    let gap = 8.0_f32;
+
+    let mut nodes = Vec::with_capacity(cols * rows);
+    for row in 0..rows {
+        for col in 0..cols {
+            let x = col as f32 * (cell + gap);
+            let y = row as f32 * (cell + gap);
+            let r = ((col * 9) % 256) as u8;
+            let g = ((row * 13) % 256) as u8;
+            let b = 140;
+            let effects = LayerEffects {
+                noises: vec![FeNoiseEffect {
+                    active: true,
+                    noise_size: 1.2 + (row % 3) as f32 * 0.4,
+                    density: 0.25 + (col % 5) as f32 * 0.08,
+                    num_octaves: 3,
+                    seed: (col * 31 + row * 17) as f32,
+                    coloring: NoiseEffectColors::Mono {
+                        color: CGColor::from_rgba(255, 255, 255, 40),
+                    },
+                    blend_mode: BlendMode::Normal,
+                }],
+                ..LayerEffects::default()
+            };
+            nodes.push(rect_with_effects(x, y, cell, cell, solid(r, g, b, 255), effects));
+        }
+    }
+    flat_scene("bench-noise-grid", nodes)
+}
+
+/// Liquid glass on a zebra stripe field, composed like `fixtures/l0_effects_glass.rs` / L0 scene
+/// "L0 Effects Glass": white base, black vertical stripes (even indices), then inset rounded glass
+/// with empty fills and `FeLiquidGlass` matching the golden reference.
+fn scene_glass_grid() -> Scene {
+    let cols = 15;
+    let rows = 10;
+    let cell = 64.0_f32;
+    let gap = 12.0_f32;
+    // Same stripe pitch as L0 (`l0_effects_glass.rs`).
+    let stripe_w = 10.0_f32;
+    // Inset glass like L0's padding around the 300px panel (40 / 300 ≈ 13%).
+    let inset = (cell * (40.0 / 300.0)).clamp(6.0, 14.0);
+
+    let n_stripes_per_cell = (cell / stripe_w).ceil() as i32;
+    let nodes_per_cell = 1 + (n_stripes_per_cell as usize + 1) / 2 + 1;
+    let mut pairs: Vec<(u64, Node)> = Vec::with_capacity(cols * rows * nodes_per_cell);
+    let mut roots: Vec<u64> = Vec::with_capacity(cols * rows * nodes_per_cell);
+    let mut id: u64 = 1;
+
+    for row in 0..rows {
+        for col in 0..cols {
+            let x = col as f32 * (cell + gap);
+            let y = row as f32 * (cell + gap);
+
+            // 1) White tile (shows through stripe gaps).
+            pairs.push((id, rect(x, y, cell, cell, solid(255, 255, 255, 255))));
+            roots.push(id);
+            id += 1;
+
+            // 2) Black vertical stripes on even indices only (odd columns stay white).
+            for i in 0..n_stripes_per_cell {
+                if i % 2 != 0 {
+                    continue;
+                }
+                let left = i as f32 * stripe_w;
+                if left >= cell {
+                    break;
+                }
+                let w = stripe_w.min(cell - left);
+                pairs.push((
+                    id,
+                    rect(x + left, y, w, cell, solid(0, 0, 0, 255)),
+                ));
+                roots.push(id);
+                id += 1;
+            }
+
+            // 3) Glass: no fill/stroke, rounded rect, L0-style liquid glass (scaled depth for tile).
+            let gw = cell - 2.0 * inset;
+            let gh = cell - 2.0 * inset;
+            let gx = x + inset;
+            let gy = y + inset;
+            let corner = (gw * (60.0 / 300.0)).clamp(6.0, 18.0);
+            let depth = (100.0 * (gw / 300.0)).clamp(24.0, 100.0);
+
+            pairs.push((
+                id,
+                Node::Rectangle(RectangleNodeRec {
+                    active: true,
+                    opacity: 1.0,
+                    blend_mode: LayerBlendMode::PassThrough,
+                    mask: None,
+                    transform: AffineTransform::from_box_center(gx, gy, gw, gh, 0.0),
+                    size: Size {
+                        width: gw,
+                        height: gh,
+                    },
+                    corner_radius: RectangularCornerRadius::circular(corner),
+                    corner_smoothing: CornerSmoothing(0.0),
+                    fills: Paints::new(vec![]),
+                    strokes: Paints::new(vec![]),
+                    stroke_style: StrokeStyle::default(),
+                    stroke_width: StrokeWidth::None,
+                    effects: LayerEffects {
+                        glass: Some(FeLiquidGlass {
+                            active: true,
+                            light_intensity: 0.7,
+                            light_angle: 45.0,
+                            refraction: 1.0,
+                            depth,
+                            blur_radius: 0.0,
+                            dispersion: 1.0,
+                        }),
+                        ..LayerEffects::default()
+                    },
+                    layout_child: None,
+                }),
+            ));
+            roots.push(id);
+            id += 1;
+        }
+    }
+
+    build_scene("bench-glass-grid", None, pairs, HashMap::new(), roots)
 }
 
 /// Opacity grid: 5 000 rects with fill only, varying opacity (0.1–0.9).
@@ -725,13 +938,17 @@ fn main() {
         ("bench-deep-nesting", scene_deep_nesting()),
         ("bench-rotated-rects", scene_rotated_rects()),
         ("bench-text-heavy", scene_text_heavy()),
+        ("bench-text-stroke-heavy", scene_text_stroke_heavy()),
+        ("bench-stroke-rect-grid", scene_stroke_rect_grid()),
         ("bench-shadow-grid", scene_shadow_grid()),
         ("bench-blur-grid", scene_blur_grid()),
         ("bench-mixed-effects", scene_mixed_effects()),
-        ("bench-shadow-container", scene_shadow_container()),
         ("bench-blur-container", scene_blur_container()),
         ("bench-blur-children-in-container", scene_blur_children_in_container()),
         ("bench-progressive-blur-grid", scene_progressive_blur_grid()),
+        ("bench-backdrop-blur-grid", scene_backdrop_blur_grid()),
+        ("bench-noise-grid", scene_noise_grid()),
+        ("bench-glass-grid", scene_glass_grid()),
         ("bench-opacity-fill-only", scene_opacity_fill_only()),
         ("bench-opacity-fill-stroke", scene_opacity_fill_stroke()),
     ];

@@ -79,6 +79,8 @@ Known citations:
 
 ## Reference Repositories
 
+**Local clones (optional):** If `~/Documents/GitHub/` exists, it may contain default-style clones (sibling dirs named by repo, e.g. `skia`). Prefer searching there before cloning or using only the web.
+
 ### Graphics & Rendering
 
 | Repo                                                | Lang | When to reference                                                             | Key paths                                             |

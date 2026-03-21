@@ -36,12 +36,13 @@ impl<'a> NodePainter<'a> {
             let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
+                    self.painter.with_opacity(node.opacity, None, || {
                         self.painter.with_blendmode(
                             node.blend_mode,
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 self.painter.draw_fills(&shape, &node.fills);
                                 let stroke_width = node.render_bounds_stroke_width();
@@ -72,12 +73,13 @@ impl<'a> NodePainter<'a> {
 
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
+                    self.painter.with_opacity(node.opacity, None, || {
                         self.painter.with_blendmode(
                             node.blend_mode,
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 // Use the single image fill directly - aligns with web development patterns
                                 // where <img> elements have one image source
@@ -115,12 +117,13 @@ impl<'a> NodePainter<'a> {
             let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
+                    self.painter.with_opacity(node.opacity, None, || {
                         self.painter.with_blendmode(
                             node.blend_mode,
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 self.painter.draw_fills(&shape, &node.fills);
                                 self.painter.draw_strokes(
@@ -146,12 +149,13 @@ impl<'a> NodePainter<'a> {
             let node_enum = Node::Line(node.clone());
             let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
 
-            self.painter.with_opacity(node.opacity, || {
+            self.painter.with_opacity(node.opacity, None, || {
                 self.painter.with_blendmode(
                     node.blend_mode,
                     &shape,
                     &node.effects,
                     &node.transform.matrix,
+                    None,
                     || {
                         self.painter.draw_strokes(
                             &shape,
@@ -187,12 +191,13 @@ impl<'a> NodePainter<'a> {
             let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
+                    self.painter.with_opacity(node.opacity, None, || {
                         self.painter.with_blendmode(
                             node.blend_mode,
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 if !node.fills.is_empty() {
                                     self.painter.draw_fills(&shape, &node.fills);
@@ -234,12 +239,13 @@ impl<'a> NodePainter<'a> {
             let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
+                    self.painter.with_opacity(node.opacity, None, || {
                         self.painter.with_blendmode(
                             node.blend_mode,
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 if !node.fills.is_empty() {
                                     self.painter.draw_fills(&shape, &node.fills);
@@ -272,12 +278,13 @@ impl<'a> NodePainter<'a> {
             let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter
                 .draw_shape_with_effects(&node.effects, &shape, || {
-                    self.painter.with_opacity(node.opacity, || {
+                    self.painter.with_opacity(node.opacity, None, || {
                         self.painter.with_blendmode(
                             node.blend_mode,
                             &shape,
                             &node.effects,
                             &identity_transform,
+                            None,
                             || {
                                 self.painter.draw_fills(&shape, &node.fills);
                                 self.painter.draw_strokes(
@@ -357,12 +364,13 @@ impl<'a> NodePainter<'a> {
             let shape = build_shape(&node_enum, &DUMMY_BOUNDS);
             // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
             let identity_transform = math2::transform::AffineTransform::identity().matrix;
-            self.painter.with_opacity(node.opacity, || {
+            self.painter.with_opacity(node.opacity, None, || {
                 self.painter.with_blendmode(
                     node.blend_mode,
                     &shape,
                     &node.effects,
                     &identity_transform,
+                    None,
                     || {
                         self.painter.draw_text_span(
                             &dummy_id,
@@ -403,7 +411,7 @@ impl<'a> NodePainter<'a> {
                 active: true,
             });
 
-            self.painter.with_opacity(node.opacity, || {
+            self.painter.with_opacity(node.opacity, None, || {
                 self.painter.draw_fills(&shape, std::slice::from_ref(&fill));
                 self.painter.draw_strokes(
                     &shape,
@@ -428,7 +436,7 @@ impl<'a> NodePainter<'a> {
         cache: &GeometryCache,
     ) {
         self.painter.with_transform_option(&node.transform, || {
-            self.painter.with_opacity(node.opacity, || {
+            self.painter.with_opacity(node.opacity, None, || {
                 if let Some(children) = graph.get_children(id) {
                     for child_id in children {
                         if let Ok(child) = graph.get_node(child_id) {
@@ -453,12 +461,13 @@ impl<'a> NodePainter<'a> {
                 let identity_transform = math2::transform::AffineTransform::identity().matrix;
                 self.painter
                     .draw_shape_with_effects(&node.effects, &shape, || {
-                        self.painter.with_opacity(node.opacity, || {
+                        self.painter.with_opacity(node.opacity, None, || {
                             self.painter.with_blendmode(
                                 node.blend_mode,
                                 &shape,
                                 &node.effects,
                                 &identity_transform,
+                                None,
                                 || {
                                     if !node.fills.is_empty() {
                                         self.painter.draw_fills(&shape, &node.fills);
@@ -533,7 +542,7 @@ impl<'a> NodePainter<'a> {
                     .expect("Geometry must exist - pipeline bug");
 
                 self.painter.with_transform(&local_transform.matrix, || {
-                    self.painter.with_opacity(n.opacity, || {
+                    self.painter.with_opacity(n.opacity, None, || {
                         // Geometry guaranteed to exist - no Option
                         let bounds = cache
                             .get_world_bounds(id)
@@ -551,6 +560,7 @@ impl<'a> NodePainter<'a> {
                                     &shape,
                                     &n.effects,
                                     &identity_transform,
+                                    None,
                                     || {
                                         // Paint fills first
                                         self.painter.draw_fills(&shape, &n.fills);

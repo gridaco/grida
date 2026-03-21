@@ -50,7 +50,6 @@ pub fn render_noise_effect(effect: &FeNoiseEffect, canvas: &sk::Canvas, shape: &
     // Apply blend mode directly to paint, matching SVG feMerge behavior
     let blend_mode: sk::BlendMode = effect.blend_mode.into();
     let mut p = Paint::default();
-    let path = shape.to_path();
 
     match &effect.coloring {
         NoiseEffectColors::Mono { color } => {
@@ -78,7 +77,7 @@ pub fn render_noise_effect(effect: &FeNoiseEffect, canvas: &sk::Canvas, shape: &
             p.set_shader(shader);
             p.set_blend_mode(blend_mode);
             p.set_anti_alias(true);
-            canvas.draw_path(&path, &p);
+            shape.draw_on_canvas(canvas, &p);
         }
         NoiseEffectColors::Duo { color1, color2 } => {
             // SVG filter pipeline for Duo (USES TWO DISTINCT NON-OVERLAPPING PATTERNS):
@@ -117,7 +116,7 @@ pub fn render_noise_effect(effect: &FeNoiseEffect, canvas: &sk::Canvas, shape: &
             p.set_shader(shader1);
             p.set_blend_mode(blend_mode);
             p.set_anti_alias(true);
-            canvas.draw_path(&path, &p);
+            shape.draw_on_canvas(canvas, &p);
 
             // Draw color2 pattern (upper alpha range) on top
             let color2_sk: sk::Color = (*color2).into();
@@ -126,7 +125,7 @@ pub fn render_noise_effect(effect: &FeNoiseEffect, canvas: &sk::Canvas, shape: &
             p.set_shader(shader2);
             p.set_blend_mode(blend_mode);
             p.set_anti_alias(true);
-            canvas.draw_path(&path, &p);
+            shape.draw_on_canvas(canvas, &p);
         }
         NoiseEffectColors::Multi { opacity } => {
             // SVG filter pipeline for Multi:
@@ -153,7 +152,7 @@ pub fn render_noise_effect(effect: &FeNoiseEffect, canvas: &sk::Canvas, shape: &
             p.set_alpha(alpha);
             p.set_blend_mode(blend_mode);
             p.set_anti_alias(true);
-            canvas.draw_path(&path, &p);
+            shape.draw_on_canvas(canvas, &p);
         }
     }
 }

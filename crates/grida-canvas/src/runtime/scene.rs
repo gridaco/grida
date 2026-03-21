@@ -20,12 +20,35 @@ use crate::{
 
 use math2::{self, rect};
 use skia_safe::{
-    surfaces, Canvas, FilterMode, Image, MipmapMode, Paint as SkPaint, Picture, PictureRecorder,
-    Rect, SamplingOptions, Surface,
+    surfaces, Canvas, Color, FilterMode, Image, MipmapMode, Paint as SkPaint, Picture,
+    PictureRecorder, Rect, SamplingOptions, Surface,
 };
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+// ---------------------------------------------------------------------------
+// Renderer tuning constants
+// ---------------------------------------------------------------------------
+
+/// Zoom scale bucket ratio for the compositor raster cache.
+///
+/// A cached node image is reused (GPU-stretched) as long as the current zoom
+/// stays within this factor of the zoom at which the image was rasterized.
+/// Once the drift exceeds this ratio in either direction the node is
+/// re-rasterized (subject to the per-frame time budget on interactive frames,
+/// or immediately on stable frames).
+///
+/// Set to 2.0 to match Chromium's `kMaxScaleRatioDuringPinch`: tiles are
+/// reused until the zoom drifts more than 2× from the cached scale, then
+/// re-rasterization is triggered.
+///
+/// Raising this value reduces re-rasterization frequency (smoother
+/// interaction, blurrier stretched content). Lowering it increases sharpness
+/// at the cost of more frequent re-rasters.
+const RASTER_ZOOM_RATIO: f32 = 2.0;
+
+// ---------------------------------------------------------------------------
 
 fn normalize_image_id(id: &str) -> String {
     if id.starts_with("res://") || id.starts_with("system://") {
@@ -102,6 +125,11 @@ pub struct FramePlan {
     pub promoted: Vec<NodeId>,
     /// regions with their intersecting indices (live-drawn nodes only)
     pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
+    /// Visible layer indices with promotable effects (shadows, blur, noise).
+    /// Pre-filtered from the R-tree query so the compositor iterates only
+    /// nodes that may need promotion, avoiding a redundant R-tree query
+    /// and the per-node `has_promotable_effects` check.
+    pub compositor_indices: Vec<usize>,
     pub display_list_duration: Duration,
     pub display_list_size_estimated: usize,
 }
@@ -196,6 +224,26 @@ impl RendererWindowContext {
 /// Nodes larger than this in either axis are skipped for compositing.
 const COMPOSITOR_SURFACE_SIZE: i32 = 4096;
 
+/// Maximum screen-space offset (in pixels) before the pan image cache is
+/// invalidated and a full re-draw is triggered. Beyond this threshold the
+/// exposed strips are too large for the blit-only fast path to look acceptable.
+const PAN_IMAGE_CACHE_MAX_OFFSET: f32 = 200.0;
+
+/// Cached GPU snapshot of the composited frame for pan-only fast path.
+///
+/// During pan-only camera changes (the most common interaction), the scene
+/// graph is static and zoom is constant — only the viewport translation
+/// changes. Instead of re-drawing every visible node each frame, we capture
+/// the composited frame as a GPU texture and blit it at the new camera
+/// offset. This replaces O(N) draw commands with a single texture blit.
+struct PanImageCache {
+    /// GPU texture snapshot of the composited frame.
+    image: Image,
+    /// View matrix translation components at capture time.
+    origin_tx: f32,
+    origin_ty: f32,
+}
+
 pub struct Renderer {
     pub backend: Backend,
     pub scene: Option<Scene>,
@@ -230,6 +278,9 @@ pub struct Renderer {
     downscale_surface: Option<Surface>,
     /// Dimensions of the cached downscale surface (to detect size changes).
     downscale_dims: (i32, i32),
+    /// Cached composited frame for pan-only fast path.
+    /// See [`PanImageCache`] for details.
+    pan_image_cache: Option<PanImageCache>,
 }
 
 impl Renderer {
@@ -257,11 +308,25 @@ impl Renderer {
         policy: RenderPolicy,
     ) {
         let variant_key = policy.variant_key();
-        // Prefill picture cache for visible layers so Painter can reuse pictures even with masks
+        // Prefill picture cache for visible layers so Painter can reuse pictures even with masks.
+        // Fast path: skip clone + recording when the picture is already cached (common case
+        // on cache-warm frames). The clone of LayerEntry is expensive because it deep-copies
+        // fills, strokes, effects, paths, etc.
         for (_region, indices) in &plan.regions {
             for idx in indices {
-                if let Some(entry) = self.scene_cache.layers.layers.get(*idx).cloned() {
+                if let Some(entry) = self.scene_cache.layers.layers.get(*idx) {
                     let id = entry.id;
+                    // Check cache before cloning — avoids expensive deep clone on cache hits.
+                    if self
+                        .scene_cache
+                        .picture
+                        .get_node_picture_variant(&id, variant_key)
+                        .is_some()
+                    {
+                        continue;
+                    }
+                    // Cache miss — clone and record.
+                    let entry = entry.clone();
                     let _ = self.with_recording_cached_with_policy(
                         &id,
                         variant_key,
@@ -275,6 +340,74 @@ impl Renderer {
         }
     }
 
+    /// Pre-extract blit data for all promoted nodes.
+    ///
+    /// Iterates through the promoted node list and extracts the image,
+    /// source rect, destination rect, opacity, and blend mode for each node.
+    /// The resulting map is passed to the Painter so it can blit promoted
+    /// nodes inline at their correct z-position in the render command tree.
+    fn build_promoted_blits(
+        &mut self,
+        plan: &FramePlan,
+    ) -> (
+        std::collections::HashMap<NodeId, crate::painter::PromotedBlit>,
+        usize,
+    ) {
+        let mut blits = std::collections::HashMap::new();
+        let mut cache_hits = 0usize;
+
+        for id in &plan.promoted {
+            if let Some(layer_img) = self.scene_cache.compositor.get(id) {
+                let b = &layer_img.local_bounds;
+                let dst_rect = Rect::from_xywh(b.x, b.y, b.width, b.height);
+                let opacity = layer_img.opacity;
+                let cg_blend: crate::cg::types::BlendMode = layer_img.blend_mode.into();
+                let sk_blend: skia_safe::BlendMode = cg_blend.into();
+
+                let blit = if layer_img.is_atlas_backed() {
+                    // Atlas path: same-texture sub-rect blit.
+                    if let Some((atlas_image, src_rect)) =
+                        self.compositor_atlas.get_image_and_src_rect(id)
+                    {
+                        Some(crate::painter::PromotedBlit {
+                            image: std::rc::Rc::new(atlas_image.clone()),
+                            src_rect,
+                            dst_rect,
+                            opacity,
+                            blend_mode: sk_blend,
+                        })
+                    } else {
+                        None
+                    }
+                } else if let Some(img) = layer_img.individual_image() {
+                    // Individual texture path.
+                    let src_rect = Rect::new(
+                        0.0,
+                        0.0,
+                        img.width() as f32,
+                        img.height() as f32,
+                    );
+                    Some(crate::painter::PromotedBlit {
+                        image: std::rc::Rc::clone(img),
+                        src_rect,
+                        dst_rect,
+                        opacity,
+                        blend_mode: sk_blend,
+                    })
+                } else {
+                    None
+                };
+
+                if let Some(blit) = blit {
+                    blits.insert(*id, blit);
+                    cache_hits += 1;
+                }
+            }
+        }
+
+        (blits, cache_hits)
+    }
+
     #[inline]
     fn draw_layers_with_scene_cache(&mut self, canvas: &Canvas, plan: &FramePlan) -> usize {
         self.draw_layers_with_scene_cache_skip(canvas, plan, None)
@@ -284,7 +417,7 @@ impl Renderer {
         &mut self,
         canvas: &Canvas,
         plan: &FramePlan,
-        promoted_skip: Option<&std::collections::HashSet<NodeId>>,
+        promoted_blits: Option<&std::collections::HashMap<NodeId, crate::painter::PromotedBlit>>,
     ) -> usize {
         // Select effect quality based on frame stability.
         // Unstable (interactive) frames use reduced effects for performance.
@@ -304,8 +437,8 @@ impl Renderer {
             &self.scene_cache,
             policy,
         );
-        let painter = if let Some(skip) = promoted_skip {
-            painter.with_promoted_skip(skip)
+        let painter = if let Some(blits) = promoted_blits {
+            painter.with_promoted_blits(blits)
         } else {
             painter
         };
@@ -371,6 +504,7 @@ impl Renderer {
             ),
             downscale_surface: None,
             downscale_dims: (0, 0),
+            pan_image_cache: None,
         }
     }
 
@@ -555,6 +689,7 @@ impl Renderer {
             // re-captured as individual textures on the next frame.
             self.scene_cache.compositor.invalidate_all();
             self.compositor_atlas.clear();
+            self.pan_image_cache = None;
         }
     }
 
@@ -640,37 +775,106 @@ impl Renderer {
 
     /// Render the queued frame if any and return the completed statistics.
     /// Intended to be called by the host when a redraw request is received.
+    ///
+    /// NOTE: camera `consume_change()` is NOT called here. The caller
+    /// (`app.redraw()` or `app.frame()`) is responsible for consuming
+    /// after rendering. Consuming here would eat the change before
+    /// `frame()` sees it on the web path, where both `redraw()` (called
+    /// by JS) and `frame()` (called by RAF) may run.
     pub fn flush(&mut self) -> FrameFlushResult {
         if !self.fc.has_pending() {
             return FrameFlushResult::NoPending;
         }
 
-        let Some(frame) = self.plan.take() else {
+        let Some(plan) = self.plan.take() else {
             return FrameFlushResult::NoFrame;
         };
 
+        if self.scene.is_none() {
+            return FrameFlushResult::NoScene;
+        }
+
+        let stats = self.render_frame(plan);
+
+        self.fc.flush();
+        self.plan = None;
+
+        FrameFlushResult::OK(stats)
+    }
+
+    /// Core rendering logic shared by `flush()` and `flush_with_plan()`.
+    ///
+    /// Assumes `self.scene` is `Some`. Panics otherwise.
+    fn render_frame(&mut self, plan: FramePlan) -> FrameFlushStats {
         let start = Instant::now();
 
-        let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) else {
-            return FrameFlushResult::NoScene;
-        };
-
+        let scene_ptr = self.scene.as_ref().unwrap() as *const Scene;
         let surface = unsafe { &mut *self.backend.get_surface() };
         let scene = unsafe { &*scene_ptr };
 
         let width = surface.width() as f32;
         let height = surface.height() as f32;
 
+        // --- Pan image cache fast path ---
+        // On pan-only frames with a valid cached composited frame and small
+        // offset, blit the cached GPU texture instead of re-drawing all
+        // nodes. This replaces O(N) draw commands + GPU rasterization with
+        // a single texture blit.
+        if plan.camera_change == CameraChangeKind::PanOnly && self.backend.is_gpu() {
+            if let Some(ref cache) = self.pan_image_cache {
+                let vm = self.camera.view_matrix();
+                let dx = vm.matrix[0][2] - cache.origin_tx;
+                let dy = vm.matrix[1][2] - cache.origin_ty;
+
+                if dx.abs() <= PAN_IMAGE_CACHE_MAX_OFFSET
+                    && dy.abs() <= PAN_IMAGE_CACHE_MAX_OFFSET
+                {
+                    let canvas = surface.canvas();
+                    if let Some(bg) = scene.background_color {
+                        canvas.clear(Color::from(bg));
+                    } else {
+                        canvas.clear(Color::TRANSPARENT);
+                    }
+                    canvas.draw_image(&cache.image, (dx, dy), None);
+
+                    let mid_flush_start = Instant::now();
+                    Self::gpu_flush(surface);
+                    let mid_flush_duration = mid_flush_start.elapsed();
+                    let frame_duration = start.elapsed();
+
+                    return FrameFlushStats {
+                        frame: plan,
+                        draw: DrawResult {
+                            painter_duration: Duration::ZERO,
+                            cache_picture_used: 0,
+                            cache_picture_size: self.scene_cache.picture.len(),
+                            cache_geometry_size: self.scene_cache.geometry.len(),
+                            layer_image_cache_size: 0,
+                            layer_image_cache_hits: 0,
+                            layer_image_cache_bytes: 0,
+                            live_draw_count: 0,
+                        },
+                        frame_duration,
+                        flush_duration: Duration::ZERO,
+                        total_duration: frame_duration,
+                        compositor_duration: Duration::ZERO,
+                        mid_flush_duration,
+                    };
+                }
+                // Offset too large — fall through to full re-draw below.
+            }
+        }
+
+        // --- Full draw path ---
+
         // Reuse or create a downscaled offscreen for interaction rendering.
         let interaction_scale = self.config.interaction_render_scale;
-        let use_downscale = !frame.stable
-            && interaction_scale > 0.0
-            && interaction_scale < 1.0;
+        let use_downscale =
+            !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
         if use_downscale {
             let sw = (width * interaction_scale).ceil() as i32;
             let sh = (height * interaction_scale).ceil() as i32;
             if sw > 0 && sh > 0 && (sw, sh) != self.downscale_dims {
-                // Size changed — recreate the surface.
                 let info = skia_safe::ImageInfo::new_n32_premul((sw, sh), None);
                 self.downscale_surface = surface.new_surface(&info);
                 self.downscale_dims = (sw, sh);
@@ -688,7 +892,7 @@ impl Renderer {
         let mut canvas = surface.canvas();
         let draw = self.draw(
             &mut canvas,
-            &frame,
+            &plan,
             scene.background_color,
             width,
             height,
@@ -700,37 +904,36 @@ impl Renderer {
             self.downscale_surface = ds_taken;
         }
 
-        // Layer compositing cache: capture (or re-capture) node images.
-        //
-        // GPU-only: offscreen surfaces share the GL context so cached
-        // SkImages live in VRAM. On a CPU/raster backend the extra copy
-        // would be strictly slower than direct painting, so we skip it.
-        //
-        // Runs on every frame — the method itself is cheap when all entries
-        // are already cached and clean.  Rasterisation only happens for nodes
-        // that are new or dirty (zoom change, content edit, etc.).
-        // Mid-frame flush: isolate draw vs compositor GPU work.
+        // Mid-frame GPU flush: isolate draw vs compositor GPU work.
         let mid_flush_start = Instant::now();
-        if let Some(mut gr_context) = surface.recording_context() {
-            if let Some(mut direct_context) = gr_context.as_direct_context() {
-                direct_context.flush_and_submit();
-            }
-        }
+        Self::gpu_flush(surface);
         let mid_flush_duration = mid_flush_start.elapsed();
 
+        // Capture composited frame for pan image cache.
+        // After mid_flush the surface has the complete rendered scene.
+        // Only capture on non-stable frames that didn't change zoom — zoom
+        // frames invalidate the cache on the next queue(), so capturing
+        // them wastes the snapshot.
+        if self.backend.is_gpu() && !plan.stable && !plan.camera_change.zoom_changed() {
+            let vm = self.camera.view_matrix();
+            let image = surface.image_snapshot();
+            self.pan_image_cache = Some(PanImageCache {
+                image,
+                origin_tx: vm.matrix[0][2],
+                origin_ty: vm.matrix[1][2],
+            });
+        }
+
+        // Compositor update (GPU-only).
         let compositor_start = Instant::now();
         if self.backend.is_gpu() {
-            let effective_layer_compositing = self.config.layer_compositing
+            let effective = self.config.layer_compositing
                 && self.config.render_policy.allows_layer_compositing();
-            if effective_layer_compositing {
-                if frame.stable {
-                    // Stable frame: re-rasterize all stale entries at the
-                    // final zoom density without a time budget.
-                    self.update_compositor_stable(surface);
+            if effective {
+                if plan.stable {
+                    self.update_compositor_stable(surface, &plan.compositor_indices);
                 } else {
-                    // Unstable frame: budgeted re-rasterization. Stale
-                    // entries stay GPU-stretched until their turn comes.
-                    self.update_compositor(surface);
+                    self.update_compositor(surface, &plan.compositor_indices);
                 }
             }
         }
@@ -738,28 +941,30 @@ impl Renderer {
 
         let frame_duration = start.elapsed();
 
+        // Final GPU flush.
         let flush_start = Instant::now();
-        if let Some(mut gr_context) = surface.recording_context() {
-            if let Some(mut direct_context) = gr_context.as_direct_context() {
-                direct_context.flush_and_submit();
-            }
-        }
+        Self::gpu_flush(surface);
         let flush_duration = flush_start.elapsed();
 
-        let stats = FrameFlushStats {
-            frame,
+        FrameFlushStats {
+            frame: plan,
             draw,
             frame_duration,
             flush_duration,
             total_duration: frame_duration + flush_duration,
             compositor_duration,
             mid_flush_duration,
-        };
+        }
+    }
 
-        self.fc.flush();
-        self.plan = None;
-
-        FrameFlushResult::OK(stats)
+    /// Submit pending GPU work on the surface's direct context (if any).
+    #[inline]
+    fn gpu_flush(surface: &mut Surface) {
+        if let Some(mut gr_context) = surface.recording_context() {
+            if let Some(mut direct_context) = gr_context.as_direct_context() {
+                direct_context.flush_and_submit();
+            }
+        }
     }
 
     /// Invoke the request redraw callback.
@@ -785,6 +990,7 @@ impl Renderer {
         self.scene = Some(scene);
 
         self.scene_cache = cache::scene::SceneCache::new();
+        self.pan_image_cache = None;
         if let Some(scene) = self.scene.as_ref() {
             let requested = collect_scene_font_families(scene);
             self.fonts.set_requested_families(requested.into_iter());
@@ -839,6 +1045,13 @@ impl Renderer {
             self.scene_cache.compositor.mark_all_stale();
         }
 
+        // Invalidate pan image cache when zoom changes or on stable frames.
+        // Zoom changes alter the pixel content (different scale/density).
+        // Stable frames should produce a full-quality render, not a cached blit.
+        if camera_change.zoom_changed() || stable {
+            self.pan_image_cache = None;
+        }
+
         // Always compute the latest frame plan so that a subsequent flush uses up-to-date state,
         // even if a previous frame is already pending.
         let rect = Some(self.camera.rect());
@@ -866,12 +1079,51 @@ impl Renderer {
         self.queue(true);
     }
 
+    /// Mark compositor entries as stale on zoom change.
+    ///
+    /// Called by the application's `frame()` method when the camera zoom
+    /// changed. Separated from `queue()` so that the new `FrameLoop`-based
+    /// path can prepare the renderer without building a full plan eagerly.
+    pub fn invalidate_compositor_on_zoom(&mut self) {
+        if self.config.layer_compositing {
+            self.scene_cache.compositor.mark_all_stale();
+        }
+    }
+
+    /// Build a frame plan without queuing it on the renderer.
+    ///
+    /// Used by the application's unified `frame()` entry point, which
+    /// handles frame scheduling through `FrameLoop` rather than the
+    /// legacy `FrameCounter`-based path.
+    pub fn build_frame_plan(
+        &self,
+        bounds: rect::Rectangle,
+        zoom: f32,
+        stable: bool,
+        camera_change: CameraChangeKind,
+    ) -> FramePlan {
+        self.frame(bounds, zoom, stable, camera_change)
+    }
+
+    /// Flush a caller-provided plan: draw + GPU submit + compositor update.
+    ///
+    /// Returns `Some(stats)` on success, `None` if no scene is loaded.
+    /// Unlike the legacy `flush()`, this does NOT consult `FrameCounter`
+    /// — the caller (via `FrameLoop`) already decided to render.
+    pub fn flush_with_plan(&mut self, plan: FramePlan) -> Option<FrameFlushStats> {
+        if self.scene.is_none() {
+            return None;
+        }
+        Some(self.render_frame(plan))
+    }
+
     /// Clear the cached scene picture.
     pub fn invalidate_cache(&mut self) {
         self.scene_cache.invalidate();
         // Also invalidate all compositor layer images so they re-rasterize.
         self.scene_cache.compositor.invalidate_all();
         self.compositor_atlas.clear();
+        self.pan_image_cache = None;
     }
 
     /// Rebuild scene caches after scene geometry has changed.
@@ -1011,40 +1263,56 @@ impl Renderer {
     ) -> FramePlan {
         let __start = Instant::now();
 
-        let painter_region = vec![bounds];
-
         let effective_layer_compositing = self.config.layer_compositing
             && self.config.render_policy.allows_layer_compositing();
 
         let mut promoted_ids: Vec<NodeId> = Vec::new();
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
-        for rect in painter_region {
-            let mut indices = self.scene_cache.intersects(rect);
+        // Query the R-tree once for all visible layer indices.
+        let mut indices = self.scene_cache.intersects(bounds);
 
-            // TODO: sort is expensive — consider incremental visible-set
-            // update (item 19) for pan-only frames where the entering/exiting
-            // sets are tiny.
-            indices.sort();
+        // TODO: sort is expensive — consider incremental visible-set
+        // update (item 19) for pan-only frames where the entering/exiting
+        // sets are tiny.
+        indices.sort();
 
-            if effective_layer_compositing {
-                // Separate promoted (cached) nodes from live-drawn nodes.
-                let mut live_indices = Vec::new();
-                for &idx in &indices {
-                    if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
-                        if self.scene_cache.compositor.peek(&entry.id).is_some() {
-                            promoted_ids.push(entry.id);
-                        } else {
-                            live_indices.push(idx);
-                        }
+        // Pre-filter compositor-relevant indices during the same pass.
+        // Nodes without expensive effects (the vast majority) are skipped
+        // by the compositor anyway. Filtering here avoids a redundant
+        // R-tree query in update_compositor_inner AND reduces the compositor
+        // loop to only promotable nodes.
+        let mut compositor_indices = Vec::new();
+
+        if effective_layer_compositing {
+            // Separate promoted (cached) nodes from live-drawn nodes.
+            let mut live_indices = Vec::new();
+            for &idx in &indices {
+                if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                    if crate::cache::compositor::promotion::has_promotable_effects(&entry.layer) {
+                        compositor_indices.push(idx);
+                    }
+                    if self.scene_cache.compositor.peek(&entry.id).is_some() {
+                        promoted_ids.push(entry.id);
+                    } else {
+                        live_indices.push(idx);
                     }
                 }
-                if !live_indices.is_empty() {
-                    regions.push((rect, live_indices));
-                }
-            } else {
-                regions.push((rect, indices));
             }
+            if !live_indices.is_empty() {
+                regions.push((bounds, live_indices));
+            }
+        } else {
+            // No compositing: still collect compositor-relevant indices
+            // for the compositor update pass.
+            for &idx in &indices {
+                if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                    if crate::cache::compositor::promotion::has_promotable_effects(&entry.layer) {
+                        compositor_indices.push(idx);
+                    }
+                }
+            }
+            regions.push((bounds, indices));
         }
 
         let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
@@ -1056,6 +1324,7 @@ impl Renderer {
             camera_change,
             promoted: promoted_ids,
             regions,
+            compositor_indices,
             display_list_duration: __ll_duration,
             display_list_size_estimated: ll_len,
         }
@@ -1170,8 +1439,6 @@ impl Renderer {
             // Fallback: draw at full resolution below.
         }
 
-        canvas.clear(skia_safe::Color::TRANSPARENT);
-
         Self::clear_and_paint_background(canvas, background_color, width, height);
 
         canvas.save();
@@ -1179,76 +1446,20 @@ impl Renderer {
         // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // Draw promoted nodes from the layer compositing cache.
-        // Each cached image is blitted at its world-space render bounds.
-        // The camera view matrix (already applied to canvas) handles zoom.
-        // Opacity and blend mode are stored in LayerImage at capture time.
-        //
-        // Atlas-backed nodes use same-texture sub-rect draws (batch-friendly,
-        // eliminates GPU texture switching). Individual-backed nodes use
-        // per-node texture blits as fallback.
-        let mut layer_image_cache_hits = 0usize;
-        let promoted_set: std::collections::HashSet<NodeId> =
-            plan.promoted.iter().copied().collect();
-        if !plan.promoted.is_empty() {
-            for id in &plan.promoted {
-                if let Some(layer_img) = self.scene_cache.compositor.get(id) {
-                    let b = &layer_img.local_bounds;
-                    let dst = Rect::from_xywh(b.x, b.y, b.width, b.height);
-                    let mut paint = SkPaint::default();
-                    if layer_img.opacity < 1.0 {
-                        paint.set_alpha_f(layer_img.opacity);
-                    }
-                    let cg_blend: crate::cg::types::BlendMode = layer_img.blend_mode.into();
-                    let sk_blend: skia_safe::BlendMode = cg_blend.into();
-                    paint.set_blend_mode(sk_blend);
+        // Build promoted blit map: pre-extract image data for compositor-
+        // cached nodes. The Painter will blit these inline at their correct
+        // z-position in the render command tree, preserving proper z-order
+        // when a live parent (e.g. Container with fills) has promoted children.
+        let (promoted_blits, layer_image_cache_hits) = self.build_promoted_blits(plan);
 
-                    if layer_img.is_atlas_backed() {
-                        // Atlas path: same-texture sub-rect blit.
-                        if let Some((atlas_image, src_rect)) =
-                            self.compositor_atlas.get_image_and_src_rect(id)
-                        {
-                            canvas.draw_image_rect(
-                                atlas_image,
-                                Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
-                                dst,
-                                &paint,
-                            );
-                        }
-                    } else if let Some(img) = layer_img.individual_image() {
-                        // Individual texture path.
-                        let src = Rect::new(
-                            0.0,
-                            0.0,
-                            img.width() as f32,
-                            img.height() as f32,
-                        );
-                        canvas.draw_image_rect(
-                            img,
-                            Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
-                            dst,
-                            &paint,
-                        );
-                    }
-                    layer_image_cache_hits += 1;
-                }
-            }
-        }
-
-        // Draw live (non-promoted) layers via the Painter.
-        // Promoted nodes are skipped — they were already blitted above.
-        // Skip entirely when all visible nodes are promoted — no live work needed.
-        let has_live_work = plan.regions.iter().any(|(_, indices)| !indices.is_empty());
-        let promoted_skip = if promoted_set.is_empty() {
+        // Draw all layers via the Painter with promoted nodes blitted inline.
+        let promoted_blits_ref = if promoted_blits.is_empty() {
             None
         } else {
-            Some(&promoted_set)
+            Some(&promoted_blits)
         };
-        let cache_picture_used = if has_live_work {
-            self.draw_layers_with_scene_cache_skip(canvas, plan, promoted_skip)
-        } else {
-            0
-        };
+        let cache_picture_used =
+            self.draw_layers_with_scene_cache_skip(canvas, plan, promoted_blits_ref);
 
         let __painter_duration = __before_paint.elapsed();
 
@@ -1301,59 +1512,15 @@ impl Renderer {
         off_canvas.scale((scale, scale));
         off_canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // Blit promoted (compositor-cached) nodes.
-        let mut layer_image_cache_hits = 0usize;
-        let promoted_set: std::collections::HashSet<NodeId> =
-            plan.promoted.iter().copied().collect();
-        for id in &plan.promoted {
-            if let Some(layer_img) = self.scene_cache.compositor.get(id) {
-                let b = &layer_img.local_bounds;
-                let dst = Rect::from_xywh(b.x, b.y, b.width, b.height);
-                let mut paint = SkPaint::default();
-                if layer_img.opacity < 1.0 {
-                    paint.set_alpha_f(layer_img.opacity);
-                }
-                let cg_blend: crate::cg::types::BlendMode = layer_img.blend_mode.into();
-                let sk_blend: skia_safe::BlendMode = cg_blend.into();
-                paint.set_blend_mode(sk_blend);
-
-                if layer_img.is_atlas_backed() {
-                    if let Some((atlas_image, src_rect)) =
-                        self.compositor_atlas.get_image_and_src_rect(id)
-                    {
-                        off_canvas.draw_image_rect(
-                            atlas_image,
-                            Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
-                            dst,
-                            &paint,
-                        );
-                    }
-                } else if let Some(img) = layer_img.individual_image() {
-                    let src = Rect::new(0.0, 0.0, img.width() as f32, img.height() as f32);
-                    off_canvas.draw_image_rect(
-                        img,
-                        Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
-                        dst,
-                        &paint,
-                    );
-                }
-                layer_image_cache_hits += 1;
-            }
-        }
-
-        // Draw live (non-promoted) layers at reduced resolution.
-        // Promoted nodes are skipped — they were already blitted above.
-        let has_live_work = plan.regions.iter().any(|(_, indices)| !indices.is_empty());
-        let promoted_skip = if promoted_set.is_empty() {
+        // Build promoted blit map and draw all layers with inline blitting.
+        let (promoted_blits, layer_image_cache_hits) = self.build_promoted_blits(plan);
+        let promoted_blits_ref = if promoted_blits.is_empty() {
             None
         } else {
-            Some(&promoted_set)
+            Some(&promoted_blits)
         };
-        let cache_picture_used = if has_live_work {
-            self.draw_layers_with_scene_cache_skip(off_canvas, plan, promoted_skip)
-        } else {
-            0
-        };
+        let cache_picture_used =
+            self.draw_layers_with_scene_cache_skip(off_canvas, plan, promoted_blits_ref);
 
         off_canvas.restore();
 
@@ -1486,14 +1653,22 @@ impl Renderer {
     /// during unstable (interactive) frames, and without limit on stable
     /// (settled) frames. Stale entries (zoom mismatch) are blitted with
     /// GPU texture stretching until re-rasterized.
-    fn update_compositor(&mut self, parent_surface: &mut Surface) {
-        self.update_compositor_inner(parent_surface, false);
+    fn update_compositor(
+        &mut self,
+        parent_surface: &mut Surface,
+        visible_indices: &[usize],
+    ) {
+        self.update_compositor_inner(parent_surface, false, visible_indices);
     }
 
     /// Variant called on stable frames — no time budget, all stale entries
     /// are re-rasterized to achieve full quality at the final zoom.
-    fn update_compositor_stable(&mut self, parent_surface: &mut Surface) {
-        self.update_compositor_inner(parent_surface, true);
+    fn update_compositor_stable(
+        &mut self,
+        parent_surface: &mut Surface,
+        visible_indices: &[usize],
+    ) {
+        self.update_compositor_inner(parent_surface, true, visible_indices);
     }
 
     /// Core compositor update logic.
@@ -1502,7 +1677,12 @@ impl Renderer {
     /// re-rasterized without a time budget. When false (unstable/interactive
     /// frame), re-rasterization is capped to `ZOOM_RERASTER_BUDGET` to keep
     /// frame times low.
-    fn update_compositor_inner(&mut self, parent_surface: &mut Surface, force_all: bool) {
+    fn update_compositor_inner(
+        &mut self,
+        parent_surface: &mut Surface,
+        force_all: bool,
+        visible_indices: &[usize],
+    ) {
         use crate::cache::compositor::promotion;
 
         let zoom = self.camera.get_zoom();
@@ -1521,11 +1701,8 @@ impl Renderer {
             }
         }
 
-        // Only process layers visible in the current viewport.
-        let viewport_rect = self.camera.rect();
-        let visible_indices = self.scene_cache.intersects(viewport_rect);
-        let visible_set: std::collections::HashSet<usize> =
-            visible_indices.into_iter().collect();
+        // Visible indices are pre-computed by the frame plan's R-tree query
+        // and passed in to avoid a redundant spatial query each frame.
 
         // Time budget for stale re-rasterization during interactive frames.
         // 8ms leaves headroom within a 16ms frame budget (60fps target).
@@ -1533,17 +1710,16 @@ impl Renderer {
             std::time::Duration::from_micros(8000);
         let budget_start = std::time::Instant::now();
 
-        // Zoom scale bucket ratio — only re-rasterize when the zoom drift
-        // exceeds this threshold. Within the bucket, the GPU stretch is
-        // visually acceptable.
-        const RASTER_ZOOM_RATIO: f32 = 1.5;
-
-        for (idx, entry) in self.scene_cache.layers.layers.iter().enumerate() {
-            if !visible_set.contains(&idx) {
+        for &idx in visible_indices {
+            let Some(entry) = self.scene_cache.layers.layers.get(idx) else {
                 continue;
-            }
+            };
 
             let id = entry.id;
+
+            // Note: visible_indices is pre-filtered by the frame plan to only
+            // include nodes with promotable effects (has_promotable_effects).
+            // No need to re-check here.
 
             // Decide whether this node needs (re-)rasterization.
             //

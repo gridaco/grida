@@ -165,46 +165,47 @@ Related:
       per-paint alpha changes the blend input, producing different
       compositing results than whole-node alpha.
 
-    ### When per-paint alpha is technically wrong but acceptable
+    ### Previously: heuristic-based tolerance (superseded)
 
-    - **Fills + stroke at high opacity (>0.8)** — the double-blend at
-      the stroke/fill boundary is `opacity^2` vs `opacity`. At 0.9,
-      that's 0.81 vs 0.9 — a 10% difference in a thin band. Typically
-      imperceptible.
-    - **Fills + stroke with thin stroke (1-2px)** — the overlap band
-      is sub-pixel to 2px. Hard to see at any opacity.
+    Before the non-overlapping fill path optimization, a heuristic allowed
+    per-paint alpha for thin strokes or high opacity. This has been
+    **replaced** by the exact PathOp::Difference approach, which eliminates
+    the overlap entirely and produces pixel-correct results at all opacities
+    and stroke widths. See `docs/wg/feat-2d/stroke-fill-opacity.md`.
 
     ### Decision rule for implementation
 
     ```text
     can_use_per_paint_alpha(node):
-      if node has noise effects     → NO  (always wrong)
-      if node has fills AND strokes → MAYBE (see below)
-      if node has only fills        → YES
-      if node has only strokes      → YES
-
-    fill+stroke heuristic:
-      if stroke_width <= 2.0        → YES (overlap band too thin to see)
-      if opacity >= 0.85            → YES (double-blend delta < 13%)
-      otherwise                     → NO  (use save_layer)
+      if node has noise effects       → NO  (always wrong)
+      if node has expensive effects   → NO  (shadows/blur need isolation)
+      if non-Normal blend mode        → NO  (need blend isolation)
+      if node has only fills          → YES (one draw call, no overlap)
+      if node has only strokes        → YES (one draw call, no overlap)
+      if node has fill + stroke:
+        if stroke_align == Outside    → YES (no geometric overlap)
+        if non_overlapping_fill_path  → YES (overlap eliminated by PathOp)
+        otherwise                     → NO  (PathOp failed, use save_layer)
     ```
+
+    See `docs/wg/feat-2d/stroke-fill-opacity.md` for the full spec.
 
     ### Current state in codebase
 
-    `with_opacity()` in `painter.rs:202` uses **unbounded**
-    `save_layer_alpha(None, ...)` for ALL nodes with `opacity < 1.0`.
-    The per-paint alpha optimization is **not implemented**. Even when
-    `save_layer` is needed, the missing bounds make it worse (allocates
-    a full-canvas offscreen instead of a tight rect).
+    **Implemented.** Per-paint alpha is used for all qualifying nodes:
+    fills-only, strokes-only, and fill+stroke with non-overlapping fill
+    paths. `with_opacity()` now passes tight local bounds when
+    `save_layer_alpha` is still required (effects needing opacity
+    isolation). See `docs/wg/feat-2d/stroke-fill-opacity.md`.
 
     ### Implementation priority
 
-    1. **Fills-only or strokes-only nodes** — safe, no heuristic needed,
-       large speedup. Majority of typical document nodes.
-    2. **Pass bounds to remaining `save_layer` calls** — even when
-       `save_layer` is still needed, bounded is cheaper than unbounded.
-    3. **Fill+stroke with heuristic** — optional, requires threshold
-       tuning, smaller win (most of the cost is already in tier 1).
+    1. ~~**Fills-only or strokes-only nodes**~~ — **done**. Safe, no heuristic
+       needed, large speedup. Majority of typical document nodes.
+    2. ~~**Pass bounds to remaining `save_layer` calls**~~ — **done**.
+       `with_opacity()` now computes `shape.rect ∪ stroke_path.bounds()`.
+    3. ~~**Fill+stroke with heuristic**~~ — **done**. Replaced by
+       non-overlapping fill path (PathOp::Difference). See stroke-fill-opacity.md.
 
 7. **Per-Node Image Cache (for Expensive Effect Nodes)**
 
@@ -257,6 +258,82 @@ Related:
 
     Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_atlas.rs`
 
+7c. **Compositor Early-Exit for Non-Promotable Nodes**
+
+    The compositor update loop iterates over all visible nodes each frame to
+    decide which nodes should be promoted to cached GPU textures. For nodes
+    without expensive effects (simple fill/stroke), this loop performs
+    unnecessary HashMap lookups (`compositor.peek`, `geometry.get_render_bounds`)
+    and `should_promote` calls — only to conclude the node is not promotable.
+
+    **The optimization:** check `has_promotable_effects()` (a cheap struct field
+    check on the LayerEffects fields) before any HashMap lookups. Nodes without
+    shadows, blur, noise, or glass skip the entire compositor evaluation.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                          | Compositor before | Compositor after | Delta   |
+    | ------------------------------ | ----------------- | ---------------- | ------- |
+    | flat grid (10K rects, pan)     | 941 µs            | 134 µs           | -85.8%  |
+    | stroke rect grid (2K, pan)     | 122 µs            | 18 µs            | -85.2%  |
+    | opacity fill (5K, pan)         | 346 µs            | 51 µs            | -85.3%  |
+    | opacity fill+stroke (5K, pan)  | 428 µs            | 74 µs            | -82.7%  |
+    | shadow grid (2K promoted, pan) | 38 µs             | 38 µs            | 0%      |
+
+    Total frame time improvement:
+
+    | Scene                        | Pan avg before | Pan avg after | Delta   |
+    | ---------------------------- | -------------- | ------------- | ------- |
+    | flat grid (10K rects)        | 7310 µs        | 6084 µs       | -16.8%  |
+    | opacity fill (5K)            | 3320 µs        | 2956 µs       | -11.0%  |
+    | opacity fill+stroke (5K)     | 6214 µs        | 5767 µs       | -7.2%   |
+    | shadow grid (2K promoted)    | 1233 µs        | 1224 µs       | 0%      |
+
+    Scenes with promoted nodes (shadow grid) are unaffected — all their visible
+    nodes have effects and still go through the full compositor path.
+
+7d. **Pre-Filtered Compositor Indices (Eliminate Redundant R-Tree Query)**
+
+    The compositor update previously performed its own R-tree spatial query
+    each frame to find visible nodes, duplicating the same query already done
+    by the frame plan builder. Additionally, it iterated ALL visible nodes
+    just to check `has_promotable_effects()` — which returns false for the
+    vast majority of nodes in typical scenes.
+
+    **The optimization:** the frame plan now pre-filters visible indices to
+    only those with promotable effects (`compositor_indices`) during its
+    existing iteration pass. The compositor receives this pre-filtered slice,
+    eliminating both the redundant R-tree query and the per-node promotability
+    check.
+
+    For scenes without effects (the common case), `compositor_indices` is
+    empty and the compositor loop body never executes — zero work.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                          | Compositor before | Compositor after | Delta   |
+    | ------------------------------ | ----------------- | ---------------- | ------- |
+    | flat grid (10K rects, pan)     | 134 µs            | 0 µs             | -100%   |
+    | stroke rect grid (2K, pan)     | 18 µs             | 0 µs             | -100%   |
+    | opacity fill (5K, pan)         | 51 µs             | 0 µs             | -100%   |
+    | shadow grid (2K promoted, pan) | 34 µs             | 33 µs            | -3%     |
+
+    **Criterion (CPU raster, statistically rigorous):**
+
+    | Scene                                  | Change    | p-value |
+    | -------------------------------------- | --------- | ------- |
+    | simple_baseline/pan                    | -2.18%    | < 0.01  |
+    | simple_baseline/zoom                   | -1.85%    | < 0.01  |
+    | heavy_compositing/pan                  | -5.41%    | < 0.01  |
+    | heavy_compositing/zoom                 | -4.63%    | < 0.01  |
+    | heavy_compositing/pinch_zoom           | -4.85%    | < 0.01  |
+    | heavy_compositing/pan_after_zoom       | -4.79%    | < 0.01  |
+    | heavy_compositing/rapid_zoom_steps     | -4.94%    | < 0.01  |
+
+    Also includes: `RefCell<usize>` → `Cell<usize>` for the picture cache
+    hit counter (eliminates runtime borrow checking overhead in the hot draw
+    loop), and removal of a redundant `canvas.clear(TRANSPARENT)` call.
+
 8. **Dirty & Re-Cache Strategy**
    - Nodes marked dirty trigger re-recording of their `SkPicture`.
    - Render surfaces containing dirty children are re-composited.
@@ -307,6 +384,109 @@ Related:
     - Reuse transforms and paints.
     - Precompute common values like DPI × Zoom × ViewMatrix.
 
+11b. **Specialized Primitive Draw Calls (Avoid Intermediate Path Creation)**
+
+    `PainterShape` discriminates between rect, rrect, oval, and path. Instead
+    of always calling `shape.to_path()` followed by `canvas.draw_path()`, use
+    Skia's specialized draw calls (`draw_rect`, `draw_rrect`, `draw_oval`)
+    that bypass path construction and use optimized GPU pipelines.
+
+    Similarly, clipping uses `clip_rect`/`clip_rrect` instead of converting to
+    a path and calling `clip_path`.
+
+    The `draw_on_canvas()` and `clip_on_canvas()` methods on `PainterShape`
+    dispatch to the optimal Skia primitive based on shape type.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                        | Before      | After       | Delta  |
+    | ---------------------------- | ----------- | ----------- | ------ |
+    | flat grid (10K rects, pan)   | 11802 µs    | 10717 µs    | -9.2%  |
+    | stroke rect grid (2K, pan)   | 4015 µs     | 3654 µs     | -9.0%  |
+    | opacity fill (5K, pan)       | 13910 µs    | 13073 µs    | -6.0%  |
+
+    **Criterion (CPU raster, statistically rigorous):**
+
+    | Scene                        | Change    | p-value |
+    | ---------------------------- | --------- | ------- |
+    | simple_baseline/pan          | -10.3%    | < 0.01  |
+    | simple_baseline/pan_zoomed_in| -20.7%    | < 0.01  |
+    | heavy_compositing/pan        | -11.6%    | < 0.01  |
+
+    The improvement is purely CPU-side: eliminated `Path::rect()`/`Path::rrect()`
+    allocation on every fill draw call. At 10000 visible nodes, this saves ~1ms
+    of CPU time per frame.
+
+    Applied to: `draw_fills`, `draw_fills_with_opacity`, `draw_drop_shadow`,
+    `draw_inner_shadow`, `render_noise_effect`, `with_clip`, `draw_backdrop_blur`,
+    `draw_glass_effect`.
+
+11c. **Direct Color Paint for Single Solid Fills**
+
+    `sk_paint_stack` creates a `SkColorShader` and attaches it to the paint
+    even for the most common case: a single solid fill. The GPU backend
+    dispatches a shader program for any paint with a shader, even a trivial
+    color shader. Setting the color directly on the paint via
+    `paint.set_color()` gives Skia a simpler GPU code path.
+
+    The fast path fires when `paints.len() == 1` and the paint is
+    `Paint::Solid`. All other cases (gradients, images, multi-paint stacks)
+    fall through to the existing shader-blending path.
+
+    Applied to both `sk_paint_stack` and `sk_paint_stack_without_images`.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                        | Before      | After       | Delta   |
+    | ---------------------------- | ----------- | ----------- | ------- |
+    | flat grid (10K rects, pan)   | 10885 µs    | 9223 µs     | -15.3%  |
+    | opacity fill (5K, pan)       | 13906 µs    | 4296 µs     | -69.1%  |
+    | opacity fill+stroke (5K)     | 16416 µs    | 7462 µs     | -54.6%  |
+
+    The opacity scene improvements are amplified by the combined effect of
+    this optimization, per-paint-alpha opacity folding (item 6b), and
+    specialized primitive draw calls (item 11b). For fill-only nodes,
+    per-paint-alpha eliminates `save_layer` entirely; for fill+stroke
+    nodes with overlap, the non-overlapping fill path (PathOp::Difference)
+    achieves the same. Direct color paint further reduces per-draw overhead
+    by avoiding shader program dispatch for solid colors.
+
+11d. **Translate-Fold for Pure-Translation Transforms**
+
+    For the most common node type — fills-only with a pure-translation
+    transform (no rotation, scale, or skew) — the painter folds the
+    translation directly into the shape coordinates and draws with a single
+    Skia call. This eliminates `canvas.save()`, `canvas.concat(matrix)`, and
+    `canvas.restore()`, reducing the recorded SkPicture from 4 commands to 1
+    per qualifying node.
+
+    The optimization fires when:
+    - Transform is pure translation (`[[1,0,tx],[0,1,ty]]`)
+    - No clip path
+    - No stroke path (fills only)
+    - Trivial fast path conditions (opacity=1.0, no effects, Normal blend)
+
+    Also applied to the per-paint-alpha opacity path for fills-only nodes
+    with opacity < 1.0.
+
+    For rect shapes, coordinates are offset directly. For rrect and oval
+    shapes, `with_offset()` is used. Path shapes fall back to
+    `save/translate/draw/restore`.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                        | Before      | After       | Delta   |
+    | ---------------------------- | ----------- | ----------- | ------- |
+    | flat grid (10K rects, pan)   | 6882 µs     | 5455 µs     | -20.7%  |
+    | flat grid (10K rects, draw)  | 5538 µs     | 4228 µs     | -23.7%  |
+    | opacity fill (5K, pan)       | 2896 µs     | 2529 µs     | -12.7%  |
+    | opacity fill (5K, draw)      | 2311 µs     | 1899 µs     | -17.8%  |
+    | stroke rect (2K, pan)        | 2115 µs     | ~2250 µs    | ~0% (noise) |
+    | shadow grid (2K promoted)    | 1196 µs     | ~1218 µs    | ~0% (noise) |
+
+    Scenes with strokes or effects are unaffected — all their nodes bypass
+    the translate-fold path and use the existing `save/concat/restore`.
+
 12. **Tight Bounds for `save_layer` Operations**
     - First: avoid `save_layer` entirely when possible (see item 6b).
     - When required: always provide explicit bounds.
@@ -317,6 +497,12 @@ Related:
     - Critical for blend mode isolation and render surface sizing.
     - Each `save_layer` has a fixed ~57-60 µs overhead (measured).
       At scale, this dominates frame time.
+
+    **Current status:** `with_opacity()` now passes tight local bounds
+    (`shape.rect ∪ stroke_path.bounds()`) to `save_layer_alpha`. Previously
+    it passed `None` (unbounded, full-canvas offscreen). Blend mode isolation
+    (`with_blendmode`, `with_blendmode_and_opacity`) already used bounded
+    `save_layer` via `compute_blend_mode_bounds_with_stroke()`.
 
 13. **Text & Path Caching**
     - Cache laid-out paragraphs keyed by content hash + font generation.
@@ -336,20 +522,20 @@ Not all effects can be cached in isolation. The critical distinction:
 
 **Self-contained** (safe to cache):
 
-| Effect                               | Notes                                                                                       |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Fills (solid, gradient, image)       | Pure paint operations                                                                       |
-| Strokes (all variants)               | Computed from path + stroke params                                                          |
-| Drop shadows                         | Extends bounds — cached image must include expansion                                        |
-| Inner shadows                        | Clipped to shape; operates on own content only                                              |
-| Noise effects                        | Blends with fills within same surface                                                       |
-| Layer blur                           | `save_layer` with image filter — reads own buffer only                                      |
-| Opacity (fills-only or strokes-only) | Per-paint alpha — no `save_layer` needed (item 6b)                                          |
-| Opacity (fills + noise)              | Requires `save_layer` — noise compositing is wrong without isolation                        |
-| Opacity (fills + stroke)             | `save_layer` for correctness; per-paint acceptable if thin stroke or high opacity (item 6b) |
-| Opacity (2+ overlapping children)    | Requires `save_layer` via render surface (item 6)                                           |
-| Clip paths                           | Restricts visible area                                                                      |
-| Mask groups                          | Self-contained, cached as a unit                                                            |
+| Effect                               | Notes                                                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Fills (solid, gradient, image)       | Pure paint operations                                                                                               |
+| Strokes (all variants)               | Computed from path + stroke params                                                                                  |
+| Drop shadows                         | Extends bounds — cached image must include expansion                                                                |
+| Inner shadows                        | Clipped to shape; operates on own content only                                                                      |
+| Noise effects                        | Blends with fills within same surface                                                                               |
+| Layer blur                           | `save_layer` with image filter — reads own buffer only                                                              |
+| Opacity (fills-only or strokes-only) | Per-paint alpha — no `save_layer` needed (item 6b)                                                                  |
+| Opacity (fills + noise)              | Requires `save_layer` — noise compositing is wrong without isolation                                                |
+| Opacity (fills + stroke)             | Per-paint alpha via non-overlapping fill path (PathOp::Difference); `save_layer` fallback if PathOp fails (item 6b) |
+| Opacity (2+ overlapping children)    | Requires `save_layer` via render surface (item 6)                                                                   |
+| Clip paths                           | Restricts visible area                                                                                              |
+| Mask groups                          | Self-contained, cached as a unit                                                                                    |
 
 **Context-dependent** (must draw live):
 
@@ -385,10 +571,12 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
     Computed once per frame, threaded through the pipeline so every stage
     can take the cheapest path.
 
-    **Frame cost hierarchy:** `None < ZoomIn < PanOnly < ZoomOut < PanAndZoom`.
-    Zoom-in is cheaper than pan because no new spatial content enters the
-    viewport — only pixel density changes. Zoom-out is more expensive than
-    pan because new content appears in all four directions simultaneously.
+    **Frame cost hierarchy:** `None < PanOnly < ZoomIn < ZoomOut < PanAndZoom`.
+    With the pan image cache (item 16b), PanOnly is now the cheapest
+    non-idle frame — a single GPU texture blit (~20-200 µs regardless of
+    scene complexity). ZoomIn is next cheapest (cached content is a spatial
+    superset). ZoomOut is more expensive than zoom-in because new content
+    appears at all edges. PanAndZoom combines both costs.
 
 16. **Cached Content Reuse on Pan**
 
@@ -398,6 +586,78 @@ zoom stays constant. This unlocks optimizations impossible when scale changes.
     - The compositor blits cached textures at shifted positions.
     - Only live (non-cached) nodes need actual draw calls.
     - No re-rasterization, no geometry recomputation.
+
+16b. **Pan Image Cache (Whole-Frame GPU Texture Blit)**
+
+    The most aggressive pan optimization: capture the fully composited
+    frame as a GPU texture snapshot (`SkImage`) after the first draw, then
+    on subsequent pan-only frames, blit this single texture at the camera
+    offset instead of re-drawing all visible nodes.
+
+    This replaces the entire draw pipeline (CPU iteration over N nodes,
+    per-node SkPicture replay, GPU rasterization of all draw commands)
+    with a single `draw_image` call — one texture blit.
+
+    **How it works:**
+    1. After the draw phase and mid-flush GPU submit, `surface.image_snapshot()`
+       captures the composited frame as a GPU-resident `SkImage` (copy-on-write,
+       near-zero cost).
+    2. The view matrix translation at capture time is stored alongside.
+    3. On the next pan-only frame, the screen-space offset is computed from
+       the difference in view matrix translations.
+    4. The canvas is cleared (background color), and the cached image is
+       blitted at the computed offset. A single GPU flush processes the blit.
+    5. The draw phase, per-node picture replay, compositor update, and second
+       GPU flush are all skipped entirely.
+
+    **Cache invalidation:**
+    - Zoom change (pixel density changes)
+    - Scene mutation (load_scene, invalidate_cache)
+    - Stable frame (settle after interaction — full-quality re-draw)
+    - Offset exceeds threshold (200px — exposed strips too large)
+    - Config changes (compositor atlas toggle, render policy)
+
+    **Limitations & visual tradeoff:**
+    - **Exposed strips:** viewport edges show background color instead of
+      scene content when the camera moves past the cached image boundary.
+      For typical per-frame deltas (5-20px), the strips are narrow (~1-2%
+      of viewport). After the gesture settles, the stable frame re-draws
+      at full quality. This is the same tradeoff browsers make during
+      scroll (checkerboard/blank tiles filled asynchronously).
+    - **Cache is not refreshed on the fast path.** During sustained pan,
+      the cache builds up offset until it exceeds the 200px threshold,
+      then one full-cost frame re-draws and re-captures. In practice this
+      means ~4-20 fast frames per 1 slow frame, depending on pan velocity.
+    - GPU-only: the snapshot is a GPU texture; raster backends fall through
+      to the normal draw path.
+    - Zoom frames skip capture to avoid unnecessary copy-on-write overhead
+      (the cache would be invalidated immediately on the next frame anyway).
+
+    **Measured impact (Apple M2 Pro, GPU benchmark, 100 frames):**
+
+    Note: benchmark numbers below represent **cache-hit frames** — the
+    cache is primed during warmup, so all 100 measurement frames take the
+    fast path. Real-world pan mixes cache-hit (~20-200 µs) with periodic
+    cache-miss frames (same cost as "before"). The effective speedup
+    during a sustained pan gesture depends on how often the cache refreshes.
+
+    | Scene                        | Pan before  | Pan after (cache hit) | Cache hit cost |
+    | ---------------------------- | ----------- | --------------------- | -------------- |
+    | bench-backdrop-blur-grid     | 45,471 µs   | 24 µs                 | 1,895x         |
+    | [WWW] Design (10.5K nodes)   | 37,808 µs   | 55 µs                 | 687x           |
+    | bench-glass-grid             | 29,132 µs   | 29 µs                 | 1,005x         |
+    | Materials (6.5K nodes)       | 12,794 µs   | 23 µs                 | 556x           |
+    | bench-flat-grid (69K nodes)  | 6,469 µs    | 200 µs                | 32x            |
+    | bench-shadow-grid (promoted) | 1,534 µs    | 90 µs                 | 17x            |
+    | Icons (4.9K vectors)         | 1,763 µs    | 30 µs                 | 59x            |
+    The heaviest GPU-bound scenes (backdrop blur, glass, complex vectors)
+    saw the largest gains because the cache eliminates the GPU rasterization
+    that dominated their frame time (`mid_flush`).
+
+    **Chromium parallel:** Chromium's compositor tiles serve a similar role —
+    existing tiles are translated during scroll without re-rasterization.
+    Our approach is simpler (one full-frame texture vs. a tile grid) but
+    achieves the same effect for the common case of small pan deltas.
 
 17. **Incremental Visible-Set Update**
 

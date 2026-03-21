@@ -133,6 +133,47 @@ impl PainterShape {
         }
     }
 
+    /// Draw the shape directly on the canvas using the most efficient Skia
+    /// primitive for the shape type.
+    ///
+    /// For simple shapes (rect, rrect, oval), this avoids creating an
+    /// intermediate `Path` object and uses Skia's specialized GPU draw calls
+    /// (`draw_rect`, `draw_rrect`, `draw_oval`) which have lower overhead
+    /// than `draw_path`.
+    #[inline]
+    pub fn draw_on_canvas(&self, canvas: &skia_safe::Canvas, paint: &skia_safe::Paint) {
+        if let Some(rect) = self.rect_shape {
+            canvas.draw_rect(rect, paint);
+        } else if let Some(rrect) = &self.rrect {
+            canvas.draw_rrect(rrect, paint);
+        } else if let Some(oval) = &self.oval {
+            canvas.draw_oval(oval, paint);
+        } else if let Some(existing_path) = &self.path {
+            canvas.draw_path(existing_path, paint);
+        } else {
+            canvas.draw_rect(self.rect, paint);
+        }
+    }
+
+    /// Clip the canvas to this shape using the most efficient Skia primitive.
+    ///
+    /// For rect/rrect shapes, uses `clip_rect`/`clip_rrect` which are faster
+    /// than `clip_path`. Falls back to `clip_path` for ovals and complex paths.
+    #[inline]
+    pub fn clip_on_canvas(&self, canvas: &skia_safe::Canvas) {
+        if let Some(rect) = self.rect_shape {
+            canvas.clip_rect(rect, None, true);
+        } else if let Some(rrect) = &self.rrect {
+            canvas.clip_rrect(rrect, None, true);
+        } else if let Some(oval) = &self.oval {
+            canvas.clip_path(&Path::oval(oval, None), None, true);
+        } else if let Some(existing_path) = &self.path {
+            canvas.clip_path(existing_path, None, true);
+        } else {
+            canvas.clip_rect(self.rect, None, true);
+        }
+    }
+
     pub fn is_closed(&self) -> bool {
         if let Some(path) = &self.path {
             path.is_last_contour_closed()
