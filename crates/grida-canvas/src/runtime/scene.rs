@@ -27,6 +27,29 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+// ---------------------------------------------------------------------------
+// Renderer tuning constants
+// ---------------------------------------------------------------------------
+
+/// Zoom scale bucket ratio for the compositor raster cache.
+///
+/// A cached node image is reused (GPU-stretched) as long as the current zoom
+/// stays within this factor of the zoom at which the image was rasterized.
+/// Once the drift exceeds this ratio in either direction the node is
+/// re-rasterized (subject to the per-frame time budget on interactive frames,
+/// or immediately on stable frames).
+///
+/// Set to 2.0 to match Chromium's `kMaxScaleRatioDuringPinch`: tiles are
+/// reused until the zoom drifts more than 2× from the cached scale, then
+/// re-rasterization is triggered.
+///
+/// Raising this value reduces re-rasterization frequency (smoother
+/// interaction, blurrier stretched content). Lowering it increases sharpness
+/// at the cost of more frequent re-rasters.
+const RASTER_ZOOM_RATIO: f32 = 2.0;
+
+// ---------------------------------------------------------------------------
+
 fn normalize_image_id(id: &str) -> String {
     if id.starts_with("res://") || id.starts_with("system://") {
         id.to_string()
@@ -1668,11 +1691,6 @@ impl Renderer {
         const ZOOM_RERASTER_BUDGET: std::time::Duration =
             std::time::Duration::from_micros(8000);
         let budget_start = std::time::Instant::now();
-
-        // Zoom scale bucket ratio — only re-rasterize when the zoom drift
-        // exceeds this threshold. Within the bucket, the GPU stretch is
-        // visually acceptable.
-        const RASTER_ZOOM_RATIO: f32 = 1.5;
 
         for &idx in visible_indices {
             let Some(entry) = self.scene_cache.layers.layers.get(idx) else {
