@@ -102,6 +102,11 @@ pub struct FramePlan {
     pub promoted: Vec<NodeId>,
     /// regions with their intersecting indices (live-drawn nodes only)
     pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
+    /// Visible layer indices with promotable effects (shadows, blur, noise).
+    /// Pre-filtered from the R-tree query so the compositor iterates only
+    /// nodes that may need promotion, avoiding a redundant R-tree query
+    /// and the per-node `has_promotable_effects` check.
+    pub compositor_indices: Vec<usize>,
     pub display_list_duration: Duration,
     pub display_list_size_estimated: usize,
 }
@@ -808,11 +813,11 @@ impl Renderer {
                 if frame.stable {
                     // Stable frame: re-rasterize all stale entries at the
                     // final zoom density without a time budget.
-                    self.update_compositor_stable(surface);
+                    self.update_compositor_stable(surface, &frame.compositor_indices);
                 } else {
                     // Unstable frame: budgeted re-rasterization. Stale
                     // entries stay GPU-stretched until their turn comes.
-                    self.update_compositor(surface);
+                    self.update_compositor(surface, &frame.compositor_indices);
                 }
             }
         }
@@ -1042,9 +1047,9 @@ impl Renderer {
                 && self.config.render_policy.allows_layer_compositing();
             if effective {
                 if plan.stable {
-                    self.update_compositor_stable(surface);
+                    self.update_compositor_stable(surface, &plan.compositor_indices);
                 } else {
-                    self.update_compositor(surface);
+                    self.update_compositor(surface, &plan.compositor_indices);
                 }
             }
         }
@@ -1217,40 +1222,56 @@ impl Renderer {
     ) -> FramePlan {
         let __start = Instant::now();
 
-        let painter_region = vec![bounds];
-
         let effective_layer_compositing = self.config.layer_compositing
             && self.config.render_policy.allows_layer_compositing();
 
         let mut promoted_ids: Vec<NodeId> = Vec::new();
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
-        for rect in painter_region {
-            let mut indices = self.scene_cache.intersects(rect);
+        // Query the R-tree once for all visible layer indices.
+        let mut indices = self.scene_cache.intersects(bounds);
 
-            // TODO: sort is expensive — consider incremental visible-set
-            // update (item 19) for pan-only frames where the entering/exiting
-            // sets are tiny.
-            indices.sort();
+        // TODO: sort is expensive — consider incremental visible-set
+        // update (item 19) for pan-only frames where the entering/exiting
+        // sets are tiny.
+        indices.sort();
 
-            if effective_layer_compositing {
-                // Separate promoted (cached) nodes from live-drawn nodes.
-                let mut live_indices = Vec::new();
-                for &idx in &indices {
-                    if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
-                        if self.scene_cache.compositor.peek(&entry.id).is_some() {
-                            promoted_ids.push(entry.id);
-                        } else {
-                            live_indices.push(idx);
-                        }
+        // Pre-filter compositor-relevant indices during the same pass.
+        // Nodes without expensive effects (the vast majority) are skipped
+        // by the compositor anyway. Filtering here avoids a redundant
+        // R-tree query in update_compositor_inner AND reduces the compositor
+        // loop to only promotable nodes.
+        let mut compositor_indices = Vec::new();
+
+        if effective_layer_compositing {
+            // Separate promoted (cached) nodes from live-drawn nodes.
+            let mut live_indices = Vec::new();
+            for &idx in &indices {
+                if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                    if crate::cache::compositor::promotion::has_promotable_effects(&entry.layer) {
+                        compositor_indices.push(idx);
+                    }
+                    if self.scene_cache.compositor.peek(&entry.id).is_some() {
+                        promoted_ids.push(entry.id);
+                    } else {
+                        live_indices.push(idx);
                     }
                 }
-                if !live_indices.is_empty() {
-                    regions.push((rect, live_indices));
-                }
-            } else {
-                regions.push((rect, indices));
             }
+            if !live_indices.is_empty() {
+                regions.push((bounds, live_indices));
+            }
+        } else {
+            // No compositing: still collect compositor-relevant indices
+            // for the compositor update pass.
+            for &idx in &indices {
+                if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                    if crate::cache::compositor::promotion::has_promotable_effects(&entry.layer) {
+                        compositor_indices.push(idx);
+                    }
+                }
+            }
+            regions.push((bounds, indices));
         }
 
         let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
@@ -1262,6 +1283,7 @@ impl Renderer {
             camera_change,
             promoted: promoted_ids,
             regions,
+            compositor_indices,
             display_list_duration: __ll_duration,
             display_list_size_estimated: ll_len,
         }
@@ -1375,8 +1397,6 @@ impl Renderer {
             }
             // Fallback: draw at full resolution below.
         }
-
-        canvas.clear(skia_safe::Color::TRANSPARENT);
 
         Self::clear_and_paint_background(canvas, background_color, width, height);
 
@@ -1592,14 +1612,22 @@ impl Renderer {
     /// during unstable (interactive) frames, and without limit on stable
     /// (settled) frames. Stale entries (zoom mismatch) are blitted with
     /// GPU texture stretching until re-rasterized.
-    fn update_compositor(&mut self, parent_surface: &mut Surface) {
-        self.update_compositor_inner(parent_surface, false);
+    fn update_compositor(
+        &mut self,
+        parent_surface: &mut Surface,
+        visible_indices: &[usize],
+    ) {
+        self.update_compositor_inner(parent_surface, false, visible_indices);
     }
 
     /// Variant called on stable frames — no time budget, all stale entries
     /// are re-rasterized to achieve full quality at the final zoom.
-    fn update_compositor_stable(&mut self, parent_surface: &mut Surface) {
-        self.update_compositor_inner(parent_surface, true);
+    fn update_compositor_stable(
+        &mut self,
+        parent_surface: &mut Surface,
+        visible_indices: &[usize],
+    ) {
+        self.update_compositor_inner(parent_surface, true, visible_indices);
     }
 
     /// Core compositor update logic.
@@ -1608,7 +1636,12 @@ impl Renderer {
     /// re-rasterized without a time budget. When false (unstable/interactive
     /// frame), re-rasterization is capped to `ZOOM_RERASTER_BUDGET` to keep
     /// frame times low.
-    fn update_compositor_inner(&mut self, parent_surface: &mut Surface, force_all: bool) {
+    fn update_compositor_inner(
+        &mut self,
+        parent_surface: &mut Surface,
+        force_all: bool,
+        visible_indices: &[usize],
+    ) {
         use crate::cache::compositor::promotion;
 
         let zoom = self.camera.get_zoom();
@@ -1627,12 +1660,8 @@ impl Renderer {
             }
         }
 
-        // Only process layers visible in the current viewport.
-        // Iterate visible indices directly instead of building a HashSet
-        // and scanning all layers — avoids O(total_layers) iteration and
-        // HashSet allocation/lookup overhead.
-        let viewport_rect = self.camera.rect();
-        let visible_indices = self.scene_cache.intersects(viewport_rect);
+        // Visible indices are pre-computed by the frame plan's R-tree query
+        // and passed in to avoid a redundant spatial query each frame.
 
         // Time budget for stale re-rasterization during interactive frames.
         // 8ms leaves headroom within a 16ms frame budget (60fps target).
@@ -1645,25 +1674,16 @@ impl Renderer {
         // visually acceptable.
         const RASTER_ZOOM_RATIO: f32 = 1.5;
 
-        for idx in visible_indices {
+        for &idx in visible_indices {
             let Some(entry) = self.scene_cache.layers.layers.get(idx) else {
                 continue;
             };
 
             let id = entry.id;
 
-            // Fast skip: nodes without expensive effects will never be promoted.
-            // This avoids HashMap lookups (compositor.peek, geometry.get_render_bounds)
-            // and should_promote calls for simple fill/stroke nodes — the vast majority
-            // of nodes in typical scenes.
-            //
-            // Safety: effects don't change without rebuilding the layer list, and
-            // should_promote already returns NoExpensiveEffects for these nodes.
-            // De-promotion of previously-promoted nodes that lost effects is handled
-            // by scene rebuild (which invalidates the compositor).
-            if !promotion::has_promotable_effects(&entry.layer) {
-                continue;
-            }
+            // Note: visible_indices is pre-filtered by the frame plan to only
+            // include nodes with promotable effects (has_promotable_effects).
+            // No need to re-check here.
 
             // Decide whether this node needs (re-)rasterization.
             //

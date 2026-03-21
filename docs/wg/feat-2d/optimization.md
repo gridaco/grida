@@ -292,6 +292,48 @@ Related:
     Scenes with promoted nodes (shadow grid) are unaffected — all their visible
     nodes have effects and still go through the full compositor path.
 
+7d. **Pre-Filtered Compositor Indices (Eliminate Redundant R-Tree Query)**
+
+    The compositor update previously performed its own R-tree spatial query
+    each frame to find visible nodes, duplicating the same query already done
+    by the frame plan builder. Additionally, it iterated ALL visible nodes
+    just to check `has_promotable_effects()` — which returns false for the
+    vast majority of nodes in typical scenes.
+
+    **The optimization:** the frame plan now pre-filters visible indices to
+    only those with promotable effects (`compositor_indices`) during its
+    existing iteration pass. The compositor receives this pre-filtered slice,
+    eliminating both the redundant R-tree query and the per-node promotability
+    check.
+
+    For scenes without effects (the common case), `compositor_indices` is
+    empty and the compositor loop body never executes — zero work.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark):**
+
+    | Scene                          | Compositor before | Compositor after | Delta   |
+    | ------------------------------ | ----------------- | ---------------- | ------- |
+    | flat grid (10K rects, pan)     | 134 µs            | 0 µs             | -100%   |
+    | stroke rect grid (2K, pan)     | 18 µs             | 0 µs             | -100%   |
+    | opacity fill (5K, pan)         | 51 µs             | 0 µs             | -100%   |
+    | shadow grid (2K promoted, pan) | 34 µs             | 33 µs            | -3%     |
+
+    **Criterion (CPU raster, statistically rigorous):**
+
+    | Scene                                  | Change    | p-value |
+    | -------------------------------------- | --------- | ------- |
+    | simple_baseline/pan                    | -2.18%    | < 0.01  |
+    | simple_baseline/zoom                   | -1.85%    | < 0.01  |
+    | heavy_compositing/pan                  | -5.41%    | < 0.01  |
+    | heavy_compositing/zoom                 | -4.63%    | < 0.01  |
+    | heavy_compositing/pinch_zoom           | -4.85%    | < 0.01  |
+    | heavy_compositing/pan_after_zoom       | -4.79%    | < 0.01  |
+    | heavy_compositing/rapid_zoom_steps     | -4.94%    | < 0.01  |
+
+    Also includes: `RefCell<usize>` → `Cell<usize>` for the picture cache
+    hit counter (eliminates runtime borrow checking overhead in the hot draw
+    loop), and removal of a redundant `canvas.clear(TRANSPARENT)` call.
+
 8. **Dirty & Re-Cache Strategy**
    - Nodes marked dirty trigger re-recording of their `SkPicture`.
    - Render surfaces containing dirty children are re-composited.

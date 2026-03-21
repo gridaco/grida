@@ -21,7 +21,7 @@ use skia_safe::{
     canvas::SaveLayerRec, textlayout, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
     Shader,
 };
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -52,7 +52,7 @@ pub struct Painter<'a> {
     images: &'a ImageRepository,
     path_cache: RefCell<VectorPathCache>,
     scene_cache: Option<&'a SceneCache>,
-    cache_hits: RefCell<usize>,
+    cache_hits: Cell<usize>,
     policy: RenderPolicy,
     variant_key: u64,
     /// Pre-extracted blit data for promoted (compositor-cached) nodes.
@@ -103,7 +103,7 @@ impl<'a> Painter<'a> {
             images,
             path_cache: RefCell::new(VectorPathCache::new()),
             scene_cache: Some(scene_cache), // Store reference to scene cache
-            cache_hits: RefCell::new(0),
+            cache_hits: Cell::new(0),
             policy,
             variant_key,
             promoted_blits: None,
@@ -1902,7 +1902,7 @@ impl<'a> Painter<'a> {
                             scene_cache.get_node_picture_variant(layer.id(), self.variant_key)
                         {
                             self.canvas.draw_picture(pic, None, None);
-                            *self.cache_hits.borrow_mut() += 1;
+                            self.cache_hits.set(self.cache_hits.get() + 1);
                             continue;
                         }
                     }
@@ -2257,7 +2257,7 @@ impl<'a> Painter<'a> {
                 if let Some(pic) = scene_cache.get_node_picture_variant(&entry.id, self.variant_key)
                 {
                     self.canvas.draw_picture(pic, None, None);
-                    *self.cache_hits.borrow_mut() += 1;
+                    self.cache_hits.set(self.cache_hits.get() + 1);
                     continue;
                 }
             }
@@ -2266,6 +2266,6 @@ impl<'a> Painter<'a> {
     }
 
     pub fn cache_picture_hits(&self) -> usize {
-        *self.cache_hits.borrow()
+        self.cache_hits.get()
     }
 }
