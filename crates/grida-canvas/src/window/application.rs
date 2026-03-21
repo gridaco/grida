@@ -87,8 +87,11 @@ pub trait ApplicationApi {
         style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
     );
 
-    /// Load a scene from a JSON string using the `io_grida` parser.
-    fn load_scene_json(&mut self, json: &str);
+    /// Load a scene from a `.grida1` JSON string using the `io_grida` parser.
+    fn load_scene_grida1(&mut self, json: &str);
+
+    /// Load a scene from `.grida` FlatBuffers binary bytes.
+    fn load_scene_grida(&mut self, bytes: &[u8]);
 
     /// Apply a batch of scene transactions represented as JSON Patch operations.
     fn apply_document_transactions(
@@ -496,10 +499,34 @@ impl ApplicationApi for UnknownTargetApplication {
         self.queue();
     }
 
-    fn load_scene_json(&mut self, json: &str) {
+    fn load_scene_grida1(&mut self, json: &str) {
         match serde_json::from_str::<Value>(json) {
             Ok(value) => self.load_scene_from_value(value),
             Err(err) => eprintln!("failed to parse scene json: {}", err),
+        }
+    }
+
+    fn load_scene_grida(&mut self, bytes: &[u8]) {
+        use crate::io::io_grida_fbs;
+        match io_grida_fbs::decode_with_id_map(bytes) {
+            Ok(result) => {
+                // Build id mappings from the decode result
+                let mut string_to_internal = std::collections::HashMap::new();
+                let mut internal_to_string = std::collections::HashMap::new();
+                for (internal_id, string_id) in &result.id_map {
+                    string_to_internal.insert(string_id.clone(), *internal_id);
+                    internal_to_string.insert(*internal_id, string_id.clone());
+                }
+                self.id_mapping = string_to_internal;
+                self.id_mapping_reverse = internal_to_string;
+
+                if let Some(scene) = result.scenes.into_iter().next() {
+                    self.renderer.load_scene(scene);
+                } else {
+                    eprintln!("load_scene_grida: no scenes in FlatBuffers data");
+                }
+            }
+            Err(err) => eprintln!("failed to decode .grida FlatBuffers: {:?}", err),
         }
     }
 

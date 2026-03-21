@@ -215,12 +215,9 @@ pub fn decode_all(bytes: &[u8]) -> Result<Vec<Scene>, FbsDecodeError> {
 }
 
 fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
-    let opts = flatbuffers::VerifierOptions {
-        max_tables: usize::MAX,
-        max_depth: 1024,
-        ..Default::default()
-    };
-    let grida_file = flatbuffers::root_with_opts::<fbs::GridaFile>(&opts, bytes)?;
+    // SAFETY: Skip verification to avoid stack overflow on large documents
+    // traversal of all tables exhausts the WASM stack (64 KB default).
+    let grida_file = unsafe { flatbuffers::root_unchecked::<fbs::GridaFile>(bytes) };
     let document = grida_file
         .document()
         .ok_or(FbsDecodeError::MissingDocument)?;

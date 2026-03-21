@@ -5566,8 +5566,13 @@ export namespace format {
             continue;
           }
 
+          // UnknownNode has no layer — skip it during deserialization
+          if (nodeType === fbs.Node.UnknownNode) {
+            continue;
+          }
+
           // Access node and layer fields from typed node (for all other node types)
-          // All node types except SceneNode and BasicShapeNode have node() and layer() methods
+          // All node types except SceneNode, BasicShapeNode, and UnknownNode have node() and layer() methods
           type NodeWithLayer =
             | fbs.ContainerNode
             | fbs.TextSpanNode

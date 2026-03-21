@@ -280,8 +280,12 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.highlight_strokes(ids, style);
     }
 
-    fn load_scene_json(&mut self, json: &str) {
-        self.base.load_scene_json(json);
+    fn load_scene_grida1(&mut self, json: &str) {
+        self.base.load_scene_grida1(json);
+    }
+
+    fn load_scene_grida(&mut self, bytes: &[u8]) {
+        self.base.load_scene_grida(bytes);
     }
 
     fn apply_document_transactions(

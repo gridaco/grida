@@ -3188,11 +3188,17 @@ export class Editor
               }
             : document;
 
-        const p = JSON.stringify({
-          version: grida.program.document.SCHEMA_VERSION,
-          document: payloadDocument,
-        });
-        surface.loadScene(p);
+        try {
+          const bytes = io.GRID.encode(payloadDocument);
+          surface.loadSceneGrida(bytes);
+        } catch {
+          // Fallback to JSON if FlatBuffers encoding fails (e.g. unsupported node types)
+          const p = JSON.stringify({
+            version: grida.program.document.SCHEMA_VERSION,
+            document: payloadDocument,
+          });
+          surface.loadScene(p);
+        }
         surface.redraw();
       };
 

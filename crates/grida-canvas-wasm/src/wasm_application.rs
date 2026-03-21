@@ -104,8 +104,8 @@ pub unsafe extern "C" fn redraw(app: *mut UnknownTargetApplication) {
 }
 
 #[no_mangle]
-/// js::_load_scene_json
-pub unsafe extern "C" fn load_scene_json(
+/// js::_load_scene_grida1
+pub unsafe extern "C" fn load_scene_grida1(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
@@ -113,7 +113,22 @@ pub unsafe extern "C" fn load_scene_json(
     if let Some(app) = app.as_mut() {
         let json = __str_from_ptr_len(ptr, len);
         if let Some(json) = json {
-            app.load_scene_json(&json);
+            app.load_scene_grida1(&json);
+        }
+    }
+}
+
+#[no_mangle]
+/// js::_load_scene_grida
+pub unsafe extern "C" fn load_scene_grida(
+    app: *mut UnknownTargetApplication,
+    ptr: *const u8,
+    len: usize,
+) {
+    if let Some(app) = app.as_mut() {
+        if !ptr.is_null() && len > 0 {
+            let bytes = std::slice::from_raw_parts(ptr, len);
+            app.load_scene_grida(bytes);
         }
     }
 }

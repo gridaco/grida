@@ -34,7 +34,12 @@ declare namespace canvas {
       height: number
     ): void;
     _redraw(state: GridaCanvasApplicationPtr): void;
-    _load_scene_json(
+    _load_scene_grida1(
+      state: GridaCanvasApplicationPtr,
+      ptr: number,
+      len: number
+    ): void;
+    _load_scene_grida(
       state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number

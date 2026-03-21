@@ -243,6 +243,10 @@ export class Canvas {
     this._scene.loadScene(json);
   }
 
+  loadSceneGrida(data: Uint8Array) {
+    this._scene.loadSceneGrida(data);
+  }
+
   /**
    * Register a font with the renderer. Multiple calls with the same family
    * and different font files are supported (e.g. Regular, Bold, Italic per family).

@@ -87,14 +87,26 @@ export class Scene {
   }
 
   /**
-   * Load a scene from a JSON string.
+   * Load a scene from a `.grida1` JSON string.
    * @param data - The JSON string to load.
    */
   loadScene(data: string) {
     this._assertAlive();
     const [ptr, len] = this._alloc_string(data);
-    this.module._load_scene_json(this.appptr, ptr, len - 1);
+    this.module._load_scene_grida1(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
+  }
+
+  /**
+   * Load a scene from `.grida` FlatBuffers binary bytes.
+   * Zero-copy on the Rust side — much more memory-efficient than JSON for large documents.
+   * @param data - The FlatBuffers binary data.
+   */
+  loadSceneGrida(data: Uint8Array) {
+    this._assertAlive();
+    const [ptr, len] = ffi.allocBytes(this.module, data);
+    this.module._load_scene_grida(this.appptr, ptr, len);
+    ffi.free(this.module, ptr, len);
   }
 
   applyTransactions(batch: unknown[][]): TransactionApplyReport[] | null {

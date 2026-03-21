@@ -43,7 +43,8 @@ const EXPECTED_FUNCTIONS = [
   { name: "_redraw", paramCount: 1 },
 
   // scene
-  { name: "_load_scene_json", paramCount: 3 },
+  { name: "_load_scene_grida1", paramCount: 3 },
+  { name: "_load_scene_grida", paramCount: 3 },
   { name: "_apply_scene_transactions", paramCount: 3 },
   { name: "_load_dummy_scene", paramCount: 1 },
   { name: "_load_benchmark_scene", paramCount: 3 },
