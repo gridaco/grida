@@ -966,12 +966,12 @@ impl UnknownTargetApplication {
     }
 
     /// Convert internal u64 ID to user string ID
-    fn internal_id_to_user(&self, internal_id: NodeId) -> Option<String> {
+    pub fn internal_id_to_user(&self, internal_id: NodeId) -> Option<String> {
         self.id_mapping_reverse.get(&internal_id).cloned()
     }
 
     /// Convert multiple internal IDs to user IDs
-    fn internal_ids_to_user(&self, internal_ids: Vec<NodeId>) -> Vec<String> {
+    pub fn internal_ids_to_user(&self, internal_ids: Vec<NodeId>) -> Vec<String> {
         internal_ids
             .into_iter()
             .filter_map(|id| self.internal_id_to_user(id))

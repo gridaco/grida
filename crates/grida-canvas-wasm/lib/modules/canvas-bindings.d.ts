@@ -168,6 +168,42 @@ declare namespace canvas {
       len: number
     ): void;
 
+    // ====================================================================================================
+    // SURFACE INTERACTION
+    // ====================================================================================================
+    _surface_pointer_move(
+      state: GridaCanvasApplicationPtr,
+      x: number,
+      y: number
+    ): number;
+    _surface_pointer_down(
+      state: GridaCanvasApplicationPtr,
+      x: number,
+      y: number,
+      button: number,
+      modifiers: number
+    ): number;
+    _surface_pointer_up(
+      state: GridaCanvasApplicationPtr,
+      x: number,
+      y: number,
+      button: number,
+      modifiers: number
+    ): number;
+    _surface_get_cursor(state: GridaCanvasApplicationPtr): number;
+    _surface_get_hovered_node(state: GridaCanvasApplicationPtr): Ptr;
+    _surface_get_selected_nodes(state: GridaCanvasApplicationPtr): Ptr;
+    _surface_set_selection(
+      state: GridaCanvasApplicationPtr,
+      json_ptr: number,
+      json_len: number
+    ): void;
+    _set_surface_overlay_config(
+      state: GridaCanvasApplicationPtr,
+      json_ptr: number,
+      json_len: number
+    ): void;
+
     _set_debug(state: GridaCanvasApplicationPtr, debug: boolean): void;
     _toggle_debug(state: GridaCanvasApplicationPtr): void;
     _set_verbose(state: GridaCanvasApplicationPtr, verbose: boolean): void;

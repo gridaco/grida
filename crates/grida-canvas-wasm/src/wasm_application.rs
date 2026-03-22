@@ -215,11 +215,241 @@ pub unsafe extern "C" fn apply_scene_transactions(
 
 #[no_mangle]
 /// js::_pointer_move
+///
+/// Legacy path — updates devtools hit test only, does NOT dispatch through
+/// the surface event system. Use `surface_pointer_move` for full surface
+/// interaction (hover, cursor icon).
 pub unsafe extern "C" fn pointer_move(app: *mut UnknownTargetApplication, x: f32, y: f32) {
     if let Some(app) = app.as_mut() {
         app.pointer_move(x, y);
     }
 }
+
+// ====================================================================================================
+// #region: surface interaction
+// ====================================================================================================
+
+/// Pack a `SurfaceResponse` into a u32 bitmask for cheap cross-boundary return.
+///
+/// bit 0 = needs_redraw
+/// bit 1 = cursor_changed
+/// bit 2 = selection_changed
+/// bit 3 = hover_changed
+fn pack_surface_response(r: &cg::surface::SurfaceResponse) -> u32 {
+    (r.needs_redraw as u32)
+        | ((r.cursor_changed as u32) << 1)
+        | ((r.selection_changed as u32) << 2)
+        | ((r.hover_changed as u32) << 3)
+}
+
+/// Decode a modifiers bitmask from JS.
+///
+/// bit 0 = shift, bit 1 = alt, bit 2 = ctrl_or_cmd
+fn decode_modifiers(bits: u32) -> cg::surface::Modifiers {
+    cg::surface::Modifiers {
+        shift: bits & 1 != 0,
+        alt: bits & 2 != 0,
+        ctrl_or_cmd: bits & 4 != 0,
+    }
+}
+
+/// Decode a pointer button from JS.
+///
+/// 0 = Primary, 1 = Secondary, 2 = Middle
+fn decode_button(id: u32) -> cg::surface::PointerButton {
+    match id {
+        1 => cg::surface::PointerButton::Secondary,
+        2 => cg::surface::PointerButton::Middle,
+        _ => cg::surface::PointerButton::Primary,
+    }
+}
+
+#[no_mangle]
+/// js::_surface_pointer_move
+///
+/// Dispatches a pointer-move through the surface event system (hover, cursor).
+/// Returns packed `SurfaceResponse` flags as u32.
+pub unsafe extern "C" fn surface_pointer_move(
+    app: *mut UnknownTargetApplication,
+    x: f32,
+    y: f32,
+) -> u32 {
+    match app.as_mut() {
+        Some(app) => pack_surface_response(&app.surface_pointer_move(x, y)),
+        None => 0,
+    }
+}
+
+#[no_mangle]
+/// js::_surface_pointer_down
+///
+/// `button`: 0=Primary, 1=Secondary, 2=Middle
+/// `modifiers`: bitmask (bit0=shift, bit1=alt, bit2=ctrl_or_cmd)
+/// Returns packed `SurfaceResponse` flags as u32.
+pub unsafe extern "C" fn surface_pointer_down(
+    app: *mut UnknownTargetApplication,
+    x: f32,
+    y: f32,
+    button: u32,
+    modifiers: u32,
+) -> u32 {
+    match app.as_mut() {
+        Some(app) => pack_surface_response(&app.surface_pointer_down(
+            x,
+            y,
+            decode_button(button),
+            decode_modifiers(modifiers),
+        )),
+        None => 0,
+    }
+}
+
+#[no_mangle]
+/// js::_surface_pointer_up
+///
+/// `button`: 0=Primary, 1=Secondary, 2=Middle
+/// `modifiers`: bitmask (bit0=shift, bit1=alt, bit2=ctrl_or_cmd)
+/// Returns packed `SurfaceResponse` flags as u32.
+pub unsafe extern "C" fn surface_pointer_up(
+    app: *mut UnknownTargetApplication,
+    x: f32,
+    y: f32,
+    button: u32,
+    modifiers: u32,
+) -> u32 {
+    match app.as_mut() {
+        Some(app) => pack_surface_response(&app.surface_pointer_up(
+            x,
+            y,
+            decode_button(button),
+            decode_modifiers(modifiers),
+        )),
+        None => 0,
+    }
+}
+
+#[no_mangle]
+/// js::_surface_get_cursor
+///
+/// Returns the current cursor icon as u32:
+/// 0=Default, 1=Pointer, 2=Grab, 3=Grabbing, 4=Crosshair, 5=Move
+pub unsafe extern "C" fn surface_get_cursor(app: *const UnknownTargetApplication) -> u32 {
+    match app.as_ref() {
+        Some(app) => match app.surface_cursor() {
+            cg::surface::CursorIcon::Default => 0,
+            cg::surface::CursorIcon::Pointer => 1,
+            cg::surface::CursorIcon::Grab => 2,
+            cg::surface::CursorIcon::Grabbing => 3,
+            cg::surface::CursorIcon::Crosshair => 4,
+            cg::surface::CursorIcon::Move => 5,
+        },
+        None => 0,
+    }
+}
+
+#[no_mangle]
+/// js::_surface_get_hovered_node
+///
+/// Returns a length-prefixed JSON string of the hovered node ID, or null.
+pub unsafe extern "C" fn surface_get_hovered_node(
+    app: *const UnknownTargetApplication,
+) -> *const u8 {
+    match app.as_ref() {
+        Some(app) => match app.surface_hovered_node() {
+            Some(id) => {
+                // Convert internal NodeId to user-facing string ID
+                match app.internal_id_to_user(*id) {
+                    Some(user_id) => {
+                        let json = serde_json::to_vec(&user_id).unwrap_or_default();
+                        alloc_len_prefixed(&json)
+                    }
+                    None => std::ptr::null(),
+                }
+            }
+            None => std::ptr::null(),
+        },
+        None => std::ptr::null(),
+    }
+}
+
+#[no_mangle]
+/// js::_surface_get_selected_nodes
+///
+/// Returns a length-prefixed JSON string of the selected node IDs (as user-facing strings).
+pub unsafe extern "C" fn surface_get_selected_nodes(
+    app: *const UnknownTargetApplication,
+) -> *const u8 {
+    match app.as_ref() {
+        Some(app) => {
+            let internal_ids = app.surface_selected_nodes();
+            let user_ids = app.internal_ids_to_user(internal_ids.to_vec());
+            let json = serde_json::to_vec(&user_ids).unwrap_or_default();
+            alloc_len_prefixed(&json)
+        }
+        None => std::ptr::null(),
+    }
+}
+
+#[no_mangle]
+/// js::_surface_set_selection
+///
+/// Restore selection from a JSON array of node IDs (e.g. for undo/redo).
+pub unsafe extern "C" fn surface_set_selection(
+    app: *mut UnknownTargetApplication,
+    json_ptr: *const u8,
+    json_len: u32,
+) {
+    let Some(app) = app.as_mut() else { return };
+    let slice = std::slice::from_raw_parts(json_ptr, json_len as usize);
+    // JS sends user-facing string IDs — convert to internal NodeId
+    if let Ok(user_ids) = serde_json::from_slice::<Vec<String>>(slice) {
+        let internal_ids: Vec<cg::node::schema::NodeId> = user_ids
+            .iter()
+            .filter_map(|uid| app.user_id_to_internal(uid))
+            .collect();
+        app.surface_set_selection(internal_ids);
+    }
+}
+
+#[no_mangle]
+/// js::_set_surface_overlay_config
+///
+/// Configure surface overlay rendering from JSON.
+/// Fields: { dpr, text_baseline_decoration, show_size_meter, show_frame_titles }
+pub unsafe extern "C" fn set_surface_overlay_config(
+    app: *mut UnknownTargetApplication,
+    json_ptr: *const u8,
+    json_len: u32,
+) {
+    let Some(app) = app.as_mut() else { return };
+    let slice = std::slice::from_raw_parts(json_ptr, json_len as usize);
+
+    #[derive(serde::Deserialize)]
+    struct Config {
+        #[serde(default = "default_dpr")]
+        dpr: f32,
+        #[serde(default)]
+        text_baseline_decoration: bool,
+        #[serde(default)]
+        show_size_meter: bool,
+        #[serde(default)]
+        show_frame_titles: bool,
+    }
+    fn default_dpr() -> f32 {
+        1.0
+    }
+
+    if let Ok(cfg) = serde_json::from_slice::<Config>(slice) {
+        app.surface_overlay_config = cg::devtools::surface_overlay::SurfaceOverlayConfig {
+            dpr: cfg.dpr,
+            text_baseline_decoration: cfg.text_baseline_decoration,
+            show_size_meter: cfg.show_size_meter,
+            show_frame_titles: cfg.show_frame_titles,
+        };
+    }
+}
+
+// #endregion: surface interaction
 
 #[no_mangle]
 /// js::_command
@@ -231,6 +461,8 @@ pub unsafe extern "C" fn command(app: *mut UnknownTargetApplication, id: u32, a:
             2 => ApplicationCommand::ZoomOut,
             3 => ApplicationCommand::ZoomDelta { delta: a },
             4 => ApplicationCommand::Pan { tx: a, ty: b },
+            5 => ApplicationCommand::SelectAll,
+            6 => ApplicationCommand::DeselectAll,
             _ => ApplicationCommand::None,
         };
         app.command(cmd);
