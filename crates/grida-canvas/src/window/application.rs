@@ -710,6 +710,95 @@ impl UnknownTargetApplication {
         &self.surface
     }
 
+    // ---- Surface convenience methods ----
+    // These handle screen→canvas coordinate conversion internally so that
+    // hosts (native, wasm, emscripten) stay thin and consistent.
+
+    /// Process a pointer-move at the given screen coordinates.
+    ///
+    /// Updates the cursor position, converts to canvas space, and dispatches
+    /// through the surface event system (hover, gesture, cursor icon).
+    pub fn surface_pointer_move(
+        &mut self,
+        screen_x: f32,
+        screen_y: f32,
+    ) -> crate::surface::SurfaceResponse {
+        self.set_cursor_position([screen_x, screen_y]);
+        let canvas_point = self
+            .renderer
+            .camera
+            .screen_to_canvas_point([screen_x, screen_y]);
+        let event = crate::surface::SurfaceEvent::PointerMove {
+            canvas_point,
+            screen_point: [screen_x, screen_y],
+        };
+        self.surface_dispatch(event)
+    }
+
+    /// Process a pointer-down at the given screen coordinates.
+    pub fn surface_pointer_down(
+        &mut self,
+        screen_x: f32,
+        screen_y: f32,
+        button: crate::surface::PointerButton,
+        modifiers: crate::surface::Modifiers,
+    ) -> crate::surface::SurfaceResponse {
+        let screen_point = [screen_x, screen_y];
+        let canvas_point = self.renderer.camera.screen_to_canvas_point(screen_point);
+        let event = crate::surface::SurfaceEvent::PointerDown {
+            canvas_point,
+            screen_point,
+            button,
+            modifiers,
+        };
+        self.surface_dispatch(event)
+    }
+
+    /// Process a pointer-up at the given screen coordinates.
+    pub fn surface_pointer_up(
+        &mut self,
+        screen_x: f32,
+        screen_y: f32,
+        button: crate::surface::PointerButton,
+        modifiers: crate::surface::Modifiers,
+    ) -> crate::surface::SurfaceResponse {
+        let screen_point = [screen_x, screen_y];
+        let canvas_point = self.renderer.camera.screen_to_canvas_point(screen_point);
+        let event = crate::surface::SurfaceEvent::PointerUp {
+            canvas_point,
+            screen_point,
+            button,
+            modifiers,
+        };
+        self.surface_dispatch(event)
+    }
+
+    // ---- Surface state accessors ----
+
+    /// Currently hovered node, if any.
+    pub fn surface_hovered_node(&self) -> Option<&crate::node::schema::NodeId> {
+        self.surface.hover.hovered()
+    }
+
+    /// Currently selected node IDs.
+    pub fn surface_selected_nodes(&self) -> &[crate::node::schema::NodeId] {
+        self.surface.selection.as_slice()
+    }
+
+    /// Current cursor icon.
+    pub fn surface_cursor(&self) -> crate::surface::CursorIcon {
+        self.surface.cursor
+    }
+
+    /// Restore selection state (e.g. from undo/redo).
+    pub fn surface_set_selection(&mut self, ids: Vec<crate::node::schema::NodeId>) {
+        self.surface.select_all(ids);
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            self.surface.prune_selection(&scene.graph);
+        }
+        self.queue();
+    }
+
     /// Invalidate hover without hit-testing.
     ///
     /// Call during camera transforms (pan, zoom) to avoid wasting cycles.

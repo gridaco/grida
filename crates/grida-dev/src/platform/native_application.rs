@@ -255,17 +255,9 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
         }
 
         if let WindowEvent::CursorMoved { position, .. } = &event {
-            let screen_point = [position.x as f32, position.y as f32];
-            self.app
-                .set_cursor_position(screen_point);
-            let canvas_point = self.app.renderer_mut().camera.screen_to_canvas_point(screen_point);
-            let surface_event = cg::surface::SurfaceEvent::PointerMove {
-                canvas_point,
-                screen_point,
-            };
-            let response = self.app.surface_dispatch(surface_event);
+            let response = self.app.surface_pointer_move(position.x as f32, position.y as f32);
             if response.cursor_changed {
-                let cursor = match self.app.surface().cursor {
+                let cursor = match self.app.surface_cursor() {
                     cg::surface::CursorIcon::Default => winit::window::CursorIcon::Default,
                     cg::surface::CursorIcon::Pointer => winit::window::CursorIcon::Pointer,
                     cg::surface::CursorIcon::Grab => winit::window::CursorIcon::Grab,
@@ -280,8 +272,6 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
         }
 
         if let WindowEvent::MouseInput { state, button, .. } = &event {
-            let screen_point = self.app.input_cursor();
-            let canvas_point = self.app.renderer_mut().camera.screen_to_canvas_point(screen_point);
             let modifiers = cg::surface::Modifiers {
                 shift: self.modifiers.shift_key(),
                 alt: self.modifiers.alt_key(),
@@ -297,21 +287,15 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 MouseButton::Middle => cg::surface::PointerButton::Middle,
                 _ => cg::surface::PointerButton::Primary,
             };
-            let surface_event = match state {
-                ElementState::Pressed => cg::surface::SurfaceEvent::PointerDown {
-                    canvas_point,
-                    screen_point,
-                    button: pointer_button,
-                    modifiers,
-                },
-                ElementState::Released => cg::surface::SurfaceEvent::PointerUp {
-                    canvas_point,
-                    screen_point,
-                    button: pointer_button,
-                    modifiers,
-                },
+            let [sx, sy] = self.app.input_cursor();
+            match state {
+                ElementState::Pressed => {
+                    self.app.surface_pointer_down(sx, sy, pointer_button, modifiers);
+                }
+                ElementState::Released => {
+                    self.app.surface_pointer_up(sx, sy, pointer_button, modifiers);
+                }
             };
-            self.app.surface_dispatch(surface_event);
 
             // Keep legacy selection for devtools
             if *state == ElementState::Pressed && *button == MouseButton::Left {
