@@ -379,6 +379,11 @@ Related:
       blur, and liquid glass.
     - Nodes whose entire effect-expanded bounds are outside the viewport
       are skipped.
+    - **Note:** Linear O(n) culling (without spatial index) was benchmarked
+      and causes 8–13% regression on dense real-world scenes (235K nodes)
+      because the per-node bounds check adds overhead when most nodes are
+      visible. The R-tree is required, not optional. See
+      `investigation-viewport-culling.md` for full data.
 
 11. **Minimize Canvas State Changes**
     - Reuse transforms and paints.
