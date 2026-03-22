@@ -1264,18 +1264,18 @@ fn svg_to_grida_fbs_gradient_transform_roundtrip() {
     let bytes = svg_to_grida_bytes(svg).expect("should encode");
     let scene = io_grida_fbs::decode(&bytes).expect("should decode");
 
-    // Find the vector node (rect → path → vector after FBS roundtrip)
-    let vector = scene
+    // Find the path node (rect → path after SVG pack + FBS roundtrip)
+    let path_node = scene
         .graph
         .nodes_iter()
         .find_map(|(_, n)| match n {
-            Node::Vector(v) => Some(v),
+            Node::Path(p) => Some(p),
             _ => None,
         })
-        .expect("should have a vector node");
+        .expect("should have a path node");
 
     // The gradient fill should have a rotation transform
-    let fill = &vector.fills.as_slice()[0];
+    let fill = &path_node.fills.as_slice()[0];
     let gradient = match fill {
         cg::cg::types::Paint::LinearGradient(lg) => lg,
         _ => panic!("expected linear gradient, got {:?}", fill),
@@ -1329,13 +1329,13 @@ fn svg_to_grida_fbs_roundtrip() {
     assert!(!roots.is_empty(), "decoded scene should have root nodes");
 
     // Count node types
-    let mut vector_count = 0;
+    let mut path_count = 0;
     let mut group_count = 0;
     let mut text_count = 0;
     let mut container_count = 0;
     for (_id, node) in scene.graph.nodes_iter() {
         match node {
-            Node::Vector(_) => vector_count += 1,
+            Node::Path(_) => path_count += 1,
             Node::Group(_) => group_count += 1,
             Node::TextSpan(_) => text_count += 1,
             Node::Container(_) => container_count += 1,
@@ -1343,17 +1343,16 @@ fn svg_to_grida_fbs_roundtrip() {
         }
     }
 
-    // SVG has: 1 container (<svg>), 1 group (<g>), 2 vectors (rect + circle
-    // converted from Path → Vector during FBS encode), 1 text span
+    // SVG has: 1 container (<svg>), 1 group (<g>), 2 path nodes (rect + circle), 1 text span
     assert!(
         container_count >= 1,
         "should have at least 1 container, got {}",
         container_count
     );
     assert!(
-        vector_count >= 2,
-        "should have at least 2 vectors (rect + circle), got {}",
-        vector_count
+        path_count >= 2,
+        "should have at least 2 path nodes (rect + circle), got {}",
+        path_count
     );
     assert!(
         group_count >= 1,

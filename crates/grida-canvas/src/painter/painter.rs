@@ -908,6 +908,12 @@ impl<'a> Painter<'a> {
     ///
     /// For rect, rrect, and oval shapes, translates coordinates directly.
     /// For path shapes, falls back to save/translate/draw/restore.
+    ///
+    /// When the paint carries a shader (image fill, gradient, etc.), the shader's
+    /// local matrix is also translated by `(tx, ty)` so that the texture moves
+    /// together with the geometry. Without this, shaders would stay at the
+    /// global origin while only the shape rect is offset — causing image fills
+    /// to appear "stuck" in world space when a node is translated.
     #[inline]
     fn draw_shape_at_offset(
         &self,
@@ -918,7 +924,25 @@ impl<'a> Painter<'a> {
     ) {
         if tx == 0.0 && ty == 0.0 {
             shape.draw_on_canvas(self.canvas, paint);
-        } else if let Some(rect) = shape.rect_shape {
+            return;
+        }
+
+        // If the paint has a shader (image, gradient, etc.), translate its
+        // local matrix so the texture moves with the geometry.
+        let translated_paint;
+        let paint = if let Some(shader) = paint.shader() {
+            let m = skia_safe::Matrix::translate((tx, ty));
+            translated_paint = {
+                let mut p = paint.clone();
+                p.set_shader(shader.with_local_matrix(&m));
+                p
+            };
+            &translated_paint
+        } else {
+            paint
+        };
+
+        if let Some(rect) = shape.rect_shape {
             self.canvas.draw_rect(rect.with_offset((tx, ty)), paint);
         } else if let Some(rrect) = &shape.rrect {
             self.canvas

@@ -39,6 +39,7 @@ use crate::cg::{
         Axis, BlendMode, BooleanPathOperation, CGPoint, ContainerClipFlag, CornerSmoothing,
         CrossAxisAlignment, DiamondGradientPaint, EdgeInsets, FontFeature, FontOpticalSizing,
         FontVariation, FontWeight, GradientStop, ImageFilters, ImagePaint, ImagePaintFit,
+        ImageRepeat, ImageTile,
         LayerBlendMode, LayerMaskType, LayoutGap, LayoutMode, LayoutPositioning, LayoutWrap,
         LinearGradientPaint, MainAxisAlignment, Paint, Paints, RadialGradientPaint,
         RectangularCornerRadius, ResourceRef, SolidPaint, StrokeAlign, StrokeCap, StrokeJoin,
@@ -696,7 +697,29 @@ fn decode_image_paint_fit(ip: &fbs::ImagePaint<'_>) -> ImagePaintFit {
                 .unwrap_or_default();
             ImagePaintFit::Transform(transform)
         }
+        fbs::ImagePaintFit::ImagePaintFitTile => {
+            let tile = ip
+                .fit_as_image_paint_fit_tile()
+                .and_then(|f| f.tile())
+                .map(|t| ImageTile {
+                    scale: t.scale(),
+                    repeat: decode_image_repeat(t.repeat()),
+                })
+                .unwrap_or(ImageTile {
+                    scale: 1.0,
+                    repeat: ImageRepeat::Repeat,
+                });
+            ImagePaintFit::Tile(tile)
+        }
         _ => ImagePaintFit::Fit(BoxFit::Cover),
+    }
+}
+
+fn decode_image_repeat(r: fbs::ImageRepeat) -> ImageRepeat {
+    match r {
+        fbs::ImageRepeat::RepeatX => ImageRepeat::RepeatX,
+        fbs::ImageRepeat::RepeatY => ImageRepeat::RepeatY,
+        _ => ImageRepeat::Repeat,
     }
 }
 
@@ -1599,7 +1622,7 @@ fn decode_path_node(
         data: pn.data().unwrap_or("").to_string(),
         strokes: decode_paints_vec(pn.stroke_paints()),
         stroke_style,
-        stroke_width: SingularStrokeWidth(Some(stroke_width_f32)),
+        stroke_width: singular_stroke_width(stroke_width_f32),
         layout_child: lc.layout_child.clone(),
     })
 }
