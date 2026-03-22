@@ -11,17 +11,14 @@ A summary of all discussed optimization techniques for achieving high-performanc
 ## Transform & Geometry
 
 1. **Transform Cache**
-
    - Store `local_transform` and derived `world_transform`.
    - Use dirty flags and top-down updates.
 
 2. **Geometry Cache**
-
    - Cache `local_bounds`, `world_bounds`.
    - Used for culling, layout, and hit-testing.
 
 3. **Flat Scene Graph + Parent Pointers**
-
    - Flat arena with parent/children relationships.
    - Enables O(1) access and traversal.
 
@@ -30,17 +27,14 @@ A summary of all discussed optimization techniques for achieving high-performanc
 ## Rendering Pipeline
 
 4. **GPU Acceleration (Skia Backend::GL/Vulkan)**
-
    - Use hardware compositing, filters, transforms.
 
 5. **Scene-Level Picture Caching**
-
    - Use `SkPicture` to record full-scene vector draw ops.
    - Serves as the always-up-to-date canonical snapshot.
    - Resolution-independent; ideal for rerendering or tile regeneration.
 
 6. **Tile-Based Raster Cache (Hybrid Rendering)**
-
    - Render the full viewport, take snapshot. debounced (after no more changes. e.g. 150ms)
    - Divide the snapshot into fixed-size tiles (e.g., 512×512).
    - When new area discovered, render the cached, non-overlapping parts with tile cache. only render newly discovered area.
@@ -48,24 +42,19 @@ A summary of all discussed optimization techniques for achieving high-performanc
    - Optional padding per tile to account for effects (blur, shadows).
 
 7. **Dynamic Mode Switching (Picture vs Tile)**
-
    - Render from `SkPicture` directly during normal zoom or active edits.
    - Fallback to raster tiles for zoomed-out or complex views.
    - Tile invalidation/redraw is driven by zoom level, camera transform, or frame budget.
 
 8. **Dirty & Re-Cache Strategy**
-
    - Nodes marked dirty will trigger re-recording of affected picture regions or tiles.
    - Use change tracking to only re-record minimum needed areas.
    - Recording large subtrees is expensive—optimize granularity based on tree structure.
 
 9. **Scene Cache Config / Strategy**
-
    - Defines how scene caching is organized.
    - Properties include:
-
      - `depth`:
-
        - `0` → Entire scene is one cache.
        - `1` → Cache per top-level container.
        - `n` → Cache at depth `n`, chunking deeper layers.
@@ -83,10 +72,8 @@ A summary of all discussed optimization techniques for achieving high-performanc
    - Cache accessors like `get_picture_cache_by_id()` support scoped re-rendering.
 
 10. **Will-Change Optimization**
-
     - Nodes marked with "will-change" are expected to become dirty soon.
     - Examples:
-
       - Image node waiting on async src resolution
       - Text node waiting on font availability
 
@@ -94,9 +81,7 @@ A summary of all discussed optimization techniques for achieving high-performanc
     - Prevents re-recording full subtrees—minimizes recording cost.
 
 11. **Flattened Render Command List**
-
     - Scene is compiled into a flat list of `RenderCommand` structs with resolved:
-
       - Transform
       - Clip bounds
       - Opacity
@@ -128,9 +113,8 @@ A summary of all discussed optimization techniques for achieving high-performanc
     - This model is essential for dynamic caching, parallel planning, and GPU-aware scheduling.
 
 12. **Dirty-Region Culling**
-
     - Use camera’s `visible_rect` to cull `world_bounds`.
-    - Optional: accelerate with quadtree or BVH.
+    - **Requires spatial index** (quadtree or BVH, see item 36). Linear O(n) culling was benchmarked and causes 8-13% regression on dense real-world scenes (235K nodes) because the per-node bounds check adds overhead when most nodes are visible. See `investigation-viewport-culling.md` for full data.
 
 13. **Minimize Canvas State Changes**
 
@@ -309,7 +293,6 @@ Even if content is temporarily low-res, the tool still feels precise.
 ## Text & Glyph Optimization
 
 29. **Glyph Cache (Atlas or Paragraph Caching)**
-
     - Cache rasterized or vector glyphs used across the document.
     - Prevents redundant layout or rendering of text.
     - Essential for high-DPI or frequently zoomed views.
