@@ -622,6 +622,12 @@ impl ApplicationApi for UnknownTargetApplication {
 }
 
 impl UnknownTargetApplication {
+    /// Returns image refs that were needed during the last render but not found.
+    /// Only returns refs not yet reported in a previous call.
+    pub fn drain_missing_images(&mut self) -> Vec<String> {
+        self.renderer.drain_missing_images()
+    }
+
     /// Mark whether this application is driven by a platform-managed tick loop
     /// (e.g. Emscripten RAF).
     pub fn set_auto_tick(&mut self, enabled: bool) {

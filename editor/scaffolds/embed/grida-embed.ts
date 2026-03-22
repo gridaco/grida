@@ -38,6 +38,7 @@ type EmbedEventMap = {
   "document-load": { scenes: EmbedSceneInfo[] };
   "selection-change": { selection: string[] };
   "scene-change": { sceneId: string };
+  "images-needed": { refs: string[] };
   pong: {
     ready: boolean;
     scenes: EmbedSceneInfo[];
@@ -54,6 +55,7 @@ const EVENT_TYPE_MAP: Record<EmbedEventType, EmbedEvent["type"]> = {
   "document-load": "grida:document-load",
   "selection-change": "grida:selection-change",
   "scene-change": "grida:scene-change",
+  "images-needed": "grida:images-needed",
   pong: "grida:pong",
 };
 
@@ -136,6 +138,15 @@ export class GridaEmbed {
    */
   ping(): void {
     this.iframe.contentWindow?.postMessage({ type: "grida:ping" }, "*");
+  }
+
+  /**
+   * Resolve image refs requested via the `images-needed` event by providing their bytes.
+   *
+   * @param images - Map of RID to raw image bytes.
+   */
+  resolveImages(images: Record<string, ArrayBuffer>): void {
+    this.send({ type: "grida:images-resolve", images });
   }
 
   /**

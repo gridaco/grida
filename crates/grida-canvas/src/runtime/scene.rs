@@ -652,6 +652,12 @@ impl Renderer {
     ///
     /// Layer compositing requires a GPU backend — offscreen surfaces share
     /// the GL context so cached images stay in VRAM.  On a raster backend
+    /// Returns image refs that were needed during render but not found,
+    /// excluding refs already reported in a previous drain.
+    pub fn drain_missing_images(&mut self) -> Vec<String> {
+        self.images.drain_missing()
+    }
+
     /// the setting is accepted but silently ignored at render time.
     pub fn set_layer_compositing(&mut self, enable: bool) {
         self.config.layer_compositing = enable;
@@ -991,6 +997,7 @@ impl Renderer {
 
         self.scene_cache = cache::scene::SceneCache::new();
         self.pan_image_cache = None;
+        self.images.clear_missing_tracking();
         if let Some(scene) = self.scene.as_ref() {
             let requested = collect_scene_font_families(scene);
             self.fonts.set_requested_families(requested.into_iter());

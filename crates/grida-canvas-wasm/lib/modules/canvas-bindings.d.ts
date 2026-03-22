@@ -49,6 +49,16 @@ declare namespace canvas {
       ptr: number,
       len: number
     ): void;
+    _drain_missing_images(
+      state: GridaCanvasApplicationPtr
+    ): Ptr;
+    _resolve_image(
+      state: GridaCanvasApplicationPtr,
+      rid_ptr: number,
+      rid_len: number,
+      bytes_ptr: number,
+      bytes_len: number
+    ): void;
     _apply_scene_transactions(
       state: GridaCanvasApplicationPtr,
       ptr: number,

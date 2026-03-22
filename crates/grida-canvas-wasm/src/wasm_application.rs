@@ -149,6 +149,47 @@ pub unsafe extern "C" fn switch_scene(
 }
 
 #[no_mangle]
+/// js::_drain_missing_images
+/// Returns a len-prefixed JSON array of missing image ref strings, or null if empty.
+pub unsafe extern "C" fn drain_missing_images(
+    app: *mut UnknownTargetApplication,
+) -> *const u8 {
+    if let Some(app) = app.as_mut() {
+        let refs = app.drain_missing_images();
+        if refs.is_empty() {
+            return std::ptr::null();
+        }
+        if let Ok(json) = serde_json::to_string(&refs) {
+            return alloc_len_prefixed(json.as_bytes());
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
+/// js::_resolve_image
+/// Same as _add_image_with_rid but without return value, and queues a redraw.
+/// Used by the lazy image loading system.
+pub unsafe extern "C" fn resolve_image(
+    app: *mut UnknownTargetApplication,
+    rid_ptr: *const u8,
+    rid_len: usize,
+    bytes_ptr: *const u8,
+    bytes_len: usize,
+) {
+    if let Some(app) = app.as_mut() {
+        let rid = __str_from_ptr_len(rid_ptr, rid_len);
+        if let Some(rid) = rid {
+            if !bytes_ptr.is_null() && bytes_len > 0 {
+                let bytes = std::slice::from_raw_parts(bytes_ptr, bytes_len);
+                app.add_image_with_rid(bytes, &rid);
+                app.request_redraw();
+            }
+        }
+    }
+}
+
+#[no_mangle]
 /// js::_apply_scene_transactions
 pub unsafe extern "C" fn apply_scene_transactions(
     app: *mut UnknownTargetApplication,

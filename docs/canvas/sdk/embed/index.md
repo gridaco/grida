@@ -116,6 +116,25 @@ embed.fit({ selector: "selection", animate: true });
 | `selector` | `string`  | `"*"`   | What to fit. `"*"` = all nodes, `"selection"` = current selection. |
 | `animate`  | `boolean` | `false` | Animate the camera transition.                                     |
 
+#### `resolveImages(images)`
+
+Resolve image refs requested via the `images-needed` event by providing their bytes.
+
+```ts
+embed.on("images-needed", async ({ refs }) => {
+  const images = {};
+  for (const rid of refs) {
+    const res = await fetch(myImageResolver(rid));
+    images[rid] = await res.arrayBuffer();
+  }
+  embed.resolveImages(images);
+});
+```
+
+| Parameter | Type                          | Description                    |
+| --------- | ----------------------------- | ------------------------------ |
+| `images`  | `Record<string, ArrayBuffer>` | Map of RID to raw image bytes. |
+
 #### `ping()`
 
 Request a state snapshot from the iframe. It replies with a `pong` event containing the full current state. Useful to verify connectivity or re-sync if the host missed events. Bypasses the ready queue -- can be called at any time.
@@ -169,6 +188,19 @@ embed.on("scene-change", ({ sceneId }) => {
 });
 ```
 
+#### `images-needed`
+
+Emitted when the renderer encounters image paints whose bytes haven't been loaded. Contains the RIDs of the missing images. The host should resolve these (e.g. via Figma API, CDN, local files) and call `resolveImages()`.
+
+Only emits refs not previously requested — no duplicates across frames.
+
+```ts
+embed.on("images-needed", async ({ refs }) => {
+  // refs: string[] (RIDs like "res://images/abc123")
+  // resolve and provide bytes
+});
+```
+
 #### `pong`
 
 Reply to `ping()`. Contains a full state snapshot.
@@ -201,8 +233,11 @@ grida:ready              (once, canvas mounted)
   v
 grida:document-load      (document parsed, scenes available)
   |
-  +-- user interacts ---> grida:selection-change
-  +-- user interacts ---> grida:scene-change
+  +-- render needs images --> grida:images-needed
+  +-- host provides -------> grida:images-resolve --> re-render
+  |
+  +-- user interacts ------> grida:selection-change
+  +-- user interacts ------> grida:scene-change
   |
   v
 grida:load command       (host loads a new file)
@@ -213,6 +248,8 @@ grida:document-load      (new document, fresh scene list)
 ```
 
 During a document load/reset, `selection-change` and `scene-change` events are **suppressed**. They only fire for changes that happen after the document is fully loaded. This prevents stale intermediate state from leaking to the host.
+
+Images are loaded lazily -- the renderer reports which image refs it needs as it encounters them during rendering. The host resolves and provides bytes on demand. Only visible images are requested.
 
 ## Local development
 
@@ -244,13 +281,14 @@ The SDK communicates via `window.postMessage`. All messages have a `type` field 
 
 ### Host to iframe (commands)
 
-| Message type       | Payload                                                                |
-| ------------------ | ---------------------------------------------------------------------- |
-| `grida:load`       | `{ data: ArrayBuffer, format: "fig" \| "json" \| "json.gz" \| "zip" }` |
-| `grida:select`     | `{ nodeIds: string[], mode?: "reset" \| "add" \| "toggle" }`           |
-| `grida:load-scene` | `{ sceneId: string }`                                                  |
-| `grida:fit`        | `{ selector?: string, animate?: boolean }`                             |
-| `grida:ping`       | (none)                                                                 |
+| Message type           | Payload                                                                |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `grida:load`           | `{ data: ArrayBuffer, format: "fig" \| "json" \| "json.gz" \| "zip" }` |
+| `grida:select`         | `{ nodeIds: string[], mode?: "reset" \| "add" \| "toggle" }`           |
+| `grida:load-scene`     | `{ sceneId: string }`                                                  |
+| `grida:fit`            | `{ selector?: string, animate?: boolean }`                             |
+| `grida:ping`           | (none)                                                                 |
+| `grida:images-resolve` | `{ images: Record<string, ArrayBuffer> }`                              |
 
 ### Iframe to host (events)
 
@@ -260,4 +298,5 @@ The SDK communicates via `window.postMessage`. All messages have a `type` field 
 | `grida:document-load`    | `{ scenes: Array<{ id: string, name: string }> }`                                                       | Each document load, after state is settled          |
 | `grida:selection-change` | `{ selection: string[] }`                                                                               | Selection changes (suppressed during document load) |
 | `grida:scene-change`     | `{ sceneId: string }`                                                                                   | Scene changes (suppressed during document load)     |
+| `grida:images-needed`    | `{ refs: string[] }`                                                                                    | Renderer needs image bytes (lazy, deduplicated)     |
 | `grida:pong`             | `{ ready: boolean, scenes: Array<{ id: string, name: string }>, sceneId: string, selection: string[] }` | Reply to `grida:ping`                               |

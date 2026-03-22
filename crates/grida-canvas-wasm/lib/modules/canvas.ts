@@ -121,6 +121,42 @@ export class Scene {
     this._free_string(ptr, len);
   }
 
+  /**
+   * Returns image refs that were needed during the last render but not found.
+   * Only returns refs not yet reported in a previous call.
+   * Returns an empty array if no new missing images.
+   */
+  drainMissingImages(): string[] {
+    this._assertAlive();
+    const outptr = this.module._drain_missing_images(this.appptr);
+    if (outptr === 0) {
+      return [];
+    }
+    const str = ffi.readLenPrefixedString(this.module, outptr);
+    return JSON.parse(str) as string[];
+  }
+
+  /**
+   * Resolve a missing image by providing its raw bytes for a given resource ID.
+   * The image is decoded, stored, and a redraw is queued.
+   * @param rid - Resource ID (e.g. "res://images/abc123")
+   * @param bytes - Raw image bytes (PNG, JPEG, WebP, etc.)
+   */
+  resolveImage(rid: string, bytes: Uint8Array) {
+    this._assertAlive();
+    const [ridPtr, ridLen] = this._alloc_string(rid);
+    const [bytesPtr, bytesLen] = ffi.allocBytes(this.module, bytes);
+    this.module._resolve_image(
+      this.appptr,
+      ridPtr,
+      ridLen - 1,
+      bytesPtr,
+      bytesLen
+    );
+    this._free_string(ridPtr, ridLen);
+    ffi.free(this.module, bytesPtr, bytesLen);
+  }
+
   applyTransactions(batch: unknown[][]): TransactionApplyReport[] | null {
     this._assertAlive();
     const json = JSON.stringify(batch);

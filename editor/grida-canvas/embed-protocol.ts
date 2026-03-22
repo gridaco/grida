@@ -30,6 +30,11 @@ export type EmbedCommand =
   | {
       /** Request a state snapshot. Iframe replies with `grida:pong`. */
       type: "grida:ping";
+    }
+  | {
+      /** Resolve image refs requested via `grida:images-needed` by providing their bytes for refs requested via `grida:images-needed`. */
+      type: "grida:images-resolve";
+      images: Record<string, ArrayBuffer>;
     };
 
 // ---------------------------------------------------------------------------
@@ -60,6 +65,11 @@ export type EmbedEvent =
       scenes: EmbedSceneInfo[];
       sceneId: string | undefined;
       selection: string[];
+    }
+  | {
+      /** Emitted when the renderer needs image bytes it doesn't have. */
+      type: "grida:images-needed";
+      refs: string[];
     };
 
 // ---------------------------------------------------------------------------
