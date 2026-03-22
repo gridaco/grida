@@ -757,10 +757,7 @@ class EditorDocumentStore
       },
     };
 
-    this.insert(
-      { document: packedDoc },
-      this.mstate.scene_id ?? null
-    );
+    this.insert({ document: packedDoc }, this.mstate.scene_id ?? null);
 
     // Use the first remapped root (the SVG container) — this is
     // deterministic from the remap, unlike insert()'s return order.
@@ -3306,7 +3303,8 @@ export class Editor
             outline_mode,
             outline_mode_ignores_clips
           );
-        }
+        },
+        (a, b) => a[0] === b[0] && a[1] === b[1]
       );
 
       this.doc.subscribeWithSelector(
@@ -3325,7 +3323,8 @@ export class Editor
             },
           });
           this._m_wasm_canvas_scene?.redraw();
-        }
+        },
+        (a, b) => a.length === b.length && a.every((id, i) => id === b[i])
       );
 
       this.doc.subscribeWithSelector(
