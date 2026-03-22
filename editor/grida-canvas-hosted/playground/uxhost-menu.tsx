@@ -108,6 +108,10 @@ export function PlaygroundMenuContent({
   // Get editor state for View menu
   const ruler = useEditorState(instance, (state) => state.ruler);
   const pixelgrid = useEditorState(instance, (state) => state.pixelgrid);
+  const canvas_ui_container_label = useEditorState(
+    instance,
+    (state) => state.canvas_ui.container_label
+  );
   const outline_mode = useEditorState(instance, (state) => state.outline_mode);
   const outline_mode_ignores_clips = useEditorState(
     instance,
@@ -262,6 +266,7 @@ export function PlaygroundMenuContent({
         <ViewMenuContent
           pixelgrid={pixelgrid}
           ruler={ruler}
+          canvas_ui_container_label={canvas_ui_container_label}
           outline_mode={outline_mode}
           outline_mode_ignores_clips={outline_mode_ignores_clips}
           pixelpreview={pixelpreview}
@@ -465,6 +470,7 @@ function EditMenuContent({
 function ViewMenuContent({
   pixelgrid,
   ruler,
+  canvas_ui_container_label,
   outline_mode,
   outline_mode_ignores_clips,
   pixelpreview,
@@ -473,6 +479,7 @@ function ViewMenuContent({
 }: {
   pixelgrid: string;
   ruler: string;
+  canvas_ui_container_label: string;
   outline_mode: string;
   outline_mode_ignores_clips: boolean;
   pixelpreview: string;
@@ -577,6 +584,15 @@ function ViewMenuContent({
           <DropdownMenuShortcut>
             {keyboardShortcutText("workbench.surface.view.hide-show-ruler")}
           </DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={canvas_ui_container_label === "on"}
+          onSelect={() => {
+            instance.surface.surfaceToggleCanvasUiContainerLabel();
+          }}
+          className="text-xs"
+        >
+          Frame title bars
         </DropdownMenuCheckboxItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="text-xs">

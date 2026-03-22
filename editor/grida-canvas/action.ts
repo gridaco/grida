@@ -846,6 +846,7 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 export type SurfaceAction =
   | EditorSurface_RulerAndGuideAction
   | EditorSurface_PixelGridStateAction
+  | EditorSurface_CanvasUiContainerLabelStateAction
   | EditorSurface_OutlineModeAction
   | EditorSurface_OutlineModeIgnoresClipsAction
   | EditorSurface_PixelPreviewScaleAction
@@ -871,6 +872,11 @@ export interface EditorSurface_RulerStateAction {
 
 export interface EditorSurface_PixelGridStateAction {
   type: "surface/pixel-grid";
+  state: "on" | "off";
+}
+
+export interface EditorSurface_CanvasUiContainerLabelStateAction {
+  type: "surface/canvas-ui-container-label";
   state: "on" | "off";
 }
 

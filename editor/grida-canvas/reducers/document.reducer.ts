@@ -2022,6 +2022,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "surface/ruler":
     case "surface/guide/delete":
     case "surface/pixel-grid":
+    case "surface/canvas-ui-container-label":
     case "surface/outline-mode":
     case "surface/outline-mode-ignores-clips":
     case "surface/pixel-preview":

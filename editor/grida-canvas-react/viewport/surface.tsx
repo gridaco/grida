@@ -178,6 +178,10 @@ export function EditorSurface() {
   const content_edit_mode = useContentEditModeMinimalState();
   const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
   const ruler = useEditorState(editor, (state) => state.ruler);
+  const canvas_ui_container_label = useEditorState(
+    editor,
+    (state) => state.canvas_ui.container_label
+  );
   const dropzone = useEditorState(editor, (state) => state.dropzone);
   const brush = useBrushState();
   const cursor = useEventTargetCSSCursor();
@@ -481,7 +485,7 @@ export function EditorSurface() {
             </SurfaceGroup>
           </SurfaceGroup>
           {editable && dropzone && <DropzoneOverlay {...dropzone} />}
-          <RootFramesBarOverlay />
+          {canvas_ui_container_label === "on" && <RootFramesBarOverlay />}
         </div>
       </div>
     </SurfaceSelectionGroupProvider>

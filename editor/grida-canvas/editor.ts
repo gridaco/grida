@@ -4642,6 +4642,20 @@ export class EditorSurface
   }
   // #endregion IPixelGridActions implementation
 
+  surfaceConfigureCanvasUiContainerLabel(state: "on" | "off") {
+    this.dispatch({
+      type: "surface/canvas-ui-container-label",
+      state,
+    });
+  }
+
+  surfaceToggleCanvasUiContainerLabel(): "on" | "off" {
+    const { canvas_ui } = this.state;
+    const next = canvas_ui.container_label === "on" ? "off" : "on";
+    this.surfaceConfigureCanvasUiContainerLabel(next);
+    return next;
+  }
+
   // #region IPixelPreviewActions implementation
   surfaceConfigurePixelPreviewScale(scale: "disabled" | "1x" | "2x") {
     this.dispatch({
