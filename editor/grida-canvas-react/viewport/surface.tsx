@@ -17,6 +17,7 @@ import {
   useContentEditModeMinimalState,
   useCurrentSceneState,
   useDocumentState,
+  useEditableState,
   useEventTargetCSSCursor,
   useGestureState,
   useIsTransforming,
@@ -169,6 +170,7 @@ export function EditorSurface() {
   const is_window_resizing = useIsWindowResizing();
   const is_transforming = useIsTransforming();
   const editor = useCurrentEditor();
+  const editable = useEditableState();
   const { transform } = useTransformState();
   const { is_node_transforming, is_node_translating } = useGestureState();
   const { hovered_node_id, selection } = useSelectionState();
@@ -265,6 +267,7 @@ export function EditorSurface() {
       },
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
+        if (!editable) return;
 
         // Double-click toggles content edit mode (enter or exit). Modes that must
         // not exit on double-click (e.g. text, for word select) consume the event
@@ -374,7 +377,7 @@ export function EditorSurface() {
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
-        {(tool?.type === "brush" || tool?.type === "eraser") && (
+        {editable && (tool?.type === "brush" || tool?.type === "eraser") && (
           <BrushCursor brush={brush} />
         )}
 
@@ -398,54 +401,60 @@ export function EditorSurface() {
           {content_edit_mode?.type === "vector" && <VectorMeasurementGuide />}
           <SnapGuide />
 
-          <SurfaceGroup>
-            {content_edit_mode?.type === "text" && (
-              <SurfaceTextEditor
-                key="text-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-          </SurfaceGroup>
+          {editable && (
+            <SurfaceGroup>
+              {content_edit_mode?.type === "text" && (
+                <SurfaceTextEditor
+                  key="text-editor"
+                  node_id={content_edit_mode.node_id}
+                />
+              )}
+            </SurfaceGroup>
+          )}
 
           {/* surfaces with performance considerations */}
-          <SurfaceGroup
-            hidden={
-              is_transforming ||
-              is_node_transforming ||
-              is_node_translating ||
-              is_window_resizing
-            }
-            dontRenderWhenHidden
-          >
-            {content_edit_mode?.type === "vector" && (
-              <SurfaceVectorEditor
-                key="vector-geometry-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-            {content_edit_mode?.type === "paint/gradient" && (
-              <SurfaceGradientEditor
-                key="gradient-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-          </SurfaceGroup>
+          {editable && (
+            <SurfaceGroup
+              hidden={
+                is_transforming ||
+                is_node_transforming ||
+                is_node_translating ||
+                is_window_resizing
+              }
+              dontRenderWhenHidden
+            >
+              {content_edit_mode?.type === "vector" && (
+                <SurfaceVectorEditor
+                  key="vector-geometry-editor"
+                  node_id={content_edit_mode.node_id}
+                />
+              )}
+              {content_edit_mode?.type === "paint/gradient" && (
+                <SurfaceGradientEditor
+                  key="gradient-editor"
+                  node_id={content_edit_mode.node_id}
+                />
+              )}
+            </SurfaceGroup>
+          )}
 
           {/* surfaces relatively cheap */}
-          <SurfaceGroup hidden={is_window_resizing}>
-            {content_edit_mode?.type === "paint/image" && (
-              <SurfaceImageEditor
-                key="image-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-            {content_edit_mode?.type === "width" && (
-              <SurfaceVariableWidthEditor
-                key="varwidth-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-          </SurfaceGroup>
+          {editable && (
+            <SurfaceGroup hidden={is_window_resizing}>
+              {content_edit_mode?.type === "paint/image" && (
+                <SurfaceImageEditor
+                  key="image-editor"
+                  node_id={content_edit_mode.node_id}
+                />
+              )}
+              {content_edit_mode?.type === "width" && (
+                <SurfaceVariableWidthEditor
+                  key="varwidth-editor"
+                  node_id={content_edit_mode.node_id}
+                />
+              )}
+            </SurfaceGroup>
+          )}
 
           <SurfaceGroup
             hidden={
@@ -456,7 +465,7 @@ export function EditorSurface() {
           >
             <SelectionOverlay
               selection={selection}
-              readonly={!!content_edit_mode}
+              readonly={!editable || !!content_edit_mode}
             />
           </SurfaceGroup>
           <SurfaceGroup
@@ -471,7 +480,7 @@ export function EditorSurface() {
               )}
             </SurfaceGroup>
           </SurfaceGroup>
-          {dropzone && <DropzoneOverlay {...dropzone} />}
+          {editable && dropzone && <DropzoneOverlay {...dropzone} />}
           <RootFramesBarOverlay />
         </div>
       </div>
