@@ -1,23 +1,40 @@
 /**
  * @fileoverview fig2grida — browser-safe programmatic API
  *
- * Converts a `.fig` file (Uint8Array) into a `.grida` archive (Uint8Array).
- * Pure function: no fs, no Node.js APIs.
+ * `fig2grida` accepts any of the following inputs and produces a `.grida`
+ * archive (Uint8Array):
+ *
+ * - **`.fig` bytes** — Figma's native binary format (Kiwi / ZIP).
+ * - **REST archive ZIP** — A ZIP containing `document.json` (and optional
+ *   `images/<hash>.*`) as produced by `.tools/figma_archive.py`.
+ * - **REST JSON object** — The parsed result of `GET /v1/files/:key`.
+ *
+ * `restJsonToGridaDocument` is a lower-level helper that returns the in-memory
+ * `Document` + assets without packing into a `.grida` ZIP.
+ *
+ * Pure functions: no fs, no Node.js APIs.
  *
  * @example
  * ```ts
  * import { fig2grida } from "@grida/io-figma/fig2grida-core";
  *
- * const figBytes = new Uint8Array(/* .fig file * /);
- * const { bytes, pageNames, nodeCount, imageCount } = fig2grida(figBytes);
+ * // From .fig bytes
+ * const result = fig2grida(figBytes);
+ *
+ * // From REST archive ZIP
+ * const result = fig2grida(restArchiveZipBytes);
+ *
+ * // From parsed REST JSON
+ * const result = fig2grida(parsedJson);
  * ```
  */
+import { unzipSync, strFromU8 } from "fflate";
 import { iofigma } from "./lib";
 import { io } from "@grida/io";
 import grida from "@grida/schema";
 
 export interface Fig2GridaOptions {
-  /** Convert specific page indices only. Default: all pages. */
+  /** Convert specific page indices only (only applies to `.fig` input). */
   pages?: number[];
 }
 
@@ -38,50 +55,74 @@ function makeIdGenerator(prefix: string): () => string {
   return () => `${prefix}-${++_idCounter}`;
 }
 
-/**
- * Convert a .fig file to a .grida archive.
- * Pure function: Uint8Array in, Uint8Array out. No fs, no Node.js APIs.
- */
-export function fig2grida(
-  input: Uint8Array,
-  options?: Fig2GridaOptions
-): Fig2GridaResult {
-  // Reset counter for each invocation
-  _idCounter = 0;
+// ---------------------------------------------------------------------------
+// ZIP magic detection
+// ---------------------------------------------------------------------------
 
-  // 1. Parse .fig file
-  const figFile = iofigma.kiwi.parseFile(input);
+const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04] as const;
 
-  // 2. Extract images from the .fig ZIP
-  const extractedImages = iofigma.kiwi.extractImages(figFile.zip_files);
-
-  // 3. Select pages (filter by index if specified, sort by sortkey)
-  let pages = [...figFile.pages].sort((a, b) =>
-    a.sortkey.localeCompare(b.sortkey)
+function isZip(data: Uint8Array): boolean {
+  if (data.length < 4) return false;
+  return (
+    data[0] === ZIP_MAGIC[0] &&
+    data[1] === ZIP_MAGIC[1] &&
+    data[2] === ZIP_MAGIC[2] &&
+    data[3] === ZIP_MAGIC[3]
   );
+}
 
-  if (options?.pages && options.pages.length > 0) {
-    pages = options.pages
-      .filter((i) => i >= 0 && i < pages.length)
-      .map((i) => pages[i]);
+/**
+ * Try to read `document.json` + `images/*` from a REST archive ZIP.
+ * Returns `null` when the ZIP does not contain `document.json` (i.e. it is
+ * a regular `.fig` ZIP instead).
+ */
+function tryReadRestArchiveZip(
+  data: Uint8Array
+): { json: unknown; images: Record<string, Uint8Array> } | null {
+  const entries = unzipSync(data);
+  let json: unknown | undefined;
+  const images: Record<string, Uint8Array> = {};
+  for (const [path, bytes] of Object.entries(entries)) {
+    if (path.includes("__MACOSX")) continue;
+    if (path.endsWith("document.json")) {
+      json = JSON.parse(strFromU8(bytes));
+      continue;
+    }
+    if (path.includes("/images/") || path.startsWith("images/")) {
+      const file = path.split("/").pop()!;
+      const dot = file.lastIndexOf(".");
+      if (dot > 0) {
+        images[file.slice(0, dot)] = bytes;
+      }
+    }
   }
+  return json !== undefined ? { json, images } : null;
+}
 
-  // 4. Convert each page to a packed scene document
-  const pageResults: Array<{
-    name: string;
-    result: iofigma.restful.factory.FigmaImportResult;
-  }> = [];
+// ---------------------------------------------------------------------------
+// Shared merge logic
+// ---------------------------------------------------------------------------
 
-  for (const page of pages) {
-    const result = iofigma.kiwi.convertPageToScene(page, {
-      resolve_image_src: (ref: string) =>
-        extractedImages.has(ref) ? `res://images/${ref}` : null,
-      gradient_id_generator: makeIdGenerator("grad"),
-    });
-    pageResults.push({ name: page.name, result });
-  }
+interface PageResult {
+  name: string;
+  result: iofigma.restful.factory.FigmaImportResult;
+}
 
-  // 5. Merge pages into a multi-scene Document
+interface MergedDocument {
+  document: grida.program.document.Document;
+  imageRecord: Record<string, Uint8Array>;
+  imageRefsUsed: string[];
+  pageNames: string[];
+}
+
+/**
+ * Merge per-page conversion results into a single multi-scene Document and
+ * collect referenced image bytes.
+ */
+function mergePages(
+  pageResults: PageResult[],
+  imageProvider: (ref: string) => Uint8Array | undefined
+): MergedDocument {
   const allImageRefsUsed = new Set<string>();
   const mergedNodes: Record<string, any> = {};
   const mergedLinks: Record<string, string[] | undefined> = {};
@@ -93,10 +134,9 @@ export function fig2grida(
   for (const { name, result } of pageResults) {
     const packed = result.document;
 
-    // Generate a unique scene ID
-    const sceneId = packed.scene.id === "tmp" ? makeIdGenerator("scene")() : packed.scene.id;
+    const sceneId =
+      packed.scene.id === "tmp" ? makeIdGenerator("scene")() : packed.scene.id;
 
-    // Create SceneNode from the packed scene
     const sceneNode: grida.program.nodes.SceneNode = {
       type: "scene",
       id: sceneId,
@@ -109,15 +149,11 @@ export function fig2grida(
       background_color: packed.scene.background_color,
     };
 
-    // Add scene node to merged nodes
     mergedNodes[sceneId] = sceneNode;
-    // Wire up scene children in links
     mergedLinks[sceneId] = packed.scene.children_refs;
     scenesRef.push(sceneId);
 
-    // Merge all nodes, links, images, bitmaps, properties
     Object.assign(mergedNodes, packed.nodes);
-    // Merge links carefully (don't overwrite scene link we just set)
     for (const [key, value] of Object.entries(packed.links)) {
       if (key !== sceneId) {
         mergedLinks[key] = value;
@@ -127,16 +163,12 @@ export function fig2grida(
     Object.assign(mergedBitmaps, packed.bitmaps);
     Object.assign(mergedProperties, packed.properties);
 
-    // Collect image refs
     for (const ref of result.imageRefsUsed) {
       allImageRefsUsed.add(ref);
     }
   }
 
-  // 6. Prune orphan nodes — nodes in `nodes` but not reachable from any scene
-  //    through the `links` graph. The FlatBuffers encoder requires a parent
-  //    reference for every non-scene node; orphans would cause a required-field
-  //    error during serialization.
+  // Prune orphan nodes
   const reachable = new Set<string>(scenesRef);
   const queue = [...scenesRef];
   while (queue.length > 0) {
@@ -151,8 +183,6 @@ export function fig2grida(
       }
     }
   }
-
-  // Remove unreachable nodes and their links
   for (const id of Object.keys(mergedNodes)) {
     if (!reachable.has(id)) {
       delete mergedNodes[id];
@@ -160,7 +190,6 @@ export function fig2grida(
     }
   }
 
-  // 7. Build final Document
   const document: grida.program.document.Document = {
     nodes: mergedNodes,
     links: mergedLinks,
@@ -171,28 +200,346 @@ export function fig2grida(
     entry_scene_id: scenesRef[0],
   };
 
-  // 8. Build images record — only include referenced images
+  const imageRefsUsed = Array.from(allImageRefsUsed);
   const imageRecord: Record<string, Uint8Array> = {};
-  for (const ref of allImageRefsUsed) {
-    const imageBytes = extractedImages.get(ref);
+  for (const ref of imageRefsUsed) {
+    const imageBytes = imageProvider(ref);
     if (imageBytes) {
-      // Store with the hash as key (pack() adds `images/` prefix)
       imageRecord[ref] = imageBytes;
     }
   }
 
-  // 9. Pack into .grida archive
-  const archiveBytes = io.archive.pack(document, imageRecord);
+  return {
+    document,
+    imageRecord,
+    imageRefsUsed,
+    pageNames: pageResults.map((p) => p.name),
+  };
+}
 
-  // 10. Compute stats
-  const nodeCount = Object.keys(mergedNodes).filter(
-    (id) => mergedNodes[id]?.type !== "scene"
+function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
+  const archiveBytes = io.archive.pack(merged.document, merged.imageRecord);
+  const nodeCount = Object.keys(merged.document.nodes).filter(
+    (id) => merged.document.nodes[id]?.type !== "scene"
   ).length;
 
   return {
     bytes: archiveBytes,
-    pageNames: pageResults.map((p) => p.name),
+    pageNames: merged.pageNames,
     nodeCount,
-    imageCount: Object.keys(imageRecord).length,
+    imageCount: Object.keys(merged.imageRecord).length,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// fig2grida — unified entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a Figma file to a `.grida` archive.
+ *
+ * Accepts:
+ * - `Uint8Array` — `.fig` binary **or** REST archive ZIP (auto-detected).
+ * - `object` — Parsed REST API JSON (`GET /v1/files/:key`).
+ */
+export function fig2grida(
+  input: Uint8Array | object,
+  options?: Fig2GridaOptions
+): Fig2GridaResult {
+  _idCounter = 0;
+
+  // --- Object input: REST JSON directly ---
+  if (!(input instanceof Uint8Array)) {
+    return fig2gridaFromRestJson(input, undefined);
+  }
+
+  // --- Bytes input: detect format ---
+  if (isZip(input)) {
+    // Try REST archive ZIP first (contains document.json)
+    const restArchive = tryReadRestArchiveZip(input);
+    if (restArchive) {
+      return fig2gridaFromRestJson(restArchive.json, restArchive.images);
+    }
+    // Otherwise fall through to .fig parser (handles both ZIP and raw Kiwi)
+  } else if (input.length > 0 && input[0] === 0x7b /* '{' */) {
+    // JSON text — parse and treat as REST API response
+    const json = JSON.parse(new TextDecoder().decode(input));
+    return fig2gridaFromRestJson(json, undefined);
+  }
+
+  return fig2gridaFromFigBytes(input, options);
+}
+
+// ---------------------------------------------------------------------------
+// .fig bytes path
+// ---------------------------------------------------------------------------
+
+function fig2gridaFromFigBytes(
+  input: Uint8Array,
+  options?: Fig2GridaOptions
+): Fig2GridaResult {
+  const figFile = iofigma.kiwi.parseFile(input);
+  const extractedImages = iofigma.kiwi.extractImages(figFile.zip_files);
+
+  let pages = [...figFile.pages].sort((a, b) =>
+    a.sortkey.localeCompare(b.sortkey)
+  );
+
+  if (options?.pages && options.pages.length > 0) {
+    pages = options.pages
+      .filter((i) => i >= 0 && i < pages.length)
+      .map((i) => pages[i]);
+  }
+
+  const pageResults: PageResult[] = [];
+  for (const page of pages) {
+    const result = iofigma.kiwi.convertPageToScene(page, {
+      resolve_image_src: (ref: string) =>
+        extractedImages.has(ref) ? `res://images/${ref}` : null,
+      gradient_id_generator: makeIdGenerator("grad"),
+    });
+    pageResults.push({ name: page.name, result });
+  }
+
+  return packMergedDocument(
+    mergePages(pageResults, (ref) => extractedImages.get(ref))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// REST JSON path (object or extracted from archive ZIP)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the CANVAS pages from a REST API JSON response.
+ *
+ * Accepted shapes:
+ * - `{ document: { type: "DOCUMENT", children: [CANVAS, …] } }` — full `GET /v1/files/:key`
+ * - `{ document: { type: "CANVAS", children: […] } }` — single-page node fetch
+ * - `{ nodes: { "id": { document: …, … }, … } }` — `GET /v1/files/:key/nodes?ids=…`
+ * - `{ type: "DOCUMENT", children: [CANVAS, …] }` — document node directly
+ * - `{ type: "CANVAS", children: […] }` — single CANVAS node
+ * - `{ children: […] }` — bare object with children
+ */
+function extractCanvases(
+  json: unknown
+): Array<{ name?: string; children?: Array<Record<string, unknown>> }> {
+  const obj = json as Record<string, unknown> | null | undefined;
+  if (!obj || typeof obj !== "object") {
+    throw new Error("fig2grida: input is not an object");
+  }
+
+  // Handle `GET /v1/files/:key/nodes` response: `{ nodes: { "id": { document, … } } }`
+  // Flatten all node entries and recursively extract canvases from each.
+  const nodesMap = (obj as any).nodes;
+  if (
+    nodesMap &&
+    typeof nodesMap === "object" &&
+    !Array.isArray(nodesMap) &&
+    !(obj as any).document &&
+    !(obj as any).children
+  ) {
+    const result: Array<{
+      name?: string;
+      children?: Array<Record<string, unknown>>;
+    }> = [];
+    for (const entry of Object.values(nodesMap)) {
+      result.push(...extractCanvases(entry));
+    }
+    if (result.length === 0) {
+      throw new Error("fig2grida: nodes map contains no convertible entries");
+    }
+    return result;
+  }
+
+  // Resolve the node to inspect — unwrap `{ document: ... }` wrapper if present
+  const docNode = (obj as any).document;
+  const node = docNode && typeof docNode === "object" ? docNode : obj;
+
+  // If the node itself is a CANVAS, treat it as a single page
+  if (
+    (node as any).type === "CANVAS" &&
+    Array.isArray((node as any).children)
+  ) {
+    return [{ name: (node as any).name, children: (node as any).children }];
+  }
+
+  const children: Array<Record<string, unknown>> | undefined = Array.isArray(
+    (node as any).children
+  )
+    ? (node as any).children
+    : undefined;
+
+  if (!children || children.length === 0) {
+    // Single node with no children — treat the node itself as the only root
+    if ((node as any).type && (node as any).id) {
+      return [{ name: (node as any).name ?? "Page", children: [node as any] }];
+    }
+    throw new Error("fig2grida: input JSON has no document.children");
+  }
+
+  const canvases = children.filter(
+    (p) => (p as { type?: string }).type === "CANVAS"
+  ) as Array<{ name?: string; children?: Array<Record<string, unknown>> }>;
+
+  // If no CANVAS nodes found, treat all top-level children as a single page
+  if (canvases.length === 0) {
+    return [{ name: (node as any).name ?? "Page", children }];
+  }
+
+  return canvases;
+}
+
+function restJsonToMergedDocument(
+  json: unknown,
+  images: Record<string, Uint8Array> | undefined
+): MergedDocument {
+  const canvases = extractCanvases(json);
+
+  const pageResults: PageResult[] = canvases.map((canvas) => ({
+    name: canvas.name ?? "Page",
+    result: convertRestCanvasToFigmaImportResult(canvas, images),
+  }));
+
+  return mergePages(pageResults, (ref) => (images ? images[ref] : undefined));
+}
+
+function fig2gridaFromRestJson(
+  json: unknown,
+  images: Record<string, Uint8Array> | undefined
+): Fig2GridaResult {
+  return packMergedDocument(restJsonToMergedDocument(json, images));
+}
+
+// ---------------------------------------------------------------------------
+// REST CANVAS → FigmaImportResult (per-page conversion)
+// ---------------------------------------------------------------------------
+
+function convertRestCanvasToFigmaImportResult(
+  canvas: { name?: string; children?: Array<Record<string, unknown>> },
+  images: Record<string, Uint8Array> | undefined
+): iofigma.restful.factory.FigmaImportResult {
+  const rootNodes = canvas.children ?? [];
+  if (rootNodes.length === 0) {
+    return {
+      document: {
+        nodes: {},
+        links: {},
+        images: {},
+        bitmaps: {},
+        properties: {},
+        scene: {
+          type: "scene",
+          id: "tmp",
+          name: canvas.name ?? "Page",
+          children_refs: [],
+          guides: [],
+          edges: [],
+          constraints: { children: "multiple" },
+        },
+      },
+      imageRefsUsed: [],
+    };
+  }
+
+  let counter = 0;
+  const baseGradientGen = () => `grad-${++counter}`;
+  const resolveImageSrc =
+    images && Object.keys(images).length > 0
+      ? (ref: string) => (ref in images ? `res://images/${ref}` : null)
+      : undefined;
+
+  const context: iofigma.restful.factory.FactoryContext = {
+    gradient_id_generator: baseGradientGen,
+    prefer_path_for_geometry: true,
+    node_id_generator: () => `rest-import-${++counter}`,
+    ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
+  };
+
+  const individualResults = rootNodes.map((rootNode) =>
+    iofigma.restful.factory.document(rootNode as any, {}, context)
+  );
+
+  const imageRefsUsed = new Set<string>();
+  for (const r of individualResults) {
+    r.imageRefsUsed.forEach((ref: string) => imageRefsUsed.add(ref));
+  }
+
+  let packed: grida.program.document.IPackedSceneDocument;
+  if (individualResults.length === 1) {
+    packed = individualResults[0].document;
+  } else {
+    packed = {
+      bitmaps: {},
+      images: {},
+      nodes: {},
+      links: {},
+      properties: {},
+      scene: {
+        type: "scene",
+        id: "tmp",
+        name: canvas.name ?? "Page",
+        children_refs: [],
+        guides: [],
+        edges: [],
+        constraints: { children: "multiple" },
+      },
+    };
+    for (const result of individualResults) {
+      const d = result.document;
+      Object.assign(packed.nodes, d.nodes);
+      Object.assign(packed.links, d.links);
+      Object.assign(packed.images, d.images);
+      Object.assign(packed.bitmaps, d.bitmaps);
+      Object.assign(packed.properties, d.properties);
+      packed.scene.children_refs.push(...d.scene.children_refs);
+    }
+  }
+
+  return {
+    document: packed,
+    imageRefsUsed: Array.from(imageRefsUsed),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// restJsonToGridaDocument — returns in-memory Document (no .grida packing)
+// ---------------------------------------------------------------------------
+
+export interface RestJsonToGridaOptions {
+  /**
+   * Image hashes from Figma `images` metadata to raw bytes. When provided,
+   * resolves `IMAGE` paint refs to `res://images/<hash>`.
+   */
+  images?: Record<string, Uint8Array>;
+}
+
+export interface RestJsonToGridaResult {
+  document: grida.program.document.Document;
+  /** Raw image bytes keyed by hash (for `editor.loadImages`) */
+  assets: Record<string, Uint8Array>;
+  /** Image ref hashes referenced by converted paints */
+  imageRefsUsed: string[];
+}
+
+/**
+ * Convert a Figma REST API file JSON (`document.children` = CANVAS pages)
+ * into a single Grida `Document` with one scene per page.
+ *
+ * Returns the in-memory `Document` + assets without packing into a `.grida`
+ * ZIP archive.
+ */
+export function restJsonToGridaDocument(
+  json: unknown,
+  options?: RestJsonToGridaOptions
+): RestJsonToGridaResult {
+  _idCounter = 0;
+  const images = options?.images;
+  const merged = restJsonToMergedDocument(json, images);
+
+  return {
+    document: merged.document,
+    assets: merged.imageRecord,
+    imageRefsUsed: merged.imageRefsUsed,
   };
 }

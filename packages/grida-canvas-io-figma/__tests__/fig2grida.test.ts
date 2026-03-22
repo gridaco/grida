@@ -1,8 +1,43 @@
 import { readFileSync } from "fs";
-import { fig2grida } from "../fig2grida-core";
+import { basename } from "node:path";
+import { unzipSync, strFromU8 } from "fflate";
+import { fig2grida, restJsonToGridaDocument } from "../fig2grida-core";
 import { io } from "@grida/io";
 
 const FIXTURES_BASE = __dirname + "/../../../fixtures/test-fig";
+/** REST API ZIP archives: `document.json` + `images/` — see `fixtures/test-figma/community/README.md`. */
+const FIGMA_COMMUNITY_REST =
+  __dirname + "/../../../fixtures/test-figma/community";
+
+/**
+ * Reads `document.json` and `images/<hash>.*` from a `.tools/figma_archive.py` ZIP.
+ */
+function loadFigmaRestArchive(zipPath: string): {
+  documentJson: unknown;
+  images: Record<string, Uint8Array>;
+} {
+  const unzip = unzipSync(new Uint8Array(readFileSync(zipPath)));
+  let documentJson: unknown;
+  const images: Record<string, Uint8Array> = {};
+  for (const [path, data] of Object.entries(unzip)) {
+    if (path.includes("__MACOSX")) continue;
+    if (path.endsWith("document.json")) {
+      documentJson = JSON.parse(strFromU8(data));
+      continue;
+    }
+    if (path.includes("/images/")) {
+      const file = basename(path);
+      const dot = file.lastIndexOf(".");
+      if (dot > 0) {
+        images[file.slice(0, dot)] = data;
+      }
+    }
+  }
+  if (documentJson === undefined) {
+    throw new Error(`document.json not found in archive: ${zipPath}`);
+  }
+  return { documentJson, images };
+}
 
 describe("fig2grida", () => {
   describe("blank.fig", () => {
@@ -159,6 +194,122 @@ describe("fig2grida", () => {
           expect(sceneNode.type).toBe("scene");
         }
       }
+    });
+  });
+
+  describe("REST JSON (restJsonToGridaDocument)", () => {
+    test(
+      "converts captured REST archive (zip → document.json + images) to Grida document",
+      () => {
+        const { documentJson, images } = loadFigmaRestArchive(
+          `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
+        );
+        const result = restJsonToGridaDocument(documentJson, { images });
+
+        expect(result.document.scenes_ref.length).toBeGreaterThan(0);
+        expect(Object.keys(result.document.nodes).length).toBeGreaterThan(0);
+        for (const ref of result.imageRefsUsed) {
+          if (ref in images) {
+            expect(result.assets[ref]).toBeDefined();
+            expect(result.assets[ref]!.byteLength).toBeGreaterThan(0);
+          }
+        }
+      },
+      120_000
+    );
+
+    test("throws when document.children is missing", () => {
+      expect(() => restJsonToGridaDocument({})).toThrow(/no document\.children/);
+    });
+
+    test("treats non-CANVAS children as implicit page when no CANVAS nodes exist", () => {
+      const result = restJsonToGridaDocument({
+        document: {
+          id: "0:0",
+          type: "DOCUMENT",
+          children: [
+            {
+              id: "1:1",
+              type: "FRAME",
+              name: "Frame",
+              children: [],
+              fills: [],
+              strokes: [],
+              effects: [],
+              absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+              size: { x: 100, y: 100 },
+              blendMode: "NORMAL",
+              constraints: { vertical: "TOP", horizontal: "LEFT" },
+            },
+          ],
+        },
+      });
+      expect(result.document.scenes_ref.length).toBe(1);
+    });
+  });
+
+  describe("fig2grida unified input", () => {
+    test("accepts a JSON object directly", () => {
+      const { documentJson } = loadFigmaRestArchive(
+        `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
+      );
+      const result = fig2grida(documentJson as object);
+      expect(result.bytes.length).toBeGreaterThan(0);
+      expect(result.pageNames.length).toBeGreaterThan(0);
+      expect(result.nodeCount).toBeGreaterThan(0);
+    }, 120_000);
+
+    test("accepts a REST archive ZIP (auto-detects document.json)", () => {
+      const zipBytes = new Uint8Array(
+        readFileSync(
+          `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
+        )
+      );
+      const result = fig2grida(zipBytes);
+      expect(result.bytes.length).toBeGreaterThan(0);
+      expect(result.pageNames.length).toBeGreaterThan(0);
+      expect(result.nodeCount).toBeGreaterThan(0);
+    }, 120_000);
+
+    test("accepts document node directly (no wrapping { document })", () => {
+      const { documentJson } = loadFigmaRestArchive(
+        `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
+      );
+      // Pass just the document node, not the full response
+      const docNode = (documentJson as any).document;
+      const result = fig2grida(docNode);
+      expect(result.bytes.length).toBeGreaterThan(0);
+      expect(result.pageNames.length).toBeGreaterThan(0);
+      expect(result.nodeCount).toBeGreaterThan(0);
+    }, 120_000);
+
+    test("throws for JSON object with no children at all", () => {
+      expect(() => fig2grida({})).toThrow(/no document\.children/);
+    });
+
+    test("treats non-CANVAS children as implicit page", () => {
+      const result = fig2grida({
+        document: {
+          id: "0:0",
+          type: "DOCUMENT",
+          children: [
+            {
+              id: "1:1",
+              type: "FRAME",
+              name: "Frame",
+              children: [],
+              fills: [],
+              strokes: [],
+              effects: [],
+              absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+              size: { x: 100, y: 100 },
+              blendMode: "NORMAL",
+              constraints: { vertical: "TOP", horizontal: "LEFT" },
+            },
+          ],
+        },
+      });
+      expect(result.pageNames).toEqual(["Page"]);
     });
   });
 });
