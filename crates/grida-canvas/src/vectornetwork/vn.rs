@@ -281,9 +281,18 @@ fn build_path_from_segments(
     let mut current_start: Option<usize> = None;
     let mut previous_end: Option<usize> = None;
 
+    // `a`/`b` must index `vertices`. Out-of-range segments are skipped so rendering never
+    // panics on bad imports or corrupt buffers, but that silently drops geometry and can
+    // break subpath continuity. Prefer validating once at deserialize/import (e.g. a
+    // single linear scan, or asserting invariants only in debug) and then removing or
+    // narrowing these checks if we can rely on invariants without per-segment cost.
+    let vlen = vertices.len();
     for segment in segments {
         let a_idx = segment.a;
         let b_idx = segment.b;
+        if a_idx >= vlen || b_idx >= vlen {
+            continue;
+        }
         let a = vertices[a_idx];
         let b = vertices[b_idx];
         let ta = segment.ta;
@@ -369,10 +378,15 @@ impl VectorNetwork {
 
                 let mut current_start = None;
                 let mut previous_end = None;
+                // Same OOB handling as `build_path_from_segments` (see comment there).
+                let vlen = vertices.len();
                 for &idx in seg_indices {
                     let seg = &segments[idx];
                     let a_idx = seg.a;
                     let b_idx = seg.b;
+                    if a_idx >= vlen || b_idx >= vlen {
+                        continue;
+                    }
                     let a = vertices[a_idx];
                     let b = vertices[b_idx];
                     let ta = seg.ta;
@@ -450,7 +464,13 @@ impl VectorNetwork {
         }
 
         let mut bbox: Option<Rectangle> = None;
+        // Same OOB handling as path building (see `build_path_from_segments`); empty bbox if
+        // every segment is invalid.
+        let vlen = self.vertices.len();
         for seg in &self.segments {
+            if seg.a >= vlen || seg.b >= vlen {
+                continue;
+            }
             let a = self.vertices[seg.a];
             let b = self.vertices[seg.b];
             let ta = seg.ta;

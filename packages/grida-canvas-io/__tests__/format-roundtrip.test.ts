@@ -140,6 +140,26 @@ const baseLine = (id: string): grida.program.nodes.LineNode => ({
   stroke_join: "miter",
 });
 
+const basePath = (id: string): grida.program.nodes.PathNode => ({
+  type: "path",
+  id,
+  name: "Path",
+  active: true,
+  locked: false,
+  opacity: 1,
+  z_index: 0,
+  layout_positioning: "absolute",
+  layout_inset_left: 0,
+  layout_inset_top: 0,
+  layout_target_width: 100,
+  layout_target_height: 80,
+  rotation: 0,
+  stroke_width: 0,
+  stroke_cap: "butt",
+  stroke_join: "miter",
+  data: "M0,0 L100,0 L100,80 L0,80 Z",
+});
+
 const baseVector = (id: string): grida.program.nodes.VectorNode => ({
   type: "vector",
   id,
@@ -2642,6 +2662,107 @@ describe("format roundtrip", () => {
           expect(containerNode.fe_shadows).toBeUndefined();
           expect(containerNode.fe_liquid_glass).toBeUndefined();
           expect(containerNode.fe_noises).toBeUndefined();
+        }
+      );
+    });
+  });
+
+  // ─── PathNode ───────────────────────────────────────────────────────────────
+
+  describe("PathNode", () => {
+    it("roundtrips PathNode with SVG path data", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePath(nodeId),
+          data: "M0,0 L100,0 L100,80 L0,80 Z",
+        },
+      });
+      roundtripTest<grida.program.nodes.PathNode>(
+        doc,
+        nodeId,
+        "path",
+        (node) => {
+          expect(node.data).toBe("M0,0 L100,0 L100,80 L0,80 Z");
+          expect(node.type).toBe("path");
+        }
+      );
+    });
+
+    it("roundtrips PathNode with fill paints", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePath(nodeId),
+          fill_paints: [
+            {
+              type: "solid",
+              color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
+              blend_mode: "normal",
+              active: true,
+            } satisfies cg.SolidPaint,
+          ],
+        },
+      });
+      roundtripTest<grida.program.nodes.PathNode>(
+        doc,
+        nodeId,
+        "path",
+        (node) => {
+          expect(node.fill_paints).toBeDefined();
+          expect(node.fill_paints!.length).toBe(1);
+          expect(node.fill_paints![0].type).toBe("solid");
+        }
+      );
+    });
+
+    it("roundtrips PathNode with stroke paints", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePath(nodeId),
+          stroke_paints: [
+            {
+              type: "solid",
+              color: { r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F,
+              blend_mode: "normal",
+              active: true,
+            } satisfies cg.SolidPaint,
+          ],
+          stroke_width: 2,
+        },
+      });
+      roundtripTest<grida.program.nodes.PathNode>(
+        doc,
+        nodeId,
+        "path",
+        (node) => {
+          expect(node.stroke_paints).toBeDefined();
+          expect(node.stroke_paints!.length).toBe(1);
+          expect(node.stroke_width).toBe(2);
+        }
+      );
+    });
+
+    it("roundtrips PathNode with complex SVG path", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const complexPath = "M10,80 C40,10 65,10 95,80 S150,150 180,80";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePath(nodeId),
+          data: complexPath,
+        },
+      });
+      roundtripTest<grida.program.nodes.PathNode>(
+        doc,
+        nodeId,
+        "path",
+        (node) => {
+          expect(node.data).toBe(complexPath);
         }
       );
     });

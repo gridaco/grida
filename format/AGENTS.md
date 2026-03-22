@@ -79,6 +79,13 @@ The short version you must internalize:
   - migrate, or
   - reject with a clear error.
 
+## Testing
+
+Schema changes require round-trip tests in both Rust and TS. New union members must be **appended** (never inserted mid-list).
+
+- **Rust:** `crates/grida-canvas/tests/fbs_roundtrip.rs` — `cargo test -p cg --test fbs_roundtrip`
+- **TS:** `packages/grida-canvas-io/__tests__/format-roundtrip.test.ts` — `pnpm turbo test --filter='@grida/io'`
+
 ## Review checklist (before you consider the work “done”)
 
 - **Strategy**: you can state whether this is **Evolution** or **Breaking**, and why.
