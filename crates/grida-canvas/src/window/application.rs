@@ -1365,6 +1365,7 @@ impl UnknownTargetApplication {
                 &self.surface_overlay_config,
                 &mut self.ui_hit_regions,
                 self.renderer.scene.as_ref().map(|s| &s.graph),
+                &self.renderer.fonts,
             );
             if self.devtools_rendering_show_ruler {
                 ruler_overlay::Ruler::draw(&canvas, &self.renderer.camera);

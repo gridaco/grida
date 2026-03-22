@@ -2,8 +2,10 @@ use crate::cache::scene::SceneCache;
 use crate::devtools::surface_overlay::SurfaceOverlayConfig;
 use crate::node::scene_graph::SceneGraph;
 use crate::runtime::camera::Camera2D;
+use crate::runtime::font_repository::FontRepository;
 use crate::surface::state::SurfaceState;
 use crate::surface::ui::hit_region::{HitRegion, HitRegions, OverlayAction};
+use skia_safe::textlayout;
 use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, Point, RRect, Rect};
 
 /// Selection overlay color (blue) — shared with SurfaceOverlay.
@@ -35,10 +37,6 @@ thread_local! {
     static FONT_SIZE_METER: Font = Font::new(
         crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES),
         SIZE_METER_FONT_SIZE,
-    );
-    static FONT_FRAME_TITLE: Font = Font::new(
-        crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES),
-        FRAME_TITLE_FONT_SIZE,
     );
 
     static ACCENT_FILL: Paint = {
@@ -78,6 +76,7 @@ impl SurfaceUI {
         config: &SurfaceOverlayConfig,
         hit_regions: &mut HitRegions,
         graph: Option<&SceneGraph>,
+        fonts: &FontRepository,
     ) {
         hit_regions.clear();
 
@@ -85,7 +84,9 @@ impl SurfaceUI {
 
         if config.show_frame_titles {
             if let Some(graph) = graph {
-                Self::draw_frame_titles(canvas, surface, camera, cache, hit_regions, graph, dpr);
+                Self::draw_frame_titles(
+                    canvas, surface, camera, cache, hit_regions, graph, dpr, fonts,
+                );
             }
         }
 
@@ -160,6 +161,10 @@ impl SurfaceUI {
     }
 
     /// Draw title labels above nodes and register hit regions for them.
+    ///
+    /// Uses the Paragraph API with `FontCollection` from the shared
+    /// `FontRepository` so that CJK and other non-Latin scripts fall back
+    /// to user-provided fallback fonts instead of rendering as tofu.
     fn draw_frame_titles(
         canvas: &Canvas,
         surface: &SurfaceState,
@@ -168,117 +173,106 @@ impl SurfaceUI {
         hit_regions: &mut HitRegions,
         graph: &SceneGraph,
         dpr: f32,
+        fonts: &FontRepository,
     ) {
-        FONT_FRAME_TITLE.with(|base_font| {
-            let font = scaled_font(base_font, dpr);
-            let title_height = TITLE_BAR_HEIGHT * dpr;
-            let min_width = MIN_TITLE_WIDTH * dpr;
-            let view = camera.view_matrix();
-            let metrics = font.metrics();
+        let title_height = TITLE_BAR_HEIGHT * dpr;
+        let min_width = MIN_TITLE_WIDTH * dpr;
+        let view = camera.view_matrix();
+        let font_size = FRAME_TITLE_FONT_SIZE * dpr;
 
-            // Iterate root nodes directly — no HashSet needed.
-            for &node_id in graph.roots() {
-                let world_bounds = match cache.geometry.get_world_bounds(&node_id) {
-                    Some(b) => b,
-                    None => continue,
-                };
+        // Build font families list: primary + user fallback fonts
+        let fallbacks = fonts.user_fallback_families();
+        let mut families: Vec<&str> = Vec::with_capacity(1 + fallbacks.len());
+        families.push(crate::fonts::embedded::geist::FAMILY);
+        for f in &fallbacks {
+            families.push(f.as_str());
+        }
 
-                let screen_tl =
-                    math2::vector2::transform([world_bounds.x, world_bounds.y], &view);
-                let screen_tr = math2::vector2::transform(
-                    [world_bounds.x + world_bounds.width, world_bounds.y],
-                    &view,
-                );
-                let screen_width = (screen_tr[0] - screen_tl[0]).abs();
+        // Iterate root nodes directly — no HashSet needed.
+        for &node_id in graph.roots() {
+            let world_bounds = match cache.geometry.get_world_bounds(&node_id) {
+                Some(b) => b,
+                None => continue,
+            };
 
-                if screen_width < min_width {
-                    continue;
-                }
+            let screen_tl =
+                math2::vector2::transform([world_bounds.x, world_bounds.y], &view);
+            let screen_tr = math2::vector2::transform(
+                [world_bounds.x + world_bounds.width, world_bounds.y],
+                &view,
+            );
+            let screen_width = (screen_tr[0] - screen_tl[0]).abs();
 
-                let label: &str = graph.get_name(&node_id).unwrap_or_else(|| {
-                    graph
-                        .get_node(&node_id)
-                        .map(|n| n.type_label())
-                        .unwrap_or("?")
-                });
-
-                let is_selected = surface.selection.contains(&node_id);
-                let color = if is_selected { ACCENT_COLOR } else { MUTED_COLOR };
-
-                let display_text = truncate_with_ellipsis(&font, label, screen_width);
-                let (text_width, _) = font.measure_str(&display_text, None);
-
-                let title_x = screen_tl[0];
-                let title_y = screen_tl[1] - title_height;
-
-                let mut paint = Paint::default();
-                paint.set_color(color);
-                paint.set_anti_alias(true);
-
-                let text_baseline_y =
-                    title_y + (title_height - metrics.1.ascent - metrics.1.descent) * 0.5;
-
-                canvas.draw_str(
-                    &display_text,
-                    Point::new(title_x, text_baseline_y),
-                    &font,
-                    &paint,
-                );
-
-                let hit_rect = Rect::from_xywh(title_x, title_y, text_width, title_height);
-                hit_regions.push(HitRegion {
-                    screen_rect: hit_rect,
-                    action: OverlayAction::SelectNode(node_id),
-                });
+            if screen_width < min_width {
+                continue;
             }
-        });
-    }
-}
 
-/// Truncate text with ellipsis if it exceeds max_width.
-/// Uses binary search on char boundaries (text width is monotonic).
-fn truncate_with_ellipsis(font: &Font, text: &str, max_width: f32) -> String {
-    if max_width <= 0.0 {
-        return String::new();
-    }
+            let label: &str = graph.get_name(&node_id).unwrap_or_else(|| {
+                graph
+                    .get_node(&node_id)
+                    .map(|n| n.type_label())
+                    .unwrap_or("?")
+            });
 
-    let (full_width, _) = font.measure_str(text, None);
-    if full_width <= max_width {
-        return text.to_string();
-    }
+            let is_selected = surface.selection.contains(&node_id);
+            let color = if is_selected { ACCENT_COLOR } else { MUTED_COLOR };
 
-    let ellipsis = "\u{2026}"; // …
-    let (ellipsis_width, _) = font.measure_str(ellipsis, None);
-    let target = max_width - ellipsis_width;
-    if target <= 0.0 {
-        return ellipsis.to_string();
-    }
+            // Build a single-line paragraph with ellipsis truncation
+            let mut paragraph_style = textlayout::ParagraphStyle::new();
+            paragraph_style.set_max_lines(1);
+            paragraph_style.set_ellipsis("\u{2026}");
+            paragraph_style.set_apply_rounding_hack(false);
 
-    // Collect char boundary indices for binary search
-    let boundaries: Vec<usize> = (1..=text.len())
-        .filter(|&i| text.is_char_boundary(i))
-        .collect();
+            let mut text_style = textlayout::TextStyle::new();
+            text_style.set_font_size(font_size);
+            text_style.set_font_families(&families);
+            text_style.set_font_style(skia_safe::FontStyle::new(
+                skia_safe::font_style::Weight::MEDIUM,
+                skia_safe::font_style::Width::NORMAL,
+                skia_safe::font_style::Slant::Upright,
+            ));
+            // Set explicit wght variation so variable fallback fonts
+            // (e.g. Noto Sans KR) render at Medium (500) weight,
+            // matching the primary Geist font.
+            let wght_coord = skia_safe::font_arguments::variation_position::Coordinate {
+                axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
+                value: 500.0,
+            };
+            let variation_position = skia_safe::font_arguments::VariationPosition {
+                coordinates: &[wght_coord],
+            };
+            let font_args = skia_safe::FontArguments::new()
+                .set_variation_design_position(variation_position);
+            text_style.set_font_arguments(&font_args);
+            let mut fg_paint = Paint::default();
+            fg_paint.set_color(color);
+            fg_paint.set_anti_alias(true);
+            text_style.set_foreground_paint(&fg_paint);
+            paragraph_style.set_text_style(&text_style);
 
-    if boundaries.is_empty() {
-        return ellipsis.to_string();
-    }
+            let mut builder =
+                textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
+            builder.push_style(&text_style);
+            builder.add_text(label);
+            let mut paragraph = builder.build();
+            paragraph.layout(screen_width);
 
-    // Binary search: find the largest boundary where text width <= target
-    let mut lo: usize = 0;
-    let mut hi = boundaries.len();
-    while lo < hi {
-        let mid = lo + (hi - lo) / 2;
-        let (w, _) = font.measure_str(&text[..boundaries[mid]], None);
-        if w <= target {
-            lo = mid + 1;
-        } else {
-            hi = mid;
+            let text_width = paragraph.max_intrinsic_width().min(screen_width);
+            let para_height = paragraph.height();
+
+            let title_x = screen_tl[0];
+            let title_y = screen_tl[1] - title_height;
+
+            // Vertically center the paragraph within the title bar
+            let text_y = title_y + (title_height - para_height) * 0.5;
+
+            paragraph.paint(canvas, Point::new(title_x, text_y));
+
+            let hit_rect = Rect::from_xywh(title_x, title_y, text_width, title_height);
+            hit_regions.push(HitRegion {
+                screen_rect: hit_rect,
+                action: OverlayAction::SelectNode(node_id),
+            });
         }
     }
-
-    if lo == 0 {
-        return ellipsis.to_string();
-    }
-
-    format!("{}{}", &text[..boundaries[lo - 1]], ellipsis)
 }
