@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fig2grida } from "@grida/io-figma/fig2grida-core";
 import { io } from "@grida/io";
 import { editor } from "@/grida-canvas";
@@ -9,7 +9,35 @@ import { distro } from "@/grida-canvas-hosted/distro";
 
 function validateExt(name: string) {
   const l = name.toLowerCase();
-  return l.endsWith(".fig") || l.endsWith(".json") || l.endsWith(".zip");
+  return (
+    l.endsWith(".fig") ||
+    l.endsWith(".json") ||
+    l.endsWith(".json.gz") ||
+    l.endsWith(".zip")
+  );
+}
+
+async function decompressGzip(buf: ArrayBuffer): Promise<ArrayBuffer> {
+  const ds = new DecompressionStream("gzip");
+  const writer = ds.writable.getWriter();
+  writer.write(new Uint8Array(buf));
+  writer.close();
+  const reader = ds.readable.getReader();
+  const chunks: Uint8Array[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  let total = 0;
+  for (const c of chunks) total += c.byteLength;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.byteLength;
+  }
+  return out.buffer;
 }
 
 export function useRefigEditor() {
@@ -92,7 +120,10 @@ export function useRefigEditor() {
         const lower = file.name.toLowerCase();
 
         let input: Uint8Array | object;
-        if (lower.endsWith(".json")) {
+        if (lower.endsWith(".json.gz")) {
+          const decompressed = await decompressGzip(buf);
+          input = JSON.parse(new TextDecoder().decode(decompressed)) as object;
+        } else if (lower.endsWith(".json")) {
           input = JSON.parse(new TextDecoder().decode(bytes)) as object;
         } else {
           input = bytes;

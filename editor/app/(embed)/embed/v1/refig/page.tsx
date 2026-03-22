@@ -36,21 +36,73 @@ function parseFileParam(
   return { ok: true, url: u.toString() };
 }
 
+/**
+ * Extract a filename hint from the `Content-Disposition` header.
+ * Handles both `filename="name.fig"` and `filename*=UTF-8''name.fig` forms.
+ */
+function parseContentDispositionFilename(
+  header: string | null
+): string | null {
+  if (!header) return null;
+  // RFC 6266 filename*= (UTF-8 encoded, preferred)
+  const starMatch = header.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
+  if (starMatch) return decodeURIComponent(starMatch[1]);
+  // Plain filename=
+  const plainMatch = header.match(/filename\s*=\s*"?([^";\s]+)"?/i);
+  if (plainMatch) return plainMatch[1];
+  return null;
+}
+
+const SUPPORTED_EXT_RE = /\.(fig|json\.gz|json|zip)$/i;
+
+/**
+ * Infer a usable filename from a remote URL + response headers.
+ *
+ * Resolution order (first match wins):
+ * 1. `Content-Disposition` header (handles signed/opaque URLs where the path is meaningless)
+ * 2. URL pathname extension
+ * 3. `Content-Type` / `Content-Encoding` header heuristics
+ * 4. Fallback to `.fig` for octet-stream / empty content-type
+ */
 function inferFilenameForRemote(
   url: string,
-  contentType: string | null
+  contentType: string | null,
+  contentDisposition: string | null = null,
+  contentEncoding: string | null = null
 ): string | null {
+  // 1. Content-Disposition (most reliable for signed URLs)
+  const cdName = parseContentDispositionFilename(contentDisposition);
+  if (cdName && SUPPORTED_EXT_RE.test(cdName)) {
+    return cdName;
+  }
+
+  // 2. URL pathname
   let pathName: string;
   try {
     pathName = new URL(url).pathname;
   } catch {
-    return null;
+    pathName = "";
   }
-  const base = pathName.split("/").pop() || "";
-  if (/\.(fig|json|zip)$/i.test(base)) {
+  const base = decodeURIComponent(pathName.split("/").pop() || "");
+  if (SUPPORTED_EXT_RE.test(base)) {
     return base;
   }
+
+  // 3. Content-Type / Content-Encoding heuristics
   const ct = (contentType || "").toLowerCase();
+  const ce = (contentEncoding || "").toLowerCase();
+
+  // gzip-compressed JSON (Content-Type: application/json + Content-Encoding: gzip,
+  // or Content-Type: application/gzip with a JSON hint in the URL/disposition)
+  if (
+    ct.includes("application/gzip") ||
+    ct.includes("application/x-gzip") ||
+    (ce.includes("gzip") &&
+      (ct.includes("application/json") || ct.includes("text/json")))
+  ) {
+    return "remote.json.gz";
+  }
+
   if (ct.includes("application/json") || ct.includes("text/json")) {
     return "remote.json";
   }
@@ -93,11 +145,13 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl: string }) {
           throw new Error(`Failed to fetch file (HTTP ${res.status})`);
         }
         const ct = res.headers.get("content-type");
+        const cd = res.headers.get("content-disposition");
+        const ce = res.headers.get("content-encoding");
         const buf = await res.arrayBuffer();
-        const inferred = inferFilenameForRemote(remoteFileUrl, ct);
+        const inferred = inferFilenameForRemote(remoteFileUrl, ct, cd, ce);
         if (!inferred) {
           throw new Error(
-            "Could not infer a supported extension (.fig, .json, .zip) from the URL or Content-Type"
+            "Could not infer a supported extension (.fig, .json, .json.gz, .zip) from the URL or Content-Type"
           );
         }
         const file = new File([buf], inferred, {

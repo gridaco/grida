@@ -13,7 +13,10 @@ import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { cn } from "@/components/lib/utils";
-import { useRefigEditor, validateExt } from "@/scaffolds/embed/use-refig-editor";
+import {
+  useRefigEditor,
+  validateExt,
+} from "@/scaffolds/embed/use-refig-editor";
 import { RefigCanvas, SceneSelector } from "@/scaffolds/embed/refig-shared";
 
 function RefigMarketing() {
@@ -167,7 +170,7 @@ function RefigDemoPage() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".fig,.json,.zip,application/json,application/zip"
+          accept=".fig,.json,.json.gz,.zip,application/json,application/gzip,application/zip"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -261,14 +264,12 @@ function RefigDemoPage() {
               className="relative min-h-0 flex-1"
               onDragEnter={(e) => {
                 e.preventDefault();
-                if (e.dataTransfer.types.includes("Files"))
-                  setDropActive(true);
+                if (e.dataTransfer.types.includes("Files")) setDropActive(true);
               }}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (e.dataTransfer.types.includes("Files"))
-                  setDropActive(true);
+                if (e.dataTransfer.types.includes("Files")) setDropActive(true);
               }}
               onDragLeave={(e) => {
                 e.preventDefault();
