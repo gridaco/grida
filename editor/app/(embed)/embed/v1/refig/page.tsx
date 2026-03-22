@@ -11,6 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useRefigEditor } from "@/scaffolds/embed/use-refig-editor";
 import { RefigCanvas } from "@/scaffolds/embed/refig-shared";
+import { useEmbedBridge } from "@/grida-canvas-react/use-embed-bridge";
 
 function parseFileParam(
   raw: string | null
@@ -40,9 +41,7 @@ function parseFileParam(
  * Extract a filename hint from the `Content-Disposition` header.
  * Handles both `filename="name.fig"` and `filename*=UTF-8''name.fig` forms.
  */
-function parseContentDispositionFilename(
-  header: string | null
-): string | null {
+function parseContentDispositionFilename(header: string | null): string | null {
   if (!header) return null;
   // RFC 6266 filename*= (UTF-8 encoded, preferred)
   const starMatch = header.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
@@ -118,7 +117,7 @@ function inferFilenameForRemote(
   return null;
 }
 
-function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl: string }) {
+function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
   const {
     editor: instance,
     fonts,
@@ -129,6 +128,8 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl: string }) {
     documentLoaded,
     onFile,
   } = useRefigEditor();
+
+  useEmbedBridge(instance, { documentLoaded, onFile });
 
   const remoteFetchGen = useRef(0);
 
@@ -203,8 +204,14 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl: string }) {
 
 function RefigEmbedContent() {
   const searchParams = useSearchParams();
-  const parsed = parseFileParam(searchParams.get("file"));
+  const raw = searchParams.get("file");
 
+  // `?file=` is optional — users can load files entirely via postMessage.
+  if (!raw) {
+    return <RefigEmbedInner />;
+  }
+
+  const parsed = parseFileParam(raw);
   if (!parsed.ok) {
     return (
       <div
