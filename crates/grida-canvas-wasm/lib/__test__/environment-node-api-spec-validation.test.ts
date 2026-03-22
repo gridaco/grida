@@ -45,9 +45,14 @@ const EXPECTED_FUNCTIONS = [
   // scene
   { name: "_load_scene_grida1", paramCount: 3 },
   { name: "_load_scene_grida", paramCount: 3 },
+  { name: "_switch_scene", paramCount: 3 },
   { name: "_apply_scene_transactions", paramCount: 3 },
   { name: "_load_dummy_scene", paramCount: 1 },
   { name: "_load_benchmark_scene", paramCount: 3 },
+
+  // images (lazy loading)
+  { name: "_drain_missing_images", paramCount: 1 },
+  { name: "_resolve_image", paramCount: 5 },
 
   // input
   { name: "_pointer_move", paramCount: 3 },

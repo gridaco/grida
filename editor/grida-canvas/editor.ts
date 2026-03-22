@@ -3356,6 +3356,13 @@ export class Editor
    */
   private _image_poll_timer: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * Callback invoked with image RIDs that the renderer needs but couldn't
+   * resolve locally. Set by the embed bridge (or any external image provider)
+   * to handle network-fetched images.
+   */
+  onUnresolvedImages: ((refs: string[]) => void) | null = null;
+
   private static __parse_image_ref_from_src(src: string): string {
     const raw = src.trim();
     if (
@@ -3416,7 +3423,7 @@ export class Editor
    *
    * @returns refs that were requested but not available locally
    */
-  _drainAndResolveImages(): string[] {
+  private _drainAndResolveImages(): string[] {
     if (!this._m_wasm_canvas_scene) return [];
 
     const missing = this._m_wasm_canvas_scene.drainMissingImages();
@@ -3441,7 +3448,10 @@ export class Editor
   }
 
   private _resolveImages(): void {
-    this._drainAndResolveImages();
+    const unresolved = this._drainAndResolveImages();
+    if (unresolved.length > 0 && this.onUnresolvedImages) {
+      this.onUnresolvedImages(unresolved);
+    }
   }
 
   __is_image_registered(ref: string): boolean {

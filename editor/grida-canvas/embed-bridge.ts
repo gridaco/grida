@@ -41,7 +41,6 @@ export class EmbedBridge {
   private onFile?: (file: File) => void;
   private messageHandler: (e: MessageEvent) => void;
   private unsubscribe: (() => void) | null = null;
-  private imagePollTimer: ReturnType<typeof setInterval> | null = null;
   private readySent = false;
 
   /**
@@ -78,7 +77,11 @@ export class EmbedBridge {
     if (this.readySent) return;
     this.readySent = true;
     this.post({ type: "grida:ready" });
-    this.startImagePoll();
+
+    // Hook into the editor's image poll — emit unresolved refs to host.
+    this.ed.onUnresolvedImages = (refs) => {
+      this.post({ type: "grida:images-needed", refs });
+    };
   }
 
   /** Remove all listeners and subscriptions. */
@@ -88,9 +91,8 @@ export class EmbedBridge {
       this.unsubscribe();
       this.unsubscribe = null;
     }
-    if (this.imagePollTimer) {
-      clearInterval(this.imagePollTimer);
-      this.imagePollTimer = null;
+    if (this.ed.onUnresolvedImages) {
+      this.ed.onUnresolvedImages = null;
     }
   }
 
@@ -191,20 +193,6 @@ export class EmbedBridge {
         break;
       }
     }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Image polling — emits grida:images-needed for unresolved refs
-  // ---------------------------------------------------------------------------
-
-  private startImagePoll(): void {
-    if (this.imagePollTimer) return;
-    this.imagePollTimer = setInterval(() => {
-      const unresolved = this.ed._drainAndResolveImages();
-      if (unresolved.length > 0) {
-        this.post({ type: "grida:images-needed", refs: unresolved });
-      }
-    }, 200);
   }
 
   // ---------------------------------------------------------------------------
