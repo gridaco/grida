@@ -5,7 +5,6 @@ use crate::runtime::camera::Camera2D;
 use crate::surface::state::SurfaceState;
 use crate::surface::ui::hit_region::{HitRegion, HitRegions, OverlayAction};
 use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, Point, RRect, Rect};
-use std::collections::HashSet;
 
 /// Selection overlay color (blue) — shared with SurfaceOverlay.
 const ACCENT_COLOR: Color = Color::from_argb(255, 0, 120, 255);
@@ -32,11 +31,37 @@ const TITLE_BAR_HEIGHT: f32 = 24.0;
 /// Minimum screen-space node width (logical px) to show a title bar.
 const MIN_TITLE_WIDTH: f32 = 20.0;
 
-fn make_font(size: f32) -> Font {
-    Font::new(
+thread_local! {
+    static FONT_SIZE_METER: Font = Font::new(
         crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES),
-        size,
-    )
+        SIZE_METER_FONT_SIZE,
+    );
+    static FONT_FRAME_TITLE: Font = Font::new(
+        crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES),
+        FRAME_TITLE_FONT_SIZE,
+    );
+
+    static ACCENT_FILL: Paint = {
+        let mut p = Paint::default();
+        p.set_color(ACCENT_COLOR);
+        p.set_style(PaintStyle::Fill);
+        p.set_anti_alias(true);
+        p
+    };
+    static WHITE_TEXT: Paint = {
+        let mut p = Paint::default();
+        p.set_color(Color::WHITE);
+        p.set_anti_alias(true);
+        p
+    };
+}
+
+/// Returns a scaled clone of a base font. The typeface is shared (ref-counted),
+/// only the size field changes — much cheaper than parsing bytes.
+fn scaled_font(base: &Font, dpr: f32) -> Font {
+    let mut f = base.clone();
+    f.set_size(base.size() * dpr);
+    f
 }
 
 pub struct SurfaceUI;
@@ -105,39 +130,33 @@ impl SurfaceUI {
             &view,
         );
 
-        let font = make_font(SIZE_METER_FONT_SIZE * dpr);
-        let pad_x = SIZE_METER_PAD_X * dpr;
-        let pad_y = SIZE_METER_PAD_Y * dpr;
-        let offset_y = SIZE_METER_OFFSET_Y * dpr;
-        let radius = SIZE_METER_RADIUS * dpr;
+        FONT_SIZE_METER.with(|base_font| {
+            let font = scaled_font(base_font, dpr);
+            let pad_x = SIZE_METER_PAD_X * dpr;
+            let pad_y = SIZE_METER_PAD_Y * dpr;
+            let offset_y = SIZE_METER_OFFSET_Y * dpr;
+            let radius = SIZE_METER_RADIUS * dpr;
 
-        let (text_width, _) = font.measure_str(&text, None);
-        let metrics = font.metrics();
-        let text_height = -metrics.1.ascent + metrics.1.descent;
+            let (text_width, _) = font.measure_str(&text, None);
+            let metrics = font.metrics();
+            let text_height = -metrics.1.ascent + metrics.1.descent;
 
-        let pill_w = text_width + pad_x * 2.0;
-        let pill_h = text_height + pad_y * 2.0;
-        // Web uses translate(-50%, -50%): pill center sits at (centerX, bottomY + offset)
-        let pill_x = bottom_center[0] - pill_w * 0.5;
-        let pill_y = bottom_center[1] + offset_y - pill_h * 0.5;
+            let pill_w = text_width + pad_x * 2.0;
+            let pill_h = text_height + pad_y * 2.0;
+            let pill_x = bottom_center[0] - pill_w * 0.5;
+            let pill_y = bottom_center[1] + offset_y - pill_h * 0.5;
 
-        let pill_rect = Rect::from_xywh(pill_x, pill_y, pill_w, pill_h);
-        let rrect = RRect::new_rect_xy(pill_rect, radius, radius);
+            let pill_rect = Rect::from_xywh(pill_x, pill_y, pill_w, pill_h);
+            let rrect = RRect::new_rect_xy(pill_rect, radius, radius);
 
-        // Background pill
-        let mut bg = Paint::default();
-        bg.set_color(ACCENT_COLOR);
-        bg.set_style(PaintStyle::Fill);
-        bg.set_anti_alias(true);
-        canvas.draw_rrect(rrect, &bg);
+            ACCENT_FILL.with(|bg| canvas.draw_rrect(rrect, bg));
 
-        // Text
-        let mut text_paint = Paint::default();
-        text_paint.set_color(Color::WHITE);
-        text_paint.set_anti_alias(true);
-        let text_x = pill_x + pad_x;
-        let text_y = pill_y + pad_y - metrics.1.ascent;
-        canvas.draw_str(&text, Point::new(text_x, text_y), &font, &text_paint);
+            WHITE_TEXT.with(|tp| {
+                let text_x = pill_x + pad_x;
+                let text_y = pill_y + pad_y - metrics.1.ascent;
+                canvas.draw_str(&text, Point::new(text_x, text_y), &font, tp);
+            });
+        });
     }
 
     /// Draw title labels above nodes and register hit regions for them.
@@ -150,82 +169,74 @@ impl SurfaceUI {
         graph: &SceneGraph,
         dpr: f32,
     ) {
-        // Title bars are shown only for root-level children (matching surface.tsx).
-        let mut title_nodes = HashSet::new();
-        for root_id in graph.roots() {
-            title_nodes.insert(*root_id);
-        }
-
-        let view = camera.view_matrix();
-        let font = make_font(FRAME_TITLE_FONT_SIZE * dpr);
-        let title_height = TITLE_BAR_HEIGHT * dpr;
-        let min_width = MIN_TITLE_WIDTH * dpr;
-
-        for &node_id in &title_nodes {
-            let world_bounds = match cache.geometry.get_world_bounds(&node_id) {
-                Some(b) => b,
-                None => continue,
-            };
-
-            // Transform top-left and top-right to screen space
-            let screen_tl =
-                math2::vector2::transform([world_bounds.x, world_bounds.y], &view);
-            let screen_tr = math2::vector2::transform(
-                [world_bounds.x + world_bounds.width, world_bounds.y],
-                &view,
-            );
-            let screen_width = (screen_tr[0] - screen_tl[0]).abs();
-
-            if screen_width < min_width {
-                continue;
-            }
-
-            // Get node display name, falling back to type label
-            let label: &str = graph.get_name(&node_id).unwrap_or_else(|| {
-                graph
-                    .get_node(&node_id)
-                    .map(|n| n.type_label())
-                    .unwrap_or("?")
-            });
-
-            let is_selected = surface.selection.contains(&node_id);
-            let color = if is_selected { ACCENT_COLOR } else { MUTED_COLOR };
-
-            let display_text = truncate_with_ellipsis(&font, label, screen_width);
-            let (text_width, _) = font.measure_str(&display_text, None);
-
-            let title_x = screen_tl[0];
-            let title_y = screen_tl[1] - title_height;
-
-            // Draw text
-            let mut paint = Paint::default();
-            paint.set_color(color);
-            paint.set_anti_alias(true);
-
+        FONT_FRAME_TITLE.with(|base_font| {
+            let font = scaled_font(base_font, dpr);
+            let title_height = TITLE_BAR_HEIGHT * dpr;
+            let min_width = MIN_TITLE_WIDTH * dpr;
+            let view = camera.view_matrix();
             let metrics = font.metrics();
-            // Skia ascent is negative. To center text in the title bar:
-            // baseline = box_center - (ascent + descent) / 2
-            let text_baseline_y =
-                title_y + (title_height - metrics.1.ascent - metrics.1.descent) * 0.5;
 
-            canvas.draw_str(
-                &display_text,
-                Point::new(title_x, text_baseline_y),
-                &font,
-                &paint,
-            );
+            // Iterate root nodes directly — no HashSet needed.
+            for &node_id in graph.roots() {
+                let world_bounds = match cache.geometry.get_world_bounds(&node_id) {
+                    Some(b) => b,
+                    None => continue,
+                };
 
-            // Hit region fits the text, not the full node width
-            let hit_rect = Rect::from_xywh(title_x, title_y, text_width, title_height);
-            hit_regions.push(HitRegion {
-                screen_rect: hit_rect,
-                action: OverlayAction::SelectNode(node_id),
-            });
-        }
+                let screen_tl =
+                    math2::vector2::transform([world_bounds.x, world_bounds.y], &view);
+                let screen_tr = math2::vector2::transform(
+                    [world_bounds.x + world_bounds.width, world_bounds.y],
+                    &view,
+                );
+                let screen_width = (screen_tr[0] - screen_tl[0]).abs();
+
+                if screen_width < min_width {
+                    continue;
+                }
+
+                let label: &str = graph.get_name(&node_id).unwrap_or_else(|| {
+                    graph
+                        .get_node(&node_id)
+                        .map(|n| n.type_label())
+                        .unwrap_or("?")
+                });
+
+                let is_selected = surface.selection.contains(&node_id);
+                let color = if is_selected { ACCENT_COLOR } else { MUTED_COLOR };
+
+                let display_text = truncate_with_ellipsis(&font, label, screen_width);
+                let (text_width, _) = font.measure_str(&display_text, None);
+
+                let title_x = screen_tl[0];
+                let title_y = screen_tl[1] - title_height;
+
+                let mut paint = Paint::default();
+                paint.set_color(color);
+                paint.set_anti_alias(true);
+
+                let text_baseline_y =
+                    title_y + (title_height - metrics.1.ascent - metrics.1.descent) * 0.5;
+
+                canvas.draw_str(
+                    &display_text,
+                    Point::new(title_x, text_baseline_y),
+                    &font,
+                    &paint,
+                );
+
+                let hit_rect = Rect::from_xywh(title_x, title_y, text_width, title_height);
+                hit_regions.push(HitRegion {
+                    screen_rect: hit_rect,
+                    action: OverlayAction::SelectNode(node_id),
+                });
+            }
+        });
     }
 }
 
 /// Truncate text with ellipsis if it exceeds max_width.
+/// Uses binary search on char boundaries (text width is monotonic).
 fn truncate_with_ellipsis(font: &Font, text: &str, max_width: f32) -> String {
     if max_width <= 0.0 {
         return String::new();
@@ -243,16 +254,31 @@ fn truncate_with_ellipsis(font: &Font, text: &str, max_width: f32) -> String {
         return ellipsis.to_string();
     }
 
-    // Trim from the end until it fits
-    for end in (1..=text.len()).rev() {
-        if !text.is_char_boundary(end) {
-            continue;
-        }
-        let (w, _) = font.measure_str(&text[..end], None);
+    // Collect char boundary indices for binary search
+    let boundaries: Vec<usize> = (1..=text.len())
+        .filter(|&i| text.is_char_boundary(i))
+        .collect();
+
+    if boundaries.is_empty() {
+        return ellipsis.to_string();
+    }
+
+    // Binary search: find the largest boundary where text width <= target
+    let mut lo: usize = 0;
+    let mut hi = boundaries.len();
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        let (w, _) = font.measure_str(&text[..boundaries[mid]], None);
         if w <= target {
-            return format!("{}{}", &text[..end], ellipsis);
+            lo = mid + 1;
+        } else {
+            hi = mid;
         }
     }
 
-    ellipsis.to_string()
+    if lo == 0 {
+        return ellipsis.to_string();
+    }
+
+    format!("{}{}", &text[..boundaries[lo - 1]], ellipsis)
 }

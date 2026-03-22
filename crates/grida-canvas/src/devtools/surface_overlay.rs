@@ -5,7 +5,7 @@ use crate::runtime::camera::Camera2D;
 use crate::sk;
 use crate::surface::gesture::SurfaceGesture;
 use crate::surface::state::SurfaceState;
-use skia_safe::{Canvas, Color, Paint, PaintStyle, PathEffect};
+use skia_safe::{Canvas, Color, Matrix, Paint, PaintStyle, PathEffect};
 
 /// Selection overlay color (blue).
 const SELECTION_COLOR: Color = Color::from_argb(255, 0, 120, 255);
@@ -54,6 +54,7 @@ impl SurfaceOverlay {
         config: &SurfaceOverlayConfig,
     ) {
         let use_text_baseline = config.text_baseline_decoration;
+        let view_sk = sk::sk_matrix(camera.view_matrix().matrix);
 
         // Draw hover highlight
         if let Some(hovered_id) = surface.hover.hovered() {
@@ -61,7 +62,7 @@ impl SurfaceOverlay {
             if !surface.selection.contains(hovered_id) {
                 // Hover: text nodes show baseline only (no bounding rect)
                 Self::draw_node_outline(
-                    canvas, hovered_id, camera, cache, HOVER_COLOR, 1.5, use_text_baseline,
+                    canvas, hovered_id, &view_sk, cache, HOVER_COLOR, 1.5, use_text_baseline,
                 );
             }
         }
@@ -72,15 +73,15 @@ impl SurfaceOverlay {
             for id in surface.selection.iter() {
                 // Selection: always draw bounding rect
                 Self::draw_node_outline(
-                    canvas, id, camera, cache, SELECTION_COLOR, 1.5, false,
+                    canvas, id, &view_sk, cache, SELECTION_COLOR, 1.5, false,
                 );
                 // Selection: additionally draw text baseline decoration
                 if use_text_baseline {
-                    Self::draw_text_baseline(canvas, id, camera, cache, SELECTION_COLOR);
+                    Self::draw_text_baseline(canvas, id, &view_sk, cache, SELECTION_COLOR);
                 }
             }
             if sel_count > 1 {
-                Self::draw_group_bounding_rect(canvas, surface, camera, cache);
+                Self::draw_group_bounding_rect(canvas, surface, &view_sk, cache);
             }
         }
 
@@ -90,7 +91,7 @@ impl SurfaceOverlay {
             current_canvas,
         } = &surface.gesture
         {
-            Self::draw_marquee(canvas, camera, *anchor_canvas, *current_canvas);
+            Self::draw_marquee(canvas, &view_sk, *anchor_canvas, *current_canvas);
         }
     }
 
@@ -101,7 +102,7 @@ impl SurfaceOverlay {
     fn draw_node_outline(
         canvas: &Canvas,
         id: &crate::node::schema::NodeId,
-        camera: &Camera2D,
+        view_sk: &Matrix,
         cache: &SceneCache,
         color: Color,
         stroke_width: f32,
@@ -135,7 +136,7 @@ impl SurfaceOverlay {
         };
 
         path = path.make_transform(&sk::sk_matrix(transform.matrix));
-        path = path.make_transform(&sk::sk_matrix(camera.view_matrix().matrix));
+        path = path.make_transform(view_sk);
 
         let mut paint = Paint::default();
         paint.set_color(color);
@@ -150,7 +151,7 @@ impl SurfaceOverlay {
     fn draw_text_baseline(
         canvas: &Canvas,
         id: &crate::node::schema::NodeId,
-        camera: &Camera2D,
+        view_sk: &Matrix,
         cache: &SceneCache,
         color: Color,
     ) {
@@ -173,7 +174,7 @@ impl SurfaceOverlay {
         let transform = layer_entry.layer.transform();
         let mut path = baseline_path;
         path = path.make_transform(&sk::sk_matrix(transform.matrix));
-        path = path.make_transform(&sk::sk_matrix(camera.view_matrix().matrix));
+        path = path.make_transform(view_sk);
 
         let mut paint = Paint::default();
         paint.set_color(color);
@@ -188,7 +189,7 @@ impl SurfaceOverlay {
     fn draw_group_bounding_rect(
         canvas: &Canvas,
         surface: &SurfaceState,
-        camera: &Camera2D,
+        view_sk: &Matrix,
         cache: &SceneCache,
     ) {
         let rects: Vec<math2::rect::Rectangle> = surface
@@ -202,9 +203,8 @@ impl SurfaceOverlay {
         }
 
         let union = math2::rect::union(&rects);
-        let view = sk::sk_matrix(camera.view_matrix().matrix);
-        let p1 = view.map_point((union.x, union.y));
-        let p2 = view.map_point((union.x + union.width, union.y + union.height));
+        let p1 = view_sk.map_point((union.x, union.y));
+        let p2 = view_sk.map_point((union.x + union.width, union.y + union.height));
         let screen_rect = skia_safe::Rect::from_ltrb(
             p1.x.min(p2.x),
             p1.y.min(p2.y),
@@ -223,7 +223,7 @@ impl SurfaceOverlay {
 
     fn draw_marquee(
         canvas: &Canvas,
-        camera: &Camera2D,
+        view_sk: &Matrix,
         anchor: math2::vector2::Vector2,
         current: math2::vector2::Vector2,
     ) {
@@ -236,10 +236,8 @@ impl SurfaceOverlay {
             return;
         }
 
-        // Transform marquee corners from canvas space to screen space
-        let view = sk::sk_matrix(camera.view_matrix().matrix);
-        let p1 = view.map_point((x, y));
-        let p2 = view.map_point((x + w, y + h));
+        let p1 = view_sk.map_point((x, y));
+        let p2 = view_sk.map_point((x + w, y + h));
         let screen_rect = skia_safe::Rect::from_ltrb(
             p1.x.min(p2.x),
             p1.y.min(p2.y),
