@@ -1,0 +1,62 @@
+# -----------------------------------------------------------------
+# Freshness check for committed FlatBuffers bindings
+# -----------------------------------------------------------------
+#
+# Why this exists
+# ---------------
+# The Rust FlatBuffers bindings (`crates/grida-canvas/src/io/generated/grida.rs`)
+# are committed to git so that `cargo build` works from a clean checkout without
+# requiring `flatc`. However, because the file is generated from `format/grida.fbs`,
+# it can become stale if someone edits the schema but forgets to regenerate.
+#
+# This workflow re-runs codegen and asserts that the committed file is identical
+# to what `flatc` would produce. If it differs, the check fails with a clear
+# error message telling the contributor how to fix it.
+#
+# When does it run
+# ----------------
+# Only on PRs / pushes that touch the schema, the generated output, the codegen
+# tooling, or the TS format package (which shares the same schema source).
+#
+# How to fix a failure
+# --------------------
+#   pnpm --filter @crates/grida-canvas generate
+#   git add crates/grida-canvas/src/io/generated/grida.rs
+#   git commit
+# -----------------------------------------------------------------
+
+name: check generated flatbuffers
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "format/grida.fbs"
+      - "crates/grida-canvas/src/io/generated/**"
+      - "packages/grida-format/src/**"
+      - "bin/activate-flatc"
+
+jobs:
+  rust-bindings:
+    name: rust fbs freshness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Regenerate Rust FlatBuffers bindings
+        run: |
+          python3 bin/activate-flatc -- --rust \
+            -o crates/grida-canvas/src/io/generated \
+            format/grida.fbs
+          mv crates/grida-canvas/src/io/generated/grida_generated.rs \
+             crates/grida-canvas/src/io/generated/grida.rs
+
+      - name: Check for uncommitted changes
+        run: |
+          if ! git diff --exit-code crates/grida-canvas/src/io/generated/grida.rs; then
+            echo "::error::Generated Rust FlatBuffers bindings are stale. Run 'pnpm --filter @crates/grida-canvas generate' and commit the result."
+            exit 1
+          fi

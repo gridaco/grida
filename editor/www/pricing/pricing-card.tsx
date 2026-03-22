@@ -16,11 +16,12 @@ export function PricingCard({
   features = [],
   action,
 }: {
-  //
   plan: string;
   price: {
     primary: string;
     secondary?: string;
+    /** Small muted note under price (e.g. "Starts from $599/mo") */
+    note?: string;
   };
   excerpt: string;
   highlight?: boolean;
@@ -35,12 +36,12 @@ export function PricingCard({
         bg-background
         dark:bg-muted/50
         flex-1 flex flex-col p-6 border gap-4 rounded-lg
-        md:h-[570px]
+        min-h-[480px] md:h-[570px]
         hover:scale-[1.02]
         duration-300
         transition-all
         shadow
-        justify-between
+        justify-between overflow-hidden
         "
     >
       {highlight && (
@@ -49,21 +50,26 @@ export function PricingCard({
       <div className="flex-[2] flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <span className="text-2xl font-semibold">{plan}</span>
-          <span className=" text-sm font-normal text-muted-foreground">
+          <span className="text-sm font-normal text-muted-foreground">
             {excerpt}
           </span>
         </div>
-        <div className="my-2">
-          <span className="text-4xl font-bold">{price.primary}</span>
-          {price.secondary && (
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {price.secondary}
-            </span>
+        <div className="my-2 flex flex-col gap-0.5">
+          <div>
+            <span className="text-4xl font-bold">{price.primary}</span>
+            {price.secondary && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                {price.secondary}
+              </span>
+            )}
+          </div>
+          {price.note && (
+            <span className="text-xs text-muted-foreground">{price.note}</span>
           )}
         </div>
         <hr />
       </div>
-      <div className="flex-[3] flex flex-col gap-3">
+      <div className="flex-[3] flex min-h-0 shrink flex-col gap-3">
         {features.map((feature, i) => (
           <PricingFeatureRow key={i} {...feature} />
         ))}
@@ -86,15 +92,14 @@ export function PricingCardButton({
   );
 }
 
-export function PricingFeatureRow({
-  name,
-  trail: number,
-}: PricingCardFeatureItem) {
+export function PricingFeatureRow({ name, trail }: PricingCardFeatureItem) {
   return (
     <div className="flex items-center w-full gap-2">
       <CheckIcon />
       <span className="flex-1 text-sm">{name}</span>
-      <span className="opacity-50 text-sm">{number}</span>
+      {trail != null && (
+        <span className="opacity-50 text-sm shrink-0">{trail}</span>
+      )}
     </div>
   );
 }

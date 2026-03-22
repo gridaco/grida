@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+    <title>Paths</title>
+    <desc>L0 test fixture for paths</desc>
+    <!-- Background -->
+    <rect width="1000" height="1000" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+        .grid { stroke: #eee; stroke-width: 1; }
+        .ref { fill: red; r: 2; }
+    </style>
+
+    <!-- 1. Absolute vs Relative Commands & H/V -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">Absolute (M, L, C)</text>
+        <path d="M 0 50 L 25 0 C 50 0, 75 100, 100 50" fill="none" stroke="blue" stroke-width="2"/>
+    </g>
+    <g transform="translate(250, 50)">
+        <text x="0" y="-10" class="label">Relative (m, l, c)</text>
+        <path d="M 0 50 m 0 0 l 25 -50 c 25 0, 50 100, 75 50" fill="none" stroke="green"
+            stroke-width="2"/>
+    </g>
+    <g transform="translate(450, 50)">
+        <text x="0" y="-10" class="label">Horizontal/Vertical (H, V, h, v)</text>
+        <path d="M 0 0 H 50 V 50 h 50 v -50" fill="none" stroke="purple" stroke-width="2"/>
+    </g>
+
+    <!-- 2. Smooth Curves (S, T) -->
+    <g transform="translate(700, 50)">
+        <text x="0" y="-10" class="label">Smooth Cubic (C -> S)</text>
+        <path d="M 0 50 C 20 0, 40 0, 50 50 S 80 100, 100 50" fill="none" stroke="red"
+            stroke-width="2"/>
+        <circle cx="20" cy="0" class="ref"/>
+        <circle cx="40" cy="0" class="ref"/>
+        <circle cx="80" cy="100" class="ref"/>
+    </g>
+    <g transform="translate(850, 50)">
+        <text x="0" y="-10" class="label">Smooth Quad (Q -> T)</text>
+        <path d="M 0 50 Q 25 0, 50 50 T 100 50" fill="none" stroke="orange" stroke-width="2"/>
+        <circle cx="25" cy="0" class="ref"/>
+    </g>
+
+    <!-- 3. Arcs (Large Arc & Sweep Flags) -->
+    <g transform="translate(50, 200)">
+        <text x="0" y="-10" class="label">Arcs (A rx ry x-rot large-arc sweep x y)</text>
+        <!-- Start point for all arcs -->
+        <circle cx="50" cy="50" class="ref"/>
+        <circle cx="100" cy="50" class="ref"/>
+
+        <path d="M 50 50 A 30 40 0 0 0 100 50" fill="none" stroke="blue" stroke-width="2"/>
+        <text x="50" y="100" class="label">0 0</text>
+
+        <path d="M 50 50 A 30 40 0 1 0 100 50" fill="none" stroke="red" stroke-width="2"/>
+        <text x="100" y="100" class="label">1 0</text>
+
+        <path d="M 50 50 A 30 40 0 0 1 100 50" fill="none" stroke="green" stroke-width="2"/>
+        <text x="50" y="10" class="label">0 1</text>
+
+        <path d="M 50 50 A 30 40 0 1 1 100 50" fill="none" stroke="orange" stroke-width="2"/>
+        <text x="100" y="10" class="label">1 1</text>
+    </g>
+
+    <!-- 4. Closed vs Unclosed Paths (Impact on Stroke Joins) -->
+    <g transform="translate(350, 200)">
+        <text x="0" y="-10" class="label">Unclosed (ends at start, no Z)</text>
+        <!-- Notice the bottom-left corner does not have a proper join because it's just two end
+        caps -->
+        <path d="M 0 80 L 50 0 L 100 80 L 0 80" fill="none" stroke="black" stroke-width="15"
+            stroke-linejoin="miter"/>
+    </g>
+    <g transform="translate(600, 200)">
+        <text x="0" y="-10" class="label">Closed (with Z)</text>
+        <!-- Notice the bottom-left corner has a proper miter join -->
+        <path d="M 0 80 L 50 0 L 100 80 Z" fill="none" stroke="black" stroke-width="15"
+            stroke-linejoin="miter"/>
+    </g>
+
+    <!-- 5. Multiple Subpaths & Fill Rules -->
+    <g transform="translate(50, 380)">
+        <text x="0" y="-10" class="label">Multiple Subpaths (nonzero)</text>
+        <!-- Outer square clockwise, inner square clockwise -> filled -->
+        <path d="M 0 0 L 100 0 L 100 100 L 0 100 Z M 25 25 L 75 25 L 75 75 L 25 75 Z"
+            fill="purple" fill-rule="nonzero" stroke="black"/>
+    </g>
+    <g transform="translate(250, 380)">
+        <text x="0" y="-10" class="label">Multiple Subpaths (evenodd)</text>
+        <!-- Outer square clockwise, inner square clockwise -> hole -->
+        <path d="M 0 0 L 100 0 L 100 100 L 0 100 Z M 25 25 L 75 25 L 75 75 L 25 75 Z"
+            fill="purple" fill-rule="evenodd" stroke="black"/>
+    </g>
+    <g transform="translate(450, 380)">
+        <text x="0" y="-10" class="label">Opposite Winding (nonzero)</text>
+        <!-- Outer square clockwise, inner square counter-clockwise -> hole -->
+        <path d="M 0 0 L 100 0 L 100 100 L 0 100 Z M 25 25 L 25 75 L 75 75 L 75 25 Z"
+            fill="purple" fill-rule="nonzero" stroke="black"/>
+    </g>
+
+    <!-- 6. Stroke Caps -->
+    <g transform="translate(50, 550)">
+        <text x="0" y="-10" class="label">stroke-linecap</text>
+        <path d="M 0 10 L 100 10" stroke="black" stroke-width="10" stroke-linecap="butt"/>
+        <text x="120" y="15" class="label">butt</text>
+
+        <path d="M 0 30 L 100 30" stroke="black" stroke-width="10" stroke-linecap="round"/>
+        <text x="120" y="35" class="label">round</text>
+
+        <path d="M 0 50 L 100 50" stroke="black" stroke-width="10" stroke-linecap="square"/>
+        <text x="120" y="55" class="label">square</text>
+
+        <path d="M 0 0 L 0 60 M 100 0 L 100 60" stroke="red" stroke-width="1"/>
+    </g>
+
+    <!-- 7. Stroke Joins -->
+    <g transform="translate(300, 550)">
+        <text x="0" y="-10" class="label">stroke-linejoin</text>
+        <path d="M 0 50 L 25 10 L 50 50" stroke="black" stroke-width="10" fill="none"
+            stroke-linejoin="miter"/>
+        <text x="15" y="70" class="label">miter</text>
+
+        <path d="M 60 50 L 85 10 L 110 50" stroke="black" stroke-width="10" fill="none"
+            stroke-linejoin="round"/>
+        <text x="75" y="70" class="label">round</text>
+
+        <path d="M 120 50 L 145 10 L 170 50" stroke="black" stroke-width="10" fill="none"
+            stroke-linejoin="bevel"/>
+        <text x="135" y="70" class="label">bevel</text>
+    </g>
+
+    <!-- 8. Implicit Commands -->
+    <g transform="translate(50, 700)">
+        <text x="0" y="-10" class="label">Implicit L after M</text>
+        <!-- M 0 0 50 50 100 0 implies M 0 0 L 50 50 L 100 0 -->
+        <path d="M 0 0 50 50 100 0" fill="none" stroke="black" stroke-width="2"/>
+    </g>
+
+</svg>

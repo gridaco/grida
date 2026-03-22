@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+    <title>Viewbox Aspect Ratio</title>
+    <desc>L0 test fixture for viewbox-aspect-ratio</desc>
+    <!-- Background -->
+    <rect width="800" height="600" fill="#ffffff"/>
+
+    <style>
+        .label { font-family: monospace; font-size: 12px; fill: #666; }
+        .viewport-border { fill: none; stroke: red; stroke-width: 2; stroke-dasharray: 4; }
+    </style>
+
+    <defs>
+        <!-- The content we will map into different viewports -->
+        <g id="content">
+            <rect x="0" y="0" width="100" height="100" fill="#ecf0f1" stroke="#bdc3c7"
+                stroke-width="2"/>
+            <circle cx="50" cy="50" r="40" fill="#3498db"/>
+            <path d="M 20 20 L 80 80 M 80 20 L 20 80" stroke="#2c3e50" stroke-width="4"/>
+        </g>
+    </defs>
+
+    <!-- 1. preserveAspectRatio="none" (Stretching) -->
+    <g transform="translate(50, 50)">
+        <text x="0" y="-10" class="label">none (stretch to fill 200x100)</text>
+        <rect width="200" height="100" class="viewport-border"/>
+        <svg width="200" height="100" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <use href="#content"/>
+        </svg>
+    </g>
+
+    <!-- 2. preserveAspectRatio="xMidYMid meet" (Default, uniform scale, fit inside) -->
+    <g transform="translate(300, 50)">
+        <text x="0" y="-10" class="label">xMidYMid meet (default, fit inside)</text>
+        <rect width="200" height="100" class="viewport-border"/>
+        <svg width="200" height="100" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+            <use href="#content"/>
+        </svg>
+    </g>
+
+    <!-- 3. preserveAspectRatio="xMinYMin meet" (Align top-left) -->
+    <g transform="translate(550, 50)">
+        <text x="0" y="-10" class="label">xMinYMin meet (align top-left)</text>
+        <rect width="200" height="100" class="viewport-border"/>
+        <svg width="200" height="100" viewBox="0 0 100 100" preserveAspectRatio="xMinYMin meet">
+            <use href="#content"/>
+        </svg>
+    </g>
+
+    <!-- 4. preserveAspectRatio="xMidYMid slice" (Uniform scale, fill box, clip) -->
+    <g transform="translate(50, 250)">
+        <text x="0" y="-10" class="label">xMidYMid slice (fill and clip)</text>
+        <rect width="200" height="100" class="viewport-border"/>
+        <svg width="200" height="100" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+            <use href="#content"/>
+        </svg>
+    </g>
+
+    <!-- 5. preserveAspectRatio="xMaxYMax slice" (Align bottom-right, fill box, clip) -->
+    <g transform="translate(300, 250)">
+        <text x="0" y="-10" class="label">xMaxYMax slice (align bottom-right)</text>
+        <rect width="200" height="100" class="viewport-border"/>
+        <svg width="200" height="100" viewBox="0 0 100 100" preserveAspectRatio="xMaxYMax slice">
+            <use href="#content"/>
+        </svg>
+    </g>
+
+    <!-- 6. Negative ViewBox values (Offsetting the origin) -->
+    <g transform="translate(550, 250)">
+        <text x="0" y="-10" class="label">viewBox="-50 -50 200 200" (Offset origin)</text>
+        <rect width="200" height="200" class="viewport-border"/>
+        <svg width="200" height="200" viewBox="-50 -50 200 200">
+            <use href="#content"/>
+        </svg>
+    </g>
+
+</svg>

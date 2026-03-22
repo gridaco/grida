@@ -15,21 +15,21 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn emscripten_request_animation_frame(
         cb: ::std::option::Option<
-            unsafe extern "C" fn(time: f64, userData: *mut ::std::os::raw::c_void) -> bool,
+            unsafe extern "C" fn(time: f64, user_data: *mut ::std::os::raw::c_void) -> bool,
         >,
-        userData: *mut ::std::os::raw::c_void,
+        user_data: *mut ::std::os::raw::c_void,
     ) -> ::std::os::raw::c_int;
 }
 
 unsafe extern "C" {
-    pub fn emscripten_cancel_animation_frame(requestAnimationFrameId: ::std::os::raw::c_int);
+    pub fn emscripten_cancel_animation_frame(request_animation_frame_id: ::std::os::raw::c_int);
 }
 
 unsafe extern "C" {
     pub fn emscripten_request_animation_frame_loop(
         cb: ::std::option::Option<
-            unsafe extern "C" fn(time: f64, userData: *mut ::std::os::raw::c_void) -> bool,
+            unsafe extern "C" fn(time: f64, user_data: *mut ::std::os::raw::c_void) -> bool,
         >,
-        userData: *mut ::std::os::raw::c_void,
+        user_data: *mut ::std::os::raw::c_void,
     );
 }

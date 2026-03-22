@@ -108,7 +108,7 @@ fn main() {
         text_decoration_color: Some(CGColor::BLUE),
         text_decoration_style: None,
         text_decoration_skip_ink: None,
-        text_decoration_thinkness: None,
+        text_decoration_thickness: None,
     });
     let mut ts = textstyle(&style, &None);
     ts.set_foreground_paint(&paint);

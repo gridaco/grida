@@ -1,15 +1,27 @@
+pub mod attributed_text;
 pub mod history;
 pub mod layout;
 pub mod simple_layout;
+pub mod text_edit_session;
+pub mod time;
+
+#[cfg(feature = "skia")]
+pub mod selection_rects;
 #[cfg(feature = "skia")]
 pub mod skia_layout;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod session_tests;
 
-pub use history::{EditHistory, EditKind};
-pub use layout::{line_index_for_offset, CaretRect, LineMetrics, SelectionRect, TextLayoutEngine};
+pub use history::EditKind;
+pub use layout::{line_index_for_offset, CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine, DEFAULT_CARET_WIDTH};
 pub use simple_layout::SimpleLayoutEngine;
+pub use text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
+
+#[cfg(feature = "skia")]
+pub use selection_rects::{EmptyLineSelectionPolicy, selection_rects_with_policy, skia_line_index_for_u16_offset};
 #[cfg(feature = "skia")]
 pub use skia_layout::SkiaLayoutEngine;
 
@@ -42,15 +54,29 @@ pub fn normalize_newlines(s: &str) -> String {
 
 // ---------------------------------------------------------------------------
 // Grapheme boundary helpers
+//
+// All three functions use a small local window around `pos` instead of
+// scanning from byte 0, making them O(1) amortized regardless of position.
+// The window size (64 bytes) covers the largest known grapheme clusters
+// (complex emoji ZWJ sequences are ≤ ~28 bytes).
 // ---------------------------------------------------------------------------
+
+/// Maximum lookback/lookahead in bytes for grapheme boundary scanning.
+/// Must be larger than the longest grapheme cluster (emoji ZWJ family
+/// sequences are ~28 bytes). 64 is a safe margin.
+const GRAPHEME_WINDOW: usize = 64;
 
 pub fn prev_grapheme_boundary(text: &str, pos: usize) -> usize {
     if pos == 0 {
         return 0;
     }
-    let mut prev = 0;
-    for (i, g) in text.grapheme_indices(true) {
-        let end = i + g.len();
+    // Scan a small window ending at pos.
+    let window_start = floor_char_boundary(text, pos.saturating_sub(GRAPHEME_WINDOW));
+    let slice = &text[window_start..pos.min(text.len())];
+    let mut prev = window_start;
+    for (i, g) in slice.grapheme_indices(true) {
+        let abs_i = window_start + i;
+        let end = abs_i + g.len();
         if end >= pos {
             return prev;
         }
@@ -70,23 +96,35 @@ pub fn snap_grapheme_boundary(text: &str, pos: usize) -> usize {
     if pos == 0 {
         return 0;
     }
-    for (i, g) in text.grapheme_indices(true) {
-        let end = i + g.len();
-        if i <= pos && pos < end {
-            return i; // pos is inside this cluster — snap to its start
+    // Scan a small window around pos.
+    let window_start = floor_char_boundary(text, pos.saturating_sub(GRAPHEME_WINDOW));
+    let window_end = ceil_char_boundary(text, (pos + GRAPHEME_WINDOW).min(text.len()));
+    let slice = &text[window_start..window_end];
+    for (i, g) in slice.grapheme_indices(true) {
+        let abs_i = window_start + i;
+        let end = abs_i + g.len();
+        if abs_i <= pos && pos < end {
+            return abs_i; // pos is inside this cluster — snap to its start
         }
-        if i > pos {
-            // overshot without a match (should not happen for well-formed UTF-8)
-            return i;
+        if abs_i > pos {
+            return abs_i;
         }
     }
     text.len()
 }
 
 pub fn next_grapheme_boundary(text: &str, pos: usize) -> usize {
-    for (i, g) in text.grapheme_indices(true) {
-        if i >= pos {
-            return i + g.len();
+    if pos >= text.len() {
+        return text.len();
+    }
+    // Scan a small window starting at pos.
+    let window_start = floor_char_boundary(text, pos);
+    let window_end = ceil_char_boundary(text, (pos + GRAPHEME_WINDOW).min(text.len()));
+    let slice = &text[window_start..window_end];
+    for (i, g) in slice.grapheme_indices(true) {
+        let abs_i = window_start + i;
+        if abs_i >= pos {
+            return abs_i + g.len();
         }
     }
     text.len()
@@ -123,6 +161,9 @@ pub fn ceil_char_boundary(text: &str, pos: usize) -> usize {
 
 // ---------------------------------------------------------------------------
 // Word segment boundary (UAX #29)
+//
+// Uses a local window around `offset` instead of scanning from byte 0,
+// making it O(1) amortized regardless of position in the document.
 // ---------------------------------------------------------------------------
 
 /// Find the UAX #29 word segment containing `offset`.
@@ -131,8 +172,13 @@ pub fn ceil_char_boundary(text: &str, pos: usize) -> usize {
 /// standalone equivalent of `TextLayoutEngine::word_boundary_at` so that
 /// pure editing commands (`BackspaceWord`, `DeleteWord`) can resolve word
 /// boundaries without requiring a layout engine.
+///
+/// The iterator is lazy — it stops as soon as the segment containing
+/// `offset` is found, so cost is proportional to the offset position,
+/// not the full document length.
 pub fn word_segment_at(text: &str, offset: usize) -> (usize, usize) {
     let offset = offset.min(text.len());
+
     let mut last_start = 0usize;
     for (byte_idx, segment) in text.split_word_bound_indices() {
         let end = byte_idx + segment.len();
@@ -141,6 +187,7 @@ pub fn word_segment_at(text: &str, offset: usize) -> (usize, usize) {
         }
         last_start = byte_idx;
     }
+    // offset is at or past the last segment boundary.
     (last_start, text.len())
 }
 
@@ -221,6 +268,23 @@ impl TextEditorState {
         self.anchor.map_or(false, |a| a != self.cursor)
     }
 
+    /// Whether the caret should be shown.
+    ///
+    /// Returns `true` when there is **no** active selection (caret mode).
+    /// When the user has selected text, the caret is hidden — only the
+    /// selection highlight is visible.  This is the standard behaviour of
+    /// every major OS text editor (macOS, Windows, Linux).
+    ///
+    /// Consumers should combine this with the blink state to decide whether
+    /// to actually paint the caret:
+    ///
+    /// ```text
+    /// let paint = state.should_show_caret() && blink_visible;
+    /// ```
+    pub fn should_show_caret(&self) -> bool {
+        !self.has_selection()
+    }
+
     pub fn selection_range(&self) -> Option<(usize, usize)> {
         self.anchor.map(|a| {
             let lo = a.min(self.cursor);
@@ -251,6 +315,11 @@ pub enum EditingCommand {
     BackspaceWord,
     Delete,
     DeleteWord,
+    /// Delete the current selection (cut semantics per W3C Input Events L2
+    /// `deleteByCut`).  When the selection is collapsed this is a no-op —
+    /// the caller is responsible for having already copied text to the
+    /// clipboard before dispatching this command.
+    DeleteByCut,
     MoveLeft { extend: bool },
     MoveRight { extend: bool },
     MoveDocStart { extend: bool },
@@ -308,6 +377,7 @@ impl EditingCommand {
             Self::Delete | Self::DeleteWord | Self::DeleteLine => {
                 Some(EditKind::Delete)
             }
+            Self::DeleteByCut => Some(EditKind::Cut),
             _ => None,
         }
     }
@@ -317,66 +387,140 @@ impl EditingCommand {
 // apply_command
 // ---------------------------------------------------------------------------
 
-/// Apply a single editing command to `state`, returning the new state.
+/// Describes a text mutation performed by [`apply_command_mut`].
+///
+/// * `offset` — byte offset in the **old** text where the edit starts.
+/// * `old_len` — number of bytes removed (0 for pure insert).
+/// * `new_len` — number of bytes inserted (0 for pure delete).
+///
+/// Cursor-only commands return `None` instead.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EditDelta {
+    pub offset: usize,
+    pub old_len: usize,
+    pub new_len: usize,
+}
+
+/// Apply a single editing command to `state` **in place**.
 ///
 /// Layout-dependent commands call into `layout`; pure commands do not.
-/// The function is intentionally pure in the non-layout path (no side effects).
-pub fn apply_command(
-    state: &TextEditorState,
+/// Cursor-only commands are O(1) — no text is copied.
+///
+/// Returns `Some(EditDelta)` when the text buffer was mutated, `None` for
+/// cursor-only commands. The caller can use this to update dependent data
+/// structures (e.g. attributed text runs, incremental layout) without
+/// re-diffing the text.
+///
+/// For backward compatibility, [`apply_command`] is provided as a thin
+/// wrapper that clones the state before delegating here.
+pub fn apply_command_mut(
+    s: &mut TextEditorState,
     command: EditingCommand,
     layout: &mut dyn TextLayoutEngine,
-) -> TextEditorState {
-    let mut s = state.clone();
-
-    match command {
+) -> Option<EditDelta> {
+    let delta = match command {
         EditingCommand::Insert(text) => {
-            let pos = delete_selection_in_place(&mut s);
+            let sel = s.selection_range();
+            let pos = delete_selection_in_place(s);
+            let sel_removed = sel.map_or(0, |(lo, hi)| hi - lo);
             let normalized = normalize_newlines(&text);
+            let inserted = normalized.len();
             s.text.insert_str(pos, &normalized);
-            s.cursor = pos + normalized.len();
+            s.cursor = pos + inserted;
             s.anchor = None;
+            Some(EditDelta { offset: pos, old_len: sel_removed, new_len: inserted })
         }
 
         EditingCommand::Backspace => {
             if s.has_selection() {
-                s.cursor = delete_selection_in_place(&mut s);
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                s.anchor = None;
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
             } else if s.cursor > 0 {
                 let prev = prev_grapheme_boundary(&s.text, s.cursor);
+                let removed = s.cursor - prev;
                 s.text.drain(prev..s.cursor);
                 s.cursor = prev;
+                s.anchor = None;
+                Some(EditDelta { offset: prev, old_len: removed, new_len: 0 })
+            } else {
+                s.anchor = None;
+                None
             }
-            s.anchor = None;
         }
 
         EditingCommand::BackspaceWord => {
             if s.has_selection() {
-                s.cursor = delete_selection_in_place(&mut s);
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                s.anchor = None;
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
             } else if s.cursor > 0 {
                 let target = prev_word_segment_start(&s.text, s.cursor);
+                let removed = s.cursor - target;
                 s.text.drain(target..s.cursor);
                 s.cursor = target;
+                s.anchor = None;
+                Some(EditDelta { offset: target, old_len: removed, new_len: 0 })
+            } else {
+                s.anchor = None;
+                None
             }
-            s.anchor = None;
         }
 
         EditingCommand::Delete => {
             if s.has_selection() {
-                s.cursor = delete_selection_in_place(&mut s);
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                s.anchor = None;
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
             } else if s.cursor < s.text.len() {
                 let next = next_grapheme_boundary(&s.text, s.cursor);
+                let removed = next - s.cursor;
                 s.text.drain(s.cursor..next);
+                s.anchor = None;
+                Some(EditDelta { offset: s.cursor, old_len: removed, new_len: 0 })
+            } else {
+                s.anchor = None;
+                None
             }
-            s.anchor = None;
         }
 
         EditingCommand::DeleteWord => {
             if s.has_selection() {
-                s.cursor = delete_selection_in_place(&mut s);
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                s.anchor = None;
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
             } else if s.cursor < s.text.len() {
                 let target = next_word_segment_end(&s.text, s.cursor);
+                let removed = target - s.cursor;
                 s.text.drain(s.cursor..target);
+                s.anchor = None;
+                Some(EditDelta { offset: s.cursor, old_len: removed, new_len: 0 })
+            } else {
+                s.anchor = None;
+                None
             }
-            s.anchor = None;
+        }
+
+        // deleteByCut (W3C Input Events L2): only acts when a
+        // non-collapsed selection exists; otherwise it's a no-op.
+        EditingCommand::DeleteByCut => {
+            if s.has_selection() {
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                s.anchor = None;
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
+            } else {
+                None
+            }
         }
 
         EditingCommand::MoveLeft { extend } => {
@@ -385,10 +529,11 @@ pub fn apply_command(
                 s.cursor = lo;
                 s.anchor = None;
             } else {
-                set_anchor_if_extending(&mut s, extend);
+                set_anchor_if_extending(s, extend);
                 s.cursor = prev_grapheme_boundary(&s.text, s.cursor);
-                clear_anchor_if_not_extending(&mut s, extend);
+                clear_anchor_if_not_extending(s, extend);
             }
+            None
         }
 
         EditingCommand::MoveRight { extend } => {
@@ -397,62 +542,84 @@ pub fn apply_command(
                 s.cursor = hi;
                 s.anchor = None;
             } else {
-                set_anchor_if_extending(&mut s, extend);
+                set_anchor_if_extending(s, extend);
                 s.cursor = next_grapheme_boundary(&s.text, s.cursor);
-                clear_anchor_if_not_extending(&mut s, extend);
+                clear_anchor_if_not_extending(s, extend);
             }
+            None
         }
 
         EditingCommand::MoveDocStart { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             s.cursor = 0;
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MoveDocEnd { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             s.cursor = s.text.len();
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::SelectAll => {
             s.anchor = Some(0);
             s.cursor = s.text.len();
+            None
         }
 
         EditingCommand::SetCursorPos { pos, anchor } => {
             s.cursor = snap_grapheme_boundary(&s.text, pos);
             s.anchor = anchor.map(|a| snap_grapheme_boundary(&s.text, a));
+            None
         }
 
         EditingCommand::BackspaceLine => {
-            if s.has_selection() {
-                s.cursor = delete_selection_in_place(&mut s);
+            let d = if s.has_selection() {
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
             } else {
                 let metrics = layout.line_metrics(&s.text);
                 if !metrics.is_empty() {
                     let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
                     let line_start = metrics[line_idx].start_index;
                     if line_start < s.cursor {
+                        let removed = s.cursor - line_start;
                         s.text.drain(line_start..s.cursor);
                         s.cursor = line_start;
+                        Some(EditDelta { offset: line_start, old_len: removed, new_len: 0 })
                     } else if s.cursor > 0 {
                         let prev = prev_grapheme_boundary(&s.text, s.cursor);
+                        let removed = s.cursor - prev;
                         s.text.drain(prev..s.cursor);
                         s.cursor = prev;
+                        Some(EditDelta { offset: prev, old_len: removed, new_len: 0 })
+                    } else {
+                        None
                     }
                 } else if s.cursor > 0 {
                     let prev = prev_grapheme_boundary(&s.text, s.cursor);
+                    let removed = s.cursor - prev;
                     s.text.drain(prev..s.cursor);
                     s.cursor = prev;
+                    Some(EditDelta { offset: prev, old_len: removed, new_len: 0 })
+                } else {
+                    None
                 }
-            }
+            };
             s.anchor = None;
+            d
         }
 
         EditingCommand::DeleteLine => {
-            if s.has_selection() {
-                s.cursor = delete_selection_in_place(&mut s);
+            let d = if s.has_selection() {
+                let (lo, hi) = s.selection_range().unwrap();
+                let removed = hi - lo;
+                s.cursor = delete_selection_in_place(s);
+                Some(EditDelta { offset: lo, old_len: removed, new_len: 0 })
             } else {
                 let metrics = layout.line_metrics(&s.text);
                 if !metrics.is_empty() {
@@ -463,15 +630,22 @@ pub fn apply_command(
                         line_end = prev_grapheme_boundary(&s.text, line_end);
                     }
                     if s.cursor < line_end {
+                        let removed = line_end - s.cursor;
                         s.text.drain(s.cursor..line_end);
+                        Some(EditDelta { offset: s.cursor, old_len: removed, new_len: 0 })
+                    } else {
+                        None
                     }
+                } else {
+                    None
                 }
-            }
+            };
             s.anchor = None;
+            d
         }
 
         EditingCommand::MoveUp { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             let metrics = layout.line_metrics(&s.text);
             if metrics.is_empty() {
                 s.cursor = 0;
@@ -490,11 +664,12 @@ pub fn apply_command(
                     s.cursor = 0;
                 }
             }
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MoveDown { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             let metrics = layout.line_metrics(&s.text);
             if metrics.is_empty() {
                 s.cursor = s.text.len();
@@ -513,11 +688,12 @@ pub fn apply_command(
                     s.cursor = s.text.len();
                 }
             }
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MoveHome { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             let metrics = layout.line_metrics(&s.text);
             if !metrics.is_empty() {
                 let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
@@ -525,11 +701,12 @@ pub fn apply_command(
             } else {
                 s.cursor = 0;
             }
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MoveEnd { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             let metrics = layout.line_metrics(&s.text);
             if !metrics.is_empty() {
                 let line_idx = line_index_for_offset_utf8(&metrics, s.cursor);
@@ -542,11 +719,12 @@ pub fn apply_command(
             } else {
                 s.cursor = s.text.len();
             }
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MovePageUp { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             let metrics = layout.line_metrics(&s.text);
             if metrics.is_empty() {
                 s.cursor = 0;
@@ -567,11 +745,12 @@ pub fn apply_command(
                     s.cursor = layout.position_at_point(&s.text, x, target_y.max(0.0));
                 }
             }
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MovePageDown { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             let metrics = layout.line_metrics(&s.text);
             if metrics.is_empty() {
                 s.cursor = s.text.len();
@@ -593,11 +772,12 @@ pub fn apply_command(
                     s.cursor = layout.position_at_point(&s.text, x, target_y.max(0.0));
                 }
             }
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MoveWordLeft { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             let mut pos = s.cursor;
             loop {
                 let old = pos;
@@ -618,11 +798,12 @@ pub fn apply_command(
                 }
             }
             s.cursor = pos;
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MoveWordRight { extend } => {
-            set_anchor_if_extending(&mut s, extend);
+            set_anchor_if_extending(s, extend);
             let mut pos = s.cursor;
             loop {
                 let old = pos;
@@ -643,13 +824,15 @@ pub fn apply_command(
                 }
             }
             s.cursor = pos.min(s.text.len());
-            clear_anchor_if_not_extending(&mut s, extend);
+            clear_anchor_if_not_extending(s, extend);
+            None
         }
 
         EditingCommand::MoveTo { x, y } => {
             let pos = layout.position_at_point(&s.text, x, y);
             s.cursor = pos;
             s.anchor = None;
+            None
         }
 
         EditingCommand::ExtendTo { x, y } => {
@@ -657,6 +840,7 @@ pub fn apply_command(
                 s.anchor = Some(s.cursor);
             }
             s.cursor = layout.position_at_point(&s.text, x, y);
+            None
         }
 
         EditingCommand::SelectWordAt { x, y } => {
@@ -664,6 +848,7 @@ pub fn apply_command(
             let (start, end) = layout.word_boundary_at(&s.text, pos);
             s.anchor = Some(start);
             s.cursor = end;
+            None
         }
 
         EditingCommand::SelectLineAt { x, y } => {
@@ -678,8 +863,9 @@ pub fn apply_command(
                 s.anchor = Some(lm.start_index);
                 s.cursor = lm.end_index.min(s.text.len());
             }
+            None
         }
-    }
+    };
 
     debug_assert!(
         s.cursor <= s.text.len() && s.text.is_char_boundary(s.cursor),
@@ -694,6 +880,21 @@ pub fn apply_command(
         s.text.len(),
     );
 
+    delta
+}
+
+/// Apply a single editing command to `state`, returning the new state.
+///
+/// This is a convenience wrapper around [`apply_command_mut`] that clones the
+/// state first. Prefer `apply_command_mut` in hot paths to avoid the O(n)
+/// clone.
+pub fn apply_command(
+    state: &TextEditorState,
+    command: EditingCommand,
+    layout: &mut dyn TextLayoutEngine,
+) -> TextEditorState {
+    let mut s = state.clone();
+    apply_command_mut(&mut s, command, layout);
     s
 }
 
@@ -725,15 +926,17 @@ fn clear_anchor_if_not_extending(s: &mut TextEditorState, extend: bool) {
 
 /// Find which line contains `utf8_offset`.
 ///
-/// Uses the forward-scan rule: the first line where `offset < end_index`.
+/// Uses binary search on `end_index` (which is monotonically non-decreasing).
+/// Semantics: returns the first line where `offset < end_index`.
 /// Falls back to the last line when `offset >= all end indices` (cursor at
 /// text end or on a trailing phantom line).  This is the same rule used by
 /// `caret_rect_at`, ensuring editing commands and caret rendering always
 /// agree on which line the cursor belongs to.
 pub fn line_index_for_offset_utf8(metrics: &[LineMetrics], utf8_offset: usize) -> usize {
-    metrics
-        .iter()
-        .position(|lm| utf8_offset < lm.end_index)
-        .unwrap_or(metrics.len().saturating_sub(1))
+    if metrics.is_empty() {
+        return 0;
+    }
+    let idx = metrics.partition_point(|lm| lm.end_index <= utf8_offset);
+    idx.min(metrics.len() - 1)
 }
 

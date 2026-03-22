@@ -1,7 +1,9 @@
 pub mod camera;
 pub mod config;
 pub mod counter;
+pub mod effect_tree;
 pub mod font_repository;
+pub mod frame_loop;
 pub mod image_repository;
 pub mod pixel_preview;
 pub mod render_policy;

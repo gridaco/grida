@@ -10,7 +10,7 @@
 //! and wrong for real rendering — its only purpose is to produce deterministic,
 //! inspectable results for unit tests.
 
-use crate::layout::{CaretRect, LineMetrics, SelectionRect, TextLayoutEngine};
+use crate::layout::{CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine};
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -55,6 +55,7 @@ impl SimpleLayoutEngine {
                 baseline,
                 ascent,
                 descent,
+                left: 0.0,
             });
 
             if !has_nl {
@@ -217,6 +218,34 @@ impl TextLayoutEngine for SimpleLayoutEngine {
 
     fn viewport_height(&self) -> f32 {
         self.viewport_height
+    }
+}
+
+impl ManagedTextLayout for SimpleLayoutEngine {
+    fn ensure_layout(&mut self, _content: &crate::attributed_text::AttributedText) {
+        // No-op: monospace layout needs no rebuild.
+    }
+
+    fn invalidate(&mut self) {
+        // No-op: stateless.
+    }
+
+    fn layout_width(&self) -> f32 {
+        // SimpleLayoutEngine has no wrapping, but we provide a nominal width.
+        // This is only used for scroll calculations.
+        f32::MAX
+    }
+
+    fn layout_height(&self) -> f32 {
+        self.viewport_height
+    }
+
+    fn set_layout_width(&mut self, _width: f32) {
+        // No-op: monospace layout doesn't wrap.
+    }
+
+    fn set_layout_height(&mut self, height: f32) {
+        self.viewport_height = height;
     }
 }
 

@@ -3,6 +3,8 @@
   width="200"
   viewBox="0 0 220 220"
   xmlns="http://www.w3.org/2000/svg">
+  <title>Filters Fespecularlighting</title>
+  <desc>L0 test fixture for filters-feSpecularLighting</desc>
   <filter id="filter">
     <feSpecularLighting
       result="specOut"

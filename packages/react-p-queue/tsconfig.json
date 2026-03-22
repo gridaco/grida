@@ -1,8 +1,17 @@
 {
   "compilerOptions": {
-    "jsx": "react-jsx",
+    "target": "es2020",
+    "module": "esnext",
     "moduleResolution": "node",
-    "esModuleInterop": true
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": [
+      "vitest/globals",
+      "node"
+    ]
   },
-  "exclude": ["dist"]
+  "exclude": [
+    "dist"
+  ]
 }

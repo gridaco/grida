@@ -1,0 +1,523 @@
+// real world, random user prompt examples - the prompts are as-is, does not mean they are supported by the current system.
+// {this} = currently selected node(s), {that} = contextually referenced node, {context} = surrounding conversation/state
+
+// --- shape & geometry ---
+can you make {that} rounded?
+round the corners more, like 20px or something
+make it a perfect circle
+turn this rectangle into a pill shape
+can you make the top corners rounded but keep the bottom ones sharp?
+make {this} a triangle
+draw a hexagon here
+i need a star shape, 5 points
+can you squish {this} a bit, make it wider
+make all of these the same size
+resize {this} to 1920x1080
+can you make it square?
+set the aspect ratio to 16:9
+
+// --- fill & color ---
+make it blue
+change the background to dark gray
+can you make {this} transparent? like 50%
+add a gradient, something like blue to purple
+i want a radial gradient, white in the center fading out
+can you use the same color as {that}?
+make it match our brand color #FF5733
+remove the fill
+add another fill layer on top
+swap the fill to an image
+can we make {this} a warm orange instead?
+pick the color from {that} and apply it here
+
+// --- stroke & border ---
+add a border to {this}
+make the border thicker, like 3px
+can you make it a dashed line?
+dotted border please
+remove the stroke
+change the border color to red
+i want the border on the inside, not centered
+add a stroke but only on the bottom
+
+// --- text ---
+make the text bigger
+change the font to Inter
+can we use pixel-style font?
+make it bold
+center the text
+i want the text all caps
+add underline to {this}
+change line height to 1.5
+reduce letter spacing a bit
+make the font lighter, like weight 300
+can you make this text italic?
+justify the text
+limit it to 2 lines with ellipsis
+change the text to "Hello World"
+
+// --- typography / advanced ---
+enable old-style numbers on {this}
+turn on ligatures
+use a monospace font for this section
+can we try a variable font and crank up the weight axis?
+apply stylistic set 3
+
+// --- layout & positioning ---
+center {this} on the canvas
+align these to the left
+distribute them evenly horizontally
+can you add some spacing between these? like 16px gap
+make {this} a flex container, horizontal
+wrap these in a frame
+add 24px padding to this container
+stack these vertically with 8px gap
+make it wrap when it runs out of space
+stretch the children to fill the container
+move {this} 10px to the right
+put it in the top-left corner
+
+// --- transform ---
+rotate {this} 45 degrees
+flip it horizontally
+can you mirror {this}?
+tilt it a bit, like 15 degrees
+scale {this} up by 2x
+rotate it so it's diagonal
+
+// --- effects & filters ---
+add a drop shadow
+add a subtle shadow, not too strong
+blur {this}
+add a frosted glass effect to {this}
+make the background blurry behind {this}
+add some noise texture to {this}
+can you add an inner shadow?
+remove all effects from {this}
+make the shadow softer and bigger
+add a liquid glass effect
+
+// --- opacity & blending ---
+make {this} semi-transparent
+set opacity to 80%
+use multiply blend mode
+can you make it overlay on {that}?
+make {this} see-through
+
+// --- layers & hierarchy ---
+bring {this} to front
+send {this} to the back
+move it one layer up
+group these together
+ungroup {this}
+lock {this} so i don't accidentally move it
+hide {this} for now
+rename this layer to "hero-section"
+
+// --- selection & navigation ---
+select everything on this frame
+zoom into {this}
+fit the canvas to my screen
+zoom to 100%
+can you select all the text layers?
+
+// --- copy & duplicate ---
+duplicate {this}
+make 5 copies of {this} spaced evenly
+copy the style from {that} and paste it on {this}
+clone this row
+
+// --- boolean operations ---
+merge these two shapes together
+subtract {that} from {this}
+cut out the overlapping part
+intersect these shapes
+make a hole in {this} using {that}
+
+// --- vector & path editing ---
+can you convert {this} to vector graphics?
+i want to edit the individual points
+flatten {this}
+add a point on this edge
+delete this anchor point
+curve this segment
+make this corner smooth
+straighten this path
+
+// --- components & instances ---
+make {this} a component
+create an instance of {that}
+detach this instance
+update all instances of this component
+swap this instance to use the other variant
+override the text on this instance
+reset {this} instance to match the master
+
+// --- image & media ---
+crop this image
+fit the image to cover the frame
+change the image to contain mode
+add an image here
+replace the image on {this}
+can you adjust the contrast on this image?
+bump up the saturation
+make it black and white
+insert a video here
+mute the video
+
+// --- export ---
+export {this} as PNG
+export at 2x
+save {this} as SVG
+export the whole frame as PDF
+export {this} as JPG at 80% quality
+can you export all frames at once?
+
+// --- import ---
+paste this SVG onto the canvas
+import a figma file
+drop this image onto {this}
+
+// --- background & canvas ---
+{context} can we add dotted-pattern background?
+change the canvas background to white
+make the background dark, i'm designing dark mode
+add a grid to the background
+
+// --- pixel / bitmap editing ---
+switch to brush tool and paint on {this}
+erase this part
+i want to do some pixel art, set up a bitmap layer
+
+// --- measurement & guides ---
+show me the distance between {this} and {that}
+add a horizontal guide at 200px
+can you turn on the ruler?
+snap {this} to the grid
+remove all guides
+
+// --- prototyping & links ---
+link {this} to https://example.com
+make {this} open in a new tab when clicked
+change the cursor to pointer on {this}
+
+// --- data & properties ---
+add a custom property "variant" to {this}
+set userdata key "status" to "draft"
+bind the text to a data field
+
+// --- undo & history ---
+undo that
+go back 3 steps
+can you redo?
+
+// --- multi-step / compound ---
+create a card component with an image on top, title, description, and a button at the bottom
+make a navigation bar with logo on the left and 4 links on the right, evenly spaced
+build a 3-column grid layout with 16px gaps
+take this list and turn it into a horizontal scrollable row
+duplicate this card 4 times and arrange them in a 2x2 grid
+design a simple login form with email, password, and a submit button
+can you make a color palette showing 5 shades of blue in a row?
+create a profile avatar — circle with an image inside, 48x48
+set up an icon button: 40x40 rounded square, centered icon inside
+
+// --- vague / ambiguous / real user style ---
+make it look better
+this feels off, can you fix the spacing?
+something's wrong with the alignment
+can you clean this up?
+it's too crowded, give it some breathing room
+make it more modern
+can you make it pop more?
+this looks flat, add some depth
+it needs to feel more premium
+can you tighten this up?
+the hierarchy is off, fix the text sizes
+make the layout more balanced
+this is boring, spice it up
+can you style it like Apple's website?
+give it a glassmorphism vibe
+make it look like a material design card
+do the neumorphism thing
+brutalist style please
+can you make this responsive?
+why does it look blurry?
+the colors clash, pick something that works better
+i don't like the font, suggest something else
+it looks broken on mobile preview
+
+// --- single vector / svg illustration ---
+design a minimalist logo for a tech startup, just a geometric shape
+create a flat illustration of a mountain landscape for a hero section
+draw a cute ghost character for a 404 page
+design a badge for a "top contributor" award
+create a geometric pattern that can be used as a background
+design a simple map pin icon with a star inside
+draw a battery charging indicator with a lightning bolt
+create an illustration of a rocket launching for an empty state
+design a simple coffee cup icon for a cafe menu
+draw a minimalist outline of a cat for a pet store logo
+create a stylized sun icon for a weather app
+design a simple shopping cart icon with a plus sign
+draw a minimalist house icon for a real estate app
+create a flat illustration of a laptop with code on the screen
+design a simple calendar icon showing the 15th
+design a promotional poster for a summer music festival with a retro synthwave aesthetic
+create a single presentation slide explaining the water cycle with a diagram
+design a modern certificate of achievement for a coding bootcamp
+create a flyer for a neighborhood block party with a map and schedule
+design a social media infographic showing 5 tips for better sleep
+create a detailed architectural floor plan of a small studio apartment
+design a typographic poster featuring a famous quote with bold, overlapping letters
+create an isometric illustration of a cozy bedroom setup
+design a complex mandala pattern with intricate geometric details
+
+// ===========================================
+// PROJECT-SCOPED / LONG-RUNNING / BIG TASKS
+// ===========================================
+// these are complex, multi-frame, session-long tasks that require
+// planning, design decisions, iteration, and working across many layers/frames.
+// the agent should be able to break these down and execute end-to-end.
+
+// --- app design from scratch ---
+design a weather app
+design a todo app, keep it minimal
+make me a fitness tracker app — dashboard, workout log, and progress charts
+design a recipe app with browse, detail, and saved recipes screens
+i need a music player app, think spotify but simpler
+create a banking app — home screen with balance, transactions list, and send money flow
+design a meditation app with timer, ambient sounds picker, and streak tracker
+design an e-commerce app — product grid, product detail, cart, and checkout
+make a social media app like instagram — feed, profile, stories bar, and post detail
+i need a ride-sharing app — map view, ride request, driver arriving, and trip summary
+design a note-taking app similar to notion but simplified
+create a food delivery app — restaurant list, menu, cart, order tracking
+design a dating app — card swipe, match screen, chat
+build a podcast app — discover, now playing, episode list, and library
+design a crypto wallet — portfolio overview, coin detail, send/receive flow
+
+// --- specific screens / flows ---
+design a user onboarding flow — 4 screens with illustrations, progress dots, and a skip button
+create a settings page with sections for account, notifications, privacy, and about
+make a checkout flow — cart review, shipping info, payment, and confirmation
+design a sign-up / login flow with social auth options and email fallback
+create a 404 error page, make it fun
+design a pricing page with 3 tiers — free, pro, enterprise
+make a file upload screen with drag-and-drop area and progress indicator
+design an email inbox — sidebar with folders, email list, and reading pane
+create a dashboard for a SaaS product — KPI cards, charts, recent activity table, sidebar nav
+design a user profile page with avatar, bio, stats, and a tabbed content section
+
+// --- website / landing page ---
+design a landing page for a developer tool
+create a SaaS landing page with hero, features grid, pricing, testimonials, and footer
+design a portfolio website for a photographer — hero with fullscreen image, gallery grid, about, contact
+make a startup landing page — big headline, waitlist email input, 3 feature blocks, social proof logos
+create a product launch page with countdown timer, feature highlights, and early access signup
+design a restaurant website — hero with food photo, menu section, location map placeholder, reservation CTA
+design a personal blog — post list with thumbnails, sidebar with categories, single post layout
+make a documentation site layout — sidebar nav tree, content area with headings, table of contents
+create an agency website — case studies grid, services, team section, contact form
+design a nonprofit landing page — hero with mission statement, impact numbers, donation CTA, stories
+
+// --- presentation / slides ---
+create a pitch deck — title slide, problem, solution, market size, business model, team, ask
+based on my selection, extract the branding and draft a new slide deck for a product launch
+design a 10-slide investor presentation with consistent styling
+make a case study presentation — context, challenge, approach, results, learnings
+create a workshop slide template — title slide, agenda, content slides, exercise slides, wrap-up
+design conference talk slides — speaker intro, topic overview, key points with visuals, Q&A slide
+make an internal team update deck — OKR progress, highlights, blockers, next steps
+create a project proposal presentation — executive summary, scope, timeline, budget, risks
+
+// --- branding & identity ---
+based on {this} selection, extract the colors and typography and build a brand style guide
+create a brand kit page — logo placement, color palette with hex codes, typography scale, do's and don'ts
+design a color system — primary, secondary, neutral, semantic colors (success, warning, error, info) with light and dark variants
+build a typography scale page — display, h1 through h6, body, caption, overline, all with the project font
+create a component library page — buttons (primary, secondary, ghost, destructive), inputs, checkboxes, toggles, badges, avatars
+make a brand moodboard — arrange these reference images in a grid with color swatches pulled from them
+
+// --- design system / components ---
+design a button component set — primary, secondary, outline, ghost, destructive, each with default/hover/disabled states
+build an icon set page — 24x24 grid of common UI icons, consistently styled
+create a form component kit — text input, textarea, select dropdown, checkbox, radio, toggle, date picker, file upload
+design a card system — basic card, card with image, horizontal card, pricing card, testimonial card
+make a data table component — header row, sortable columns, pagination bar, row selection checkboxes
+design a notification system — toast, banner, inline alert, badge, each in info/success/warning/error variants
+create a modal/dialog component set — confirmation, form modal, full-screen modal, bottom sheet
+
+// --- marketing / social media ---
+design an instagram post — 1080x1080, bold headline, subtitle, background gradient
+create a set of instagram stories — 5 slides for a product launch, consistent branding, swipe-up CTA
+make a twitter/X header banner — 1500x500, clean and professional
+design an email newsletter header — 600px wide, logo, headline, hero image
+create a youtube thumbnail — 1280x720, face placeholder, bold text overlay, high contrast
+design a linkedin carousel — 10 slides, educational content format, slide numbers
+make a facebook ad set — headline, image, description text, CTA button, in 3 different aspect ratios
+create a poster for an event — A3 size, date/time/venue, speaker names, QR code placeholder
+design a product hunt launch asset set — logo, tagline banner, gallery screenshots
+
+// --- iteration on existing work ---
+i've got this wireframe, can you turn it into a high-fidelity mockup?
+take my current design and make a dark mode version of it
+here's my mobile design, now adapt it for desktop
+i have this landing page, can you redesign the hero section? keep the copy, change the layout
+take this old design and modernize it — update the typography, colors, and spacing
+refactor this layout — it's all absolute positioned, convert it to auto-layout
+my client wants 3 different style options for this homepage — make variations
+redesign this dashboard but make it more data-dense without feeling cluttered
+take this english UI and set it up for RTL layout
+make a before/after comparison — put the old design next to the redesigned version
+
+// --- cross-cutting / contextual ---
+look at what i have so far and suggest improvements
+audit this design for accessibility — contrast ratios, text sizes, touch targets
+organize my layers, everything is a mess
+i have 20 frames, can you make the naming consistent?
+extract all the colors used in this file and create a palette
+find all the text layers and make sure they use the same font
+go through my screens and make sure the spacing is consistent — use 8px grid
+create a component out of every repeated pattern you find in my design
+set up a proper page structure — cover page, table of contents, then my content frames
+i pasted a screenshot, can you recreate it as editable vector layers?
+
+// --- data-driven / realistic content ---
+populate this table with realistic fake data — 20 rows of users with name, email, role, status
+fill these cards with real-looking content — product images, names, prices, ratings
+generate placeholder avatar images for this team section
+populate this chart mockup with realistic monthly revenue numbers
+fill this email inbox with 10 realistic email previews — sender, subject, snippet, time
+put real-looking notifications in this notification panel — mix of types and timestamps
+fill this social feed with realistic posts — different users, images, captions, likes, comments
+
+// --- handoff / developer-facing ---
+annotate this design with spacing and sizing specs
+add redline annotations showing the margins and padding
+export every component as individual SVGs with proper naming
+set up export configs for all icons at 1x, 2x, and 3x PNG
+create a specs page next to each screen showing colors, fonts, and dimensions used
+
+// --- multi-device / responsive ---
+i have a desktop layout, generate tablet and mobile versions
+create a responsive breakpoint comparison — show the same page at 1440, 1024, 768, and 375 widths
+design mobile-first, then show me how it scales up to desktop
+this dashboard needs to work on iPad landscape — adapt the layout
+
+// --- states / skeletons / edge cases ---
+show me the hover state for all these buttons
+design the loading skeleton for this page
+create empty states for this list — no results, error, first-time user
+show the different states of this form — default, focused, filled, error, disabled, success
+design a multi-step wizard and show each step as a separate frame
+make a tooltip and show it in context on different elements
+
+// --- wild / open-ended / real user chaos ---
+i have a rough sketch on paper, i'll paste a photo — can you recreate it digitally?
+here's a competitor's app, make something similar but better
+my boss wants it to "look like apple" — you know what that means, just do it
+i don't have a design yet, i just have a product brief: it's a habit tracking app for students. go.
+take this spreadsheet data and turn it into a visual dashboard
+i need this done in 30 minutes for a client call, just make it look presentable
+we're pivoting — take the existing app design and rebrand it from fitness to wellness
+can you design the same screen in 3 different visual styles so we can compare?
+clone the layout of linear.app's homepage but with our content
+here's our API response JSON, design a UI that displays this data well
+
+// --- domain-specific app projects ---
+design an admin panel for a school management system — students table, class schedule, attendance tracker, report cards
+make a CRM dashboard — pipeline kanban board, contact list, deal summary cards, activity timeline
+design a project management tool — board view, list view, calendar view, and task detail modal
+create a healthcare patient portal — appointments, medical records, prescriptions, messaging with doctor
+design an inventory management system — product catalog, stock levels, purchase orders, supplier list
+build a real estate listing app — map with pins, property cards, filter sidebar, property detail with gallery
+design a fleet tracking dashboard — live map with vehicle positions, route history, driver stats, alerts panel
+create a restaurant POS system — table layout, order builder, kitchen ticket view, daily summary
+
+// --- multi-page document / print ---
+design a resume — clean single-page layout, sections for experience, education, skills, contact
+create a business card — front and back, 3.5x2 inches
+design a menu for a coffee shop — drinks, food, prices, two-fold layout
+make a conference badge — name, role, company, QR code, lanyard hole
+create a magazine spread — feature article with pull quotes, images, and columns
+design a product packaging label — ingredients, nutrition facts, branding, barcode area
+create an event program — schedule, speaker bios, sponsor logos, map
+
+// --- collaborative / feedback-driven ---
+my teammate left comments on the design, can you address them?
+the developer says this layout is hard to implement — simplify it while keeping the design intent
+the client sent feedback: "make the CTA more prominent and move the testimonials above the fold"
+we got user testing results — users couldn't find the search bar. make it more visible.
+the PM wants to add a new section to this page. find a good place for it without breaking the flow.
+marketing says we need to A/B test two hero variants — set up both versions side by side
+legal says we need a cookie consent banner — design one that doesn't ruin the experience
+
+// --- conversion / migration ---
+i have this figma file, recreate the key screens here
+here's a screenshot of our current live website — rebuild it as an editable design
+take this bootstrap HTML page and design a modern replacement
+we're migrating from material design to our own design system — retheme these 5 screens
+our app is in iOS style, make an android/material version of the same screens
+
+// --- theming / variants ---
+i have a light theme, now generate the full dark theme version across all screens
+create a high-contrast accessibility theme for this app
+make a seasonal variant — holiday theme with festive colors but same layout
+our client has 3 sub-brands — take this master design and create color variants for each
+design a "kids mode" version of this app — friendlier colors, larger touch targets, playful typography
+
+// ===========================================
+// DETAILED BRIEFS / LONG-FORM PROMPTS
+// ===========================================
+// real users describe WHAT the thing does and HOW it should feel.
+// they don't specify hex codes or font sizes — that's the agent's job.
+// these are feature-driven, content-driven, vibe-driven briefs.
+
+design a mobile app for a neighborhood coffee shop called "Mornings". scandinavian, cozy, the kind of place that uses recycled cardboard cups. i need a menu screen where you can browse by category — coffee, pastry, seasonal specials — and each item shows the name, a short description, and price. when you tap an item, there's a detail screen where you pick your size and add it to your order. then a cart screen with everything you've added, a subtotal, and a checkout button. the whole thing should feel like a sunday morning, not a tech startup.
+
+i need a dashboard for our internal tool "Pulse". dark theme. the main view should have a row of KPI cards at the top — things like total revenue, active users, conversion rate, MRR — each with a sparkline or percentage change indicator. below that, a large time-series chart for revenue trends alongside a breakdown chart for traffic sources. at the bottom, a recent transactions table with status badges that show completed, pending, and failed states. sidebar navigation on the left. it should feel like a tool engineers would trust, not a marketing dashboard with too many gradients.
+
+create a landing page for "Form & Function 2026", a design conference in Copenhagen, September 14–16. big bold hero with the conference name, dates, location, and a ticket CTA. then a speakers section — grid of speaker cards with photo, name, title, and a one-line bio. show at least 6 speakers. after that, a schedule section with day tabs and a timeline of talks with times, titles, speaker names, and talk duration. sponsors section with a row of logo placeholders. footer with nav links and social icons. the overall feel should be confident and typographic — let the content breathe, don't over-design.
+
+pitch deck for "Relay" — we're building a logistics optimization platform for freight companies. 10 slides: title with tagline "Smarter routes. Faster delivery.", a problem slide with stats (38% of trucks run empty, $180B wasted in fuel, 2.4 day average delay), a solution slide showing the product (simplified dashboard mockup with a map), a "how it works" 3-step diagram (upload routes → AI optimizes → dispatch & track), a market opportunity slide with TAM/SAM/SOM, a traction slide with our numbers (47 customers, 3.2M deliveries, 94% retention) and a growth chart, a business model slide with 3 pricing tiers, a team slide with 4 founders, "the ask" slide (raising $4M Series A, with use of funds breakdown), and a closing slide. keep it clean, data-forward. don't make it flashy — we're pitching to logistics VCs, they want to see substance.
+
+design a social reading app called "marginalia". the concept: you share book highlights and margin notes with friends, like a literary social network. the vibe should feel like old books and handwritten notes — warm, textured, not slick. i need a home feed where you see friends' highlights styled as book quotes with the book title and author credited below, and reaction buttons. a book detail screen with the cover, rating, description, and a list of highlights you've saved from it. a reading view where you can select text and a toolbar pops up to highlight, add a note, or share. a profile screen with your reading stats (books read, highlights, followers) and a tab for your highlights/books/lists. and a notification screen. the whole thing should make you want to curl up and read.
+
+i'm working on a patient check-in kiosk for a medical clinic. this runs on a big portrait touchscreen, so everything has to be large, legible, and dead simple — think people who are nervous and not tech-savvy. welcome screen with "I have an appointment" and "Walk-in" as the only two options, plus a language switcher for English/Spanish/Chinese. patient lookup screen where you enter your last name and birthday to find your appointment. confirmation screen showing the matched appointment details with a big "Check in" button. a forms screen showing a checklist of required documents (health questionnaire, insurance, consent) with completion status and a progress bar — you can't continue until everything's done. final screen: you're checked in, here's your estimated wait time, go sit down. make it feel reassuring and medical without being sterile.
+
+design a meal prep app called "Preppy" for people who batch-cook on sundays. the main screen is a week overview — you tap a day and see your breakfast, lunch, and dinner slots. each meal card shows the recipe name, calories, prep time, and a thumbnail. empty slots have a big plus button. tapping a meal takes you to a recipe detail screen with a big photo, ingredient checklist, and step-by-step instructions, with an "Add to Plan" button. there's also a grocery list screen that auto-generates from your weekly plan, grouped by category (produce, protein, dairy, pantry) with checkboxes. and a browse/search screen with filter chips like "quick", "high protein", "vegetarian", "under 500 cal", "batch-friendly" and a grid of recipe cards. the whole thing should feel fresh and motivating, not clinical like a calorie counter.
+
+conference badge design for "DevConnect 2026" in Berlin, March 22–24. the badge needs the conference branding at the top, a large area for the attendee name and company, a pass type indicator (make 3 variants: attendee, speaker, staff — each with a different color strip), a QR code area, and the conference wifi info at the bottom. include a hole punch for the lanyard. also design the lanyard itself — a simple repeating pattern with the conference name. make 3 badge variants. the vibe is developer-friendly — bold, not corporate.
+
+design a "trial ending" email for a SaaS product called "CloudBase". the goal is conversion — this email needs to create urgency without being annoying. start with the product logo, then a hero section with a headline like "Your free trial ends in 3 days". personalized paragraph that acknowledges what the user has already accomplished (projects created, team members invited). a quick reminder of 3 key features they'll lose. a prominent upgrade CTA with the price. a short customer testimonial for social proof. footer with product/company/legal links, social icons, and unsubscribe. keep it warm and helpful, not desperate.
+
+we're building a property management tool for small landlords — the ones with 2-15 units who currently use spreadsheets. the app is called "Tenantry". i need screens for: a portfolio overview showing all your properties as cards with address, occupancy status, rent due/collected this month, and any maintenance alerts. a single property detail page with unit list, lease info, recent payment history, and a maintenance request log. a tenant profile page showing their lease terms, payment history, communication log, and documents. a maintenance request detail screen that shows the issue description, photos, priority level, status timeline (reported → assigned → in progress → resolved), and contractor notes. and a finances overview with monthly income/expense breakdown, a rent collection calendar showing which tenants paid and who's late, and a yearly P&L summary. the feel should be trustworthy and straightforward — these users hate complexity, they just want to see if rent came in and if anything's broken.
+
+i'm designing an app for independent musicians to manage their live gig bookings. it's called "Setlist". musicians use this to find venues, submit booking requests, manage their calendar, and track payments. i need: a dashboard home screen showing upcoming gigs on a calendar strip, pending booking requests, and a quick earnings summary. a venue discovery screen where you can browse local venues with filters for capacity, genre preference, and pay range — each venue card shows a photo, name, location, typical pay, and available dates. a booking request screen where you fill in your preferred date, set length, equipment needs, and expected draw, and submit it to the venue. a gig detail screen for confirmed bookings showing the venue, date, load-in time, set time, pay agreement, venue contact info, and a notes section for things like "bring your own cables" or "parking in the back". a payment tracker showing gig history with payment status (paid, pending, overdue) and totals. the vibe should be scrappy and real — think band stickers on a laptop, not a corporate booking platform.
+
+design slides for an internal quarterly business review. we're a 50-person B2B SaaS company. the deck should have: a cover slide with the quarter (Q1 2026) and company name. a TL;DR slide with 3-4 bullet takeaways. a revenue slide showing ARR, net new ARR, and a comparison to last quarter with a simple bar or line chart. a customer slide with new logos, churned logos, NRR, and a cohort retention chart. a product slide summarizing what shipped this quarter — list the top 5 features with one-line descriptions. an engineering slide with velocity metrics, tech debt status, and upcoming infra milestones. a sales pipeline slide with deal stages shown as a funnel or horizontal bar. a team slide covering new hires, open roles, and org changes. a "next quarter" slide with top 3 priorities. and a discussion/Q&A slide at the end. it should feel internal and efficient — not a sales pitch, more like something you'd present to a board over zoom. no fluff.
+
+i run a small bakery and i want to design our seasonal menu. it's a single-page menu, maybe two-fold. the bakery is called "Flour & Fold". we need sections for: Breads (sourdough boule, rye, focaccia, baguette), Pastries (croissant, almond croissant, pain au chocolat, danish), Cakes & Tarts (lemon tart, chocolate cake, carrot cake — these rotate weekly so label it "rotating"), Drinks (drip coffee, espresso, latte, matcha, hot chocolate, fresh juice), and a small Breakfast section (avocado toast, granola bowl, egg sandwich). each item needs a name and price, some have a short one-liner description. there should be a small note at the bottom about allergens and a line that says "ask about our daily specials". the feel should be artisanal and handmade — like you'd see it printed on thick kraft paper or pinned to a reclaimed wood board. not a chain restaurant menu.
+
+design an app for dog owners called "Good Boy". this is a daily dog care tracker — you log walks, meals, vet visits, medications, and your dog's weight over time. the home screen should show your dog's profile (photo, name, breed, age) and today's care summary — did they get walked, fed, given their meds. tap to log each activity. a history screen shows a weekly calendar with activity dots so you can see patterns (did i skip walks this week?). a health screen tracks weight over time as a simple line chart, lists upcoming vet appointments, and shows current medications with dosage and frequency. a walk screen logs the walk with duration, distance, and you can add notes like "pulled a lot today" or "found a dead bird, ate half of it". there should also be a multi-dog mode — some people have 2-3 dogs and need to track them separately. the vibe: playful and warm, but functional. not cutesy to the point of being annoying.
+
+i need to put together a case study deck for a client project. we're a design agency called "Studio Null". the project was a rebrand for a fintech startup called "Clearway". the deck should have: a cover slide with the project title "Clearway Rebrand" and our agency name. a context slide explaining who Clearway is and what they do (a B2B payments platform for small businesses, founded 2021, 200+ customers). a brief slide — what they asked us to do: modernize their visual identity because they were expanding into europe and the old brand felt too "scrappy startup". a process slide showing our approach in 3-4 phases (research, exploration, refinement, delivery). a research findings slide with key insights — their competitors all look the same (blue and corporate), their users are small business owners who value simplicity and trust, and the brand needed to work across cultures. then 2-3 slides showing the evolution — early concepts, rejected directions, and the final direction with rationale. a final brand showcase slide showing the new logo, color palette, typography, and sample applications (business card, website header, app icon). a results slide with any metrics or client feedback. and a closing slide with a quote from the client. the tone should be polished but real — show the messy middle, not just the perfect outcome.
+
+design a coworking space booking app. the space is called "The Commons". members use this to reserve desks, meeting rooms, and event spaces. the home screen shows today's layout — a simplified floor map with available/occupied indicators, or at least a list view of what's open right now. a booking screen where you pick a space type (hot desk, dedicated desk, 4-person room, 8-person room, event space), a date, and a time block (morning, afternoon, full day, or custom hours). a "my bookings" screen showing upcoming and past reservations with cancel/modify options. a community screen showing who's in the space today (opt-in visibility), upcoming community events, and a message board. and an admin/billing screen showing your membership plan, payment history, and usage stats (days visited this month, most used room). make it feel like a space you actually want to work in — not corporate, more like a good coffee shop with better wifi.
+
+i'm creating a travel planning app for group trips. it's called "Rally". the problem it solves: coordinating with friends is a nightmare — everyone uses different group chats, docs, and spreadsheets. i need: a trip creation screen where you name the trip, set the dates, add a destination, and invite friends by phone number or link. a trip dashboard that acts as the central hub — it shows the destination, dates, who's going, and tiles for key sections. an itinerary builder where anyone can suggest activities, and the group votes on them — each activity shows what it is, when, where, estimated cost, and a vote count. a expenses section where you log shared costs and the app shows who owes who — like splitwise but built in. a lodging section where someone can post an Airbnb link and everyone can discuss it. a polls section for group decisions ("which restaurant tonight?" "do we rent a car?"). the vibe should feel exciting and collaborative — this is a vacation, not a work project. but it also needs to actually work well when 8 people are all using it at once.
+
+design an investor-facing annual report for a climate tech company called "Canopy". they make carbon capture hardware for industrial facilities. the report needs: a cover page with the company name and "Annual Report 2025". a letter from the CEO — just a page with a big pull quote, then body text, and a signature. a year in numbers page — key metrics in large type: tons of CO2 captured, number of installations, revenue, team size, countries operating in. a timeline page showing major milestones across the year. a product page explaining their technology — a simplified diagram showing how the carbon capture unit works, with labeled parts. a customers & case studies page — 2-3 short case studies showing an industrial client, the installation, and the measurable impact. a financial summary page with revenue, costs, and runway presented as simple charts. a team & culture page with leadership photos and a hiring stat. a looking forward page with next year's goals. and a back cover with contact info and legal disclaimers. it should feel serious and credible — these people are selling to industrial clients and raising from climate-focused funds — but not boring. let the data speak.
+
+design a mobile app for a neighborhood tool library. the concept: instead of everyone buying a drill they use once a year, the neighborhood shares tools. the app is called "Borrow". the home screen shows available tools near you — a list or grid of tool cards with a photo, name, owner/lender name, distance, and availability status. tapping a tool shows a detail screen with more photos, a description, the condition, pickup location (approximate, not exact address), and a "Request to Borrow" button with a date picker. there's a "My Borrows" screen showing tools you currently have checked out with return-by dates, and tools you've lent out with who has them. a messages screen for coordinating pickup and return. and a "My Tools" screen where you list your own tools that you're willing to lend — add a photo, name, category, condition, and set availability. include some kind of trust indicator — maybe a rating or a "verified neighbor" badge. the vibe should be community-first and friendly, like a really good neighborhood facebook group but without the drama.
+
+design a dashboard for a small youtube channel. the creator has about 50K subscribers and posts weekly. they want a single overview screen that shows: channel stats at the top (total subs, views this month, watch hours, revenue estimate), then a list of their recent videos with thumbnail, title, publish date, view count, CTR, and average view duration. clicking a video shows a detail view with the retention curve, traffic sources breakdown, click-through rate over time, and top comments. there should be a section for upcoming/drafts — videos they're planning with a working title, target publish date, and a status (idea, scripting, filming, editing, ready). and an "ideas" section — just a running list where they can jot down video topics with a rough priority. the whole thing should feel like a personal command center, not an enterprise analytics suite.
+
+i need a mobile app for a vintage record store called "Groove". the store is in brooklyn and they do both in-store and online sales. the app needs: a browse screen where you can flip through records — think crate digging but digital. each record shows the album art, artist, title, genre, condition (mint, VG+, VG, etc.), and price. you should be able to filter by genre, decade, price range, and condition. a record detail screen with larger album art, tracklist, a description from the shop owner (they write little notes about why each record is special), and an add to cart button. they also do a "staff picks" section that rotates weekly. a cart and checkout flow. and a "new arrivals" feed that works like a drop — when new stock comes in, people get notified and it sells fast, so there's an urgency element. maybe a "notify me" feature for specific artists or genres. the vibe should feel like walking into a record store — a little dusty, a little cool, full of discovery.
+
+i want slides for a design workshop i'm giving to junior designers. the topic is "designing with constraints". about 30 slides. the structure: an intro section with title, my name, and a provocative opening question like "what if limitations made your work better?". a section on why constraints matter — 3-4 slides covering cognitive load, decision fatigue, and how constraints focus creativity, with real examples. a section on types of constraints — technical (screen size, performance), business (brand guidelines, legal requirements), user-driven (accessibility, reading level, context of use), and self-imposed (limiting your palette, using only type). each type gets 2-3 slides with a visual example. an exercise section — i want 3 hands-on exercises: first, design a poster using only 2 colors and 1 font; second, redesign a complex screen for a watch-sized viewport; third, make a landing page where you can't use any images. each exercise gets a brief slide and a "show your work" discussion slide. a wrap-up section with key takeaways and resources. the slides should feel creative and energetic — this is a workshop, not a lecture. use typographic variation and layout to practice what we're preaching about constraint-driven design.
+
+design an e-ink display interface for a smart kitchen device. it's a recipe display that sits on your kitchen counter — 7 inch screen, e-ink so only black and white, no grays. the device shows one recipe at a time and you navigate with two physical buttons (next/prev). the main screen shows the recipe title, serving count, total time, and the current step in large text. only one step at a time — "Step 3 of 8: Add the garlic and sauté for 2 minutes until fragrant". there's a timer indicator when a step involves waiting. the overview screen lists all steps as a simple numbered list so you can jump around. an ingredients screen shows the full ingredient list with quantities. the whole UI needs to be readable from 3 feet away with messy hands — big text, high contrast, zero ambiguity. think about what a cookbook page looks like but even simpler. no color, no photos, just pure information hierarchy.
+
+i need a mobile app for managing a community garden. the garden has 40 plots, about 60 members, and a shed full of shared tools. the app is called "Sprout". home screen shows a visual map of the garden with plots — each plot shows who tends it and what's currently growing. tapping a plot shows the gardener's profile, their crop log (what they planted and when), and photos from their plot over the season. there's a shared calendar for watering schedules, workdays, and community events like harvest potlucks. a bulletin board for announcements ("the gate lock code changed", "free tomato seedlings in the shed", "watch out for aphids on the east plots"). a resources section with the tool inventory, beginner growing guides, and local frost dates. and a messaging feature for plot neighbors to coordinate. the feel should be earthy and grounded — not a silicon valley productivity app, more like something you'd see on a bulletin board at a community center, but digital.

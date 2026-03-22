@@ -8,7 +8,7 @@ use super::_internal::*;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use cg::io::io_svg::{svg_optimize, svg_pack};
+use cg::io::io_svg::{svg_optimize, svg_to_grida_bytes};
 
 // ====================================================================================================
 // #region: WASM Response Structs
@@ -19,13 +19,6 @@ use cg::io::io_svg::{svg_optimize, svg_pack};
 pub struct WasmSvgOptimizeResult {
     /// Optimized SVG string with CSS styles resolved and inlined
     pub svg_optimized: String,
-}
-
-/// WASM response for SVG pack result
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmSvgPackResult {
-    /// Packed SVG IR node structure
-    pub svg: serde_json::Value,
 }
 
 // ====================================================================================================
@@ -73,22 +66,19 @@ pub unsafe extern "C" fn grida_svg_optimize(svg: *const c_char) -> *mut c_char {
     }
 }
 
-/// Packs an SVG into an intermediate representation (IR) structure.
+/// Parse SVG and return `.grida` FlatBuffers bytes.
 ///
-/// Converts an SVG string into a structured IR format that can be used for rendering
-/// or further processing. See `cg::io::io_svg::svg_pack` for detailed documentation.
+/// Returns a pointer to a length-prefixed buffer:
+///   bytes[0..4] = u32 LE payload length
+///   bytes[4..4+len] = FBS payload
 ///
-/// # Arguments
-/// * `svg` - Input SVG string (null-terminated C string)
+/// Returns 0 (null) on error.
+/// The JS side must free the pointer with `Module._deallocate(ptr, 4 + len)`.
 ///
-/// # Returns
-/// JSON string containing `WasmSvgPackResult` with `svg` field containing the IR structure
-/// or error information. The returned pointer must be freed using `grida_svg_free()`.
-///
-/// js::_grida_svg_pack
+/// js::_grida_svg_to_document
 #[no_mangle]
-pub unsafe extern "C" fn grida_svg_pack(svg: *const c_char) -> *mut c_char {
-    let result = (|| -> Result<String, String> {
+pub unsafe extern "C" fn grida_svg_to_document(svg: *const c_char) -> *mut u8 {
+    let result = (|| -> Result<Vec<u8>, String> {
         if svg.is_null() {
             return Err("svg cannot be null".to_string());
         }
@@ -98,22 +88,22 @@ pub unsafe extern "C" fn grida_svg_pack(svg: *const c_char) -> *mut c_char {
         if svg_str.is_empty() {
             return Err("svg cannot be empty".to_string());
         }
-        let packed_json = svg_pack(svg_str)?;
-        // Parse the JSON to extract the "svg" field from SVGPackedScene
-        let packed_value: serde_json::Value = serde_json::from_str(&packed_json)
-            .map_err(|e| format!("Failed to parse packed SVG JSON: {}", e))?;
-        let svg_ir = packed_value
-            .get("svg")
-            .ok_or_else(|| "Missing 'svg' field in packed result".to_string())?
-            .clone();
-        WasmSuccessResponse::new(WasmSvgPackResult { svg: svg_ir }).to_json()
+        svg_to_grida_bytes(svg_str)
     })();
 
     match result {
-        Ok(json) => CString::new(json).unwrap().into_raw(),
-        Err(error) => CString::new(WasmErrorResponse::new(error).to_json().unwrap())
-            .unwrap()
-            .into_raw(),
+        Ok(bytes) => {
+            let total = 4 + bytes.len();
+            let ptr = super::_internal::allocate(total);
+            if ptr.is_null() {
+                return std::ptr::null_mut();
+            }
+            let len = bytes.len() as u32;
+            std::ptr::copy_nonoverlapping(len.to_le_bytes().as_ptr(), ptr, 4);
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.add(4), bytes.len());
+            ptr
+        }
+        Err(_error) => std::ptr::null_mut(),
     }
 }
 

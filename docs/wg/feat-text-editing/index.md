@@ -32,7 +32,7 @@ This document proposes a **minimal but extensible** text editing model and geome
 - **Model vs view separation**: input state is pure data; geometry is queried; rendering is host-defined.
 - **Text positions are contracts**: cursoring and selection operate on _valid cursor stops_, not arbitrary integers.
 - **Determinism (scoped)**: for fixed font set, shaping engine, and layout constraints, the mapping (state) → geometry is a function (same input ⇒ same output).
-- **Incremental computation**: queries should be cheap, cacheable, and invalidated predictably.
+- **Incremental computation**: queries should be cheap, cacheable, and invalidated predictably. (See `impl-performance.md` for the full performance model.)
 - **Accessibility compatibility**: expose enough structure to bridge to platform accessibility layers.
 
 ## Core contracts (read this first)
@@ -307,6 +307,45 @@ Two viable strategies exist:
   - Cons: needs an animation clock (cursor blink) and careful invalidation/redraw policy.
 
 Either is valid; choosing should be guided by performance goals, platform constraints, and correctness needs.
+
+## Scroll
+
+When the text content exceeds the viewport height, the host introduces a **scroll offset** that shifts the visible window over the layout. The editing engine operates entirely in **layout-local coordinates** — it has no knowledge of scroll. The host is responsible for translating between screen coordinates and layout coordinates.
+
+### Coordinate contract
+
+All geometry returned by the engine (caret rects, selection rects, line metrics, diagnostic geometry) is in **layout-local space** — origin at the top-left of the text layout box, y increasing downward. The host applies the scroll transform:
+
+- **Screen → layout**: `layout_y = screen_y + scroll_offset`
+- **Layout → screen**: `screen_y = layout_y - scroll_offset`
+
+All input coordinates passed to the engine (`position_at_point`, `ExtendTo`, `SelectWordAt`) must be in layout-local space. The host converts before calling.
+
+### Scroll adjustment
+
+The host maintains the scroll offset and adjusts it in response to:
+
+- **Direct scroll input** (mouse wheel, trackpad gesture, scrollbar drag).
+- **Cursor-following**: after any operation that moves the cursor (typing, arrow keys, PageUp/PageDown, search-and-jump), the host checks whether the caret rect is within the visible viewport. If not, the host adjusts the scroll offset to bring the caret into view, with at least one line of margin above or below.
+- **Content change**: when text is inserted or deleted, the content height may change. The host clamps the scroll offset to `[0, max(0, content_height - viewport_height)]`.
+- **Viewport resize**: same clamping applies.
+- **Width-driven reflow (scroll anchoring)**: when the layout width changes (e.g. the user resizes the editor), text re-wraps and content height changes. A naïve clamp can cause the visible content to jump unpredictably. Instead, the engine applies **scroll anchoring**: the first visual line that was visible before the reflow is pinned to the same screen-y position after the reflow. The algorithm is:
+  1. Before reflow, find the first line whose bottom exceeds `scroll_y`. Record that line's `start_index` (a UTF-8 byte offset, which is stable across reflow since no text mutation occurs) and the sub-line pixel fraction `scroll_y - line.top()`.
+  2. Rebuild layout at the new width.
+  3. After reflow, find the line that now contains the recorded byte offset. Compute `new_scroll_y = new_line.top() + fraction`.
+  4. Clamp to `[0, max_scroll_y]`.
+  
+  Special case: if `scroll_y == 0` before reflow, it stays `0` (no anchoring needed; the document top is already the anchor).
+
+### Engine requirements
+
+The engine provides the information the host needs to implement scroll:
+
+- **`line_metrics`**: per-line baselines, ascent, and descent — sufficient to compute total content height and determine which lines are visible for a given scroll offset.
+- **`caret_rect_at`**: the caret's position in layout-local space — the host uses this to decide whether to auto-scroll.
+- **`viewport_height`**: used by PageUp/PageDown to compute the jump distance in lines.
+
+The engine does **not** own the scroll offset, does not clip rendering, and does not filter geometry by visibility. These are host responsibilities. This separation keeps the engine stateless with respect to scroll and allows different hosts (canvas overlay, standalone editor, WASM) to implement scroll differently.
 
 ## Text diagnostics and spellcheck indication (UX layer)
 

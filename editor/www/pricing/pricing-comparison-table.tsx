@@ -46,11 +46,13 @@ function PricingMobileHeader({
       </h2>
       <div className="flex items-baseline gap-2">
         {from && <span className="text-foreground text-base">From</span>}
-        {showDollarSign ? (
-          <span className="h1 font-mono">{price}</span>
-        ) : (
-          <span className="text-foreground-light">{price}</span>
-        )}
+        {price ? (
+          showDollarSign ? (
+            <span className="h1 font-mono">{price}</span>
+          ) : (
+            <span className="text-foreground-light">{price}</span>
+          )
+        ) : null}
 
         <p className="p opacity-50">{priceDescription}</p>
       </div>
@@ -61,6 +63,7 @@ function PricingMobileHeader({
 
 const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   const [activeMobilePlan, setActiveMobilePlan] = useState("Free");
+  const enterprisePlan = plans.find((p) => p.name === "Enterprise");
 
   return (
     <div
@@ -250,14 +253,11 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingMobileHeader
               plans={plans}
               plan="Enterprise"
-              price={"Contact us"}
-              priceDescription={""}
-              description={
-                "Designated support team, account manager and technical specialist"
-              }
+              price=""
+              priceDescription={enterprisePlan?.priceNote ?? ""}
+              description={enterprisePlan?.description ?? ""}
               showDollarSign={false}
             />
-
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"enterprise"}
@@ -325,14 +325,22 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
                       <h3 className="text-lg xl:text-xl 2xl:text-2xl leading-5 uppercase font-mono font-normal">
                         {plan.name}
                       </h3>
-                      <span className="text-foreground-lighter font-mono text-lg tracking-tighter">
-                        {plan.priceMonthly}
-                      </span>
+                      {plan.name !== "Enterprise" && (
+                        <span className="text-foreground-lighter font-mono text-lg tracking-tighter">
+                          {plan.priceMonthly}
+                        </span>
+                      )}
                     </div>
                     <div className="h-5">
-                      {["Free", "Pro", "Team"].includes(plan.name) && (
+                      {["Free", "Pro", "Team"].includes(plan.name) &&
+                        plan.costUnit && (
+                          <span className="text-[13px] opacity-50 leading-4">
+                            {plan.costUnit}
+                          </span>
+                        )}
+                      {plan.name === "Enterprise" && plan.priceNote && (
                         <span className="text-[13px] opacity-50 leading-4">
-                          {plan.costUnit}
+                          {plan.priceNote}
                         </span>
                       )}
                     </div>

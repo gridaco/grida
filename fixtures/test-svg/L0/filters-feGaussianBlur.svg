@@ -3,6 +3,8 @@
   height="120"
   xmlns="http://www.w3.org/2000/svg"
   xmlns:xlink="http://www.w3.org/1999/xlink">
+  <title>Filters Fegaussianblur</title>
+  <desc>L0 test fixture for filters-feGaussianBlur</desc>
   <filter id="blurMe">
     <feGaussianBlur in="SourceGraphic" stdDeviation="5"/>
   </filter>

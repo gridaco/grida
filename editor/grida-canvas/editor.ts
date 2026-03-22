@@ -8,7 +8,7 @@ import { animateTransformTo } from "./animation";
 import { EditorFollowPlugin } from "./plugins/follow";
 import { DocumentFontManager } from "./font-manager";
 import { DocumentHistoryManager } from "./history-manager";
-import init, { svgtypes, type Scene } from "@grida/canvas-wasm";
+import init, { type Scene } from "@grida/canvas-wasm";
 import locateFile from "./backends/wasm-locate-file";
 import {
   NoopDefaultExportInterfaceProvider,
@@ -32,7 +32,7 @@ import grida from "@grida/schema";
 import tree from "@grida/tree";
 import vn from "@grida/vn";
 import cg from "@grida/cg";
-import iosvg from "@grida/io-svg";
+
 import cmath from "@grida/cmath";
 import kolor from "@grida/color";
 import assert from "assert";
@@ -704,35 +704,71 @@ class EditorDocumentStore
   public async createNodeFromSvg(
     svg: string
   ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
-    const id = this.idgen.next();
-
-    const packed = await this.svg.svgPack(svg);
-    if (!packed) {
-      throw new Error("Failed to pack SVG");
+    const bytes = this.svg.svgToDocument(svg);
+    if (!bytes) {
+      throw new Error("Failed to convert SVG to .grida bytes");
     }
 
-    const svgData = packed.svg;
+    // Decode FBS bytes into the editor's full document model
+    const fullDoc = io.GRID.decode(bytes);
 
-    let result = await iosvg.convert(svgData, {
-      name: "svg",
-      currentColor: kolor.colorformats.RGBA32F.BLACK,
-    });
-    if (result) {
-      result = result as grida.program.nodes.i.ILayoutTrait;
+    // Extract the first scene's children (the actual SVG content roots)
+    const sceneId = fullDoc.scenes_ref[0];
+    const sceneChildren = fullDoc.links[sceneId] ?? [];
 
-      // Use explicit scene-level target for programmatic SVG node creation
-      this.insert(
-        {
-          id: id,
-          prototype: result,
-        },
-        this.mstate.scene_id ?? null
+    // Remove the scene node itself — we're inserting into the editor's
+    // existing scene, not creating a new one.
+    const { [sceneId]: _sceneNode, ...contentNodes } = fullDoc.nodes;
+    const { [sceneId]: _sceneLinks, ...contentLinks } = fullDoc.links;
+
+    // Remap all IDs to avoid conflicts with existing document nodes.
+    // The FBS file contains placeholder IDs from the Rust encoder;
+    // each import must get fresh IDs from the editor's generator.
+    const idgen = this.idgen;
+    const { graph: remapped, roots: remappedRoots } =
+      tree.graph.remapKeys<grida.program.nodes.Node>(
+        { nodes: contentNodes, links: contentLinks },
+        sceneChildren,
+        () => idgen.next()
       );
 
-      return this.getNodeById<grida.program.nodes.ContainerNode>(id);
-    } else {
-      throw new Error("Failed to convert SVG");
+    // Ensure root nodes are absolutely positioned so they're draggable
+    for (const rootId of remappedRoots) {
+      const node = remapped.nodes[rootId];
+      if (node && "layout_positioning" in node) {
+        node.layout_positioning = "absolute";
+      }
     }
+
+    const packedDoc: grida.program.document.IPackedSceneDocument = {
+      nodes: remapped.nodes,
+      links: remapped.links,
+      images: fullDoc.images ?? {},
+      bitmaps: fullDoc.bitmaps ?? {},
+      properties: fullDoc.properties ?? {},
+      scene: {
+        type: "scene",
+        id: "tmp",
+        name: "svg",
+        children_refs: remappedRoots,
+        guides: [],
+        edges: [],
+        constraints: { children: "multiple" },
+      },
+    };
+
+    this.insert(
+      { document: packedDoc },
+      this.mstate.scene_id ?? null
+    );
+
+    // Use the first remapped root (the SVG container) — this is
+    // deterministic from the remap, unlike insert()'s return order.
+    const rootId = remappedRoots[0];
+    if (!rootId) {
+      throw new Error("SVG import produced no nodes");
+    }
+    return this.getNodeById<grida.program.nodes.ContainerNode>(rootId);
   }
 
   public createImageNode(
@@ -762,7 +798,8 @@ class EditorDocumentStore
     text = ""
   ): NodeProxy<grida.program.nodes.TextSpanNode> {
     const id = this.idgen.next();
-    // Use explicit scene-level target for programmatic text node creation
+    // Use explicit scene-level target for programmatic text node creation.
+    // Include key text properties so pasted/external text respects the contract.
     this.insert(
       {
         id: id,
@@ -772,6 +809,12 @@ class EditorDocumentStore
           text: text,
           layout_target_width: "auto",
           layout_target_height: "auto",
+          layout_positioning: "absolute",
+          layout_inset_left: 0,
+          layout_inset_top: 0,
+          ...editor.config.fonts.DEFAULT_TEXT_STYLE_INTER,
+          text_align: "left",
+          text_align_vertical: "top",
           fill: {
             type: "solid",
             color: kolor.colorformats.RGBA32F.BLACK,
@@ -2666,6 +2709,18 @@ export class Editor
   readonly doc: EditorDocumentStore;
 
   private _m_wasm_canvas_scene: Scene | null = null;
+
+  /**
+   * Access the underlying WASM Scene instance for the canvas backend.
+   *
+   * Returns `null` when the backend is not "canvas" or the scene is not
+   * yet initialized. Used by text editing components to call the text
+   * editing C ABI functions directly.
+   */
+  public get wasmScene(): Scene | null {
+    return this._m_wasm_canvas_scene;
+  }
+
   private _m_exporter: editor.api.IDocumentExporterInterfaceProvider =
     new NoopDefaultExportInterfaceProvider();
 
@@ -2872,9 +2927,11 @@ export class Editor
    * - OPFS persistence (playground `Cmd/Ctrl+S`)
    *
    * What it does:
-   * - Collects **used** image paint `src` references (res://images/<ref>).
+   * - Collects **used** image paint `src` references (res://images/<ref>), excluding system:// built-ins.
    * - Parses ref from each src, resolves bytes from WASM, produces `images/<ref>.<ext>` entries.
    * - Document keeps `src` unchanged (no rewrite).
+   * - `system://` images (built-in runtime resources) are excluded — they are
+   *   auto-registered by the WASM runtime on load and must not be embedded.
    *
    * For DOM backend (hosted HTML flow), we keep external `src` values as-is and do not embed.
    *
@@ -2893,7 +2950,9 @@ export class Editor
       .document as grida.program.document.Document;
     const images: Record<string, Uint8Array> = {};
 
-    const usedSrcs = new dq.DocumentStateQuery(snapshot).image_srcs();
+    const usedSrcs = new dq.DocumentStateQuery(
+      snapshot
+    ).persistable_image_srcs();
     if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) {
       throw new Error(
         "`archivedir()` requires the canvas/WASM backend to be mounted."
@@ -3037,7 +3096,7 @@ export class Editor
       locateFile: locateFile,
     }).then((factory) => {
       const surface = factory.createWebGLCanvasSurface(el);
-      surface.runtime_renderer_set_cache_tile(false);
+      surface.runtime_renderer_set_layer_compositing(true);
       // surface.setDebug(this.debug);
       // surface.setVerbose(this.debug);
       this.__bind_wasm_surface(surface);
@@ -3130,7 +3189,7 @@ export class Editor
             : document;
 
         const p = JSON.stringify({
-          version: "0.90.0-beta+20260108",
+          version: grida.program.document.SCHEMA_VERSION,
           document: payloadDocument,
         });
         surface.loadScene(p);
@@ -3783,7 +3842,7 @@ export class Editor
   // #endregion IRulerActions implementation
 
   // #region IVectorInterfaceActions implementation
-  toVectorNetwork(node_id: string): vn.VectorNetwork | null {
+  toVectorNetwork(node_id: string): vn.FlattenResult | null {
     if (!this.vectorProvider) {
       throw new Error("Vector interface provider is not bound");
     }
@@ -3806,13 +3865,11 @@ export class Editor
     this.doc.swapFillAndStroke(node_id, ensureStroke);
   }
 
-  public svgPack(
-    svg: string
-  ): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null {
+  public svgToDocument(svg: string): Uint8Array | null {
     if (!this.svgProvider) {
       throw new Error("SVG interface provider is not bound");
     }
-    return this.svgProvider.svgPack(svg);
+    return this.svgProvider.svgToDocument(svg);
   }
 
   // #endregion IDocumentSVGInterfaceActions implementation

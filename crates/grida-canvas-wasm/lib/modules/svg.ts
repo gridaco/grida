@@ -2,7 +2,7 @@
 // #region: High-Level JavaScript Wrapper Functions
 // ====================================================================================================
 
-import type { svg, svgtypes } from "./svg-bindings";
+import type { svg } from "./svg-bindings";
 
 export class SVGAPI {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
@@ -81,16 +81,39 @@ export class SVGAPI {
     }
   }
 
-  pack(svg: string): svg.SVGPackResponse {
+  /**
+   * Parse SVG and return `.grida` FlatBuffers bytes.
+   *
+   * This replaces the two-step pipeline (pack → JS convert) with a
+   * single Rust call that produces the FBS binary directly.
+   *
+   * @returns Uint8Array of FBS bytes, or null on error
+   */
+  toDocument(svg: string): Uint8Array | null {
     let svgPtr: number | null = null;
     let svgLen: number | null = null;
+    let resultPtr: number = 0;
+    let resultLen: number = 0;
     try {
       [svgPtr, svgLen] = this._alloc_string(svg);
-      const resultPtr = this.module._grida_svg_pack(svgPtr);
-      const resultJson = this._string_from_wasm(resultPtr);
-      return JSON.parse(resultJson);
+      resultPtr = this.module._grida_svg_to_document(svgPtr);
+      if (resultPtr === 0) return null;
+
+      const heap: Uint8Array = this.module.HEAPU8;
+      resultLen =
+        heap[resultPtr] |
+        (heap[resultPtr + 1] << 8) |
+        (heap[resultPtr + 2] << 16) |
+        (heap[resultPtr + 3] << 24);
+      const bytes = new Uint8Array(resultLen);
+      bytes.set(heap.subarray(resultPtr + 4, resultPtr + 4 + resultLen));
+      return bytes;
+    } catch (error) {
+      return null;
     } finally {
-      // Always clean up allocated memory
+      if (resultPtr !== 0) {
+        this.module._deallocate(resultPtr, 4 + resultLen);
+      }
       if (svgPtr !== null && svgLen !== null) {
         this._free_string(svgPtr, svgLen);
       }

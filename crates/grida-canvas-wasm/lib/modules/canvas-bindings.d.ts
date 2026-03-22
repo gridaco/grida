@@ -172,7 +172,7 @@ declare namespace canvas {
       show: boolean
     ): void;
 
-    _runtime_renderer_set_cache_tile(
+    _runtime_renderer_set_layer_compositing(
       state: GridaCanvasApplicationPtr,
       enabled: boolean
     ): void;
@@ -196,5 +196,86 @@ declare namespace canvas {
       state: GridaCanvasApplicationPtr,
       enable: boolean
     ): void;
+
+    // ====================================================================================================
+    // TEXT EDITING
+    // ====================================================================================================
+    _text_edit_enter(
+      state: GridaCanvasApplicationPtr,
+      node_id_ptr: number,
+      node_id_len: number
+    ): boolean;
+    _text_edit_exit(
+      state: GridaCanvasApplicationPtr,
+      commit: boolean
+    ): Ptr;
+    _text_edit_is_active(state: GridaCanvasApplicationPtr): boolean;
+    _text_edit_get_text(state: GridaCanvasApplicationPtr): Ptr;
+    _text_edit_undo(state: GridaCanvasApplicationPtr): boolean;
+    _text_edit_redo(state: GridaCanvasApplicationPtr): boolean;
+    _text_edit_command(
+      state: GridaCanvasApplicationPtr,
+      json_ptr: number,
+      json_len: number
+    ): void;
+    _text_edit_pointer_down(
+      state: GridaCanvasApplicationPtr,
+      x: number,
+      y: number,
+      shift: boolean,
+      click_count: number
+    ): void;
+    _text_edit_pointer_move(
+      state: GridaCanvasApplicationPtr,
+      x: number,
+      y: number
+    ): void;
+    _text_edit_pointer_up(state: GridaCanvasApplicationPtr): void;
+    _text_edit_ime_set_preedit(
+      state: GridaCanvasApplicationPtr,
+      text_ptr: number,
+      text_len: number
+    ): void;
+    _text_edit_ime_commit(
+      state: GridaCanvasApplicationPtr,
+      text_ptr: number,
+      text_len: number
+    ): void;
+    _text_edit_ime_cancel(state: GridaCanvasApplicationPtr): void;
+    _text_edit_get_selected_text(state: GridaCanvasApplicationPtr): Ptr;
+    _text_edit_get_selected_html(state: GridaCanvasApplicationPtr): Ptr;
+    _text_edit_paste_text(
+      state: GridaCanvasApplicationPtr,
+      text_ptr: number,
+      text_len: number
+    ): void;
+    _text_edit_paste_html(
+      state: GridaCanvasApplicationPtr,
+      html_ptr: number,
+      html_len: number
+    ): void;
+    _text_edit_get_caret_rect(state: GridaCanvasApplicationPtr): Ptr;
+    _text_edit_get_selection_rects(state: GridaCanvasApplicationPtr): Ptr;
+    _text_edit_toggle_bold(state: GridaCanvasApplicationPtr): void;
+    _text_edit_toggle_italic(state: GridaCanvasApplicationPtr): void;
+    _text_edit_toggle_underline(state: GridaCanvasApplicationPtr): void;
+    _text_edit_toggle_strikethrough(state: GridaCanvasApplicationPtr): void;
+    _text_edit_set_font_size(
+      state: GridaCanvasApplicationPtr,
+      size: number
+    ): void;
+    _text_edit_set_font_family(
+      state: GridaCanvasApplicationPtr,
+      family_ptr: number,
+      family_len: number
+    ): void;
+    _text_edit_set_color(
+      state: GridaCanvasApplicationPtr,
+      r: number,
+      g: number,
+      b: number,
+      a: number
+    ): void;
+    _text_edit_tick(state: GridaCanvasApplicationPtr): boolean;
   }
 }

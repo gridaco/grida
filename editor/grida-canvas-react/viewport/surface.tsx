@@ -49,7 +49,7 @@ import { VectorMeasurementGuide } from "./ui/vector-measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
 import { cursors } from "../../components/cursor/cursor-data";
-import { SurfaceTextEditor } from "./ui/text-editor";
+import { SurfaceTextEditor } from "./ui/surface-text-editor";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
 import { SurfaceImageEditor } from "./ui/surface-image-editor";
@@ -107,6 +107,9 @@ import cmath from "@grida/cmath";
 import { cn } from "@/components/lib/utils";
 
 const DRAG_THRESHOLD = 2;
+
+/** Minimum pointer movement (px) before creating a new ruler guideline. Prevents accidental insertion on click. */
+const RULER_GUIDELINE_DRAG_THRESHOLD = 4;
 
 /*
 const SURFACE_TRANSFORM_CONTEXT = React.createContext<cmath.Transform>(
@@ -263,7 +266,9 @@ export function EditorSurface() {
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
 
-        // [order matters] - otherwise, it will always try to enter the content edit mode
+        // Double-click toggles content edit mode (enter or exit). Modes that must
+        // not exit on double-click (e.g. text, for word select) consume the event
+        // in their overlay (stopPropagation) so this handler does not run.
         editor.surface.surfaceTryToggleContentEditMode(); // 1
         editor.surface.surfaceDoubleClick(event); // 2
       },
@@ -1829,22 +1834,60 @@ function RulerGuideOverlay() {
 
   const bindX = useSurfaceGesture(
     {
+      onPointerDown: ({ event }) => {
+        event.stopPropagation();
+      },
       onDragStart: ({ event }) => {
-        editorInstance.surface.surfaceStartGuideGesture("y", -1);
         event.preventDefault();
+        editorInstance.surface.surfaceStartGuideGesture("y", -1);
+      },
+      onDrag: (e) => {
+        if (e.event.defaultPrevented) return;
+        editorInstance.surface.surfaceDrag({
+          delta: e.delta,
+          distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
+          xy: e.xy,
+        });
+      },
+      onDragEnd: ({ event }) => {
+        editorInstance.surface.surfaceDragEnd(event as PointerEvent);
       },
     },
-    { enabled: !eager_canvas_input }
+    {
+      enabled: !eager_canvas_input,
+      drag: { threshold: RULER_GUIDELINE_DRAG_THRESHOLD },
+    }
   );
 
   const bindY = useSurfaceGesture(
     {
+      onPointerDown: ({ event }) => {
+        event.stopPropagation();
+      },
       onDragStart: ({ event }) => {
-        editorInstance.surface.surfaceStartGuideGesture("x", -1);
         event.preventDefault();
+        editorInstance.surface.surfaceStartGuideGesture("x", -1);
+      },
+      onDrag: (e) => {
+        if (e.event.defaultPrevented) return;
+        editorInstance.surface.surfaceDrag({
+          delta: e.delta,
+          distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
+          xy: e.xy,
+        });
+      },
+      onDragEnd: ({ event }) => {
+        editorInstance.surface.surfaceDragEnd(event as PointerEvent);
       },
     },
-    { enabled: !eager_canvas_input }
+    {
+      enabled: !eager_canvas_input,
+      drag: { threshold: RULER_GUIDELINE_DRAG_THRESHOLD },
+    }
   );
 
   const ranges = useMemo(() => {

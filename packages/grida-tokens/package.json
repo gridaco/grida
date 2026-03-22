@@ -40,6 +40,7 @@
   "scripts": {
     "build": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   }
 }

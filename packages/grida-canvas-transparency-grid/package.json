@@ -37,7 +37,8 @@
   },
   "scripts": {
     "build": "tsup index.ts react.tsx --format cjs,esm --dts",
-    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch"
+    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "color-parse": "^2.0.2"

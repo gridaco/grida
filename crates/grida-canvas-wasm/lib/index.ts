@@ -4,13 +4,13 @@ import {
   Scene,
   type CreateImageResourceResult,
   type AddImageWithIdResult,
+  type TextEditCommand,
 } from "./modules/canvas";
-import { svgtypes } from "./modules/svg-bindings";
 export {
   type Scene,
-  type svgtypes,
   type CreateImageResourceResult,
   type AddImageWithIdResult,
+  type TextEditCommand,
 };
 export const version = _version;
 
@@ -114,6 +114,17 @@ export namespace types {
   export interface VectorNetwork {
     vertices: VectorNetworkVertex[];
     segments: VectorNetworkSegment[];
+  }
+
+  /**
+   * Result of flattening a shape node to a vector network.
+   *
+   * When `corner_radius` is present, the vector network contains straight
+   * segments and corner radius should be applied as a rendering effect.
+   * When absent, corner geometry is baked into the vector network as curves.
+   */
+  export interface FlattenResult extends VectorNetwork {
+    corner_radius?: number;
   }
 }
 

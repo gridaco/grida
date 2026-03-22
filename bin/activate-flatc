@@ -5,9 +5,10 @@ Grida: FlatBuffers compiler (flatc) bootstrapper
 
 Why this exists
 ---------------
-We intentionally do NOT commit generated FlatBuffers bindings to git (see
-`packages/grida-format/.gitignore`). The package build step runs `flatc` (see
-`packages/grida-format/package.json`), so CI and Vercel builds must have a
+Generated FlatBuffers bindings are committed for the Rust crate
+(`crates/grida-canvas/src/io/generated/grida.rs`) so that `cargo build` works
+from a clean checkout. The TypeScript package (`packages/grida-format`)
+regenerates at build time. In both cases CI and Vercel builds need a
 deterministic way to obtain `flatc`.
 
 FlatBuffers does not ship `flatc` via npm, so this script installs a prebuilt

@@ -1,30 +1,30 @@
 # Font strategy for @grida/refig (Figma renderer)
 
-This document describes Figma’s default font behavior and how this renderer aligns with it so that exported output matches Figma’s rendering (where possible).
+This document describes Figma's default font behavior and how this renderer aligns with it so that exported output matches Figma's rendering (where possible).
 
 ---
 
-## Figma’s default font behavior
+## Figma's default font behavior
 
 Figma uses **platform-agnostic default fonts** and **implicit font fallback**. The fallback chain is not exposed in the Figma API or stored in `.fig` files.
 
 - **Primary font**: Whatever the designer sets (e.g. Caveat, Inter, Roboto). Only this family (and sometimes style) is stored in the file or returned by the API.
 - **Fallback**: When the primary font lacks glyphs for some characters, Figma automatically uses a fixed set of default fonts. The **per-character** choice of fallback font is **not** stored and **not** returned in any API or in the `.fig` format.
-- **Example**: A text node with font **Caveat** and content `"ABC가나다"` will have only `fontFamily: "Caveat"` (or equivalent) in the document. The Latin "ABC" is drawn with Caveat; the Korean "가나다" is drawn with a Figma platform default (e.g. Noto Sans KR). That Korean run is **implicit**—there is no separate style or font reference for "가나다" in the API or `.fig`; it is simply Figma’s platform default behavior.
+- **Example**: A text node with font **Caveat** and content `"ABC가나다"` will have only `fontFamily: "Caveat"` (or equivalent) in the document. The Latin "ABC" is drawn with Caveat; the Korean "가나다" is drawn with a Figma platform default (e.g. Noto Sans KR). That Korean run is **implicit**—there is no separate style or font reference for "가나다" in the API or `.fig`; it is simply Figma's platform default behavior.
 
-So for mixed-script text, the **effective** fonts used at render time include both the document font and Figma’s default fallback set, even though only the primary font is explicit in the file.
+So for mixed-script text, the **effective** fonts used at render time include both the document font and Figma's default fallback set, even though only the primary font is explicit in the file.
 
 Figma has stated they **fall back only to Noto fonts**, regardless of platform ([Figma: When fonts fall](https://www.figma.com/blog/when-fonts-fall/)). The effective default fallback set (by script) is summarized below. Exact names/order may vary; this table reflects the mapping we align to.
 
-| Script / usage         | Figma default font                  | Note                               |
-| ---------------------- | ----------------------------------- | ---------------------------------- |
-| Latin, Cyrillic, Greek | Inter                               | Common default for Western         |
-| Korean (Hangul, etc.)  | Noto Sans KR                        | CJK fallback                       |
-| Japanese (Kana, Kanji) | Noto Sans JP                        | CJK fallback                       |
-| Chinese (Simplified)   | Noto Sans SC                        | CJK fallback                       |
-| Chinese (Traditional)  | Noto Sans TC                        | Optional; TC/HK variants           |
-| Chinese (Hong Kong)    | Noto Sans HK                        | Optional                           |
-| Emoji                  | Platform font (see [Emoji](#emoji)) | Apple Color Emoji / Segoe UI Emoji |
+| Script / usage         | Figma default font                          | Note                                           |
+| ---------------------- | ------------------------------------------- | ---------------------------------------------- |
+| Latin, Cyrillic, Greek | Inter                                       | Common default for Western                     |
+| Korean (Hangul, etc.)  | Noto Sans KR                                | CJK fallback                                   |
+| Japanese (Kana, Kanji) | Noto Sans JP                                | CJK fallback                                   |
+| Chinese (Simplified)   | Noto Sans SC                                | CJK fallback                                   |
+| Chinese (Traditional)  | Noto Sans TC                                | Optional; TC/HK variants                       |
+| Chinese (Hong Kong)    | Noto Sans HK                                | Optional                                       |
+| Emoji                  | CDN-hosted PNG images (see [Emoji](#emoji)) | Apple emoji style; served from Figma's own CDN |
 
 None of the fallback choices appear in the Figma API or `.fig`; they are implicit at render time.
 
@@ -32,7 +32,7 @@ None of the fallback choices appear in the Figma API or `.fig`; they are implici
 
 ## Aligning this renderer with Figma
 
-To avoid **tofu** (missing glyphs / `.notdef`) and to approximate Figma’s behavior, the renderer should **boot with the same config**:
+To avoid **tofu** (missing glyphs / `.notdef`) and to approximate Figma's behavior, the renderer should **boot with the same config**:
 
 | Step | Action                                                                                                                                        |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -62,18 +62,20 @@ The built-in implementation uses CDN URLs defined in the package (see `figma-def
 
 ## Emoji
 
-|            | Figma                                                                                | This renderer (@grida/refig)                                     |
-| ---------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **Font**   | **Platform** emoji font (e.g. Apple Color Emoji on macOS, Segoe UI Emoji on Windows) | **Noto Color Emoji**                                             |
-| **Reason** | OS-provided; rendering is OS-dependent                                               | We cannot ship Apple/Segoe emoji fonts (license/redistribution). |
-| **Output** | Varies by platform                                                                   | Fixed (Noto Color Emoji); **different from Figma by design**.    |
+|            | Figma                                                                                                                                                                | This renderer (@grida/refig)                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Method** | **CDN-hosted PNG images** (not a font) — each emoji is a separate PNG fetched from Figma's own CDN                                                                   | **Noto Color Emoji** font                                              |
+| **Reason** | Figma hosts emoji as individual PNGs on their own CDN to bypass font licensing (e.g. Apple Color Emoji is proprietary); rendering is consistent across all platforms | We cannot ship Apple/Segoe emoji fonts (license/redistribution).       |
+| **Output** | Consistent across all platforms — Apple emoji visual style, CDN-served PNGs                                                                                          | Fixed (Noto Color Emoji); **visually different from Figma by design**. |
 
-Same logic applies: unsupported characters (including emoji) fall back to a default font. We intentionally use a different default for emoji, so **different render output is expected** for emoji (and for any other characters Figma would draw with a platform-specific font we don’t ship).
+Figma does **not** use OS/platform emoji fonts. It renders emoji as individual PNG images fetched from its own CDN, which allows it to present the Apple emoji visual style on every platform (macOS, Windows, Linux, browser) without distributing the proprietary font file. Output is therefore **platform-independent**, not OS-dependent.
 
-This is the only documented, intentional deviation from Figma’s default behavior; the rest of the strategy (Noto for CJK, explicit default set + fallback order) is intended to align with Figma.
+This renderer uses Noto Color Emoji as a real font instead. The visual appearance differs from Figma's Apple-style PNG emoji, and this is an intentional, documented divergence.
+
+This is the only documented, intentional deviation from Figma's default behavior; the rest of the strategy (Noto for CJK, explicit default set + fallback order) is intended to align with Figma.
 
 ---
 
 ## Last updated
 
-**2025-02-25** — Added bring-your-own-font flow. Figma’s default font set and fallback behavior are unlikely to change often but can change without notice. Re‑check Figma’s behavior and docs when doing font-related work.
+**2025-02-25** — Added bring-your-own-font flow. Figma's default font set and fallback behavior are unlikely to change often but can change without notice. Re‑check Figma's behavior and docs when doing font-related work.

@@ -21,6 +21,13 @@ pub fn export_node_as_svg(
     let width = rect.width;
     let height = rect.height;
 
+    // Guard: Skia cannot create a raster surface with zero or negative dimensions.
+    let pixel_w = width as i32;
+    let pixel_h = height as i32;
+    if pixel_w <= 0 || pixel_h <= 0 {
+        return None;
+    }
+
     // Create SVG canvas
     let bounds = SkRect::from_wh(width, height);
     let canvas = svg::Canvas::new(bounds, None);
@@ -31,7 +38,7 @@ pub fn export_node_as_svg(
     // Temporary renderer using raster backend sharing the ByteStore
     let store = fonts.store();
     let mut renderer = Renderer::new_with_store(
-        Backend::new_from_raster(width as i32, height as i32),
+        Backend::new_from_raster(pixel_w, pixel_h),
         None,
         camera,
         store,

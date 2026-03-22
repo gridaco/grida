@@ -71,7 +71,7 @@ impl Into<VectorNetwork> for &Shape {
             Shape::OrthogonalSmoothRRect(shape) => {
                 build_orthogonal_smooth_rrect_vector_network(shape)
             }
-            Shape::SimplePolygon(shape) => build_simple_polygon_vector_network(shape),
+            Shape::SimplePolygon(shape) => build_simple_polygon_vector_geometry(shape).into(),
             Shape::Ellipse(shape) => build_ellipse_vector_network(shape),
             Shape::EllipticalRingSector(_shape) => {
                 todo!("Arc shape to vector network requires manual implementation")
@@ -80,8 +80,8 @@ impl Into<VectorNetwork> for &Shape {
                 todo!("Arc shape to vector network requires manual implementation")
             }
             Shape::EllipticalRing(shape) => build_ring_vector_network(shape),
-            Shape::RegularStarPolygon(shape) => build_star_vector_network(shape),
-            Shape::RegularPolygon(shape) => build_regular_polygon_vector_network(shape),
+            Shape::RegularStarPolygon(shape) => build_star_vector_geometry(shape).into(),
+            Shape::RegularPolygon(shape) => build_regular_polygon_vector_geometry(shape).into(),
         }
     }
 }

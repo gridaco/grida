@@ -29,6 +29,17 @@ export interface RulerOptions {
   readonly color?: string;
   readonly accentBackgroundColor?: string;
   readonly accentColor?: string;
+  /**
+   * Subdivisions between major ticks (minor/subticks).
+   * - `false` or `0`: disabled (default — current behavior)
+   * - `true` or `"auto"`: automatically infer subdivisions from the step (1-2-5 heuristic)
+   * - `number` (e.g. `5`): fixed subdivision count — renders `(n-1)` unlabeled subticks between each pair of major ticks
+   */
+  readonly subticks?: false | true | "auto" | number;
+  /** Height (length) of subtick lines. Defaults to `Math.round(tickHeight * 0.4)`. */
+  readonly subtickHeight?: number;
+  /** Color of subtick lines. Defaults to `color`. */
+  readonly subtickColor?: string;
 }
 
 export class RulerCanvas implements RulerOptions {
@@ -50,6 +61,9 @@ export class RulerCanvas implements RulerOptions {
   tickHeight: number;
   accentBackgroundColor: string;
   accentColor: string;
+  subticks: false | true | "auto" | number;
+  subtickHeight: number | undefined;
+  subtickColor: string | undefined;
   priorityPoints: number[] = [];
 
   constructor(
@@ -69,6 +83,9 @@ export class RulerCanvas implements RulerOptions {
       color = "rgba(128, 128, 128, 0.5)",
       accentBackgroundColor = "rgba(80, 200, 255, 0.25)",
       accentColor = "rgba(80, 200, 255, 1)",
+      subticks = false,
+      subtickHeight,
+      subtickColor,
     }: RulerOptions
   ) {
     this.ctx = canvas.getContext("2d")!;
@@ -87,6 +104,9 @@ export class RulerCanvas implements RulerOptions {
     this.tickHeight = tickHeight;
     this.accentBackgroundColor = accentBackgroundColor;
     this.accentColor = accentColor;
+    this.subticks = subticks;
+    this.subtickHeight = subtickHeight;
+    this.subtickColor = subtickColor;
   }
 
   setSize(w: number, h: number) {
@@ -272,6 +292,27 @@ export class RulerCanvas implements RulerOptions {
     const endUnit = startUnit + dimension / this.zoom;
     const firstTick = Math.floor(startUnit / step) * step;
 
+    // subticks (rendered before major ticks so majors draw on top)
+    const subdivisions = resolveSubticks(step, this.subticks);
+    if (subdivisions > 1) {
+      const subStep = step / subdivisions;
+      const subColor = this.subtickColor ?? this.color;
+      const subHeight = this.subtickHeight ?? Math.round(this.tickHeight * 0.4);
+      for (let t = firstTick; t < endUnit; t += subStep) {
+        // skip positions that coincide with major ticks
+        const remainder = Math.abs(Math.round((t / step) * 1e9) % 1e9);
+        if (remainder < 1) continue;
+        const pos = t * this.zoom + this.offset;
+        if (pos < 0 || pos > dimension) continue;
+        this.renderTick({
+          pos: pos,
+          color: subColor,
+          strokeHeight: subHeight,
+        });
+      }
+    }
+
+    // major ticks
     for (let t = firstTick; t < endUnit; t += step) {
       const pos = t * this.zoom + this.offset;
       if (pos < 0 || pos > dimension) continue;
@@ -282,6 +323,26 @@ export class RulerCanvas implements RulerOptions {
       });
     }
   }
+}
+
+/**
+ * Resolve the number of subdivisions for subticks.
+ * Returns 0 or 1 when subticks are disabled (no subticks to draw).
+ */
+function resolveSubticks(
+  step: number,
+  subticks: false | true | "auto" | number
+): number {
+  if (subticks === false || subticks === 0) return 0;
+  if (typeof subticks === "number") return Math.max(Math.round(subticks), 1);
+  // "auto" or true — derive from the 1-2-5 series pattern
+  const magnitude = Math.pow(10, Math.floor(Math.log10(step)));
+  const leading = Math.round((step / magnitude) * 10) / 10; // e.g. 1, 2, 2.5, 5
+  if (leading === 1) return 10;
+  if (leading === 2) return 4;
+  if (leading === 2.5) return 5;
+  if (leading === 5) return 5;
+  return 5; // fallback
 }
 
 function mergeOverlappingRanges(ranges: Range[]): Range[] {

@@ -95,7 +95,6 @@ Perfect candidates for `opt-level = "z"`.
 
 Example crates we tuned:
 
-- `figma-api`
 - `usvg`
 - `pulldown-cmark`
 

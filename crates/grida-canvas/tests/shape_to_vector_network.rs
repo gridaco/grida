@@ -15,15 +15,23 @@ fn ellipse_vector_network_has_four_segments() {
 }
 
 #[test]
-fn rrect_vector_network_has_eight_segments() {
+fn rrect_vector_network_has_curved_corners() {
     let shape = RRectShape {
         width: 100.0,
         height: 80.0,
         corner_radius: RectangularCornerRadius::circular(10.0),
     };
     let vn = build_rrect_vector_network(&shape);
-    assert_eq!(vn.vertices.len(), 8);
-    assert_eq!(vn.segments.len(), 8);
+
+    // Each corner's conic is subdivided into multiple cubic segments.
+    // With 4 corners, curved count should be a positive multiple of 4.
+    let curved = vn
+        .segments
+        .iter()
+        .filter(|s| s.ta != (0.0, 0.0) || s.tb != (0.0, 0.0))
+        .count();
+    assert!(curved >= 4, "expected at least 4 curved segments, got {curved}");
+    assert_eq!(curved % 4, 0, "expected multiple of 4 curved segments, got {curved}");
 }
 
 #[test]

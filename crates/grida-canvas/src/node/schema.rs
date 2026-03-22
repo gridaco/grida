@@ -30,6 +30,18 @@ impl LayerEffects {
         Self::default()
     }
 
+    /// Returns true when there are no effects at all (no shadows, blur,
+    /// backdrop blur, glass, or noise). Used for fast-path dispatch
+    /// to skip the effects pipeline entirely for simple nodes.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.blur.is_none()
+            && self.backdrop_blur.is_none()
+            && self.glass.is_none()
+            && self.shadows.is_empty()
+            && self.noises.is_empty()
+    }
+
     /// Set layer blur effect
     pub fn blur(mut self, blur: impl Into<FeBlur>) -> Self {
         self.blur = Some(FeLayerBlur::from(blur.into()));
@@ -88,6 +100,56 @@ impl LayerEffects {
     pub fn glass(mut self, glass: impl Into<FeLiquidGlass>) -> Self {
         self.glass = Some(glass.into());
         self
+    }
+
+    /// Returns true if opacity must be isolated in a separate save_layer
+    /// because effects (shadows, blur, glass, backdrop blur) render outside
+    /// the opacity wrapper and should appear at full alpha.
+    ///
+    /// When false, opacity can be safely folded into a parent save_layer
+    /// or the paint alpha, eliminating a GPU surface allocation.
+    #[inline]
+    pub fn needs_opacity_isolation(&self) -> bool {
+        // Drop/inner shadows render outside opacity — they should appear at
+        // full opacity even when the shape content is semi-transparent.
+        if self.shadows.iter().any(|s| s.active()) {
+            return true;
+        }
+        // Layer blur wraps everything including content — opacity inside
+        // blur vs outside blur produces different results.
+        if self.blur.as_ref().is_some_and(|b| b.active) {
+            return true;
+        }
+        // Backdrop blur and glass read from content behind the node
+        // and render outside the opacity wrapper.
+        if self.backdrop_blur.as_ref().is_some_and(|b| b.active) {
+            return true;
+        }
+        if self.glass.as_ref().is_some_and(|g| g.active) {
+            return true;
+        }
+        false
+    }
+
+    /// Returns true if this layer has any active effects that are expensive
+    /// to paint (shadows, blurs, noise, glass).  Simple fill/stroke-only
+    /// nodes return false.
+    pub fn has_expensive_effects(&self) -> bool {
+        if self.blur.as_ref().is_some_and(|b| b.active) {
+            return true;
+        }
+        // Note: backdrop_blur is context-dependent and excluded from
+        // compositing by the promotion heuristic, so we don't count it here.
+        if self.shadows.iter().any(|s| s.active()) {
+            return true;
+        }
+        if self.glass.as_ref().is_some_and(|g| g.active) {
+            return true;
+        }
+        if self.noises.iter().any(|n| n.active) {
+            return true;
+        }
+        false
     }
 
     /// Convert a list of filter effects into a layer effects object.
@@ -780,6 +842,7 @@ impl LayoutPositioningBasis {
         match self {
             Self::Cartesian(point) => Some(point.x),
             Self::Inset(inset) => Some(inset.left),
+            #[allow(deprecated)]
             Self::Anchored => unreachable!("Anchored positioning is not supported"),
         }
     }
@@ -788,6 +851,7 @@ impl LayoutPositioningBasis {
         match self {
             Self::Cartesian(point) => Some(point.y),
             Self::Inset(inset) => Some(inset.top),
+            #[allow(deprecated)]
             Self::Anchored => unreachable!("Anchored positioning is not supported"),
         }
     }
@@ -895,6 +959,92 @@ impl Node {
             Node::Image(n) => n.mask,
             Node::Error(_) => None,
         }
+    }
+
+    /// Returns the node's opacity (0.0–1.0).
+    /// `InitialContainer` has no opacity field and returns 1.0.
+    pub fn opacity(&self) -> f32 {
+        match self {
+            Node::InitialContainer(_) => 1.0,
+            Node::Container(n) => n.opacity,
+            Node::Error(n) => n.opacity,
+            Node::Group(n) => n.opacity,
+            Node::Rectangle(n) => n.opacity,
+            Node::Ellipse(n) => n.opacity,
+            Node::Polygon(n) => n.opacity,
+            Node::RegularPolygon(n) => n.opacity,
+            Node::RegularStarPolygon(n) => n.opacity,
+            Node::Line(n) => n.opacity,
+            Node::TextSpan(n) => n.opacity,
+            Node::Path(n) => n.opacity,
+            Node::Vector(n) => n.opacity,
+            Node::BooleanOperation(n) => n.opacity,
+            Node::Image(n) => n.opacity,
+        }
+    }
+
+    /// Returns the node's blend mode.
+    /// `InitialContainer` and `Error` default to `PassThrough`.
+    pub fn blend_mode(&self) -> LayerBlendMode {
+        match self {
+            Node::InitialContainer(_) => LayerBlendMode::PassThrough,
+            Node::Error(_) => LayerBlendMode::PassThrough,
+            Node::Container(n) => n.blend_mode,
+            Node::Group(n) => n.blend_mode,
+            Node::Rectangle(n) => n.blend_mode,
+            Node::Ellipse(n) => n.blend_mode,
+            Node::Polygon(n) => n.blend_mode,
+            Node::RegularPolygon(n) => n.blend_mode,
+            Node::RegularStarPolygon(n) => n.blend_mode,
+            Node::Line(n) => n.blend_mode,
+            Node::TextSpan(n) => n.blend_mode,
+            Node::Path(n) => n.blend_mode,
+            Node::Vector(n) => n.blend_mode,
+            Node::BooleanOperation(n) => n.blend_mode,
+            Node::Image(n) => n.blend_mode,
+        }
+    }
+
+    /// Returns the node's effects, if it has any.
+    /// `InitialContainer`, `Error`, and `Group` have no effects.
+    pub fn effects(&self) -> Option<&LayerEffects> {
+        match self {
+            Node::InitialContainer(_) => None,
+            Node::Error(_) => None,
+            Node::Group(_) => None,
+            Node::Container(n) => Some(&n.effects),
+            Node::Rectangle(n) => Some(&n.effects),
+            Node::Ellipse(n) => Some(&n.effects),
+            Node::Polygon(n) => Some(&n.effects),
+            Node::RegularPolygon(n) => Some(&n.effects),
+            Node::RegularStarPolygon(n) => Some(&n.effects),
+            Node::Line(n) => Some(&n.effects),
+            Node::TextSpan(n) => Some(&n.effects),
+            Node::Path(n) => Some(&n.effects),
+            Node::Vector(n) => Some(&n.effects),
+            Node::BooleanOperation(n) => Some(&n.effects),
+            Node::Image(n) => Some(&n.effects),
+        }
+    }
+
+    /// Returns the container clip flag if this node is a Container.
+    /// Only containers can clip their descendants.
+    pub fn clips_content(&self) -> bool {
+        match self {
+            Node::Container(n) => n.clip,
+            _ => false,
+        }
+    }
+
+    /// Returns true if this node is a container type that can have children.
+    pub fn is_container_like(&self) -> bool {
+        matches!(
+            self,
+            Node::InitialContainer(_)
+                | Node::Container(_)
+                | Node::Group(_)
+                | Node::BooleanOperation(_)
+        )
     }
 }
 
@@ -1813,7 +1963,7 @@ impl NodeShapeMixin for PolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_simple_polygon_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 
@@ -1930,7 +2080,7 @@ impl NodeShapeMixin for RegularPolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_regular_polygon_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 
@@ -2035,7 +2185,7 @@ impl NodeShapeMixin for RegularStarPolygonNodeRec {
     }
 
     fn to_vector_network(&self) -> VectorNetwork {
-        build_star_vector_network(&self.to_own_shape())
+        (&self.to_shape()).into()
     }
 }
 

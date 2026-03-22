@@ -11,38 +11,13 @@ import { sitemap } from "@/www/data/sitemap";
 import type { Metadata } from "next";
 import { downloads } from "./downloads";
 import { headers } from "next/headers";
-import { DownloadIcon } from "@radix-ui/react-icons";
+import { PrimaryDownloadButton } from "./download-button";
 
 export const metadata: Metadata = {
   title: "Downloads",
   description: "Download Grida",
   keywords: "Grida, download, desktop, design, tool, editor",
 };
-
-const oslabel = {
-  mac: "macOS",
-  windows: "Windows",
-  linux: "Linux",
-};
-
-function OSIcon({
-  os,
-  className,
-}: {
-  os: "mac" | "windows" | "linux";
-  className?: string;
-}) {
-  switch (os) {
-    case "mac":
-      return <Apple className={className} />;
-    case "windows":
-      return <Windows className={className} />;
-    case "linux":
-      return <Linux className={className} />;
-    default:
-      return null;
-  }
-}
 
 export default async function DownloadsPage() {
   const headersList = await headers();
@@ -64,20 +39,11 @@ export default async function DownloadsPage() {
             </h1>
             <div>
               <div className="flex justify-center lg:justify-start space-x-4">
-                {os ? (
-                  <Link href={links.default!.url}>
-                    <Button size="lg">
-                      <OSIcon os={os} className="size-4" /> Download for{" "}
-                      {oslabel[os]}
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link href={sitemap.links.releases_latest}>
-                    <Button size="lg">
-                      <DownloadIcon className="size-4" /> Download
-                    </Button>
-                  </Link>
-                )}
+                <PrimaryDownloadButton
+                  os={os}
+                  defaultUrl={links.default?.url ?? null}
+                  fallbackUrl={sitemap.links.releases_latest}
+                />
               </div>
               <p className="mt-4 text-sm text-muted-foreground text-center lg:text-left">
                 <Link

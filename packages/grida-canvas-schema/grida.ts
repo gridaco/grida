@@ -530,7 +530,42 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "0.90.0-beta+20260108";
+  export const SCHEMA_VERSION = "0.91.0-beta+20260311";
+
+  /**
+   * Schema version compatibility check.
+   *
+   * ## Versioning policy
+   *
+   * We follow semver-ish `MAJOR.MINOR.PATCH-prerelease+build`.
+   *
+   * **While MAJOR is 0** (current), MINOR is the breaking-change boundary:
+   * - 0.90.x → 0.91.x is a **breaking** change (e.g. FlatBuffers field-ID renumbering).
+   * - 0.91.0 → 0.91.1 is a **compatible** (evolution) change.
+   *
+   * **Once MAJOR ≥ 1**, MAJOR becomes the breaking-change boundary (standard semver).
+   *
+   * @returns `true` if the file version is compatible with the current reader.
+   */
+  export function isSchemaCompatible(fileVersion: string): boolean {
+    const current = parseVersion(SCHEMA_VERSION);
+    const file = parseVersion(fileVersion);
+    if (!current || !file) return false;
+
+    if (current.major === 0) {
+      // Pre-1.0: minor is the breaking boundary
+      return file.major === current.major && file.minor === current.minor;
+    }
+    // Post-1.0: major is the breaking boundary (standard semver)
+    return file.major === current.major;
+  }
+
+  function parseVersion(
+    version: string
+  ): { major: number; minor: number } | null {
+    const match = version.match(/^(\d+)\.(\d+)\./);
+    return match ? { major: Number(match[1]), minor: Number(match[2]) } : null;
+  }
 
   /**
    * JSON-serializable value type

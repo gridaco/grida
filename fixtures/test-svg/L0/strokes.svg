@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+    <title>Strokes</title>
+    <desc>L0 test fixture for strokes</desc>
     <!-- Stroke caps and joins -->
     <rect x="28" y="28" width="80" height="80" fill="none" stroke="#ef4444" stroke-width="12"
         stroke-linejoin="bevel"/>

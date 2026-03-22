@@ -2,6 +2,8 @@
   width="200"
   height="200"
   xmlns="http://www.w3.org/2000/svg">
+  <title>Filters Feflood</title>
+  <desc>L0 test fixture for filters-feFlood</desc>
   <filter id="filter1">
     <feFlood flood-color="seagreen" flood-opacity="0.5"/>
   </filter>

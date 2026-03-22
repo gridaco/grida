@@ -1,6 +1,6 @@
 {
   "name": "@grida/ruler",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": false,
   "description": "Zero-Dependency Canvas Ruler Component for Infinite Canvas",
   "keywords": [
@@ -35,7 +35,8 @@
   },
   "scripts": {
     "build": "tsup index.ts react.tsx --format cjs,esm --dts",
-    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch"
+    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/react": "^19",

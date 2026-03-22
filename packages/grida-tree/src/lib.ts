@@ -2337,5 +2337,81 @@ export namespace tree {
         this._generation++;
       }
     }
+
+    /**
+     * Remap all keys in a graph, producing a new graph with fresh keys.
+     *
+     * This is essential when importing external documents (SVG, clipboard,
+     * drag-drop) where the source graph may contain keys that conflict
+     * with the current document.
+     *
+     * The function:
+     * 1. Builds a mapping from old keys to new keys via the `keygen` callback
+     * 2. Rewrites `nodes`, `links`, and `roots` using the mapping
+     * 3. Returns the remapped graph and the key mapping (old → new)
+     *
+     * @param subgraph - The graph to remap (nodes + links)
+     * @param roots - The root keys of the subgraph
+     * @param keygen - Function that generates a fresh key for each old key
+     * @returns `{ graph, roots, keyMap }` with all keys replaced
+     *
+     * @example
+     * ```ts
+     * const { graph, roots, keyMap } = tree.graph.remapKeys(
+     *   imported,
+     *   imported.scene.children_refs,
+     *   (oldKey) => idgen.next()
+     * );
+     * ```
+     */
+    export function remapKeys<T>(
+      subgraph: IGraph<T>,
+      roots: tree.Key[],
+      keygen: (oldKey: tree.Key) => tree.Key
+    ): {
+      graph: IGraph<T>;
+      roots: tree.Key[];
+      keyMap: Record<tree.Key, tree.Key>;
+    } {
+      // 1. Build the mapping
+      const keyMap: Record<tree.Key, tree.Key> = {};
+      for (const oldKey of Object.keys(subgraph.nodes)) {
+        keyMap[oldKey] = keygen(oldKey);
+      }
+
+      // 2. Remap nodes (shallow-copy to avoid mutating input)
+      const nodes: Record<tree.Key, T> = {};
+      for (const [oldKey, node] of Object.entries(subgraph.nodes)) {
+        const newKey = keyMap[oldKey]!;
+        let mapped = node as T;
+        if (
+          node &&
+          typeof node === "object" &&
+          "id" in (node as Record<string, unknown>) &&
+          typeof (node as Record<string, unknown>).id === "string"
+        ) {
+          mapped = { ...(node as any), id: newKey } as T;
+        }
+        nodes[newKey] = mapped;
+      }
+
+      // 3. Remap links
+      const links: Record<tree.Key, tree.Key[] | undefined> = {};
+      for (const [oldKey, children] of Object.entries(subgraph.links)) {
+        const newKey = keyMap[oldKey]!;
+        if (Array.isArray(children)) {
+          links[newKey] = children.map(
+            (childKey: tree.Key) => keyMap[childKey] ?? childKey
+          );
+        } else {
+          links[newKey] = undefined;
+        }
+      }
+
+      // 4. Remap roots
+      const newRoots = roots.map((r) => keyMap[r] ?? r);
+
+      return { graph: { nodes, links }, roots: newRoots, keyMap };
+    }
   }
 }

@@ -48,33 +48,57 @@ cargo build
 cargo run --example <example-name>
 ```
 
+### Performance benchmarking
+
+> **Always use `--release` for benchmarks.** Debug builds are ~20-30× slower
+> and produce meaningless performance data.
+
+```sh
+# headless GPU benchmark (via grida-dev)
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida
+
+# headless GPU example (cg only, requires native-gl-context feature)
+cargo run -p cg --example headless_gpu --features native-gl-context --release
+```
+
 ## Tools
 
-### `tool_io_grida` - Grida File Validator
+### `tool_io_grida` — Grida File Inspector
 
-A CLI tool for validating `.grida` files and debugging parsing issues.
+Unified CLI tool for inspecting and validating `.grida` / `.grida1` files
+in any format (FlatBuffers, ZIP, or legacy JSON). Includes a layout-engine
+check to diagnose "Container must have layout result" panics.
 
 **Usage:**
 
 ```sh
-cargo run --example tool_io_grida <path-to-grida-file>
+# Basic inspection (auto-detects format)
+cargo run --example tool_io_grida -- path/to/file.grida
+
+# List scenes (FBS/ZIP multi-scene files)
+cargo run --example tool_io_grida -- path/to/file.grida --list-scenes
+
+# Inspect a specific scene with full node tree
+cargo run --example tool_io_grida -- path/to/file.grida --scene 0 --verbose
+
+# Run layout check (detect containers missing layout results)
+cargo run --example tool_io_grida -- path/to/file.grida --layout-check
 ```
 
 **Features:**
 
-- Validates `.grida` file structure and parses all nodes
-- Reports total node count, scene references, and entry scene
-- Provides node type breakdown (container, text, image, etc.)
-- Detects parsing errors with detailed error messages
-- Handles legacy file formats gracefully (missing fields, typos, etc.)
-
-**Example:**
+- Auto-detects file format (FlatBuffers, ZIP archive, JSON)
+- Validates file structure and parses all nodes
+- Reports per-scene node counts and type breakdown
+- Shows ID mapping info for FBS/ZIP files (internal NodeId to string ID)
+- `--layout-check`: runs the layout engine and reports containers missing layout results
+- `--verbose`: prints the full node tree with string IDs
+- Handles legacy JSON formats gracefully (missing fields, typos, etc.)
 
 See [examples/tool_io_grida.rs](./examples/tool_io_grida.rs) for full documentation.
 
 ## Package Docs
 
 ```sh
-# skia-safe
-cargo doc --package skia-safe --open --no-deps
+cargo doc --package cg --open --no-deps
 ```

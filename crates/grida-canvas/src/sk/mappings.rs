@@ -157,7 +157,7 @@ impl From<TextDecoration> for skia_safe::textlayout::Decoration {
             // },
             color: decoration.text_decoration_color.into(),
             style: decoration.text_decoration_style.into(),
-            thickness_multiplier: decoration.text_decoration_thinkness,
+            thickness_multiplier: decoration.text_decoration_thickness,
         }
     }
 }

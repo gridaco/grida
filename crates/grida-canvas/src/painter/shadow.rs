@@ -39,14 +39,13 @@ pub fn drop_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
 /// Draw a drop shadow behind the given shape on the provided canvas.
 pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
     let color: sk::Color = shadow.color.into();
-    let path = shape.to_path();
 
     let mut paint = Paint::default();
     let filter = drop_shadow_image_filter(shadow);
     paint.set_color(color);
     paint.set_image_filter(filter);
     paint.set_anti_alias(true);
-    canvas.draw_path(&path, &paint);
+    shape.draw_on_canvas(canvas, &paint);
 }
 
 pub fn inner_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
@@ -96,8 +95,7 @@ pub fn draw_inner_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeS
     shadow_paint.set_anti_alias(true);
 
     canvas.save();
-    let path = shape.to_path();
-    canvas.clip_path(&path, None, true);
-    canvas.draw_path(&path, &shadow_paint);
+    shape.clip_on_canvas(canvas);
+    shape.draw_on_canvas(canvas, &shadow_paint);
     canvas.restore();
 }

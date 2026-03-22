@@ -31,6 +31,7 @@ import { Data } from "@/lib/data";
 import { FormStartPage } from "@/theme/templates/formstart";
 import type { MenuGroup } from "./menu";
 import { editor } from "@/grida-canvas";
+import grida from "@grida/schema";
 import { DataFormat } from "../data-format";
 
 export function initialEditorState(init: EditorInit): EditorState {
@@ -316,7 +317,7 @@ function __init_canvas(
   // check the version
   if (
     (data as SchemaMayVaryDocumentServerObject).__schema_version !==
-    "0.90.0-beta+20260108"
+    grida.program.document.SCHEMA_VERSION
   ) {
     return {
       __schema_version: (data as SchemaMayVaryDocumentServerObject)
@@ -349,7 +350,8 @@ function __init_form_start_page_state(
 
   // check the version
   if (
-    (data as FormStartPageSchema).__schema_version !== "0.90.0-beta+20260108"
+    (data as FormStartPageSchema).__schema_version !==
+    grida.program.document.SCHEMA_VERSION
   ) {
     return {
       __schema_version: (data as FormStartPageSchema).__schema_version,

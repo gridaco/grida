@@ -7,4 +7,6 @@ pub enum ApplicationCommand {
     Pan { tx: f32, ty: f32 },
     ToggleDebugMode,
     TryCopyAsPNG,
+    NextScene,
+    PrevScene,
 }

@@ -419,7 +419,7 @@ export default function ReferrerPageTemplate({
               </header>
 
               {design.article && (
-                <article className="prose prose-sm dark:prose-invert">
+                <article className="prose prose-sm dark:prose-invert prose-img:!w-full">
                   <span
                     dangerouslySetInnerHTML={{ __html: design.article.html }}
                   />

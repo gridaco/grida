@@ -6,7 +6,6 @@ import vn from "@grida/vn";
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import { normalizeVectorNodeBBox } from "./vector";
-import * as modeProperties from "@/grida-canvas/utils/properties";
 
 /**
  * Node types that can be flattened into vector paths.
@@ -57,27 +56,37 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   const rect = context.geometry.getNodeAbsoluteBoundingRect(node_id);
   if (!rect) return null;
 
-  // attempt to resolve vector network via wasm backend when available
-  let v: vn.VectorNetwork | null = null;
+  // attempt to resolve vector network via wasm backend when available.
+  // The result includes an optional corner_radius: when present, the VN has
+  // straight segments and corner radius is a rendering effect to preserve.
+  let flattenResult: vn.FlattenResult | null = null;
   try {
-    v = context.vector?.toVectorNetwork(node_id) ?? null;
+    flattenResult = context.vector?.toVectorNetwork(node_id) ?? null;
   } catch {}
-  if (!v) {
-    v = toVectorNetworkFallback(node, {
+  if (!flattenResult) {
+    const fallback = toVectorNetworkFallback(node, {
       width: rect.width,
       height: rect.height,
     });
+    if (fallback) {
+      flattenResult = fallback;
+    }
   }
-  if (!v) return null;
+  if (!flattenResult) return null;
+
+  // Extract corner_radius from rust-side result (if curves are NOT baked in).
+  // When corner_radius is present, the vector node should keep it as a
+  // rendering effect. When absent, geometry is baked — clear corner_radius.
+  const { corner_radius: resultCornerRadius, ...vectorNetwork } = flattenResult;
 
   const vectornode: grida.program.nodes.VectorNode = {
     ...(node as grida.program.nodes.UnknownNode),
     type: "vector",
     id: node.id,
     active: node.active,
-    corner_radius: modeProperties.cornerRadius(node),
+    corner_radius: resultCornerRadius ?? undefined,
     fill_rule: (node as grida.program.nodes.UnknownNode).fill_rule ?? "nonzero",
-    vector_network: v,
+    vector_network: vectorNetwork,
     layout_target_width: rect.width,
     layout_target_height: rect.height,
     layout_inset_left: (node as grida.program.nodes.UnknownNode)
@@ -101,37 +110,40 @@ function __dangerously_delete_non_vector_properties(
   node: grida.program.nodes.Node
 ) {
   // Remove primitive-only properties that should not persist on vector nodes.
-  // star
-  delete (node as any).pointCount;
-  delete (node as any).innerRadius;
+
+  // star / polygon
+  delete (node as any).point_count;
+  delete (node as any).inner_radius;
+
+  // rectangle (per-corner radius & per-side stroke width)
+  delete (node as any).rectangular_corner_radius_top_left;
+  delete (node as any).rectangular_corner_radius_top_right;
+  delete (node as any).rectangular_corner_radius_bottom_left;
+  delete (node as any).rectangular_corner_radius_bottom_right;
+  delete (node as any).corner_smoothing;
+  delete (node as any).rectangular_stroke_width_top;
+  delete (node as any).rectangular_stroke_width_right;
+  delete (node as any).rectangular_stroke_width_bottom;
+  delete (node as any).rectangular_stroke_width_left;
+
+  // ellipse (arc data)
+  delete (node as any).angle;
+  delete (node as any).angle_offset;
 
   // text
   delete (node as any).text;
 }
 
-function modeCornerRadius(node: grida.program.nodes.Node): number | undefined {
-  if ("corner_radius" in node) {
-    return node.corner_radius;
-  }
-
-  if ("rectangular_corner_radius_top_left" in node) {
-    const values: number[] = [
-      node.rectangular_corner_radius_top_left,
-      node.rectangular_corner_radius_top_right,
-      node.rectangular_corner_radius_bottom_left,
-      node.rectangular_corner_radius_bottom_right,
-    ].filter((it) => it !== undefined);
-
-    return cmath.mode(values);
-  }
-}
-
 function toVectorNetworkFallback(
   node: grida.program.nodes.Node,
   size: { width: number; height: number }
-): vn.VectorNetwork | null {
+): vn.FlattenResult | null {
   switch (node.type) {
     case "rectangle": {
+      // Rectangle does NOT carry corner_radius here. Native rrect uses
+      // conic arcs while corner_path uses quadratic Bézier — different
+      // curves. The Rust backend bakes rrect geometry; this fallback
+      // produces a sharp rect (acceptable degradation when WASM is absent).
       return vn.fromRect({
         x: 0,
         y: 0,
@@ -149,23 +161,34 @@ function toVectorNetworkFallback(
       });
     }
     case "polygon": {
-      return vn.fromRegularPolygon({
-        x: 0,
-        y: 0,
-        width: size.width,
-        height: size.height,
-        points: node.point_count ?? 3,
-      });
+      // Polygon/star use corner_path PathEffect for rendering, so
+      // corner_radius is a rendering effect — preserve it on the result.
+      // (Mirrors what the Rust backend returns for these shapes.)
+      const cr = node.corner_radius;
+      return {
+        ...vn.fromRegularPolygon({
+          x: 0,
+          y: 0,
+          width: size.width,
+          height: size.height,
+          points: node.point_count ?? 3,
+        }),
+        ...(cr && cr > 0 ? { corner_radius: cr } : {}),
+      };
     }
     case "star": {
-      return vn.fromRegularStarPolygon({
-        x: 0,
-        y: 0,
-        width: size.width,
-        height: size.height,
-        points: node.point_count ?? 5,
-        innerRadius: node.inner_radius ?? 0.5,
-      });
+      const cr = node.corner_radius;
+      return {
+        ...vn.fromRegularStarPolygon({
+          x: 0,
+          y: 0,
+          width: size.width,
+          height: size.height,
+          points: node.point_count ?? 5,
+          innerRadius: node.inner_radius ?? 0.5,
+        }),
+        ...(cr && cr > 0 ? { corner_radius: cr } : {}),
+      };
     }
     case "line": {
       // return vn.fromLine({

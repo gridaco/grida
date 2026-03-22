@@ -29,6 +29,21 @@ pub fn sk_paint_stack(
     size: (f32, f32),
     images: &ImageRepository,
 ) -> Option<skia_safe::Paint> {
+    // Fast path: single solid fill — set color directly on the paint,
+    // avoiding shader object allocation and giving Skia's GPU backend
+    // a simpler code path (no shader program dispatch).
+    if paints.len() == 1 {
+        if let Paint::Solid(solid) = &paints[0] {
+            let CGColor { r, g, b, a } = solid.color;
+            let final_alpha = (a as f32 * solid.opacity()).round() as u8;
+            let mut paint = skia_safe::Paint::default();
+            paint.set_anti_alias(true);
+            paint.set_color(Color::from_argb(final_alpha, r, g, b));
+            paint.set_blend_mode(solid.blend_mode.into());
+            return Some(paint);
+        }
+    }
+
     // Paint stacking semantics:
     // - `paints` is ordered bottom → top (the last entry is visually top-most).
     // - Skia's `shaders::blend(mode, dst, src)` interprets the first shader as the
@@ -72,6 +87,19 @@ pub fn sk_paint_stack_without_images(
     paints: &[Paint],
     size: (f32, f32),
 ) -> Option<skia_safe::Paint> {
+    // Fast path: single solid fill — direct color, no shader allocation.
+    if paints.len() == 1 {
+        if let Paint::Solid(solid) = &paints[0] {
+            let CGColor { r, g, b, a } = solid.color;
+            let final_alpha = (a as f32 * solid.opacity()).round() as u8;
+            let mut paint = skia_safe::Paint::default();
+            paint.set_anti_alias(true);
+            paint.set_color(Color::from_argb(final_alpha, r, g, b));
+            paint.set_blend_mode(solid.blend_mode.into());
+            return Some(paint);
+        }
+    }
+
     // Same ordering rules as `sk_paint_stack` (bottom → top).
     let mut iter = paints.iter();
     let first = iter.next()?;
@@ -89,8 +117,6 @@ pub fn sk_paint_stack_without_images(
     // Apply the base paint's blend mode at the paint level so the first
     // fill can blend with the canvas/background, matching editor semantics.
     paint.set_blend_mode(base_blend_mode.into());
-
-    // Don't set blend mode - defaults to SrcOver, and blending is already handled in shader composition
     Some(paint)
 }
 

@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
     mdxRs: true,
   },
   images: {
+    dangerouslyAllowLocalIP: process.env.NODE_ENV === "development",
     remotePatterns: [
       {
         protocol: "http",

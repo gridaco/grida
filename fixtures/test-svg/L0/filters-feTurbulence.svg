@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+    <title>Filters Feturbulence</title>
+    <desc>L0 test fixture for filters-feTurbulence</desc>
     <rect x="0" y="0" width="800" height="600" fill="#ffffff"/>
 
     <defs>

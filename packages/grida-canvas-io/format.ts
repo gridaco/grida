@@ -2,7 +2,7 @@ import grida from "@grida/schema";
 import cg from "@grida/cg";
 import type cmath from "@grida/cmath";
 import * as fbs from "@grida/format";
-import { unionToPaint, unionListToNode, unionToFeBlur } from "@grida/format";
+import { unionToPaint, unionToNode, unionToFeBlur } from "@grida/format";
 import type { vn } from "@grida/schema";
 import * as flatbuffers from "flatbuffers";
 import { generateNKeysBetween } from "@grida/sequence";
@@ -960,15 +960,31 @@ export namespace format {
         // Nodes don't have blend_mode directly - it's not part of the TS node model
         const blendMode: fbs.LayerBlendMode = fbs.LayerBlendMode.PassThrough;
 
-        // Encode mask_type (LayerMaskType union)
-        // Default to Image(Alpha) - create LayerMaskTypeImage
-        fbs.LayerMaskTypeImage.startLayerMaskTypeImage(builder);
-        fbs.LayerMaskTypeImage.addImageMaskType(
-          builder,
-          fbs.ImageMaskType.Alpha
-        );
-        const maskTypeOffset =
-          fbs.LayerMaskTypeImage.endLayerMaskTypeImage(builder);
+        // Encode mask_type (LayerMaskType union) — only when the node is actually a mask
+        const nodeWithMask = node as grida.program.nodes.Node &
+          Partial<grida.program.nodes.i.ILayerMaskType>;
+        let maskTypeOffset: flatbuffers.Offset | undefined = undefined;
+        let maskTypeEnum: fbs.LayerMaskType = fbs.LayerMaskType.NONE;
+        if (nodeWithMask.mask != null) {
+          if (nodeWithMask.mask === "geometry") {
+            fbs.LayerMaskTypeGeometry.startLayerMaskTypeGeometry(builder);
+            maskTypeOffset =
+              fbs.LayerMaskTypeGeometry.endLayerMaskTypeGeometry(builder);
+            maskTypeEnum = fbs.LayerMaskType.LayerMaskTypeGeometry;
+          } else {
+            // ImageMaskType: "alpha" | "luminance"
+            fbs.LayerMaskTypeImage.startLayerMaskTypeImage(builder);
+            fbs.LayerMaskTypeImage.addImageMaskType(
+              builder,
+              nodeWithMask.mask === "luminance"
+                ? fbs.ImageMaskType.Luminance
+                : fbs.ImageMaskType.Alpha
+            );
+            maskTypeOffset =
+              fbs.LayerMaskTypeImage.endLayerMaskTypeImage(builder);
+            maskTypeEnum = fbs.LayerMaskType.LayerMaskTypeImage;
+          }
+        }
 
         // Encode effects
         let effectsOffset: flatbuffers.Offset | undefined = undefined;
@@ -1010,14 +1026,16 @@ export namespace format {
           );
         }
 
+        // 1. Parent (required field — use empty reference for root nodes)
+        // Must be created before startLayerTrait; FlatBuffers forbids createString inside an object block.
+        if (parentReferenceOffset === undefined) {
+          parentReferenceOffset = structs.parentReference(builder, "", "");
+        }
+
         fbs.LayerTrait.startLayerTrait(builder);
 
         // Field order: parent (required), opacity, blend_mode, mask_type, effects, layout, post_layout_transform, post_layout_transform_origin
-
-        // 1. Parent (required field)
-        if (parentReferenceOffset !== undefined) {
-          fbs.LayerTrait.addParent(builder, parentReferenceOffset);
-        }
+        fbs.LayerTrait.addParent(builder, parentReferenceOffset);
 
         // 2. Opacity
         const nodeWithOpacity = node as grida.program.nodes.Node &
@@ -1027,12 +1045,11 @@ export namespace format {
         // 3. Blend mode
         fbs.LayerTrait.addBlendMode(builder, blendMode);
 
-        // 4. Mask type
-        fbs.LayerTrait.addMaskTypeType(
-          builder,
-          fbs.LayerMaskType.LayerMaskTypeImage
-        );
-        fbs.LayerTrait.addMaskType(builder, maskTypeOffset);
+        // 4. Mask type (only set when the node is a mask)
+        if (maskTypeOffset !== undefined) {
+          fbs.LayerTrait.addMaskTypeType(builder, maskTypeEnum);
+          fbs.LayerTrait.addMaskType(builder, maskTypeOffset);
+        }
 
         // 5. Effects
         if (effectsOffset !== undefined) {
@@ -2255,15 +2272,29 @@ export namespace format {
         }
 
         /**
-         * Decodes LinearGradientPaint.
+         * Decodes LinearGradientPaint (with xy1/xy2 endpoints).
          */
         export function linearGradient(
           paintValue: unknown
         ): cg.LinearGradientPaint {
-          return decodeGradientPaint(
-            paintValue as fbs.LinearGradientPaint,
-            "linear_gradient"
-          );
+          const lg = paintValue as fbs.LinearGradientPaint;
+          const xy1Obj = lg.xy1();
+          const xy2Obj = lg.xy2();
+          return {
+            type: "linear_gradient" as const,
+            stops: decodeGradientStops(lg),
+            transform: decodeGradientTransform(lg.transform()),
+            blend_mode: styling.decode.blendMode(lg.blendMode()),
+            opacity: lg.opacity(),
+            active: lg.active(),
+            // Alignment space: CENTER_LEFT=(-1,0), CENTER_RIGHT=(1,0)
+            xy1: xy1Obj
+              ? ([xy1Obj.x(), xy1Obj.y()] as [number, number])
+              : ([-1, 0] as [number, number]),
+            xy2: xy2Obj
+              ? ([xy2Obj.x(), xy2Obj.y()] as [number, number])
+              : ([1, 0] as [number, number]),
+          };
         }
 
         /**
@@ -2502,11 +2533,12 @@ export namespace format {
       function createStrokeStyle(
         builder: Builder,
         strokeCap: cg.StrokeCap | undefined,
-        strokeJoin: cg.StrokeJoin | undefined
+        strokeJoin: cg.StrokeJoin | undefined,
+        strokeDashArray?: number[]
       ): flatbuffers.Offset {
         const dashArrayOffset = fbs.StrokeStyle.createStrokeDashArrayVector(
           builder,
-          []
+          strokeDashArray ?? []
         );
         fbs.StrokeStyle.startStrokeStyle(builder);
         fbs.StrokeStyle.addStrokeCap(
@@ -2532,12 +2564,14 @@ export namespace format {
           stroke_width?: number;
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
+          stroke_dash_array?: number[];
         }>
       ): flatbuffers.Offset {
         const strokeStyleOffset = createStrokeStyle(
           builder,
           node.stroke_cap,
-          node.stroke_join
+          node.stroke_join,
+          node.stroke_dash_array
         );
 
         // Create VariableWidthProfile (empty for now)
@@ -2981,6 +3015,7 @@ export namespace format {
         stroke_width: number;
         stroke_cap: cg.StrokeCap;
         stroke_join: cg.StrokeJoin;
+        stroke_dash_array?: number[];
       } {
         if (!trait) {
           return {
@@ -2998,10 +3033,23 @@ export namespace format {
           ? styling.decode.strokeJoin(strokeStyle.strokeJoin())
           : "miter";
 
+        // Decode dash array
+        let stroke_dash_array: number[] | undefined;
+        if (strokeStyle) {
+          const len = strokeStyle.strokeDashArrayLength();
+          if (len > 0) {
+            stroke_dash_array = [];
+            for (let i = 0; i < len; i++) {
+              stroke_dash_array.push(strokeStyle.strokeDashArray(i)!);
+            }
+          }
+        }
+
         return {
           stroke_width: trait.strokeWidth() ?? 0,
           stroke_cap: cap,
           stroke_join: join,
+          ...(stroke_dash_array ? { stroke_dash_array } : {}),
         };
       }
 
@@ -4430,8 +4478,7 @@ export namespace format {
         // Deterministic ordering: sort by string id
         nodeIds.sort();
 
-        const nodeOffsets: flatbuffers.Offset[] = [];
-        const nodeTypes: fbs.Node[] = [];
+        const nodeSlotOffsets: flatbuffers.Offset[] = [];
         for (const nodeId of nodeIds) {
           const node = document.nodes[nodeId]!;
           const parentRef = nodeToParentRef.get(nodeId);
@@ -4483,18 +4530,16 @@ export namespace format {
             parentRef,
             layoutOffset
           );
-          nodeOffsets.push(nodeOffset);
-          nodeTypes.push(nodeType);
+          // Wrap in NodeSlot table (avoids vector-of-unions, enables Rust codegen)
+          fbs.NodeSlot.startNodeSlot(builder);
+          fbs.NodeSlot.addNodeType(builder, nodeType);
+          fbs.NodeSlot.addNode(builder, nodeOffset);
+          nodeSlotOffsets.push(fbs.NodeSlot.endNodeSlot(builder));
         }
 
-        // Create both nodesType and nodes vectors for union
-        const nodesTypeOffset = fbs.CanvasDocument.createNodesTypeVector(
-          builder,
-          nodeTypes
-        );
         const nodesOffset = fbs.CanvasDocument.createNodesVector(
           builder,
-          nodeOffsets
+          nodeSlotOffsets
         );
 
         // Encode scenes array
@@ -4508,7 +4553,6 @@ export namespace format {
         // Build CanvasDocument table
         fbs.CanvasDocument.startCanvasDocument(builder);
         fbs.CanvasDocument.addSchemaVersion(builder, schemaVersionOffset);
-        fbs.CanvasDocument.addNodesType(builder, nodesTypeOffset);
         fbs.CanvasDocument.addNodes(builder, nodesOffset);
         fbs.CanvasDocument.addScenes(builder, scenesOffset);
         const documentOffset = fbs.CanvasDocument.endCanvasDocument(builder);
@@ -4518,7 +4562,7 @@ export namespace format {
         fbs.GridaFile.addDocument(builder, documentOffset);
         const rootOffset = fbs.GridaFile.endGridaFile(builder);
 
-        builder.finish(rootOffset);
+        builder.finish(rootOffset, "GRID");
 
         return builder.asUint8Array();
       }
@@ -5301,6 +5345,9 @@ export namespace format {
               enums.STROKE_MARKER_PRESET_DECODE.get(n.markerEndShape()) ??
               "none",
             vector_network: vectorNetwork,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.VectorNode;
         }
@@ -5363,7 +5410,12 @@ export namespace format {
         }
 
         /**
-         * Decodes GroupNode (fallback).
+         * Decodes GroupNode.
+         *
+         * NOTE: The FBS `post_layout_transform` may carry a full affine
+         * matrix (scale, skew) for SVG-imported groups. The TS SDK model
+         * currently only supports rotation — scale/skew are lost here.
+         * The data is preserved in the FBS file for future use.
          */
         export function group(
           n: fbs.GroupNode,
@@ -5403,7 +5455,9 @@ export namespace format {
         const m10 = transform.m10();
         const m00 = transform.m00();
         const rotationRad = Math.atan2(m10, m00);
-        return (rotationRad * 180) / Math.PI;
+        const degrees = (rotationRad * 180) / Math.PI;
+        // Snap near-zero to exactly 0 to avoid epsilon noise
+        return Math.abs(degrees) < 1e-5 ? 0 : degrees;
       }
 
       /**
@@ -5425,8 +5479,13 @@ export namespace format {
           );
         }
 
-        const schemaVersion =
-          document.schemaVersion() || grida.program.document.SCHEMA_VERSION;
+        const schemaVersion = document.schemaVersion() ?? "";
+
+        if (!grida.program.document.isSchemaCompatible(schemaVersion)) {
+          throw new Error(
+            `schema incompatible: file version "${schemaVersion}" is not compatible with current "${grida.program.document.SCHEMA_VERSION}"`
+          );
+        }
 
         // Decode nodes array and collect parent references
         const nodes: Record<string, grida.program.nodes.Node> = {};
@@ -5438,15 +5497,14 @@ export namespace format {
 
         const nodeCount = document.nodesLength();
         for (let i = 0; i < nodeCount; i++) {
-          const nodeType = document.nodesType(i);
-          if (nodeType === null || nodeType === fbs.Node.NONE) continue;
+          const slot = document.nodes(i);
+          if (!slot) continue;
 
-          // Get typed node table using union
-          const typedNode = unionListToNode(
-            nodeType,
-            (index: number, obj: any) => document.nodes(index, obj),
-            i
-          );
+          const nodeType = slot.nodeType();
+          if (nodeType === fbs.Node.NONE) continue;
+
+          // Unwrap NodeSlot to get the typed node table
+          const typedNode = unionToNode(nodeType, (obj: any) => slot.node(obj));
           if (!typedNode) continue;
 
           // SceneNode is special - it doesn't use LayerTrait

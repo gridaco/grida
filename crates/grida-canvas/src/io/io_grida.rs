@@ -62,6 +62,10 @@ pub enum JSONPaint {
     LinearGradient {
         id: Option<String>,
         transform: Option<CGTransform2D>,
+        /// Gradient start point in UV [0,1] space.
+        xy1: Option<[f32; 2]>,
+        /// Gradient end point in UV [0,1] space.
+        xy2: Option<[f32; 2]>,
         stops: Vec<JSONGradientStop>,
         #[serde(default = "default_opacity")]
         opacity: f32,
@@ -393,6 +397,8 @@ impl From<Option<JSONPaint>> for Paint {
             }),
             Some(JSONPaint::LinearGradient {
                 transform,
+                xy1,
+                xy2,
                 stops,
                 opacity,
                 blend_mode,
@@ -401,8 +407,12 @@ impl From<Option<JSONPaint>> for Paint {
             }) => {
                 let stops = stops.into_iter().map(|s| s.into()).collect();
                 Paint::LinearGradient(LinearGradientPaint {
-                    xy1: Alignment::CENTER_LEFT,
-                    xy2: Alignment::CENTER_RIGHT,
+                    xy1: xy1
+                        .map(|[x, y]| Alignment::from_uv(Uv(x, y)))
+                        .unwrap_or(Alignment::CENTER_LEFT),
+                    xy2: xy2
+                        .map(|[x, y]| Alignment::from_uv(Uv(x, y)))
+                        .unwrap_or(Alignment::CENTER_RIGHT),
                     tile_mode: TileMode::Clamp,
                     transform: transform
                         .map(|t| t.into())
@@ -1033,7 +1043,7 @@ pub struct JSONTextSpanNode {
         alias = "textDecorationThickness",
         default
     )]
-    pub text_decoration_thinkness: Option<f32>,
+    pub text_decoration_thickness: Option<f32>,
 
     #[serde(rename = "line_height", alias = "lineHeight", default)]
     pub line_height: Option<f32>,
@@ -1133,6 +1143,27 @@ impl From<VectorNetwork> for JSONVectorNetwork {
     fn from(network: VectorNetwork) -> Self {
         (&network).into()
     }
+}
+
+/// Result of flattening a shape to a vector network.
+///
+/// When `corner_radius` is `Some`, the vector network contains straight
+/// segments and the corner radius should be applied as a rendering effect
+/// (e.g. polygon, star). These shapes use `corner_path` PathEffect for
+/// rendering, so the effect is preserved.
+///
+/// When `corner_radius` is `None`, the corner geometry is already baked
+/// into the vector network as Bézier curves (e.g. rectangle, ellipse).
+/// Rectangles always bake because their native rrect rendering uses conic
+/// arcs, which differ from the `corner_path` PathEffect. See
+/// [`crate::shape::build_corner_radius_path`] for details.
+#[derive(Debug, Serialize)]
+pub struct JSONFlattenResult {
+    #[serde(flatten)]
+    pub vector_network: JSONVectorNetwork,
+    /// Uniform corner radius to apply as a rendering effect, if applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub corner_radius: Option<f32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1410,7 +1441,7 @@ impl From<JSONTextSpanNode> for TextSpanNodeRec {
                     text_decoration_color: Some(node.text_decoration_color),
                     text_decoration_style: node.text_decoration_style,
                     text_decoration_skip_ink: node.text_decoration_skip_ink,
-                    text_decoration_thinkness: node.text_decoration_thinkness,
+                    text_decoration_thickness: node.text_decoration_thickness,
                 }),
                 font_family: node.font_family.unwrap_or_else(|| "".to_string()),
                 font_size: node.font_size.unwrap_or(14.0),
@@ -3193,7 +3224,7 @@ mod tests {
     #[test]
     fn parse_grida_file_new_format() {
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {
@@ -3250,7 +3281,7 @@ mod tests {
     fn parse_grida_file_with_container_children() {
         // Test that container nodes with children in links work correctly
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {
@@ -3317,7 +3348,7 @@ mod tests {
     fn test_nested_children_population() {
         // Test that deeply nested children get properly populated from links
         let json = r#"{
-            "version": "0.90.0-beta+20260108",
+            "version": "0.91.0-beta+20260311",
             "document": {
                 "nodes": {
                     "main": {

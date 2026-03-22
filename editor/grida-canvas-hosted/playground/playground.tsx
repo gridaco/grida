@@ -497,11 +497,26 @@ export default function CanvasPlayground({
             }
           }
         } catch (error) {
-          // File not found or other error - continue to fallback
           if (error instanceof Error && error.message.includes("not found")) {
             // File doesn't exist yet - this is fine, continue to fallback
           } else {
-            console.error("Failed to load from OPFS:", error);
+            // Any decode, structural validation, or state-init failure
+            // means the persisted data is incompatible with the current
+            // version. Quarantine the stale files so the user's bytes are
+            // preserved for possible future migration, then fall through
+            // to the default document.
+            console.warn(
+              "OPFS document unusable (possible schema change), quarantining:",
+              error
+            );
+            try {
+              await opfs?.quarantine();
+            } catch (quarantineError) {
+              console.error(
+                "Failed to quarantine stale OPFS data:",
+                quarantineError
+              );
+            }
           }
         }
 
@@ -886,7 +901,7 @@ function SidebarLeft({
             <div className="flex items-center gap-2">
               <span>Open Library</span>
               <KbdGroup>
-                <Kbd>{uikbdk(M.CtrlCmd)}</Kbd>
+                <Kbd>{uikbdk(M.Shift)}</Kbd>
                 <Kbd>{uikbdk(KeyCode.KeyI)}</Kbd>
               </KbdGroup>
             </div>
@@ -985,6 +1000,7 @@ function SidebarRight({
   setTab: (tab: "inspect" | "agent") => void;
 }) {
   const should_show_artboards_list = useArtboardListCondition();
+  const AGENT_PANEL_WIDTH = "540px";
 
   return (
     <aside
@@ -993,7 +1009,7 @@ function SidebarRight({
       className="relative data-[variant=floating]:absolute data-[variant=floating]:right-0"
       style={
         {
-          "--sidebar-width": tab === "inspect" ? "240px" : "400px",
+          "--sidebar-width": tab === "inspect" ? "240px" : AGENT_PANEL_WIDTH,
         } as React.CSSProperties
       }
     >

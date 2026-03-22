@@ -163,7 +163,17 @@ export function ScenesList() {
     },
     dataLoader: {
       getItem(itemId) {
-        return scenesmap[itemId];
+        const item = scenesmap[itemId];
+        if (item) return item;
+        // Root or deleted scene: tree may hold stale refs until rebuildTree runs.
+        // Return a stub so syncDataLoaderFeature doesn't throw "returned undefined".
+        if (itemId === "<document>") {
+          return {
+            id: "<document>",
+            name: "<document>",
+          } as grida.program.nodes.SceneNode;
+        }
+        return { id: itemId, name: "" } as grida.program.nodes.SceneNode;
       },
       getChildren: (itemId) => {
         if (itemId === "<document>") {
@@ -210,7 +220,7 @@ export function ScenesList() {
     <Tree tree={tree} indent={0}>
       {tree.getItems().map((item) => {
         const scene = item.getItemData();
-        if (!scene) return null;
+        if (!scene || !scenesmap[scene.id]) return null;
         const isRenaming = item.isRenaming();
         return (
           <SceneItemContextMenuWrapper

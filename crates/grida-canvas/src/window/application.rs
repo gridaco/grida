@@ -1,21 +1,24 @@
 use crate::cg::types::TextAlignVertical;
 use crate::devtools::{
-    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, tile_overlay,
+    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay,
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
-use crate::io::io_grida::{self, JSONVectorNetwork};
+use crate::io::io_grida::{self, JSONFlattenResult};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
 use crate::node::schema::*;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
+use crate::runtime::frame_loop::{FrameLoop, FrameQuality};
 use crate::sys::clock;
-use crate::sys::scheduler;
 use crate::sys::timer::TimerMgr;
 use crate::text;
 use crate::vectornetwork::VectorNetwork;
+use grida_text_edit::layout::ManagedTextLayout;
+use grida_text_edit::TextLayoutEngine;
 use crate::window::command::ApplicationCommand;
+#[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 use serde_json::Value;
@@ -44,10 +47,10 @@ pub trait ApplicationApi {
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
-    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork>;
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult>;
 
-    /// Enable or disable caching of raster tiles.
-    fn runtime_renderer_set_cache_tile(&mut self, cache: bool);
+    /// Enable or disable per-node layer compositing cache.
+    fn runtime_renderer_set_layer_compositing(&mut self, enable: bool);
 
     /// Configure Pixel Preview scale.
     ///
@@ -149,7 +152,6 @@ pub struct UnknownTargetApplication {
     pub(crate) clock: clock::EventLoopClock,
     pub(crate) timer: TimerMgr,
     pub(crate) clipboard: Clipboard,
-    pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) request_redraw: crate::runtime::scene::RequestRedrawCallback,
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::AnySurfaceState,
@@ -158,7 +160,9 @@ pub struct UnknownTargetApplication {
     pub(crate) hit_test_result: Option<crate::node::schema::NodeId>,
     pub(crate) hit_test_last: std::time::Instant,
     pub(crate) hit_test_interval: std::time::Duration,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
@@ -170,10 +174,8 @@ pub struct UnknownTargetApplication {
     pub(crate) devtools_rendering_show_stats: bool,
     pub(crate) devtools_rendering_show_hit_overlay: bool,
     pub(crate) devtools_rendering_show_ruler: bool,
-    pub(crate) queue_stable_debounce_millis: u64,
-
-    /// timer id for debouncing stable frame queues
-    queue_stable_timer: Option<crate::sys::timer::TimerId>,
+    /// Unified frame lifecycle controller.
+    frame_loop: FrameLoop,
 
     /// Bidirectional mapping between user string IDs and internal u64 IDs
     /// Maintained across scene loads to enable API calls with string IDs
@@ -185,6 +187,17 @@ pub struct UnknownTargetApplication {
     /// When `true`, this application is driven by a platform-managed tick loop
     /// and should be freed by that loop after `running` becomes `false`.
     auto_tick: bool,
+
+    /// Active text editing session and its layout engine, if any.
+    ///
+    /// The session and layout are stored together so the overlay renderer
+    /// can access both during `draw_and_flush_devtools_overlay`.
+    pub text_edit: Option<crate::text_edit_session::ActiveTextEdit>,
+
+    /// Text editing decorations (caret + selection) for the overlay pass.
+    /// `None` when no text editing session is active.
+    text_edit_decorations:
+        Option<crate::devtools::text_edit_decoration_overlay::TextEditingDecorations>,
 }
 
 impl ApplicationApi for UnknownTargetApplication {
@@ -193,6 +206,13 @@ impl ApplicationApi for UnknownTargetApplication {
     fn tick(&mut self, time: f64) {
         self.clock.tick(time);
         self.timer.tick(self.clock.now());
+
+        // Drive the text-edit clock from the host's wall time.
+        // `time` is milliseconds (from performance.now()); the text-edit
+        // Instant uses microseconds.  On native builds this is a no-op
+        // (native Instant uses std::time::Instant directly).
+        #[cfg(target_arch = "wasm32")]
+        grida_text_edit::time::Instant::set_micros((time * 1000.0) as u64);
     }
 
     /// Update backing resources after a window resize.
@@ -272,7 +292,9 @@ impl ApplicationApi for UnknownTargetApplication {
                     }
                 }
             }
-            ApplicationCommand::None => {}
+            ApplicationCommand::None
+            | ApplicationCommand::NextScene
+            | ApplicationCommand::PrevScene => {}
         }
 
         false
@@ -343,17 +365,34 @@ impl ApplicationApi for UnknownTargetApplication {
         return None;
     }
 
-    fn to_vector_network(&mut self, id: &str) -> Option<JSONVectorNetwork> {
+    fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
         let internal_id = self.user_id_to_internal(id)?;
         if let Some(scene) = self.renderer.scene.as_ref() {
             if let Ok(node) = scene.graph.get_node(&internal_id) {
-                let vn = match node {
-                    Node::Rectangle(n) => Some(n.to_vector_network()),
-                    Node::Ellipse(n) => Some(n.to_vector_network()),
-                    Node::Polygon(n) => Some(n.to_vector_network()),
-                    Node::RegularPolygon(n) => Some(n.to_vector_network()),
-                    Node::RegularStarPolygon(n) => Some(n.to_vector_network()),
-                    Node::Vector(n) => Some(n.network.clone()),
+                /// Convert a positive corner radius to `Some`, zero/negative to `None`.
+                fn nonzero_radius(r: f32) -> Option<f32> {
+                    if r > 0.0 { Some(r) } else { None }
+                }
+
+                let result: Option<(VectorNetwork, Option<f32>)> = match node {
+                    // Rectangle: always bake corner geometry into the VN.
+                    // Skia's native rrect uses conic arcs while corner_path
+                    // PathEffect uses a different curve type (quadratic Bézier).
+                    // See `shape/corner.rs` for documentation.
+                    Node::Rectangle(n) => Some((n.to_vector_network(), None)),
+                    Node::Ellipse(n) => Some((n.to_vector_network(), None)),
+                    // Polygon/star shapes use corner_path for rendering, so
+                    // corner_radius is preserved as a rendering effect.
+                    Node::Polygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::RegularPolygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::RegularStarPolygon(n) => {
+                        Some((n.to_vector_network(), nonzero_radius(n.corner_radius)))
+                    }
+                    Node::Vector(n) => Some((n.network.clone(), None)),
                     // TODO: find a better way to clean this, as simple as Text::to_vector_network()
                     Node::TextSpan(n) => {
                         let paragraph = self.renderer.get_cache().paragraph.borrow_mut().paragraph(
@@ -386,18 +425,22 @@ impl ApplicationApi for UnknownTargetApplication {
                         if y_offset != 0.0 {
                             path = path.make_transform(&Matrix::translate((0.0, y_offset)));
                         }
-                        Some(VectorNetwork::from(&path))
+                        Some((VectorNetwork::from(&path), None))
                     }
                     _ => None,
                 };
-                return vn.map(|v| v.into());
+                return result.map(|(vn, cr)| JSONFlattenResult {
+                    vector_network: vn.into(),
+                    corner_radius: cr,
+                });
             }
         }
         None
     }
 
-    fn runtime_renderer_set_cache_tile(&mut self, cache: bool) {
-        self.renderer.set_cache_tile(cache);
+    fn runtime_renderer_set_layer_compositing(&mut self, enable: bool) {
+        self.renderer.set_layer_compositing(enable);
+        self.queue();
     }
 
     fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {
@@ -546,9 +589,9 @@ impl UnknownTargetApplication {
         state: super::state::AnySurfaceState,
         backend: Backend,
         camera: Camera2D,
-        target_fps: u32,
-        image_rx: mpsc::UnboundedReceiver<ImageMessage>,
-        font_rx: mpsc::UnboundedReceiver<FontMessage>,
+        _target_fps: u32,
+        #[cfg(not(target_arch = "wasm32"))] image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+        #[cfg(not(target_arch = "wasm32"))] font_rx: mpsc::UnboundedReceiver<FontMessage>,
         request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
         options: crate::runtime::scene::RendererOptions,
     ) -> Self {
@@ -571,9 +614,10 @@ impl UnknownTargetApplication {
             hit_test_result: None,
             hit_test_last: std::time::Instant::now(),
             hit_test_interval: std::time::Duration::from_millis(0),
+            #[cfg(not(target_arch = "wasm32"))]
             image_rx,
+            #[cfg(not(target_arch = "wasm32"))]
             font_rx,
-            scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
             devtools_selection: None,
@@ -585,12 +629,13 @@ impl UnknownTargetApplication {
             devtools_rendering_show_hit_overlay: debug,
             devtools_rendering_show_ruler: debug,
             timer: TimerMgr::new(),
-            queue_stable_timer: None,
-            queue_stable_debounce_millis: 50,
+            frame_loop: FrameLoop::new(),
             id_mapping: std::collections::HashMap::new(),
             id_mapping_reverse: std::collections::HashMap::new(),
             running: true,
             auto_tick: false,
+            text_edit: None,
+            text_edit_decorations: None,
         }
     }
 
@@ -603,7 +648,9 @@ impl UnknownTargetApplication {
         height: i32,
         options: crate::runtime::scene::RendererOptions,
     ) -> Box<Self> {
+        #[cfg(not(target_arch = "wasm32"))]
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
+        #[cfg(not(target_arch = "wasm32"))]
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
 
         let camera = Camera2D::new(crate::node::schema::Size {
@@ -615,7 +662,16 @@ impl UnknownTargetApplication {
         let backend = state.backend();
 
         Box::new(Self::new(
-            state, backend, camera, 120, image_rx, font_rx, None, options,
+            state,
+            backend,
+            camera,
+            120,
+            #[cfg(not(target_arch = "wasm32"))]
+            image_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            font_rx,
+            None,
+            options,
         ))
     }
 
@@ -656,7 +712,7 @@ impl UnknownTargetApplication {
     }
 
     /// Convert user string ID to internal u64 ID
-    fn user_id_to_internal(&self, user_id: &str) -> Option<NodeId> {
+    pub fn user_id_to_internal(&self, user_id: &str) -> Option<NodeId> {
         self.id_mapping.get(user_id).copied()
     }
 
@@ -706,27 +762,98 @@ impl UnknownTargetApplication {
     }
 
     fn queue(&mut self) {
-        self.renderer.queue_unstable();
+        // Invalidate the frame loop — it will handle unstable/stable
+        // scheduling automatically via poll()/complete().
+        let now = self.clock.now();
+        self.frame_loop.invalidate(now);
 
-        if let Some(id) = self.queue_stable_timer.take() {
-            self.timer.cancel(id);
+        // Legacy path: also eager-queue an unstable frame on the renderer
+        // so that the existing `redraw()` flow continues to work when
+        // hosts call the old `redraw()` entry point.
+        self.renderer.queue_unstable();
+    }
+
+    /// Unified frame entry point.
+    ///
+    /// Called once per host frame (e.g. from RAF on WASM, RedrawRequested on
+    /// native). The engine decides whether to produce pixels and at what
+    /// quality. Returns `true` if a frame was rendered.
+    pub fn frame(&mut self, time: f64) -> bool {
+        // 1. Advance host clock
+        self.clock.tick(time);
+
+        // 2. Fire non-frame timers (text blink, etc.)
+        //    Timer callbacks may call invalidate() on the frame loop — that's
+        //    fine, invalidate() just sets flags.
+        self.timer.tick(self.clock.now());
+
+        // Drive the text-edit clock from the host's wall time.
+        #[cfg(target_arch = "wasm32")]
+        grida_text_edit::time::Instant::set_micros((time * 1000.0) as u64);
+
+        // 3. Process async resources (native only)
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.process_image_queue();
+            self.process_font_queue();
         }
 
-        let renderer_ptr: *mut Renderer = &mut self.renderer;
-        self.queue_stable_timer = Some(self.timer.set_timeout(
-            std::time::Duration::from_millis(self.queue_stable_debounce_millis),
-            move || unsafe {
-                (*renderer_ptr).queue_stable();
-            },
-        ));
+        // 4. Poll frame loop — should we render?
+        let now = self.clock.now();
+        let quality = match self.frame_loop.poll(now) {
+            Some(q) => q,
+            None => return false, // idle
+        };
 
-        // TODO: can't use debounce - let's try this later
-        // self.debounce(
-        //     std::time::Duration::from_millis(100),
-        //     || self.renderer.queue_stable(),
-        //     false,
-        //     true,
-        // );
+        // 5. Build plan + render
+        let __frame_start = std::time::Instant::now();
+
+        // Prepare camera change for the renderer
+        let camera_change = self.renderer.camera.change_kind();
+        if camera_change.zoom_changed() {
+            self.renderer.invalidate_compositor_on_zoom();
+        }
+
+        // Promote to stable quality when the camera didn't change — there is
+        // no reason to render at reduced resolution for non-camera
+        // invalidations (hit-test highlight, scene edits, etc.).
+        let stable = quality == FrameQuality::Stable || !camera_change.any_changed();
+
+        // Warm the camera cache once per frame so view_matrix(), rect(), and
+        // screen_to_canvas_point() are essentially free for the rest of this frame.
+        self.renderer.camera.warm_cache();
+
+        // Build frame plan lazily
+        let rect = self.renderer.camera.rect();
+        let zoom = self.renderer.camera.get_zoom();
+        let plan = self.renderer.build_frame_plan(rect, zoom, stable, camera_change);
+
+        // Consume the camera change so the next frame sees None
+        // (unless a new mutation occurs before then).
+        self.renderer.camera.consume_change();
+
+        // Flush (draw + GPU submit)
+        let stats = self.renderer.flush_with_plan(plan);
+
+        // 6. Stats bookkeeping — update *before* the overlay so the overlay
+        //    always shows the current frame's data (not the previous frame's).
+        //    This matters for the stable frame: it's the last frame before idle,
+        //    so the overlay text it paints is what the user sees until the next
+        //    interaction.
+        let __render_time = __frame_start.elapsed();
+        if let Some(ref stats) = stats {
+            self.update_stats(stats, __render_time);
+        }
+
+        // 7. Draw devtools overlays (uses the just-updated last_stats)
+        let _overlay_time = self.draw_and_flush_devtools_overlay();
+
+        // 8. Complete frame in the loop
+        self.frame_loop.complete(quality);
+
+        self.last_frame_time = __frame_start;
+
+        true
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -769,6 +896,7 @@ impl UnknownTargetApplication {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn print_font_repository_info(&self) {
         let font_repo = &self.renderer.fonts;
         let family_count = font_repo.family_count();
@@ -905,37 +1033,21 @@ impl UnknownTargetApplication {
             }
         };
 
-        let overlay_time = self.draw_and_flush_devtools_overlay();
+        // Consume the camera change so the next change_kind() returns None
+        // (unless a new mutation occurs). This must happen here (not in
+        // renderer.flush()) because on the web path both redraw() and frame()
+        // may run: consuming in flush() would eat the change before frame()
+        // sees it.  Completing the frame loop prevents frame() from rendering
+        // a redundant second frame for the same invalidation.
+        self.renderer.camera.consume_change();
+        self.frame_loop.complete(crate::runtime::frame_loop::FrameQuality::Unstable);
 
-        let __sleep_start = std::time::Instant::now();
-        self.scheduler.sleep_to_maintain_fps();
-        let __sleep_time = __sleep_start.elapsed();
+        // Build stats string BEFORE the overlay so the overlay shows the
+        // current frame's data, not the previous frame's.
+        let __total_frame_time_pre = __frame_start.elapsed();
+        self.update_stats(&stats, __total_frame_time_pre);
 
-        let __total_frame_time = __frame_start.elapsed();
-        let stat_string = format!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | res: {} | img: {} | fnt: {}",
-            1.0 / __total_frame_time.as_secs_f64(),
-            __total_frame_time.as_secs_f64() * 1000.0,
-            stats.total_duration.as_secs_f64() * 1000.0,
-            stats.flush_duration.as_secs_f64() * 1000.0,
-            overlay_time.as_secs_f64() * 1000.0,
-            stats.frame_duration.as_secs_f64() * 1000.0,
-            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
-            stats.frame.display_list_size_estimated,
-            stats.draw.painter_duration.as_secs_f64() * 1000.0,
-            stats.draw.cache_picture_size,
-            stats.draw.cache_picture_used,
-            stats.draw.cache_geometry_size,
-            stats.draw.tiles_total,
-            stats.draw.tiles_used,
-            self.renderer.resources.len(),
-            self.renderer.images.len(),
-            self.renderer.fonts.len(),
-        );
-
-        self.verbose(&stat_string);
-
-        self.last_stats = Some(stat_string);
+        let _overlay_time = self.draw_and_flush_devtools_overlay();
 
         self.last_frame_time = __frame_start;
     }
@@ -949,7 +1061,7 @@ impl UnknownTargetApplication {
             let surface = self.state.surface_mut();
             let canvas = surface.canvas();
             if self.devtools_rendering_show_fps {
-                fps_overlay::FpsMeter::draw(&canvas, self.scheduler.average_fps());
+                fps_overlay::FpsMeter::draw(&canvas, self.clock.hz() as f32);
             }
             if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
@@ -976,11 +1088,15 @@ impl UnknownTargetApplication {
                     self.highlight_stroke_style.as_ref(),
                 );
             }
-            if self.devtools_rendering_show_tiles {
-                tile_overlay::TileOverlay::draw(
+            // Text editing decorations (caret + selection) are rendered as
+            // an overlay — unclipped by parent containers and with a
+            // zoom-independent caret width.
+            if let Some(ref deco) = self.text_edit_decorations {
+                crate::devtools::text_edit_decoration_overlay::TextEditDecorationOverlay::draw(
                     &canvas,
+                    deco,
                     &self.renderer.camera,
-                    self.renderer.get_cache().tile.tiles(),
+                    self.renderer.get_cache(),
                 );
             }
             if self.devtools_rendering_show_ruler {
@@ -996,6 +1112,38 @@ impl UnknownTargetApplication {
             overlay_draw_time = __overlay_start.elapsed();
         }
         overlay_flush_time + overlay_draw_time
+    }
+
+    /// Format and store the frame stats string for the devtools overlay.
+    fn update_stats(
+        &mut self,
+        stats: &crate::runtime::scene::FrameFlushStats,
+        wall_time: std::time::Duration,
+    ) {
+        let s = format!(
+            "fps*: {:.0} | t: {:.2}ms | cam: {} | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | comp: {:?} ({:?} hit, {:.1}KB) | live: {:?} | res: {} | img: {} | fnt: {}",
+            1.0 / wall_time.as_secs_f64(),
+            wall_time.as_secs_f64() * 1000.0,
+            stats.frame.camera_change.label(),
+            stats.total_duration.as_secs_f64() * 1000.0,
+            stats.flush_duration.as_secs_f64() * 1000.0,
+            stats.frame_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_size_estimated,
+            stats.draw.painter_duration.as_secs_f64() * 1000.0,
+            stats.draw.cache_picture_size,
+            stats.draw.cache_picture_used,
+            stats.draw.cache_geometry_size,
+            stats.draw.layer_image_cache_size,
+            stats.draw.layer_image_cache_hits,
+            stats.draw.layer_image_cache_bytes as f64 / 1024.0,
+            stats.draw.live_draw_count,
+            self.renderer.resources.len(),
+            self.renderer.images.len(),
+            self.renderer.fonts.len(),
+        );
+        self.verbose(&s);
+        self.last_stats = Some(s);
     }
 
     /// Update the cursor position and run a debounced hit test.
@@ -1062,5 +1210,422 @@ impl UnknownTargetApplication {
 
     pub fn get_image_size(&self, id: &str) -> Option<(u32, u32)> {
         self.renderer.get_image_size(id)
+    }
+
+    // -----------------------------------------------------------------------
+    // Text editing — first-class engine feature
+    // -----------------------------------------------------------------------
+
+    /// Enter text editing mode for a node.
+    ///
+    /// Reads all text properties directly from the scene node to ensure
+    /// the editing layout engine uses exactly the same configuration as
+    /// the Painter. Returns `true` on success.
+    ///
+    /// The layout adapter (`ParagraphCacheLayout`) builds paragraphs with
+    /// the **same** `textstyle()`, `FontCollection`, and
+    /// `TextStyleRecBuildContext` that `ParagraphCache::measure()` uses,
+    /// eliminating font fallback mismatches and layout divergence.
+    pub fn text_edit_enter(&mut self, user_node_id: &str) -> bool {
+        use crate::node::schema::Node;
+        use crate::text::paragraph_cache_layout::ParagraphCacheLayout;
+        use crate::text_edit_session::ActiveTextEdit;
+
+        let node_id = match self.user_id_to_internal(user_node_id) {
+            Some(id) => id,
+            None => return false,
+        };
+
+        // Look up the text node from the scene to get the authoritative
+        // properties — same data the Painter and ParagraphCache use.
+        let scene = match self.renderer.scene.as_ref() {
+            Some(s) => s,
+            None => return false,
+        };
+        let node = match scene.graph.get_node(&node_id) {
+            Ok(n) => n,
+            Err(_) => return false,
+        };
+        let tspan = match node {
+            Node::TextSpan(t) => t,
+            _ => return false,
+        };
+
+        let text = &tspan.text;
+        let text_style_rec = &tspan.text_style;
+        let text_align = &tspan.text_align;
+        let layout_height = tspan.height.unwrap_or(10000.0);
+
+        let fill = grida_text_edit::attributed_text::TextFill::default();
+        let paragraph_style = grida_text_edit::attributed_text::ParagraphStyle::default();
+
+        // Build the layout adapter using the same font collection and style
+        // code path as ParagraphCache::measure().
+        let layout = ParagraphCacheLayout::new(
+            text_style_rec.clone(),
+            *text_align,
+            tspan.width, // None = auto-width (intrinsic sizing)
+            layout_height,
+            &self.renderer.fonts,
+        );
+
+        let te = ActiveTextEdit::new(
+            node_id,
+            text,
+            text_style_rec,
+            fill,
+            paragraph_style,
+            layout,
+        );
+
+        self.text_edit = Some(te);
+        self.text_edit_refresh_decorations();
+        true
+    }
+
+    /// Exit text editing mode.
+    ///
+    /// If `commit`, returns the final text (if modified). Otherwise cancels.
+    pub fn text_edit_exit(&mut self, commit: bool) -> Option<String> {
+        let te = self.text_edit.take()?;
+        self.text_edit_decorations = None;
+        self.renderer.queue_unstable();
+
+        if commit {
+            te.commit()
+        } else {
+            te.cancel();
+            None
+        }
+    }
+
+    /// Whether a text editing session is active.
+    pub fn text_edit_is_active(&self) -> bool {
+        self.text_edit.is_some()
+    }
+
+    /// Returns the current text of the active editing session, or `None`
+    /// if no session is active.
+    pub fn text_edit_get_text(&self) -> Option<&str> {
+        self.text_edit.as_ref().map(|te| te.session.state.text.as_str())
+    }
+
+    /// Dispatch an editing command.
+    pub fn text_edit_command(&mut self, cmd: grida_text_edit::EditingCommand) {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.apply(cmd);
+        }
+        self.text_edit_refresh_decorations();
+    }
+
+    /// Undo within the text editing session.
+    ///
+    /// Returns `true` if the session had something to undo.
+    pub fn text_edit_undo(&mut self) -> bool {
+        let performed = self
+            .text_edit
+            .as_mut()
+            .is_some_and(|te| te.session.undo());
+        self.text_edit_refresh_decorations();
+        performed
+    }
+
+    /// Redo within the text editing session.
+    ///
+    /// Returns `true` if the session had something to redo.
+    pub fn text_edit_redo(&mut self) -> bool {
+        let performed = self
+            .text_edit
+            .as_mut()
+            .is_some_and(|te| te.session.redo());
+        self.text_edit_refresh_decorations();
+        performed
+    }
+
+    /// Pointer down in layout-local coordinates.
+    pub fn text_edit_pointer_down(&mut self, x: f32, y: f32, shift: bool, click_count: u32) {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.handle_click(x, y, click_count, shift);
+        }
+        self.text_edit_refresh_decorations();
+    }
+
+    /// Pointer move during drag (layout-local coordinates).
+    pub fn text_edit_pointer_move(&mut self, x: f32, y: f32) {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.on_pointer_move(x, y);
+        }
+        self.text_edit_refresh_decorations();
+    }
+
+    /// Pointer up.
+    pub fn text_edit_pointer_up(&mut self) {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.on_pointer_up();
+        }
+    }
+
+    /// Set IME preedit string.
+    pub fn text_edit_ime_set_preedit(&mut self, text: String) {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.update_preedit(text);
+        }
+        self.text_edit_sync_display_text();
+        self.text_edit_refresh_decorations();
+    }
+
+    /// Commit IME composition.
+    pub fn text_edit_ime_commit(&mut self, text: &str) {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.apply_with_kind(
+                grida_text_edit::EditingCommand::Insert(text.to_owned()),
+                grida_text_edit::EditKind::ImeCommit,
+            );
+            te.session.cancel_preedit();
+        }
+        self.text_edit_refresh_decorations();
+    }
+
+    /// Cancel IME composition.
+    pub fn text_edit_ime_cancel(&mut self) {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.cancel_preedit();
+        }
+        self.text_edit_sync_display_text();
+        self.text_edit_refresh_decorations();
+    }
+
+    /// Get selected text (plain).
+    pub fn text_edit_get_selected_text(&self) -> Option<String> {
+        let te = self.text_edit.as_ref()?;
+        te.session.selected_text().map(|s| s.to_owned())
+    }
+
+    /// Get selected text as HTML.
+    pub fn text_edit_get_selected_html(&self) -> Option<String> {
+        let te = self.text_edit.as_ref()?;
+        te.session.selected_html()
+    }
+
+    /// Paste plain text.
+    pub fn text_edit_paste_text(&mut self, text: &str) {
+        if text.is_empty() { return; }
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.apply_with_kind(
+                grida_text_edit::EditingCommand::Insert(text.to_owned()),
+                grida_text_edit::EditKind::Paste,
+            );
+        }
+        self.text_edit_refresh_decorations();
+    }
+
+    /// Paste HTML with formatting.
+    pub fn text_edit_paste_html(&mut self, html: &str) {
+        if html.is_empty() { return; }
+        if let Some(te) = self.text_edit.as_mut() {
+            let base_style = te.session.content.default_style().clone();
+            match grida_text_edit::attributed_text::html::html_to_attributed_text(html, base_style) {
+                Ok(pasted) if !pasted.is_empty() => {
+                    te.session.paste_attributed(&pasted);
+                }
+                _ => {} // malformed HTML — ignore silently
+            }
+        }
+        self.text_edit_refresh_decorations();
+    }
+
+    /// Get caret rect in layout-local coordinates.
+    pub fn text_edit_get_caret_rect(&mut self) -> Option<grida_text_edit::CaretRect> {
+        let te = self.text_edit.as_mut()?;
+        Some(te.session.caret_rect())
+    }
+
+    /// Get selection rects in layout-local coordinates.
+    pub fn text_edit_get_selection_rects(&mut self) -> Option<Vec<grida_text_edit::SelectionRect>> {
+        let te = self.text_edit.as_mut()?;
+        let (lo, hi) = te.session.selection_range()?;
+        let rects = te.session.layout.selection_rects_for_range(&te.session.state.text, lo, hi);
+        if rects.is_empty() { None } else { Some(rects) }
+    }
+
+    /// Toggle bold on selection/caret.
+    pub fn text_edit_toggle_bold(&mut self) {
+        if let Some(te) = self.text_edit.as_mut() { te.session.toggle_bold(); }
+        self.text_edit_after_style_change();
+    }
+
+    /// Toggle italic on selection/caret.
+    pub fn text_edit_toggle_italic(&mut self) {
+        if let Some(te) = self.text_edit.as_mut() { te.session.toggle_italic(); }
+        self.text_edit_after_style_change();
+    }
+
+    /// Toggle underline on selection/caret.
+    pub fn text_edit_toggle_underline(&mut self) {
+        if let Some(te) = self.text_edit.as_mut() { te.session.toggle_underline(); }
+        self.text_edit_after_style_change();
+    }
+
+    /// Toggle strikethrough on selection/caret.
+    pub fn text_edit_toggle_strikethrough(&mut self) {
+        if let Some(te) = self.text_edit.as_mut() { te.session.toggle_strikethrough(); }
+        self.text_edit_after_style_change();
+    }
+
+    /// Set font size on selection/caret.
+    pub fn text_edit_set_font_size(&mut self, size: f32) {
+        if let Some(te) = self.text_edit.as_mut() { te.session.set_font_size(size); }
+        self.text_edit_after_style_change();
+    }
+
+    /// Set font family on selection/caret.
+    pub fn text_edit_set_font_family(&mut self, family: &str) {
+        if let Some(te) = self.text_edit.as_mut() { te.session.set_font_family(family); }
+        self.text_edit_after_style_change();
+    }
+
+    /// Set fill color on selection/caret.
+    pub fn text_edit_set_color(&mut self, r: f32, g: f32, b: f32, a: f32) {
+        use grida_text_edit::attributed_text::RGBA;
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.set_color(RGBA { r, g, b, a });
+        }
+        self.text_edit_after_style_change();
+    }
+
+    /// Tick the blink timer. Returns `true` if visibility changed.
+    pub fn text_edit_tick(&mut self) -> bool {
+        let changed = self
+            .text_edit
+            .as_mut()
+            .map(|te| te.session.tick_blink())
+            .unwrap_or(false);
+        if changed {
+            if let Some(te) = self.text_edit.as_ref() {
+                let visible = te.session.should_show_caret();
+                if let Some(ref mut deco) = self.text_edit_decorations {
+                    if let Some(ref mut caret) = deco.caret {
+                        caret.visible = visible;
+                    }
+                }
+            }
+            self.renderer.queue_unstable();
+        }
+        changed
+    }
+
+    // -- Internal helpers --
+
+    /// Build the display text (committed text + preedit at cursor) and
+    /// sync it to the layer. Called during IME composition so the user
+    /// sees each intermediate syllable.
+    fn text_edit_sync_display_text(&mut self) {
+        if let Some(te) = self.text_edit.as_ref() {
+            let node_id = te.node_id();
+            let display_text = match te.session.preedit() {
+                Some(preedit) if !preedit.is_empty() => {
+                    let committed = &te.session.state.text;
+                    let cursor = te.session.state.cursor;
+                    let mut buf = String::with_capacity(committed.len() + preedit.len());
+                    buf.push_str(&committed[..cursor]);
+                    buf.push_str(preedit);
+                    buf.push_str(&committed[cursor..]);
+                    buf
+                }
+                _ => te.session.state.text.clone(),
+            };
+            self.renderer.update_layer_text(node_id, &display_text);
+        }
+        self.renderer.queue_unstable();
+    }
+
+    fn text_edit_after_style_change(&mut self) {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.layout.invalidate();
+            te.session.layout.ensure_layout(&te.session.content);
+        }
+        self.text_edit_refresh_decorations();
+    }
+
+    fn text_edit_refresh_decorations(&mut self) {
+        // The generic session's apply() already calls ensure_layout internally,
+        // but we still need to compute decoration data for the overlay.
+
+        // Split borrows: extract data from `text_edit`, then access `renderer`.
+        let deco_data = self.text_edit.as_mut().map(|te| {
+            // Ensure layout is up to date.
+            te.session.layout.ensure_layout(&te.session.content);
+            let node_id = te.node_id();
+            let paragraph_height = te.session.layout.paragraph_height();
+            // Use display text (committed + preedit) so intermediate IME
+            // syllables remain visible when decorations are refreshed.
+            let display_text = match te.session.preedit() {
+                Some(preedit) if !preedit.is_empty() => {
+                    let committed = &te.session.state.text;
+                    let cursor = te.session.state.cursor;
+                    let mut buf = String::with_capacity(committed.len() + preedit.len());
+                    buf.push_str(&committed[..cursor]);
+                    buf.push_str(preedit);
+                    buf.push_str(&committed[cursor..]);
+                    buf
+                }
+                _ => te.session.state.text.clone(),
+            };
+            let caret = te.session.caret_rect();
+            let visible = te.session.should_show_caret();
+            let selection_rects = te.session.selection_range().map(|(lo, hi)| {
+                te.session.layout.selection_rects_for_range(&te.session.state.text, lo, hi)
+            }).unwrap_or_default();
+            (node_id, paragraph_height, display_text, caret, visible, selection_rects)
+        });
+
+        if let Some((node_id, paragraph_height, display_text, caret, visible, selection_rects)) =
+            deco_data
+        {
+            self.renderer.update_layer_text(node_id, &display_text);
+
+            let y_offset =
+                Self::compute_text_y_offset(&self.renderer, node_id, paragraph_height);
+
+            use crate::devtools::text_edit_decoration_overlay::{
+                CaretDecoration, TextEditingDecorations,
+            };
+
+            self.text_edit_decorations = Some(TextEditingDecorations {
+                node_id,
+                caret: Some(CaretDecoration { rect: caret, visible }),
+                selection_rects,
+                y_offset,
+            });
+        }
+        self.renderer.queue_unstable();
+    }
+
+    /// Compute the text vertical alignment offset for a text node.
+    fn compute_text_y_offset(
+        renderer: &Renderer,
+        node_id: NodeId,
+        paragraph_height: f32,
+    ) -> f32 {
+        use crate::node::schema::Node;
+        let scene = match renderer.scene.as_ref() {
+            Some(s) => s,
+            None => return 0.0,
+        };
+        let node = match scene.graph.get_node(&node_id) {
+            Ok(n) => n,
+            Err(_) => return 0.0,
+        };
+        match node {
+            Node::TextSpan(t) => match t.height {
+                Some(h) => match t.text_align_vertical {
+                    TextAlignVertical::Top => 0.0,
+                    TextAlignVertical::Center => (h - paragraph_height) / 2.0,
+                    TextAlignVertical::Bottom => h - paragraph_height,
+                },
+                None => 0.0,
+            },
+            _ => 0.0,
+        }
     }
 }

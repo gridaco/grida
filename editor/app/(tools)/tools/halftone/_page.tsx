@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,15 +10,16 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ColorPicker32F } from "@/scaffolds/sidecontrol/controls/color-picker";
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, ImageIcon, UploadIcon } from "lucide-react";
 import kolor from "@grida/color";
 
-const DEFAULT_GRID = 8;
-const MAX_SIZE = 1024; // px – down‑scale large uploads
+const DEFAULT_GRID = 10;
+const MAX_SIZE = 1024;
+const DEMO_IMAGE_SRC = "/images/customer-support-ceo.png";
 
 type Shape =
   | "circle"
@@ -77,19 +78,17 @@ function drawShape(
       break;
     }
     case "x": {
-      // rotated plus (X)
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate(Math.PI / 4); // 45°
-      ctx.rect(-radius / 3, -radius, (radius / 3) * 2, radius * 2); // vertical bar
-      ctx.rect(-radius, -radius / 3, radius * 2, (radius / 3) * 2); // horizontal bar
+      ctx.rotate(Math.PI / 4);
+      ctx.rect(-radius / 3, -radius, (radius / 3) * 2, radius * 2);
+      ctx.rect(-radius, -radius / 3, radius * 2, (radius / 3) * 2);
       ctx.restore();
       break;
     }
     case "+": {
-      // plus sign
-      ctx.rect(cx - radius / 3, cy - radius, (radius / 3) * 2, radius * 2); // vertical bar
-      ctx.rect(cx - radius, cy - radius / 3, radius * 2, (radius / 3) * 2); // horizontal bar
+      ctx.rect(cx - radius / 3, cy - radius, (radius / 3) * 2, radius * 2);
+      ctx.rect(cx - radius, cy - radius / 3, radius * 2, (radius / 3) * 2);
       break;
     }
     default: {
@@ -98,12 +97,11 @@ function drawShape(
   }
 }
 
-/** Perceived luminance (ITU‑R BT.601) mapped to 0–1 */
+/** Perceived luminance (ITU-R BT.601) mapped to 0–1 */
 function luminance(r: number, g: number, b: number): number {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
-/** Render halftone dots from raw pixel data */
 function renderHalftone(
   ctx: CanvasRenderingContext2D,
   data: Uint8ClampedArray,
@@ -132,22 +130,19 @@ function renderHalftone(
       const b = data[idx + 2];
 
       const brightness = luminance(r, g, b);
-      const mapped = Math.pow(brightness, gamma); // gamma curve
-      let radius = (1 - mapped) * maxRadius; // scale
-      radius = Math.min(radius, maxRadius); // cap
+      const mapped = Math.pow(brightness, gamma);
+      let radius = (1 - mapped) * maxRadius;
+      radius = Math.min(radius, maxRadius);
 
-      // cell‑center plus jitter
       const jx = (Math.random() * 2 - 1) * jitter;
       const jy = (Math.random() * 2 - 1) * jitter;
       const cx = x + grid / 2 + jx;
       const cy = y + grid / 2 + jy;
 
       if (shape === "image" && customShapeImage) {
-        // Draw custom image shape as-is
         const size = radius * 2;
         ctx.drawImage(customShapeImage, cx - radius, cy - radius, size, size);
       } else {
-        // Draw standard shapes
         ctx.beginPath();
         drawShape(ctx, shape, cx, cy, radius);
         ctx.fill();
@@ -158,9 +153,6 @@ function renderHalftone(
   ctx.globalAlpha = prevAlpha;
 }
 
-/**
- * Trigger a browser download from a Blob.
- */
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -170,9 +162,6 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/**
- * Convert one halftone cell to an SVG snippet.
- */
 function shapeToSVG(shape: Shape, cx: number, cy: number, r: number): string {
   switch (shape) {
     case "square":
@@ -225,9 +214,61 @@ function shapeToSVG(shape: Shape, cx: number, cy: number, r: number): string {
   }
 }
 
+function SliderRow({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onValueChange,
+  format,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onValueChange: (v: number) => void;
+  format?: (v: number) => string;
+}) {
+  const id = useId();
+  const display = format ? format(value) : String(value);
+  return (
+    <div className="grid gap-1.5">
+      <div className="flex items-center justify-between">
+        <span id={id} className="text-xs text-muted-foreground">
+          {label}
+        </span>
+        <span className="text-xs font-mono tabular-nums text-foreground">
+          {display}
+        </span>
+      </div>
+      <Slider
+        aria-labelledby={id}
+        min={min}
+        max={max}
+        step={step}
+        value={[value]}
+        onValueChange={([v]) => onValueChange(v)}
+      />
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70 px-1 pt-3 pb-1">
+      {children}
+    </p>
+  );
+}
+
 export default function HalftoneTool() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [isDemo, setIsDemo] = useState(true);
   const [shape, setShape] = useState<Shape>("circle");
   const [grid, setGrid] = useState<number>(DEFAULT_GRID);
   const [maxRadius, setMaxRadius] = useState<number>(DEFAULT_GRID / 2);
@@ -239,8 +280,21 @@ export default function HalftoneTool() {
   );
   const [customShapeImage, setCustomShapeImage] =
     useState<HTMLImageElement | null>(null);
+  const [isCanvasReady, setIsCanvasReady] = useState(false);
+  const [canvasDims, setCanvasDims] = useState<{
+    w: number;
+    h: number;
+  } | null>(null);
+
   const imageDataRef = useRef<ImageData | null>(null);
   const sizeRef = useRef<{ w: number; h: number } | null>(null);
+  // Tracks the active blob URL so it can be revoked when replaced
+  const blobUrlRef = useRef<string | null>(null);
+
+  // Load demo image on first mount
+  useEffect(() => {
+    setImageSrc(DEMO_IMAGE_SRC);
+  }, []);
 
   useEffect(() => {
     if (!imageSrc) return;
@@ -250,35 +304,34 @@ export default function HalftoneTool() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    setIsCanvasReady(false);
+
+    let cancelled = false;
     const img = new Image();
-    img.src = imageSrc;
+
     img.onload = () => {
-      // original dimensions
+      if (cancelled) return;
+
       let w = img.width;
       let h = img.height;
 
-      // down‑scale if too large
       const scale = Math.min(1, MAX_SIZE / Math.max(w, h));
       if (scale < 1) {
         w = Math.round(w * scale);
         h = Math.round(h * scale);
       }
 
-      // prepare a source canvas (off‑screen) at the working size
       const src = document.createElement("canvas");
       src.width = w;
       src.height = h;
       const sctx = src.getContext("2d")!;
       sctx.drawImage(img, 0, 0, w, h);
 
-      // use the source pixels
       const imageData = sctx.getImageData(0, 0, w, h);
-
-      // store refs for export
       imageDataRef.current = imageData;
       sizeRef.current = { w, h };
+      setCanvasDims({ w, h });
 
-      // destination canvas
       canvas.width = w;
       canvas.height = h;
 
@@ -296,6 +349,15 @@ export default function HalftoneTool() {
         kolor.colorformats.RGBA32F.intoCSSRGBA(color),
         customShapeImage
       );
+
+      setIsCanvasReady(true);
+    };
+
+    img.src = imageSrc;
+
+    return () => {
+      cancelled = true;
+      img.onload = null;
     };
   }, [
     imageSrc,
@@ -308,6 +370,17 @@ export default function HalftoneTool() {
     color,
     customShapeImage,
   ]);
+
+  const handleImageUpload = (file: File) => {
+    // Revoke the previous blob URL to avoid memory leaks
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+    }
+    const url = URL.createObjectURL(file);
+    blobUrlRef.current = url;
+    setImageSrc(url);
+    setIsDemo(false);
+  };
 
   const exportPNG = () => {
     const canvas = canvasRef.current;
@@ -358,51 +431,97 @@ export default function HalftoneTool() {
   };
 
   return (
-    <main className="flex-1 w-full h-full flex py-4 container mx-auto gap-4">
-      <aside className="flex-1">
-        <Card className="flex flex-col gap-6 p-6">
-          <Label>Shape</Label>
-          <div className="grid gap-2">
-            <span className="text-xs">Image</span>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setImageSrc(URL.createObjectURL(file));
-                }
-              }}
-            />
+    <main className="flex-1 w-full h-full flex py-4 container mx-auto gap-6 min-h-0">
+      {/* ── Controls panel ── */}
+      <aside className="w-64 shrink-0 flex flex-col overflow-y-auto overflow-x-hidden">
+        {/* Source image */}
+        <SectionLabel>Source Image</SectionLabel>
+        <div className="flex flex-col gap-2 px-1 pb-3">
+          {/* Thumbnail */}
+          <div
+            className="relative w-full aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer group"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {imageSrc ? (
+              <img
+                src={imageSrc}
+                alt="Source"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <ImageIcon className="size-8" />
+                <span className="text-xs">No image</span>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <UploadIcon className="size-5 text-white" />
+            </div>
+            {isDemo && imageSrc && (
+              <div className="absolute top-1.5 left-1.5">
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  demo
+                </Badge>
+              </div>
+            )}
           </div>
-          <div className="grid gap-2">
-            <span className="text-xs">Shape</span>
-            <Select
-              value={shape}
-              onValueChange={(v) => setShape(v as Shape)}
-              defaultValue="circle"
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="circle">Circle</SelectItem>
-                <SelectItem value="square">Square</SelectItem>
-                <SelectItem value="triangle">Triangle</SelectItem>
-                <SelectItem value="star">Star</SelectItem>
-                <SelectItem value="spark">Spark</SelectItem>
-                <SelectItem value="x">X‑cross</SelectItem>
-                <SelectItem value="+">Plus‑cross</SelectItem>
-                <SelectItem value="image">Custom Image</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <UploadIcon className="size-3.5" />
+            Upload image
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImageUpload(file);
+              e.currentTarget.value = "";
+            }}
+          />
+        </div>
+
+        <Separator />
+
+        {/* Shape */}
+        <SectionLabel>Shape</SectionLabel>
+        <div className="flex flex-col gap-2 px-1 pb-3">
+          <Select
+            value={shape}
+            onValueChange={(v) => setShape(v as Shape)}
+            defaultValue="circle"
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="circle">Circle</SelectItem>
+              <SelectItem value="square">Square</SelectItem>
+              <SelectItem value="triangle">Triangle</SelectItem>
+              <SelectItem value="star">Star</SelectItem>
+              <SelectItem value="spark">Spark</SelectItem>
+              <SelectItem value="x">X‑cross</SelectItem>
+              <SelectItem value="+">Plus‑cross</SelectItem>
+              <SelectItem value="image">Custom Image</SelectItem>
+            </SelectContent>
+          </Select>
+
           {shape === "image" && (
-            <div className="grid gap-2">
-              <span className="text-xs">Custom Shape Image</span>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-muted-foreground">
+                Custom shape image
+              </span>
               <Input
                 type="file"
                 accept="image/png,image/svg+xml"
+                className="h-8 text-xs cursor-pointer"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -410,105 +529,143 @@ export default function HalftoneTool() {
                     reader.onload = (event) => {
                       const img = new Image();
                       img.src = event.target?.result as string;
-                      img.onload = () => {
-                        setCustomShapeImage(img);
-                      };
+                      img.onload = () => setCustomShapeImage(img);
                     };
                     reader.readAsDataURL(file);
                   }
+                  e.currentTarget.value = "";
                 }}
               />
+              {!customShapeImage && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Upload a PNG or SVG above — until then the canvas shows
+                  circles as a placeholder.
+                </p>
+              )}
             </div>
           )}
-          <div className="grid gap-2">
-            <span className="text-xs">Grid</span>
-            <Slider
-              min={4}
-              max={64}
-              step={1}
-              value={[grid]}
-              onValueChange={([v]) => setGrid(v)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <span className="text-xs">Max radius</span>
-            <Slider
-              min={1}
-              max={64}
-              step={0.1}
-              value={[maxRadius]}
-              onValueChange={([v]) => setMaxRadius(v)}
-            />
-          </div>
+        </div>
 
-          <div className="grid gap-2">
-            <span className="text-xs">Gamma</span>
-            <Slider
-              min={0.1}
-              max={3}
-              step={0.1}
-              value={[gamma]}
-              onValueChange={([v]) => setGamma(v)}
-            />
-          </div>
+        <Separator />
 
-          <div className="grid gap-2">
-            <span className="text-xs">Opacity</span>
-            <Slider
-              min={0}
-              max={1}
-              step={0.1}
-              value={[opacity]}
-              onValueChange={([v]) => setOpacity(v)}
-            />
-          </div>
+        {/* Parameters */}
+        <SectionLabel>Parameters</SectionLabel>
+        <div className="flex flex-col gap-4 px-1 pb-3">
+          <SliderRow
+            label="Grid"
+            value={grid}
+            min={4}
+            max={64}
+            step={1}
+            onValueChange={setGrid}
+            format={(v) => `${v}px`}
+          />
+          <SliderRow
+            label="Max Radius"
+            value={maxRadius}
+            min={1}
+            max={64}
+            step={0.5}
+            onValueChange={setMaxRadius}
+            format={(v) => `${v}px`}
+          />
+          <SliderRow
+            label="Gamma"
+            value={gamma}
+            min={0.1}
+            max={3}
+            step={0.1}
+            onValueChange={setGamma}
+            format={(v) => v.toFixed(1)}
+          />
+          <SliderRow
+            label="Jitter"
+            value={jitter}
+            min={0}
+            max={32}
+            step={1}
+            onValueChange={setJitter}
+            format={(v) => `${v}px`}
+          />
+          <SliderRow
+            label="Opacity"
+            value={opacity}
+            min={0}
+            max={1}
+            step={0.05}
+            onValueChange={setOpacity}
+            format={(v) => `${Math.round(v * 100)}%`}
+          />
+        </div>
 
-          <div className="grid gap-2">
-            <span className="text-xs">Jitter</span>
-            <Slider
-              min={0}
-              max={32}
-              step={1}
-              value={[jitter]}
-              onValueChange={([v]) => setJitter(v)}
-            />
-          </div>
+        <Separator />
 
-          <div className="grid gap-2">
-            <span className="text-xs">Color</span>
-            <ColorPicker32F color={color} onColorChange={setColor} />
-          </div>
+        {/* Color */}
+        <SectionLabel>Color</SectionLabel>
+        <div className="px-1 pb-3">
+          <ColorPicker32F color={color} onColorChange={setColor} />
+        </div>
 
-          <div className="grid gap-2">
-            <span className="text-xs">Download</span>
-            <div className="w-full flex gap-2">
-              <Button variant="outline" onClick={exportPNG}>
-                <DownloadIcon className="size-4" /> PNG
-              </Button>
-              <Button
-                variant="outline"
-                onClick={exportSVG}
-                disabled={shape === "image"}
-                title={
-                  shape === "image"
-                    ? "SVG export not available for custom images"
-                    : ""
-                }
-              >
-                <DownloadIcon className="size-4" /> SVG
-              </Button>
-            </div>
-            {shape === "image" && (
-              <span className="text-xs text-muted-foreground">
-                SVG export is not available when using custom images
-              </span>
-            )}
+        <Separator />
+
+        {/* Export */}
+        <SectionLabel>Export</SectionLabel>
+        <div className="flex flex-col gap-2 px-1 pb-3">
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={exportPNG}
+              disabled={!isCanvasReady}
+            >
+              <DownloadIcon className="size-3.5" />
+              PNG
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={exportSVG}
+              disabled={!isCanvasReady || shape === "image"}
+              title={
+                shape === "image"
+                  ? "SVG export unavailable for custom image shapes"
+                  : undefined
+              }
+            >
+              <DownloadIcon className="size-3.5" />
+              SVG
+            </Button>
           </div>
-        </Card>
+          {canvasDims && (
+            <p className="text-[11px] text-muted-foreground tabular-nums">
+              {canvasDims.w} × {canvasDims.h} px
+            </p>
+          )}
+          {shape === "image" && (
+            <p className="text-[11px] text-muted-foreground">
+              SVG export unavailable for custom image shapes.
+            </p>
+          )}
+        </div>
       </aside>
-      <aside className="flex-[3] flex flex-col items-center justify-center">
-        <canvas ref={canvasRef} style={{ maxWidth: "100%" }} />
-      </aside>
+
+      {/* ── Canvas preview ── */}
+      <div className="flex-1 flex items-center justify-center rounded-xl border overflow-hidden min-h-[400px]">
+        {imageSrc ? (
+          <canvas
+            ref={canvasRef}
+            className="shadow-lg"
+            style={{ maxWidth: "100%", maxHeight: "100%" }}
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-3 text-muted-foreground">
+            <ImageIcon className="size-10 opacity-30" />
+            <p className="text-sm">Upload an image to get started</p>
+          </div>
+        )}
+      </div>
     </main>
   );
 }

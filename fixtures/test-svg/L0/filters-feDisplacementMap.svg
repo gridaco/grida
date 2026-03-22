@@ -3,6 +3,8 @@
   height="200"
   viewBox="0 0 220 220"
   xmlns="http://www.w3.org/2000/svg">
+  <title>Filters Fedisplacementmap</title>
+  <desc>L0 test fixture for filters-feDisplacementMap</desc>
   <filter id="displacementFilter">
     <feTurbulence
       type="turbulence"

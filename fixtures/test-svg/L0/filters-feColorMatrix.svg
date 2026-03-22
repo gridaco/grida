@@ -5,6 +5,8 @@
     preserveAspectRatio="xMidYMid meet"
     xmlns="http://www.w3.org/2000/svg"
     xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Filters Fecolormatrix</title>
+    <desc>L0 test fixture for filters-feColorMatrix</desc>
     <!-- ref -->
     <defs>
         <g id="circles">

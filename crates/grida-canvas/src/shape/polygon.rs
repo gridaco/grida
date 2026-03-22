@@ -1,4 +1,4 @@
-use super::vn::{VectorNetwork, VectorNetworkSegment};
+use super::vn::VectorNetworkSegment;
 use super::*;
 use crate::cg::CGPoint;
 use math2::Rectangle;
@@ -38,10 +38,8 @@ pub fn build_simple_polygon_path(shape: &SimplePolygonShape) -> skia_safe::Path 
     build_corner_radius_path(&path, r)
 }
 
-/// Build a [`VectorNetwork`] from the polygon points. Corner radius is ignored
-/// in this conversion; resulting network represents the sharp-corner polygon.
-#[deprecated(note = "use VectorGeometryShape instead")]
-pub fn build_simple_polygon_vector_network(shape: &SimplePolygonShape) -> VectorNetwork {
+/// Build a [`VectorGeometryShape`] from the polygon points, preserving the corner radius.
+pub fn build_simple_polygon_vector_geometry(shape: &SimplePolygonShape) -> VectorGeometryShape {
     let n = shape.points.len();
     assert!(n >= 3);
     let vertices: Vec<(f32, f32)> = shape.points.iter().map(|p| (p.x, p.y)).collect();
@@ -51,10 +49,10 @@ pub fn build_simple_polygon_vector_network(shape: &SimplePolygonShape) -> Vector
         let b = (i + 1) % n;
         segments.push(VectorNetworkSegment::ab(a, b));
     }
-    VectorNetwork {
+    VectorGeometryShape {
         vertices,
         segments,
-        regions: vec![],
+        corner_radius: shape.corner_radius,
     }
 }
 

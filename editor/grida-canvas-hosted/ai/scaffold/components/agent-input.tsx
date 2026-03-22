@@ -10,10 +10,24 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
-import type { ChatStatus } from "ai";
+import {
+  Context,
+  ContextContent,
+  ContextContentBody,
+  ContextContentHeader,
+  ContextTrigger,
+} from "@/components/ai-elements/context";
+import type { ChatStatus, LanguageModelUsage } from "ai";
 import { ArrowUpIcon, XIcon } from "lucide-react";
 import { InputGroupButton } from "@/components/ui/input-group";
 import { Spinner } from "@/components/ui/spinner";
+
+export type ContextUsageData = {
+  usedTokens: number;
+  maxTokens: number;
+  usage: LanguageModelUsage;
+  modelId: string | undefined;
+};
 
 export interface AgentInputProps {
   onSend: (content: string) => Promise<void>;
@@ -21,7 +35,7 @@ export interface AgentInputProps {
   disabled?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
-  onIncludeContext?: () => void;
+  contextUsage?: ContextUsageData;
 }
 
 export function AgentInput({
@@ -30,6 +44,7 @@ export function AgentInput({
   disabled = false,
   placeholder = "Ask anything",
   autoFocus = true,
+  contextUsage,
 }: AgentInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const status = isLoading ? "streaming" : "ready";
@@ -56,14 +71,74 @@ export function AgentInput({
           />
         </PromptInputBody>
         <PromptInputFooter>
-          {/* layout placeholder */}
           <PromptInputTools />
-          <PromptInputSubmit status={status} disabled={disabled} />
+          <div className="flex items-center gap-0">
+            {contextUsage && contextUsage.usedTokens > 0 && (
+              <ContextIndicator {...contextUsage} />
+            )}
+            <PromptInputSubmit status={status} disabled={disabled} />
+          </div>
         </PromptInputFooter>
       </PromptInput>
     </PromptInputProvider>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Context window indicator
+// ---------------------------------------------------------------------------
+
+function ContextIndicator({ usedTokens, maxTokens, usage }: ContextUsageData) {
+  return (
+    <Context usedTokens={usedTokens} maxTokens={maxTokens || 1} usage={usage}>
+      <ContextTrigger className="h-6 px-1 text-xs [&>span]:hidden" />
+      <ContextContent
+        side="top"
+        align="center"
+        sideOffset={0}
+        collisionPadding={8}
+      >
+        <ContextContentHeader />
+        <ContextContentBody>
+          <div className="space-y-1">
+            <TokenRow label="Input" tokens={usage?.inputTokens} />
+            <TokenRow label="Output" tokens={usage?.outputTokens} />
+            <TokenRow
+              label="Reasoning"
+              tokens={
+                usage?.outputTokenDetails?.reasoningTokens ??
+                usage?.reasoningTokens
+              }
+            />
+            <TokenRow
+              label="Cache"
+              tokens={
+                usage?.inputTokenDetails?.cacheReadTokens ??
+                usage?.cachedInputTokens
+              }
+            />
+          </div>
+        </ContextContentBody>
+      </ContextContent>
+    </Context>
+  );
+}
+
+function TokenRow({ label, tokens }: { label: string; tokens?: number }) {
+  if (!tokens) return null;
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span>
+        {new Intl.NumberFormat("en-US", { notation: "compact" }).format(tokens)}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Submit button
+// ---------------------------------------------------------------------------
 
 const PromptInputSubmit = ({
   status,

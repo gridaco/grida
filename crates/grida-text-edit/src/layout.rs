@@ -14,6 +14,12 @@ pub struct LineMetrics {
     pub ascent: f32,
     /// Distance below baseline to the bottom of the line.
     pub descent: f32,
+    /// X offset of the line's left edge in layout-local space.
+    ///
+    /// For left-aligned text this is `0.0`. For center-aligned text it is
+    /// `(layout_width - content_width) / 2`, etc. Comes from Skia's
+    /// `LineMetrics::left` field; `SimpleLayoutEngine` always sets `0.0`.
+    pub left: f32,
 }
 
 impl LineMetrics {
@@ -36,6 +42,12 @@ impl LineMetrics {
         self.baseline + self.descent
     }
 }
+
+/// Default caret width in screen pixels.
+///
+/// Renderers (Skia overlay, WASM FFI, etc.) should use this constant as
+/// the default caret width unless the caller overrides it.
+pub const DEFAULT_CARET_WIDTH: f32 = 2.0;
 
 /// Caret geometry returned by [`TextLayoutEngine::caret_rect_at`].
 ///
@@ -113,17 +125,60 @@ pub trait TextLayoutEngine {
 }
 
 // ---------------------------------------------------------------------------
+// ManagedTextLayout — layout lifecycle trait
+// ---------------------------------------------------------------------------
+
+/// Extended layout engine trait that adds lifecycle management.
+///
+/// `TextLayoutEngine` provides read-only geometry queries (caret position,
+/// selection rects, etc.). `ManagedTextLayout` extends it with layout
+/// invalidation, rebuild, and sizing — everything `TextEditSession` needs
+/// to orchestrate the full editing loop.
+///
+/// Implementors:
+/// - `SimpleLayoutEngine` — trivial no-ops (test-only, monospace).
+/// - `SkiaLayoutEngine` — Skia Paragraph per-block layout (behind `skia` feature).
+/// - Canvas-side adapters — delegate to the scene's paragraph cache.
+pub trait ManagedTextLayout: TextLayoutEngine {
+    /// Ensure layout is up-to-date for the given attributed text.
+    ///
+    /// Implementations may cache and skip rebuild if content hasn't changed
+    /// (e.g. by checking `AttributedText::generation()`).
+    fn ensure_layout(&mut self, content: &crate::attributed_text::AttributedText);
+
+    /// Invalidate all cached layout. The next `ensure_layout` call will
+    /// rebuild from scratch.
+    fn invalidate(&mut self);
+
+    /// The current layout width (the wrap boundary).
+    fn layout_width(&self) -> f32;
+
+    /// The current layout height (viewport/container height).
+    fn layout_height(&self) -> f32;
+
+    /// Update layout width. Implementations should invalidate if changed.
+    fn set_layout_width(&mut self, width: f32);
+
+    /// Update layout height.
+    fn set_layout_height(&mut self, height: f32);
+}
+
+// ---------------------------------------------------------------------------
 // Utility: find the line index for a UTF-8 offset
 // ---------------------------------------------------------------------------
 
 /// Find which line contains `utf8_offset`.
 ///
-/// Forward-scan: first line where `offset < end_index`.
+/// Uses binary search on `end_index` (which is monotonically non-decreasing).
+/// Semantics: returns the first line where `offset < end_index`.
 /// Falls back to the last line when offset is past all end indices.
 /// This is the same rule used by `caret_rect_at`.
 pub fn line_index_for_offset(metrics: &[LineMetrics], utf8_offset: usize) -> usize {
-    metrics
-        .iter()
-        .position(|lm| utf8_offset < lm.end_index)
-        .unwrap_or(metrics.len().saturating_sub(1))
+    if metrics.is_empty() {
+        return 0;
+    }
+    // partition_point returns the first index where the predicate is false,
+    // i.e. the first line where end_index > utf8_offset.
+    let idx = metrics.partition_point(|lm| lm.end_index <= utf8_offset);
+    idx.min(metrics.len() - 1)
 }

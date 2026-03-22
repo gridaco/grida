@@ -309,6 +309,43 @@ export function useEditorHotKeys() {
     editor.surface.a11yEscape();
   });
 
+  // Scene navigation: PageUp = previous scene, PageDown = next scene
+  useHotkeys(
+    "pageup",
+    () => {
+      const { scene_id, document } = editor.state;
+      const scenes = document.scenes_ref ?? [];
+      if (scenes.length <= 1) return;
+      const idx = scenes.indexOf(scene_id ?? "");
+      if (idx > 0) {
+        editor.commands.loadScene(scenes[idx - 1]!);
+      }
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys(
+    "pagedown",
+    () => {
+      const { scene_id, document } = editor.state;
+      const scenes = document.scenes_ref ?? [];
+      if (scenes.length <= 1) return;
+      const idx = scenes.indexOf(scene_id ?? "");
+      if (idx >= 0 && idx < scenes.length - 1) {
+        editor.commands.loadScene(scenes[idx + 1]!);
+      }
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
   useHotkeys(
     "meta+shift+h, ctrl+shift+h",
     () => {

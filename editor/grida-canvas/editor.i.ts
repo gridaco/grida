@@ -15,7 +15,7 @@ import grida from "@grida/schema";
 import kolor from "@grida/color";
 import tree from "@grida/tree";
 import type { io } from "@grida/io";
-import type { svgtypes } from "@grida/io-svg";
+
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -426,13 +426,13 @@ export namespace editor.config {
    * In practice, the final threshold often scales inversely with the current zoom level:
    *
    * ```ts
-   * const threshold = Math.ceil(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR / zoom);
+   * const threshold = Math.ceil(DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR / zoom);
    * ```
    *
    * At higher zoom levels, the threshold becomes smaller for more precise snapping;
    * at lower zoom levels, it grows for a smoother user experience.
    */
-  export const DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR = 5;
+  export const DEFAULT_SNAP_MOVEMENT_THRESHOLD_FACTOR = 5;
 
   export const DEFAULT_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
   export const DEFAULT_CANVAS_TRANSFORM_SCALE_MAX = 256;
@@ -2700,20 +2700,24 @@ export namespace editor.api {
   }
 
   /**
-   * interface for svg optimizer/parser/importer
+   * Interface for SVG optimizer/parser/importer.
    *
-   * grida has 2 svg module:
-   * 1. @grida/io-svg (js) (DEPRECATED)
-   * 2. @grida/canvas-wasm (rust)
-   *
+   * All SVG processing is done in Rust via @grida/canvas-wasm.
+   * The primary import path is `svgToDocument` which returns
+   * `.grida` FlatBuffers bytes (Uint8Array). Callers decode
+   * via `io.GRID.decode()` to get a Document.
    */
   export interface IDocumentSVGInterfaceProvider {
     /**
-     * optimize the svg string
-     * @param svg input svg string
+     * Optimize the SVG string (CSS resolution, normalization).
      */
     svgOptimize(svg: string): string | null;
-    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
+
+    /**
+     * Parse SVG and return `.grida` FlatBuffers bytes.
+     * The caller decodes via `io.GRID.decode()` to get an IPackedSceneDocument.
+     */
+    svgToDocument(svg: string): Uint8Array | null;
   }
 
   /**
@@ -2732,11 +2736,16 @@ export namespace editor.api {
 
   export interface IDocumentVectorInterfaceProvider {
     /**
-     * converts the node into a vector network
+     * Converts the node into a flatten result (vector network + optional corner radius).
+     *
+     * When `corner_radius` is present in the result, the vector network has
+     * straight segments and corner radius should be preserved on the vector node.
+     * When absent, corner geometry is baked into the Bézier curves.
+     *
      * @param node_id
-     * @returns vector network or null if unsupported
+     * @returns flatten result or null if unsupported
      */
-    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+    toVectorNetwork(node_id: string): vn.FlattenResult | null;
   }
 
   //
@@ -2775,13 +2784,11 @@ export namespace editor.api {
   }
 
   export interface IDocumentVectorInterfaceActions {
-    toVectorNetwork(node_id: string): vn.VectorNetwork | null;
+    toVectorNetwork(node_id: string): vn.FlattenResult | null;
   }
 
-  export interface IDocumentSVGInterfaceActions {
-    svgOptimize(svg: string): string | null;
-    svgPack(svg: string): { svg: svgtypes.ir.IRSVGInitialContainerNode } | null;
-  }
+  export interface IDocumentSVGInterfaceActions
+    extends IDocumentSVGInterfaceProvider {}
 
   export interface IDocumentMarkdownInterfaceActions {
     markdownToHtml(markdown: string): string | null;

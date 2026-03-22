@@ -57,7 +57,8 @@ grant delete, insert, references, select, trigger, truncate, update on table pgm
 CREATE OR REPLACE FUNCTION grida_hosted.enqueue_new_organization_event()
 RETURNS trigger
 LANGUAGE plpgsql
-SET search_path = ''
+SECURITY DEFINER
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
   PERFORM pgmq.send(

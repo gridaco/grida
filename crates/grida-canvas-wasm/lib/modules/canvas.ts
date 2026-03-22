@@ -165,10 +165,7 @@ export class Scene {
     }
   }
 
-  addImageWithId(
-    data: Uint8Array,
-    rid: string
-  ): AddImageWithIdResult | false {
+  addImageWithId(data: Uint8Array, rid: string): AddImageWithIdResult | false {
     this._assertAlive();
     const [dataPtr, dataLen] = ffi.allocBytes(this.module, data);
     const [ridPtr, ridLen] = this._alloc_string(rid);
@@ -344,8 +341,13 @@ export class Scene {
   /**
    * Convert a node into a vector network representation.
    * Supports primitive shapes and text nodes.
+   *
+   * Returns a flatten result containing the vector network and an optional
+   * corner radius. When `corner_radius` is present, it means the vector
+   * network has straight segments and corner radius should be applied as
+   * a rendering effect. When absent, curves are baked into the geometry.
    */
-  toVectorNetwork(id: string): types.VectorNetwork | null {
+  toVectorNetwork(id: string): types.FlattenResult | null {
     this._assertAlive();
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._to_vector_network(this.appptr, ptr, len - 1);
@@ -421,9 +423,9 @@ export class Scene {
     this._free_string(ptr, len);
   }
 
-  runtime_renderer_set_cache_tile(enable: boolean) {
+  runtime_renderer_set_layer_compositing(enable: boolean) {
     this._assertAlive();
-    this.module._runtime_renderer_set_cache_tile(this.appptr, enable);
+    this.module._runtime_renderer_set_layer_compositing(this.appptr, enable);
   }
 
   runtime_renderer_set_pixel_preview_scale(scale: number) {
@@ -509,4 +511,286 @@ export class Scene {
     this._assertAlive();
     this.module._devtools_rendering_set_show_ruler(this.appptr, show);
   }
+
+  // ==========================================================================
+  // Text editing
+  // ==========================================================================
+
+  /**
+   * Enter text editing mode for a node.
+   *
+   * The engine reads all text properties (font, size, width, alignment)
+   * directly from the scene node, so only the node ID is needed.
+   */
+  textEditEnter(nodeId: string): boolean {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(nodeId);
+    const result = this.module._text_edit_enter(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+    return !!result;
+  }
+
+  /**
+   * Exit text editing mode.
+   * @param commit - If true, returns the final text. If false, cancels.
+   * @returns The committed text, or null if cancelled / no session.
+   */
+  textEditExit(commit: boolean): string | null {
+    this._assertAlive();
+    const outptr = this.module._text_edit_exit(this.appptr, commit) as number;
+    if (!outptr) return null;
+    return ffi.readLenPrefixedString(this.module, outptr);
+  }
+
+  /** Check if a text editing session is active. */
+  textEditIsActive(): boolean {
+    this._assertAlive();
+    return !!this.module._text_edit_is_active(this.appptr);
+  }
+
+  /**
+   * Returns the current text of the active editing session, or null if
+   * no session is active.
+   */
+  textEditGetText(): string | null {
+    this._assertAlive();
+    const outptr = this.module._text_edit_get_text(this.appptr) as number;
+    if (!outptr) return null;
+    return ffi.readLenPrefixedString(this.module, outptr);
+  }
+
+  /**
+   * Undo within the text editing session.
+   *
+   * The session owns all undo during editing. Document-level undo is not
+   * involved until the session exits.
+   */
+  textEditUndo(): boolean {
+    this._assertAlive();
+    return !!this.module._text_edit_undo(this.appptr);
+  }
+
+  /**
+   * Redo within the text editing session.
+   */
+  textEditRedo(): boolean {
+    this._assertAlive();
+    return !!this.module._text_edit_redo(this.appptr);
+  }
+
+  /**
+   * Dispatch an editing command.
+   * @param cmd - The command object (JSON-serializable WasmEditCommand).
+   */
+  textEditCommand(cmd: TextEditCommand) {
+    this._assertAlive();
+    const json = JSON.stringify(cmd);
+    const [ptr, len] = this._alloc_string(json);
+    this.module._text_edit_command(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  /** Pointer down in layout-local coordinates. */
+  textEditPointerDown(
+    x: number,
+    y: number,
+    shift: boolean,
+    clickCount: number
+  ) {
+    this._assertAlive();
+    this.module._text_edit_pointer_down(this.appptr, x, y, shift, clickCount);
+  }
+
+  /** Pointer move in layout-local coordinates (during drag). */
+  textEditPointerMove(x: number, y: number) {
+    this._assertAlive();
+    this.module._text_edit_pointer_move(this.appptr, x, y);
+  }
+
+  /** Pointer up. */
+  textEditPointerUp() {
+    this._assertAlive();
+    this.module._text_edit_pointer_up(this.appptr);
+  }
+
+  /** Set IME preedit string. */
+  textEditImeSetPreedit(text: string) {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(text);
+    this.module._text_edit_ime_set_preedit(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  /** Commit IME composition. */
+  textEditImeCommit(text: string) {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(text);
+    this.module._text_edit_ime_commit(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  /** Cancel IME composition. */
+  textEditImeCancel() {
+    this._assertAlive();
+    this.module._text_edit_ime_cancel(this.appptr);
+  }
+
+  /** Get selected text as plain text. */
+  textEditGetSelectedText(): string | null {
+    this._assertAlive();
+    const outptr = this.module._text_edit_get_selected_text(
+      this.appptr
+    ) as number;
+    if (!outptr) return null;
+    return ffi.readLenPrefixedString(this.module, outptr);
+  }
+
+  /** Get selected text as HTML. */
+  textEditGetSelectedHtml(): string | null {
+    this._assertAlive();
+    const outptr = this.module._text_edit_get_selected_html(
+      this.appptr
+    ) as number;
+    if (!outptr) return null;
+    return ffi.readLenPrefixedString(this.module, outptr);
+  }
+
+  /** Paste plain text. */
+  textEditPasteText(text: string) {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(text);
+    this.module._text_edit_paste_text(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  /** Paste HTML with formatting. */
+  textEditPasteHtml(html: string) {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(html);
+    this.module._text_edit_paste_html(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  /**
+   * Get the caret rectangle in layout-local coordinates.
+   * @returns {x, y, w, h} or null if no active session.
+   */
+  textEditGetCaretRect(): {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null {
+    this._assertAlive();
+    const outptr = this.module._text_edit_get_caret_rect(this.appptr) as number;
+    if (!outptr) return null;
+    const bytes = ffi.readLenPrefixedBytes(this.module, outptr);
+    if (bytes.length < 16) return null;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return {
+      x: view.getFloat32(0, true),
+      y: view.getFloat32(4, true),
+      w: view.getFloat32(8, true),
+      h: view.getFloat32(12, true),
+    };
+  }
+
+  /**
+   * Get selection rectangles in layout-local coordinates.
+   * @returns Array of {x, y, w, h} or null if no selection.
+   */
+  textEditGetSelectionRects(): Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  }> | null {
+    this._assertAlive();
+    const outptr = this.module._text_edit_get_selection_rects(
+      this.appptr
+    ) as number;
+    if (!outptr) return null;
+    const json = ffi.readLenPrefixedString(this.module, outptr);
+    try {
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  }
+
+  // --- Style commands ---
+
+  textEditToggleBold() {
+    this._assertAlive();
+    this.module._text_edit_toggle_bold(this.appptr);
+  }
+
+  textEditToggleItalic() {
+    this._assertAlive();
+    this.module._text_edit_toggle_italic(this.appptr);
+  }
+
+  textEditToggleUnderline() {
+    this._assertAlive();
+    this.module._text_edit_toggle_underline(this.appptr);
+  }
+
+  textEditToggleStrikethrough() {
+    this._assertAlive();
+    this.module._text_edit_toggle_strikethrough(this.appptr);
+  }
+
+  textEditSetFontSize(size: number) {
+    this._assertAlive();
+    this.module._text_edit_set_font_size(this.appptr, size);
+  }
+
+  textEditSetFontFamily(family: string) {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(family);
+    this.module._text_edit_set_font_family(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  textEditSetColor(r: number, g: number, b: number, a: number) {
+    this._assertAlive();
+    this.module._text_edit_set_color(this.appptr, r, g, b, a);
+  }
+
+  /**
+   * Tick the blink timer. Returns true if cursor visibility changed.
+   */
+  textEditTick(): boolean {
+    this._assertAlive();
+    return !!this.module._text_edit_tick(this.appptr);
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Text editing command types (mirrors Rust WasmEditCommand)
+// ---------------------------------------------------------------------------
+
+export type TextEditCommand =
+  | { type: "Insert"; text: string }
+  | { type: "Backspace" }
+  | { type: "BackspaceWord" }
+  | { type: "BackspaceLine" }
+  | { type: "Delete" }
+  | { type: "DeleteWord" }
+  | { type: "DeleteLine" }
+  | { type: "DeleteByCut" }
+  | { type: "MoveLeft"; extend: boolean }
+  | { type: "MoveRight"; extend: boolean }
+  | { type: "MoveUp"; extend: boolean }
+  | { type: "MoveDown"; extend: boolean }
+  | { type: "MoveHome"; extend: boolean }
+  | { type: "MoveEnd"; extend: boolean }
+  | { type: "MoveDocStart"; extend: boolean }
+  | { type: "MoveDocEnd"; extend: boolean }
+  | { type: "MovePageUp"; extend: boolean }
+  | { type: "MovePageDown"; extend: boolean }
+  | { type: "MoveWordLeft"; extend: boolean }
+  | { type: "MoveWordRight"; extend: boolean }
+  | { type: "SelectAll" }
+  | { type: "Undo" }
+  | { type: "Redo" };

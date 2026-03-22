@@ -95,6 +95,42 @@ impl AffineTransform {
         Self::from_box(x, y, w, h, deg, 0.5, 0.5)
     }
 
+    /// Like [`from_box`] but takes pre-computed `cos` and `sin` values instead
+    /// of a degree angle.  This avoids the lossy `degrees → radians → sin_cos`
+    /// round-trip when the original cos/sin are available (e.g. from a stored
+    /// rotation matrix).
+    pub fn from_box_raw(
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        cos: f32,
+        sin: f32,
+        origin_x: f32,
+        origin_y: f32,
+    ) -> Self {
+        let ox = w * origin_x;
+        let oy = h * origin_y;
+        let tx = x + ox * (1.0 - cos) + sin * oy;
+        let ty = y + oy * (1.0 - cos) - sin * ox;
+        Self {
+            matrix: [[cos, -sin, tx], [sin, cos, ty]],
+        }
+    }
+
+    /// Like [`from_box_center`] but takes pre-computed `cos` and `sin`.
+    pub fn from_box_center_raw(x: f32, y: f32, w: f32, h: f32, cos: f32, sin: f32) -> Self {
+        Self::from_box_raw(x, y, w, h, cos, sin, 0.5, 0.5)
+    }
+
+    /// Creates a transform with translation and rotation from raw cos/sin.
+    /// Equivalent to `new(tx, ty, radians)` but without computing sin_cos.
+    pub fn from_translation_rotation_raw(tx: f32, ty: f32, cos: f32, sin: f32) -> Self {
+        Self {
+            matrix: [[cos, -sin, tx], [sin, cos, ty]],
+        }
+    }
+
     pub fn x(&self) -> f32 {
         self.matrix[0][2]
     }

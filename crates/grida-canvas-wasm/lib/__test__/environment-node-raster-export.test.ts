@@ -76,7 +76,7 @@ describe("raster export (node)", () => {
     const imageBytes = new Uint8Array(readFileSync(imagePath));
 
     const doc = {
-      version: "0.90.0-beta+20260108",
+      version: "0.91.0-beta+20260311",
       document: {
         nodes: {
           "image-rect": {

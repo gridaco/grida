@@ -1,8 +1,8 @@
 use super::winit::{winit_window, WinitResult};
-use cg::node::schema::Size;
-use cg::resources::{FontMessage, ImageMessage};
+use cg::node::schema::{Scene, Size};
+use cg::resources::{load_scene_images, FontMessage, ImageMessage};
 use cg::runtime::camera::Camera2D;
-use cg::window::application::{ApplicationApi, HostEvent, UnknownTargetApplication};
+use cg::window::application::{ApplicationApi, HostEvent, HostEventCallback, UnknownTargetApplication};
 use cg::window::command::ApplicationCommand;
 use cg::window::state::AnySurfaceState;
 use futures::channel::mpsc;
@@ -11,11 +11,11 @@ use glutin::{
     prelude::GlSurface,
     surface::{Surface as GlutinSurface, WindowSurface},
 };
-use math2::{rect, rect::Rectangle};
+
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::Key;
 use winit::{
@@ -37,16 +37,38 @@ fn handle_window_event(
                 },
             ..
         } => handle_key_pressed(key, modifiers),
-        WindowEvent::PinchGesture { delta, .. } => ApplicationCommand::ZoomDelta {
-            delta: *delta as f32,
-        },
-        WindowEvent::MouseWheel { delta, .. } => match delta {
-            MouseScrollDelta::PixelDelta(delta) => ApplicationCommand::Pan {
-                tx: -(delta.x as f32),
-                ty: -(delta.y as f32),
-            },
-            _ => ApplicationCommand::None,
-        },
+        WindowEvent::PinchGesture { delta, .. } => {
+            // Deadzone: ignore tiny pinch deltas that macOS trackpads
+            // generate incidentally during two-finger scroll. Without this,
+            // every pan gesture registers as PanAndZoom, defeating pan-only
+            // optimizations (pan image cache, etc.).
+            let d = *delta as f32;
+            if d.abs() < 0.002 {
+                ApplicationCommand::None
+            } else {
+                ApplicationCommand::ZoomDelta { delta: d }
+            }
+        }
+        WindowEvent::MouseWheel { delta, .. } => {
+            if modifiers.super_key() || modifiers.control_key() {
+                // Cmd+scroll (macOS) or Ctrl+scroll → zoom, same as pinch
+                let dy = match delta {
+                    MouseScrollDelta::PixelDelta(d) => d.y as f32,
+                    MouseScrollDelta::LineDelta(_, y) => *y * 16.0,
+                };
+                let sensitivity: f32 = 0.002;
+                let zoom_delta = dy * sensitivity;
+                ApplicationCommand::ZoomDelta { delta: zoom_delta }
+            } else {
+                match delta {
+                    MouseScrollDelta::PixelDelta(delta) => ApplicationCommand::Pan {
+                        tx: -(delta.x as f32),
+                        ty: -(delta.y as f32),
+                    },
+                    _ => ApplicationCommand::None,
+                }
+            }
+        }
         _ => ApplicationCommand::None,
     }
 }
@@ -72,7 +94,11 @@ fn handle_key_pressed(
             _ => ApplicationCommand::None,
         }
     } else {
-        ApplicationCommand::None
+        match key {
+            Key::Named(winit::keyboard::NamedKey::PageDown) => ApplicationCommand::NextScene,
+            Key::Named(winit::keyboard::NamedKey::PageUp) => ApplicationCommand::PrevScene,
+            _ => ApplicationCommand::None,
+        }
     }
 }
 
@@ -84,6 +110,19 @@ pub struct NativeApplication {
     pub(crate) modifiers: winit::keyboard::ModifiersState,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
     fit_scene_on_load: bool,
+    /// When >0, the next N ticks should request a redraw to produce a
+    /// settle frame (showing "none" after a gesture ends).
+    settle_countdown: u8,
+    /// All scenes loaded from the file (for PageUp/PageDown switching).
+    pub(crate) scenes: Vec<Scene>,
+    /// Index of the currently displayed scene in `scenes`.
+    pub(crate) scene_index: usize,
+    /// Image channel sender for loading scene images on scene switch.
+    pub(crate) image_tx: Option<mpsc::UnboundedSender<ImageMessage>>,
+    /// Host event callback for notifying the event loop of image load completion.
+    pub(crate) event_cb: Option<HostEventCallback>,
+    /// Receives replacement scene lists from the drop task (for multi-scene pagination).
+    pub(crate) scenes_rx: Option<UnboundedReceiver<Vec<Scene>>>,
 }
 
 impl NativeApplication {
@@ -101,6 +140,7 @@ impl NativeApplication {
             cg::runtime::scene::RendererOptions::default(),
             None,
             false,
+            None,
         )
     }
 
@@ -112,6 +152,7 @@ impl NativeApplication {
         options: cg::runtime::scene::RendererOptions,
         file_drop_tx: Option<UnboundedSender<PathBuf>>,
         fit_scene_on_load: bool,
+        scenes_rx: Option<UnboundedReceiver<Vec<Scene>>>,
     ) -> (Self, EventLoop<HostEvent>) {
         let WinitResult {
             state,
@@ -154,6 +195,12 @@ impl NativeApplication {
             modifiers: winit::keyboard::ModifiersState::default(),
             file_drop_tx,
             fit_scene_on_load,
+            settle_countdown: 0,
+            scenes: Vec::new(),
+            scene_index: 0,
+            image_tx: None,
+            event_cb: None,
+            scenes_rx,
         };
 
         std::thread::spawn(move || loop {
@@ -217,10 +264,60 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             }
         }
 
-        match handle_window_event(&event, &self.modifiers) {
-            cmd => {
+        let cmd = handle_window_event(&event, &self.modifiers);
+        match &cmd {
+            ApplicationCommand::NextScene | ApplicationCommand::PrevScene => {
+                if !self.scenes.is_empty() {
+                    let new_index = match &cmd {
+                        ApplicationCommand::NextScene => {
+                            (self.scene_index + 1) % self.scenes.len()
+                        }
+                        ApplicationCommand::PrevScene => {
+                            (self.scene_index + self.scenes.len() - 1) % self.scenes.len()
+                        }
+                        _ => unreachable!(),
+                    };
+                    if new_index != self.scene_index {
+                        self.scene_index = new_index;
+                        let scene = self.scenes[new_index].clone();
+                        let title = format!(
+                            "[{}/{}] {}",
+                            new_index + 1,
+                            self.scenes.len(),
+                            scene.name,
+                        );
+                        eprintln!("{title}");
+
+                        // Load scene images in background for the new scene.
+                        if let (Some(image_tx), Some(event_cb)) =
+                            (self.image_tx.clone(), self.event_cb.clone())
+                        {
+                            let scene_for_images = scene.clone();
+                            std::thread::spawn(move || {
+                                futures::executor::block_on(async move {
+                                    load_scene_images(&scene_for_images, image_tx, event_cb).await;
+                                });
+                            });
+                        }
+
+                        let renderer = self.app.renderer_mut();
+                        renderer.load_scene(scene);
+                        fit_camera_to_scene(renderer);
+                        renderer.queue_unstable();
+                        self.window.request_redraw();
+                        self.window.set_title(&title);
+                    }
+                }
+            }
+            _ => {
                 let is_copy_png = matches!(cmd, ApplicationCommand::TryCopyAsPNG);
                 let ok = self.app.command(cmd);
+                if ok {
+                    // Schedule a settle redraw ~50ms after the last interaction
+                    // so the overlay shows "none" when the gesture ends.
+                    // The 240Hz tick decrements the countdown (~12 ticks ≈ 50ms).
+                    self.settle_countdown = 12;
+                }
 
                 if ok && is_copy_png {
                     use std::io::Write;
@@ -237,7 +334,43 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: HostEvent) {
         match event {
             HostEvent::Tick => {
+                // Poll for new scenes from the drop task.
+                if let Some(rx) = &mut self.scenes_rx {
+                    if let Ok(scenes) = rx.try_recv() {
+                        if let Some(first) = scenes.first().cloned() {
+                            let total = scenes.len();
+                            self.scenes = scenes;
+                            self.scene_index = 0;
+
+                            let title = if total > 1 {
+                                format!("[1/{}] {}", total, first.name)
+                            } else {
+                                first.name.clone()
+                            };
+
+                            let renderer = self.app.renderer_mut();
+                            renderer.load_scene(first);
+                            if self.fit_scene_on_load {
+                                fit_camera_to_scene(renderer);
+                            }
+                            renderer.queue_unstable();
+                            self.window.set_title(&title);
+                            self.window.request_redraw();
+                        }
+                    }
+                }
                 self.app.tick_with_current_time();
+
+                // Settle frame: after the last interaction, request one more
+                // redraw so the overlay shows "none" and the renderer
+                // can capture a clean pan-image-cache snapshot.
+                if self.settle_countdown > 0 {
+                    self.settle_countdown -= 1;
+                    if self.settle_countdown == 0 {
+                        self.app.renderer_mut().queue_unstable();
+                        self.window.request_redraw();
+                    }
+                }
             }
             HostEvent::RedrawRequest => self.window.request_redraw(),
             HostEvent::FontLoaded(_f) => {
@@ -262,42 +395,5 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
 }
 
 fn fit_camera_to_scene(renderer: &mut cg::runtime::scene::Renderer) {
-    let Some(scene) = renderer.scene.as_ref() else {
-        return;
-    };
-
-    let geometry = renderer.get_cache().geometry();
-    let mut union: Option<Rectangle> = None;
-    for root in scene.graph.roots() {
-        if let Some(bounds) = geometry.get_world_bounds(&root) {
-            union = Some(match union {
-                Some(existing) => rect::union(&[existing, bounds]),
-                None => bounds,
-            });
-        }
-    }
-
-    let Some(bounds) = union else {
-        return;
-    };
-
-    let padding = 64.0;
-    let padded = Rectangle {
-        x: bounds.x - padding,
-        y: bounds.y - padding,
-        width: (bounds.width + padding * 2.0).max(1.0),
-        height: (bounds.height + padding * 2.0).max(1.0),
-    };
-
-    let viewport = renderer.camera.get_size();
-    let zoom_x = viewport.width / padded.width.max(1.0);
-    let zoom_y = viewport.height / padded.height.max(1.0);
-    let target_zoom = zoom_x.min(zoom_y) * 0.98;
-    if target_zoom.is_finite() && target_zoom > 0.0 {
-        renderer.camera.set_zoom(target_zoom);
-    }
-
-    let center_x = padded.x + padded.width * 0.5;
-    let center_y = padded.y + padded.height * 0.5;
-    renderer.camera.set_center(center_x, center_y);
+    renderer.fit_camera_to_scene();
 }

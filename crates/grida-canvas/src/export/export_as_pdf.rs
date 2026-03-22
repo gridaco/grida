@@ -29,6 +29,11 @@ pub fn export_node_as_pdf(
     let width = rect.width;
     let height = rect.height;
 
+    // Guard: Skia cannot create a raster surface with zero or negative dimensions.
+    if width as i32 <= 0 || height as i32 <= 0 {
+        return None;
+    }
+
     // Begin a new page
     let mut page = doc.begin_page(SkSize::new(width, height), None);
     let canvas = page.canvas();

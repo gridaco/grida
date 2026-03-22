@@ -1,5 +1,8 @@
 {
   "name": "@grida/tailwindcss",
   "private": true,
-  "description": "TailwindCSS Integration for Grida Canvas"
+  "description": "TailwindCSS Integration for Grida Canvas",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
 }

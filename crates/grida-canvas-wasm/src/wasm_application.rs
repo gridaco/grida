@@ -552,8 +552,8 @@ pub unsafe extern "C" fn to_vector_network(
         return std::ptr::null();
     };
 
-    if let Some(vn) = app.to_vector_network(&id) {
-        if let Ok(json) = serde_json::to_string(&vn) {
+    if let Some(result) = app.to_vector_network(&id) {
+        if let Ok(json) = serde_json::to_string(&result) {
             return alloc_len_prefixed(json.as_bytes());
         }
     }
@@ -614,13 +614,13 @@ pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
 }
 
 #[no_mangle]
-/// js::_runtime_renderer_set_cache_tile
-pub unsafe extern "C" fn runtime_renderer_set_cache_tile(
+/// js::_runtime_renderer_set_layer_compositing
+pub unsafe extern "C" fn runtime_renderer_set_layer_compositing(
     app: *mut UnknownTargetApplication,
     enabled: bool,
 ) {
     if let Some(app) = app.as_mut() {
-        app.runtime_renderer_set_cache_tile(enabled);
+        app.runtime_renderer_set_layer_compositing(enabled);
     }
 }
 

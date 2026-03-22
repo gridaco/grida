@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <title>Paint Radial Gradient 01</title>
+  <desc>L0 test fixture for paint-radial-gradient-01</desc>
   <defs>
     <radialGradient id="rg" cx="0.5" cy="0.5" r="0.5" gradientTransform="translate(0, -0.1)">
       <stop offset="0%" stop-color="#ffff00" stop-opacity="1.0"/>

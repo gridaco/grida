@@ -8,9 +8,9 @@ description = "Native winit playground for grida-canvas scenes."
 
 [dependencies]
 cg = { path = "../grida-canvas", features = [
-  "figma",
   "web",
   "native-clock-tick",
+  "native-gl-context",
 ] }
 math2 = { path = "../math2" }
 anyhow = "1.0"
@@ -33,7 +33,6 @@ skia-safe = { version = "0.91.0", features = [
   "svg",
   "webp",
 ] }
-figma-api = "0.31.3"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 image = { version = "0.25", default-features = false, features = [
@@ -46,3 +45,4 @@ indicatif = "0.17"
 toml = "0.9.8"
 glob = "0.3.3"
 arboard = "3"
+zip = { version = "8.2.0", default-features = false, features = ["deflate-flate2"] }
