@@ -17,18 +17,22 @@ export function useEmbedBridge(
     onFile?: (file: File) => void;
   }
 ): void {
-  const bridgeRef = useRef<EmbedBridge | null>(null);
+  // Store onFile in a ref to avoid recreating the bridge when it changes.
+  const onFileRef = useRef(onFile);
+  onFileRef.current = onFile;
 
   useEffect(() => {
-    const bridge = new EmbedBridge(ed, { onFile });
-    bridgeRef.current = bridge;
+    // Don't create bridge until canvas is ready — notifyReady needs to be
+    // called exactly once per bridge lifetime, at creation time.
+    if (!canvasReady) return;
+
+    const bridge = new EmbedBridge(ed, {
+      onFile: (file) => onFileRef.current?.(file),
+    });
+    bridge.notifyReady();
+
     return () => {
       bridge.dispose();
-      bridgeRef.current = null;
     };
-  }, [ed, onFile]);
-
-  useEffect(() => {
-    if (canvasReady) bridgeRef.current?.notifyReady();
-  }, [canvasReady]);
+  }, [ed, canvasReady]);
 }

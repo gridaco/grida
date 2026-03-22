@@ -488,10 +488,11 @@ export namespace iofigma {
           }
           case "IMAGE": {
             const imageRef = (p as figrest.ImagePaint).imageRef ?? "";
-            const src =
-              ctx.resolve_image_src?.(imageRef) ??
-              _GRIDA_SYSTEM_EMBEDDED_CHECKER;
-            if (src !== _GRIDA_SYSTEM_EMBEDDED_CHECKER && imageRef) {
+            const src = imageRef
+              ? (ctx.resolve_image_src?.(imageRef) ??
+                `res://images/${imageRef}`)
+              : _GRIDA_SYSTEM_EMBEDDED_CHECKER;
+            if (imageRef) {
               imageRefsUsed.add(imageRef);
             }
             return {
