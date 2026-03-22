@@ -134,6 +134,21 @@ pub unsafe extern "C" fn load_scene_grida(
 }
 
 #[no_mangle]
+/// js::_switch_scene
+pub unsafe extern "C" fn switch_scene(
+    app: *mut UnknownTargetApplication,
+    ptr: *const u8,
+    len: usize,
+) {
+    if let Some(app) = app.as_mut() {
+        let scene_id = __str_from_ptr_len(ptr, len);
+        if let Some(scene_id) = scene_id {
+            app.switch_scene(&scene_id);
+        }
+    }
+}
+
+#[no_mangle]
 /// js::_apply_scene_transactions
 pub unsafe extern "C" fn apply_scene_transactions(
     app: *mut UnknownTargetApplication,

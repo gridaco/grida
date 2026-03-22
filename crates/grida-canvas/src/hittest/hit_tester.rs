@@ -112,13 +112,14 @@ impl<'a> HitTester<'a> {
         true
     }
 
-    /// Fast hit testing using only axis-aligned bounding boxes.
+    /// Fast hit testing using only axis-aligned bounding boxes (geometry bounds,
+    /// not effect-expanded render bounds).
     pub fn hit_first_fast(&self, point: Vector2) -> Option<NodeId> {
         let mut indices = self.cache.intersects_point(point);
         indices.sort();
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
+            if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
                     // Check if the point is within all parent container clip bounds
                     if self.is_point_within_parent_clip_bounds(&entry.id, point) {
@@ -130,14 +131,14 @@ impl<'a> HitTester<'a> {
         None
     }
 
-    /// Return all nodes whose bounding boxes contain the point.
+    /// Return all nodes whose geometry bounding boxes contain the point.
     pub fn hits_fast(&self, point: Vector2) -> Vec<NodeId> {
         let mut indices = self.cache.intersects_point(point);
         indices.sort();
         let mut out = Vec::with_capacity(indices.len());
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
+            if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
                     // Check if the point is within all parent container clip bounds
                     if self.is_point_within_parent_clip_bounds(&entry.id, point) {
@@ -149,11 +150,11 @@ impl<'a> HitTester<'a> {
         out
     }
 
-    /// Check bounding box containment for a single node.
+    /// Check geometry bounding box containment for a single node.
     pub fn contains_fast(&self, id: &NodeId, point: Vector2) -> bool {
         self.cache
             .geometry
-            .get_render_bounds(id)
+            .get_world_bounds(id)
             .map(|b| rect::contains_point(&b, point))
             .unwrap_or(false)
     }
@@ -171,7 +172,7 @@ impl<'a> HitTester<'a> {
         indices.sort();
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
+            if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
                     let transform = entry.layer.transform();
                     let mut path = if let Some(path_entry) = self.cache.path.borrow().get(&entry.id)
@@ -210,7 +211,7 @@ impl<'a> HitTester<'a> {
         let mut out = Vec::with_capacity(indices.len());
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
+            if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
                     let shape = entry.layer.shape();
                     let transform = entry.layer.transform();
@@ -266,7 +267,7 @@ impl<'a> HitTester<'a> {
         let center_point = [rect.x + rect.width / 2.0, rect.y + rect.height / 2.0];
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
-            if let Some(bounds) = self.cache.geometry.get_render_bounds(&entry.id) {
+            if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::intersects(&bounds, rect) {
                     // Check if the rectangle center is within all parent container clip bounds
                     if self.is_point_within_parent_clip_bounds(&entry.id, center_point) {

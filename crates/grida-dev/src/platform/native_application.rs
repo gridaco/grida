@@ -88,6 +88,7 @@ fn handle_key_pressed(
                     "=" => ApplicationCommand::ZoomIn,
                     "-" => ApplicationCommand::ZoomOut,
                     "i" => ApplicationCommand::ToggleDebugMode,
+                    "a" => ApplicationCommand::SelectAll,
                     _ => ApplicationCommand::None,
                 }
             }
@@ -95,6 +96,7 @@ fn handle_key_pressed(
         }
     } else {
         match key {
+            Key::Named(winit::keyboard::NamedKey::Escape) => ApplicationCommand::DeselectAll,
             Key::Named(winit::keyboard::NamedKey::PageDown) => ApplicationCommand::NextScene,
             Key::Named(winit::keyboard::NamedKey::PageUp) => ApplicationCommand::PrevScene,
             _ => ApplicationCommand::None,
@@ -247,12 +249,65 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
         }
 
         if let WindowEvent::CursorMoved { position, .. } = &event {
+            let screen_point = [position.x as f32, position.y as f32];
             self.app
-                .set_cursor_position([position.x as f32, position.y as f32]);
+                .set_cursor_position(screen_point);
+            let canvas_point = self.app.renderer_mut().camera.screen_to_canvas_point(screen_point);
+            let surface_event = cg::surface::SurfaceEvent::PointerMove {
+                canvas_point,
+                screen_point,
+            };
+            let response = self.app.surface_dispatch(surface_event);
+            if response.cursor_changed {
+                let cursor = match self.app.surface().cursor {
+                    cg::surface::CursorIcon::Default => winit::window::CursorIcon::Default,
+                    cg::surface::CursorIcon::Pointer => winit::window::CursorIcon::Pointer,
+                    cg::surface::CursorIcon::Grab => winit::window::CursorIcon::Grab,
+                    cg::surface::CursorIcon::Grabbing => winit::window::CursorIcon::Grabbing,
+                    cg::surface::CursorIcon::Crosshair => winit::window::CursorIcon::Crosshair,
+                    cg::surface::CursorIcon::Move => winit::window::CursorIcon::Move,
+                };
+                self.window.set_cursor(cursor);
+            }
+            // Keep legacy hit test updated for devtools overlay
             self.app.perform_hit_test_host();
         }
 
         if let WindowEvent::MouseInput { state, button, .. } = &event {
+            let screen_point = self.app.input_cursor();
+            let canvas_point = self.app.renderer_mut().camera.screen_to_canvas_point(screen_point);
+            let modifiers = cg::surface::Modifiers {
+                shift: self.modifiers.shift_key(),
+                alt: self.modifiers.alt_key(),
+                ctrl_or_cmd: if cfg!(target_os = "macos") {
+                    self.modifiers.super_key()
+                } else {
+                    self.modifiers.control_key()
+                },
+            };
+            let pointer_button = match button {
+                MouseButton::Left => cg::surface::PointerButton::Primary,
+                MouseButton::Right => cg::surface::PointerButton::Secondary,
+                MouseButton::Middle => cg::surface::PointerButton::Middle,
+                _ => cg::surface::PointerButton::Primary,
+            };
+            let surface_event = match state {
+                ElementState::Pressed => cg::surface::SurfaceEvent::PointerDown {
+                    canvas_point,
+                    screen_point,
+                    button: pointer_button,
+                    modifiers,
+                },
+                ElementState::Released => cg::surface::SurfaceEvent::PointerUp {
+                    canvas_point,
+                    screen_point,
+                    button: pointer_button,
+                    modifiers,
+                },
+            };
+            self.app.surface_dispatch(surface_event);
+
+            // Keep legacy selection for devtools
             if *state == ElementState::Pressed && *button == MouseButton::Left {
                 self.app.capture_hit_test_selection();
             }

@@ -44,6 +44,11 @@ declare namespace canvas {
       ptr: number,
       len: number
     ): void;
+    _switch_scene(
+      state: GridaCanvasApplicationPtr,
+      ptr: number,
+      len: number
+    ): void;
     _apply_scene_transactions(
       state: GridaCanvasApplicationPtr,
       ptr: number,

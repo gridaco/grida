@@ -109,6 +109,18 @@ export class Scene {
     ffi.free(this.module, ptr, len);
   }
 
+  /**
+   * Switch to a previously loaded scene by its string ID.
+   * Only works after `loadSceneGrida` has decoded a multi-scene document.
+   * @param sceneId - The string ID of the scene to switch to.
+   */
+  switchScene(sceneId: string) {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(sceneId);
+    this.module._switch_scene(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
   applyTransactions(batch: unknown[][]): TransactionApplyReport[] | null {
     this._assertAlive();
     const json = JSON.stringify(batch);

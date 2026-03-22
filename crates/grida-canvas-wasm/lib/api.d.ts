@@ -85,6 +85,10 @@ interface Grida2DRuntime {
    * @param scene
    */
   loadScene(scene: TODO): void;
+  /**
+   * Switch to a previously loaded scene by its string ID.
+   */
+  switchScene(sceneId: string): void;
   applyTransactions(
     transactions: unknown[][]
   ): {

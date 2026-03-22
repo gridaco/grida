@@ -1,6 +1,6 @@
 use crate::cg::types::TextAlignVertical;
 use crate::devtools::{
-    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay,
+    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay,
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
@@ -17,7 +17,16 @@ use crate::text;
 use crate::vectornetwork::VectorNetwork;
 use grida_text_edit::layout::ManagedTextLayout;
 use grida_text_edit::TextLayoutEngine;
+use crate::query::Hierarchy;
 use crate::window::command::ApplicationCommand;
+
+/// A no-op hierarchy for when no scene graph is loaded.
+struct NoHierarchy;
+impl Hierarchy for NoHierarchy {
+    fn parent(&self, _id: &crate::node::schema::NodeId) -> Option<crate::node::schema::NodeId> {
+        None
+    }
+}
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
@@ -92,6 +101,10 @@ pub trait ApplicationApi {
 
     /// Load a scene from `.grida` FlatBuffers binary bytes.
     fn load_scene_grida(&mut self, bytes: &[u8]);
+
+    /// Switch to a previously loaded scene by its string ID.
+    /// Only works after `load_scene_grida` has decoded a multi-scene document.
+    fn switch_scene(&mut self, scene_id: &str);
 
     /// Apply a batch of scene transactions represented as JSON Patch operations.
     fn apply_document_transactions(
@@ -185,6 +198,10 @@ pub struct UnknownTargetApplication {
     id_mapping: std::collections::HashMap<UserNodeId, NodeId>,
     id_mapping_reverse: std::collections::HashMap<NodeId, UserNodeId>,
 
+    /// All decoded scenes from the last `load_scene_grida` call, keyed by string ID.
+    /// Used by `switch_scene` to swap scenes without re-encoding/decoding the document.
+    loaded_scenes: Vec<(String, crate::node::schema::Scene)>,
+
     /// When `false`, any platform-managed tick loop (e.g. Emscripten RAF) should stop.
     running: bool,
     /// When `true`, this application is driven by a platform-managed tick loop
@@ -201,6 +218,12 @@ pub struct UnknownTargetApplication {
     /// `None` when no text editing session is active.
     text_edit_decorations:
         Option<crate::devtools::text_edit_decoration_overlay::TextEditingDecorations>,
+
+    /// Canvas surface interaction state (hover, selection, gesture, cursor).
+    pub(crate) surface: crate::surface::SurfaceState,
+
+    /// Surface overlay rendering configuration.
+    pub surface_overlay_config: crate::devtools::surface_overlay::SurfaceOverlayConfig,
 }
 
 impl ApplicationApi for UnknownTargetApplication {
@@ -245,6 +268,13 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn command(&mut self, cmd: ApplicationCommand) -> bool {
+        // Invalidate hover on camera transforms — avoid hit-testing while
+        // panning/zooming so the renderer can focus on fast redraws.
+        // Hover is re-evaluated on the next PointerMove.
+        if cmd.is_camera_transform() {
+            self.surface.invalidate_hover();
+        }
+
         match cmd {
             ApplicationCommand::ZoomIn => {
                 let current_zoom = self.renderer.camera.get_zoom();
@@ -293,6 +323,29 @@ impl ApplicationApi for UnknownTargetApplication {
                             return true;
                         }
                     }
+                }
+            }
+            ApplicationCommand::SelectAll => {
+                let all_ids: Vec<_> = self
+                    .renderer
+                    .get_cache()
+                    .layers
+                    .layers
+                    .iter()
+                    .map(|e| e.id)
+                    .collect();
+                self.surface.select_all(all_ids);
+                if let Some(scene) = self.renderer.scene.as_ref() {
+                    self.surface.prune_selection(&scene.graph);
+                }
+                self.queue();
+                return true;
+            }
+            ApplicationCommand::DeselectAll => {
+                if !self.surface.selection.is_empty() {
+                    self.surface.selection.clear();
+                    self.queue();
+                    return true;
                 }
             }
             ApplicationCommand::None
@@ -520,13 +573,33 @@ impl ApplicationApi for UnknownTargetApplication {
                 self.id_mapping = string_to_internal;
                 self.id_mapping_reverse = internal_to_string;
 
-                if let Some(scene) = result.scenes.into_iter().next() {
-                    self.renderer.load_scene(scene);
-                } else {
+                // Store all decoded scenes. The caller is responsible for
+                // calling switch_scene() to activate the desired scene.
+                self.loaded_scenes = result
+                    .scene_ids
+                    .iter()
+                    .zip(result.scenes.into_iter())
+                    .map(|(id, scene)| (id.clone(), scene))
+                    .collect();
+
+                if self.loaded_scenes.is_empty() {
                     eprintln!("load_scene_grida: no scenes in FlatBuffers data");
                 }
             }
             Err(err) => eprintln!("failed to decode .grida FlatBuffers: {:?}", err),
+        }
+    }
+
+    fn switch_scene(&mut self, scene_id: &str) {
+        if let Some((_, scene)) = self.loaded_scenes.iter().find(|(id, _)| id == scene_id) {
+            self.renderer.load_scene(scene.clone());
+            self.queue();
+        } else {
+            eprintln!(
+                "switch_scene: scene '{}' not found (available: {:?})",
+                scene_id,
+                self.loaded_scenes.iter().map(|(id, _)| id).collect::<Vec<_>>()
+            );
         }
     }
 
@@ -584,12 +657,58 @@ impl UnknownTargetApplication {
         self.input.cursor = position;
     }
 
+    /// Current cursor position in screen coordinates.
+    pub fn input_cursor(&self) -> [f32; 2] {
+        self.input.cursor
+    }
+
     pub fn perform_hit_test_host(&mut self) {
         self.perform_hit_test();
     }
 
     pub fn capture_hit_test_selection(&mut self) {
         self.devtools_selection = self.hit_test_result.clone();
+    }
+
+    /// Dispatch a surface event (hover, select, gesture) and return what changed.
+    ///
+    /// The caller provides screen-space coordinates; this method handles the
+    /// camera transform and hit-tester construction internally.
+    pub fn surface_dispatch(
+        &mut self,
+        event: crate::surface::SurfaceEvent,
+    ) -> crate::surface::SurfaceResponse {
+        // Build hit tester and hierarchy from renderer fields without
+        // borrowing `self` as a whole.
+        let (hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let r = self.surface.dispatch(event, &ht, &scene.graph);
+            (ht, r)
+        } else {
+            let ht = crate::hittest::HitTester::new(self.renderer.get_cache());
+            let r = self.surface.dispatch(event, &ht, &NoHierarchy);
+            (ht, r)
+        };
+        drop(hit_tester);
+        if response.needs_redraw {
+            self.queue();
+        }
+        response
+    }
+
+    /// Read-only access to the surface state.
+    pub fn surface(&self) -> &crate::surface::SurfaceState {
+        &self.surface
+    }
+
+    /// Invalidate hover without hit-testing.
+    ///
+    /// Call during camera transforms (pan, zoom) to avoid wasting cycles.
+    pub fn surface_invalidate_hover(&mut self) {
+        let response = self.surface.invalidate_hover();
+        if response.needs_redraw {
+            self.queue();
+        }
     }
 
     pub fn clipboard_bytes(&self) -> Option<&[u8]> {
@@ -659,10 +778,14 @@ impl UnknownTargetApplication {
             frame_loop: FrameLoop::new(),
             id_mapping: std::collections::HashMap::new(),
             id_mapping_reverse: std::collections::HashMap::new(),
+            loaded_scenes: Vec::new(),
             running: true,
             auto_tick: false,
             text_edit: None,
             text_edit_decorations: None,
+            surface: crate::surface::SurfaceState::new(),
+            surface_overlay_config:
+                crate::devtools::surface_overlay::SurfaceOverlayConfig::default(),
         }
     }
 
@@ -1126,6 +1249,14 @@ impl UnknownTargetApplication {
                     self.renderer.get_cache(),
                 );
             }
+            // Surface interaction overlays (hover, selection, marquee)
+            surface_overlay::SurfaceOverlay::draw(
+                &canvas,
+                &self.surface,
+                &self.renderer.camera,
+                self.renderer.get_cache(),
+                &self.surface_overlay_config,
+            );
             if self.devtools_rendering_show_ruler {
                 ruler_overlay::Ruler::draw(&canvas, &self.renderer.camera);
             }
