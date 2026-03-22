@@ -2406,6 +2406,8 @@ export namespace format {
 
           // Decode fit from ImagePaintFit union
           let fit: cg.BoxFit | "transform" | "tile" = "cover";
+          let transform: cg.AffineTransform | undefined;
+          let scale: number | undefined;
           const fitType = imagePaint.fitType();
           if (fitType === fbs.ImagePaintFit.ImagePaintFitFit) {
             const fitFit = imagePaint.fit(
@@ -2417,16 +2419,34 @@ export namespace format {
             }
           } else if (fitType === fbs.ImagePaintFit.ImagePaintFitTransform) {
             fit = "transform";
-            // TODO: decode transform if needed
+            const fitTransform = imagePaint.fit(
+              new fbs.ImagePaintFitTransform()
+            ) as fbs.ImagePaintFitTransform | null;
+            const t = fitTransform?.transform();
+            if (t) {
+              transform = [
+                [t.m00(), t.m01(), t.m02()],
+                [t.m10(), t.m11(), t.m12()],
+              ];
+            }
           } else if (fitType === fbs.ImagePaintFit.ImagePaintFitTile) {
             fit = "tile";
-            // TODO: decode tile scale if needed
+            const fitTile = imagePaint.fit(
+              new fbs.ImagePaintFitTile()
+            ) as fbs.ImagePaintFitTile | null;
+            const tile = fitTile?.tile();
+            if (tile) {
+              scale = tile.scale();
+            }
           }
 
           return {
             type: "image",
             src,
             fit,
+            ...(transform !== undefined && { transform }),
+            ...(scale !== undefined && { scale }),
+            quarter_turns: imagePaint.quarterTurns(),
             blend_mode: styling.decode.blendMode(imagePaint.blendMode()),
             opacity: imagePaint.opacity(),
             active: imagePaint.active(),
