@@ -211,6 +211,7 @@ export function useRefigEditor() {
     loadError,
     fileLabel,
     documentLoaded,
+    documentKey,
     onFile,
   };
 }

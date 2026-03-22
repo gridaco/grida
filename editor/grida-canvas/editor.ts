@@ -3180,24 +3180,23 @@ export class Editor
         document: grida.program.document.Document,
         sceneId?: string
       ) => {
-        const payloadDocument: grida.program.document.Document =
-          sceneId && document.entry_scene_id !== sceneId
-            ? {
-                ...document,
-                entry_scene_id: sceneId,
-              }
-            : document;
-
         try {
-          const bytes = io.GRID.encode(payloadDocument);
+          const bytes = io.GRID.encode(document);
           surface.loadSceneGrida(bytes);
         } catch {
           // Fallback to JSON if FlatBuffers encoding fails (e.g. unsupported node types)
           const p = JSON.stringify({
             version: grida.program.document.SCHEMA_VERSION,
-            document: payloadDocument,
+            document,
           });
           surface.loadScene(p);
+        }
+        // loadSceneGrida only decodes and stores scenes.
+        // switchScene activates the requested scene (or first if unspecified).
+        const targetScene =
+          sceneId ?? document.scenes_ref?.[0] ?? document.entry_scene_id;
+        if (targetScene) {
+          surface.switchScene(targetScene);
         }
         surface.redraw();
       };
@@ -3284,10 +3283,8 @@ export class Editor
       this.doc.subscribeWithSelector(
         (state) => state.scene_id,
         (_, scene_id) => {
-          if (!this._m_wasm_canvas_scene) return;
-
-          const document = this.doc.state.document;
-          syncDocument(this._m_wasm_canvas_scene, document, scene_id);
+          if (!this._m_wasm_canvas_scene || !scene_id) return;
+          this._m_wasm_canvas_scene.switchScene(scene_id);
         }
       );
 

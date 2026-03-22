@@ -5,7 +5,7 @@ format: md
 
 # Embed SDK
 
-Embed the Grida Canvas viewer in any web page via an iframe and control it programmatically with the host-side SDK.
+Embed the Grida Canvas viewer in any web page via an iframe and control it programmatically.
 
 ## Quick start
 
@@ -23,12 +23,16 @@ Embed the Grida Canvas viewer in any web page via an iframe and control it progr
 
   const embed = new GridaEmbed(document.getElementById("grida"));
 
-  embed.on("ready", ({ scenes }) => {
+  embed.on("ready", () => {
+    console.log("Canvas mounted");
+  });
+
+  embed.on("document-load", ({ scenes }) => {
     console.log("Loaded", scenes.length, "scenes");
   });
 
   embed.on("selection-change", ({ selection }) => {
-    console.log("Selected nodes:", selection);
+    console.log("Selected:", selection);
   });
 </script>
 ```
@@ -54,21 +58,19 @@ The `file` URL must be CORS-accessible from the embed origin. For files that can
 ```ts
 import { GridaEmbed } from "@grida/embed";
 
-const embed = new GridaEmbed(iframe: HTMLIFrameElement);
+const embed = new GridaEmbed(iframe);
 ```
 
-Commands sent before the viewer is ready are queued and flushed automatically.
+Commands sent before `ready` are queued and flushed automatically.
 
 ### Commands
 
 #### `load(data, format)`
 
-Load a file into the viewer via postMessage. Bypasses CORS entirely -- the host reads the file and sends the raw bytes.
+Load a file into the viewer. Can be called multiple times to replace the document. Bypasses CORS -- the host reads the file and sends the raw bytes via postMessage.
 
 ```ts
-const res = await fetch("http://localhost:3000/design.fig");
-const buf = await res.arrayBuffer();
-
+const buf = await fetch("/design.fig").then((r) => r.arrayBuffer());
 embed.load(buf, "fig");
 ```
 
@@ -78,8 +80,6 @@ embed.load(buf, "fig");
 | `format`  | `"fig" \| "json" \| "json.gz" \| "zip"` | File format.       |
 
 #### `select(nodeIds, mode?)`
-
-Select nodes in the viewer.
 
 ```ts
 embed.select(["1:23", "1:24"]); // replace selection
@@ -94,21 +94,21 @@ embed.select([]); // clear selection
 
 #### `loadScene(sceneId)`
 
-Switch the active scene (page).
+Switch the active scene (page). Use scene IDs from the `document-load` event.
 
 ```ts
-embed.on("ready", ({ scenes }) => {
-  embed.loadScene(scenes[1].id);
+embed.on("document-load", ({ scenes }) => {
+  embed.loadScene(scenes[0].id);
 });
 ```
 
 #### `fit(options?)`
 
-Fit the camera to show all content (or a specific selector).
+Fit the camera to content.
 
 ```ts
 embed.fit();
-embed.fit({ animate: true });
+embed.fit({ selector: "selection", animate: true });
 ```
 
 | Option     | Type      | Default | Description                                                        |
@@ -116,21 +116,42 @@ embed.fit({ animate: true });
 | `selector` | `string`  | `"*"`   | What to fit. `"*"` = all nodes, `"selection"` = current selection. |
 | `animate`  | `boolean` | `false` | Animate the camera transition.                                     |
 
+#### `ping()`
+
+Request a state snapshot from the iframe. It replies with a `pong` event containing the full current state. Useful to verify connectivity or re-sync if the host missed events. Bypasses the ready queue -- can be called at any time.
+
+```ts
+embed.ping();
+embed.on("pong", ({ ready, scenes, sceneId, selection }) => {
+  console.log("State:", { ready, scenes, sceneId, selection });
+});
+```
+
 ### Events
+
+All events follow `.on(name, callback)` and return an unsubscribe function.
 
 #### `ready`
 
-Fired once after the viewer has loaded and the document is parsed. Carries the scene list.
+Fired once when the WASM canvas is mounted. The viewer now accepts commands.
 
 ```ts
-embed.on("ready", ({ scenes }) => {
+const off = embed.on("ready", () => {});
+```
+
+#### `document-load`
+
+Fired each time a document finishes loading. This is the only place you receive the scene list. Guaranteed to fire **after** all internal state (scene, selection) is settled -- no stale intermediate events leak before this.
+
+```ts
+embed.on("document-load", ({ scenes }) => {
   // scenes: Array<{ id: string; name: string }>
 });
 ```
 
 #### `selection-change`
 
-Fired when the selected nodes change.
+Fired when the selection changes (user interaction or programmatic).
 
 ```ts
 embed.on("selection-change", ({ selection }) => {
@@ -140,7 +161,7 @@ embed.on("selection-change", ({ selection }) => {
 
 #### `scene-change`
 
-Fired when the active scene changes.
+Fired when the active scene changes (user interaction or programmatic). Not fired during document load -- use `document-load` for the initial scene.
 
 ```ts
 embed.on("scene-change", ({ sceneId }) => {
@@ -148,17 +169,52 @@ embed.on("scene-change", ({ sceneId }) => {
 });
 ```
 
+#### `pong`
+
+Reply to `ping()`. Contains a full state snapshot.
+
+```ts
+embed.on("pong", ({ ready, scenes, sceneId, selection }) => {
+  // ready: boolean
+  // scenes: Array<{ id: string; name: string }>
+  // sceneId: string | undefined
+  // selection: string[]
+});
+```
+
 ### `dispose()`
 
-Removes the message listener and clears all state. Call when the embed is no longer needed.
+Removes all listeners. Call when the embed is no longer needed.
 
 ```ts
 embed.dispose();
 ```
 
-## Local development
+## Event lifecycle
 
-When developing locally, the file you want to preview is often on `localhost` which the hosted embed cannot fetch due to CORS. Use `load()` to push the file bytes directly:
+```
+iframe loads
+  |
+  v
+grida:ready              (once, canvas mounted)
+  |
+  v
+grida:document-load      (document parsed, scenes available)
+  |
+  +-- user interacts ---> grida:selection-change
+  +-- user interacts ---> grida:scene-change
+  |
+  v
+grida:load command       (host loads a new file)
+  |
+  v
+grida:document-load      (new document, fresh scene list)
+  ...
+```
+
+During a document load/reset, `selection-change` and `scene-change` events are **suppressed**. They only fire for changes that happen after the document is fully loaded. This prevents stale intermediate state from leaking to the host.
+
+## Local development
 
 ```html
 <iframe id="grida" src="https://grida.co/embed/v1/refig"></iframe>
@@ -168,11 +224,7 @@ When developing locally, the file you want to preview is often on `localhost` wh
 
   const embed = new GridaEmbed(document.getElementById("grida"));
 
-  // Read the file on the host side (same origin, no CORS issue)
-  const res = await fetch("/design.fig");
-  const buf = await res.arrayBuffer();
-
-  // Push bytes to the embed -- no network request from the iframe
+  const buf = await fetch("/design.fig").then((r) => r.arrayBuffer());
   embed.load(buf, "fig");
 </script>
 ```
@@ -188,23 +240,24 @@ When developing locally, the file you want to preview is often on `localhost` wh
 
 ## Protocol reference
 
-The SDK communicates via `window.postMessage`. All messages are plain objects with a `type` field prefixed by `grida:`.
+The SDK communicates via `window.postMessage`. All messages have a `type` field prefixed by `grida:`. You can use the protocol directly without the SDK.
 
-### Host to iframe
+### Host to iframe (commands)
 
 | Message type       | Payload                                                                |
 | ------------------ | ---------------------------------------------------------------------- |
+| `grida:load`       | `{ data: ArrayBuffer, format: "fig" \| "json" \| "json.gz" \| "zip" }` |
 | `grida:select`     | `{ nodeIds: string[], mode?: "reset" \| "add" \| "toggle" }`           |
 | `grida:load-scene` | `{ sceneId: string }`                                                  |
 | `grida:fit`        | `{ selector?: string, animate?: boolean }`                             |
-| `grida:load`       | `{ data: ArrayBuffer, format: "fig" \| "json" \| "json.gz" \| "zip" }` |
+| `grida:ping`       | (none)                                                                 |
 
-### Iframe to host
+### Iframe to host (events)
 
-| Message type             | Payload                                           |
-| ------------------------ | ------------------------------------------------- |
-| `grida:ready`            | `{ scenes: Array<{ id: string, name: string }> }` |
-| `grida:selection-change` | `{ selection: string[] }`                         |
-| `grida:scene-change`     | `{ sceneId: string }`                             |
-
-You can use the protocol directly without the SDK if preferred. The SDK is a thin convenience wrapper over these messages.
+| Message type             | Payload                                                                                                 | When                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `grida:ready`            | (none)                                                                                                  | Once, canvas mounted                                |
+| `grida:document-load`    | `{ scenes: Array<{ id: string, name: string }> }`                                                       | Each document load, after state is settled          |
+| `grida:selection-change` | `{ selection: string[] }`                                                                               | Selection changes (suppressed during document load) |
+| `grida:scene-change`     | `{ sceneId: string }`                                                                                   | Scene changes (suppressed during document load)     |
+| `grida:pong`             | `{ ready: boolean, scenes: Array<{ id: string, name: string }>, sceneId: string, selection: string[] }` | Reply to `grida:ping`                               |

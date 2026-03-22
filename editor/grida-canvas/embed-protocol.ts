@@ -26,6 +26,10 @@ export type EmbedCommand =
       data: ArrayBuffer;
       /** File format. */
       format: "fig" | "json" | "json.gz" | "zip";
+    }
+  | {
+      /** Request a state snapshot. Iframe replies with `grida:pong`. */
+      type: "grida:ping";
     };
 
 // ---------------------------------------------------------------------------
@@ -38,9 +42,25 @@ export interface EmbedSceneInfo {
 }
 
 export type EmbedEvent =
-  | { type: "grida:ready"; scenes: EmbedSceneInfo[] }
+  | {
+      /** Fired once when the WASM canvas is mounted and the iframe accepts commands. */
+      type: "grida:ready";
+    }
+  | {
+      /** Fired each time a document is loaded (via ?file=, grida:load, or reset). */
+      type: "grida:document-load";
+      scenes: EmbedSceneInfo[];
+    }
   | { type: "grida:selection-change"; selection: string[] }
-  | { type: "grida:scene-change"; sceneId: string };
+  | { type: "grida:scene-change"; sceneId: string }
+  | {
+      /** Reply to `grida:ping`. Full state snapshot for sync. */
+      type: "grida:pong";
+      ready: boolean;
+      scenes: EmbedSceneInfo[];
+      sceneId: string | undefined;
+      selection: string[];
+    };
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -10,7 +10,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useRefigEditor } from "@/scaffolds/embed/use-refig-editor";
-import { RefigCanvas } from "@/scaffolds/embed/refig-shared";
+import { RefigCanvas, SceneSelector } from "@/scaffolds/embed/refig-shared";
 import { useEmbedBridge } from "@/grida-canvas-react/use-embed-bridge";
 
 function parseFileParam(
@@ -129,7 +129,7 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
     onFile,
   } = useRefigEditor();
 
-  useEmbedBridge(instance, { documentLoaded, onFile });
+  useEmbedBridge(instance, { canvasReady, onFile });
 
   const remoteFetchGen = useRef(0);
 
@@ -191,6 +191,11 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
                 <EditorSurface />
                 <RefigCanvas canvasRef={canvasRef} />
               </ViewportRoot>
+              {documentLoaded && (
+                <div className="absolute top-2 left-2 z-10">
+                  <SceneSelector />
+                </div>
+              )}
               {showLoadingOverlay ? (
                 <div className="absolute inset-0 bg-background" aria-hidden />
               ) : null}

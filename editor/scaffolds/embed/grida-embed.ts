@@ -6,9 +6,12 @@
  * const iframe = document.querySelector("iframe");
  * const embed = new GridaEmbed(iframe);
  *
- * embed.on("ready", ({ scenes }) => {
+ * embed.on("ready", () => {
+ *   console.log("Viewer ready");
+ * });
+ *
+ * embed.on("document-load", ({ scenes }) => {
  *   console.log("Scenes:", scenes);
- *   embed.loadScene(scenes[0].id);
  * });
  *
  * embed.on("selection-change", ({ selection }) => {
@@ -31,9 +34,16 @@ import type {
 // ---------------------------------------------------------------------------
 
 type EmbedEventMap = {
-  ready: { scenes: EmbedSceneInfo[] };
+  ready: {};
+  "document-load": { scenes: EmbedSceneInfo[] };
   "selection-change": { selection: string[] };
   "scene-change": { sceneId: string };
+  pong: {
+    ready: boolean;
+    scenes: EmbedSceneInfo[];
+    sceneId: string | undefined;
+    selection: string[];
+  };
 };
 
 type EmbedEventType = keyof EmbedEventMap;
@@ -41,8 +51,10 @@ type EmbedEventType = keyof EmbedEventMap;
 // Map from short event name to wire type
 const EVENT_TYPE_MAP: Record<EmbedEventType, EmbedEvent["type"]> = {
   ready: "grida:ready",
+  "document-load": "grida:document-load",
   "selection-change": "grida:selection-change",
   "scene-change": "grida:scene-change",
+  pong: "grida:pong",
 };
 
 // ---------------------------------------------------------------------------
@@ -113,6 +125,17 @@ export class GridaEmbed {
 
   fit(options?: { selector?: string; animate?: boolean }): void {
     this.send({ type: "grida:fit", ...options });
+  }
+
+  /**
+   * Send a ping to the iframe. It replies with a `pong` event containing
+   * the full current state. Useful to verify connectivity or re-sync
+   * after the host may have missed events.
+   *
+   * Bypasses the ready queue — can be called at any time.
+   */
+  ping(): void {
+    this.iframe.contentWindow?.postMessage({ type: "grida:ping" }, "*");
   }
 
   /**
