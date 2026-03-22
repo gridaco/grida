@@ -152,7 +152,13 @@ export function useRefigEditor() {
         };
 
         const t0 = performance.now();
-        const { bytes: zipBytes, nodeCount, pageNames } = fig2grida(input);
+        const {
+          bytes: zipBytes,
+          nodeCount,
+          pageNames,
+        } = fig2grida(input, {
+          placeholder_for_missing_images: false,
+        });
         console.log(
           `[@grida/refig] fig2grida: ${pageNames.length} page(s), ${nodeCount} nodes in ${(performance.now() - t0).toFixed(0)}ms`
         );

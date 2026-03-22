@@ -417,6 +417,14 @@ export namespace iofigma {
          * @default false
          */
         prefer_path_for_geometry?: boolean;
+        /**
+         * When true, image paints whose ref cannot be resolved via `resolve_image_src`
+         * are replaced with a built-in checker pattern placeholder.
+         * When false, unresolved refs are kept as `res://images/<ref>` so the lazy
+         * image loading system can request them at render time.
+         * @default true
+         */
+        placeholder_for_missing_images?: boolean;
       };
 
       function toGradientPaint(paint: figrest.GradientPaint) {
@@ -488,11 +496,18 @@ export namespace iofigma {
           }
           case "IMAGE": {
             const imageRef = (p as figrest.ImagePaint).imageRef ?? "";
-            const src = imageRef
-              ? (ctx.resolve_image_src?.(imageRef) ??
-                `res://images/${imageRef}`)
-              : _GRIDA_SYSTEM_EMBEDDED_CHECKER;
-            if (imageRef) {
+            const usePlaceholder = ctx.placeholder_for_missing_images !== false;
+            const resolved = imageRef
+              ? (ctx.resolve_image_src?.(imageRef) ?? null)
+              : null;
+            const src =
+              resolved ??
+              (imageRef
+                ? usePlaceholder
+                  ? _GRIDA_SYSTEM_EMBEDDED_CHECKER
+                  : `res://images/${imageRef}`
+                : _GRIDA_SYSTEM_EMBEDDED_CHECKER);
+            if (src !== _GRIDA_SYSTEM_EMBEDDED_CHECKER && imageRef) {
               imageRefsUsed.add(imageRef);
             }
             return {
@@ -611,7 +626,9 @@ export namespace iofigma {
               size?: any;
               absoluteBoundingBox?: any;
             },
-        parent?: { absoluteBoundingBox?: { x: number; y: number } | null } | null
+        parent?: {
+          absoluteBoundingBox?: { x: number; y: number } | null;
+        } | null
       ): Pick<
         grida.program.nodes.ContainerNode,
         | "layout_positioning"
@@ -1470,10 +1487,8 @@ export namespace iofigma {
             const textAbsBox = node.absoluteBoundingBox;
             const parentAbsBox = parent?.absoluteBoundingBox;
 
-            const fixedwidth =
-              node.size?.x ?? textAbsBox?.width ?? 0;
-            const fixedheight =
-              node.size?.y ?? textAbsBox?.height ?? 0;
+            const fixedwidth = node.size?.x ?? textAbsBox?.width ?? 0;
+            const fixedheight = node.size?.y ?? textAbsBox?.height ?? 0;
 
             let fixedleft: number;
             let fixedtop: number;
@@ -1489,16 +1504,16 @@ export namespace iofigma {
             }
 
             // Compute right/bottom insets using parent size (prefer size, fall back to absBox)
-            const parentWidth =
-              parent?.size?.x ?? parentAbsBox?.width;
-            const parentHeight =
-              parent?.size?.y ?? parentAbsBox?.height;
-            const fixedright = parentWidth != null
-              ? parentWidth - fixedleft - fixedwidth
-              : undefined;
-            const fixedbottom = parentHeight != null
-              ? parentHeight - fixedtop - fixedheight
-              : undefined;
+            const parentWidth = parent?.size?.x ?? parentAbsBox?.width;
+            const parentHeight = parent?.size?.y ?? parentAbsBox?.height;
+            const fixedright =
+              parentWidth != null
+                ? parentWidth - fixedleft - fixedwidth
+                : undefined;
+            const fixedbottom =
+              parentHeight != null
+                ? parentHeight - fixedtop - fixedheight
+                : undefined;
 
             const constraints = {
               left:

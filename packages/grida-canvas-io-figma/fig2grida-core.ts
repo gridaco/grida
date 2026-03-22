@@ -36,6 +36,12 @@ import grida from "@grida/schema";
 export interface Fig2GridaOptions {
   /** Convert specific page indices only (only applies to `.fig` input). */
   pages?: number[];
+  /**
+   * When true (default), unresolved image refs are replaced with a checker
+   * pattern placeholder. When false, refs are preserved as `res://images/<ref>`
+   * so the lazy image loading system can request them at render time.
+   */
+  placeholder_for_missing_images?: boolean;
 }
 
 export interface Fig2GridaResult {
@@ -248,9 +254,12 @@ export function fig2grida(
 ): Fig2GridaResult {
   _idCounter = 0;
 
+  const placeholderForMissing =
+    options?.placeholder_for_missing_images !== false;
+
   // --- Object input: REST JSON directly ---
   if (!(input instanceof Uint8Array)) {
-    return fig2gridaFromRestJson(input, undefined);
+    return fig2gridaFromRestJson(input, undefined, placeholderForMissing);
   }
 
   // --- Bytes input: detect format ---
@@ -258,13 +267,17 @@ export function fig2grida(
     // Try REST archive ZIP first (contains document.json)
     const restArchive = tryReadRestArchiveZip(input);
     if (restArchive) {
-      return fig2gridaFromRestJson(restArchive.json, restArchive.images);
+      return fig2gridaFromRestJson(
+        restArchive.json,
+        restArchive.images,
+        placeholderForMissing
+      );
     }
     // Otherwise fall through to .fig parser (handles both ZIP and raw Kiwi)
   } else if (input.length > 0 && input[0] === 0x7b /* '{' */) {
     // JSON text — parse and treat as REST API response
     const json = JSON.parse(new TextDecoder().decode(input));
-    return fig2gridaFromRestJson(json, undefined);
+    return fig2gridaFromRestJson(json, undefined, placeholderForMissing);
   }
 
   return fig2gridaFromFigBytes(input, options);
@@ -293,10 +306,14 @@ function fig2gridaFromFigBytes(
 
   const pageResults: PageResult[] = [];
   for (const page of pages) {
+    const placeholderForMissing =
+      options?.placeholder_for_missing_images !== false;
     const result = iofigma.kiwi.convertPageToScene(page, {
       resolve_image_src: (ref: string) =>
         extractedImages.has(ref) ? `res://images/${ref}` : null,
       gradient_id_generator: makeIdGenerator("grad"),
+      prefer_path_for_geometry: true,
+      placeholder_for_missing_images: placeholderForMissing,
     });
     pageResults.push({ name: page.name, result });
   }
@@ -392,13 +409,18 @@ function extractCanvases(
 
 function restJsonToMergedDocument(
   json: unknown,
-  images: Record<string, Uint8Array> | undefined
+  images: Record<string, Uint8Array> | undefined,
+  placeholderForMissing: boolean
 ): MergedDocument {
   const canvases = extractCanvases(json);
 
   const pageResults: PageResult[] = canvases.map((canvas) => ({
     name: canvas.name ?? "Page",
-    result: convertRestCanvasToFigmaImportResult(canvas, images),
+    result: convertRestCanvasToFigmaImportResult(
+      canvas,
+      images,
+      placeholderForMissing
+    ),
   }));
 
   return mergePages(pageResults, (ref) => (images ? images[ref] : undefined));
@@ -406,9 +428,12 @@ function restJsonToMergedDocument(
 
 function fig2gridaFromRestJson(
   json: unknown,
-  images: Record<string, Uint8Array> | undefined
+  images: Record<string, Uint8Array> | undefined,
+  placeholderForMissing: boolean
 ): Fig2GridaResult {
-  return packMergedDocument(restJsonToMergedDocument(json, images));
+  return packMergedDocument(
+    restJsonToMergedDocument(json, images, placeholderForMissing)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -417,7 +442,8 @@ function fig2gridaFromRestJson(
 
 function convertRestCanvasToFigmaImportResult(
   canvas: { name?: string; children?: Array<Record<string, unknown>> },
-  images: Record<string, Uint8Array> | undefined
+  images: Record<string, Uint8Array> | undefined,
+  placeholderForMissing: boolean
 ): iofigma.restful.factory.FigmaImportResult {
   const rootNodes = canvas.children ?? [];
   if (rootNodes.length === 0) {
@@ -452,6 +478,7 @@ function convertRestCanvasToFigmaImportResult(
   const context: iofigma.restful.factory.FactoryContext = {
     gradient_id_generator: baseGradientGen,
     prefer_path_for_geometry: true,
+    placeholder_for_missing_images: placeholderForMissing,
     node_id_generator: () => `rest-import-${++counter}`,
     ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
   };
@@ -535,7 +562,7 @@ export function restJsonToGridaDocument(
 ): RestJsonToGridaResult {
   _idCounter = 0;
   const images = options?.images;
-  const merged = restJsonToMergedDocument(json, images);
+  const merged = restJsonToMergedDocument(json, images, true);
 
   return {
     document: merged.document,
