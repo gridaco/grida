@@ -236,6 +236,7 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         id: String,
         parent: Option<(String, String)>, // (parent_id, fractional-index position)
         node: Node,
+        name: Option<String>,
     }
 
     struct SceneMeta {
@@ -258,10 +259,11 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                 let sys = typed.node();
                 let layer = typed.layer();
                 let id = sys.id().id().to_owned();
+                let name = sys.name().map(|s| s.to_owned());
                 let parent = decode_parent_ref(&layer);
                 let lc = decode_layer_common(&sys, &layer);
                 let node = $decode_fn(&lc, &layer, &typed);
-                node_entries.push(NodeEntry { id, parent, node });
+                node_entries.push(NodeEntry { id, parent, node, name });
             }
         };
     }
@@ -361,6 +363,15 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         .filter_map(|e| Some((get_id(&e.id)?, e.node.clone())))
         .collect();
 
+    let node_names: Vec<_> = node_entries
+        .iter()
+        .filter_map(|e| {
+            let id = get_id(&e.id)?;
+            let name = e.name.clone()?;
+            Some((id, name))
+        })
+        .collect();
+
     let internal_links: HashMap<_, Vec<_>> = children_by_parent
         .iter()
         .filter_map(|(parent_str, children)| {
@@ -400,11 +411,16 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
             .filter_map(|(child_str, _)| get_id(child_str))
             .collect();
 
-        let graph = SceneGraph::new_from_snapshot(
+        let mut graph = SceneGraph::new_from_snapshot(
             node_pairs.clone(),
             internal_links.clone(),
             roots_internal,
         );
+
+        // Preserve node display names
+        for (id, name) in &node_names {
+            graph.set_name(*id, name.clone());
+        }
 
         scenes.push(Scene {
             name,

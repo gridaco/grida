@@ -180,17 +180,23 @@ impl NativeApplication {
             })
         };
 
+        let mut uta = UnknownTargetApplication::new(
+            state,
+            backend,
+            camera,
+            144,
+            image_rx,
+            font_rx,
+            Some(redraw_cb),
+            options,
+        );
+        uta.surface_overlay_config.dpr = scale_factor as f32;
+        uta.surface_overlay_config.text_baseline_decoration = true;
+        uta.surface_overlay_config.show_size_meter = true;
+        uta.surface_overlay_config.show_frame_titles = true;
+
         let app = NativeApplication {
-            app: UnknownTargetApplication::new(
-                state,
-                backend,
-                camera,
-                144,
-                image_rx,
-                font_rx,
-                Some(redraw_cb),
-                options,
-            ),
+            app: uta,
             gl_surface,
             gl_context,
             window,

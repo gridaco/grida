@@ -224,6 +224,9 @@ pub struct UnknownTargetApplication {
 
     /// Surface overlay rendering configuration.
     pub surface_overlay_config: crate::devtools::surface_overlay::SurfaceOverlayConfig,
+
+    /// Overlay UI hit regions, rebuilt each frame during drawing.
+    pub(crate) ui_hit_regions: crate::surface::ui::HitRegions,
 }
 
 impl ApplicationApi for UnknownTargetApplication {
@@ -688,11 +691,11 @@ impl UnknownTargetApplication {
         // borrowing `self` as a whole.
         let (hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
             let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
-            let r = self.surface.dispatch(event, &ht, &scene.graph);
+            let r = self.surface.dispatch(event, &ht, &scene.graph, &self.ui_hit_regions);
             (ht, r)
         } else {
             let ht = crate::hittest::HitTester::new(self.renderer.get_cache());
-            let r = self.surface.dispatch(event, &ht, &NoHierarchy);
+            let r = self.surface.dispatch(event, &ht, &NoHierarchy, &self.ui_hit_regions);
             (ht, r)
         };
         drop(hit_tester);
@@ -792,6 +795,7 @@ impl UnknownTargetApplication {
             surface: crate::surface::SurfaceState::new(),
             surface_overlay_config:
                 crate::devtools::surface_overlay::SurfaceOverlayConfig::default(),
+            ui_hit_regions: crate::surface::ui::HitRegions::new(),
         }
     }
 
@@ -1262,6 +1266,16 @@ impl UnknownTargetApplication {
                 &self.renderer.camera,
                 self.renderer.get_cache(),
                 &self.surface_overlay_config,
+            );
+            // Surface UI elements (size meter, frame titles, hit regions)
+            crate::surface::ui::SurfaceUI::draw(
+                &canvas,
+                &self.surface,
+                &self.renderer.camera,
+                self.renderer.get_cache(),
+                &self.surface_overlay_config,
+                &mut self.ui_hit_regions,
+                self.renderer.scene.as_ref().map(|s| &s.graph),
             );
             if self.devtools_rendering_show_ruler {
                 ruler_overlay::Ruler::draw(&canvas, &self.renderer.camera);

@@ -6,6 +6,7 @@ use crate::surface::gesture::SurfaceGesture;
 use crate::surface::hover::{HoverSource, HoverState};
 use crate::surface::response::SurfaceResponse;
 use crate::surface::selection::SelectionState;
+use crate::surface::ui::hit_region::{HitRegions, OverlayAction};
 
 /// Canvas surface interaction state.
 ///
@@ -80,26 +81,34 @@ impl SurfaceState {
     /// - Transforming screen coordinates to canvas coordinates via the camera
     /// - Constructing a [`HitTester`] from the current scene cache
     /// - Providing a [`Hierarchy`] for selection pruning (typically the scene graph)
+    /// - Providing [`HitRegions`] from the most recent draw pass for overlay UI hit testing
     /// - Queueing a redraw if `response.needs_redraw` is true
     pub fn dispatch(
         &mut self,
         event: SurfaceEvent,
         hit_tester: &HitTester,
         hierarchy: &impl Hierarchy,
+        ui_hit_regions: &HitRegions,
     ) -> SurfaceResponse {
         match event {
             SurfaceEvent::PointerMove {
                 canvas_point,
-                screen_point: _,
-            } => self.handle_pointer_move(canvas_point, hit_tester, hierarchy),
+                screen_point,
+            } => self.handle_pointer_move(canvas_point, screen_point, hit_tester, hierarchy, ui_hit_regions),
 
             SurfaceEvent::PointerDown {
                 canvas_point,
-                screen_point: _,
+                screen_point,
                 button,
                 modifiers,
             } => {
                 self.modifiers = modifiers;
+                // Check overlay UI hit regions first (they are visually on top)
+                if button == PointerButton::Primary {
+                    if let Some(action) = ui_hit_regions.hit_test([screen_point[0], screen_point[1]]) {
+                        return self.handle_overlay_action(action, hierarchy);
+                    }
+                }
                 self.handle_pointer_down(canvas_point, button, hit_tester, hierarchy)
             }
 
@@ -120,16 +129,59 @@ impl SurfaceState {
         }
     }
 
+    /// Handle an overlay UI action (e.g. clicking a frame title bar).
+    fn handle_overlay_action(
+        &mut self,
+        action: &OverlayAction,
+        hierarchy: &impl Hierarchy,
+    ) -> SurfaceResponse {
+        let mut response = SurfaceResponse::none();
+        match action {
+            OverlayAction::SelectNode(id) => {
+                if self.modifiers.shift {
+                    self.selection.toggle(*id);
+                    self.prune_selection(hierarchy);
+                } else {
+                    self.selection.select_one(*id);
+                }
+                response.selection_changed = true;
+                response.needs_redraw = true;
+            }
+        }
+        response
+    }
+
     fn handle_pointer_move(
         &mut self,
         canvas_point: math2::vector2::Vector2,
+        screen_point: math2::vector2::Vector2,
         hit_tester: &HitTester,
         hierarchy: &impl Hierarchy,
+        ui_hit_regions: &HitRegions,
     ) -> SurfaceResponse {
         let mut response = SurfaceResponse::none();
 
         match self.gesture {
             SurfaceGesture::Idle => {
+                // Check overlay UI regions — hover the associated node
+                if let Some(action) = ui_hit_regions.hit_test([screen_point[0], screen_point[1]]) {
+                    let new_cursor = CursorIcon::Pointer;
+                    if new_cursor != self.cursor {
+                        self.cursor = new_cursor;
+                        response.cursor_changed = true;
+                    }
+                    // Set hover to the node referenced by the overlay action
+                    let node_id = match action {
+                        OverlayAction::SelectNode(id) => Some(*id),
+                    };
+                    let hover_changed = self.hover.set(node_id, HoverSource::HitTest);
+                    if hover_changed {
+                        response.hover_changed = true;
+                        response.needs_redraw = true;
+                    }
+                    return response;
+                }
+
                 // Update hover via hit test
                 let hit = hit_tester.hit_first(canvas_point);
                 let hover_changed = self.hover.set(hit, HoverSource::HitTest);
@@ -139,11 +191,7 @@ impl SurfaceState {
                 }
 
                 // Update cursor based on hover
-                let new_cursor = if self.hover.hovered().is_some() {
-                    CursorIcon::Default
-                } else {
-                    CursorIcon::Default
-                };
+                let new_cursor = CursorIcon::Default;
                 if new_cursor != self.cursor {
                     self.cursor = new_cursor;
                     response.cursor_changed = true;

@@ -19,16 +19,26 @@ const MARQUEE_STROKE_COLOR: Color = Color::from_argb(200, 0, 120, 255);
 /// Configuration for how the surface overlay renders.
 #[derive(Debug, Clone)]
 pub struct SurfaceOverlayConfig {
-    /// When true, text nodes use baseline-line paths instead of bounding shape.
-    /// This matches the editor's behavior where text selection shows
-    /// horizontal lines under each text line rather than an outline.
-    pub text_baseline_highlight: bool,
+    /// Device pixel ratio (e.g. 2.0 on Retina). Scales all screen-space UI
+    /// elements (fonts, paddings, offsets) so they appear at the correct
+    /// logical size regardless of display density.
+    pub dpr: f32,
+    /// When true, text nodes show baseline underlines on hover/selection.
+    /// On hover: baseline only. On selection: bounding rect + baseline.
+    pub text_baseline_decoration: bool,
+    /// Show size dimension label below selection.
+    pub show_size_meter: bool,
+    /// Show type labels above root frames and selected nodes.
+    pub show_frame_titles: bool,
 }
 
 impl Default for SurfaceOverlayConfig {
     fn default() -> Self {
         Self {
-            text_baseline_highlight: true,
+            dpr: 1.0,
+            text_baseline_decoration: false,
+            show_size_meter: false,
+            show_frame_titles: false,
         }
     }
 }
@@ -43,19 +53,35 @@ impl SurfaceOverlay {
         cache: &SceneCache,
         config: &SurfaceOverlayConfig,
     ) {
+        let use_text_baseline = config.text_baseline_decoration;
+
         // Draw hover highlight
         if let Some(hovered_id) = surface.hover.hovered() {
             // Don't draw hover on selected nodes (selection overlay takes precedence)
             if !surface.selection.contains(hovered_id) {
+                // Hover: text nodes show baseline only (no bounding rect)
                 Self::draw_node_outline(
-                    canvas, hovered_id, camera, cache, HOVER_COLOR, 1.5, config,
+                    canvas, hovered_id, camera, cache, HOVER_COLOR, 1.5, use_text_baseline,
                 );
             }
         }
 
         // Draw selection outlines
-        for id in surface.selection.iter() {
-            Self::draw_node_outline(canvas, id, camera, cache, SELECTION_COLOR, 4.0, config);
+        let sel_count = surface.selection.len();
+        if sel_count >= 1 {
+            for id in surface.selection.iter() {
+                // Selection: always draw bounding rect
+                Self::draw_node_outline(
+                    canvas, id, camera, cache, SELECTION_COLOR, 1.5, false,
+                );
+                // Selection: additionally draw text baseline decoration
+                if use_text_baseline {
+                    Self::draw_text_baseline(canvas, id, camera, cache, SELECTION_COLOR);
+                }
+            }
+            if sel_count > 1 {
+                Self::draw_group_bounding_rect(canvas, surface, camera, cache);
+            }
         }
 
         // Draw marquee rectangle
@@ -68,6 +94,10 @@ impl SurfaceOverlay {
         }
     }
 
+    /// Draw an outline for a single node.
+    ///
+    /// When `use_text_baseline` is true and the node is a text layer,
+    /// the baseline underline path is drawn instead of the bounding shape.
     fn draw_node_outline(
         canvas: &Canvas,
         id: &crate::node::schema::NodeId,
@@ -75,7 +105,7 @@ impl SurfaceOverlay {
         cache: &SceneCache,
         color: Color,
         stroke_width: f32,
-        config: &SurfaceOverlayConfig,
+        use_text_baseline: bool,
     ) {
         let layer_entry = match cache.layers.layers.iter().find(|e| e.id == *id) {
             Some(e) => e,
@@ -90,8 +120,7 @@ impl SurfaceOverlay {
 
         let mut path = if let Some(path_entry) = cache.path.borrow().get(id) {
             (*path_entry.path).clone()
-        } else if config.text_baseline_highlight {
-            // Use text-specific baseline path for text layers
+        } else if use_text_baseline {
             match &layer_entry.layer {
                 PainterPictureLayer::Text(text_layer) => {
                     match text_overlay::TextOverlay::text_layer_baseline(cache, text_layer) {
@@ -105,7 +134,6 @@ impl SurfaceOverlay {
             layer_entry.layer.shape().to_path()
         };
 
-        // Transform path: local → world → screen (same pattern as StrokeOverlay)
         path = path.make_transform(&sk::sk_matrix(transform.matrix));
         path = path.make_transform(&sk::sk_matrix(camera.view_matrix().matrix));
 
@@ -116,6 +144,81 @@ impl SurfaceOverlay {
         paint.set_anti_alias(true);
 
         canvas.draw_path(&path, &paint);
+    }
+
+    /// Draw text baseline decoration for a node (no-op if not a text layer).
+    fn draw_text_baseline(
+        canvas: &Canvas,
+        id: &crate::node::schema::NodeId,
+        camera: &Camera2D,
+        cache: &SceneCache,
+        color: Color,
+    ) {
+        let layer_entry = match cache.layers.layers.iter().find(|e| e.id == *id) {
+            Some(e) => e,
+            None => return,
+        };
+
+        let text_layer = match &layer_entry.layer {
+            PainterPictureLayer::Text(t) => t,
+            _ => return,
+        };
+
+        let baseline_path =
+            match text_overlay::TextOverlay::text_layer_baseline(cache, text_layer) {
+                Some(p) => p,
+                None => return,
+            };
+
+        let transform = layer_entry.layer.transform();
+        let mut path = baseline_path;
+        path = path.make_transform(&sk::sk_matrix(transform.matrix));
+        path = path.make_transform(&sk::sk_matrix(camera.view_matrix().matrix));
+
+        let mut paint = Paint::default();
+        paint.set_color(color);
+        paint.set_style(PaintStyle::Stroke);
+        paint.set_stroke_width(1.0);
+        paint.set_anti_alias(true);
+
+        canvas.draw_path(&path, &paint);
+    }
+
+    /// Draw a union bounding rect around all selected nodes.
+    fn draw_group_bounding_rect(
+        canvas: &Canvas,
+        surface: &SurfaceState,
+        camera: &Camera2D,
+        cache: &SceneCache,
+    ) {
+        let rects: Vec<math2::rect::Rectangle> = surface
+            .selection
+            .iter()
+            .filter_map(|id| cache.geometry.get_world_bounds(id))
+            .collect();
+
+        if rects.is_empty() {
+            return;
+        }
+
+        let union = math2::rect::union(&rects);
+        let view = sk::sk_matrix(camera.view_matrix().matrix);
+        let p1 = view.map_point((union.x, union.y));
+        let p2 = view.map_point((union.x + union.width, union.y + union.height));
+        let screen_rect = skia_safe::Rect::from_ltrb(
+            p1.x.min(p2.x),
+            p1.y.min(p2.y),
+            p1.x.max(p2.x),
+            p1.y.max(p2.y),
+        );
+
+        let mut paint = Paint::default();
+        paint.set_color(SELECTION_COLOR);
+        paint.set_style(PaintStyle::Stroke);
+        paint.set_stroke_width(1.5);
+        paint.set_anti_alias(true);
+
+        canvas.draw_rect(screen_rect, &paint);
     }
 
     fn draw_marquee(

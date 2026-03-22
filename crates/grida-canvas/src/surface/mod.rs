@@ -5,6 +5,7 @@ pub mod hover;
 pub mod response;
 pub mod selection;
 pub mod state;
+pub mod ui;
 
 pub use cursor::CursorIcon;
 pub use event::{Modifiers, PointerButton, SurfaceEvent};
