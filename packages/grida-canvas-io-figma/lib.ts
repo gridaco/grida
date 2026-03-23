@@ -3405,11 +3405,25 @@ export namespace iofigma {
         node_id_generator: sharedNodeIdGenerator,
       };
 
+      const canvasBg = page.canvas.backgroundColor;
+      const background_color = canvasBg
+        ? kolor.colorformats.newRGBA32F(
+            canvasBg.r,
+            canvasBg.g,
+            canvasBg.b,
+            canvasBg.a
+          )
+        : undefined;
+
       const individualResults = page.rootNodes.map((rootNode) =>
         iofigma.restful.factory.document(rootNode, {}, sharedContext)
       );
 
-      if (individualResults.length === 1) return individualResults[0];
+      if (individualResults.length === 1) {
+        const result = individualResults[0];
+        result.document.scene.background_color = background_color;
+        return result;
+      }
 
       // Merge multiple roots into single document
       const imageRefsUsed = new Set<string>();
@@ -3427,6 +3441,7 @@ export namespace iofigma {
           guides: [],
           edges: [],
           constraints: { children: "multiple" },
+          background_color,
           // TODO: convert it to our format, number.
           // order: page.sortkey,
         },

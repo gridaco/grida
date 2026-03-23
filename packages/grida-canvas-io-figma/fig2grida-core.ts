@@ -32,6 +32,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import { iofigma } from "./lib";
 import { io } from "@grida/io";
 import grida from "@grida/schema";
+import kolor from "@grida/color";
 
 export interface Fig2GridaOptions {
   /** Convert specific page indices only (only applies to `.fig` input). */
@@ -340,7 +341,11 @@ function fig2gridaFromFigBytes(
  */
 function extractCanvases(
   json: unknown
-): Array<{ name?: string; children?: Array<Record<string, unknown>> }> {
+): Array<{
+  name?: string;
+  backgroundColor?: { r: number; g: number; b: number; a: number };
+  children?: Array<Record<string, unknown>>;
+}> {
   const obj = json as Record<string, unknown> | null | undefined;
   if (!obj || typeof obj !== "object") {
     throw new Error("fig2grida: input is not an object");
@@ -358,6 +363,7 @@ function extractCanvases(
   ) {
     const result: Array<{
       name?: string;
+      backgroundColor?: { r: number; g: number; b: number; a: number };
       children?: Array<Record<string, unknown>>;
     }> = [];
     for (const entry of Object.values(nodesMap)) {
@@ -378,7 +384,13 @@ function extractCanvases(
     (node as any).type === "CANVAS" &&
     Array.isArray((node as any).children)
   ) {
-    return [{ name: (node as any).name, children: (node as any).children }];
+    return [
+      {
+        name: (node as any).name,
+        backgroundColor: (node as any).backgroundColor,
+        children: (node as any).children,
+      },
+    ];
   }
 
   const children: Array<Record<string, unknown>> | undefined = Array.isArray(
@@ -397,7 +409,11 @@ function extractCanvases(
 
   const canvases = children.filter(
     (p) => (p as { type?: string }).type === "CANVAS"
-  ) as Array<{ name?: string; children?: Array<Record<string, unknown>> }>;
+  ) as Array<{
+    name?: string;
+    backgroundColor?: { r: number; g: number; b: number; a: number };
+    children?: Array<Record<string, unknown>>;
+  }>;
 
   // If no CANVAS nodes found, treat all top-level children as a single page
   if (canvases.length === 0) {
@@ -441,10 +457,23 @@ function fig2gridaFromRestJson(
 // ---------------------------------------------------------------------------
 
 function convertRestCanvasToFigmaImportResult(
-  canvas: { name?: string; children?: Array<Record<string, unknown>> },
+  canvas: {
+    name?: string;
+    backgroundColor?: { r: number; g: number; b: number; a: number };
+    children?: Array<Record<string, unknown>>;
+  },
   images: Record<string, Uint8Array> | undefined,
   placeholderForMissing: boolean
 ): iofigma.restful.factory.FigmaImportResult {
+  const canvasBg = canvas.backgroundColor;
+  const background_color = canvasBg
+    ? kolor.colorformats.newRGBA32F(
+        canvasBg.r,
+        canvasBg.g,
+        canvasBg.b,
+        canvasBg.a
+      )
+    : undefined;
   const rootNodes = canvas.children ?? [];
   if (rootNodes.length === 0) {
     return {
@@ -462,6 +491,7 @@ function convertRestCanvasToFigmaImportResult(
           guides: [],
           edges: [],
           constraints: { children: "multiple" },
+          background_color,
         },
       },
       imageRefsUsed: [],
@@ -495,6 +525,7 @@ function convertRestCanvasToFigmaImportResult(
   let packed: grida.program.document.IPackedSceneDocument;
   if (individualResults.length === 1) {
     packed = individualResults[0].document;
+    packed.scene.background_color = background_color;
   } else {
     packed = {
       bitmaps: {},
@@ -510,6 +541,7 @@ function convertRestCanvasToFigmaImportResult(
         guides: [],
         edges: [],
         constraints: { children: "multiple" },
+        background_color,
       },
     };
     for (const result of individualResults) {
