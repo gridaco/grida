@@ -35,6 +35,8 @@ import {
 const _GRIDA_SYSTEM_EMBEDDED_CHECKER =
   "system://images/checker-16-strip-L98L92.png";
 
+const DEFAULT_FONT_SIZE = 14;
+
 export namespace iofigma {
   /**
    * custom structs for bridging difference between rest api spec, kiwi spec and plugin sdk spec.
@@ -1565,7 +1567,11 @@ export namespace iofigma {
               line_height: node.style.lineHeightPercentFontSize
                 ? node.style.lineHeightPercentFontSize / 100
                 : 1.2,
-              letter_spacing: node.style.letterSpacing,
+              // letter spacing in rest api is always in px.
+              letter_spacing: node.style.letterSpacing
+                ? node.style.letterSpacing /
+                  (node.style.fontSize || DEFAULT_FONT_SIZE)
+                : 0,
               font_size: node.style.fontSize ?? 0,
               font_family: node.style.fontFamily,
               font_weight:
@@ -2333,7 +2339,7 @@ export namespace iofigma {
               nc.letterSpacing?.units === "PERCENT"
                 ? nc.letterSpacing.value / 100
                 : nc.letterSpacing?.units === "PIXELS"
-                  ? nc.letterSpacing.value
+                  ? nc.letterSpacing.value / (nc.fontSize ?? DEFAULT_FONT_SIZE)
                   : (nc.letterSpacing?.value ?? 0),
             lineHeightPx:
               nc.lineHeight?.units === "PIXELS"
