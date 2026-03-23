@@ -6,6 +6,29 @@
  *
  * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Fig.kiwi format glossary
  *
+ * ## TODO — Auto-layout conversion (not implemented)
+ *
+ * Currently ALL nodes are emitted with `layout_positioning: "absolute"` and
+ * `layout_mode: "flow"`. Figma auto-layout properties (`layoutMode`,
+ * `layoutAlign`, `layoutGrow`, `primaryAxisAlignItems`,
+ * `counterAxisAlignItems`, `layoutPositioning`, sizing modes, `layoutWrap`)
+ * are completely dropped during conversion. Positions are always derived
+ * from `absoluteBoundingBox` / `relativeTransform`.
+ *
+ * This means:
+ * - The output is always safe for `skip_layout` (no flex containers exist)
+ * - Auto-layout semantics are lost — re-layout in Grida won't match Figma
+ * - Resizing a container won't reflow children as it would in Figma
+ *
+ * To support true auto-layout round-trip:
+ * - Map `layoutMode` → `layout_mode: "flex"`
+ * - Map `layoutAlign`, `layoutGrow`, `layoutPositioning` per child
+ * - Map `primaryAxisAlignItems` / `counterAxisAlignItems` → alignment
+ * - Map `primaryAxisSizingMode` / `counterAxisSizingMode` → sizing
+ * - Map `layoutWrap` → `layout_wrap`
+ * - Only set `layout_positioning: "absolute"` for children with
+ *   `layoutPositioning: "ABSOLUTE"` in Figma
+ *
  * ## TODO — Kiwi → REST (not yet fully mapped)
  *
  * - **Rich text**: `characterStyleOverrides` and `styleOverrideTable` are always empty.
