@@ -452,7 +452,14 @@ export class Scene {
     return JSON.parse(str);
   }
 
-  getNodeAbsoluteBoundingBox(id: string): types.Rect | null {
+  /**
+   * Get the absolute bounding box of a node or the active scene.
+   *
+   * @param target - A node ID, or `"<scene>"` to get the union bounds of the
+   *   active scene's root children (computed in a single WASM call).
+   */
+  getNodeAbsoluteBoundingBox(target: (string & {}) | "<scene>"): types.Rect | null {
+    const id = target;
     this._assertAlive();
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._get_node_absolute_bounding_box(

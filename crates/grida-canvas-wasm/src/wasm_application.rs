@@ -783,7 +783,8 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
     if let Some(app) = app.as_mut() {
         let id = __str_from_ptr_len(ptr, len);
         if let Some(id) = id {
-            if let Some(rect) = app.get_node_absolute_bounding_box(&id) {
+            let target = cg::window::application::BoundsTarget::from_str(&id);
+            if let Some(rect) = app.get_node_absolute_bounding_box(target) {
                 let vec4 = rect.to_vec4(); // [f32; 4]
                 let out = allocate(std::mem::size_of::<f32>() * 4) as *mut f32;
                 std::ptr::copy_nonoverlapping(vec4.as_ptr(), out, 4);

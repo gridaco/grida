@@ -5,8 +5,7 @@ use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::runtime::scene::RendererOptions;
-use crate::window::application::ApplicationApi;
-use crate::window::application::UnknownTargetApplication;
+use crate::window::application::{ApplicationApi, BoundsTarget, UnknownTargetApplication};
 use crate::window::command::ApplicationCommand;
 use crate::window::state::{self, GpuState, SurfaceState};
 #[cfg(not(target_arch = "wasm32"))]
@@ -212,8 +211,8 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.get_node_ids_from_envelope(rect)
     }
 
-    fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
-        self.base.get_node_absolute_bounding_box(id)
+    fn get_node_absolute_bounding_box(&mut self, target: BoundsTarget) -> Option<Rectangle> {
+        self.base.get_node_absolute_bounding_box(target)
     }
 
     fn export_node_as(

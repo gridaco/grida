@@ -78,7 +78,12 @@ export class DOMGeometryQueryInterfaceProvider
     return contained;
   }
 
-  getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
+  getNodeAbsoluteBoundingRect(
+    target: (string & {}) | "<scene>"
+  ): cmath.Rectangle | null {
+    // DOM backend does not support "<scene>" — fall back to null
+    if (target === "<scene>") return null;
+    const node_id = target;
     const contentrect = this.content.getBoundingClientRect()!;
     const noderect = window.document
       .getElementById(node_id)

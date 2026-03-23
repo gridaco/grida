@@ -39,8 +39,10 @@ export class CanvasWasmGeometryQueryInterfaceProvider
     return this.getNodeIdsFromPoint(p);
   }
 
-  getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
-    return this.surface.getNodeAbsoluteBoundingBox(node_id);
+  getNodeAbsoluteBoundingRect(
+    target: (string & {}) | "<scene>"
+  ): cmath.Rectangle | null {
+    return this.surface.getNodeAbsoluteBoundingBox(target);
   }
 }
 

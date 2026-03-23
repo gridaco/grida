@@ -29,10 +29,29 @@ impl Hierarchy for NoHierarchy {
 }
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
-use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
+use math2::{rect, rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 use serde_json::Value;
 use skia_safe::{Matrix, Surface};
 use std::sync::Arc;
+
+/// Target for bounding box queries.
+pub enum BoundsTarget<'a> {
+    /// A specific node by its user-facing ID.
+    Node(&'a str),
+    /// The active scene — returns the union of all scene root children's bounds.
+    Scene,
+}
+
+impl<'a> BoundsTarget<'a> {
+    /// Parse from a string, recognizing `"<scene>"` as the scene target.
+    pub fn from_str(s: &'a str) -> Self {
+        if s == "<scene>" {
+            Self::Scene
+        } else {
+            Self::Node(s)
+        }
+    }
+}
 
 pub trait ApplicationApi {
     fn tick(&mut self, time: f64);
@@ -54,7 +73,7 @@ pub trait ApplicationApi {
     fn get_node_ids_from_point(&mut self, point: Vector2) -> Vec<String>;
     /// returns all node ids intersecting with the envelope in canvas space.
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
-    fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
+    fn get_node_absolute_bounding_box(&mut self, target: BoundsTarget) -> Option<Rectangle>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult>;
 
@@ -401,12 +420,31 @@ impl ApplicationApi for UnknownTargetApplication {
         self.internal_ids_to_user(internal_ids)
     }
 
-    fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
-        let internal_id = self.user_id_to_internal(id)?;
-        self.renderer
-            .get_cache()
-            .geometry()
-            .get_world_bounds(&internal_id)
+    fn get_node_absolute_bounding_box(&mut self, target: BoundsTarget) -> Option<Rectangle> {
+        match target {
+            BoundsTarget::Scene => {
+                let scene = self.renderer.scene.as_ref()?;
+                let geometry = self.renderer.get_cache().geometry();
+                let roots = scene.graph.roots();
+                let mut union: Option<Rectangle> = None;
+                for root_id in roots {
+                    if let Some(bounds) = geometry.get_world_bounds(root_id) {
+                        union = Some(match union {
+                            Some(u) => rect::union(&[u, bounds]),
+                            None => bounds,
+                        });
+                    }
+                }
+                union
+            }
+            BoundsTarget::Node(id) => {
+                let internal_id = self.user_id_to_internal(id)?;
+                self.renderer
+                    .get_cache()
+                    .geometry()
+                    .get_world_bounds(&internal_id)
+            }
+        }
     }
 
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported> {

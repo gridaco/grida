@@ -2582,11 +2582,14 @@ export namespace editor.api {
     getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
 
     /**
-     * returns a bounding rect of the node in canvas space
-     * @param node_id
-     * @returns
+     * Returns the absolute bounding rect of a node or the active scene.
+     *
+     * @param target - A node ID, or `"<scene>"` to get the union bounds of the
+     *   active scene's root children.
      */
-    getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null;
+    getNodeAbsoluteBoundingRect(
+      target: (string & {}) | "<scene>"
+    ): cmath.Rectangle | null;
   }
 
   export interface IDocumentImageExportInterfaceProvider {
