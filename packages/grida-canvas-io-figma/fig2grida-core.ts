@@ -225,7 +225,13 @@ function mergePages(
 }
 
 function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
-  const archiveBytes = io.archive.pack(merged.document, merged.imageRecord);
+  const archiveBytes = io.archive.pack(
+    merged.document,
+    merged.imageRecord,
+    undefined,
+    undefined,
+    { level: 0 }
+  );
   const nodeCount = Object.keys(merged.document.nodes).filter(
     (id) => merged.document.nodes[id]?.type !== "scene"
   ).length;
