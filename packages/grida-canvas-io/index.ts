@@ -932,11 +932,21 @@ export namespace io {
      * @param bitmaps - Optional bitmap assets to include in the archive
      * @returns Uint8Array containing the ZIP archive
      */
+    export interface PackOptions {
+      /**
+       * ZIP compression level (0–9). 0 = store-only (fastest), 6 = default,
+       * 9 = best compression. Use 0 for transient archives that will be
+       * immediately consumed (e.g. fig2grida → io.load round-trip).
+       */
+      level?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+    }
+
     export function pack(
       document: grida.program.document.Document,
       images?: Record<string, Uint8Array>,
       schemaVersion: string = grida.program.document.SCHEMA_VERSION,
-      bitmaps?: Record<string, io.Bitmap>
+      bitmaps?: Record<string, io.Bitmap>,
+      options?: PackOptions
     ): Uint8Array {
       // Extract bitmaps from document if not provided
       const inferredBitmaps: Record<string, io.Bitmap> | undefined =
@@ -1018,7 +1028,7 @@ export namespace io {
         }
       }
 
-      return zipSync(files);
+      return zipSync(files, { level: options?.level ?? 6 });
     }
 
     /**
@@ -1451,8 +1461,7 @@ export namespace io {
        */
       async quarantine(label?: string): Promise<void> {
         const dir = await this.getDirectoryHandle();
-        const safeLabel =
-          label ?? new Date().toISOString().replace(/:/g, "-");
+        const safeLabel = label ?? new Date().toISOString().replace(/:/g, "-");
         const archiveRoot = await dir.getDirectoryHandle("_quarantine", {
           create: true,
         });

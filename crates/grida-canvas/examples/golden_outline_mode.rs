@@ -95,6 +95,7 @@ fn render_with_outline_mode(outline: bool) -> skia_safe::Image {
         camera,
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
 

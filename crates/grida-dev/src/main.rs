@@ -46,6 +46,9 @@ enum Command {
     /// Bulk benchmark — runs all scenes in all `.grida` files, outputs a compact JSON report.
     /// Accepts a single `.grida` file or a directory (recursively finds `*.grida` files).
     BenchReport(bench::BenchReportArgs),
+    /// Measure `load_scene()` per-stage timings (layout, geometry, effects, layers).
+    /// Identifies cold-start bottlenecks without GPU rendering.
+    LoadBench(bench::LoadBenchArgs),
 }
 
 #[tokio::main]
@@ -57,6 +60,7 @@ async fn main() -> Result<()> {
         Some(Command::Reftest(args)) => reftest::run(args).await?,
         Some(Command::SvgToGrida(args)) => run_svg_to_grida(args),
         Some(Command::BenchReport(args)) => bench::run_bench_report(args, loader).await?,
+        Some(Command::LoadBench(args)) => bench::run_load_bench(args, loader).await?,
         None => run_interactive(cli.file).await?,
     }
     Ok(())
@@ -96,11 +100,7 @@ struct SvgToGridaArgs {
 fn run_svg_to_grida(args: SvgToGridaArgs) {
     use cg::io::io_svg::svg_to_grida_bytes;
 
-    let input_dir = PathBuf::from(
-        args.path
-            .as_deref()
-            .unwrap_or("fixtures/test-svg/L0"),
-    );
+    let input_dir = PathBuf::from(args.path.as_deref().unwrap_or("fixtures/test-svg/L0"));
     let output_dir = PathBuf::from(
         args.output
             .as_deref()
@@ -168,7 +168,9 @@ fn run_svg_to_grida(args: SvgToGridaArgs) {
     }
     println!(
         "\n{} converted, {} skipped → {}",
-        ok, skip, output_dir.display()
+        ok,
+        skip,
+        output_dir.display()
     );
 }
 
@@ -234,10 +236,7 @@ async fn run_interactive(file: Option<String>) -> Result<()> {
         vec![build_empty_scene()]
     };
 
-    let first = initial_scenes
-        .first()
-        .cloned()
-        .expect("at least one scene");
+    let first = initial_scenes.first().cloned().expect("at least one scene");
 
     let (drop_tx, drop_rx) = unbounded_channel::<PathBuf>();
     let (scenes_tx, scenes_rx) = unbounded_channel::<Vec<Scene>>();
@@ -264,8 +263,8 @@ async fn run_interactive(file: Option<String>) -> Result<()> {
 
 fn scene_from_svg_path(path: &Path) -> Result<Scene> {
     use cg::cg::prelude::CGColor;
-    let svg_source =
-        std::fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    let svg_source = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
     let graph = pack::from_svg_str(&svg_source)
         .map_err(|err| anyhow::anyhow!("failed to convert SVG {}: {err}", path.display()))?;
 

@@ -3,7 +3,7 @@ name: research
 description: >
   Research upstream and peer projects to inform Grida's design and
   implementation. Use when investigating how Chromium, Skia, Servo,
-  or peer canvas editors solve a problem before writing code. Covers
+  Taffy, or peer canvas editors solve a problem before writing code. Covers
   source-code exploration, research document authoring, and the
   study-adapt-differ pattern used in .plan.md files. Relevant dirs:
   docs/wg/research/, docs/wg/feat-2d/, crates/grida-canvas/.
@@ -92,10 +92,11 @@ Known citations:
 
 ### Web Standards & CSS
 
-| Repo                                    | Lang | When to reference                                                         | Key paths                                |
-| --------------------------------------- | ---- | ------------------------------------------------------------------------- | ---------------------------------------- |
-| [servo](https://github.com/servo/servo) | Rust | CSS layout, DOM, Rust browser-engine patterns. We vendor its style system | `components/style/` `components/layout/` |
-| [stylo](https://github.com/servo/stylo) | Rust | CSS parsing and style resolution                                          | `style/`                                 |
+| Repo                                         | Lang | When to reference                                                         | Key paths                                |
+| -------------------------------------------- | ---- | ------------------------------------------------------------------------- | ---------------------------------------- |
+| [servo](https://github.com/servo/servo)      | Rust | CSS layout, DOM, Rust browser-engine patterns. We vendor its style system | `components/style/` `components/layout/` |
+| [stylo](https://github.com/servo/stylo)      | Rust | CSS parsing and style resolution                                          | `style/`                                 |
+| [taffy](https://github.com/DioxusLabs/taffy) | Rust | Flexbox/Grid layout algorithms and Rust-native layout engine internals    | `src/tree/` `src/compute/` `src/style/`  |
 
 ### Canvas Editor Peers
 

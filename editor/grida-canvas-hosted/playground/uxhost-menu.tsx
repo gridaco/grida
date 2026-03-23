@@ -525,7 +525,7 @@ function ViewMenuContent({
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => instance.camera.fit("*")}
+          onSelect={() => instance.camera.fit("<scene>")}
           className="text-xs"
         >
           Zoom to fit

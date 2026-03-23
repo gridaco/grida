@@ -22,6 +22,9 @@ pub struct BenchArgs {
     /// Viewport height.
     #[arg(long = "height", default_value_t = 1000)]
     pub height: i32,
+    /// Run the resize benchmark (alternates between two viewport sizes).
+    #[arg(long = "resize", default_value_t = false)]
+    pub resize: bool,
 }
 
 #[derive(Args, Debug)]

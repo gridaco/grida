@@ -37,6 +37,19 @@ impl LayoutResult {
     pub fn clear(&mut self) {
         self.layouts.clear();
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&NodeId, &ComputedLayout)> {
+        self.layouts.iter()
+    }
+
+    /// Pre-allocate storage for `capacity` layout entries.
+    ///
+    /// Call after `clear()` when the upcoming node count is known.
+    pub fn reserve(&mut self, capacity: usize) {
+        if self.layouts.capacity() < capacity {
+            self.layouts.reserve(capacity);
+        }
+    }
 }
 
 impl Default for LayoutResult {

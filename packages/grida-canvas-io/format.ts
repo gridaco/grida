@@ -1486,6 +1486,7 @@ export namespace format {
                 stroke_cap: containerNode.stroke_cap,
                 stroke_join: containerNode.stroke_join,
                 stroke_width: containerNode.stroke_width,
+                stroke_dash_array: containerNode.stroke_dash_array,
                 rectangular_stroke_width_top:
                   containerNode.rectangular_stroke_width_top,
                 rectangular_stroke_width_right:
@@ -1547,6 +1548,7 @@ export namespace format {
                 stroke_width: lineNode.stroke_width,
                 stroke_cap: lineNode.stroke_cap,
                 stroke_join: lineNode.stroke_join,
+                stroke_dash_array: lineNode.stroke_dash_array,
               });
             const strokePaintsFiltered = paints(lineNode, "stroke");
             const strokePaintsOffset = format.paint.encode.strokePaints(
@@ -1600,6 +1602,7 @@ export namespace format {
                 stroke_width: vectorNode.stroke_width,
                 stroke_cap: vectorNode.stroke_cap,
                 stroke_join: vectorNode.stroke_join,
+                stroke_dash_array: vectorNode.stroke_dash_array,
               });
             const vectorWithSmoothing =
               vectorNode as grida.program.nodes.VectorNode &
@@ -1663,6 +1666,7 @@ export namespace format {
                 stroke_width: pathNode.stroke_width,
                 stroke_cap: pathNode.stroke_cap,
                 stroke_join: pathNode.stroke_join,
+                stroke_dash_array: pathNode.stroke_dash_array,
               });
             const fillPaintsFiltered = paints(pathNode, "fill");
             const fillPaintsOffset = format.paint.encode.fillPaints(
@@ -1709,6 +1713,7 @@ export namespace format {
                 stroke_width: booleanNode.stroke_width,
                 stroke_cap: booleanNode.stroke_cap,
                 stroke_join: booleanNode.stroke_join,
+                stroke_dash_array: booleanNode.stroke_dash_array,
               });
             const booleanWithSmoothing =
               booleanNode as grida.program.nodes.BooleanPathOperationNode &
@@ -2668,6 +2673,7 @@ export namespace format {
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
           stroke_width?: number;
+          stroke_dash_array?: number[];
           rectangular_stroke_width_top?: number;
           rectangular_stroke_width_right?: number;
           rectangular_stroke_width_bottom?: number;
@@ -2677,7 +2683,8 @@ export namespace format {
         const strokeStyleOffset = createStrokeStyle(
           builder,
           node.stroke_cap,
-          node.stroke_join
+          node.stroke_join,
+          node.stroke_dash_array
         );
 
         // Create VariableWidthProfile (empty for now)
@@ -3006,6 +3013,7 @@ export namespace format {
         rectangular_stroke_width_left: number;
         stroke_cap: cg.StrokeCap;
         stroke_join: cg.StrokeJoin;
+        stroke_dash_array?: number[];
       } {
         if (!trait) {
           return {
@@ -3026,6 +3034,18 @@ export namespace format {
           ? styling.decode.strokeJoin(strokeStyle.strokeJoin())
           : "miter";
 
+        // Decode dash array
+        let stroke_dash_array: number[] | undefined;
+        if (strokeStyle) {
+          const len = strokeStyle.strokeDashArrayLength();
+          if (len > 0) {
+            stroke_dash_array = [];
+            for (let i = 0; i < len; i++) {
+              stroke_dash_array.push(strokeStyle.strokeDashArray(i)!);
+            }
+          }
+        }
+
         const strokeWidth = trait.rectangularStrokeWidth();
         return {
           rectangular_stroke_width_top: strokeWidth?.strokeTopWidth() ?? 0,
@@ -3035,6 +3055,7 @@ export namespace format {
           rectangular_stroke_width_left: strokeWidth?.strokeLeftWidth() ?? 0,
           stroke_cap: cap,
           stroke_join: join,
+          ...(stroke_dash_array ? { stroke_dash_array } : {}),
         };
       }
 
@@ -5067,6 +5088,9 @@ export namespace format {
               format.shape.decode.deriveStrokeWidth(strokeGeometryProps),
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             rectangular_corner_radius_top_left:
               cornerRadiusProps.rectangular_corner_radius_top_left,
             rectangular_corner_radius_top_right:
@@ -5331,6 +5355,9 @@ export namespace format {
             marker_end_shape:
               enums.STROKE_MARKER_PRESET_DECODE.get(n.markerEndShape()) ??
               "none",
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.LineNode;
         }
@@ -5472,6 +5499,9 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             data: n.data() ?? "",
             fill_rule: fillRule,
             ...(effects || {}),
@@ -5531,6 +5561,9 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.BooleanPathOperationNode;
         }

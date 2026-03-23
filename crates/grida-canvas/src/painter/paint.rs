@@ -140,7 +140,9 @@ pub fn shader_from_paint(
             let key = match &img.image {
                 ResourceRef::RID(r) | ResourceRef::HASH(r) => r,
             };
-            let skia_image = repo.get_by_size(key, size.0, size.1)?;
+            // Skia's built-in mipmaps handle LOD selection at rasterization
+            // time based on the final canvas transform. No zoom needed here.
+            let skia_image = repo.get(key)?;
             image::image_shader(img, skia_image, size)
         }
     }

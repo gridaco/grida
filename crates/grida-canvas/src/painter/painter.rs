@@ -88,7 +88,7 @@ impl<'a> Painter<'a> {
         }
     }
 
-    /// Create a new Painter that uses the SceneCache's paragraph cache
+    /// Create a new Painter that uses the SceneCache's paragraph cache.
     pub fn new_with_scene_cache(
         canvas: &'a skia_safe::Canvas,
         fonts: &'a FontRepository,

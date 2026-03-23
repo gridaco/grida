@@ -6,6 +6,29 @@
  *
  * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Fig.kiwi format glossary
  *
+ * ## TODO — Auto-layout conversion (not implemented)
+ *
+ * Currently ALL nodes are emitted with `layout_positioning: "absolute"` and
+ * `layout_mode: "flow"`. Figma auto-layout properties (`layoutMode`,
+ * `layoutAlign`, `layoutGrow`, `primaryAxisAlignItems`,
+ * `counterAxisAlignItems`, `layoutPositioning`, sizing modes, `layoutWrap`)
+ * are completely dropped during conversion. Positions are always derived
+ * from `absoluteBoundingBox` / `relativeTransform`.
+ *
+ * This means:
+ * - The output is always safe for `skip_layout` (no flex containers exist)
+ * - Auto-layout semantics are lost — re-layout in Grida won't match Figma
+ * - Resizing a container won't reflow children as it would in Figma
+ *
+ * To support true auto-layout round-trip:
+ * - Map `layoutMode` → `layout_mode: "flex"`
+ * - Map `layoutAlign`, `layoutGrow`, `layoutPositioning` per child
+ * - Map `primaryAxisAlignItems` / `counterAxisAlignItems` → alignment
+ * - Map `primaryAxisSizingMode` / `counterAxisSizingMode` → sizing
+ * - Map `layoutWrap` → `layout_wrap`
+ * - Only set `layout_positioning: "absolute"` for children with
+ *   `layoutPositioning: "ABSOLUTE"` in Figma
+ *
  * ## TODO — Kiwi → REST (not yet fully mapped)
  *
  * - **Rich text**: `characterStyleOverrides` and `styleOverrideTable` are always empty.
@@ -427,6 +450,29 @@ export namespace iofigma {
          * @default true
          */
         placeholder_for_missing_images?: boolean;
+        /**
+         * When true, TEXT nodes always use concrete width/height from
+         * absoluteBoundingBox, ignoring Figma's `textAutoResize` ("auto"
+         * sizing). This produces fixed-size text frames whose dimensions
+         * match Figma's rendered output exactly.
+         *
+         * Use this when the consumer skips layout computation (e.g.
+         * `skip_layout` mode) and needs pre-resolved text dimensions.
+         *
+         * When false (default), TEXT nodes respect `textAutoResize`:
+         * "WIDTH_AND_HEIGHT" sets both to auto, "HEIGHT" sets height to
+         * auto. These require layout-time text measurement to resolve.
+         *
+         * **Caveat:** The fixed dimensions come from Figma's own renderer
+         * and font metrics. If the rendering environment uses different
+         * fonts or a different text shaper, the actual text extent may
+         * not match the baked-in size — text may overflow or leave extra
+         * whitespace. Only use this flag when font fidelity cannot be
+         * guaranteed or when layout computation is explicitly skipped.
+         *
+         * @default false
+         */
+        prefer_fixed_text_sizing?: boolean;
       };
 
       function toGradientPaint(paint: figrest.GradientPaint) {
@@ -1570,12 +1616,14 @@ export namespace iofigma {
               layout_inset_right: constraints.right,
               layout_inset_bottom: constraints.bottom,
               layout_target_width:
+                !context.prefer_fixed_text_sizing &&
                 figma_text_resizing_model === "WIDTH_AND_HEIGHT"
                   ? "auto"
                   : fixedwidth,
               layout_target_height:
-                figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
-                figma_text_resizing_model === "HEIGHT"
+                !context.prefer_fixed_text_sizing &&
+                (figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
+                  figma_text_resizing_model === "HEIGHT")
                   ? "auto"
                   : fixedheight,
               text_align: node.style.textAlignHorizontal

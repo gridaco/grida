@@ -34,10 +34,11 @@ pub fn build() -> Scene {
         opacity: 1.0,
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
-        transform: AffineTransform::from_box_center(
-            padding, padding, glass_size, glass_size, 0.0,
-        ),
-        size: Size { width: glass_size, height: glass_size },
+        transform: AffineTransform::from_box_center(padding, padding, glass_size, glass_size, 0.0),
+        size: Size {
+            width: glass_size,
+            height: glass_size,
+        },
         corner_radius: RectangularCornerRadius::circular(60.0),
         corner_smoothing: CornerSmoothing(0.0),
         fills: Paints::new(vec![]),

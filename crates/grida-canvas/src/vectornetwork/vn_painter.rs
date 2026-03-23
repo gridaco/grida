@@ -369,9 +369,11 @@ mod tests {
 
     #[test]
     fn image_stroke_renders() {
-        // Prepare image repository with a simple blue image
+        // Prepare image repository with a blue image.
+        // Use a larger image so bilinear+mipmap sampling doesn't blend
+        // edge pixels with the transparent Decal border.
         let mut store = ByteStore::new();
-        let mut img_surface = surfaces::raster_n32_premul((2, 2)).expect("surface");
+        let mut img_surface = surfaces::raster_n32_premul((32, 32)).expect("surface");
         img_surface.canvas().clear(Color::BLUE);
         let img = img_surface.image_snapshot();
         let data = img.encode(None, EncodedImageFormat::PNG, None).unwrap();

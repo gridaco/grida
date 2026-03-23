@@ -452,7 +452,16 @@ export class Scene {
     return JSON.parse(str);
   }
 
-  getNodeAbsoluteBoundingBox(id: string): types.Rect | null {
+  /**
+   * Get the absolute bounding box of a node or the active scene.
+   *
+   * @param target - A node ID, or `"<scene>"` to get the union bounds of the
+   *   active scene's root children (computed in a single WASM call).
+   */
+  getNodeAbsoluteBoundingBox(
+    target: (string & {}) | "<scene>"
+  ): types.Rect | null {
+    const id = target;
     this._assertAlive();
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._get_node_absolute_bounding_box(
@@ -553,9 +562,7 @@ export class Scene {
    */
   surfacePointerMove(x: number, y: number): SurfaceResponse {
     this._assertAlive();
-    return unpackResponse(
-      this.module._surface_pointer_move(this.appptr, x, y)
-    );
+    return unpackResponse(this.module._surface_pointer_move(this.appptr, x, y));
   }
 
   /**
@@ -707,6 +714,21 @@ export class Scene {
   runtime_renderer_set_render_policy_flags(flags: number) {
     this._assertAlive();
     this.module._runtime_renderer_set_render_policy_flags(this.appptr, flags);
+  }
+
+  /**
+   * Skip layout computation during scene loading.
+   *
+   * When enabled, `load_scene` derives layout from schema positions/sizes
+   * instead of running the Taffy flexbox engine. Set **before** loading a scene.
+   *
+   * Use this for documents with only absolute positioning (e.g. imported
+   * Figma files without auto-layout) to eliminate the layout phase, which
+   * is the dominant cost in `load_scene` for large documents.
+   */
+  runtime_renderer_set_skip_layout(skip: boolean) {
+    this._assertAlive();
+    this.module._runtime_renderer_set_skip_layout(this.appptr, skip);
   }
 
   runtime_renderer_set_outline_mode(enable: boolean) {

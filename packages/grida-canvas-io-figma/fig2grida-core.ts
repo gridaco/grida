@@ -34,15 +34,14 @@ import { io } from "@grida/io";
 import grida from "@grida/schema";
 import kolor from "@grida/color";
 
-export interface Fig2GridaOptions {
+export interface Fig2GridaOptions extends Pick<
+  iofigma.restful.factory.FactoryContext,
+  | "placeholder_for_missing_images"
+  | "preserve_figma_ids"
+  | "prefer_fixed_text_sizing"
+> {
   /** Convert specific page indices only (only applies to `.fig` input). */
   pages?: number[];
-  /**
-   * When true (default), unresolved image refs are replaced with a checker
-   * pattern placeholder. When false, refs are preserved as `res://images/<ref>`
-   * so the lazy image loading system can request them at render time.
-   */
-  placeholder_for_missing_images?: boolean;
 }
 
 export interface Fig2GridaResult {
@@ -225,7 +224,13 @@ function mergePages(
 }
 
 function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
-  const archiveBytes = io.archive.pack(merged.document, merged.imageRecord);
+  const archiveBytes = io.archive.pack(
+    merged.document,
+    merged.imageRecord,
+    undefined,
+    undefined,
+    { level: 0 }
+  );
   const nodeCount = Object.keys(merged.document.nodes).filter(
     (id) => merged.document.nodes[id]?.type !== "scene"
   ).length;
@@ -258,9 +263,18 @@ export function fig2grida(
   const placeholderForMissing =
     options?.placeholder_for_missing_images !== false;
 
+  const preserveFigmaIds = options?.preserve_figma_ids;
+  const preferFixedTextSizing = options?.prefer_fixed_text_sizing;
+
   // --- Object input: REST JSON directly ---
   if (!(input instanceof Uint8Array)) {
-    return fig2gridaFromRestJson(input, undefined, placeholderForMissing);
+    return fig2gridaFromRestJson(
+      input,
+      undefined,
+      placeholderForMissing,
+      preserveFigmaIds,
+      preferFixedTextSizing
+    );
   }
 
   // --- Bytes input: detect format ---
@@ -271,14 +285,22 @@ export function fig2grida(
       return fig2gridaFromRestJson(
         restArchive.json,
         restArchive.images,
-        placeholderForMissing
+        placeholderForMissing,
+        preserveFigmaIds,
+        preferFixedTextSizing
       );
     }
     // Otherwise fall through to .fig parser (handles both ZIP and raw Kiwi)
   } else if (input.length > 0 && input[0] === 0x7b /* '{' */) {
     // JSON text — parse and treat as REST API response
     const json = JSON.parse(new TextDecoder().decode(input));
-    return fig2gridaFromRestJson(json, undefined, placeholderForMissing);
+    return fig2gridaFromRestJson(
+      json,
+      undefined,
+      placeholderForMissing,
+      preserveFigmaIds,
+      preferFixedTextSizing
+    );
   }
 
   return fig2gridaFromFigBytes(input, options);
@@ -315,6 +337,8 @@ function fig2gridaFromFigBytes(
       gradient_id_generator: makeIdGenerator("grad"),
       prefer_path_for_geometry: true,
       placeholder_for_missing_images: placeholderForMissing,
+      preserve_figma_ids: options?.preserve_figma_ids,
+      prefer_fixed_text_sizing: options?.prefer_fixed_text_sizing,
     });
     pageResults.push({ name: page.name, result });
   }
@@ -424,7 +448,9 @@ function extractCanvases(json: unknown): Array<{
 function restJsonToMergedDocument(
   json: unknown,
   images: Record<string, Uint8Array> | undefined,
-  placeholderForMissing: boolean
+  placeholderForMissing: boolean,
+  preserveFigmaIds?: boolean,
+  preferFixedTextSizing?: boolean
 ): MergedDocument {
   const canvases = extractCanvases(json);
 
@@ -434,7 +460,11 @@ function restJsonToMergedDocument(
     gradient_id_generator: makeIdGenerator("grad"),
     prefer_path_for_geometry: true,
     placeholder_for_missing_images: placeholderForMissing,
-    node_id_generator: makeIdGenerator("rest-import"),
+    preserve_figma_ids: preserveFigmaIds,
+    prefer_fixed_text_sizing: preferFixedTextSizing,
+    node_id_generator: preserveFigmaIds
+      ? undefined
+      : makeIdGenerator("rest-import"),
     ...(images &&
       Object.keys(images).length > 0 && {
         resolve_image_src: (ref: string) =>
@@ -458,10 +488,18 @@ function restJsonToMergedDocument(
 function fig2gridaFromRestJson(
   json: unknown,
   images: Record<string, Uint8Array> | undefined,
-  placeholderForMissing: boolean
+  placeholderForMissing: boolean,
+  preserveFigmaIds?: boolean,
+  preferFixedTextSizing?: boolean
 ): Fig2GridaResult {
   return packMergedDocument(
-    restJsonToMergedDocument(json, images, placeholderForMissing)
+    restJsonToMergedDocument(
+      json,
+      images,
+      placeholderForMissing,
+      preserveFigmaIds,
+      preferFixedTextSizing
+    )
   );
 }
 
@@ -554,7 +592,10 @@ function emptyPackedScene(
 // restJsonToGridaDocument — returns in-memory Document (no .grida packing)
 // ---------------------------------------------------------------------------
 
-export interface RestJsonToGridaOptions {
+export interface RestJsonToGridaOptions extends Pick<
+  iofigma.restful.factory.FactoryContext,
+  "prefer_fixed_text_sizing"
+> {
   /**
    * Image hashes from Figma `images` metadata to raw bytes. When provided,
    * resolves `IMAGE` paint refs to `res://images/<hash>`.
@@ -583,7 +624,13 @@ export function restJsonToGridaDocument(
 ): RestJsonToGridaResult {
   _idCounter = 0;
   const images = options?.images;
-  const merged = restJsonToMergedDocument(json, images, true);
+  const merged = restJsonToMergedDocument(
+    json,
+    images,
+    true,
+    undefined,
+    options?.prefer_fixed_text_sizing
+  );
 
   return {
     document: merged.document,

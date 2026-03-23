@@ -82,6 +82,7 @@ fn render_with_pixel_preview(scale: u8) -> skia_safe::Image {
         camera,
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
 
@@ -142,7 +143,12 @@ fn main() {
         &border,
     );
     canvas.draw_rect(
-        Rect::from_xywh(right_x, top_y, normal.width() as f32, normal.height() as f32),
+        Rect::from_xywh(
+            right_x,
+            top_y,
+            normal.width() as f32,
+            normal.height() as f32,
+        ),
         &border,
     );
 
@@ -156,4 +162,3 @@ fn main() {
     )
     .expect("write png");
 }
-

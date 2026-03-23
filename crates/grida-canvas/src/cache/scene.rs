@@ -199,5 +199,4 @@ impl SceneCache {
             .map(|il| il.index)
             .collect()
     }
-
 }

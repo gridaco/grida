@@ -1,12 +1,12 @@
 ---
 title: Rendering Optimization Strategies
+format: md
 tags:
   - internal
   - wg
   - canvas
   - performance
   - rendering
-
 ---
 
 # Rendering Optimization Strategies
@@ -857,17 +857,78 @@ missing the cheapest possible camera-change path.
 
 ---
 
+## Scene Loading & Layout
+
+Scene loading (`Renderer::load_scene`) is the cold-start path that runs
+before the first frame. For large documents (100K–150K+ nodes), the
+layout phase dominates (~95%+ of `load_scene` time). The remaining
+stages (geometry, effects, layers) are comparatively cheap.
+
+**Pipeline:** `load_scene` runs five stages in order: font collection,
+layout (Taffy tree build + flexbox + text measurement), geometry
+propagation, effect classification, and layer flattening.
+
+WASM runs ~5x slower than native for this workload due to allocator
+and single-thread overhead.
+
+34. **Skip Layout for Absolute-Position Documents** ✅ IMPLEMENTED
+
+    `skip_layout` bypasses the Taffy flexbox engine entirely.
+    `compute_schema_only()` walks the scene graph once and copies
+    schema positions/sizes — O(n) with no allocations, no text
+    measurement, no tree construction.
+
+    Correct for absolute-positioned documents. Documents with
+    auto-layout/flex containers require the full Taffy path.
+
+    ~5x layout speedup on small scenes; orders of magnitude on
+    100K+ node scenes where Taffy + text measurement dominate.
+
+    CLI: `cargo run -p grida-dev --release -- load-bench file.grida --skip-layout`
+
+35. **Pre-Allocate Layout Data Structures** ✅ IMPLEMENTED
+
+    `LayoutTree::reserve(node_count)` pre-allocates the TaffyTree slab
+    and ID-mapping HashMaps before tree construction. Avoids ~17
+    doubling reallocations for 100K+ node scenes. More impactful in
+    WASM where per-reallocation cost is higher.
+
+36. **Deferred / Viewport-Only Layout** (future)
+
+    Compute layout only for viewport-visible nodes on cold start.
+    Remaining nodes computed lazily as the user pans. Requires
+    bounding-box estimates from schema data.
+
+37. **Pre-Measure Text Before Taffy** (future)
+
+    Decouple text measurement from the Taffy measure callback.
+    Pre-measure all text nodes in a single pass, then run Taffy
+    with a lookup-table measure function. Eliminates repeated
+    Skia calls and enables future parallelization on native.
+
+38. **Cache Text Measurements by Width Constraint** (future)
+
+    Add a secondary cache keyed on `(node_id, width_constraint)`
+    that returns measurements directly, skipping Skia entirely for
+    repeated queries with the same width.
+
+**Diagnostic tooling:** `load-bench` CLI (`grida-dev load-bench`)
+for per-stage timing; `cargo bench -p cg --bench bench_load_scene`
+for Criterion benchmarks at synthetic scale.
+
+---
+
 ## Engine-Level
 
-34. **Precomputed World Transforms**
+39. **Precomputed World Transforms**
     - Avoid recalculating transforms per draw call.
     - Essential for random-access rendering.
 
-35. **Flat Table Architecture**
+40. **Flat Table Architecture**
     - All node data (transforms, bounds, styles) stored in flat maps.
     - Enables fast diffing, syncing, and concurrent access.
 
-36. **Scene Planner & Scheduler**
+41. **Scene Planner & Scheduler**
     - Builds the render pass list per frame.
     - Reacts to scene changes, memory pressure, frame budget.
     - Drives decisions to re-record, cache, evict, or degrade fidelity.
@@ -876,7 +937,7 @@ missing the cheapest possible camera-change path.
 
 ## Future: Worker-Thread Rasterization
 
-37. **Multithreaded Rasterization**
+42. **Multithreaded Rasterization**
 
     Move SkPicture recording and/or render surface rasterization to worker
     threads. This is the single largest performance gap vs. Chromium:
@@ -898,11 +959,11 @@ missing the cheapest possible camera-change path.
     specifically to compensate for this. Multithreaded rasterization
     applies only to native (desktop) builds.
 
-38. **BVH or Quadtree Spatial Index**
+43. **BVH or Quadtree Spatial Index**
     - Build dynamic index from `world_bounds` for fast spatial queries.
     - Currently using R-tree (rstar crate).
 
-39. **CRDT-Ready Data Stores**
+44. **CRDT-Ready Data Stores**
     - Flat table model enables future collaboration support.
 
 ---

@@ -52,6 +52,22 @@ impl LayoutTree {
         }
     }
 
+    /// Pre-allocate internal storage for `capacity` nodes.
+    ///
+    /// Call after `clear()` when the upcoming node count is known.
+    /// Avoids repeated reallocation of the taffy slab and both hash maps
+    /// during tree construction — significant for large scenes (100k+ nodes).
+    pub(crate) fn reserve(&mut self, capacity: usize) {
+        // TaffyTree::with_capacity pre-allocates its internal SlotMaps.
+        // After clear() the backing vecs keep their old capacity, so we
+        // only need to replace the tree when the new count exceeds it.
+        if self.scene_to_taffy.capacity() < capacity {
+            self.taffy = TaffyTree::with_capacity(capacity);
+            self.scene_to_taffy.reserve(capacity);
+            self.taffy_to_scene.reserve(capacity);
+        }
+    }
+
     /// Create a leaf node in the layout tree
     ///
     /// Maps the scene node ID to a taffy node ID and returns it

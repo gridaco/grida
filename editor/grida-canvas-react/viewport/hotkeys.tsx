@@ -894,7 +894,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+1, shift+9", (e) => {
-    editor.camera.fit("*", { margin: 64 });
+    editor.camera.fit("<scene>", { margin: 64 });
     toast.success(`Zoom to fit`);
   });
 

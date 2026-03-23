@@ -19,6 +19,7 @@
  *   --out, -o       Output path (default: input with .grida extension)
  *   --pages, -p     Comma-separated page indices to include (default: all)
  *   --info          Print file info (pages, node counts) — .fig only
+ *   --prefer-fixed-text-sizing  Use fixed width/height for text nodes
  *   --verbose       Print progress details
  *   --help          Show help
  */
@@ -43,6 +44,7 @@ Options:
   --out, -o       Output path (default: input with .grida extension)
   --pages, -p     Comma-separated page indices to include (default: all)
   --info          Print file info (pages, node counts) — .fig only
+  --prefer-fixed-text-sizing  Use fixed width/height for text nodes
   --verbose       Print progress details
   --help          Show help
 
@@ -61,6 +63,7 @@ interface CliArgs {
   info: boolean;
   verbose: boolean;
   help: boolean;
+  prefer_fixed_text_sizing: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -68,6 +71,7 @@ function parseArgs(argv: string[]): CliArgs {
     info: false,
     verbose: false,
     help: false,
+    prefer_fixed_text_sizing: false,
   };
 
   const positional: string[] = [];
@@ -92,6 +96,9 @@ function parseArgs(argv: string[]): CliArgs {
       case "-o":
         i++;
         args.output = argv[i];
+        break;
+      case "--prefer-fixed-text-sizing":
+        args.prefer_fixed_text_sizing = true;
         break;
       case "--pages":
       case "-p":
@@ -232,7 +239,9 @@ function main(): void {
   }
 
   // Build options
-  const options: Fig2GridaOptions = {};
+  const options: Fig2GridaOptions = {
+    prefer_fixed_text_sizing: args.prefer_fixed_text_sizing || undefined,
+  };
   if (args.pages) {
     options.pages = args.pages;
     if (args.verbose) {

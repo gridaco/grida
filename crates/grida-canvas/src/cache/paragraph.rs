@@ -113,7 +113,7 @@ pub struct BaselineInfo {
 ///
 /// This struct contains all available measurement results from the Skia Paragraph API,
 /// providing complete geometric information for layout calculations and rendering.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct LayoutMeasurements {
     // Basic dimensions
     /// Total height of the paragraph
@@ -156,12 +156,26 @@ pub struct ParagraphCacheEntry {
     // For now, we just store the paragraph and compute measurements on demand
 }
 
+/// Accumulated statistics from `measure()` calls — for benchmarking only.
+/// All fields are simple integer counters (zero-cost increments).
+#[derive(Default, Debug, Clone)]
+pub struct ParagraphMeasureStats {
+    pub calls: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct ParagraphCache {
     // ID-based cache for text nodes (primary usage)
     entries_measurement_by_id: HashMap<NodeId, ParagraphCacheEntry>,
     // Shape-key-based cache for flexible usage (not currently used)
     entries_measurement_by_shapekey_unstable: HashMap<u64, ParagraphCacheEntry>,
+    /// Benchmark statistics — zero-cost when not read.
+    pub stats: ParagraphMeasureStats,
+    /// When true, `measure()` returns a zero-size stub without calling Skia.
+    /// For benchmarking only — isolates text shaping cost from layout cost.
+    pub skip_text_measure: bool,
 }
 
 impl ParagraphCache {
@@ -169,6 +183,8 @@ impl ParagraphCache {
         Self {
             entries_measurement_by_id: HashMap::new(),
             entries_measurement_by_shapekey_unstable: HashMap::new(),
+            stats: ParagraphMeasureStats::default(),
+            skip_text_measure: false,
         }
     }
 
@@ -209,13 +225,20 @@ impl ParagraphCache {
         fonts: &FontRepository,
         id: Option<&NodeId>,
     ) -> LayoutMeasurements {
+        if self.skip_text_measure {
+            return LayoutMeasurements::default();
+        }
+
         let fonts_gen = fonts.generation();
+
+        self.stats.calls += 1;
 
         // Check if we have a cached paragraph
         if let Some(node_id) = id {
             // Use ID-based cache
             if let Some(entry) = self.entries_measurement_by_id.get(node_id) {
                 if entry.font_generation == fonts_gen {
+                    self.stats.cache_hits += 1;
                     // Use the cached paragraph and compute measurements
                     let paragraph_rc = entry.paragraph.clone();
                     return Self::compute_measurements(paragraph_rc, width);
@@ -226,12 +249,14 @@ impl ParagraphCache {
             let hash = Self::shape_key(text, style, align, max_lines);
             if let Some(entry) = self.entries_measurement_by_shapekey_unstable.get(&hash) {
                 if entry.font_generation == fonts_gen {
+                    self.stats.cache_hits += 1;
                     // Use the cached paragraph and compute measurements
                     let paragraph_rc = entry.paragraph.clone();
                     return Self::compute_measurements(paragraph_rc, width);
                 }
             }
         }
+        self.stats.cache_misses += 1;
 
         // Build the paragraph (expensive operation) - no paint for measurement
         let mut paragraph_style = textlayout::ParagraphStyle::new();

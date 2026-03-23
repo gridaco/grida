@@ -48,8 +48,14 @@ pub async fn run_demo_window_with_drop<F>(
         winit::event_loop::EventLoopProxy<HostEvent>,
     ),
 {
-    run_demo_window_core_multi(scene.clone(), vec![scene], init, Some(drop_tx), Some(scenes_rx))
-        .await;
+    run_demo_window_core_multi(
+        scene.clone(),
+        vec![scene],
+        init,
+        Some(drop_tx),
+        Some(scenes_rx),
+    )
+    .await;
 }
 
 async fn run_demo_window_core_multi<F>(
@@ -80,6 +86,7 @@ async fn run_demo_window_core_multi<F>(
         font_rx,
         cg::runtime::scene::RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
         file_drop_tx.clone(),
         file_drop_tx.is_some(),

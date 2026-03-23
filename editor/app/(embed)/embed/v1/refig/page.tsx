@@ -9,7 +9,10 @@ import {
 } from "@/grida-canvas-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { useRefigEditor } from "@/scaffolds/embed/use-refig-editor";
+import {
+  useRefigEditor,
+  decodeSyntheticFigmaId,
+} from "@/scaffolds/embed/use-refig-editor";
 import { RefigCanvas } from "@/scaffolds/embed/refig-shared";
 import { useEmbedBridge } from "@/grida-canvas-react/use-embed-bridge";
 
@@ -129,7 +132,11 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
     onFile,
   } = useRefigEditor();
 
-  useEmbedBridge(instance, { canvasReady, onFile });
+  useEmbedBridge(instance, {
+    canvasReady,
+    onFile,
+    __dangerously_transform_node_id: decodeSyntheticFigmaId,
+  });
 
   const remoteFetchGen = useRef(0);
 

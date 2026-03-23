@@ -25,14 +25,39 @@ fn alloc_len_prefixed(bytes: &[u8]) -> *const u8 {
 const BACKEND_WEBGL: u32 = 0;
 const BACKEND_RASTER: u32 = 1;
 
+/// Renderer config bitflags passed at init time.
+///
+/// Bit layout (LSB-first):
+///   bit 0: skip_layout
+///
+/// Unset bits use `RuntimeRendererConfig::default()` values.
+/// Extend by assigning higher bits — existing callers passing 0
+/// get the default behaviour.
+const CONFIG_FLAG_SKIP_LAYOUT: u32 = 1 << 0;
+
+fn config_from_flags(flags: u32) -> cg::runtime::config::RuntimeRendererConfig {
+    let mut config = cg::runtime::config::RuntimeRendererConfig::default();
+    if flags & CONFIG_FLAG_SKIP_LAYOUT != 0 {
+        config.skip_layout = true;
+    }
+    config
+}
+
 #[no_mangle]
 /// js::_init
 pub extern "C" fn init(
     width: i32,
     height: i32,
     use_embedded_fonts: bool,
+    config_flags: u32,
 ) -> Box<UnknownTargetApplication> {
-    init_with_backend(BACKEND_WEBGL, width, height, use_embedded_fonts)
+    init_with_backend(
+        BACKEND_WEBGL,
+        width,
+        height,
+        use_embedded_fonts,
+        config_flags,
+    )
 }
 
 #[no_mangle]
@@ -41,13 +66,20 @@ pub extern "C" fn init(
 /// backend_id:
 /// - 0 (`BACKEND_WEBGL`): webgl (emscripten/webgl2)
 /// - 1 (`BACKEND_RASTER`): raster (cpu)
+///
+/// config_flags: bitfield for `RuntimeRendererConfig` (see `CONFIG_FLAG_*`).
+/// Pass 0 for defaults.
 pub extern "C" fn init_with_backend(
     backend_id: u32,
     width: i32,
     height: i32,
     use_embedded_fonts: bool,
+    config_flags: u32,
 ) -> Box<UnknownTargetApplication> {
-    let options = cg::runtime::scene::RendererOptions { use_embedded_fonts };
+    let options = cg::runtime::scene::RendererOptions {
+        use_embedded_fonts,
+        config: config_from_flags(config_flags),
+    };
     match backend_id {
         BACKEND_RASTER => UnknownTargetApplication::new_raster(width, height, options),
         _ => cg::window::application_emscripten::new_webgl_app(width, height, options),
@@ -151,9 +183,7 @@ pub unsafe extern "C" fn switch_scene(
 #[no_mangle]
 /// js::_drain_missing_images
 /// Returns a len-prefixed JSON array of missing image ref strings, or null if empty.
-pub unsafe extern "C" fn drain_missing_images(
-    app: *mut UnknownTargetApplication,
-) -> *const u8 {
+pub unsafe extern "C" fn drain_missing_images(app: *mut UnknownTargetApplication) -> *const u8 {
     if let Some(app) = app.as_mut() {
         let refs = app.drain_missing_images();
         if refs.is_empty() {
@@ -543,10 +573,7 @@ pub unsafe extern "C" fn add_image_with_rid(
     rid_ptr: *const u8,
     rid_len: usize,
 ) -> *const u8 {
-    if let (Some(app), Some(rid)) = (
-        app.as_mut(),
-        __str_from_ptr_len(rid_ptr, rid_len),
-    ) {
+    if let (Some(app), Some(rid)) = (app.as_mut(), __str_from_ptr_len(rid_ptr, rid_len)) {
         let data = std::slice::from_raw_parts(data_ptr, data_len);
         if let Some((width, height, r#type)) = app.add_image_with_rid(data, &rid) {
             let result = AddImageWithRidResult {
@@ -783,7 +810,8 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
     if let Some(app) = app.as_mut() {
         let id = __str_from_ptr_len(ptr, len);
         if let Some(id) = id {
-            if let Some(rect) = app.get_node_absolute_bounding_box(&id) {
+            let target = cg::window::application::BoundsTarget::from_str(&id);
+            if let Some(rect) = app.get_node_absolute_bounding_box(target) {
                 let vec4 = rect.to_vec4(); // [f32; 4]
                 let out = allocate(std::mem::size_of::<f32>() * 4) as *mut f32;
                 std::ptr::copy_nonoverlapping(vec4.as_ptr(), out, 4);
@@ -957,6 +985,17 @@ pub unsafe extern "C" fn runtime_renderer_set_render_policy_flags(
 ) {
     if let Some(app) = app.as_mut() {
         app.runtime_renderer_set_render_policy_flags(flags);
+    }
+}
+
+#[no_mangle]
+/// js::_runtime_renderer_set_skip_layout
+pub unsafe extern "C" fn runtime_renderer_set_skip_layout(
+    app: *mut UnknownTargetApplication,
+    skip: bool,
+) {
+    if let Some(app) = app.as_mut() {
+        app.runtime_renderer_set_skip_layout(skip);
     }
 }
 

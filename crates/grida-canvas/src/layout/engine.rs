@@ -94,11 +94,18 @@ impl LayoutEngine {
         viewport_size: Size,
         mut text_measure: Option<TextMeasureProvider<'_>>,
     ) -> &LayoutResult {
-        // Clear previous state
+        // Clear previous state and pre-allocate for the new scene size.
+        // HashMap::clear() preserves capacity, so subsequent calls with
+        // similar-sized scenes pay no allocation cost. The reserve() calls
+        // only allocate when the new scene exceeds prior capacity.
         self.tree.clear();
         self.result.clear();
 
         let graph = &scene.graph;
+        let node_count = graph.node_count();
+        self.tree.reserve(node_count);
+        self.result.reserve(node_count);
+
         let roots: Vec<NodeId> = graph.roots().to_vec();
 
         // Build and compute layout for each root subtree
@@ -140,6 +147,54 @@ impl LayoutEngine {
         }
 
         &self.result
+    }
+
+    /// Produce layout results directly from schema positions and sizes,
+    /// bypassing the Taffy layout engine entirely.
+    ///
+    /// This is a fast path for documents where all nodes are absolutely
+    /// positioned (e.g. Figma imports without auto-layout). Each node's
+    /// schema position and size are copied verbatim into the layout result.
+    ///
+    /// Only nodes reachable from the scene's roots are included (same
+    /// scope as the full Taffy path).
+    pub fn compute_schema_only(&mut self, scene: &crate::node::schema::Scene) -> &LayoutResult {
+        self.result.clear();
+        let graph = &scene.graph;
+        let node_count = graph.node_count();
+        self.result.reserve(node_count);
+
+        let roots: Vec<NodeId> = graph.roots().to_vec();
+        for root_id in &roots {
+            self.extract_schema_only_recursive(root_id, graph);
+        }
+        &self.result
+    }
+
+    /// Recursively extract schema positions/sizes for a node and its children.
+    fn extract_schema_only_recursive(
+        &mut self,
+        id: &NodeId,
+        graph: &crate::node::scene_graph::SceneGraph,
+    ) {
+        if let Ok(node) = graph.get_node(id) {
+            let (x, y) = Self::get_schema_position(node);
+            let (width, height) = Self::get_schema_size(node);
+            self.result.insert(
+                *id,
+                ComputedLayout {
+                    x,
+                    y,
+                    width,
+                    height,
+                },
+            );
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                self.extract_schema_only_recursive(child_id, graph);
+            }
+        }
     }
 
     /// Get the full layout result
