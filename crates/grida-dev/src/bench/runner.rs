@@ -197,6 +197,125 @@ fn measure_settle(renderer: &mut cg::runtime::scene::Renderer) -> u64 {
     t.elapsed().as_micros() as u64
 }
 
+/// Simulate a resize cycle on the Renderer.
+///
+/// Reproduces the work that `Application::resize()` does, minus the GPU
+/// surface recreation (which is owned by the window/headless host):
+///   1. update_viewport_size
+///   2. camera.set_size
+///   3. rebuild_scene_caches  (layout + geometry + effects + layers)
+///   4. invalidate_cache      (nuke all picture/paragraph/path/compositor caches)
+///   5. queue_unstable + flush (full scene repaint)
+fn measure_resize(
+    renderer: &mut cg::runtime::scene::Renderer,
+    width: i32,
+    height: i32,
+) -> Option<(u64, u64, u64, u64)> {
+    let t0 = Instant::now();
+
+    renderer.update_viewport_size(width as f32, height as f32);
+    renderer.camera.set_size(Size {
+        width: width as f32,
+        height: height as f32,
+    });
+
+    let t_rebuild = Instant::now();
+    renderer.rebuild_scene_caches();
+    let rebuild_us = t_rebuild.elapsed().as_micros() as u64;
+
+    let t_invalidate = Instant::now();
+    renderer.invalidate_cache();
+    let invalidate_us = t_invalidate.elapsed().as_micros() as u64;
+
+    renderer.queue_unstable();
+    let t_flush = Instant::now();
+    match renderer.flush() {
+        FrameFlushResult::OK(_) => {
+            let flush_us = t_flush.elapsed().as_micros() as u64;
+            let total_us = t0.elapsed().as_micros() as u64;
+            Some((total_us, rebuild_us, invalidate_us, flush_us))
+        }
+        _ => None,
+    }
+}
+
+/// Run a resize pass: alternate between two viewport sizes for N iterations.
+///
+/// Simulates what happens on every ResizeObserver callback in the browser:
+/// the full resize() + redraw() path fires per frame during a window drag.
+fn run_resize_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    size_a: (i32, i32),
+    size_b: (i32, i32),
+) -> ResizePassStats {
+    let wall_start = Instant::now();
+    let mut total_us_acc = Vec::with_capacity(frames as usize);
+    let mut rebuild_us_acc = Vec::with_capacity(frames as usize);
+    let mut invalidate_us_acc = Vec::with_capacity(frames as usize);
+    let mut flush_us_acc = Vec::with_capacity(frames as usize);
+
+    for i in 0..frames {
+        let (w, h) = if i % 2 == 0 { size_a } else { size_b };
+        if let Some((total, rebuild, invalidate, flush)) = measure_resize(renderer, w, h) {
+            total_us_acc.push(total);
+            rebuild_us_acc.push(rebuild);
+            invalidate_us_acc.push(invalidate);
+            flush_us_acc.push(flush);
+        }
+    }
+
+    let wall = wall_start.elapsed();
+    compute_resize_stats(
+        &total_us_acc,
+        &rebuild_us_acc,
+        &invalidate_us_acc,
+        &flush_us_acc,
+        wall,
+    )
+}
+
+struct ResizePassStats {
+    avg_us: u64,
+    min_us: u64,
+    p50_us: u64,
+    p95_us: u64,
+    max_us: u64,
+    rebuild_us: u64,
+    invalidate_us: u64,
+    flush_us: u64,
+    wall: std::time::Duration,
+}
+
+fn compute_resize_stats(
+    total: &[u64],
+    rebuild: &[u64],
+    invalidate: &[u64],
+    flush: &[u64],
+    wall: std::time::Duration,
+) -> ResizePassStats {
+    if total.is_empty() {
+        return ResizePassStats {
+            avg_us: 0, min_us: 0, p50_us: 0, p95_us: 0, max_us: 0,
+            rebuild_us: 0, invalidate_us: 0, flush_us: 0, wall,
+        };
+    }
+    let mut sorted = total.to_vec();
+    sorted.sort();
+    let n = sorted.len();
+    ResizePassStats {
+        avg_us: wall.as_micros() as u64 / n as u64,
+        min_us: sorted[0],
+        p50_us: sorted[n / 2],
+        p95_us: sorted[n * 95 / 100],
+        max_us: sorted[n - 1],
+        rebuild_us: rebuild.iter().sum::<u64>() / n as u64,
+        invalidate_us: invalidate.iter().sum::<u64>() / n as u64,
+        flush_us: flush.iter().sum::<u64>() / n as u64,
+        wall,
+    }
+}
+
 fn compute_pass_stats(
     frame_times: &[u64],
     queue_us_acc: &[u64],
@@ -1104,6 +1223,32 @@ pub async fn run_bench(
         comp_stats.promoted_count,
         comp_stats.memory_bytes as f64 / 1024.0,
     );
+
+    // --- Resize benchmark (--resize) ---
+    if args.resize {
+        let size_a = (args.width, args.height);
+        // Second size: ~66% of the primary viewport (simulates browser resize drag)
+        let size_b = (args.width * 2 / 3, args.height * 2 / 3);
+        println!(
+            "\n=== Resize benchmark ({} frames, {}x{} <-> {}x{}) ===",
+            args.frames, size_a.0, size_a.1, size_b.0, size_b.1
+        );
+        let r = run_resize_pass(&mut renderer, args.frames, size_a, size_b);
+        println!("  wall:   {:>10.1} ms", r.wall.as_micros() as f64 / 1000.0);
+        println!("  avg:    {:>10} us", r.avg_us);
+        println!("  min:    {:>10} us", r.min_us);
+        println!("  p50:    {:>10} us", r.p50_us);
+        println!("  p95:    {:>10} us", r.p95_us);
+        println!("  MAX:    {:>10} us", r.max_us);
+        println!("  --- per-cycle breakdown (avg) ---");
+        println!("  rebuild_scene_caches: {:>7} us", r.rebuild_us);
+        println!("  invalidate_cache:     {:>7} us", r.invalidate_us);
+        println!("  flush (redraw):       {:>7} us", r.flush_us);
+
+        drop(renderer);
+        println!("\nDone.");
+        return Ok(());
+    }
 
     // --- Legacy Pan ---
     println!("=== Pan benchmark ({} frames, continuous) ===", args.frames);

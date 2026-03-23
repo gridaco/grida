@@ -131,6 +131,7 @@ reports `min/p50/p95/p99/MAX` plus per-stage breakdown and settle cost.
 | `zoom`            | slow/fast × around-fit/high                         | Zoom oscillation at different levels                                                                               |
 | `pan_with_settle` | slow/fast × fit/zoomed                              | Pan with settle frames interleaved every 12 frames                                                                 |
 | `realtime`        | fast/slow × fit/zoomed                              | **Real-time event loop simulation** with sleep, 240Hz tick thread, and settle countdown matching the native viewer |
+| `resize`          | alternating viewport sizes                          | `--resize` flag. Measures `resize()` + `redraw()` cost per cycle (layout rebuild + cache invalidation + repaint)   |
 
 The `realtime` scenarios use actual `thread::sleep()` between frames
 and simulate the native viewer's 240Hz tick thread + settle countdown.
@@ -173,6 +174,7 @@ of scenes, configs, and operations. The naming convention is
 | Does a config toggle actually help?           | Both GPU benchmarks + Criterion                  |
 | Does it match what users see in the app?      | `realtime` scenarios (sleep + settle simulation) |
 | Are there frame drops during gestures?        | Check `p99` and `MAX` in scenario stats          |
+| Is resize janky?                              | Single-scene GPU bench with `--resize`           |
 
 ---
 

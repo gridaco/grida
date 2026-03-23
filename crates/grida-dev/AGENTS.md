@@ -20,6 +20,10 @@ cargo run -p grida-dev -- icon.svg
 # Headless GPU benchmark (no window, prints per-frame stats)
 cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida
 cargo run -p grida-dev --release -- bench --size 100
+
+# Resize benchmark — measures resize() + redraw() cost per cycle
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida --resize
+cargo run -p grida-dev --release -- bench --size 100 --resize --frames 50
 ```
 
 ## Performance measurement
