@@ -850,6 +850,67 @@ missing the cheapest possible camera-change path.
 
 ---
 
+## Scene Loading & Layout
+
+Scene loading (`Renderer::load_scene`) is the cold-start path that runs
+before the first frame. For large documents (100K–150K+ nodes), the
+layout phase dominates (~95%+ of `load_scene` time). The remaining
+stages (geometry, effects, layers) are comparatively cheap.
+
+**Pipeline:** `load_scene` runs five stages in order: font collection,
+layout (Taffy tree build + flexbox + text measurement), geometry
+propagation, effect classification, and layer flattening.
+
+WASM runs ~5x slower than native for this workload due to allocator
+and single-thread overhead.
+
+40. **Skip Layout for Absolute-Position Documents** ✅ IMPLEMENTED
+
+    `skip_layout` bypasses the Taffy flexbox engine entirely.
+    `compute_schema_only()` walks the scene graph once and copies
+    schema positions/sizes — O(n) with no allocations, no text
+    measurement, no tree construction.
+
+    Correct for absolute-positioned documents. Documents with
+    auto-layout/flex containers require the full Taffy path.
+
+    ~5x layout speedup on small scenes; orders of magnitude on
+    100K+ node scenes where Taffy + text measurement dominate.
+
+    CLI: `cargo run -p grida-dev --release -- load-bench file.grida --skip-layout`
+
+41. **Pre-Allocate Layout Data Structures** ✅ IMPLEMENTED
+
+    `LayoutTree::reserve(node_count)` pre-allocates the TaffyTree slab
+    and ID-mapping HashMaps before tree construction. Avoids ~17
+    doubling reallocations for 100K+ node scenes. More impactful in
+    WASM where per-reallocation cost is higher.
+
+42. **Deferred / Viewport-Only Layout** (future)
+
+    Compute layout only for viewport-visible nodes on cold start.
+    Remaining nodes computed lazily as the user pans. Requires
+    bounding-box estimates from schema data.
+
+43. **Pre-Measure Text Before Taffy** (future)
+
+    Decouple text measurement from the Taffy measure callback.
+    Pre-measure all text nodes in a single pass, then run Taffy
+    with a lookup-table measure function. Eliminates repeated
+    Skia calls and enables future parallelization on native.
+
+44. **Cache Text Measurements by Width Constraint** (future)
+
+    Add a secondary cache keyed on `(node_id, width_constraint)`
+    that returns measurements directly, skipping Skia entirely for
+    repeated queries with the same width.
+
+**Diagnostic tooling:** `load-bench` CLI (`grida-dev load-bench`)
+for per-stage timing; `cargo bench -p cg --bench bench_load_scene`
+for Criterion benchmarks at synthetic scale.
+
+---
+
 ## Engine-Level
 
 34. **Precomputed World Transforms**

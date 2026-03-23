@@ -53,6 +53,11 @@ relying on hardcoded paths. File locations shift as the engine evolves.
 | Benchmark fixture scenes                  | `--list-scenes` flag on `grida-dev bench`, or run `bench-report` on a directory                     |
 | Config toggles (compositing, atlas, etc.) | `grep "set_layer_compositing\|set_compositor_atlas\|set_interaction_render_scale" --include="*.rs"` |
 | Existing `.plan.md` proposals             | `glob "docs/wg/feat-2d/*.plan.md"`                                                                  |
+| Scene loading pipeline                    | `grep "fn load_scene" --include="*.rs"` in `src/runtime/scene.rs`                                   |
+| Layout engine entry point                 | `grep "fn compute\b" --include="*.rs"` in `src/layout/engine.rs`                                    |
+| Text measurement stats                    | `grep "ParagraphMeasureStats" --include="*.rs"`                                                     |
+| Skip-layout config                        | `grep "skip_layout" --include="*.rs"` in `src/runtime/`                                             |
+| Load-bench CLI tool                       | Read `crates/grida-dev/src/bench/load_bench.rs`                                                     |
 
 ---
 
@@ -338,10 +343,59 @@ The document is organized by category:
 - Pan-Only Optimization (items 15-20)
 - Zoom Asymmetry (items 21-23)
 - Zoom & Interaction Optimization (items 24-30)
-- Image, Text, Engine-Level (items 31-39)
+- Image, Text (items 31-33)
+- Scene Loading & Layout (items 40-44)
+- Engine-Level (items 34-39)
 
 When working on a new optimization, check whether an item already
 exists for it, and update or add to the document as part of the work.
+
+---
+
+## Scene Loading & Layout Performance
+
+Scene loading (`Renderer::load_scene`) is the cold-start bottleneck.
+For large documents (100K–150K+ nodes), the layout phase dominates
+load time. This is separate from frame rendering — it runs once per
+scene switch, not per frame.
+
+### Key files
+
+| File                                                      | Role                                       |
+| --------------------------------------------------------- | ------------------------------------------ |
+| `crates/grida-canvas/src/runtime/scene.rs` (`load_scene`) | Orchestrates the load pipeline             |
+| `crates/grida-canvas/src/layout/engine.rs`                | Layout engine (Taffy tree build + compute) |
+| `crates/grida-canvas/src/runtime/config.rs`               | `skip_layout` flag                         |
+| `crates/grida-dev/src/bench/load_bench.rs`                | `load-bench` CLI for per-stage timing      |
+| `crates/grida-canvas/benches/bench_load_scene.rs`         | Criterion benchmarks for layout at scale   |
+
+### The load-bench tool
+
+Primary diagnostic for scene loading. Reports per-stage timings.
+
+```sh
+cargo run -p grida-dev --release -- load-bench file.grida --iterations 5
+cargo run -p grida-dev --release -- load-bench file.grida --list-scenes
+cargo run -p grida-dev --release -- load-bench file.grida --skip-text    # isolate tree + flexbox cost
+cargo run -p grida-dev --release -- load-bench file.grida --skip-layout  # schema-only fast path
+```
+
+### Cost breakdown
+
+For 100K–150K node scenes, layout is ~95%+ of `load_scene`. The main
+cost centers:
+
+1. **Taffy tree construction** — node insertion + ID mappings
+2. **Text measurement** — Skia paragraph layout calls per Taffy measure callback
+3. **Flexbox computation** — `compute_layout_with_measure()` per subtree
+4. **Layout extraction** — DFS walk to read computed results
+
+### Key optimization: skip_layout
+
+`skip_layout` bypasses Taffy entirely. `compute_schema_only()` copies
+schema positions/sizes in a single walk — correct for absolute-positioned
+documents. Set via `runtime_renderer_set_skip_layout(true)` before
+loading a scene.
 
 ---
 
@@ -403,6 +457,13 @@ draw **must recapture** the caches afterwards, so the next unstable
 frame gets a cache hit. Without recapture, every frame after settle
 is also a full draw, producing 7fps instead of 100+fps. The capture
 guard should be `if self.backend.is_gpu()` — NOT `if !plan.stable`.
+
+### Layout is the cold-start bottleneck, not rendering
+
+For large documents (100K+ nodes), `load_scene` dominates cold start
+— frame rendering optimizations do not help here. Use `load-bench`
+(not `bench`) to measure this path. Use `skip_layout` for
+absolute-positioned documents.
 
 ### Timing overhead in budgeted loops
 
