@@ -371,7 +371,9 @@ fn measure_load_scene_via_renderer(scene: Scene, width: i32, height: i32) -> u64
     );
     let t = Instant::now();
     renderer.load_scene(scene);
-    t.elapsed().as_micros() as u64
+    let elapsed = t.elapsed().as_micros() as u64;
+    renderer.free();
+    elapsed
 }
 
 fn print_timings(label: &str, timings: &StageTimings) {

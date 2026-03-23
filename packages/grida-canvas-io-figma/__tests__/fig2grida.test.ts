@@ -345,6 +345,9 @@ describe("fig2grida", () => {
         (id) => id.includes("_fill_") || id.includes("_stroke_")
       );
 
+      // Ensure at least one synthetic child was produced (regression guard)
+      expect(syntheticIds.length).toBeGreaterThan(0);
+
       // Synthetic IDs should start with a Figma-format parent ID
       for (const id of syntheticIds) {
         const parentPart = id.replace(/_(fill|stroke)_\d+$/, "");

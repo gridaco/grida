@@ -1,6 +1,6 @@
 # Benchmark Fixtures
 
-This directory holds large fixture files used by `__tests__/fig2grida.bench.ts`.
+This directory holds large fixture files used by `__bench__/fig2grida.bench.ts`.
 Files here are **gitignored** — you must supply them locally.
 
 Benchmarks that reference missing fixtures are **skipped automatically**.

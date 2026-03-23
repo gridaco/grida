@@ -287,7 +287,7 @@ const SYNTHETIC_SUFFIX_RE = /_(fill|stroke)_\d+$/;
  * The `::` separator is unique to clone IDs (never appears in Figma node IDs).
  * Captures the trailing original Figma ID after the last `::`.
  */
-const INSTANCE_CLONE_RE = /^.+::(.+)$/;
+const INSTANCE_CLONE_RE = /^.+?::\d+::(.+)$/;
 
 /**
  * Decode a Grida node ID that may contain synthetic suffixes back to the

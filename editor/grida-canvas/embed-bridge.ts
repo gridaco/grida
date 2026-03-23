@@ -117,9 +117,10 @@ export class EmbedBridge {
     return this.transformId ? this.transformId(id) : id;
   }
 
-  /** Map an array of node IDs through the optional transform. */
+  /** Map an array of node IDs through the optional transform (deduplicated). */
   private mapIds(ids: string[]): string[] {
-    return this.transformId ? ids.map(this.transformId) : ids;
+    if (!this.transformId) return ids;
+    return [...new Set(ids.map(this.transformId))];
   }
 
   /** Map scene info IDs through the optional transform. */

@@ -19,6 +19,7 @@
  *   --out, -o       Output path (default: input with .grida extension)
  *   --pages, -p     Comma-separated page indices to include (default: all)
  *   --info          Print file info (pages, node counts) — .fig only
+ *   --prefer-fixed-text-sizing  Use fixed width/height for text nodes
  *   --verbose       Print progress details
  *   --help          Show help
  */
@@ -43,6 +44,7 @@ Options:
   --out, -o       Output path (default: input with .grida extension)
   --pages, -p     Comma-separated page indices to include (default: all)
   --info          Print file info (pages, node counts) — .fig only
+  --prefer-fixed-text-sizing  Use fixed width/height for text nodes
   --verbose       Print progress details
   --help          Show help
 

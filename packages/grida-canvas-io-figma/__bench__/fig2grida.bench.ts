@@ -36,7 +36,7 @@ if (!HAS_FIXTURE) {
 const FIXTURE_GZ = HAS_FIXTURE ? readFileSync(FIXTURE_PATH) : null;
 
 const decompressedBytes = FIXTURE_GZ
-  ? gunzipSync(new Uint8Array(FIXTURE_GZ))
+  ? gunzipSync(FIXTURE_GZ)
   : null;
 const jsonString = decompressedBytes
   ? new TextDecoder().decode(decompressedBytes)
@@ -63,7 +63,7 @@ describe.skipIf(!HAS_FIXTURE)("fig2grida pipeline", () => {
   bench(
     "stage: gzip decompress",
     () => {
-      gunzipSync(new Uint8Array(FIXTURE_GZ!));
+      gunzipSync(FIXTURE_GZ!);
     },
     { iterations: 5, warmupIterations: 1 }
   );

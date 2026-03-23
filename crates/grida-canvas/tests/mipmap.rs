@@ -7,7 +7,10 @@ fn skia_with_default_mipmaps_works() {
     let image = surface.image_snapshot();
 
     let mipmapped = image.with_default_mipmaps();
-    assert!(mipmapped.is_some(), "with_default_mipmaps() should succeed for a 512×512 image");
+    assert!(
+        mipmapped.is_some(),
+        "with_default_mipmaps() should succeed for a 512×512 image"
+    );
 
     let mipmapped = mipmapped.unwrap();
     // The mipmapped image should have the same dimensions as the original.
@@ -28,7 +31,10 @@ fn mipmapped_image_shader_creation() {
     let tile_modes = (TileMode::Decal, TileMode::Decal);
 
     let shader = mipmapped.to_shader(Some(tile_modes), sampling, None);
-    assert!(shader.is_some(), "Shader creation should succeed with mipmapped image");
+    assert!(
+        shader.is_some(),
+        "Shader creation should succeed with mipmapped image"
+    );
 }
 
 /// Verifies that 1×1 images handle mipmaps gracefully.
@@ -41,5 +47,7 @@ fn tiny_image_mipmaps() {
     // the fallback in ImageRepository handles this.
     let result = image.with_default_mipmaps();
     // Either succeeds or falls back gracefully.
-    let _img = result.unwrap_or(image);
+    let img = result.unwrap_or(image);
+    assert_eq!(img.width(), 1, "Fallback image should be 1px wide");
+    assert_eq!(img.height(), 1, "Fallback image should be 1px tall");
 }

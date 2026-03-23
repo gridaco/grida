@@ -1231,7 +1231,10 @@ pub async fn run_bench(
     if args.resize {
         let size_a = (args.width, args.height);
         // Second size: ~66% of the primary viewport (simulates browser resize drag)
-        let size_b = (args.width * 2 / 3, args.height * 2 / 3);
+        let size_b = (
+            std::cmp::max(1, args.width * 2 / 3),
+            std::cmp::max(1, args.height * 2 / 3),
+        );
         println!(
             "\n=== Resize benchmark ({} frames, {}x{} <-> {}x{}) ===",
             args.frames, size_a.0, size_a.1, size_b.0, size_b.1

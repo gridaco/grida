@@ -257,10 +257,14 @@ fn bench_load_scene(c: &mut Criterion) {
                     BenchmarkId::new("total", format!("{label}_n{node_count}")),
                     &scene,
                     |b, scene| {
-                        b.iter(|| {
-                            let mut renderer = make_renderer();
-                            renderer.load_scene(black_box(scene.clone()));
-                        });
+                        b.iter_batched(
+                            || (make_renderer(), scene.clone()),
+                            |(mut renderer, s)| {
+                                renderer.load_scene(black_box(s));
+                                renderer.free();
+                            },
+                            criterion::BatchSize::LargeInput,
+                        );
                     },
                 );
             }

@@ -338,6 +338,7 @@ function fig2gridaFromFigBytes(
       prefer_path_for_geometry: true,
       placeholder_for_missing_images: placeholderForMissing,
       preserve_figma_ids: options?.preserve_figma_ids,
+      prefer_fixed_text_sizing: options?.prefer_fixed_text_sizing,
     });
     pageResults.push({ name: page.name, result });
   }
