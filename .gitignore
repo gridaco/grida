@@ -218,3 +218,11 @@ __pycache__/
 # AI & Tooling
 *.plan.md
 *.todo.md
+
+
+# Claude Code (local settings and session files)
+.claude/settings.local.json
+.claude/plans/
+.claude/todos.json
+.claude/worktrees
+CLAUDE.local.md
