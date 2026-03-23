@@ -12,21 +12,31 @@ pub fn build() -> Scene {
         mask: None,
         rotation: 0.0,
         position: LayoutPositioningBasis::Inset(EdgeInsets {
-            top: 0.0, right: 0.0, bottom: 0.0, left: 0.0,
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 0.0,
         }),
         layout_container: LayoutContainerStyle::default(),
         layout_dimensions: LayoutDimensionStyle {
             layout_target_width: Some(200.0),
             layout_target_height: Some(150.0),
-            layout_min_width: None, layout_max_width: None,
-            layout_min_height: None, layout_max_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
         },
         layout_child: None,
         corner_radius: {
             use cg::cg::types::Radius;
             let r = Radius::circular(12.0);
-            RectangularCornerRadius { tl: r, tr: r, bl: r, br: r }
+            RectangularCornerRadius {
+                tl: r,
+                tr: r,
+                bl: r,
+                br: r,
+            }
         },
         corner_smoothing: CornerSmoothing(0.0),
         fills: Paints::new(vec![solid(235, 240, 255, 255)]),
@@ -48,21 +58,31 @@ pub fn build() -> Scene {
         mask: None,
         rotation: 0.0,
         position: LayoutPositioningBasis::Inset(EdgeInsets {
-            top: 0.0, right: 0.0, bottom: 0.0, left: 240.0,
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 240.0,
         }),
         layout_container: LayoutContainerStyle::default(),
         layout_dimensions: LayoutDimensionStyle {
             layout_target_width: Some(200.0),
             layout_target_height: Some(150.0),
-            layout_min_width: None, layout_max_width: None,
-            layout_min_height: None, layout_max_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
         },
         layout_child: None,
         corner_radius: {
             use cg::cg::types::Radius;
             let r = Radius::circular(12.0);
-            RectangularCornerRadius { tl: r, tr: r, bl: r, br: r }
+            RectangularCornerRadius {
+                tl: r,
+                tr: r,
+                bl: r,
+                br: r,
+            }
         },
         corner_smoothing: CornerSmoothing(0.0),
         fills: Paints::new(vec![solid(235, 255, 240, 255)]),
@@ -84,14 +104,19 @@ pub fn build() -> Scene {
         mask: None,
         rotation: 0.0,
         position: LayoutPositioningBasis::Inset(EdgeInsets {
-            top: 180.0, right: 0.0, bottom: 0.0, left: 0.0,
+            top: 180.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 0.0,
         }),
         layout_container: LayoutContainerStyle::default(),
         layout_dimensions: LayoutDimensionStyle {
             layout_target_width: Some(400.0),
             layout_target_height: Some(250.0),
-            layout_min_width: None, layout_max_width: None,
-            layout_min_height: None, layout_max_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
         },
         layout_child: None,
@@ -112,21 +137,31 @@ pub fn build() -> Scene {
         mask: None,
         rotation: 0.0,
         position: LayoutPositioningBasis::Inset(EdgeInsets {
-            top: 20.0, right: 0.0, bottom: 0.0, left: 20.0,
+            top: 20.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 20.0,
         }),
         layout_container: LayoutContainerStyle::default(),
         layout_dimensions: LayoutDimensionStyle {
             layout_target_width: Some(300.0),
             layout_target_height: Some(180.0),
-            layout_min_width: None, layout_max_width: None,
-            layout_min_height: None, layout_max_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
         },
         layout_child: None,
         corner_radius: {
             use cg::cg::types::Radius;
             let r = Radius::circular(8.0);
-            RectangularCornerRadius { tl: r, tr: r, bl: r, br: r }
+            RectangularCornerRadius {
+                tl: r,
+                tr: r,
+                bl: r,
+                br: r,
+            }
         },
         corner_smoothing: CornerSmoothing(0.0),
         fills: Paints::new(vec![solid(220, 230, 255, 255)]),
@@ -144,14 +179,19 @@ pub fn build() -> Scene {
         mask: None,
         rotation: 0.0,
         position: LayoutPositioningBasis::Inset(EdgeInsets {
-            top: 15.0, right: 0.0, bottom: 0.0, left: 15.0,
+            top: 15.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 15.0,
         }),
         layout_container: LayoutContainerStyle::default(),
         layout_dimensions: LayoutDimensionStyle {
             layout_target_width: Some(200.0),
             layout_target_height: Some(120.0),
-            layout_min_width: None, layout_max_width: None,
-            layout_min_height: None, layout_max_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
         },
         layout_child: None,
@@ -170,19 +210,24 @@ pub fn build() -> Scene {
 
     // ── Tree ────────────────────────────────────────────────────────────
     let mut links = HashMap::new();
-    links.insert(1u64, vec![2u64]);     // clip_on → overflow_rect
-    links.insert(3u64, vec![4u64]);     // clip_off → overflow_rect2
-    links.insert(5u64, vec![6u64]);     // outer → middle
-    links.insert(6u64, vec![7u64]);     // middle → inner
-    links.insert(7u64, vec![8u64]);     // inner → leaf
+    links.insert(1u64, vec![2u64]); // clip_on → overflow_rect
+    links.insert(3u64, vec![4u64]); // clip_off → overflow_rect2
+    links.insert(5u64, vec![6u64]); // outer → middle
+    links.insert(6u64, vec![7u64]); // middle → inner
+    links.insert(7u64, vec![8u64]); // inner → leaf
 
     build_scene(
         "L0 Container",
         None,
         vec![
-            (1, clip_on), (2, overflow_rect),
-            (3, clip_off), (4, overflow_rect2),
-            (5, outer), (6, middle), (7, inner), (8, leaf),
+            (1, clip_on),
+            (2, overflow_rect),
+            (3, clip_off),
+            (4, overflow_rect2),
+            (5, outer),
+            (6, middle),
+            (7, inner),
+            (8, leaf),
         ],
         links,
         vec![1, 3, 5],

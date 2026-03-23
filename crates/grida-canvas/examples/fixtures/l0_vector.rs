@@ -16,10 +16,30 @@ pub fn build() -> Scene {
         network: VectorNetwork {
             vertices: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
             segments: vec![
-                VectorNetworkSegment { a: 0, b: 1, ta: (30.0, 0.0), tb: (-30.0, 0.0) },
-                VectorNetworkSegment { a: 1, b: 2, ta: (0.0, 30.0), tb: (0.0, -30.0) },
-                VectorNetworkSegment { a: 2, b: 3, ta: (-30.0, 0.0), tb: (30.0, 0.0) },
-                VectorNetworkSegment { a: 3, b: 0, ta: (0.0, -30.0), tb: (0.0, 30.0) },
+                VectorNetworkSegment {
+                    a: 0,
+                    b: 1,
+                    ta: (30.0, 0.0),
+                    tb: (-30.0, 0.0),
+                },
+                VectorNetworkSegment {
+                    a: 1,
+                    b: 2,
+                    ta: (0.0, 30.0),
+                    tb: (0.0, -30.0),
+                },
+                VectorNetworkSegment {
+                    a: 2,
+                    b: 3,
+                    ta: (-30.0, 0.0),
+                    tb: (30.0, 0.0),
+                },
+                VectorNetworkSegment {
+                    a: 3,
+                    b: 0,
+                    ta: (0.0, -30.0),
+                    tb: (0.0, 30.0),
+                },
             ],
             regions: vec![VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
@@ -53,8 +73,18 @@ pub fn build() -> Scene {
         network: VectorNetwork {
             vertices: vec![(0.0, 80.0), (60.0, 0.0), (120.0, 80.0)],
             segments: vec![
-                VectorNetworkSegment { a: 0, b: 1, ta: (20.0, -30.0), tb: (-20.0, 10.0) },
-                VectorNetworkSegment { a: 1, b: 2, ta: (20.0, 10.0), tb: (-20.0, -30.0) },
+                VectorNetworkSegment {
+                    a: 0,
+                    b: 1,
+                    ta: (20.0, -30.0),
+                    tb: (-20.0, 10.0),
+                },
+                VectorNetworkSegment {
+                    a: 1,
+                    b: 2,
+                    ta: (20.0, 10.0),
+                    tb: (-20.0, -30.0),
+                },
             ],
             regions: vec![],
         },
@@ -84,9 +114,24 @@ pub fn build() -> Scene {
         network: VectorNetwork {
             vertices: vec![(50.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
             segments: vec![
-                VectorNetworkSegment { a: 0, b: 1, ta: (0.0, 0.0), tb: (0.0, 0.0) },
-                VectorNetworkSegment { a: 1, b: 2, ta: (0.0, 0.0), tb: (0.0, 0.0) },
-                VectorNetworkSegment { a: 2, b: 0, ta: (0.0, 0.0), tb: (0.0, 0.0) },
+                VectorNetworkSegment {
+                    a: 0,
+                    b: 1,
+                    ta: (0.0, 0.0),
+                    tb: (0.0, 0.0),
+                },
+                VectorNetworkSegment {
+                    a: 1,
+                    b: 2,
+                    ta: (0.0, 0.0),
+                    tb: (0.0, 0.0),
+                },
+                VectorNetworkSegment {
+                    a: 2,
+                    b: 0,
+                    ta: (0.0, 0.0),
+                    tb: (0.0, 0.0),
+                },
             ],
             regions: vec![VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2])],
@@ -120,9 +165,24 @@ pub fn build() -> Scene {
         network: VectorNetwork {
             vertices: vec![(0.0, 40.0), (60.0, 0.0), (120.0, 40.0), (60.0, 80.0)],
             segments: vec![
-                VectorNetworkSegment { a: 0, b: 1, ta: (20.0, -20.0), tb: (-20.0, 10.0) },
-                VectorNetworkSegment { a: 1, b: 2, ta: (20.0, 10.0), tb: (-20.0, -20.0) },
-                VectorNetworkSegment { a: 2, b: 3, ta: (-20.0, 20.0), tb: (20.0, -10.0) },
+                VectorNetworkSegment {
+                    a: 0,
+                    b: 1,
+                    ta: (20.0, -20.0),
+                    tb: (-20.0, 10.0),
+                },
+                VectorNetworkSegment {
+                    a: 1,
+                    b: 2,
+                    ta: (20.0, 10.0),
+                    tb: (-20.0, -20.0),
+                },
+                VectorNetworkSegment {
+                    a: 2,
+                    b: 3,
+                    ta: (-20.0, 20.0),
+                    tb: (20.0, -10.0),
+                },
             ],
             regions: vec![],
         },

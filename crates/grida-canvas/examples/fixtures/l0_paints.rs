@@ -10,5 +10,8 @@ pub fn build() -> Scene {
     let sweep_rect = rect(gap * 3.0, 0.0, s, s, sweep_gradient());
     let image_rect = rect(gap * 4.0, 0.0, s, s, image_paint());
 
-    flat_scene("L0 Paints", vec![solid_rect, linear_rect, radial_rect, sweep_rect, image_rect])
+    flat_scene(
+        "L0 Paints",
+        vec![solid_rect, linear_rect, radial_rect, sweep_rect, image_rect],
+    )
 }

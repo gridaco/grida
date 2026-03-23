@@ -10,6 +10,7 @@
 
 pub use crate::fixture_helpers::*;
 
+pub mod cover;
 pub mod l0_boolean_operation;
 pub mod l0_container;
 pub mod l0_effects;
@@ -34,4 +35,3 @@ pub mod l0_type;
 pub mod l0_type_features;
 pub mod l0_type_fvar;
 pub mod l0_vector;
-pub mod cover;

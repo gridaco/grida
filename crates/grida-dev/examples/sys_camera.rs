@@ -236,6 +236,7 @@ fn main() {
         }),
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
 

@@ -14,9 +14,10 @@ pub fn build() -> Scene {
         text: "ffi ffl — liga off".to_owned(),
         text_style: {
             let mut ts = TextStyleRec::from_font("Inter", 20.0);
-            ts.font_features = Some(vec![
-                FontFeature { tag: "liga".to_owned(), value: false },
-            ]);
+            ts.font_features = Some(vec![FontFeature {
+                tag: "liga".to_owned(),
+                value: false,
+            }]);
             ts
         },
         text_align: TextAlign::Left,
@@ -43,9 +44,10 @@ pub fn build() -> Scene {
         text: "ffi ffl — liga on".to_owned(),
         text_style: {
             let mut ts = TextStyleRec::from_font("Inter", 20.0);
-            ts.font_features = Some(vec![
-                FontFeature { tag: "liga".to_owned(), value: true },
-            ]);
+            ts.font_features = Some(vec![FontFeature {
+                tag: "liga".to_owned(),
+                value: true,
+            }]);
             ts
         },
         text_align: TextAlign::Left,
@@ -72,9 +74,10 @@ pub fn build() -> Scene {
         text: "Small Caps Text — smcp".to_owned(),
         text_style: {
             let mut ts = TextStyleRec::from_font("Inter", 20.0);
-            ts.font_features = Some(vec![
-                FontFeature { tag: "smcp".to_owned(), value: true },
-            ]);
+            ts.font_features = Some(vec![FontFeature {
+                tag: "smcp".to_owned(),
+                value: true,
+            }]);
             ts
         },
         text_align: TextAlign::Left,
@@ -101,9 +104,10 @@ pub fn build() -> Scene {
         text: "Stylistic Set 01 — ss01".to_owned(),
         text_style: {
             let mut ts = TextStyleRec::from_font("Inter", 20.0);
-            ts.font_features = Some(vec![
-                FontFeature { tag: "ss01".to_owned(), value: true },
-            ]);
+            ts.font_features = Some(vec![FontFeature {
+                tag: "ss01".to_owned(),
+                value: true,
+            }]);
             ts
         },
         text_align: TextAlign::Left,
@@ -131,8 +135,14 @@ pub fn build() -> Scene {
         text_style: {
             let mut ts = TextStyleRec::from_font("Inter", 20.0);
             ts.font_features = Some(vec![
-                FontFeature { tag: "tnum".to_owned(), value: true },
-                FontFeature { tag: "zero".to_owned(), value: true },
+                FontFeature {
+                    tag: "tnum".to_owned(),
+                    value: true,
+                },
+                FontFeature {
+                    tag: "zero".to_owned(),
+                    value: true,
+                },
             ]);
             ts
         },
