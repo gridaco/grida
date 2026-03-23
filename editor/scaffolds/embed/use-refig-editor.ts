@@ -40,6 +40,37 @@ async function decompressGzip(buf: ArrayBuffer): Promise<ArrayBuffer> {
   return out.buffer;
 }
 
+/**
+ * Renderer configuration for the refig embed canvas.
+ *
+ * These flags are applied to the WASM renderer after mount, before any
+ * document is loaded. Values are intentionally narrow literals today —
+ * widen to `boolean` once the feature graduates from "always-on".
+ */
+interface RefigRenderConfig {
+  /**
+   * Skip the Taffy flexbox layout engine during scene loading.
+   *
+   * Figma imports use absolute positioning — running layout on 100k+
+   * nodes is the dominant cold-start cost (~25 s in WASM). Setting
+   * this to `true` derives layout from schema positions instead.
+   */
+  cg_skip_layout: true;
+  /**
+   * Bake Figma's absoluteBoundingBox dimensions into TEXT nodes instead
+   * of relying on layout-time text measurement.
+   *
+   * Paired with `cg_skip_layout` — without this, text nodes get 0×0
+   * sizes because the layout engine (which would measure them) is skipped.
+   */
+  prefer_fixed_text_sizing: true;
+}
+
+const REFIG_RENDER_CONFIG: RefigRenderConfig = {
+  cg_skip_layout: true,
+  prefer_fixed_text_sizing: true,
+};
+
 export function useRefigEditor() {
   const instance = useEditor(
     {
@@ -72,6 +103,14 @@ export function useRefigEditor() {
     let cancelled = false;
     setCanvasReady(false);
     const dpr = window.devicePixelRatio || 1;
+
+    // Apply renderer config at init time (before mount creates the WASM surface).
+    instance.__surfaceOptions = {
+      use_embedded_fonts: true,
+      config: {
+        skip_layout: REFIG_RENDER_CONFIG.cg_skip_layout,
+      },
+    };
 
     instance
       .mount(canvasElement, dpr)
@@ -159,6 +198,8 @@ export function useRefigEditor() {
         } = fig2grida(input, {
           placeholder_for_missing_images: false,
           preserve_figma_ids: true,
+          prefer_fixed_text_sizing:
+            REFIG_RENDER_CONFIG.prefer_fixed_text_sizing,
         });
         console.log(
           `[@grida/refig] fig2grida: ${pageNames.length} page(s), ${nodeCount} nodes in ${(performance.now() - t0).toFixed(0)}ms`
