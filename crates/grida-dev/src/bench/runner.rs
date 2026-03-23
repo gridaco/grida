@@ -42,88 +42,943 @@ fn warmup(renderer: &mut cg::runtime::scene::Renderer) {
     }
 }
 
-fn run_pan_pass(renderer: &mut cg::runtime::scene::Renderer, frames: u32) -> PanStats {
-    let pan_start = Instant::now();
+/// Measure a single frame including queue + flush.
+/// Returns (total_us, queue_us, draw_us, mid_flush_us, compositor_us, flush_us).
+fn measure_frame(renderer: &mut cg::runtime::scene::Renderer, stable: bool) -> Option<(u64, u64, u64, u64, u64, u64)> {
+    let t0 = Instant::now();
+    if stable {
+        renderer.queue_stable();
+    } else {
+        renderer.queue_unstable();
+    }
+    let queue_us = t0.elapsed().as_micros() as u64;
+
+    let t1 = Instant::now();
+    match renderer.flush() {
+        FrameFlushResult::OK(stats) => {
+            let _flush_total = t1.elapsed().as_micros() as u64;
+            let total = t0.elapsed().as_micros() as u64;
+            Some((
+                total,
+                queue_us,
+                stats.draw.painter_duration.as_micros() as u64,
+                stats.mid_flush_duration.as_micros() as u64,
+                stats.compositor_duration.as_micros() as u64,
+                stats.flush_duration.as_micros() as u64,
+            ))
+        }
+        _ => None,
+    }
+}
+
+/// Run a pan pass with configurable speed (dx per frame) at the current camera zoom.
+/// Uses CONTINUOUS panning (one direction, then reverses) to trigger cache misses
+/// and expose frame drop outliers during area discovery/culling.
+/// Measures queue + flush per frame. Ends with a settle (stable) frame.
+fn run_pan_pass_at(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    dx: f32,
+) -> PassStats {
+    let wall_start = Instant::now();
     let mut frame_times = Vec::with_capacity(frames as usize);
+    let mut queue_us_acc = Vec::with_capacity(frames as usize);
     let mut draw_us_acc = Vec::with_capacity(frames as usize);
     let mut mid_flush_us_acc = Vec::with_capacity(frames as usize);
     let mut compositor_us_acc = Vec::with_capacity(frames as usize);
     let mut flush_us_acc = Vec::with_capacity(frames as usize);
 
+    // Continuous pan: go right for half the frames, then left for the other half.
+    // This accumulates offset in one direction, triggering cache misses and
+    // new-area discovery, unlike the old alternating ±dx pattern which kept
+    // the camera in place and only measured cache hits.
+    let half = frames / 2;
     for i in 0..frames {
-        let dx = if i % 2 == 0 { 5.0 } else { -5.0 };
-        renderer.camera.translate(dx, 0.0);
-        renderer.queue_unstable();
-        let t = Instant::now();
-        if let FrameFlushResult::OK(stats) = renderer.flush() {
-            frame_times.push(t.elapsed().as_micros() as u64);
-            draw_us_acc.push(stats.draw.painter_duration.as_micros() as u64);
-            mid_flush_us_acc.push(stats.mid_flush_duration.as_micros() as u64);
-            compositor_us_acc.push(stats.compositor_duration.as_micros() as u64);
-            flush_us_acc.push(stats.flush_duration.as_micros() as u64);
+        let d = if i < half { dx } else { -dx };
+        renderer.camera.translate(d, 0.0);
+        if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, false) {
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
         }
     }
-    let pan_wall = pan_start.elapsed();
+    let wall = wall_start.elapsed();
 
+    // Settle frame (stable quality) — not counted in per-frame stats.
+    let settle_us = measure_settle(renderer);
+
+    compute_pass_stats(
+        &frame_times, &queue_us_acc, &draw_us_acc,
+        &mid_flush_us_acc, &compositor_us_acc, &flush_us_acc,
+        wall, settle_us,
+    )
+}
+
+/// Legacy: pan at dx=5.0 (default).
+fn run_pan_pass(renderer: &mut cg::runtime::scene::Renderer, frames: u32) -> PassStats {
+    run_pan_pass_at(renderer, frames, 5.0)
+}
+
+/// Run a zoom pass with configurable step and range.
+/// Measures queue + flush per frame. Ends with a settle (stable) frame.
+fn run_zoom_pass_at(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    step: f32,
+    z_min: f32,
+    z_max: f32,
+) -> PassStats {
+    let start_z = (z_min + z_max) / 2.0;
+    renderer.camera.set_zoom(start_z);
+    // Warmup at the starting zoom
+    renderer.queue_stable();
+    let _ = renderer.flush();
+
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(frames as usize);
+    let mut queue_us_acc = Vec::with_capacity(frames as usize);
+    let mut draw_us_acc = Vec::with_capacity(frames as usize);
+    let mut mid_flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut compositor_us_acc = Vec::with_capacity(frames as usize);
+    let mut flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut z = start_z;
+    let mut zdir: i32 = 1;
+
+    for _ in 0..frames {
+        let next_z = z + zdir as f32 * step;
+        // Reverse direction at bounds, but avoid clamping to the same value
+        // (which would produce a no-change frame and waste a measurement).
+        if next_z > z_max {
+            zdir = -1;
+            z = z_max;
+        } else if next_z < z_min {
+            zdir = 1;
+            z = z_min;
+        } else {
+            z = next_z;
+        }
+        renderer.camera.set_zoom(z);
+        if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, false) {
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+        }
+    }
+    let wall = wall_start.elapsed();
+
+    // Settle frame: the stable redraw after zoom ends.
+    // This is the frame that replaces the blurry zoom-cached content
+    // with full-quality rendering at the correct zoom level.
+    let settle_us = measure_settle(renderer);
+
+    compute_pass_stats(
+        &frame_times, &queue_us_acc, &draw_us_acc,
+        &mid_flush_us_acc, &compositor_us_acc, &flush_us_acc,
+        wall, settle_us,
+    )
+}
+
+/// Legacy: zoom with step=0.02, range 0.5-2.0.
+fn run_zoom_pass(renderer: &mut cg::runtime::scene::Renderer, frames: u32) -> PassStats {
+    run_zoom_pass_at(renderer, frames, 0.02, 0.5, 2.0)
+}
+
+/// Measure a single stable (settle) frame including queue + flush.
+fn measure_settle(renderer: &mut cg::runtime::scene::Renderer) -> u64 {
+    let t = Instant::now();
+    renderer.queue_stable();
+    let _ = renderer.flush();
+    t.elapsed().as_micros() as u64
+}
+
+fn compute_pass_stats(
+    frame_times: &[u64],
+    queue_us_acc: &[u64],
+    draw_us_acc: &[u64],
+    mid_flush_us_acc: &[u64],
+    compositor_us_acc: &[u64],
+    flush_us_acc: &[u64],
+    wall: std::time::Duration,
+    settle_us: u64,
+) -> PassStats {
     if frame_times.is_empty() {
-        return PanStats {
-            avg_us: 0, fps: 0.0, p50_us: 0, p95_us: 0, p99_us: 0,
-            draw_us: 0, mid_flush_us: 0, compositor_us: 0, flush_us: 0,
+        return PassStats {
+            avg_us: 0, fps: 0.0, min_us: 0, p50_us: 0, p95_us: 0, p99_us: 0, max_us: 0,
+            queue_us: 0, draw_us: 0, mid_flush_us: 0, compositor_us: 0, flush_us: 0,
+            settle_us: 0,
         };
     }
 
-    frame_times.sort();
-    let n = frame_times.len();
-    let avg = pan_wall.as_micros() as u64 / n as u64;
-    PanStats {
+    let mut sorted = frame_times.to_vec();
+    sorted.sort();
+    let n = sorted.len();
+    let avg = wall.as_micros() as u64 / n as u64;
+
+    PassStats {
         avg_us: avg,
         fps: 1_000_000.0 / avg as f64,
-        p50_us: frame_times[n / 2],
-        p95_us: frame_times[n * 95 / 100],
-        p99_us: frame_times[n * 99 / 100],
+        min_us: sorted[0],
+        p50_us: sorted[n / 2],
+        p95_us: sorted[n * 95 / 100],
+        p99_us: sorted[n * 99 / 100],
+        max_us: sorted[n - 1],
+        queue_us: queue_us_acc.iter().sum::<u64>() / n as u64,
         draw_us: draw_us_acc.iter().sum::<u64>() / n as u64,
         mid_flush_us: mid_flush_us_acc.iter().sum::<u64>() / n as u64,
         compositor_us: compositor_us_acc.iter().sum::<u64>() / n as u64,
         flush_us: flush_us_acc.iter().sum::<u64>() / n as u64,
+        settle_us,
     }
 }
 
-fn run_zoom_pass(renderer: &mut cg::runtime::scene::Renderer, frames: u32) -> ZoomStats {
-    renderer.camera.set_zoom(1.0);
-    let zoom_start = Instant::now();
-    let mut zoom_times = Vec::with_capacity(frames as usize);
-    let mut z = 1.0f32;
-    let mut zdir = 1;
+/// Run a zigzag pan pass: diagonal back-and-forth like reading a document.
+///
+/// Motion pattern: right+down for `segment_frames`, then left+down for
+/// `segment_frames`, repeating. Each segment moves `dx` horizontally and
+/// `dy` vertically per frame.
+///
+/// When `pause_frames > 0`, the user "stops to read" between each zig and
+/// zag. During the pause, settle frames fire (simulating the native viewer's
+/// settle countdown), then the next zig/zag begins cold (no cache from the
+/// previous direction).
+fn run_zigzag_pan_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    dx: f32,
+    dy: f32,
+    segment_frames: u32,
+    pause_frames: u32,
+) -> PassStats {
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::new();
+    let mut queue_us_acc = Vec::new();
+    let mut draw_us_acc = Vec::new();
+    let mut mid_flush_us_acc = Vec::new();
+    let mut compositor_us_acc = Vec::new();
+    let mut flush_us_acc = Vec::new();
 
-    for _ in 0..frames {
-        z += zdir as f32 * 0.02;
-        if z > 2.0 || z < 0.5 {
-            zdir = -zdir;
+    let mut emitted = 0u32;
+    let mut _seg_pos = 0u32;
+    let mut going_right = true;
+
+    while emitted < frames {
+        // Zig or zag segment
+        let seg_len = segment_frames.min(frames - emitted);
+        for _ in 0..seg_len {
+            let sx = if going_right { dx } else { -dx };
+            renderer.camera.translate(sx, dy);
+            if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, false) {
+                frame_times.push(total);
+                queue_us_acc.push(q);
+                draw_us_acc.push(d);
+                mid_flush_us_acc.push(mf);
+                compositor_us_acc.push(c);
+                flush_us_acc.push(f);
+            }
+            emitted += 1;
+            if emitted >= frames {
+                break;
+            }
         }
-        renderer.camera.set_zoom(z);
+
+        // Pause: "stop to read". Fire settle frames like the native viewer
+        // would during idle time. These are real frames the user sees.
+        for _ in 0..pause_frames {
+            if emitted >= frames {
+                break;
+            }
+            if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, true) {
+                frame_times.push(total);
+                queue_us_acc.push(q);
+                draw_us_acc.push(d);
+                mid_flush_us_acc.push(mf);
+                compositor_us_acc.push(c);
+                flush_us_acc.push(f);
+            }
+            emitted += 1;
+        }
+
+        going_right = !going_right;
+        _seg_pos += 1;
+    }
+
+    let wall = wall_start.elapsed();
+    let settle_us = measure_settle(renderer);
+
+    compute_pass_stats(
+        &frame_times, &queue_us_acc, &draw_us_acc,
+        &mid_flush_us_acc, &compositor_us_acc, &flush_us_acc,
+        wall, settle_us,
+    )
+}
+
+/// Run a circle-panning pass: simulates a realistic trackpad gesture where
+/// the user pans in a circle. This is the hardest case for cache-based
+/// approaches because the pan direction is unpredictable — edges get culled
+/// and rediscovered continuously.
+///
+/// `radius` is in world-space units. The circle completes over `frames` frames.
+fn run_circle_pan_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    radius: f32,
+) -> PassStats {
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(frames as usize);
+    let mut queue_us_acc = Vec::with_capacity(frames as usize);
+    let mut draw_us_acc = Vec::with_capacity(frames as usize);
+    let mut mid_flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut compositor_us_acc = Vec::with_capacity(frames as usize);
+    let mut flush_us_acc = Vec::with_capacity(frames as usize);
+
+    // Complete 2 full circles over the frame count.
+    let circles = 2.0f32;
+    let mut prev_x = 0.0f32;
+    let mut prev_y = 0.0f32;
+
+    for i in 0..frames {
+        let angle = (i as f32 / frames as f32) * std::f32::consts::TAU * circles;
+        let x = angle.cos() * radius;
+        let y = angle.sin() * radius;
+        let dx = x - prev_x;
+        let dy = y - prev_y;
+        prev_x = x;
+        prev_y = y;
+
+        renderer.camera.translate(dx, dy);
+        if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, false) {
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+        }
+    }
+    let wall = wall_start.elapsed();
+    let settle_us = measure_settle(renderer);
+
+    compute_pass_stats(
+        &frame_times, &queue_us_acc, &draw_us_acc,
+        &mid_flush_us_acc, &compositor_us_acc, &flush_us_acc,
+        wall, settle_us,
+    )
+}
+
+/// Run a pan pass that interleaves settle (stable) frames at a fixed interval,
+/// simulating the native viewer's settle countdown behavior.
+///
+/// Every `settle_interval` interaction frames, a stable frame is inserted.
+/// ALL frames (interaction + settle) go into the same stats, so p50/p95/p99/MAX
+/// reflect what the user actually sees. `settle_us` holds the average cost of
+/// settle frames specifically.
+// ---------------------------------------------------------------------------
+// Real-time event loop simulation
+// ---------------------------------------------------------------------------
+
+/// Simulates the native viewer's exact event loop timing model:
+/// - Scroll events arrive at `scroll_interval_ms` (e.g., 8ms for 120Hz trackpad)
+/// - A 240Hz tick thread decrements `settle_countdown` between events
+/// - When countdown reaches 0 → `queue_stable()` fires (clears caches, full redraw)
+/// - Real `sleep()` between events for GPU state realism
+///
+/// This produces frame timings that match what the user actually sees in the
+/// native viewer, including settle-induced frame drops at their natural frequency.
+fn run_realtime_pan_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    scroll_interval_ms: f64,
+    dx: f32,
+    dy: f32,
+    duration_ms: f64,
+    settle_ticks: u32,
+) -> PassStats {
+    let tick_interval_ms: f64 = 1000.0 / 240.0; // 240Hz tick thread
+    let wall_start = Instant::now();
+
+    let mut frame_times = Vec::new();
+    let mut queue_us_acc = Vec::new();
+    let mut draw_us_acc = Vec::new();
+    let mut mid_flush_us_acc = Vec::new();
+    let mut compositor_us_acc = Vec::new();
+    let mut flush_us_acc = Vec::new();
+    let mut settle_times = Vec::new();
+
+    let mut clock: f64 = 0.0;
+    let mut next_scroll = scroll_interval_ms;
+    let mut next_tick = tick_interval_ms;
+    let mut settle_countdown: u32 = 0;
+
+    while clock < duration_ms {
+        // Find next event
+        let next_event = next_scroll.min(next_tick).min(duration_ms);
+        let sleep_ms = next_event - clock;
+
+        // Real sleep for GPU state realism
+        if sleep_ms > 0.5 {
+            std::thread::sleep(std::time::Duration::from_micros((sleep_ms * 1000.0) as u64));
+        }
+        clock = next_event;
+
+        // Process tick events that fired
+        if clock >= next_tick {
+            if settle_countdown > 0 {
+                settle_countdown -= 1;
+                if settle_countdown == 0 {
+                    // Settle fires — this is the expensive frame
+                    if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, true) {
+                        settle_times.push(total);
+                        frame_times.push(total);
+                        queue_us_acc.push(q);
+                        draw_us_acc.push(d);
+                        mid_flush_us_acc.push(mf);
+                        compositor_us_acc.push(c);
+                        flush_us_acc.push(f);
+                    }
+                }
+            }
+            next_tick += tick_interval_ms;
+        }
+
+        // Process scroll event
+        if clock >= next_scroll && clock < duration_ms {
+            renderer.camera.translate(dx, dy);
+            settle_countdown = settle_ticks; // Reset countdown on every scroll
+
+            if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, false) {
+                frame_times.push(total);
+                queue_us_acc.push(q);
+                draw_us_acc.push(d);
+                mid_flush_us_acc.push(mf);
+                compositor_us_acc.push(c);
+                flush_us_acc.push(f);
+            }
+            next_scroll += scroll_interval_ms;
+        }
+    }
+
+    let wall = wall_start.elapsed();
+    let avg_settle = if settle_times.is_empty() {
+        0
+    } else {
+        settle_times.iter().sum::<u64>() / settle_times.len() as u64
+    };
+
+    compute_pass_stats(
+        &frame_times, &queue_us_acc, &draw_us_acc,
+        &mid_flush_us_acc, &compositor_us_acc, &flush_us_acc,
+        wall, avg_settle,
+    )
+}
+
+/// Diagnostic: realtime event loop with per-frame printing.
+#[allow(dead_code)]
+fn run_realtime_diagnostic(
+    renderer: &mut cg::runtime::scene::Renderer,
+    scroll_interval_ms: f64,
+    dx: f32,
+    dy: f32,
+    duration_ms: f64,
+    settle_ticks: u32,
+) {
+    let tick_interval_ms: f64 = 1000.0 / 240.0;
+    eprintln!(
+        "\n=== REALTIME DIAGNOSTIC: scroll every {scroll_interval_ms:.0}ms, settle after {settle_ticks} ticks ===",
+    );
+    eprintln!("{:>8} {:>6} {:>8} {:>8} {:>8}",
+        "time_ms", "event", "total_us", "draw_us", "note");
+
+    let mut clock: f64 = 0.0;
+    let mut next_scroll = scroll_interval_ms;
+    let mut next_tick = tick_interval_ms;
+    let mut settle_countdown: u32 = 0;
+
+    while clock < duration_ms {
+        let next_event = next_scroll.min(next_tick).min(duration_ms);
+        let sleep_ms = next_event - clock;
+        if sleep_ms > 0.5 {
+            std::thread::sleep(std::time::Duration::from_micros((sleep_ms * 1000.0) as u64));
+        }
+        clock = next_event;
+
+        if clock >= next_tick {
+            if settle_countdown > 0 {
+                settle_countdown -= 1;
+                if settle_countdown == 0 {
+                    if let Some((total, _q, d, _mf, _c, _f)) = measure_frame(renderer, true) {
+                        let marker = if total > 1000 { " <<<" } else { "" };
+                        eprintln!("{:>8.1} {:>6} {:>8} {:>8} settle{marker}", clock, "SETTLE", total, d);
+                    }
+                }
+            }
+            next_tick += tick_interval_ms;
+        }
+
+        if clock >= next_scroll && clock < duration_ms {
+            renderer.camera.translate(dx, dy);
+            settle_countdown = settle_ticks;
+            if let Some((total, _q, d, _mf, _c, _f)) = measure_frame(renderer, false) {
+                let note = if d > 0 { "full draw" } else { "cache hit" };
+                let marker = if total > 1000 { " <<<" } else { "" };
+                eprintln!("{:>8.1} {:>6} {:>8} {:>8} {note}{marker}", clock, "scroll", total, d);
+            }
+            next_scroll += scroll_interval_ms;
+        }
+    }
+    eprintln!();
+}
+
+fn run_pan_with_settle_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    dx: f32,
+    settle_interval: u32,
+) -> PassStats {
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(frames as usize + frames as usize / settle_interval as usize);
+    let mut queue_us_acc = Vec::new();
+    let mut draw_us_acc = Vec::new();
+    let mut mid_flush_us_acc = Vec::new();
+    let mut compositor_us_acc = Vec::new();
+    let mut flush_us_acc = Vec::new();
+    let mut settle_times = Vec::new();
+
+    let half = frames / 2;
+    let mut since_settle = 0u32;
+
+    for i in 0..frames {
+        let d = if i < half { dx } else { -dx };
+        renderer.camera.translate(d, 0.0);
+
+        // Interaction frame (unstable)
+        if let Some((total, q, dr, mf, c, f)) = measure_frame(renderer, false) {
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(dr);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+        }
+
+        since_settle += 1;
+
+        // Insert settle frame at interval (simulates native viewer countdown)
+        if since_settle >= settle_interval && i < frames - 1 {
+            since_settle = 0;
+            if let Some((total, q, dr, mf, c, f)) = measure_frame(renderer, true) {
+                settle_times.push(total);
+                // Include in overall stats — this IS a real frame the user sees
+                frame_times.push(total);
+                queue_us_acc.push(q);
+                draw_us_acc.push(dr);
+                mid_flush_us_acc.push(mf);
+                compositor_us_acc.push(c);
+                flush_us_acc.push(f);
+            }
+        }
+    }
+
+    let wall = wall_start.elapsed();
+    let avg_settle = if settle_times.is_empty() {
+        0
+    } else {
+        settle_times.iter().sum::<u64>() / settle_times.len() as u64
+    };
+
+    compute_pass_stats(
+        &frame_times, &queue_us_acc, &draw_us_acc,
+        &mid_flush_us_acc, &compositor_us_acc, &flush_us_acc,
+        wall, avg_settle,
+    )
+}
+
+/// Diagnostic: pan with settle frames interleaved, printing per-frame timing.
+/// Shows the settle cost and whether the cache recapture works (the frame
+/// AFTER settle should be fast if the cache was recaptured).
+#[allow(dead_code)]
+fn run_pan_settle_diagnostic(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    dx: f32,
+    settle_interval: u32,
+) {
+    eprintln!("\n=== PAN+SETTLE DIAGNOSTIC: dx={dx}, settle every {settle_interval} frames ===");
+    eprintln!("{:>5} {:>4} {:>8} {:>8} {:>8} {:>8}",
+        "frame", "type", "total_us", "queue_us", "draw_us", "list");
+
+    let mut since_settle = 0u32;
+    for i in 0..frames {
+        renderer.camera.translate(dx, 0.0);
+
+        if let Some((total, q, d, _mf, _c, _f)) = measure_frame(renderer, false) {
+            let list = 0; // Not available from measure_frame
+            let marker = if total > 1000 { " <<<" } else { "" };
+            eprintln!("{:>5} {:>4} {:>8} {:>8} {:>8} {:>8}{marker}",
+                i, "pan", total, q, d, list);
+        }
+
+        since_settle += 1;
+        if since_settle >= settle_interval && i < frames - 1 {
+            since_settle = 0;
+            if let Some((total, q, d, _mf, _c, _f)) = measure_frame(renderer, true) {
+                let marker = if total > 1000 { " <<<" } else { "" };
+                eprintln!("{:>5} {:>4} {:>8} {:>8} {:>8} {:>8}{marker}",
+                    i, "STTL", total, q, d, 0);
+            }
+        }
+    }
+    eprintln!();
+}
+
+/// Diagnostic: pan in one direction at fit zoom, printing per-frame timing.
+/// Shows exactly where frame drops occur during the transition from
+/// "all nodes visible" to "some nodes culled".
+#[allow(dead_code)]
+fn run_pan_diagnostic(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    dx: f32,
+) {
+    eprintln!("\n=== PAN DIAGNOSTIC: dx={dx}, {} frames ===", frames);
+    eprintln!("{:>5} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+        "frame", "total_us", "queue_us", "draw_us", "mflush", "comp_us", "flush_us");
+
+    for i in 0..frames {
+        renderer.camera.translate(dx, 0.0);
+
+        let t0 = Instant::now();
         renderer.queue_unstable();
-        let t = Instant::now();
-        if let FrameFlushResult::OK(_) = renderer.flush() {
-            zoom_times.push(t.elapsed().as_micros() as u64);
+        let queue_us = t0.elapsed().as_micros() as u64;
+
+        match renderer.flush() {
+            FrameFlushResult::OK(stats) => {
+                let total = t0.elapsed().as_micros() as u64;
+                let draw = stats.draw.painter_duration.as_micros() as u64;
+                let mf = stats.mid_flush_duration.as_micros() as u64;
+                let comp = stats.compositor_duration.as_micros() as u64;
+                let fl = stats.flush_duration.as_micros() as u64;
+                let list_size = stats.frame.display_list_size_estimated;
+                let marker = if total > 1000 { " <<<" } else { "" };
+                eprintln!(
+                    "{:>5} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}  list={}{marker}",
+                    i, total, queue_us, draw, mf, comp, fl, list_size
+                );
+            }
+            _ => {
+                eprintln!("{:>5} SKIPPED", i);
+            }
         }
     }
-    let zoom_wall = zoom_start.elapsed();
 
-    if zoom_times.is_empty() {
-        return ZoomStats { avg_us: 0, fps: 0.0, p50_us: 0, p95_us: 0, p99_us: 0 };
-    }
-
-    zoom_times.sort();
-    let n = zoom_times.len();
-    let avg = zoom_wall.as_micros() as u64 / n as u64;
-    ZoomStats {
-        avg_us: avg,
-        fps: 1_000_000.0 / avg as f64,
-        p50_us: zoom_times[n / 2],
-        p95_us: zoom_times[n * 95 / 100],
-        p99_us: zoom_times[n * 99 / 100],
-    }
+    // Settle
+    let t = Instant::now();
+    renderer.queue_stable();
+    let _ = renderer.flush();
+    let settle = t.elapsed().as_micros();
+    eprintln!("settle: {settle} us\n");
 }
+
+// ---------------------------------------------------------------------------
+// Scenario definitions
+// ---------------------------------------------------------------------------
+
+struct PanScenario {
+    name: &'static str,
+    dx: f32,
+    zoom: f32,
+}
+
+struct ZoomScenario {
+    name: &'static str,
+    step: f32,
+    z_min: f32,
+    z_max: f32,
+}
+
+/// Build the standard scenario matrix.
+/// `fit_zoom` is the zoom level from `fit_camera_to_scene`.
+fn standard_scenarios(fit_zoom: f32) -> (Vec<PanScenario>, Vec<ZoomScenario>) {
+    // Higher zoom = zoomed in (more detail, fewer visible nodes if culled)
+    let zoomed_in = (fit_zoom * 4.0).min(10.0);
+    // Zoom range around fit
+    let fit_lo = (fit_zoom * 0.5).max(0.01);
+    let fit_hi = fit_zoom * 2.0;
+
+    let pan_scenarios = vec![
+        PanScenario { name: "pan_slow_fit",    dx: 2.0,  zoom: fit_zoom },
+        PanScenario { name: "pan_fast_fit",    dx: 50.0, zoom: fit_zoom },
+        PanScenario { name: "pan_slow_zoomed", dx: 2.0,  zoom: zoomed_in },
+        PanScenario { name: "pan_fast_zoomed", dx: 50.0, zoom: zoomed_in },
+    ];
+
+    let zoom_scenarios = vec![
+        ZoomScenario { name: "zoom_slow_around_fit", step: 0.005, z_min: fit_lo, z_max: fit_hi },
+        ZoomScenario { name: "zoom_fast_around_fit", step: 0.05,  z_min: fit_lo, z_max: fit_hi },
+        ZoomScenario { name: "zoom_slow_high",       step: 0.01,  z_min: zoomed_in * 0.5, z_max: zoomed_in },
+        ZoomScenario { name: "zoom_fast_high",        step: 0.1,  z_min: zoomed_in * 0.5, z_max: zoomed_in },
+    ];
+
+    (pan_scenarios, zoom_scenarios)
+}
+
+fn run_scenarios(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    fit_zoom: f32,
+) -> Vec<ScenarioResult> {
+    let (pan_scenarios, zoom_scenarios) = standard_scenarios(fit_zoom);
+    let mut results = Vec::new();
+
+    for ps in &pan_scenarios {
+        renderer.camera.set_zoom(ps.zoom);
+        // Warmup at this zoom
+        renderer.queue_stable();
+        let _ = renderer.flush();
+        for _ in 0..5 {
+            renderer.camera.translate(1.0, 0.0);
+            renderer.queue_unstable();
+            let _ = renderer.flush();
+        }
+
+        let stats = run_pan_pass_at(renderer, frames, ps.dx);
+        results.push(ScenarioResult {
+            name: ps.name.to_string(),
+            kind: "pan".to_string(),
+            params: ScenarioParams {
+                speed: Some(ps.dx),
+                zoom: Some(ps.zoom),
+                zoom_min: None,
+                zoom_max: None,
+            },
+            stats,
+        });
+    }
+
+    // Circle pan scenarios: realistic trackpad gesture.
+    // Small radius = tight circles (edges constantly change).
+    // Large radius = wide sweeping gesture (more cache misses).
+    struct CirclePanScenario {
+        name: &'static str,
+        radius: f32,
+        zoom: f32,
+    }
+
+    let zoomed_in_c = (fit_zoom * 4.0).min(10.0);
+    let circle_scenarios = vec![
+        CirclePanScenario { name: "circle_small_fit",   radius: 200.0,  zoom: fit_zoom },
+        CirclePanScenario { name: "circle_large_fit",   radius: 2000.0, zoom: fit_zoom },
+        CirclePanScenario { name: "circle_small_zoomed", radius: 200.0,  zoom: zoomed_in_c },
+        CirclePanScenario { name: "circle_large_zoomed", radius: 2000.0, zoom: zoomed_in_c },
+    ];
+
+    for cs in &circle_scenarios {
+        renderer.camera.set_zoom(cs.zoom);
+        renderer.queue_stable();
+        let _ = renderer.flush();
+        // Small warmup
+        for _ in 0..3 {
+            renderer.camera.translate(1.0, 0.0);
+            renderer.queue_unstable();
+            let _ = renderer.flush();
+        }
+
+        let stats = run_circle_pan_pass(renderer, frames, cs.radius);
+        results.push(ScenarioResult {
+            name: cs.name.to_string(),
+            kind: "circle_pan".to_string(),
+            params: ScenarioParams {
+                speed: Some(cs.radius),
+                zoom: Some(cs.zoom),
+                zoom_min: None,
+                zoom_max: None,
+            },
+            stats,
+        });
+    }
+
+    // Zigzag pan scenarios: diagonal back-and-forth like reading a document.
+    // "fast" = continuous motion, no pauses.
+    // "slow" = pause between each zig/zag segment (settle frames fire, cache goes cold).
+    struct ZigzagScenario {
+        name: &'static str,
+        dx: f32,
+        dy: f32,
+        segment_frames: u32,
+        pause_frames: u32,
+        zoom: f32,
+    }
+
+    let zoomed_in_z = (fit_zoom * 4.0).min(10.0);
+    let zigzag_scenarios = vec![
+        // Fast zigzag: continuous diagonal sweeps, no pauses
+        ZigzagScenario {
+            name: "zigzag_fast_fit", dx: 30.0, dy: 5.0,
+            segment_frames: 20, pause_frames: 0, zoom: fit_zoom,
+        },
+        ZigzagScenario {
+            name: "zigzag_fast_zoomed", dx: 30.0, dy: 5.0,
+            segment_frames: 20, pause_frames: 0, zoom: zoomed_in_z,
+        },
+        // Slow zigzag: zig, stop (settle fires), zag, stop (settle fires)
+        // pause_frames=3 simulates ~3 settle frames during the "reading" pause
+        ZigzagScenario {
+            name: "zigzag_slow_fit", dx: 10.0, dy: 3.0,
+            segment_frames: 15, pause_frames: 3, zoom: fit_zoom,
+        },
+        ZigzagScenario {
+            name: "zigzag_slow_zoomed", dx: 10.0, dy: 3.0,
+            segment_frames: 15, pause_frames: 3, zoom: zoomed_in_z,
+        },
+    ];
+
+    for zz in &zigzag_scenarios {
+        renderer.camera.set_zoom(zz.zoom);
+        renderer.queue_stable();
+        let _ = renderer.flush();
+        for _ in 0..3 {
+            renderer.camera.translate(1.0, 0.0);
+            renderer.queue_unstable();
+            let _ = renderer.flush();
+        }
+
+        let stats = run_zigzag_pan_pass(
+            renderer, frames, zz.dx, zz.dy, zz.segment_frames, zz.pause_frames,
+        );
+        results.push(ScenarioResult {
+            name: zz.name.to_string(),
+            kind: "zigzag".to_string(),
+            params: ScenarioParams {
+                speed: Some(zz.dx),
+                zoom: Some(zz.zoom),
+                zoom_min: None,
+                zoom_max: None,
+            },
+            stats,
+        });
+    }
+
+    for zs in &zoom_scenarios {
+        let stats = run_zoom_pass_at(renderer, frames, zs.step, zs.z_min, zs.z_max);
+        results.push(ScenarioResult {
+            name: zs.name.to_string(),
+            kind: "zoom".to_string(),
+            params: ScenarioParams {
+                speed: Some(zs.step),
+                zoom: None,
+                zoom_min: Some(zs.z_min),
+                zoom_max: Some(zs.z_max),
+            },
+            stats,
+        });
+    }
+
+    // Settle-interleaved pan scenarios: simulate native viewer's settle countdown.
+    // settle_interval=12 matches the native viewer's 12-tick countdown at 240Hz (~50ms).
+    struct SettlePanScenario {
+        name: &'static str,
+        dx: f32,
+        zoom: f32,
+        settle_interval: u32,
+    }
+
+    let zoomed_in_s = (fit_zoom * 4.0).min(10.0);
+    let settle_scenarios = vec![
+        SettlePanScenario { name: "pan_settle_slow_fit",    dx: 2.0,  zoom: fit_zoom,   settle_interval: 12 },
+        SettlePanScenario { name: "pan_settle_fast_fit",    dx: 50.0, zoom: fit_zoom,   settle_interval: 12 },
+        SettlePanScenario { name: "pan_settle_slow_zoomed", dx: 2.0,  zoom: zoomed_in_s, settle_interval: 12 },
+        SettlePanScenario { name: "pan_settle_fast_zoomed", dx: 50.0, zoom: zoomed_in_s, settle_interval: 12 },
+    ];
+
+    for ss in &settle_scenarios {
+        renderer.camera.set_zoom(ss.zoom);
+        renderer.queue_stable();
+        let _ = renderer.flush();
+        for _ in 0..5 {
+            renderer.camera.translate(1.0, 0.0);
+            renderer.queue_unstable();
+            let _ = renderer.flush();
+        }
+
+        let stats = run_pan_with_settle_pass(renderer, frames, ss.dx, ss.settle_interval);
+        results.push(ScenarioResult {
+            name: ss.name.to_string(),
+            kind: "pan_with_settle".to_string(),
+            params: ScenarioParams {
+                speed: Some(ss.dx),
+                zoom: Some(ss.zoom),
+                zoom_min: None,
+                zoom_max: None,
+            },
+            stats,
+        });
+    }
+
+    // Realtime event loop simulation scenarios.
+    // These use real sleep() and simulate the native viewer's 240Hz tick
+    // thread + settle countdown, producing timings that match actual UX.
+    struct RealtimeScenario {
+        name: &'static str,
+        scroll_interval_ms: f64,
+        dx: f32,
+        dy: f32,
+        zoom: f32,
+        duration_ms: f64,
+    }
+
+    let zoomed_in_rt = (fit_zoom * 4.0).min(10.0);
+    let realtime_scenarios = vec![
+        RealtimeScenario {
+            name: "rt_pan_fast_fit", scroll_interval_ms: 8.0,
+            dx: 2.0, dy: 0.0, zoom: fit_zoom, duration_ms: 2000.0,
+        },
+        RealtimeScenario {
+            name: "rt_pan_slow_fit", scroll_interval_ms: 100.0,
+            dx: 5.0, dy: 0.0, zoom: fit_zoom, duration_ms: 2000.0,
+        },
+        RealtimeScenario {
+            name: "rt_pan_fast_zoomed", scroll_interval_ms: 8.0,
+            dx: 2.0, dy: 0.0, zoom: zoomed_in_rt, duration_ms: 2000.0,
+        },
+        RealtimeScenario {
+            name: "rt_pan_slow_zoomed", scroll_interval_ms: 100.0,
+            dx: 5.0, dy: 0.0, zoom: zoomed_in_rt, duration_ms: 2000.0,
+        },
+    ];
+
+    for rt in &realtime_scenarios {
+        renderer.camera.set_zoom(rt.zoom);
+        renderer.queue_stable();
+        let _ = renderer.flush();
+        warmup(renderer);
+
+        let stats = run_realtime_pan_pass(
+            renderer, rt.scroll_interval_ms,
+            rt.dx, rt.dy, rt.duration_ms, 12,
+        );
+        results.push(ScenarioResult {
+            name: rt.name.to_string(),
+            kind: "realtime".to_string(),
+            params: ScenarioParams {
+                speed: Some(rt.dx),
+                zoom: Some(rt.zoom),
+                zoom_min: None,
+                zoom_max: None,
+            },
+            stats,
+        });
+    }
+
+    results
+}
+
+// ---------------------------------------------------------------------------
+// File collection
+// ---------------------------------------------------------------------------
 
 fn collect_grida_files(path: &Path) -> Vec<PathBuf> {
     if path.is_file() {
@@ -225,11 +1080,12 @@ pub async fn run_bench(
     renderer.load_scene(scene);
     renderer.fit_camera_to_scene();
 
+    let fit_zoom = renderer.camera.get_zoom();
     let cam_rect = renderer.camera.rect();
     println!("Loaded scene: {} nodes", node_count);
     println!(
         "Camera: zoom={:.4} viewport=({:.0}x{:.0})",
-        renderer.camera.get_zoom(),
+        fit_zoom,
         cam_rect.width,
         cam_rect.height,
     );
@@ -249,26 +1105,45 @@ pub async fn run_bench(
         comp_stats.memory_bytes as f64 / 1024.0,
     );
 
-    // --- Pan ---
-    println!("=== Pan benchmark ({} frames) ===", args.frames);
+    // --- Legacy Pan ---
+    println!("=== Pan benchmark ({} frames, continuous) ===", args.frames);
     let pan = run_pan_pass(&mut renderer, args.frames);
     println!("  avg: {:>7} us ({:>6.1} fps)", pan.avg_us, pan.fps);
     println!(
-        "  p50: {:>7} us  p95: {:>7} us  p99: {:>7} us",
-        pan.p50_us, pan.p95_us, pan.p99_us
+        "  min: {:>7} us  p50: {:>7} us  p95: {:>7} us  p99: {:>7} us  MAX: {:>7} us",
+        pan.min_us, pan.p50_us, pan.p95_us, pan.p99_us, pan.max_us
     );
     println!(
-        "  draw: {} us  mid_flush(draw GPU): {} us  compositor: {} us  end_flush: {} us",
-        pan.draw_us, pan.mid_flush_us, pan.compositor_us, pan.flush_us
+        "  queue: {} us  draw: {} us  mid_flush: {} us  compositor: {} us  flush: {} us  settle: {} us",
+        pan.queue_us, pan.draw_us, pan.mid_flush_us, pan.compositor_us, pan.flush_us, pan.settle_us
     );
 
-    // --- Zoom ---
+    // --- Legacy Zoom ---
     println!("\n=== Zoom benchmark ({} frames) ===", args.frames);
     let zoom = run_zoom_pass(&mut renderer, args.frames);
     println!(
         "  avg: {:>7} us ({:>6.1} fps)  p50: {:>7} us  p95: {:>7} us",
         zoom.avg_us, zoom.fps, zoom.p50_us, zoom.p95_us
     );
+    println!(
+        "  queue: {} us  draw: {} us  mid_flush: {} us  compositor: {} us  flush: {} us  settle: {} us",
+        zoom.queue_us, zoom.draw_us, zoom.mid_flush_us, zoom.compositor_us, zoom.flush_us, zoom.settle_us
+    );
+
+    // --- Expanded Scenarios ---
+    println!("\n=== Expanded Scenarios ({} frames each) ===", args.frames);
+    renderer.fit_camera_to_scene();
+    let scenarios = run_scenarios(&mut renderer, args.frames, fit_zoom);
+    for s in &scenarios {
+        println!(
+            "\n  [{:25}] ({}) {:>7} us avg ({:>6.1} fps)  min: {:>7}  p50: {:>7}  p95: {:>7}  p99: {:>7}  MAX: {:>7}",
+            s.name, s.kind, s.stats.avg_us, s.stats.fps, s.stats.min_us, s.stats.p50_us, s.stats.p95_us, s.stats.p99_us, s.stats.max_us
+        );
+        println!(
+            "    queue: {} us  draw: {} us  mid_flush: {} us  compositor: {} us  flush: {} us  settle: {} us",
+            s.stats.queue_us, s.stats.draw_us, s.stats.mid_flush_us, s.stats.compositor_us, s.stats.flush_us, s.stats.settle_us
+        );
+    }
 
     drop(renderer);
     println!("\nDone.");
@@ -335,11 +1210,19 @@ pub async fn run_bench_report(
             let mut renderer = gpu.create_renderer();
             renderer.load_scene(scene);
             renderer.fit_camera_to_scene();
+            let fit_zoom = renderer.camera.get_zoom();
+
             warmup(&mut renderer);
 
             let effects_count = count_effects_nodes(&renderer);
+
+            // Legacy passes (back-compat)
             let pan = run_pan_pass(&mut renderer, args.frames);
             let zoom = run_zoom_pass(&mut renderer, args.frames);
+
+            // Expanded scenario matrix
+            renderer.fit_camera_to_scene();
+            let scenarios = run_scenarios(&mut renderer, args.frames, fit_zoom);
 
             drop(renderer);
 
@@ -349,8 +1232,10 @@ pub async fn run_bench_report(
                 scene_index: si,
                 nodes: node_count,
                 effects_nodes: effects_count,
+                fit_zoom,
                 pan,
                 zoom,
+                scenarios,
             });
         }
     }

@@ -701,49 +701,59 @@ Zoom-in and zoom-out are fundamentally different operations from a caching
 perspective. The previous `ZoomOnly` classification treated them identically,
 missing the cheapest possible camera-change path.
 
-21. **Zoom-In: Pure Texture Scale**
+21. **Zoom Image Cache (Zoom-In/Out Texture Scale)** ✅ IMPLEMENTED
 
-    When zooming in, the viewport shrinks into content that was already
-    rendered. The previous frame is a spatial superset of the current
-    frame — every pixel that will be visible was already visible. The only
-    deficit is pixel density (the texture is magnified past its native
-    resolution).
+    During active zoom gestures, the scene graph is static — only the zoom
+    level changes. Instead of re-drawing all visible nodes every frame, we
+    capture the composited frame as a GPU texture (`ZoomImageCache`) after
+    the first full draw, then on subsequent zoom frames apply a residual
+    transform (`current_view_matrix × inverse(cached_view_matrix)`) and
+    blit the cached texture with bilinear filtering.
 
-    During an active zoom-in gesture:
-    - Blit the previous composited frame with a scale transform. No new
-      rasterization, no new content discovery, no visible-set changes.
-    - The only artifact is upscale blur, which is acceptable during a
-      gesture and disappears on refinement.
-    - This is the cheapest possible non-idle frame — one texture blit.
+    This replaces O(N) draw commands + GPU rasterization with a single
+    scaled texture blit per frame. The only artifact is scale blur (magnify
+    on zoom-in, minify on zoom-out), acceptable during active interaction.
 
-    Chromium exploits this during pinch-to-zoom: existing compositor tiles
+    **Implementation details:**
+    - `ZoomImageCache` struct: stores GPU Image, zoom level, view matrix
+    - `try_zoom_cache_blit()`: computes residual transform, blits with
+      `FilterMode::Linear`
+    - Cache valid for zoom ratios up to 4× in either direction
+      (`ZOOM_IMAGE_CACHE_MAX_RATIO = 4.0`)
+    - Invalidated on: stable frames, scene graph changes
+    - Preserved across: zoom changes, no-change frames, pan+zoom
+    - First zoom frame after invalidation: full draw + capture (cache miss)
+    - All subsequent zoom frames within ratio: cache hit (single blit)
+
+    **Measured impact (yrr-main.grida, 136K nodes, 100 frames):**
+
+    | Scenario               | Before µs (fps) | After µs (fps) | Speedup |
+    |------------------------|------------------|----------------|---------|
+    | zoom_slow_around_fit   | 57,084 (17.5)    | 1,170 (855)    | **48.8×** |
+    | zoom_fast_around_fit   | 54,455 (18.4)    | 846 (1,182)    | **64.4×** |
+    | zoom_slow_high         | 38,284 (26.1)    | 522 (1,916)    | **73.3×** |
+    | zoom_fast_high         | 39,015 (25.6)    | 518 (1,931)    | **75.3×** |
+
+    Pan performance unchanged (within noise).
+
+    Chromium equivalent: during pinch-to-zoom, existing compositor tiles
     are scaled, and re-rasterization is deferred until the gesture settles.
 
-22. **Zoom-Out: Radial Content Discovery**
+22. **Zoom-Out: Radial Content Discovery** (subsumed by item 21)
 
-    When zooming out, the viewport expands beyond previously rendered
-    content. New spatial regions appear at all four edges. The center of
-    the previous frame remains valid (at higher density than needed, so
-    scaling down looks visually clean), but the border strips are
-    unrasterized.
-
-    During an active zoom-out gesture:
-    - Scale the previous frame down for the center region.
-    - Treat newly exposed border strips like pan-discovered content:
-      apply the same incremental visible-set logic (item 17), but
-      radially rather than in one direction.
-    - Prioritize rasterizing the largest newly-visible regions first.
-
-    Scale-down produces fewer visual artifacts than scale-up (discarding
-    information vs. interpolating it), so zoom-out's intermediate frames
-    look better than zoom-in's even without refinement.
+    The zoom image cache handles both zoom-in and zoom-out uniformly.
+    Zoom-out scales down the cached texture (fewer visual artifacts than
+    zoom-in since it discards information rather than interpolating).
+    Border strip rasterization (item 17) remains a future refinement for
+    the settle phase.
 
 23. **Settle & Refine (shared)**
 
-    After the gesture ends (~50 ms idle), re-rasterize at the correct zoom
-    density using progressive refinement (center-out ordering, focal point
-    priority). This is shared behavior for both zoom directions and is
-    covered further in items 25–27.
+    After the gesture ends (~50 ms idle), the frame loop fires a stable
+    frame that bypasses the zoom image cache and produces a full-quality
+    render at the correct zoom density. Progressive refinement
+    (center-out ordering, focal point priority) is a future refinement
+    covered in items 25–27.
 
 ---
 

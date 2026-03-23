@@ -1289,7 +1289,12 @@ impl UnknownTargetApplication {
         // sees it.  Completing the frame loop prevents frame() from rendering
         // a redundant second frame for the same invalidation.
         self.renderer.camera.consume_change();
-        self.frame_loop.complete(crate::runtime::frame_loop::FrameQuality::Unstable);
+        let quality = if stats.frame.stable {
+            crate::runtime::frame_loop::FrameQuality::Stable
+        } else {
+            crate::runtime::frame_loop::FrameQuality::Unstable
+        };
+        self.frame_loop.complete(quality);
 
         // Build stats string BEFORE the overlay so the overlay shows the
         // current frame's data, not the previous frame's.
