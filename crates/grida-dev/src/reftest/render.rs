@@ -231,6 +231,7 @@ pub fn render_svg_to_png(
         store.clone(),
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
 

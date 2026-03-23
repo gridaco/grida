@@ -246,6 +246,10 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.runtime_renderer_set_render_policy_flags(flags);
     }
 
+    fn runtime_renderer_set_skip_layout(&mut self, skip: bool) {
+        self.base.runtime_renderer_set_skip_layout(skip);
+    }
+
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
         self.base.set_main_camera_transform(transform);
     }

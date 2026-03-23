@@ -7,18 +7,18 @@ use crate::export::{export_node_as, ExportAs, Exported};
 use crate::io::io_grida::{self, JSONFlattenResult};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
 use crate::node::schema::*;
+use crate::query::Hierarchy;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
-use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::runtime::frame_loop::{FrameLoop, FrameQuality};
+use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
 use crate::sys::timer::TimerMgr;
 use crate::text;
 use crate::vectornetwork::VectorNetwork;
+use crate::window::command::ApplicationCommand;
 use grida_text_edit::layout::ManagedTextLayout;
 use grida_text_edit::TextLayoutEngine;
-use crate::query::Hierarchy;
-use crate::window::command::ApplicationCommand;
 
 /// A no-op hierarchy for when no scene graph is loaded.
 struct NoHierarchy;
@@ -101,6 +101,12 @@ pub trait ApplicationApi {
         &mut self,
         flags: crate::runtime::render_policy::RenderPolicyFlags,
     );
+
+    /// Skip layout computation during scene loading.
+    ///
+    /// When enabled, `load_scene` derives layout from schema positions/sizes
+    /// instead of running the Taffy flexbox engine. Set **before** loading a scene.
+    fn runtime_renderer_set_skip_layout(&mut self, skip: bool);
 
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
@@ -468,7 +474,11 @@ impl ApplicationApi for UnknownTargetApplication {
             if let Ok(node) = scene.graph.get_node(&internal_id) {
                 /// Convert a positive corner radius to `Some`, zero/negative to `None`.
                 fn nonzero_radius(r: f32) -> Option<f32> {
-                    if r > 0.0 { Some(r) } else { None }
+                    if r > 0.0 {
+                        Some(r)
+                    } else {
+                        None
+                    }
                 }
 
                 let result: Option<(VectorNetwork, Option<f32>)> = match node {
@@ -559,6 +569,10 @@ impl ApplicationApi for UnknownTargetApplication {
         self.queue();
     }
 
+    fn runtime_renderer_set_skip_layout(&mut self, skip: bool) {
+        self.renderer.set_skip_layout(skip);
+    }
+
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
         self.devtools_rendering_show_tiles = debug;
     }
@@ -639,7 +653,10 @@ impl ApplicationApi for UnknownTargetApplication {
             eprintln!(
                 "switch_scene: scene '{}' not found (available: {:?})",
                 scene_id,
-                self.loaded_scenes.iter().map(|(id, _)| id).collect::<Vec<_>>()
+                self.loaded_scenes
+                    .iter()
+                    .map(|(id, _)| id)
+                    .collect::<Vec<_>>()
             );
         }
     }
@@ -729,11 +746,15 @@ impl UnknownTargetApplication {
         // borrowing `self` as a whole.
         let (hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
             let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
-            let r = self.surface.dispatch(event, &ht, &scene.graph, &self.ui_hit_regions);
+            let r = self
+                .surface
+                .dispatch(event, &ht, &scene.graph, &self.ui_hit_regions);
             (ht, r)
         } else {
             let ht = crate::hittest::HitTester::new(self.renderer.get_cache());
-            let r = self.surface.dispatch(event, &ht, &NoHierarchy, &self.ui_hit_regions);
+            let r = self
+                .surface
+                .dispatch(event, &ht, &NoHierarchy, &self.ui_hit_regions);
             (ht, r)
         };
         drop(hit_tester);
@@ -920,8 +941,8 @@ impl UnknownTargetApplication {
             text_edit: None,
             text_edit_decorations: None,
             surface: crate::surface::SurfaceState::new(),
-            surface_overlay_config:
-                crate::devtools::surface_overlay::SurfaceOverlayConfig::default(),
+            surface_overlay_config: crate::devtools::surface_overlay::SurfaceOverlayConfig::default(
+            ),
             ui_hit_regions: crate::surface::ui::HitRegions::new(),
         }
     }
@@ -1113,7 +1134,9 @@ impl UnknownTargetApplication {
         // Build frame plan lazily
         let rect = self.renderer.camera.rect();
         let zoom = self.renderer.camera.get_zoom();
-        let plan = self.renderer.build_frame_plan(rect, zoom, stable, camera_change);
+        let plan = self
+            .renderer
+            .build_frame_plan(rect, zoom, stable, camera_change);
 
         // Consume the camera change so the next frame sees None
         // (unless a new mutation occurs before then).
@@ -1580,14 +1603,7 @@ impl UnknownTargetApplication {
             &self.renderer.fonts,
         );
 
-        let te = ActiveTextEdit::new(
-            node_id,
-            text,
-            text_style_rec,
-            fill,
-            paragraph_style,
-            layout,
-        );
+        let te = ActiveTextEdit::new(node_id, text, text_style_rec, fill, paragraph_style, layout);
 
         self.text_edit = Some(te);
         self.text_edit_refresh_decorations();
@@ -1618,7 +1634,9 @@ impl UnknownTargetApplication {
     /// Returns the current text of the active editing session, or `None`
     /// if no session is active.
     pub fn text_edit_get_text(&self) -> Option<&str> {
-        self.text_edit.as_ref().map(|te| te.session.state.text.as_str())
+        self.text_edit
+            .as_ref()
+            .map(|te| te.session.state.text.as_str())
     }
 
     /// Dispatch an editing command.
@@ -1633,10 +1651,7 @@ impl UnknownTargetApplication {
     ///
     /// Returns `true` if the session had something to undo.
     pub fn text_edit_undo(&mut self) -> bool {
-        let performed = self
-            .text_edit
-            .as_mut()
-            .is_some_and(|te| te.session.undo());
+        let performed = self.text_edit.as_mut().is_some_and(|te| te.session.undo());
         self.text_edit_refresh_decorations();
         performed
     }
@@ -1645,10 +1660,7 @@ impl UnknownTargetApplication {
     ///
     /// Returns `true` if the session had something to redo.
     pub fn text_edit_redo(&mut self) -> bool {
-        let performed = self
-            .text_edit
-            .as_mut()
-            .is_some_and(|te| te.session.redo());
+        let performed = self.text_edit.as_mut().is_some_and(|te| te.session.redo());
         self.text_edit_refresh_decorations();
         performed
     }
@@ -1720,7 +1732,9 @@ impl UnknownTargetApplication {
 
     /// Paste plain text.
     pub fn text_edit_paste_text(&mut self, text: &str) {
-        if text.is_empty() { return; }
+        if text.is_empty() {
+            return;
+        }
         if let Some(te) = self.text_edit.as_mut() {
             te.session.apply_with_kind(
                 grida_text_edit::EditingCommand::Insert(text.to_owned()),
@@ -1732,10 +1746,13 @@ impl UnknownTargetApplication {
 
     /// Paste HTML with formatting.
     pub fn text_edit_paste_html(&mut self, html: &str) {
-        if html.is_empty() { return; }
+        if html.is_empty() {
+            return;
+        }
         if let Some(te) = self.text_edit.as_mut() {
             let base_style = te.session.content.default_style().clone();
-            match grida_text_edit::attributed_text::html::html_to_attributed_text(html, base_style) {
+            match grida_text_edit::attributed_text::html::html_to_attributed_text(html, base_style)
+            {
                 Ok(pasted) if !pasted.is_empty() => {
                     te.session.paste_attributed(&pasted);
                 }
@@ -1755,43 +1772,62 @@ impl UnknownTargetApplication {
     pub fn text_edit_get_selection_rects(&mut self) -> Option<Vec<grida_text_edit::SelectionRect>> {
         let te = self.text_edit.as_mut()?;
         let (lo, hi) = te.session.selection_range()?;
-        let rects = te.session.layout.selection_rects_for_range(&te.session.state.text, lo, hi);
-        if rects.is_empty() { None } else { Some(rects) }
+        let rects = te
+            .session
+            .layout
+            .selection_rects_for_range(&te.session.state.text, lo, hi);
+        if rects.is_empty() {
+            None
+        } else {
+            Some(rects)
+        }
     }
 
     /// Toggle bold on selection/caret.
     pub fn text_edit_toggle_bold(&mut self) {
-        if let Some(te) = self.text_edit.as_mut() { te.session.toggle_bold(); }
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.toggle_bold();
+        }
         self.text_edit_after_style_change();
     }
 
     /// Toggle italic on selection/caret.
     pub fn text_edit_toggle_italic(&mut self) {
-        if let Some(te) = self.text_edit.as_mut() { te.session.toggle_italic(); }
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.toggle_italic();
+        }
         self.text_edit_after_style_change();
     }
 
     /// Toggle underline on selection/caret.
     pub fn text_edit_toggle_underline(&mut self) {
-        if let Some(te) = self.text_edit.as_mut() { te.session.toggle_underline(); }
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.toggle_underline();
+        }
         self.text_edit_after_style_change();
     }
 
     /// Toggle strikethrough on selection/caret.
     pub fn text_edit_toggle_strikethrough(&mut self) {
-        if let Some(te) = self.text_edit.as_mut() { te.session.toggle_strikethrough(); }
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.toggle_strikethrough();
+        }
         self.text_edit_after_style_change();
     }
 
     /// Set font size on selection/caret.
     pub fn text_edit_set_font_size(&mut self, size: f32) {
-        if let Some(te) = self.text_edit.as_mut() { te.session.set_font_size(size); }
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.set_font_size(size);
+        }
         self.text_edit_after_style_change();
     }
 
     /// Set font family on selection/caret.
     pub fn text_edit_set_font_family(&mut self, family: &str) {
-        if let Some(te) = self.text_edit.as_mut() { te.session.set_font_family(family); }
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session.set_font_family(family);
+        }
         self.text_edit_after_style_change();
     }
 
@@ -1884,10 +1920,23 @@ impl UnknownTargetApplication {
             };
             let caret = te.session.caret_rect();
             let visible = te.session.should_show_caret();
-            let selection_rects = te.session.selection_range().map(|(lo, hi)| {
-                te.session.layout.selection_rects_for_range(&te.session.state.text, lo, hi)
-            }).unwrap_or_default();
-            (node_id, paragraph_height, display_text, caret, visible, selection_rects)
+            let selection_rects = te
+                .session
+                .selection_range()
+                .map(|(lo, hi)| {
+                    te.session
+                        .layout
+                        .selection_rects_for_range(&te.session.state.text, lo, hi)
+                })
+                .unwrap_or_default();
+            (
+                node_id,
+                paragraph_height,
+                display_text,
+                caret,
+                visible,
+                selection_rects,
+            )
         });
 
         if let Some((node_id, paragraph_height, display_text, caret, visible, selection_rects)) =
@@ -1895,8 +1944,7 @@ impl UnknownTargetApplication {
         {
             self.renderer.update_layer_text(node_id, &display_text);
 
-            let y_offset =
-                Self::compute_text_y_offset(&self.renderer, node_id, paragraph_height);
+            let y_offset = Self::compute_text_y_offset(&self.renderer, node_id, paragraph_height);
 
             use crate::devtools::text_edit_decoration_overlay::{
                 CaretDecoration, TextEditingDecorations,
@@ -1904,7 +1952,10 @@ impl UnknownTargetApplication {
 
             self.text_edit_decorations = Some(TextEditingDecorations {
                 node_id,
-                caret: Some(CaretDecoration { rect: caret, visible }),
+                caret: Some(CaretDecoration {
+                    rect: caret,
+                    visible,
+                }),
                 selection_rects,
                 y_offset,
             });
@@ -1913,11 +1964,7 @@ impl UnknownTargetApplication {
     }
 
     /// Compute the text vertical alignment offset for a text node.
-    fn compute_text_y_offset(
-        renderer: &Renderer,
-        node_id: NodeId,
-        paragraph_height: f32,
-    ) -> f32 {
+    fn compute_text_y_offset(renderer: &Renderer, node_id: NodeId, paragraph_height: f32) -> f32 {
         use crate::node::schema::Node;
         let scene = match renderer.scene.as_ref() {
             Some(s) => s,

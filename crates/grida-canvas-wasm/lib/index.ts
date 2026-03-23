@@ -154,12 +154,40 @@ export default async function init(
   );
 }
 
+/**
+ * Renderer configuration flags.
+ *
+ * Matches the Rust `RuntimeRendererConfig` fields that are exposed via
+ * the C ABI `config_flags` bitfield. Pass at init time; individual
+ * fields remain mutable via `Scene.runtime_renderer_set_*()` setters.
+ */
+interface RendererConfig {
+  /**
+   * Skip the Taffy flexbox layout engine during scene loading.
+   * Derives layout from schema positions/sizes instead.
+   * @default false
+   */
+  skip_layout?: boolean;
+}
+
+/** Encode a `RendererConfig` into the C ABI `config_flags` bitfield. */
+function encodeConfigFlags(config?: RendererConfig): number {
+  let flags = 0;
+  if (config?.skip_layout) flags |= 1 << 0;
+  return flags;
+}
+
 interface CreateSurfaceOptions {
   /**
    * when true, embedded fonts will be registered and used for text rendering.
    * @default true
    */
   use_embedded_fonts?: boolean;
+  /**
+   * Initial renderer configuration applied at construction.
+   * Fields can still be changed at runtime via `Scene.runtime_renderer_set_*()`.
+   */
+  config?: RendererConfig;
 }
 
 class ApplicationFactory {
@@ -191,7 +219,8 @@ class ApplicationFactory {
     const ptr = this.module._init(
       canvas.width,
       canvas.height,
-      options.use_embedded_fonts
+      options.use_embedded_fonts,
+      encodeConfigFlags(options.config)
     );
     const _ = new Scene(this.module, ptr);
     _.resize(canvas.width, canvas.height);
@@ -227,6 +256,8 @@ export type CreateCanvasOptions =
       canvas: HTMLCanvasElement;
       locateFile?: GridaCanvasModuleInitOptions["locateFile"];
       useEmbeddedFonts?: boolean;
+      /** Initial renderer configuration. */
+      config?: RendererConfig;
     }
   | {
       backend: "raster";
@@ -234,6 +265,8 @@ export type CreateCanvasOptions =
       height: number;
       locateFile?: GridaCanvasModuleInitOptions["locateFile"];
       useEmbeddedFonts?: boolean;
+      /** Initial renderer configuration. */
+      config?: RendererConfig;
     };
 
 export class Canvas {
@@ -291,10 +324,7 @@ export class Canvas {
    * Register image bytes with an explicit logical RID (e.g. res://images/logo.png).
    * Use when you need stable, document-mapped identifiers.
    */
-  addImageWithId(
-    data: Uint8Array,
-    rid: string
-  ): AddImageWithIdResult | false {
+  addImageWithId(data: Uint8Array, rid: string): AddImageWithIdResult | false {
     return this._scene.addImageWithId(data, rid);
   }
 
@@ -344,13 +374,15 @@ export async function createCanvas(opts: CreateCanvasOptions): Promise<Canvas> {
 
   const module = bindings as createGridaCanvas.GridaCanvasWasmBindings;
   const useEmbeddedFonts = opts.useEmbeddedFonts ?? true;
+  const configFlags = encodeConfigFlags(opts.config);
 
   if (opts.backend === "raster") {
     const appptr = module._init_with_backend(
       BACKEND_ID.Raster,
       opts.width,
       opts.height,
-      useEmbeddedFonts
+      useEmbeddedFonts,
+      configFlags
     );
     return Canvas._fromRaster(new Scene(module, appptr));
   }
@@ -369,7 +401,8 @@ export async function createCanvas(opts: CreateCanvasOptions): Promise<Canvas> {
     BACKEND_ID.WebGL,
     opts.canvas.width,
     opts.canvas.height,
-    useEmbeddedFonts
+    useEmbeddedFonts,
+    configFlags
   );
   const scene = new Scene(module, appptr);
   scene.resize(opts.canvas.width, opts.canvas.height);

@@ -75,17 +75,25 @@ fn detect_image_mime(bytes: &[u8]) -> &'static str {
 /// Callback type used to request a redraw from the host window.
 pub type RequestRedrawCallback = Arc<dyn Fn()>;
 
-/// Options controlling renderer behaviour.
+/// Options controlling renderer behaviour at construction time.
+///
+/// Passed through the entire init chain: TS → C ABI → Application → Renderer.
+/// Fields here are applied once during construction. Most can also be changed
+/// at runtime via individual setters on `Renderer` / `ApplicationApi`.
 #[derive(Clone, Copy)]
 pub struct RendererOptions {
     /// When true, embedded fonts will be registered.
     pub use_embedded_fonts: bool,
+    /// Initial renderer configuration. Applied at construction; individual
+    /// fields remain mutable via `Renderer::set_*` / `ApplicationApi` setters.
+    pub config: super::config::RuntimeRendererConfig,
 }
 
 impl Default for RendererOptions {
     fn default() -> Self {
         Self {
             use_embedded_fonts: false,
+            config: Default::default(),
         }
     }
 }
@@ -354,11 +362,7 @@ impl Renderer {
     }
 
     #[inline]
-    fn prefill_picture_cache_for_plan(
-        &mut self,
-        plan: &FramePlan,
-        policy: RenderPolicy,
-    ) {
+    fn prefill_picture_cache_for_plan(&mut self, plan: &FramePlan, policy: RenderPolicy) {
         let variant_key = policy.variant_key();
         // Prefill picture cache for visible layers so Painter can reuse pictures even with masks.
         // Fast path: skip clone + recording when the picture is already cached (common case
@@ -433,12 +437,7 @@ impl Renderer {
                     }
                 } else if let Some(img) = layer_img.individual_image() {
                     // Individual texture path.
-                    let src_rect = Rect::new(
-                        0.0,
-                        0.0,
-                        img.width() as f32,
-                        img.height() as f32,
-                    );
+                    let src_rect = Rect::new(0.0, 0.0, img.width() as f32, img.height() as f32);
                     Some(crate::painter::PromotedBlit {
                         image: std::rc::Rc::clone(img),
                         src_rect,
@@ -547,7 +546,7 @@ impl Renderer {
             request_redraw,
             fc: FrameCounter::new(),
             plan: None,
-            config: RuntimeRendererConfig::default(),
+            config: options.config,
             layout_engine: crate::layout::engine::LayoutEngine::new(),
             window_context: RendererWindowContext::new(viewport_size),
             compositor_surface: None,
@@ -833,6 +832,18 @@ impl Renderer {
         self.config.render_policy = policy;
     }
 
+    /// Enable or disable layout computation during `load_scene`.
+    ///
+    /// When `skip` is true, `load_scene` bypasses the Taffy flexbox engine
+    /// and derives layout results directly from each node's schema position
+    /// and size. This is appropriate for documents with only absolute
+    /// positioning (e.g. imported Figma files without auto-layout).
+    ///
+    /// This flag must be set **before** calling `load_scene` / `switch_scene`.
+    pub fn set_skip_layout(&mut self, skip: bool) {
+        self.config.skip_layout = skip;
+    }
+
     /// Render the queued frame if any and return the completed statistics.
     /// Intended to be called by the host when a redraw request is received.
     ///
@@ -967,15 +978,19 @@ impl Renderer {
             && self.zoom_image_cache.is_some()
             && camera_change.zoom_changed()
         {
-            let zoom_cache_hit = self.try_zoom_cache_blit(surface, scene, &FramePlan {
-                stable,
-                camera_change,
-                promoted: Vec::new(),
-                regions: Vec::new(),
-                compositor_indices: Vec::new(),
-                display_list_duration: Duration::ZERO,
-                display_list_size_estimated: 0,
-            });
+            let zoom_cache_hit = self.try_zoom_cache_blit(
+                surface,
+                scene,
+                &FramePlan {
+                    stable,
+                    camera_change,
+                    promoted: Vec::new(),
+                    regions: Vec::new(),
+                    compositor_indices: Vec::new(),
+                    display_list_duration: Duration::ZERO,
+                    display_list_size_estimated: 0,
+                },
+            );
             if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
                 let plan = FramePlan {
                     stable,
@@ -1130,8 +1145,7 @@ impl Renderer {
 
         // Reuse or create a downscaled offscreen for interaction rendering.
         let interaction_scale = self.config.interaction_render_scale;
-        let use_downscale =
-            !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
+        let use_downscale = !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
         if use_downscale {
             let sw = (width * interaction_scale).ceil() as i32;
             let sh = (height * interaction_scale).ceil() as i32;
@@ -1249,8 +1263,7 @@ impl Renderer {
         let zoom_ratio = current_zoom / cache.zoom;
 
         // Only use cache if zoom ratio is within acceptable range.
-        if !((1.0 / ZOOM_IMAGE_CACHE_MAX_RATIO)..=ZOOM_IMAGE_CACHE_MAX_RATIO)
-            .contains(&zoom_ratio)
+        if !((1.0 / ZOOM_IMAGE_CACHE_MAX_RATIO)..=ZOOM_IMAGE_CACHE_MAX_RATIO).contains(&zoom_ratio)
         {
             // Too extreme — invalidate and fall through.
             self.zoom_image_cache = None;
@@ -1280,12 +1293,7 @@ impl Renderer {
         );
         let mut paint = SkPaint::default();
         paint.set_anti_alias(false);
-        canvas.draw_image_with_sampling_options(
-            &cache.image,
-            (0.0, 0.0),
-            sampling,
-            Some(&paint),
-        );
+        canvas.draw_image_with_sampling_options(&cache.image, (0.0, 0.0), sampling, Some(&paint));
         canvas.restore();
 
         let mid_flush_start = Instant::now();
@@ -1338,7 +1346,12 @@ impl Renderer {
             let viewport_size = self.window_context.viewport_size;
 
             // 1. Compute layout phase
-            {
+            if self.config.skip_layout {
+                // Fast path: derive layout directly from schema positions/sizes.
+                // Skips Taffy tree construction, flexbox computation, and text
+                // measurement — O(n) with minimal per-node work.
+                self.layout_engine.compute_schema_only(scene);
+            } else {
                 let mut paragraph_cache = self.scene_cache.paragraph.borrow_mut();
                 self.layout_engine.compute(
                     scene,
@@ -1503,7 +1516,9 @@ impl Renderer {
             let viewport_size = self.window_context.viewport_size;
 
             // 1. Recompute layout
-            {
+            if self.config.skip_layout {
+                self.layout_engine.compute_schema_only(scene);
+            } else {
                 let mut paragraph_cache = self.scene_cache.paragraph.borrow_mut();
                 self.layout_engine.compute(
                     scene,
@@ -1584,12 +1599,7 @@ impl Renderer {
         variant_key: u64,
         draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
-        self.with_recording_cached_with_policy(
-            id,
-            variant_key,
-            self.config.render_policy,
-            draw,
-        )
+        self.with_recording_cached_with_policy(id, variant_key, self.config.render_policy, draw)
     }
 
     fn with_recording_cached_with_policy(
@@ -1636,8 +1646,8 @@ impl Renderer {
     ) -> FramePlan {
         let __start = Instant::now();
 
-        let effective_layer_compositing = self.config.layer_compositing
-            && self.config.render_policy.allows_layer_compositing();
+        let effective_layer_compositing =
+            self.config.layer_compositing && self.config.render_policy.allows_layer_compositing();
 
         let mut promoted_ids: Vec<NodeId> = Vec::new();
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
@@ -1801,9 +1811,14 @@ impl Renderer {
             let scaled_w = offscreen.width();
             let scaled_h = offscreen.height();
             let result = self.draw_to_offscreen_and_upscale(
-                canvas, offscreen, plan, background_color,
-                width, height,
-                scaled_w, scaled_h,
+                canvas,
+                offscreen,
+                plan,
+                background_color,
+                width,
+                height,
+                scaled_w,
+                scaled_h,
                 scale,
             );
             if let Some(r) = result {
@@ -2026,11 +2041,7 @@ impl Renderer {
     /// during unstable (interactive) frames, and without limit on stable
     /// (settled) frames. Stale entries (zoom mismatch) are blitted with
     /// GPU texture stretching until re-rasterized.
-    fn update_compositor(
-        &mut self,
-        parent_surface: &mut Surface,
-        visible_indices: &[usize],
-    ) {
+    fn update_compositor(&mut self, parent_surface: &mut Surface, visible_indices: &[usize]) {
         self.update_compositor_inner(parent_surface, false, visible_indices);
     }
 
@@ -2079,8 +2090,7 @@ impl Renderer {
 
         // Time budget for stale re-rasterization during interactive frames.
         // 8ms leaves headroom within a 16ms frame budget (60fps target).
-        const ZOOM_RERASTER_BUDGET: std::time::Duration =
-            std::time::Duration::from_micros(8000);
+        const ZOOM_RERASTER_BUDGET: std::time::Duration = std::time::Duration::from_micros(8000);
         let budget_start = std::time::Instant::now();
 
         for &idx in visible_indices {
@@ -2219,11 +2229,11 @@ impl Renderer {
                         } else {
                             // Shouldn't reach here if our needs_new_page check was correct,
                             // but fall back to creating from the compositor surface.
-                            let info = skia_safe::ImageInfo::new_n32_premul(
-                                (w as i32, h as i32),
-                                None,
-                            );
-                            self.compositor_surface.as_mut().and_then(|cs| cs.new_surface(&info))
+                            let info =
+                                skia_safe::ImageInfo::new_n32_premul((w as i32, h as i32), None);
+                            self.compositor_surface
+                                .as_mut()
+                                .and_then(|cs| cs.new_surface(&info))
                         }
                     })
                     .is_some();
@@ -2242,7 +2252,11 @@ impl Renderer {
                         slot_canvas.scale((zoom, zoom));
                         slot_canvas.translate((-render_bounds.x, -render_bounds.y));
                         let painter = Painter::new_with_scene_cache(
-                            slot_canvas, fonts, images, scene_cache, policy,
+                            slot_canvas,
+                            fonts,
+                            images,
+                            scene_cache,
+                            policy,
                         );
                         painter.draw_layer(&entry_layer);
                     });
@@ -2294,12 +2308,16 @@ impl Renderer {
                 let bounds = skia_safe::IRect::from_wh(pixel_width, pixel_height);
                 if let Some(image) = offscreen.image_snapshot_with_bounds(bounds) {
                     self.scene_cache.compositor.insert(
-                        id, image, zoom, render_bounds, node_opacity, node_blend,
+                        id,
+                        image,
+                        zoom,
+                        render_bounds,
+                        node_opacity,
+                        node_blend,
                     );
                 }
             }
         }
-
     }
 }
 

@@ -2725,6 +2725,15 @@ export class Editor
   private _m_wasm_canvas_scene: Scene | null = null;
 
   /**
+   * Surface init options passed to `createWebGLCanvasSurface()`.
+   * Set before calling `mount()`. Includes renderer config (e.g. `skip_layout`).
+   */
+  __surfaceOptions: {
+    use_embedded_fonts?: boolean;
+    config?: { skip_layout?: boolean };
+  } = { use_embedded_fonts: true };
+
+  /**
    * Access the underlying WASM Scene instance for the canvas backend.
    *
    * Returns `null` when the backend is not "canvas" or the scene is not
@@ -3103,10 +3112,10 @@ export class Editor
     await init({
       locateFile: locateFile,
     }).then((factory) => {
-      const surface = factory.createWebGLCanvasSurface(el);
-      surface.runtime_renderer_set_layer_compositing(true);
-      // surface.setDebug(this.debug);
-      // surface.setVerbose(this.debug);
+      const surface = factory.createWebGLCanvasSurface(
+        el,
+        this.__surfaceOptions
+      );
       this.__bind_wasm_surface(surface);
       this.onMount?.(surface);
 

@@ -35,8 +35,8 @@ const EXPECTED_FUNCTIONS = [
   { name: "_deallocate", paramCount: 2 },
 
   // initialization / app lifecycle
-  { name: "_init", paramCount: 3 },
-  { name: "_init_with_backend", paramCount: 4 },
+  { name: "_init", paramCount: 4 },
+  { name: "_init_with_backend", paramCount: 5 },
   { name: "_tick", paramCount: 2 },
   { name: "_destroy", paramCount: 1 },
   { name: "_resize_surface", paramCount: 3 },
@@ -100,6 +100,7 @@ const EXPECTED_FUNCTIONS = [
   { name: "_runtime_renderer_set_layer_compositing", paramCount: 2 },
   { name: "_runtime_renderer_set_pixel_preview_scale", paramCount: 2 },
   { name: "_runtime_renderer_set_pixel_preview_stable", paramCount: 2 },
+  { name: "_runtime_renderer_set_skip_layout", paramCount: 2 },
 ] as const;
 
 // Expected Emscripten runtime methods
@@ -130,7 +131,10 @@ describe("WASM API Validation", () => {
       useEmbeddedFonts: true,
     });
 
-    const doc = readFileSync(resolve(process.cwd(), "example/rectangle.grida1"), "utf8");
+    const doc = readFileSync(
+      resolve(process.cwd(), "example/rectangle.grida1"),
+      "utf8"
+    );
     canvas.loadScene(doc);
     canvas.dispose();
 
