@@ -1,3 +1,12 @@
+---
+title: Kiwi Schema for .fig Format
+tags:
+  - internal
+  - working-group
+  - figma
+  - format-schema
+---
+
 # Kiwi Schema for .fig Format
 
 ## Overview

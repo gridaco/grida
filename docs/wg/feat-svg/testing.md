@@ -1,3 +1,14 @@
+---
+title: SVG Testing
+format: md
+tags:
+  - internal
+  - working-group
+  - canvas
+  - svg
+  - testing
+---
+
 # SVG Testing
 
 This document describes the testing methodology and tools used to evaluate SVG rendering accuracy in Grida Canvas.

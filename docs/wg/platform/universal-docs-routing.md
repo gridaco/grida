@@ -1,5 +1,12 @@
 ---
 title: Universal Docs Routing (WG)
+tags:
+  - internal
+  - user-facing
+  - working-group
+  - platform
+  - routing
+
 ---
 
 # Universal Docs Routing

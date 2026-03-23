@@ -1,5 +1,12 @@
 ---
 title: Masking Model (masks)
+tags:
+  - internal
+  - working-group
+  - canvas
+  - masks
+  - rendering
+
 ---
 
 # Masks — Working Group Draft (`masks`)

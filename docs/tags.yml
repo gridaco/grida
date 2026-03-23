@@ -1,0 +1,182 @@
+# Docusaurus docs tags — shared vocabulary for navigation, search, and RAG chunking.
+# Keys are referenced from doc frontmatter (`tags: [key, ...]`).
+
+internal:
+  label: Internal
+  permalink: /internal
+  description: Engineering and working-group material for Grida builders (not end-user product guides).
+
+user-facing:
+  label: User-facing
+  permalink: /user-facing
+  description: Documentation intended for product users, integrators, and doc authors consuming stable references.
+
+reference:
+  label: Reference
+  permalink: /reference
+  description: Stable technical reference tables, glossaries, and specifications.
+
+working-group:
+  label: Working Group
+  permalink: /working-group
+  description: WG design notes, feature specs, and implementation plans.
+
+research:
+  label: Research
+  permalink: /research
+  description: Upstream research and deep dives (e.g. browser engine internals) informing design decisions.
+
+platform:
+  label: Platform
+  permalink: /platform
+  description: Multi-tenant platform, routing, domains, and infrastructure.
+
+infrastructure:
+  label: Infrastructure
+  permalink: /infrastructure
+  description: Hosting, DNS, edge configuration, and operational architecture.
+
+routing:
+  label: Routing
+  permalink: /routing
+  description: URL models, universal routes, and navigation contracts.
+
+historical:
+  label: Historical
+  permalink: /historical
+  description: Archived snapshots kept for audit trails; may not reflect current behavior.
+
+canvas:
+  label: Canvas
+  permalink: /canvas
+  description: Grida Canvas engine, 2D graphics, WASM runtime, and scene graph concerns.
+
+svg:
+  label: SVG
+  permalink: /svg
+  description: SVG import, parsing, and SVG-aligned rendering behavior.
+
+vector:
+  label: Vector
+  permalink: /vector
+  description: Paths, vector networks, curve geometry, and vector editing.
+
+rendering:
+  label: Rendering
+  permalink: /rendering
+  description: Rasterization, paints, opacity, blend modes, and draw pipelines.
+
+painting:
+  label: Painting
+  permalink: /painting
+  description: Fills, strokes, noise, patterns, and paint servers.
+
+performance:
+  label: Performance
+  permalink: /performance
+  description: Culling, caching, tiling, budgets, hashing, and throughput.
+
+testing:
+  label: Testing
+  permalink: /testing
+  description: Test methodology, suites, reftests, and QA strategy.
+
+typography:
+  label: Typography
+  permalink: /typography
+  description: Fonts, shaping, OpenType, variable axes, and text layout.
+
+text:
+  label: Text
+  permalink: /text
+  description: Rich text, attributed strings, editing model, and persistence.
+
+fonts:
+  label: Fonts
+  permalink: /fonts
+  description: Font loading, fallback, italic/oblique behavior, and font resources.
+
+open-type:
+  label: OpenType
+  permalink: /open-type
+  description: OpenType layout features, tags, and font table references.
+
+editor:
+  label: Editor
+  permalink: /editor
+  description: Editor UX, tools, selection, and authoring surfaces.
+
+authoring:
+  label: Authoring
+  permalink: /authoring
+  description: Parametric design, scaling, and author-side workflows.
+
+layout:
+  label: Layout
+  permalink: /layout
+  description: Auto-layout, constraints, and spatial composition.
+
+figma:
+  label: Figma
+  permalink: /figma
+  description: Figma interchange, Kiwi format, and import pipelines.
+
+import:
+  label: Import
+  permalink: /import
+  description: Bringing external formats into Grida (SVG, Figma, assets).
+
+format-schema:
+  label: Format & schema
+  permalink: /format-schema
+  description: .grida file format, naming, serialization, and schema evolution.
+
+resources:
+  label: Resources
+  permalink: /resources
+  description: Images, blobs, byte stores, and resource identity.
+
+wasm:
+  label: WASM
+  permalink: /wasm
+  description: WebAssembly constraints and browser-hosted engine concerns.
+
+masks:
+  label: Masks
+  permalink: /masks
+  description: Masking, clips, and matte operations.
+
+filters:
+  label: Filters
+  permalink: /filters
+  description: Image filters and visual effects.
+
+ai:
+  label: AI
+  permalink: /ai
+  description: Assistant tools, model-facing operations, and AI UX.
+
+collaboration:
+  label: Collaboration
+  permalink: /collaboration
+  description: CRDTs, identity, and multi-user consistency.
+
+css:
+  label: CSS
+  permalink: /css
+  description: CSS properties, web styling alignment, and design-to-code mapping.
+
+internationalization:
+  label: Internationalization
+  permalink: /internationalization
+  description: ICU, Unicode, locale-aware text, and cross-script behavior.
+
+chromium:
+  label: Chromium
+  permalink: /chromium
+  description: Chromium / Blink / cc compositor source research notes.
+
+compositing:
+  label: Compositing
+  permalink: /compositing
+  description: Layers, surfaces, tiles, and GPU composition.

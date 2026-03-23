@@ -1,5 +1,12 @@
 ---
 title: Noise Effects (fe-noise)
+tags:
+  - internal
+  - working-group
+  - canvas
+  - painting
+  - rendering
+
 ---
 
 # Noise Effects - `fe-noise`

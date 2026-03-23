@@ -1,6 +1,13 @@
 ---
 id: impl-performance
 title: "Text Editing: Performance Model"
+tags:
+  - internal
+  - working-group
+  - typography
+  - text
+  - performance
+
 ---
 
 ## Motivation

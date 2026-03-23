@@ -2,6 +2,10 @@
 id: intro
 title: "Working Group"
 sidebar_position: 1
+tags:
+  - internal
+  - working-group
+
 ---
 
 # Working Group

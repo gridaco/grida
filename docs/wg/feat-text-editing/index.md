@@ -1,6 +1,13 @@
 ---
 id: feat-text-editing
 title: "Text Editing: Manifesto"
+tags:
+  - internal
+  - working-group
+  - typography
+  - text
+  - editor
+
 ---
 
 ## Motivation

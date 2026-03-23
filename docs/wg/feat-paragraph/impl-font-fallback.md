@@ -1,5 +1,12 @@
 ---
 title: Font Fallback Strategy (font-fallback)
+tags:
+  - internal
+  - working-group
+  - typography
+  - text
+  - fonts
+
 ---
 
 # Paragraph - `font-fallback`

@@ -1,5 +1,11 @@
 ---
 title: Layout Model (layout)
+tags:
+  - internal
+  - working-group
+  - layout
+  - canvas
+
 ---
 
 # Layout Model - `layout`

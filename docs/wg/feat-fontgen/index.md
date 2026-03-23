@@ -1,5 +1,11 @@
 ---
 title: Font Generation (fontgen)
+tags:
+  - internal
+  - working-group
+  - typography
+  - fonts
+
 ---
 
 # Font Generation - `fontgen`

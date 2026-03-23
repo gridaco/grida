@@ -1,5 +1,10 @@
 ---
 title: Platform (WG)
+tags:
+  - internal
+  - working-group
+  - platform
+
 ---
 
 # Platform (WG)

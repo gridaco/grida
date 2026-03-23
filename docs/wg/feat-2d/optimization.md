@@ -1,5 +1,12 @@
 ---
 title: Rendering Optimization Strategies
+tags:
+  - internal
+  - working-group
+  - canvas
+  - performance
+  - rendering
+
 ---
 
 # Rendering Optimization Strategies

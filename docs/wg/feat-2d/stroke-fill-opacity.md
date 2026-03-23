@@ -1,5 +1,11 @@
 ---
 title: "Stroke-Fill Opacity Compositing"
+tags:
+  - internal
+  - working-group
+  - canvas
+  - rendering
+
 ---
 
 # Stroke-Fill Opacity Compositing

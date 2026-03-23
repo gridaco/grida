@@ -1,5 +1,12 @@
 ---
 title: Emoji Placeholder Rendering (emoji-placeholder)
+tags:
+  - internal
+  - working-group
+  - typography
+  - text
+  - fonts
+
 ---
 
 # Paragraph - `emoji-placeholder`

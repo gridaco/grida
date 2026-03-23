@@ -1,3 +1,11 @@
+---
+title: Selection
+tags:
+  - internal
+  - working-group
+  - editor
+---
+
 # Selection
 
 This document describes the selection behavior for pointer interactions and keyboard modifiers.

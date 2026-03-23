@@ -1,3 +1,12 @@
+---
+title: Fundamental Tools (for AI)
+tags:
+  - internal
+  - working-group
+  - ai
+  - editor
+---
+
 # Fundamental Tools (for AI)
 
 This document proposes the philosophical basis for the fundamental toolset, enabling machines to design like humans.

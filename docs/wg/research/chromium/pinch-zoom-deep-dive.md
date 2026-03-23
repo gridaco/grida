@@ -1,6 +1,13 @@
 ---
 title: "Chromium Pinch-Zoom Deep Dive"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - rendering
+  - compositing
+
 ---
 
 # Chromium Pinch-Zoom Deep Dive

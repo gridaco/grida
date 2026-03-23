@@ -1,3 +1,12 @@
+---
+title: Image Tools (for AI)
+tags:
+  - internal
+  - working-group
+  - ai
+  - editor
+---
+
 # Image Tools (for AI)
 
 This document proposes the philosophical basis for image manipulation tools that enable AI agents to generate, enhance, and transform visual content within the design canvas.

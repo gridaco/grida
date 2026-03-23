@@ -1,6 +1,13 @@
 ---
 title: SVG Pattern Support
 format: md
+tags:
+  - internal
+  - working-group
+  - canvas
+  - svg
+  - painting
+
 ---
 
 # SVG Pattern Support

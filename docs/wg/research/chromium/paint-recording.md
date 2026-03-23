@@ -1,6 +1,13 @@
 ---
 title: "Chromium Paint Recording System"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - rendering
+  - compositing
+
 ---
 
 # Chromium Paint Recording System

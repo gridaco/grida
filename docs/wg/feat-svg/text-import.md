@@ -1,5 +1,13 @@
 ---
 format: md
+tags:
+  - internal
+  - working-group
+  - canvas
+  - svg
+  - import
+  - text
+
 ---
 
 # SVG Text Import Model

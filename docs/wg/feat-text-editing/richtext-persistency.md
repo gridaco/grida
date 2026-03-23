@@ -1,6 +1,13 @@
 ---
 id: richtext-persistency
 title: "Rich Text Persistency: Research & Comparative Reference"
+tags:
+  - internal
+  - working-group
+  - typography
+  - text
+  - editor
+
 ---
 
 ## Purpose

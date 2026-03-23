@@ -1,5 +1,12 @@
 ---
 title: Italic and Oblique Strategy (italic)
+tags:
+  - internal
+  - working-group
+  - typography
+  - text
+  - fonts
+
 ---
 
 # Paragraph - `italic`

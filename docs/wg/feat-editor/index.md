@@ -1,5 +1,10 @@
 ---
 title: Editor Features (WG)
+tags:
+  - internal
+  - working-group
+  - editor
+
 ---
 
 Editor features are a collection of **Grida editor-specific** behaviors and capabilities. These documents focus on **practical implementation details** over mathematical abstractions, emphasizing real-world UX and editor workflows.

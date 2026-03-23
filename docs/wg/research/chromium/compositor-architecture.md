@@ -1,5 +1,12 @@
 ---
 title: "Chromium Compositor Architecture"
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - rendering
+
 ---
 
 # Chromium Compositor Architecture

@@ -1,6 +1,13 @@
 ---
 title: "Chromium Compositor Scheduler"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - performance
+
 ---
 
 # Chromium Compositor Scheduler

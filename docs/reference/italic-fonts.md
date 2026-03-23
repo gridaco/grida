@@ -1,3 +1,13 @@
+---
+title: Italic Fonts
+format: md
+tags:
+  - reference
+  - user-facing
+  - typography
+  - fonts
+---
+
 # Italic Fonts
 
 This document provides a comprehensive reference table of real-world font examples organized by italic detection scenarios. Each scenario represents a different way that font families can implement italic styles, from traditional static fonts to modern variable fonts with complex axis configurations.

@@ -1,6 +1,11 @@
 ---
 title: CRDT Object ID Model
 description: A working group draft describing the Grida ID Model (for CRDT) feature for the core engine.
+tags:
+  - internal
+  - working-group
+  - collaboration
+
 ---
 
 # Grida ID Model (for CRDT)

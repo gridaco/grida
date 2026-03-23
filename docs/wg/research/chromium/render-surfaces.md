@@ -1,5 +1,12 @@
 ---
 title: "Chromium Render Surfaces"
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - rendering
+
 ---
 
 # Chromium Render Surfaces

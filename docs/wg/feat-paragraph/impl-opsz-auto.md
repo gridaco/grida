@@ -1,5 +1,12 @@
 ---
 title: Optical Size Automation (opsz-auto)
+tags:
+  - internal
+  - working-group
+  - typography
+  - text
+  - fonts
+
 ---
 
 # Paragraph - `opsz: auto`
