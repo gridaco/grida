@@ -61,6 +61,7 @@ interface CliArgs {
   info: boolean;
   verbose: boolean;
   help: boolean;
+  prefer_fixed_text_sizing: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -68,6 +69,7 @@ function parseArgs(argv: string[]): CliArgs {
     info: false,
     verbose: false,
     help: false,
+    prefer_fixed_text_sizing: false,
   };
 
   const positional: string[] = [];
@@ -92,6 +94,9 @@ function parseArgs(argv: string[]): CliArgs {
       case "-o":
         i++;
         args.output = argv[i];
+        break;
+      case "--prefer-fixed-text-sizing":
+        args.prefer_fixed_text_sizing = true;
         break;
       case "--pages":
       case "-p":
@@ -232,7 +237,9 @@ function main(): void {
   }
 
   // Build options
-  const options: Fig2GridaOptions = {};
+  const options: Fig2GridaOptions = {
+    prefer_fixed_text_sizing: args.prefer_fixed_text_sizing || undefined,
+  };
   if (args.pages) {
     options.pages = args.pages;
     if (args.verbose) {

@@ -34,21 +34,14 @@ import { io } from "@grida/io";
 import grida from "@grida/schema";
 import kolor from "@grida/color";
 
-export interface Fig2GridaOptions {
+export interface Fig2GridaOptions extends Pick<
+  iofigma.restful.factory.FactoryContext,
+  | "placeholder_for_missing_images"
+  | "preserve_figma_ids"
+  | "prefer_fixed_text_sizing"
+> {
   /** Convert specific page indices only (only applies to `.fig` input). */
   pages?: number[];
-  /**
-   * When true (default), unresolved image refs are replaced with a checker
-   * pattern placeholder. When false, refs are preserved as `res://images/<ref>`
-   * so the lazy image loading system can request them at render time.
-   */
-  placeholder_for_missing_images?: boolean;
-  /**
-   * When true, use original Figma node IDs as Grida node IDs instead of
-   * generating new ones. Required for embed/refig so that emitted events
-   * (selection-change, etc.) carry the original Figma node IDs.
-   */
-  preserve_figma_ids?: boolean;
 }
 
 export interface Fig2GridaResult {
@@ -271,6 +264,7 @@ export function fig2grida(
     options?.placeholder_for_missing_images !== false;
 
   const preserveFigmaIds = options?.preserve_figma_ids;
+  const preferFixedTextSizing = options?.prefer_fixed_text_sizing;
 
   // --- Object input: REST JSON directly ---
   if (!(input instanceof Uint8Array)) {
@@ -278,7 +272,8 @@ export function fig2grida(
       input,
       undefined,
       placeholderForMissing,
-      preserveFigmaIds
+      preserveFigmaIds,
+      preferFixedTextSizing
     );
   }
 
@@ -291,7 +286,8 @@ export function fig2grida(
         restArchive.json,
         restArchive.images,
         placeholderForMissing,
-        preserveFigmaIds
+        preserveFigmaIds,
+        preferFixedTextSizing
       );
     }
     // Otherwise fall through to .fig parser (handles both ZIP and raw Kiwi)
@@ -302,7 +298,8 @@ export function fig2grida(
       json,
       undefined,
       placeholderForMissing,
-      preserveFigmaIds
+      preserveFigmaIds,
+      preferFixedTextSizing
     );
   }
 
@@ -451,7 +448,8 @@ function restJsonToMergedDocument(
   json: unknown,
   images: Record<string, Uint8Array> | undefined,
   placeholderForMissing: boolean,
-  preserveFigmaIds?: boolean
+  preserveFigmaIds?: boolean,
+  preferFixedTextSizing?: boolean
 ): MergedDocument {
   const canvases = extractCanvases(json);
 
@@ -462,6 +460,7 @@ function restJsonToMergedDocument(
     prefer_path_for_geometry: true,
     placeholder_for_missing_images: placeholderForMissing,
     preserve_figma_ids: preserveFigmaIds,
+    prefer_fixed_text_sizing: preferFixedTextSizing,
     node_id_generator: preserveFigmaIds
       ? undefined
       : makeIdGenerator("rest-import"),
@@ -489,10 +488,17 @@ function fig2gridaFromRestJson(
   json: unknown,
   images: Record<string, Uint8Array> | undefined,
   placeholderForMissing: boolean,
-  preserveFigmaIds?: boolean
+  preserveFigmaIds?: boolean,
+  preferFixedTextSizing?: boolean
 ): Fig2GridaResult {
   return packMergedDocument(
-    restJsonToMergedDocument(json, images, placeholderForMissing, preserveFigmaIds)
+    restJsonToMergedDocument(
+      json,
+      images,
+      placeholderForMissing,
+      preserveFigmaIds,
+      preferFixedTextSizing
+    )
   );
 }
 
@@ -585,7 +591,10 @@ function emptyPackedScene(
 // restJsonToGridaDocument — returns in-memory Document (no .grida packing)
 // ---------------------------------------------------------------------------
 
-export interface RestJsonToGridaOptions {
+export interface RestJsonToGridaOptions extends Pick<
+  iofigma.restful.factory.FactoryContext,
+  "prefer_fixed_text_sizing"
+> {
   /**
    * Image hashes from Figma `images` metadata to raw bytes. When provided,
    * resolves `IMAGE` paint refs to `res://images/<hash>`.
@@ -614,7 +623,13 @@ export function restJsonToGridaDocument(
 ): RestJsonToGridaResult {
   _idCounter = 0;
   const images = options?.images;
-  const merged = restJsonToMergedDocument(json, images, true);
+  const merged = restJsonToMergedDocument(
+    json,
+    images,
+    true,
+    undefined,
+    options?.prefer_fixed_text_sizing
+  );
 
   return {
     document: merged.document,

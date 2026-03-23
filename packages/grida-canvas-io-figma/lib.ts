@@ -450,6 +450,29 @@ export namespace iofigma {
          * @default true
          */
         placeholder_for_missing_images?: boolean;
+        /**
+         * When true, TEXT nodes always use concrete width/height from
+         * absoluteBoundingBox, ignoring Figma's `textAutoResize` ("auto"
+         * sizing). This produces fixed-size text frames whose dimensions
+         * match Figma's rendered output exactly.
+         *
+         * Use this when the consumer skips layout computation (e.g.
+         * `skip_layout` mode) and needs pre-resolved text dimensions.
+         *
+         * When false (default), TEXT nodes respect `textAutoResize`:
+         * "WIDTH_AND_HEIGHT" sets both to auto, "HEIGHT" sets height to
+         * auto. These require layout-time text measurement to resolve.
+         *
+         * **Caveat:** The fixed dimensions come from Figma's own renderer
+         * and font metrics. If the rendering environment uses different
+         * fonts or a different text shaper, the actual text extent may
+         * not match the baked-in size — text may overflow or leave extra
+         * whitespace. Only use this flag when font fidelity cannot be
+         * guaranteed or when layout computation is explicitly skipped.
+         *
+         * @default false
+         */
+        prefer_fixed_text_sizing?: boolean;
       };
 
       function toGradientPaint(paint: figrest.GradientPaint) {
@@ -1593,12 +1616,14 @@ export namespace iofigma {
               layout_inset_right: constraints.right,
               layout_inset_bottom: constraints.bottom,
               layout_target_width:
+                !context.prefer_fixed_text_sizing &&
                 figma_text_resizing_model === "WIDTH_AND_HEIGHT"
                   ? "auto"
                   : fixedwidth,
               layout_target_height:
-                figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
-                figma_text_resizing_model === "HEIGHT"
+                !context.prefer_fixed_text_sizing &&
+                (figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
+                  figma_text_resizing_model === "HEIGHT")
                   ? "auto"
                   : fixedheight,
               text_align: node.style.textAlignHorizontal
