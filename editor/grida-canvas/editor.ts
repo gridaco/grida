@@ -39,6 +39,8 @@ import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 import { computeRenderPolicyFlagsForOutlineFeature } from "./render-policy-flags";
 
+const __DEV__ = process.env.NODE_ENV === "development";
+
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknownNode,
   key: keyof grida.program.nodes.UnknownNode,
@@ -192,7 +194,7 @@ export class Camera implements editor.api.ICameraActions {
    * Transform to fit
    */
   fit(
-    selector: grida.program.document.Selector,
+    selector: grida.program.document.Selector | "<scene>",
     options: {
       margin?: number | [number, number, number, number];
       animate?: boolean;
@@ -202,7 +204,16 @@ export class Camera implements editor.api.ICameraActions {
     }
   ) {
     const { document_ctx, selection, transform } = this.editor.state;
-    const ids = dq.querySelector(document_ctx, selection, selector);
+
+    let ids: string[];
+    if (selector === "<scene>") {
+      const doc = this.editor.state.document;
+      const sceneId =
+        this.editor.state.scene_id ?? doc.scenes_ref?.[0];
+      ids = sceneId ? (doc.links?.[sceneId] ?? []) : [];
+    } else {
+      ids = dq.querySelector(document_ctx, selection, selector);
+    }
 
     const rects = ids
       .map((id) => this.editor.geometryProvider.getNodeAbsoluteBoundingRect(id))
@@ -3171,16 +3182,26 @@ export class Editor
         document: grida.program.document.Document,
         sceneId?: string
       ) => {
+        const t: Record<string, number> = {};
+        const mark = (label: string) => {
+          if (__DEV__) t[label] = performance.now();
+        };
+
+        mark("encode:start");
         try {
           const bytes = io.GRID.encode(document);
+          mark("encode:end");
           surface.loadSceneGrida(bytes);
+          mark("loadSceneGrida:end");
         } catch {
+          mark("encode:end");
           // Fallback to JSON if FlatBuffers encoding fails (e.g. unsupported node types)
           const p = JSON.stringify({
             version: grida.program.document.SCHEMA_VERSION,
             document,
           });
           surface.loadScene(p);
+          mark("loadScene:end");
         }
         // loadSceneGrida only decodes and stores scenes.
         // switchScene activates the requested scene (or first if unspecified).
@@ -3189,7 +3210,22 @@ export class Editor
         if (targetScene) {
           surface.switchScene(targetScene);
         }
+        mark("switchScene:end");
         surface.redraw();
+        mark("redraw:end");
+
+        if (__DEV__) {
+          const s = t["encode:start"]!;
+          const fmt = (a: string, b: string) =>
+            t[b] && t[a] ? `${(t[b]! - t[a]!).toFixed(0)}ms` : "-";
+          console.log(
+            `[syncDocument] encode=${fmt("encode:start", "encode:end")} ` +
+              `loadSceneGrida=${fmt("encode:end", "loadSceneGrida:end")} ` +
+              `switchScene=${fmt("loadSceneGrida:end" in t ? "loadSceneGrida:end" : "loadScene:end", "switchScene:end")} ` +
+              `redraw=${fmt("switchScene:end", "redraw:end")} ` +
+              `total=${(t["redraw:end"]! - s).toFixed(0)}ms`
+          );
+        }
       };
 
       // setup hooks
@@ -3213,7 +3249,7 @@ export class Editor
       );
 
       // fit the camera
-      this.camera.fit("*");
+      this.camera.fit("<scene>");
 
       // subscribe
       this.doc.subscribeWithSelector(
@@ -3232,8 +3268,7 @@ export class Editor
               document,
               this.doc.state.scene_id
             );
-            // Perform initial actions after reset
-            this.camera.fit("*");
+            this.camera.fit("<scene>");
             return;
           }
 

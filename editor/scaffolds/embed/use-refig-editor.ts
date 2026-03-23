@@ -105,7 +105,7 @@ export function useRefigEditor() {
   useEffect(() => {
     if (!documentLoaded || !fileLabel || !canvasReady) return;
     queueMicrotask(() => {
-      instance.camera.fit("*");
+      instance.camera.fit("<scene>");
     });
   }, [documentLoaded, fileLabel, canvasReady, sceneId, documentKey, instance]);
 
@@ -178,12 +178,19 @@ export function useRefigEditor() {
 
         logMemory("before reset");
 
-        instance.commands.reset(
-          editor.state.init({
-            editable: false,
-            document: loaded.document,
-          }),
-          file.name
+        const t2 = performance.now();
+        const initState = editor.state.init({
+          editable: false,
+          document: loaded.document,
+        });
+        console.log(
+          `[@grida/refig] editor.state.init: ${(performance.now() - t2).toFixed(0)}ms`
+        );
+
+        const t3 = performance.now();
+        instance.commands.reset(initState, file.name);
+        console.log(
+          `[@grida/refig] reset (includes syncDocument): ${(performance.now() - t3).toFixed(0)}ms`
         );
 
         logMemory("after reset");
