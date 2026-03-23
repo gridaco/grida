@@ -2723,6 +2723,7 @@ export class Editor
   readonly doc: EditorDocumentStore;
 
   private _m_wasm_canvas_scene: Scene | null = null;
+  private _m_wasm_canvas_resize_observer: ResizeObserver | null = null;
 
   /**
    * Surface init options passed to `createWebGLCanvasSurface()`.
@@ -3173,7 +3174,9 @@ export class Editor
         }
       });
 
-      // TODO: cleanup not handled
+      // Store for cleanup on dispose.
+      this._m_wasm_canvas_resize_observer = ro;
+
       // Safari doesn't support the "device-pixel-content-box" box option
       try {
         ro.observe(el, { box: "device-pixel-content-box" });
@@ -4254,6 +4257,10 @@ export class Editor
    */
   dispose() {
     this._stopImagePoll();
+    if (this._m_wasm_canvas_resize_observer) {
+      this._m_wasm_canvas_resize_observer.disconnect();
+      this._m_wasm_canvas_resize_observer = null;
+    }
     this.doc.dispose();
   }
 }

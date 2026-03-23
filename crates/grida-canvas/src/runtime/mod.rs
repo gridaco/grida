@@ -1,4 +1,5 @@
 pub mod camera;
+pub mod changes;
 pub mod config;
 pub mod counter;
 pub mod effect_tree;

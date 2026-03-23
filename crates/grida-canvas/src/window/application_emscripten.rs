@@ -3,6 +3,7 @@ use crate::io::io_grida_patch::TransactionApplyReport;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
+use crate::runtime::changes::ChangeFlags;
 use crate::runtime::scene::Backend;
 use crate::runtime::scene::RendererOptions;
 use crate::window::application::{ApplicationApi, BoundsTarget, UnknownTargetApplication};
@@ -406,10 +407,10 @@ impl EmscriptenApplication {
     /// supported (e.g. Regular, Bold, Italic per family).
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.base.renderer.add_font(family, data);
-        // Newly registered fonts may affect cached text layout; invalidate any
-        // existing cache so that the renderer re-computes geometry using the
-        // new typeface.
-        self.base.renderer.invalidate_cache();
+        // Newly registered fonts may affect cached text layout; the central
+        // apply_changes() dispatcher will invalidate paragraph + picture +
+        // compositor caches on the next frame.
+        self.base.renderer.mark_changed(ChangeFlags::FONT_LOADED);
     }
 
     /// Register an image with the renderer and return metadata.

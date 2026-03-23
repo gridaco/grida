@@ -2,6 +2,7 @@ use crate::cg::prelude::*;
 use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::Painter;
 use crate::runtime::camera::CameraChangeKind;
+use crate::runtime::changes::{ChangeFlags, ChangeSet};
 use crate::runtime::counter::FrameCounter;
 use crate::runtime::render_policy::RenderPolicy;
 use crate::sk;
@@ -341,6 +342,12 @@ pub struct Renderer {
     /// Cached composited frame for zoom fast path.
     /// See [`ZoomImageCache`] for details.
     zoom_image_cache: Option<ZoomImageCache>,
+    /// Accumulated changes since the last frame.
+    ///
+    /// Mutation sites call [`mark_changed`] to declare what changed;
+    /// [`apply_changes`] consumes the set once per frame and performs
+    /// the correct invalidation for every cache layer.
+    changes: ChangeSet,
 }
 
 impl Renderer {
@@ -557,6 +564,7 @@ impl Renderer {
             downscale_dims: (0, 0),
             pan_image_cache: None,
             zoom_image_cache: None,
+            changes: ChangeSet::new(),
         }
     }
 
@@ -634,14 +642,9 @@ impl Renderer {
             .borrow_mut()
             .invalidate_by_id(node_id);
 
-        // Invalidate the picture cache for this node so the Painter
-        // doesn't use a stale cached picture.
-        self.scene_cache.picture.invalidate_node(node_id);
-
-        // Invalidate the compositor layer image for this node.
-        self.scene_cache.compositor.invalidate(&node_id);
-        // Free the atlas slot — it will be re-allocated on next capture.
-        self.compositor_atlas.free_node(&node_id);
+        // Record the change. apply_changes() will handle per-node
+        // picture/compositor/atlas invalidation and viewport caches.
+        self.mark_node_changed(node_id, ChangeFlags::NODE_TEXT);
     }
 
     pub fn canvas(&self) -> &Canvas {
@@ -716,6 +719,7 @@ impl Renderer {
         if !enable {
             self.scene_cache.compositor.clear();
             self.compositor_atlas.clear();
+            self.mark_changed(ChangeFlags::CONFIG);
         }
     }
 
@@ -747,8 +751,7 @@ impl Renderer {
             // re-captured as individual textures on the next frame.
             self.scene_cache.compositor.invalidate_all();
             self.compositor_atlas.clear();
-            self.pan_image_cache = None;
-            self.zoom_image_cache = None;
+            self.mark_changed(ChangeFlags::CONFIG);
         }
     }
 
@@ -1378,6 +1381,12 @@ impl Renderer {
             // 4. Build layers
             self.scene_cache.update_layers(scene);
         }
+        // Record SCENE_LOAD so apply_changes() knows to clear picture/paragraph/
+        // path/compositor caches on the next frame. The scene_cache was already
+        // replaced above (empty), so the caches are naturally fresh — but the
+        // flag is still needed for viewport snapshot caches and any future
+        // apply_changes() logic.
+        self.mark_changed(ChangeFlags::SCENE_LOAD);
         self.queue_stable();
     }
 
@@ -1500,6 +1509,10 @@ impl Renderer {
     }
 
     /// Clear the cached scene picture.
+    ///
+    /// **Prefer [`mark_changed`] + [`apply_changes`]** for new code.
+    /// This method is retained for the few call sites that have not yet
+    /// been migrated to the central change-tracking system.
     pub fn invalidate_cache(&mut self) {
         self.scene_cache.invalidate();
         // Also invalidate all compositor layer images so they re-rasterize.
@@ -1507,6 +1520,139 @@ impl Renderer {
         self.compositor_atlas.clear();
         self.pan_image_cache = None;
         self.zoom_image_cache = None;
+    }
+
+    // -------------------------------------------------------------------
+    // Central change-tracking
+    // -------------------------------------------------------------------
+
+    /// Declare that something changed.
+    ///
+    /// Callers set the appropriate [`ChangeFlags`] to describe the
+    /// mutation. The renderer accumulates them until the next frame,
+    /// when [`apply_changes`] translates the flags into precise
+    /// per-cache invalidation.
+    pub fn mark_changed(&mut self, flags: ChangeFlags) {
+        self.changes.mark(flags);
+    }
+
+    /// Declare that a specific node changed.
+    ///
+    /// Same as [`mark_changed`] but also records the node ID for
+    /// surgical per-node cache invalidation.
+    pub fn mark_node_changed(&mut self, id: NodeId, flags: ChangeFlags) {
+        self.changes.push_node(id, flags);
+    }
+
+    /// Consume accumulated changes and perform cache invalidation.
+    ///
+    /// Called once per frame (at the start of `Application::frame()`)
+    /// before building the frame plan.  This is the **single source of
+    /// truth** for which caches are invalidated by which mutations.
+    ///
+    /// The `camera_change` parameter is folded in so that zoom/pan
+    /// invalidation lives in the same dispatch table.
+    pub fn apply_changes(&mut self, camera_change: CameraChangeKind, stable: bool) {
+        let cs = self.changes.take();
+        let flags = cs.flags();
+
+        // Fast path: nothing changed (pure camera move handled below).
+        let has_data_changes = !flags.is_empty();
+
+        // ----- Layout -----
+        // Scene load handles its own layout in load_scene(); skip here.
+        // Viewport resize needs layout only when the scene has ICB nodes
+        // or auto-sized roots (the common infinite-canvas case has neither).
+        if has_data_changes && !flags.contains(ChangeFlags::SCENE_LOAD) {
+            let needs_layout = flags.intersects(ChangeFlags::LAYOUT_DIRTY)
+                || (flags.contains(ChangeFlags::VIEWPORT_SIZE)
+                    && self.scene_has_viewport_dependent_layout());
+            if needs_layout {
+                self.rebuild_scene_caches();
+            }
+        }
+
+        // ----- Picture cache (per-node recorded Skia Pictures) -----
+        if flags.intersects(
+            ChangeFlags::SCENE_LOAD | ChangeFlags::FONT_LOADED | ChangeFlags::IMAGE_LOADED,
+        ) {
+            self.scene_cache.picture.invalidate();
+        } else if has_data_changes {
+            for &id in cs.nodes() {
+                self.scene_cache.picture.invalidate_node(id);
+            }
+        }
+
+        // ----- Paragraph cache (text layout) -----
+        if flags.intersects(ChangeFlags::SCENE_LOAD | ChangeFlags::FONT_LOADED) {
+            self.scene_cache.paragraph.borrow_mut().invalidate();
+        }
+        // Per-node paragraph invalidation is handled by update_layer_text
+        // which runs before mark_changed, so we don't repeat it here.
+
+        // ----- Vector path cache -----
+        if flags.contains(ChangeFlags::SCENE_LOAD) {
+            self.scene_cache.path.borrow_mut().invalidate();
+        }
+
+        // ----- Compositor (LayerImageCache) + Atlas -----
+        if flags.contains(ChangeFlags::SCENE_LOAD) {
+            self.scene_cache.compositor.clear();
+            self.compositor_atlas.clear();
+        } else if flags.intersects(ChangeFlags::FONT_LOADED | ChangeFlags::IMAGE_LOADED) {
+            self.scene_cache.compositor.invalidate_all();
+            self.compositor_atlas.clear();
+        } else if flags.contains(ChangeFlags::CONFIG) {
+            // Config changes (e.g. atlas toggle off) may need full compositor reset.
+            // The config-change call site sets compositor state directly before
+            // marking CONFIG; this handles the residual viewport cache clearing.
+        }
+        // Zoom-triggered compositor staleness
+        if camera_change.zoom_changed() && self.config.layer_compositing {
+            self.scene_cache.compositor.mark_all_stale();
+        }
+        // Per-node compositor invalidation
+        for &id in cs.nodes() {
+            self.scene_cache.compositor.invalidate(&id);
+            self.compositor_atlas.free_node(&id);
+        }
+
+        // ----- Viewport snapshot caches (pan/zoom image caches) -----
+        // These are the ONLY caches that truly depend on viewport dimensions.
+        let invalidate_pan = has_data_changes || camera_change.zoom_changed() || stable;
+        let invalidate_zoom = has_data_changes || stable;
+
+        if invalidate_pan {
+            self.pan_image_cache = None;
+        }
+        if invalidate_zoom {
+            self.zoom_image_cache = None;
+        }
+    }
+
+    /// Check whether the current scene has layout that depends on viewport size.
+    ///
+    /// Returns `true` if any root node is an `InitialContainer` (ICB) — the
+    /// only node type whose Taffy style size is derived from viewport dimensions.
+    ///
+    /// When this returns `false`, `rebuild_scene_caches()` produces identical
+    /// output regardless of viewport size, so it can be skipped on resize.
+    fn scene_has_viewport_dependent_layout(&self) -> bool {
+        if self.config.skip_layout {
+            // compute_schema_only doesn't use viewport_size at all.
+            return false;
+        }
+        let Some(scene) = self.scene.as_ref() else {
+            return false;
+        };
+        for &root_id in scene.graph.roots() {
+            if let Ok(node) = scene.graph.get_node(&root_id) {
+                if matches!(node, Node::InitialContainer(_)) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Rebuild scene caches after scene geometry has changed.

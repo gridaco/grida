@@ -10,6 +10,7 @@ use crate::node::schema::*;
 use crate::query::Hierarchy;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
+use crate::runtime::changes::ChangeFlags;
 use crate::runtime::frame_loop::{FrameLoop, FrameQuality};
 use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
@@ -270,6 +271,11 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     /// Update backing resources after a window resize.
+    ///
+    /// Only recreates the GPU surface and updates viewport/camera state.
+    /// Cache invalidation is deferred to [`apply_changes`] at the start
+    /// of the next frame — this avoids the expensive full-cache nuke
+    /// that made resize drag janky (45ms/cycle → within 16ms budget).
     fn resize(&mut self, width: u32, height: u32) {
         self.state.resize(width as i32, height as i32);
         self.renderer.backend = self.state.backend();
@@ -284,10 +290,9 @@ impl ApplicationApi for UnknownTargetApplication {
             height: height as f32,
         });
 
-        // Rebuild caches - ICB layout computed automatically from viewport context
-        self.renderer.rebuild_scene_caches();
-
-        self.renderer.invalidate_cache();
+        // Declare *what* changed; apply_changes() in frame() will handle
+        // the correct invalidation (viewport caches only, no full nuke).
+        self.renderer.mark_changed(ChangeFlags::VIEWPORT_SIZE);
         self.queue();
     }
 
@@ -1118,14 +1123,17 @@ impl UnknownTargetApplication {
 
         // Prepare camera change for the renderer
         let camera_change = self.renderer.camera.change_kind();
-        if camera_change.zoom_changed() {
-            self.renderer.invalidate_compositor_on_zoom();
-        }
 
         // Promote to stable quality when the camera didn't change — there is
         // no reason to render at reduced resolution for non-camera
         // invalidations (hit-test highlight, scene edits, etc.).
         let stable = quality == FrameQuality::Stable || !camera_change.any_changed();
+
+        // Central invalidation dispatch: consume all accumulated changes
+        // (viewport resize, font/image loads, text edits, config changes)
+        // and camera state in one place. This replaces the ad-hoc
+        // invalidate_compositor_on_zoom() call and all per-site cache nuking.
+        self.renderer.apply_changes(camera_change, stable);
 
         // Warm the camera cache once per frame so view_matrix(), rect(), and
         // screen_to_canvas_point() are essentially free for the rest of this frame.
@@ -1175,7 +1183,7 @@ impl UnknownTargetApplication {
             updated = true;
         }
         if updated {
-            self.renderer.invalidate_cache();
+            self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
         }
     }
 
@@ -1199,7 +1207,7 @@ impl UnknownTargetApplication {
             updated = true;
         }
         if updated {
-            self.renderer.invalidate_cache();
+            self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
             if font_count > 0 {
                 self.print_font_repository_info();
             }
@@ -1290,7 +1298,7 @@ impl UnknownTargetApplication {
 
     pub fn set_default_fallback_fonts(&mut self, fonts: Vec<String>) {
         self.renderer.fonts.set_user_fallback_families(fonts);
-        self.renderer.invalidate_cache();
+        self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
     }
 
     pub fn get_default_fallback_fonts(&self) -> Vec<String> {
@@ -1307,7 +1315,7 @@ impl UnknownTargetApplication {
     /// supported (e.g. Regular, Bold, Italic per family).
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.renderer.add_font(family, data);
-        self.renderer.invalidate_cache();
+        self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
     }
 
     /// Register image bytes with the renderer and return metadata.

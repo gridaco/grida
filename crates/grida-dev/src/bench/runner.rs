@@ -199,18 +199,20 @@ fn measure_settle(renderer: &mut cg::runtime::scene::Renderer) -> u64 {
 
 /// Simulate a resize cycle on the Renderer.
 ///
-/// Reproduces the work that `Application::resize()` does, minus the GPU
-/// surface recreation (which is owned by the window/headless host):
-///   1. update_viewport_size
-///   2. camera.set_size
-///   3. rebuild_scene_caches  (layout + geometry + effects + layers)
-///   4. invalidate_cache      (nuke all picture/paragraph/path/compositor caches)
-///   5. queue_unstable + flush (full scene repaint)
+/// Reproduces the work that `Application::resize()` + `frame()` does,
+/// minus the GPU surface recreation (which is owned by the window/headless host):
+///   1. update_viewport_size + camera.set_size
+///   2. mark_changed(VIEWPORT_SIZE)
+///   3. apply_changes  (central dispatch — selective invalidation)
+///   4. queue_unstable + flush (scene repaint with surviving caches)
 fn measure_resize(
     renderer: &mut cg::runtime::scene::Renderer,
     width: i32,
     height: i32,
 ) -> Option<(u64, u64, u64, u64)> {
+    use cg::runtime::camera::CameraChangeKind;
+    use cg::runtime::changes::ChangeFlags;
+
     let t0 = Instant::now();
 
     renderer.update_viewport_size(width as f32, height as f32);
@@ -218,14 +220,15 @@ fn measure_resize(
         width: width as f32,
         height: height as f32,
     });
+    renderer.mark_changed(ChangeFlags::VIEWPORT_SIZE);
 
-    let t_rebuild = Instant::now();
-    renderer.rebuild_scene_caches();
-    let rebuild_us = t_rebuild.elapsed().as_micros() as u64;
+    // apply_changes replaces the old rebuild_scene_caches + invalidate_cache
+    let t_apply = Instant::now();
+    renderer.apply_changes(CameraChangeKind::None, false);
+    let apply_us = t_apply.elapsed().as_micros() as u64;
 
-    let t_invalidate = Instant::now();
-    renderer.invalidate_cache();
-    let invalidate_us = t_invalidate.elapsed().as_micros() as u64;
+    // invalidate_us is now effectively zero (no separate step)
+    let invalidate_us = 0u64;
 
     renderer.queue_unstable();
     let t_flush = Instant::now();
@@ -233,7 +236,7 @@ fn measure_resize(
         FrameFlushResult::OK(_) => {
             let flush_us = t_flush.elapsed().as_micros() as u64;
             let total_us = t0.elapsed().as_micros() as u64;
-            Some((total_us, rebuild_us, invalidate_us, flush_us))
+            Some((total_us, apply_us, invalidate_us, flush_us))
         }
         _ => None,
     }
@@ -1241,8 +1244,8 @@ pub async fn run_bench(
         println!("  p95:    {:>10} us", r.p95_us);
         println!("  MAX:    {:>10} us", r.max_us);
         println!("  --- per-cycle breakdown (avg) ---");
-        println!("  rebuild_scene_caches: {:>7} us", r.rebuild_us);
-        println!("  invalidate_cache:     {:>7} us", r.invalidate_us);
+        println!("  apply_changes:        {:>7} us", r.rebuild_us);
+        println!("  (invalidate legacy):  {:>7} us", r.invalidate_us);
         println!("  flush (redraw):       {:>7} us", r.flush_us);
 
         drop(renderer);
