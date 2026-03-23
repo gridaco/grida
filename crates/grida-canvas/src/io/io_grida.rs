@@ -2355,6 +2355,81 @@ mod padding_tests {
     }
 }
 
+#[cfg(test)]
+mod text_decoration_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_text_decoration_underline_json_roundtrip() {
+        let json = json!({
+            "type": "tspan",
+            "id": "text-1",
+            "name": "Underlined",
+            "active": true,
+            "locked": false,
+            "opacity": 1.0,
+            "z_index": 0,
+            "layout_positioning": "absolute",
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
+            "layout_target_width": 200,
+            "layout_target_height": 50,
+            "text": "Hello",
+            "text_decoration_line": "underline",
+            "text_align": "left",
+            "text_align_vertical": "top",
+            "font_size": 14,
+            "font_weight": 400,
+            "font_kerning": true,
+        });
+
+        let text_node: JSONTextSpanNode = serde_json::from_value(json).unwrap();
+        assert_eq!(text_node.text_decoration_line, TextDecorationLine::Underline);
+
+        let rec: TextSpanNodeRec = text_node.into();
+        assert_eq!(
+            rec.text_style.text_decoration.as_ref().map(|d| d.text_decoration_line),
+            Some(TextDecorationLine::Underline)
+        );
+    }
+
+    #[test]
+    fn test_text_decoration_none_default() {
+        let json = json!({
+            "type": "tspan",
+            "id": "text-2",
+            "name": "Plain",
+            "active": true,
+            "locked": false,
+            "opacity": 1.0,
+            "z_index": 0,
+            "layout_positioning": "absolute",
+            "layout_inset_left": 0,
+            "layout_inset_top": 0,
+            "layout_target_width": 200,
+            "layout_target_height": 50,
+            "text": "Hello",
+            "text_align": "left",
+            "text_align_vertical": "top",
+            "font_size": 14,
+            "font_weight": 400,
+            "font_kerning": true,
+        });
+
+        let text_node: JSONTextSpanNode = serde_json::from_value(json).unwrap();
+        assert_eq!(text_node.text_decoration_line, TextDecorationLine::None);
+
+        let rec: TextSpanNodeRec = text_node.into();
+        // text_decoration should be None (not set) for TextDecorationLine::None
+        // OR if set, it should have line = None
+        match &rec.text_style.text_decoration {
+            None => {} // OK: not set at all
+            Some(d) => assert_eq!(d.text_decoration_line, TextDecorationLine::None),
+        }
+    }
+}
+
 fn merge_effects(
     fe_shadows: Option<Vec<JSONFeShadow>>,
     fe_blur: Option<JSONFeLayerBlur>,
