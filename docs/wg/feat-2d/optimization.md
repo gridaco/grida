@@ -1,6 +1,12 @@
 ---
 title: Rendering Optimization Strategies
 format: md
+tags:
+  - internal
+  - wg
+  - canvas
+  - performance
+  - rendering
 ---
 
 # Rendering Optimization Strategies

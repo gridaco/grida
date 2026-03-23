@@ -1,5 +1,10 @@
 ---
 title: Grida document schema naming conventions
+tags:
+  - internal
+  - wg
+  - format-schema
+
 ---
 
 # `.grida` Naming Conventions

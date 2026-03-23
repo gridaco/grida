@@ -1,6 +1,13 @@
 ---
 title: "Chromium SVG Pattern Paint Server"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - rendering
+  - svg
+
 ---
 
 # Chromium SVG Pattern Paint Server

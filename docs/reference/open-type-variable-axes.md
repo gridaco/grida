@@ -1,3 +1,13 @@
+---
+title: Open Type Variable Axes Reference
+format: md
+tags:
+  - reference
+  - user-facing
+  - typography
+  - open-type
+---
+
 # Open Type Variable Axes Reference
 
 ## Overview

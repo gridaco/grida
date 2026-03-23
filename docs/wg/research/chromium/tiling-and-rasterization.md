@@ -1,5 +1,12 @@
 ---
 title: "Chromium Tiling and Rasterization"
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - performance
+
 ---
 
 # Chromium Tiling and Rasterization

@@ -1,6 +1,13 @@
 ---
 title: "Chromium Tiling Deep Dive"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - performance
+
 ---
 
 # Chromium Tiling Deep Dive

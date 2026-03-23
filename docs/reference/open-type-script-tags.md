@@ -1,3 +1,13 @@
+---
+title: OpenType Script Tags
+format: md
+tags:
+  - reference
+  - user-facing
+  - typography
+  - open-type
+---
+
 # OpenType Script Tags
 
 OpenType script tags are standardized four-letter identifiers used within the OpenType font specification to represent writing systems (scripts) such as Latin, Cyrillic, Han, Arabic, and others. These tags are embedded in font tables—specifically GSUB (Glyph Substitution) and GPOS (Glyph Positioning)—to enable advanced text layout and shaping according to the typographic and linguistic rules of each script. Script tags allow layout engines to apply the correct features and substitutions for each script encountered in text.

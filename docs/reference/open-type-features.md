@@ -1,3 +1,13 @@
+---
+title: OpenType Features Reference
+format: md
+tags:
+  - reference
+  - user-facing
+  - typography
+  - open-type
+---
+
 # OpenType Features Reference
 
 This document provides a comprehensive reference for OpenType features based on the [Microsoft OpenType specification](https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist).

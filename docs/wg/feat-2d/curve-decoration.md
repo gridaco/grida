@@ -1,5 +1,12 @@
 ---
 title: Curve Decorations (2D)
+tags:
+  - internal
+  - wg
+  - canvas
+  - vector
+  - rendering
+
 ---
 
 # Curve Decorations (2D)
