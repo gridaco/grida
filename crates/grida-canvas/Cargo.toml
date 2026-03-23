@@ -34,7 +34,7 @@ rstar = "0.12"
 # core resource hashing
 seahash = "4.1.0"
 # layout engine
-taffy = "0.9.1"
+taffy = "0.9.2"
 # svg parsing
 # (+2mb wasm32-unknown-emscripten@opt-level=3)
 usvg = { path = "../../third_party/usvg" }
@@ -88,6 +88,10 @@ harness = false
 
 [[bench]]
 name = "bench_camera"
+harness = false
+
+[[bench]]
+name = "bench_load_scene"
 harness = false
 
 [[example]]
