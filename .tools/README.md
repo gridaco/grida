@@ -6,11 +6,11 @@ This directory contains miscellaneous, trivial scripts that are useful for inter
 
 ## Available Tools
 
-| Tool               | Description                                                      | Usage                                                                |
-| ------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `pbdump.swift`     | Dump macOS clipboard contents (all UTI types)                    | `swift pbdump.swift`                                                 |
-| `figma_archive.py` | Archive a Figma file via REST API (document.json + images/)      | `python .tools/figma_archive.py --filekey <key> --archive-dir <dir>` |
-| `model_info.py`    | Look up model specs (context window, cost, etc.) from models.dev | `python .tools/model_info.py <model_id>`                             |
+| Tool               | Description                                                            | Usage                                                                           |
+| ------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `pbdump.swift`     | Dump macOS clipboard contents (all UTI types)                          | `swift pbdump.swift`                                                            |
+| `figma_archive.py` | Archive a Figma file via REST API (document.json + images/ + exports/) | `python .tools/figma_archive.py --filekey <key> --archive-dir <dir> [--export]` |
+| `model_info.py`    | Look up model specs (context window, cost, etc.) from models.dev       | `python .tools/model_info.py <model_id>`                                        |
 
 ### `model_info.py`
 

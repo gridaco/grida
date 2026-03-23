@@ -45,7 +45,7 @@ Use these terms precisely. Misusing them erodes trust in test results.
 | **rendiff**                        | Rust crate (`rendiff` v0.2) for histogram-based pixel diffing. Computes a per-channel difference histogram; thresholds are expressed as `[(max_diff, max_count), ...]` pairs. Used in `flatten_rendiff.rs` for equivalence tests. Dep in `crates/grida-canvas/`.    |
 | **dify**                           | Rust crate for perceptual image comparison in YIQ color space. Used by `grida-dev reftest` for SVG reftests. Supports `--threshold` and `--aa` (anti-aliasing detection) flags.                                                                                     |
 | **Tolerance / fuzz**               | A configured threshold below which pixel differences are ignored. Expressed as a histogram threshold (rendiff) or a YIQ distance (dify). Required when rasterization is non-deterministic across platforms.                                                         |
-| **Data test**                      | A test that asserts on the scene graph or computed values directly — no rendering needed. E.g. bounding box, resolved transform matrix, computed style. The cheapest possible assertion.                                                                             |
+| **Data test**                      | A test that asserts on the scene graph or computed values directly — no rendering needed. E.g. bounding box, resolved transform matrix, computed style. The cheapest possible assertion.                                                                            |
 | **Probe test**                     | A test that asserts correctness by reading pixel values at specific coordinates in the rendered output. Requires a purpose-built fixture with a minimal color palette and documented probe points. No full-image comparison needed.                                 |
 | **Probe-friendly fixture**         | A fixture explicitly designed for probe testing: minimal colors, no decorative elements, shapes at known coordinates. Often accompanied by a `.probe.json` file declaring expected pixel values at specific points.                                                 |
 
@@ -99,6 +99,93 @@ Use when a **trusted external reference** exists:
   and a reference implementation provides ground truth.
 
 A reftest failure means **our renderer has a bug** (or the spec changed).
+
+---
+
+## Oracle Strategies by Input Format
+
+The oracle source depends on the format being tested. Choose the right
+strategy before authoring a new fixture.
+
+### SVG — pre-baked reference vs. resvg-generated reference
+
+Two strategies, depending on whether a reference image already exists:
+
+**Strategy A — pre-baked reference (preferred when available)**
+
+Use if the SVG comes from a test suite that ships reference PNGs alongside it
+(W3C SVG 1.1, resvg-test-suite, Oxygen Icons). The oracle is the co-located
+PNG; `grida-dev reftest` picks it up automatically via `reftest.toml`.
+
+```sh
+# W3C suite — reference PNGs are in png/ next to svg/
+cargo run -p grida-dev --release -- reftest \
+  --suite-dir fixtures/local/W3C_SVG_11_TestSuite --bg white
+```
+
+**Strategy B — resvg as dynamic oracle (when no pre-baked image exists)**
+
+For arbitrary SVG files with no reference PNG, resvg is an independent,
+conformant SVG renderer that can serve as the oracle. Run resvg on the SVG to
+produce a reference PNG, commit it, then run the normal reftest against it.
+
+```sh
+# Install resvg CLI
+cargo install resvg  # or: brew install resvg
+
+# Render SVG → reference PNG at the exact viewport size
+resvg input.svg reference.png --width 512 --height 512
+
+# Store alongside the SVG fixture; reference is the oracle
+```
+
+This is still a genuine **reftest** — resvg is an independent implementation,
+not our own renderer. A mismatch means our renderer diverges from the SVG spec
+(or resvg has a bug, which can be checked upstream).
+
+**Choosing between strategies:**
+
+- Pre-baked PNG present? → use it (Strategy A).
+- No pre-baked PNG, SVG content is standard/spec-compliant? → generate via resvg (Strategy B).
+- SVG content is non-standard or uses Grida-specific extensions? → golden test (see below).
+
+---
+
+### Figma — preparing an oracle via `figma_archive.py`
+
+Figma content has **no oracle** by default — the oracle is Figma's own
+renderer. Use `figma_archive.py --export` to archive the file and export
+oracle PNGs in one step. See the script header for full `--export`
+documentation, prerequisites (nodes need export presets in Figma), and
+limitations.
+
+```sh
+# 1. Archive + export oracle PNGs
+python .agents/skills/io-figma/scripts/figma_archive.py \
+  --filekey <figma-file-key> \
+  --archive-dir fixtures/test-figma/rest-api/local/<fixture-name> \
+  --export
+
+# 2. Convert to .grida for rendering
+npx tsx packages/grida-canvas-io-figma/fig2grida.ts \
+  fixtures/test-figma/rest-api/local/<fixture-name>/document.json \
+  fixtures/test-grida/<fixture-name>.grida
+```
+
+The PNGs in `exports/` are the oracle. Without them there is no oracle —
+do not write a Figma visual comparison test without first committing
+Figma-exported reference PNGs. A comparison against our own renderer's
+output is a **golden test**, not a reftest.
+
+**Oracle type summary:**
+
+| Input format            | Oracle source            | Test type   |
+| ----------------------- | ------------------------ | ----------- |
+| SVG (W3C / resvg suite) | Co-located reference PNG | Reftest     |
+| SVG (arbitrary, no PNG) | resvg-rendered PNG       | Reftest     |
+| SVG (Grida extensions)  | Our own prior output     | Golden test |
+| Figma REST / .fig       | Figma-exported PNG       | Reftest     |
+| `.grida` native         | Our own prior output     | Golden test |
 
 ### Golden tests — native/proprietary/internal formats
 

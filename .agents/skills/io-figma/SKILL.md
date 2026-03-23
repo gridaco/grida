@@ -102,16 +102,34 @@ npx tsx packages/grida-canvas-io-figma/fig2grida.ts input.fig --pages 0,2
 npx tsx packages/grida-canvas-io-figma/fig2grida.ts input.fig --info
 ```
 
+### Figma API token
+
+`figma_archive.py` requires a Figma Personal Access Token. The script
+checks `FIGMA_TOKEN` then `X_FIGMA_TOKEN` env vars, or accepts
+`--x-figma-token` on the CLI. It fails fast with a clear error if none
+is set.
+
+The root `.env` file is **not** a standard part of this project — it may
+not exist on every machine. **Never read `.env` directly** (for security
+reasons). Instead, if a token is needed and not already in the
+environment, ask the user to provide one and have them export it:
+
+```sh
+export FIGMA_TOKEN=figd_...
+```
+
 ### Create REST API fixtures
 
-Use the bundled archiver (`scripts/figma_archive.py`, symlinked from `.tools/`):
+Use `scripts/figma_archive.py`. See the script header for full documentation, output layout, and `--export` behaviour.
 
 ```sh
 python .agents/skills/io-figma/scripts/figma_archive.py \
   --filekey <KEY> --archive-dir fixtures/test-figma/community/<name>
-```
 
-Produces `document.json` (`geometry=paths`) + `images/`. Requires `FIGMA_TOKEN` env var or `--x-figma-token`.
+# With oracle PNGs (nodes must have export presets in Figma)
+python .agents/skills/io-figma/scripts/figma_archive.py \
+  --filekey <KEY> --archive-dir fixtures/test-figma/rest-api/local/<name> --export
+```
 
 ## Tests
 
