@@ -339,9 +339,7 @@ function fig2gridaFromFigBytes(
  * - `{ type: "CANVAS", children: […] }` — single CANVAS node
  * - `{ children: […] }` — bare object with children
  */
-function extractCanvases(
-  json: unknown
-): Array<{
+function extractCanvases(json: unknown): Array<{
   name?: string;
   backgroundColor?: { r: number; g: number; b: number; a: number };
   children?: Array<Record<string, unknown>>;
@@ -430,12 +428,27 @@ function restJsonToMergedDocument(
 ): MergedDocument {
   const canvases = extractCanvases(json);
 
+  // A single shared context across all pages prevents ID collisions when
+  // merging nodes from different canvases.
+  const context: iofigma.restful.factory.FactoryContext = {
+    gradient_id_generator: makeIdGenerator("grad"),
+    prefer_path_for_geometry: true,
+    placeholder_for_missing_images: placeholderForMissing,
+    node_id_generator: makeIdGenerator("rest-import"),
+    ...(images &&
+      Object.keys(images).length > 0 && {
+        resolve_image_src: (ref: string) =>
+          ref in images ? `res://images/${ref}` : null,
+      }),
+  };
+
   const pageResults: PageResult[] = canvases.map((canvas) => ({
     name: canvas.name ?? "Page",
-    result: convertRestCanvasToFigmaImportResult(
-      canvas,
-      images,
-      placeholderForMissing
+    result: convertRootsToPackedScene(
+      canvas.name ?? "Page",
+      canvas.children ?? [],
+      canvas.backgroundColor,
+      context
     ),
   }));
 
@@ -453,65 +466,35 @@ function fig2gridaFromRestJson(
 }
 
 // ---------------------------------------------------------------------------
-// REST CANVAS → FigmaImportResult (per-page conversion)
+// Shared per-page conversion: root nodes → FigmaImportResult
 // ---------------------------------------------------------------------------
 
-function convertRestCanvasToFigmaImportResult(
-  canvas: {
-    name?: string;
-    backgroundColor?: { r: number; g: number; b: number; a: number };
-    children?: Array<Record<string, unknown>>;
-  },
-  images: Record<string, Uint8Array> | undefined,
-  placeholderForMissing: boolean
+/**
+ * Convert an array of root nodes into a single packed scene document.
+ * Used by both the REST JSON path and the .fig Kiwi path (via
+ * `iofigma.kiwi.convertPageToScene`).
+ */
+function convertRootsToPackedScene(
+  name: string,
+  rootNodes: Array<Record<string, unknown>>,
+  backgroundColor: { r: number; g: number; b: number; a: number } | undefined,
+  context: iofigma.restful.factory.FactoryContext
 ): iofigma.restful.factory.FigmaImportResult {
-  const canvasBg = canvas.backgroundColor;
-  const background_color = canvasBg
+  const background_color = backgroundColor
     ? kolor.colorformats.newRGBA32F(
-        canvasBg.r,
-        canvasBg.g,
-        canvasBg.b,
-        canvasBg.a
+        backgroundColor.r,
+        backgroundColor.g,
+        backgroundColor.b,
+        backgroundColor.a
       )
     : undefined;
-  const rootNodes = canvas.children ?? [];
+
   if (rootNodes.length === 0) {
     return {
-      document: {
-        nodes: {},
-        links: {},
-        images: {},
-        bitmaps: {},
-        properties: {},
-        scene: {
-          type: "scene",
-          id: "tmp",
-          name: canvas.name ?? "Page",
-          children_refs: [],
-          guides: [],
-          edges: [],
-          constraints: { children: "multiple" },
-          background_color,
-        },
-      },
+      document: emptyPackedScene(name, background_color),
       imageRefsUsed: [],
     };
   }
-
-  let counter = 0;
-  const baseGradientGen = () => `grad-${++counter}`;
-  const resolveImageSrc =
-    images && Object.keys(images).length > 0
-      ? (ref: string) => (ref in images ? `res://images/${ref}` : null)
-      : undefined;
-
-  const context: iofigma.restful.factory.FactoryContext = {
-    gradient_id_generator: baseGradientGen,
-    prefer_path_for_geometry: true,
-    placeholder_for_missing_images: placeholderForMissing,
-    node_id_generator: () => `rest-import-${++counter}`,
-    ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
-  };
 
   const individualResults = rootNodes.map((rootNode) =>
     iofigma.restful.factory.document(rootNode as any, {}, context)
@@ -519,7 +502,7 @@ function convertRestCanvasToFigmaImportResult(
 
   const imageRefsUsed = new Set<string>();
   for (const r of individualResults) {
-    r.imageRefsUsed.forEach((ref: string) => imageRefsUsed.add(ref));
+    for (const ref of r.imageRefsUsed) imageRefsUsed.add(ref);
   }
 
   let packed: grida.program.document.IPackedSceneDocument;
@@ -527,25 +510,8 @@ function convertRestCanvasToFigmaImportResult(
     packed = individualResults[0].document;
     packed.scene.background_color = background_color;
   } else {
-    packed = {
-      bitmaps: {},
-      images: {},
-      nodes: {},
-      links: {},
-      properties: {},
-      scene: {
-        type: "scene",
-        id: "tmp",
-        name: canvas.name ?? "Page",
-        children_refs: [],
-        guides: [],
-        edges: [],
-        constraints: { children: "multiple" },
-        background_color,
-      },
-    };
-    for (const result of individualResults) {
-      const d = result.document;
+    packed = emptyPackedScene(name, background_color);
+    for (const { document: d } of individualResults) {
       Object.assign(packed.nodes, d.nodes);
       Object.assign(packed.links, d.links);
       Object.assign(packed.images, d.images);
@@ -558,6 +524,29 @@ function convertRestCanvasToFigmaImportResult(
   return {
     document: packed,
     imageRefsUsed: Array.from(imageRefsUsed),
+  };
+}
+
+function emptyPackedScene(
+  name: string,
+  background_color: ReturnType<typeof kolor.colorformats.newRGBA32F> | undefined
+): grida.program.document.IPackedSceneDocument {
+  return {
+    nodes: {},
+    links: {},
+    images: {},
+    bitmaps: {},
+    properties: {},
+    scene: {
+      type: "scene",
+      id: "tmp",
+      name,
+      children_refs: [],
+      guides: [],
+      edges: [],
+      constraints: { children: "multiple" },
+      background_color,
+    },
   };
 }
 
