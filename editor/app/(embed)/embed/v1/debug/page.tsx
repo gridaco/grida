@@ -11,10 +11,6 @@ type LogEntry = {
   data: unknown;
 };
 
-const EMBED_ORIGIN =
-  typeof window !== "undefined" ? window.location.origin : "";
-
-
 function formatTime(ts: number) {
   const d = new Date(ts);
   return d.toLocaleTimeString("en-US", {
@@ -125,6 +121,7 @@ export default function EmbedDebugPage() {
     if (name.endsWith(".json.gz")) format = "json.gz";
     else if (name.endsWith(".json")) format = "json";
     else if (name.endsWith(".zip")) format = "zip";
+    else if (name.endsWith(".gz")) format = "json.gz";
     else format = "fig";
 
     // Wait for embed to be ready if we just loaded empty
@@ -155,9 +152,7 @@ export default function EmbedDebugPage() {
     <div className="flex h-dvh flex-col bg-background text-foreground">
       {/* Header */}
       <header className="flex shrink-0 items-center gap-3 border-b px-4 py-2">
-        <span className="font-mono text-sm font-bold">
-          embed/v1/debug
-        </span>
+        <span className="font-mono text-sm font-bold">embed/v1/debug</span>
         <span
           className={cn(
             "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider",
@@ -169,11 +164,7 @@ export default function EmbedDebugPage() {
           {ready ? "ready" : "not connected"}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLog([])}
-          >
+          <Button variant="outline" size="sm" onClick={() => setLog([])}>
             Clear log
           </Button>
         </div>
@@ -192,7 +183,9 @@ export default function EmbedDebugPage() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const form = e.currentTarget;
-                const input = form.elements.namedItem("url") as HTMLInputElement;
+                const input = form.elements.namedItem(
+                  "url"
+                ) as HTMLInputElement;
                 const url = input.value.trim();
                 if (url) loadPreset(url);
               }}
@@ -217,7 +210,7 @@ export default function EmbedDebugPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".fig,.json,.json.gz,.zip"
+              accept=".fig,.json,.json.gz,.gz,.zip,application/json,application/gzip,application/x-gzip,application/zip"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -236,11 +229,7 @@ export default function EmbedDebugPage() {
               >
                 Choose file & send grida:load
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadEmpty}
-              >
+              <Button variant="outline" size="sm" onClick={loadEmpty}>
                 Load empty embed
               </Button>
             </div>
@@ -263,7 +252,9 @@ export default function EmbedDebugPage() {
                 variant="outline"
                 size="sm"
                 disabled={!ready}
-                onClick={() => postCommand({ type: "grida:fit", animate: true })}
+                onClick={() =>
+                  postCommand({ type: "grida:fit", animate: true })
+                }
               >
                 fit (animate)
               </Button>
@@ -272,7 +263,11 @@ export default function EmbedDebugPage() {
                 size="sm"
                 disabled={!ready}
                 onClick={() =>
-                  postCommand({ type: "grida:select", nodeIds: [], mode: "reset" })
+                  postCommand({
+                    type: "grida:select",
+                    nodeIds: [],
+                    mode: "reset",
+                  })
                 }
               >
                 clear selection
@@ -355,9 +350,7 @@ export default function EmbedDebugPage() {
                   key={i}
                   className={cn(
                     "flex gap-2 border-b border-border/30 px-3 py-1",
-                    entry.dir === "in"
-                      ? "bg-blue-500/5"
-                      : "bg-orange-500/5"
+                    entry.dir === "in" ? "bg-blue-500/5" : "bg-orange-500/5"
                   )}
                 >
                   <span className="shrink-0 text-muted-foreground">
