@@ -82,10 +82,16 @@ cargo run -p grida-dev --release -- bench-report ./fixtures/local/ --frames 100 
 The JSON report contains per-scene results with:
 
 - `nodes`, `effects_nodes` — scene complexity
-- `pan.{avg_us, fps, p50_us, p95_us, p99_us}` — pan performance
-- `pan.{draw_us, mid_flush_us, compositor_us, flush_us}` — per-stage breakdown
-- `zoom.{avg_us, fps, p50_us, p95_us, p99_us}` — zoom performance
+- `fit_zoom` — the zoom level from `fit_camera_to_scene`
+- `pan` / `zoom` — legacy passes with full `PassStats`
+- `scenarios[]` — expanded scenario matrix (see below)
 - `errors[]` — files that failed to load
+
+Each `PassStats` contains:
+
+- `avg_us`, `fps`, `min_us`, `p50_us`, `p95_us`, `p99_us`, `max_us` — latency distribution
+- `queue_us`, `draw_us`, `mid_flush_us`, `compositor_us`, `flush_us` — per-stage breakdown
+- `settle_us` — cost of the stable (settle) frame after the pass ends
 
 Progress goes to stderr, JSON to stdout (or `--output path`). This
 keeps the JSON clean for programmatic consumption.
@@ -106,9 +112,25 @@ cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida --sc
 **Always use `--release`.** Debug builds are 20-30x slower and produce
 meaningless data.
 
-The output reports pan and zoom separately with avg/p50/p95/p99 and a
-per-stage breakdown. Read the breakdown to understand WHERE time is
-spent (draw vs compositor vs GPU flush), not just the total.
+The output reports legacy pan/zoom, then an expanded scenario matrix
+covering 20+ scenarios across multiple gesture types. Each scenario
+reports `min/p50/p95/p99/MAX` plus per-stage breakdown and settle cost.
+
+**Scenario types in the expanded matrix:**
+
+| Kind              | Scenarios                                           | What it tests                                                                                                      |
+| ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `pan`             | slow/fast × fit/zoomed                              | Linear back-and-forth panning                                                                                      |
+| `circle_pan`      | small/large radius × fit/zoomed                     | Circular trackpad gesture (unpredictable edges)                                                                    |
+| `zigzag`          | fast (continuous) / slow (with pauses) × fit/zoomed | Diagonal reading pattern with direction changes                                                                    |
+| `zoom`            | slow/fast × around-fit/high                         | Zoom oscillation at different levels                                                                               |
+| `pan_with_settle` | slow/fast × fit/zoomed                              | Pan with settle frames interleaved every 12 frames                                                                 |
+| `realtime`        | fast/slow × fit/zoomed                              | **Real-time event loop simulation** with sleep, 240Hz tick thread, and settle countdown matching the native viewer |
+
+The `realtime` scenarios use actual `thread::sleep()` between frames
+and simulate the native viewer's 240Hz tick thread + settle countdown.
+These produce frame timings that match what users actually see,
+including settle-induced frame drops at their natural frequency.
 
 **Choosing scenes:** Use `--list-scenes` to see what's available. Pick
 scenes that stress the subsystem you're optimizing. For effects/caching
@@ -135,15 +157,17 @@ of scenes, configs, and operations. The naming convention is
 
 ### When to use which
 
-| Question                                      | Use                              |
-| --------------------------------------------- | -------------------------------- |
-| What's slow across all fixtures?              | Bulk report (`bench-report`)     |
-| Baseline before/after a change?               | Bulk report (save JSON, compare) |
-| Detailed investigation of one scene?          | Single-scene GPU bench           |
-| Is the algorithm itself faster?               | Criterion                        |
-| Is there a statistical regression?            | Criterion (has CI)               |
-| What's the real frame time with GPU overhead? | Single-scene GPU bench           |
-| Does a config toggle actually help?           | Both GPU benchmarks + Criterion  |
+| Question                                      | Use                                              |
+| --------------------------------------------- | ------------------------------------------------ |
+| What's slow across all fixtures?              | Bulk report (`bench-report`)                     |
+| Baseline before/after a change?               | Bulk report (save JSON, compare)                 |
+| Detailed investigation of one scene?          | Single-scene GPU bench                           |
+| Is the algorithm itself faster?               | Criterion                                        |
+| Is there a statistical regression?            | Criterion (has CI)                               |
+| What's the real frame time with GPU overhead? | Single-scene GPU bench                           |
+| Does a config toggle actually help?           | Both GPU benchmarks + Criterion                  |
+| Does it match what users see in the app?      | `realtime` scenarios (sleep + settle simulation) |
+| Are there frame drops during gestures?        | Check `p99` and `MAX` in scenario stats          |
 
 ---
 
@@ -271,10 +295,11 @@ For every cache/skip optimization, trace through:
 1. **One conceptual operation per `b.iter()`.** If a benchmark measures
    multiple frames per sample, document it in a comment.
 
-2. **Bounded oscillation.** Camera state must not drift across
-   iterations. Use alternating patterns (`dx = -dx`) or two-level
-   alternation. Unbounded drift causes the camera to leave the scene,
-   measuring empty frames.
+2. **Continuous panning with reversal.** Pan benchmarks should use
+   continuous motion (one direction for half the frames, then reverse)
+   to trigger cache misses and new-area discovery. The old alternating
+   `±dx` pattern only measured cache hits. For zoom, use bounded
+   oscillation with direction reversal at limits.
 
 3. **Setup outside `b.iter()`.** Scene creation, renderer init, and
    warm-up frames go before the measured closure.
@@ -359,6 +384,25 @@ algorithmic cost and detecting regressions in pipeline logic. But it
 tells you nothing about GPU texture switching, GPU flush latency, or
 Metal/GL driver behavior. Don't conclude "compositing doesn't help"
 from Criterion results — it doesn't help on _raster_, which is expected.
+
+### Benchmark vs native viewer mismatch
+
+Back-to-back frame benchmarks (no sleep between frames) can produce
+misleadingly fast numbers because they never trigger settle frames.
+The native viewer's 240Hz tick thread fires `queue_stable()` ~50ms
+after the last interaction, clearing image caches. Use the `realtime`
+scenario type to simulate this timing and produce numbers that match
+what users actually see. Always check `p99` and `MAX` — not just
+`p50` — to catch settle-induced spikes.
+
+### Stable frames must recapture caches
+
+When `queue_stable()` fires, it clears the pan/zoom image caches so
+the stable frame renders at full quality. The stable frame's full
+draw **must recapture** the caches afterwards, so the next unstable
+frame gets a cache hit. Without recapture, every frame after settle
+is also a full draw, producing 7fps instead of 100+fps. The capture
+guard should be `if self.backend.is_gpu()` — NOT `if !plan.stable`.
 
 ### Timing overhead in budgeted loops
 

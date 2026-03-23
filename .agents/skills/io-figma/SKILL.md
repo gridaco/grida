@@ -15,7 +15,7 @@ Package: `packages/grida-canvas-io-figma/`
 
 ## Architecture
 
-```
+```text
 .fig bytes / HTML clipboard
   → fig-kiwi parser       (fig-kiwi/)          low-level, zero-opinion
   → NodeChange[]          (Kiwi schema types)
