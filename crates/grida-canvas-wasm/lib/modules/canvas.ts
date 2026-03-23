@@ -10,7 +10,81 @@ const ApplicationCommandID = {
   ZoomOut: 2,
   ZoomDelta: 3,
   Pan: 4,
+  SelectAll: 5,
+  DeselectAll: 6,
 } as const;
+
+// Surface response bitmask (matches Rust pack_surface_response)
+const RESPONSE_NEEDS_REDRAW = 1 << 0;
+const RESPONSE_CURSOR_CHANGED = 1 << 1;
+const RESPONSE_SELECTION_CHANGED = 1 << 2;
+const RESPONSE_HOVER_CHANGED = 1 << 3;
+
+export interface SurfaceResponse {
+  needsRedraw: boolean;
+  cursorChanged: boolean;
+  selectionChanged: boolean;
+  hoverChanged: boolean;
+}
+
+export type SurfaceCursorIcon =
+  | "default"
+  | "pointer"
+  | "grab"
+  | "grabbing"
+  | "crosshair"
+  | "move";
+
+const CURSOR_MAP: Record<number, SurfaceCursorIcon> = {
+  0: "default",
+  1: "pointer",
+  2: "grab",
+  3: "grabbing",
+  4: "crosshair",
+  5: "move",
+};
+
+export interface SurfaceOverlayConfig {
+  dpr?: number;
+  text_baseline_decoration?: boolean;
+  show_size_meter?: boolean;
+  show_frame_titles?: boolean;
+}
+
+/** Encode modifier keys as a bitmask for the WASM C-ABI. */
+export function encodeModifiers(event: {
+  shiftKey: boolean;
+  altKey: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+}): number {
+  const isMac =
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad/.test(navigator.platform);
+  return (
+    (event.shiftKey ? 1 : 0) |
+    (event.altKey ? 2 : 0) |
+    ((isMac ? event.metaKey : event.ctrlKey) ? 4 : 0)
+  );
+}
+
+/** Map DOM MouseEvent.button to WASM pointer button id. */
+export function encodeButton(button: number): number {
+  // DOM: 0=primary, 2=secondary, 1=middle
+  // WASM: 0=primary, 1=secondary, 2=middle
+  if (button === 2) return 1;
+  if (button === 1) return 2;
+  return 0;
+}
+
+function unpackResponse(bits: number): SurfaceResponse {
+  return {
+    needsRedraw: (bits & RESPONSE_NEEDS_REDRAW) !== 0,
+    cursorChanged: (bits & RESPONSE_CURSOR_CHANGED) !== 0,
+    selectionChanged: (bits & RESPONSE_SELECTION_CHANGED) !== 0,
+    hoverChanged: (bits & RESPONSE_HOVER_CHANGED) !== 0,
+  };
+}
 
 export interface CreateImageResourceResult {
   hash: string;
@@ -87,14 +161,74 @@ export class Scene {
   }
 
   /**
-   * Load a scene from a JSON string.
+   * Load a scene from a `.grida1` JSON string.
    * @param data - The JSON string to load.
    */
   loadScene(data: string) {
     this._assertAlive();
     const [ptr, len] = this._alloc_string(data);
-    this.module._load_scene_json(this.appptr, ptr, len - 1);
+    this.module._load_scene_grida1(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
+  }
+
+  /**
+   * Load a scene from `.grida` FlatBuffers binary bytes.
+   * Zero-copy on the Rust side — much more memory-efficient than JSON for large documents.
+   * @param data - The FlatBuffers binary data.
+   */
+  loadSceneGrida(data: Uint8Array) {
+    this._assertAlive();
+    const [ptr, len] = ffi.allocBytes(this.module, data);
+    this.module._load_scene_grida(this.appptr, ptr, len);
+    ffi.free(this.module, ptr, len);
+  }
+
+  /**
+   * Switch to a previously loaded scene by its string ID.
+   * Only works after `loadSceneGrida` has decoded a multi-scene document.
+   * @param sceneId - The string ID of the scene to switch to.
+   */
+  switchScene(sceneId: string) {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(sceneId);
+    this.module._switch_scene(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  /**
+   * Returns image refs that were needed during the last render but not found.
+   * Only returns refs not yet reported in a previous call.
+   * Returns an empty array if no new missing images.
+   */
+  drainMissingImages(): string[] {
+    this._assertAlive();
+    const outptr = this.module._drain_missing_images(this.appptr);
+    if (outptr === 0) {
+      return [];
+    }
+    const str = ffi.readLenPrefixedString(this.module, outptr);
+    return JSON.parse(str) as string[];
+  }
+
+  /**
+   * Resolve a missing image by providing its raw bytes for a given resource ID.
+   * The image is decoded, stored, and a redraw is queued.
+   * @param rid - Resource ID (e.g. "res://images/abc123")
+   * @param bytes - Raw image bytes (PNG, JPEG, WebP, etc.)
+   */
+  resolveImage(rid: string, bytes: Uint8Array) {
+    this._assertAlive();
+    const [ridPtr, ridLen] = this._alloc_string(rid);
+    const [bytesPtr, bytesLen] = ffi.allocBytes(this.module, bytes);
+    this.module._resolve_image(
+      this.appptr,
+      ridPtr,
+      ridLen - 1,
+      bytesPtr,
+      bytesLen
+    );
+    this._free_string(ridPtr, ridLen);
+    ffi.free(this.module, bytesPtr, bytesLen);
   }
 
   applyTransactions(batch: unknown[][]): TransactionApplyReport[] | null {
@@ -407,6 +541,138 @@ export class Scene {
   pointermove(x: number, y: number) {
     this._assertAlive();
     this.module._pointer_move(this.appptr, x, y);
+  }
+
+  // ====================================================================================================
+  // Surface interaction (hover, selection, marquee, cursor)
+  // ====================================================================================================
+
+  /**
+   * Dispatch a pointer-move through the surface event system.
+   * Handles hover state, cursor icon, and marquee drag.
+   */
+  surfacePointerMove(x: number, y: number): SurfaceResponse {
+    this._assertAlive();
+    return unpackResponse(
+      this.module._surface_pointer_move(this.appptr, x, y)
+    );
+  }
+
+  /**
+   * Dispatch a pointer-down through the surface event system.
+   * Handles node selection, shift-toggle, and marquee start.
+   * @param button - DOM MouseEvent.button (0=primary, 1=middle, 2=secondary)
+   * @param modifiers - Bitmask from `encodeModifiers(event)`
+   */
+  surfacePointerDown(
+    x: number,
+    y: number,
+    button: number,
+    modifiers: number
+  ): SurfaceResponse {
+    this._assertAlive();
+    return unpackResponse(
+      this.module._surface_pointer_down(
+        this.appptr,
+        x,
+        y,
+        encodeButton(button),
+        modifiers
+      )
+    );
+  }
+
+  /**
+   * Dispatch a pointer-up through the surface event system.
+   * Ends marquee gesture.
+   * @param button - DOM MouseEvent.button (0=primary, 1=middle, 2=secondary)
+   * @param modifiers - Bitmask from `encodeModifiers(event)`
+   */
+  surfacePointerUp(
+    x: number,
+    y: number,
+    button: number,
+    modifiers: number
+  ): SurfaceResponse {
+    this._assertAlive();
+    return unpackResponse(
+      this.module._surface_pointer_up(
+        this.appptr,
+        x,
+        y,
+        encodeButton(button),
+        modifiers
+      )
+    );
+  }
+
+  /**
+   * Get the current surface cursor icon.
+   */
+  getSurfaceCursor(): SurfaceCursorIcon {
+    this._assertAlive();
+    const id = this.module._surface_get_cursor(this.appptr);
+    return CURSOR_MAP[id] ?? "default";
+  }
+
+  /**
+   * Get the currently hovered node ID, or null.
+   */
+  getSurfaceHoveredNode(): string | null {
+    this._assertAlive();
+    const ptr = this.module._surface_get_hovered_node(this.appptr);
+    if (ptr === 0) return null;
+    const str = ffi.readLenPrefixedString(this.module, ptr);
+    return JSON.parse(str);
+  }
+
+  /**
+   * Get the currently selected node IDs.
+   */
+  getSurfaceSelectedNodes(): string[] {
+    this._assertAlive();
+    const ptr = this.module._surface_get_selected_nodes(this.appptr);
+    if (ptr === 0) return [];
+    const str = ffi.readLenPrefixedString(this.module, ptr);
+    return JSON.parse(str);
+  }
+
+  /**
+   * Restore selection state (e.g. from undo/redo history).
+   */
+  setSurfaceSelection(ids: string[]) {
+    this._assertAlive();
+    const json = JSON.stringify(ids);
+    const [ptr, len] = this._alloc_string(json);
+    this.module._surface_set_selection(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  /**
+   * Configure surface overlay rendering (size meter, frame titles, etc.).
+   */
+  setSurfaceOverlayConfig(config: SurfaceOverlayConfig) {
+    this._assertAlive();
+    const json = JSON.stringify(config);
+    const [ptr, len] = this._alloc_string(json);
+    this.module._set_surface_overlay_config(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
+  /**
+   * Select all nodes in the current scene.
+   */
+  selectAll() {
+    this._assertAlive();
+    this.module._command(this.appptr, ApplicationCommandID.SelectAll, 0, 0);
+  }
+
+  /**
+   * Deselect all nodes.
+   */
+  deselectAll() {
+    this._assertAlive();
+    this.module._command(this.appptr, ApplicationCommandID.DeselectAll, 0, 0);
   }
 
   highlightStrokes(opts?: {

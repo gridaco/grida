@@ -62,6 +62,8 @@ pub struct SceneGraph {
     links: HashMap<NodeId, Vec<NodeId>>,
     /// Node data repository
     nodes: NodeRepository,
+    /// Optional display names for nodes (from the source file).
+    names: HashMap<NodeId, String>,
 }
 
 impl SceneGraph {
@@ -71,6 +73,7 @@ impl SceneGraph {
             roots: Vec::new(),
             links: HashMap::new(),
             nodes: NodeRepository::new(),
+            names: HashMap::new(),
         }
     }
 
@@ -239,6 +242,16 @@ impl SceneGraph {
         self.nodes
             .get_mut(id)
             .ok_or_else(|| SceneGraphError::NodeNotFound(id.clone()))
+    }
+
+    /// Get the display name for a node, if one was set.
+    pub fn get_name(&self, id: &NodeId) -> Option<&str> {
+        self.names.get(id).map(|s| s.as_str())
+    }
+
+    /// Set the display name for a node.
+    pub fn set_name(&mut self, id: NodeId, name: String) {
+        self.names.insert(id, name);
     }
 
     /// Remove a node from the repository and return it

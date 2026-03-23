@@ -84,6 +84,17 @@ export namespace TenantMiddleware {
       return null;
     }
 
+    // Embed routes (`/embed`, `/embed/*`) are served by `app/(embed)/embed/...` on the
+    // canonical pathname. Skip tenant path prefixing so the same routes work on
+    // `*.grida.site`, custom domains, and `tenant.localhost` without duplicating
+    // files under `(tenant)/~/[tenant]/...`.
+    {
+      const p = req.nextUrl.pathname;
+      if (p === "/embed" || p.startsWith("/embed/")) {
+        return null;
+      }
+    }
+
     let url: URL;
     try {
       url = new URL(`https://${host}`);

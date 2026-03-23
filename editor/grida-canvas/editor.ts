@@ -757,10 +757,7 @@ class EditorDocumentStore
       },
     };
 
-    this.insert(
-      { document: packedDoc },
-      this.mstate.scene_id ?? null
-    );
+    this.insert({ document: packedDoc }, this.mstate.scene_id ?? null);
 
     // Use the first remapped root (the SVG container) — this is
     // deterministic from the remap, unlike insert()'s return order.
@@ -3038,15 +3035,9 @@ export class Editor
 
     this._do_legacy_warmup();
 
-    if (this._pending_images) {
-      const pending = this._pending_images;
-      this._pending_images = null;
-      try {
-        this.loadImages(pending);
-      } catch (e) {
-        this.log("failed to load pending images into wasm runtime", e);
-      }
-    }
+    // Start polling for missing images — the renderer records refs it needs
+    // during render, and we resolve them from the local byte store.
+    this._startImagePoll();
   }
 
   /**
@@ -3180,19 +3171,24 @@ export class Editor
         document: grida.program.document.Document,
         sceneId?: string
       ) => {
-        const payloadDocument: grida.program.document.Document =
-          sceneId && document.entry_scene_id !== sceneId
-            ? {
-                ...document,
-                entry_scene_id: sceneId,
-              }
-            : document;
-
-        const p = JSON.stringify({
-          version: grida.program.document.SCHEMA_VERSION,
-          document: payloadDocument,
-        });
-        surface.loadScene(p);
+        try {
+          const bytes = io.GRID.encode(document);
+          surface.loadSceneGrida(bytes);
+        } catch {
+          // Fallback to JSON if FlatBuffers encoding fails (e.g. unsupported node types)
+          const p = JSON.stringify({
+            version: grida.program.document.SCHEMA_VERSION,
+            document,
+          });
+          surface.loadScene(p);
+        }
+        // loadSceneGrida only decodes and stores scenes.
+        // switchScene activates the requested scene (or first if unspecified).
+        const targetScene =
+          sceneId ?? document.scenes_ref?.[0] ?? document.entry_scene_id;
+        if (targetScene) {
+          surface.switchScene(targetScene);
+        }
         surface.redraw();
       };
 
@@ -3278,10 +3274,8 @@ export class Editor
       this.doc.subscribeWithSelector(
         (state) => state.scene_id,
         (_, scene_id) => {
-          if (!this._m_wasm_canvas_scene) return;
-
-          const document = this.doc.state.document;
-          syncDocument(this._m_wasm_canvas_scene, document, scene_id);
+          if (!this._m_wasm_canvas_scene || !scene_id) return;
+          this._m_wasm_canvas_scene.switchScene(scene_id);
         }
       );
 
@@ -3309,7 +3303,8 @@ export class Editor
             outline_mode,
             outline_mode_ignores_clips
           );
-        }
+        },
+        (a, b) => a[0] === b[0] && a[1] === b[1]
       );
 
       this.doc.subscribeWithSelector(
@@ -3328,7 +3323,8 @@ export class Editor
             },
           });
           this._m_wasm_canvas_scene?.redraw();
-        }
+        },
+        (a, b) => a.length === b.length && a.every((id, i) => id === b[i])
       );
 
       this.doc.subscribeWithSelector(
@@ -3347,10 +3343,24 @@ export class Editor
   private readonly images = new Map<string, grida.program.document.ImageRef>();
 
   /**
-   * Pending image assets (ref -> bytes) loaded before WASM mount.
-   * Keys are refs (the part after res://images/).
+   * Local image byte store for lazy loading.
+   * Key = RID (e.g. "res://images/abc123"), Value = raw image bytes.
+   * Images are stored here by `loadImages()` and pushed to WASM on demand
+   * when the renderer reports them as missing.
    */
-  private _pending_images: Record<string, Uint8Array> | null = null;
+  private readonly _image_bytes = new Map<string, Uint8Array>();
+
+  /**
+   * Timer ID for the missing image poll loop. Cleared on dispose.
+   */
+  private _image_poll_timer: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Callback invoked with image RIDs that the renderer needs but couldn't
+   * resolve locally. Set by the embed bridge (or any external image provider)
+   * to handle network-fetched images.
+   */
+  onUnresolvedImages: ((refs: string[]) => void) | null = null;
 
   private static __parse_image_ref_from_src(src: string): string {
     const raw = src.trim();
@@ -3364,30 +3374,82 @@ export class Editor
   }
 
   /**
-   * Registers image bytes under RIDs (res://images/<ref>).
-   * Key = ref (the part after res://images/). Works for both internally-generated
-   * (hex16) and externally-defined refs (e.g. Figma 40-char).
+   * Registers image bytes for lazy loading.
+   * Bytes are stored locally and pushed to WASM on demand when the renderer
+   * reports them as missing during render.
+   *
+   * Key = ref (the part after res://images/).
    */
   public loadImages(images: Record<string, Uint8Array>): void {
     if (!images || Object.keys(images).length === 0) return;
-
-    if (this.backend === "canvas" && !this._m_wasm_canvas_scene) {
-      if (!this._pending_images) {
-        this._pending_images = {};
-      }
-      Object.assign(this._pending_images, images);
-      return;
-    }
-
     if (this.backend !== "canvas") return;
 
-    assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
     for (const [ref, bytes] of Object.entries(images)) {
-      try {
-        this._registerImageWithCustomRid(bytes, ref);
-      } catch (e) {
-        this.log("failed to load image into wasm runtime", e);
+      const rid = `res://images/${ref}`;
+      this._image_bytes.set(rid, bytes);
+    }
+  }
+
+  /**
+   * Start polling for missing images after WASM mount.
+   * Runs every 100ms, drains missing refs from the renderer,
+   * and resolves them from the local byte store.
+   *
+   * TODO: Replace this setInterval poll with a unified `frame()` lifecycle.
+   * The WASM side already has `FrameLoop.frame()` (runtime/frame_loop.rs) bound
+   * to the platform RAF. A single JS-side `onFrame(state)` callback — hooked
+   * into the RAF cycle — could return per-frame state (missing images, hit-test
+   * results, dirty rects, etc.) so all post-frame work runs in one place instead
+   * of separate timers. The image drain would be one field in that frame state.
+   */
+  private _startImagePoll(): void {
+    if (this._image_poll_timer) return;
+    this._image_poll_timer = setInterval(() => {
+      this._resolveImages();
+    }, 100);
+  }
+
+  private _stopImagePoll(): void {
+    if (this._image_poll_timer) {
+      clearInterval(this._image_poll_timer);
+      this._image_poll_timer = null;
+    }
+  }
+
+  /**
+   * Drain missing image refs from the WASM renderer and provide
+   * any that we have bytes for locally.
+   *
+   * @returns refs that were requested but not available locally
+   */
+  private _drainAndResolveImages(): string[] {
+    if (!this._m_wasm_canvas_scene) return [];
+
+    const missing = this._m_wasm_canvas_scene.drainMissingImages();
+    if (missing.length === 0) return [];
+
+    this.log("lazy-images: renderer needs", missing.length, "images");
+
+    const unresolved: string[] = [];
+    for (const rid of missing) {
+      const bytes = this._image_bytes.get(rid);
+      if (bytes) {
+        this.log("lazy-images: providing", rid, `(${bytes.byteLength} bytes)`);
+        this._m_wasm_canvas_scene.resolveImage(rid, bytes);
+        // Keep bytes in map — scene switches may need them again.
+      } else {
+        unresolved.push(rid);
+        this.log("lazy-images: unresolved", rid);
       }
+    }
+
+    return unresolved;
+  }
+
+  private _resolveImages(): void {
+    const unresolved = this._drainAndResolveImages();
+    if (unresolved.length > 0 && this.onUnresolvedImages) {
+      this.onUnresolvedImages(unresolved);
     }
   }
 
@@ -4151,6 +4213,7 @@ export class Editor
    * Dispose editor instance and cleanup resources
    */
   dispose() {
+    this._stopImagePoll();
     this.doc.dispose();
   }
 }
@@ -4577,6 +4640,20 @@ export class EditorSurface
     return next;
   }
   // #endregion IPixelGridActions implementation
+
+  surfaceConfigureCanvasUiContainerLabel(state: "on" | "off") {
+    this.dispatch({
+      type: "surface/canvas-ui-container-label",
+      state,
+    });
+  }
+
+  surfaceToggleCanvasUiContainerLabel(): "on" | "off" {
+    const { canvas_ui } = this.state;
+    const next = canvas_ui.container_label === "on" ? "off" : "on";
+    this.surfaceConfigureCanvasUiContainerLabel(next);
+    return next;
+  }
 
   // #region IPixelPreviewActions implementation
   surfaceConfigurePixelPreviewScale(scale: "disabled" | "1x" | "2x") {

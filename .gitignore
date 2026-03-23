@@ -206,6 +206,7 @@ node-compile-cache/
 
 # Test artifacts
 **/__tests__/artifacts/
+**/__tests__/.tmp/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

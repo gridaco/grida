@@ -85,6 +85,18 @@ interface Grida2DRuntime {
    * @param scene
    */
   loadScene(scene: TODO): void;
+  /**
+   * Switch to a previously loaded scene by its string ID.
+   */
+  switchScene(sceneId: string): void;
+  /**
+   * Returns image refs that were needed during the last render but not found.
+   */
+  drainMissingImages(): string[];
+  /**
+   * Resolve a missing image by providing its raw bytes for a given resource ID.
+   */
+  resolveImage(rid: string, bytes: Uint8Array): void;
   applyTransactions(
     transactions: unknown[][]
   ): {

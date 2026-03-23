@@ -3860,10 +3860,10 @@ pub struct LayoutPositioningBasisUnionTableOffset {}
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_NODE: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_NODE: u8 = 10;
+pub const ENUM_MAX_NODE: u8 = 11;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_NODE: [Node; 11] = [
+pub const ENUM_VALUES_NODE: [Node; 12] = [
   Node::NONE,
   Node::UnknownNode,
   Node::SceneNode,
@@ -3875,6 +3875,7 @@ pub const ENUM_VALUES_NODE: [Node; 11] = [
   Node::LineNode,
   Node::VectorNode,
   Node::TextSpanNode,
+  Node::PathNode,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -3893,9 +3894,10 @@ impl Node {
   pub const LineNode: Self = Self(8);
   pub const VectorNode: Self = Self(9);
   pub const TextSpanNode: Self = Self(10);
+  pub const PathNode: Self = Self(11);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 10;
+  pub const ENUM_MAX: u8 = 11;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::NONE,
     Self::UnknownNode,
@@ -3908,6 +3910,7 @@ impl Node {
     Self::LineNode,
     Self::VectorNode,
     Self::TextSpanNode,
+    Self::PathNode,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
@@ -3923,6 +3926,7 @@ impl Node {
       Self::LineNode => Some("LineNode"),
       Self::VectorNode => Some("VectorNode"),
       Self::TextSpanNode => Some("TextSpanNode"),
+      Self::PathNode => Some("PathNode"),
       _ => None,
     }
   }
@@ -18086,6 +18090,212 @@ impl ::core::fmt::Debug for VectorNode<'_> {
       ds.finish()
   }
 }
+pub enum PathNodeOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+/// Node variant: Path (raw SVG path data).
+///
+/// Render-only node that stores SVG path data as a string. Avoids the overhead
+/// of vector network conversion. Not editable — use VectorNode for editable
+/// vector shapes.
+pub struct PathNode<'a> {
+  pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for PathNode<'a> {
+  type Inner = PathNode<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: unsafe { ::flatbuffers::Table::new(buf, loc) } }
+  }
+}
+
+impl<'a> PathNode<'a> {
+  pub const VT_NODE: ::flatbuffers::VOffsetT = 4;
+  pub const VT_LAYER: ::flatbuffers::VOffsetT = 6;
+  pub const VT_STROKE_GEOMETRY: ::flatbuffers::VOffsetT = 8;
+  pub const VT_FILL_PAINTS: ::flatbuffers::VOffsetT = 10;
+  pub const VT_STROKE_PAINTS: ::flatbuffers::VOffsetT = 12;
+  pub const VT_DATA: ::flatbuffers::VOffsetT = 14;
+  pub const VT_FILL_RULE: ::flatbuffers::VOffsetT = 16;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+    PathNode { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: ::flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args PathNodeArgs<'args>
+  ) -> ::flatbuffers::WIPOffset<PathNode<'bldr>> {
+    let mut builder = PathNodeBuilder::new(_fbb);
+    if let Some(x) = args.data { builder.add_data(x); }
+    if let Some(x) = args.stroke_paints { builder.add_stroke_paints(x); }
+    if let Some(x) = args.fill_paints { builder.add_fill_paints(x); }
+    if let Some(x) = args.stroke_geometry { builder.add_stroke_geometry(x); }
+    if let Some(x) = args.layer { builder.add_layer(x); }
+    if let Some(x) = args.node { builder.add_node(x); }
+    builder.add_fill_rule(args.fill_rule);
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn node(&self) -> SystemNodeTrait<'a> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<SystemNodeTrait>>(PathNode::VT_NODE, None).unwrap()}
+  }
+  #[inline]
+  pub fn layer(&self) -> LayerTrait<'a> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<LayerTrait>>(PathNode::VT_LAYER, None).unwrap()}
+  }
+  #[inline]
+  pub fn stroke_geometry(&self) -> Option<StrokeGeometryTrait<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<StrokeGeometryTrait>>(PathNode::VT_STROKE_GEOMETRY, None)}
+  }
+  #[inline]
+  pub fn fill_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(PathNode::VT_FILL_PAINTS, None)}
+  }
+  #[inline]
+  pub fn stroke_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(PathNode::VT_STROKE_PAINTS, None)}
+  }
+  /// Raw SVG path data string (e.g. "M0,0 L10,10 Z").
+  #[inline]
+  pub fn data(&self) -> Option<&'a str> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<&str>>(PathNode::VT_DATA, None)}
+  }
+  #[inline]
+  pub fn fill_rule(&self) -> FillRule {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<FillRule>(PathNode::VT_FILL_RULE, Some(FillRule::NonZero)).unwrap()}
+  }
+}
+
+impl ::flatbuffers::Verifiable for PathNode<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut ::flatbuffers::Verifier, pos: usize
+  ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+    v.visit_table(pos)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<SystemNodeTrait>>("node", Self::VT_NODE, true)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<LayerTrait>>("layer", Self::VT_LAYER, true)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<StrokeGeometryTrait>>("stroke_geometry", Self::VT_STROKE_GEOMETRY, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("fill_paints", Self::VT_FILL_PAINTS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("stroke_paints", Self::VT_STROKE_PAINTS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("data", Self::VT_DATA, false)?
+     .visit_field::<FillRule>("fill_rule", Self::VT_FILL_RULE, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct PathNodeArgs<'a> {
+    pub node: Option<::flatbuffers::WIPOffset<SystemNodeTrait<'a>>>,
+    pub layer: Option<::flatbuffers::WIPOffset<LayerTrait<'a>>>,
+    pub stroke_geometry: Option<::flatbuffers::WIPOffset<StrokeGeometryTrait<'a>>>,
+    pub fill_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+    pub stroke_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+    pub data: Option<::flatbuffers::WIPOffset<&'a str>>,
+    pub fill_rule: FillRule,
+}
+impl<'a> Default for PathNodeArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    PathNodeArgs {
+      node: None, // required field
+      layer: None, // required field
+      stroke_geometry: None,
+      fill_paints: None,
+      stroke_paints: None,
+      data: None,
+      fill_rule: FillRule::NonZero,
+    }
+  }
+}
+
+pub struct PathNodeBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> PathNodeBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_node(&mut self, node: ::flatbuffers::WIPOffset<SystemNodeTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<SystemNodeTrait>>(PathNode::VT_NODE, node);
+  }
+  #[inline]
+  pub fn add_layer(&mut self, layer: ::flatbuffers::WIPOffset<LayerTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<LayerTrait>>(PathNode::VT_LAYER, layer);
+  }
+  #[inline]
+  pub fn add_stroke_geometry(&mut self, stroke_geometry: ::flatbuffers::WIPOffset<StrokeGeometryTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<StrokeGeometryTrait>>(PathNode::VT_STROKE_GEOMETRY, stroke_geometry);
+  }
+  #[inline]
+  pub fn add_fill_paints(&mut self, fill_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(PathNode::VT_FILL_PAINTS, fill_paints);
+  }
+  #[inline]
+  pub fn add_stroke_paints(&mut self, stroke_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(PathNode::VT_STROKE_PAINTS, stroke_paints);
+  }
+  #[inline]
+  pub fn add_data(&mut self, data: ::flatbuffers::WIPOffset<&'b  str>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(PathNode::VT_DATA, data);
+  }
+  #[inline]
+  pub fn add_fill_rule(&mut self, fill_rule: FillRule) {
+    self.fbb_.push_slot::<FillRule>(PathNode::VT_FILL_RULE, fill_rule, FillRule::NonZero);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>) -> PathNodeBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    PathNodeBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> ::flatbuffers::WIPOffset<PathNode<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    self.fbb_.required(o, PathNode::VT_NODE,"node");
+    self.fbb_.required(o, PathNode::VT_LAYER,"layer");
+    ::flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl ::core::fmt::Debug for PathNode<'_> {
+  fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+    let mut ds = f.debug_struct("PathNode");
+      ds.field("node", &self.node());
+      ds.field("layer", &self.layer());
+      ds.field("stroke_geometry", &self.stroke_geometry());
+      ds.field("fill_paints", &self.fill_paints());
+      ds.field("stroke_paints", &self.stroke_paints());
+      ds.field("data", &self.data());
+      ds.field("fill_rule", &self.fill_rule());
+      ds.finish()
+  }
+}
 pub enum TextSpanNodeOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -18424,6 +18634,21 @@ impl<'a> NodeSlot<'a> {
     }
   }
 
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn node_as_path_node(&self) -> Option<PathNode<'a>> {
+    if self.node_type() == Node::PathNode {
+      self.node().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { PathNode::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
 }
 
 impl ::flatbuffers::Verifiable for NodeSlot<'_> {
@@ -18444,6 +18669,7 @@ impl ::flatbuffers::Verifiable for NodeSlot<'_> {
           Node::LineNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<LineNode>>("Node::LineNode", pos),
           Node::VectorNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<VectorNode>>("Node::VectorNode", pos),
           Node::TextSpanNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<TextSpanNode>>("Node::TextSpanNode", pos),
+          Node::PathNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<PathNode>>("Node::PathNode", pos),
           _ => Ok(()),
         }
      })?
@@ -18563,6 +18789,13 @@ impl ::core::fmt::Debug for NodeSlot<'_> {
         },
         Node::TextSpanNode => {
           if let Some(x) = self.node_as_text_span_node() {
+            ds.field("node", &x)
+          } else {
+            ds.field("node", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        Node::PathNode => {
+          if let Some(x) = self.node_as_path_node() {
             ds.field("node", &x)
           } else {
             ds.field("node", &"InvalidFlatbuffer: Union discriminant does not match value.")

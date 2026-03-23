@@ -85,6 +85,13 @@ function __self_set_pixelgrid(
   draft.pixelgrid = pixelgrid;
 }
 
+function __self_set_canvas_ui_container_label(
+  draft: editor.state.IEditorState,
+  container_label: "on" | "off"
+) {
+  draft.canvas_ui.container_label = container_label;
+}
+
 function __self_set_outline_mode(
   draft: editor.state.IEditorState,
   outline_mode: "on" | "off"
@@ -947,6 +954,11 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       case "surface/pixel-grid": {
         const { state: pixelgridstate } = action;
         __self_set_pixelgrid(draft, pixelgridstate);
+        break;
+      }
+      case "surface/canvas-ui-container-label": {
+        const { state: labelstate } = action;
+        __self_set_canvas_ui_container_label(draft, labelstate);
         break;
       }
       case "surface/outline-mode": {

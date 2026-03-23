@@ -903,6 +903,28 @@ pub enum JSONNode {
     Unknown(JSONUnknownNodeProperties),
 }
 
+impl JSONNode {
+    /// Get the display name of this node, if any.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            JSONNode::Group(n) => n.base.name.as_deref(),
+            JSONNode::Container(n) => n.base.name.as_deref(),
+            JSONNode::Vector(n) => n.base.name.as_deref(),
+            JSONNode::Path(n) => n.base.name.as_deref(),
+            JSONNode::Ellipse(n) => n.base.name.as_deref(),
+            JSONNode::Rectangle(n) => n.base.name.as_deref(),
+            JSONNode::RegularPolygon(n) => n.base.name.as_deref(),
+            JSONNode::RegularStarPolygon(n) => n.base.name.as_deref(),
+            JSONNode::Line(n) => n.base.name.as_deref(),
+            JSONNode::TextSpan(n) => n.base.name.as_deref(),
+            JSONNode::BooleanOperation(n) => n.base.name.as_deref(),
+            JSONNode::Image(n) => n.base.name.as_deref(),
+            JSONNode::Scene(n) => Some(&n.name),
+            JSONNode::Unknown(n) => n.name.as_deref(),
+        }
+    }
+}
+
 /// JSON representation of LayoutMode for deserialization
 #[derive(Debug, Deserialize, Clone, Copy)]
 pub enum JSONLayoutMode {

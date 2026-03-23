@@ -2,6 +2,7 @@ import type { Action, EditorAction } from "../action";
 import {
   enablePatches,
   produceWithPatches,
+  original,
   type Draft,
   type Patch,
 } from "immer";
@@ -93,6 +94,32 @@ export default function reducer(
         default: {
           _reducer(draft as Draft<editor.state.IEditorState>, action, context);
         }
+      }
+
+      // ── editable guard: prevent document mutations in read-only mode ──
+      // TODO: This is a band-aid. The proper fix is a system-level redesign
+      // where the document model itself enforces immutability (e.g. a
+      // read-only proxy/wrapper around `document` that throws on write when
+      // `editable: false`), so sub-reducers never attempt mutations in the
+      // first place. Currently, all reducers run freely and we revert the
+      // document fields after the fact.
+      if (!draft.editable) {
+        const orig = original(draft)!;
+        draft.document.nodes = orig.document.nodes as Draft<
+          typeof orig.document.nodes
+        >;
+        draft.document.links = orig.document.links as Draft<
+          typeof orig.document.links
+        >;
+        draft.document.scenes_ref = orig.document.scenes_ref as Draft<
+          typeof orig.document.scenes_ref
+        >;
+        draft.document.properties = orig.document.properties as Draft<
+          typeof orig.document.properties
+        >;
+        draft.document.bitmaps = orig.document.bitmaps as Draft<
+          typeof orig.document.bitmaps
+        >;
       }
     }
   );

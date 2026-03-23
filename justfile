@@ -3,12 +3,12 @@ default:
 
 # Run type checking and cargo check
 check:
-    turbo typecheck
+    pnpm turbo typecheck
     cargo check --all-targets --all-features
 
 # Run tests
 test:
-    turbo test
+    pnpm turbo test
 
 # Dev setup
 dev packages:

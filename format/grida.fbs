@@ -1408,6 +1408,22 @@ table VectorNode {
   vector_network_data:VectorNetworkData;
 }
 
+/// Node variant: Path (raw SVG path data).
+///
+/// Render-only node that stores SVG path data as a string. Avoids the overhead
+/// of vector network conversion. Not editable — use VectorNode for editable
+/// vector shapes.
+table PathNode {
+  node:SystemNodeTrait (required);
+  layer:LayerTrait (required);
+  stroke_geometry:StrokeGeometryTrait;
+  fill_paints:[PaintStackItem];
+  stroke_paints:[PaintStackItem];
+  /// Raw SVG path data string (e.g. "M0,0 L10,10 Z").
+  data:string;
+  fill_rule:FillRule;
+}
+
 /// Node variant: Text span.
 table TextSpanNode {
   node:SystemNodeTrait (required);
@@ -1507,6 +1523,8 @@ union Node {
   VectorNode,
   // texts
   TextSpanNode,
+  // SVG path data (render-only, no vector network)
+  PathNode,
 }
 
 // -----------------------------------------------------------------------------

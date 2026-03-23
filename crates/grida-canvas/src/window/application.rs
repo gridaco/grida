@@ -1,6 +1,6 @@
 use crate::cg::types::TextAlignVertical;
 use crate::devtools::{
-    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay,
+    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay,
 };
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
@@ -17,7 +17,16 @@ use crate::text;
 use crate::vectornetwork::VectorNetwork;
 use grida_text_edit::layout::ManagedTextLayout;
 use grida_text_edit::TextLayoutEngine;
+use crate::query::Hierarchy;
 use crate::window::command::ApplicationCommand;
+
+/// A no-op hierarchy for when no scene graph is loaded.
+struct NoHierarchy;
+impl Hierarchy for NoHierarchy {
+    fn parent(&self, _id: &crate::node::schema::NodeId) -> Option<crate::node::schema::NodeId> {
+        None
+    }
+}
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
@@ -87,8 +96,15 @@ pub trait ApplicationApi {
         style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
     );
 
-    /// Load a scene from a JSON string using the `io_grida` parser.
-    fn load_scene_json(&mut self, json: &str);
+    /// Load a scene from a `.grida1` JSON string using the `io_grida` parser.
+    fn load_scene_grida1(&mut self, json: &str);
+
+    /// Load a scene from `.grida` FlatBuffers binary bytes.
+    fn load_scene_grida(&mut self, bytes: &[u8]);
+
+    /// Switch to a previously loaded scene by its string ID.
+    /// Only works after `load_scene_grida` has decoded a multi-scene document.
+    fn switch_scene(&mut self, scene_id: &str);
 
     /// Apply a batch of scene transactions represented as JSON Patch operations.
     fn apply_document_transactions(
@@ -182,6 +198,10 @@ pub struct UnknownTargetApplication {
     id_mapping: std::collections::HashMap<UserNodeId, NodeId>,
     id_mapping_reverse: std::collections::HashMap<NodeId, UserNodeId>,
 
+    /// All decoded scenes from the last `load_scene_grida` call, keyed by string ID.
+    /// Used by `switch_scene` to swap scenes without re-encoding/decoding the document.
+    loaded_scenes: Vec<(String, crate::node::schema::Scene)>,
+
     /// When `false`, any platform-managed tick loop (e.g. Emscripten RAF) should stop.
     running: bool,
     /// When `true`, this application is driven by a platform-managed tick loop
@@ -198,6 +218,15 @@ pub struct UnknownTargetApplication {
     /// `None` when no text editing session is active.
     text_edit_decorations:
         Option<crate::devtools::text_edit_decoration_overlay::TextEditingDecorations>,
+
+    /// Canvas surface interaction state (hover, selection, gesture, cursor).
+    pub(crate) surface: crate::surface::SurfaceState,
+
+    /// Surface overlay rendering configuration.
+    pub surface_overlay_config: crate::devtools::surface_overlay::SurfaceOverlayConfig,
+
+    /// Overlay UI hit regions, rebuilt each frame during drawing.
+    pub(crate) ui_hit_regions: crate::surface::ui::HitRegions,
 }
 
 impl ApplicationApi for UnknownTargetApplication {
@@ -242,6 +271,13 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn command(&mut self, cmd: ApplicationCommand) -> bool {
+        // Invalidate hover on camera transforms — avoid hit-testing while
+        // panning/zooming so the renderer can focus on fast redraws.
+        // Hover is re-evaluated on the next PointerMove.
+        if cmd.is_camera_transform() {
+            self.surface.invalidate_hover();
+        }
+
         match cmd {
             ApplicationCommand::ZoomIn => {
                 let current_zoom = self.renderer.camera.get_zoom();
@@ -290,6 +326,29 @@ impl ApplicationApi for UnknownTargetApplication {
                             return true;
                         }
                     }
+                }
+            }
+            ApplicationCommand::SelectAll => {
+                let all_ids: Vec<_> = self
+                    .renderer
+                    .get_cache()
+                    .layers
+                    .layers
+                    .iter()
+                    .map(|e| e.id)
+                    .collect();
+                self.surface.select_all(all_ids);
+                if let Some(scene) = self.renderer.scene.as_ref() {
+                    self.surface.prune_selection(&scene.graph);
+                }
+                self.queue();
+                return true;
+            }
+            ApplicationCommand::DeselectAll => {
+                if !self.surface.selection.is_empty() {
+                    self.surface.selection.clear();
+                    self.queue();
+                    return true;
                 }
             }
             ApplicationCommand::None
@@ -496,10 +555,54 @@ impl ApplicationApi for UnknownTargetApplication {
         self.queue();
     }
 
-    fn load_scene_json(&mut self, json: &str) {
+    fn load_scene_grida1(&mut self, json: &str) {
         match serde_json::from_str::<Value>(json) {
             Ok(value) => self.load_scene_from_value(value),
             Err(err) => eprintln!("failed to parse scene json: {}", err),
+        }
+    }
+
+    fn load_scene_grida(&mut self, bytes: &[u8]) {
+        use crate::io::io_grida_fbs;
+        match io_grida_fbs::decode_with_id_map(bytes) {
+            Ok(result) => {
+                // Build id mappings from the decode result
+                let mut string_to_internal = std::collections::HashMap::new();
+                let mut internal_to_string = std::collections::HashMap::new();
+                for (internal_id, string_id) in &result.id_map {
+                    string_to_internal.insert(string_id.clone(), *internal_id);
+                    internal_to_string.insert(*internal_id, string_id.clone());
+                }
+                self.id_mapping = string_to_internal;
+                self.id_mapping_reverse = internal_to_string;
+
+                // Store all decoded scenes. The caller is responsible for
+                // calling switch_scene() to activate the desired scene.
+                self.loaded_scenes = result
+                    .scene_ids
+                    .iter()
+                    .zip(result.scenes.into_iter())
+                    .map(|(id, scene)| (id.clone(), scene))
+                    .collect();
+
+                if self.loaded_scenes.is_empty() {
+                    eprintln!("load_scene_grida: no scenes in FlatBuffers data");
+                }
+            }
+            Err(err) => eprintln!("failed to decode .grida FlatBuffers: {:?}", err),
+        }
+    }
+
+    fn switch_scene(&mut self, scene_id: &str) {
+        if let Some((_, scene)) = self.loaded_scenes.iter().find(|(id, _)| id == scene_id) {
+            self.renderer.load_scene(scene.clone());
+            self.queue();
+        } else {
+            eprintln!(
+                "switch_scene: scene '{}' not found (available: {:?})",
+                scene_id,
+                self.loaded_scenes.iter().map(|(id, _)| id).collect::<Vec<_>>()
+            );
         }
     }
 
@@ -522,6 +625,12 @@ impl ApplicationApi for UnknownTargetApplication {
 }
 
 impl UnknownTargetApplication {
+    /// Returns image refs that were needed during the last render but not found.
+    /// Only returns refs not yet reported in a previous call.
+    pub fn drain_missing_images(&mut self) -> Vec<String> {
+        self.renderer.drain_missing_images()
+    }
+
     /// Mark whether this application is driven by a platform-managed tick loop
     /// (e.g. Emscripten RAF).
     pub fn set_auto_tick(&mut self, enabled: bool) {
@@ -557,12 +666,147 @@ impl UnknownTargetApplication {
         self.input.cursor = position;
     }
 
+    /// Current cursor position in screen coordinates.
+    pub fn input_cursor(&self) -> [f32; 2] {
+        self.input.cursor
+    }
+
     pub fn perform_hit_test_host(&mut self) {
         self.perform_hit_test();
     }
 
     pub fn capture_hit_test_selection(&mut self) {
         self.devtools_selection = self.hit_test_result.clone();
+    }
+
+    /// Dispatch a surface event (hover, select, gesture) and return what changed.
+    ///
+    /// The caller provides screen-space coordinates; this method handles the
+    /// camera transform and hit-tester construction internally.
+    pub fn surface_dispatch(
+        &mut self,
+        event: crate::surface::SurfaceEvent,
+    ) -> crate::surface::SurfaceResponse {
+        // Build hit tester and hierarchy from renderer fields without
+        // borrowing `self` as a whole.
+        let (hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let r = self.surface.dispatch(event, &ht, &scene.graph, &self.ui_hit_regions);
+            (ht, r)
+        } else {
+            let ht = crate::hittest::HitTester::new(self.renderer.get_cache());
+            let r = self.surface.dispatch(event, &ht, &NoHierarchy, &self.ui_hit_regions);
+            (ht, r)
+        };
+        drop(hit_tester);
+        if response.needs_redraw {
+            self.queue();
+        }
+        response
+    }
+
+    /// Read-only access to the surface state.
+    pub fn surface(&self) -> &crate::surface::SurfaceState {
+        &self.surface
+    }
+
+    // ---- Surface convenience methods ----
+    // These handle screen→canvas coordinate conversion internally so that
+    // hosts (native, wasm, emscripten) stay thin and consistent.
+
+    /// Process a pointer-move at the given screen coordinates.
+    ///
+    /// Updates the cursor position, converts to canvas space, and dispatches
+    /// through the surface event system (hover, gesture, cursor icon).
+    pub fn surface_pointer_move(
+        &mut self,
+        screen_x: f32,
+        screen_y: f32,
+    ) -> crate::surface::SurfaceResponse {
+        self.set_cursor_position([screen_x, screen_y]);
+        let canvas_point = self
+            .renderer
+            .camera
+            .screen_to_canvas_point([screen_x, screen_y]);
+        let event = crate::surface::SurfaceEvent::PointerMove {
+            canvas_point,
+            screen_point: [screen_x, screen_y],
+        };
+        self.surface_dispatch(event)
+    }
+
+    /// Process a pointer-down at the given screen coordinates.
+    pub fn surface_pointer_down(
+        &mut self,
+        screen_x: f32,
+        screen_y: f32,
+        button: crate::surface::PointerButton,
+        modifiers: crate::surface::Modifiers,
+    ) -> crate::surface::SurfaceResponse {
+        let screen_point = [screen_x, screen_y];
+        let canvas_point = self.renderer.camera.screen_to_canvas_point(screen_point);
+        let event = crate::surface::SurfaceEvent::PointerDown {
+            canvas_point,
+            screen_point,
+            button,
+            modifiers,
+        };
+        self.surface_dispatch(event)
+    }
+
+    /// Process a pointer-up at the given screen coordinates.
+    pub fn surface_pointer_up(
+        &mut self,
+        screen_x: f32,
+        screen_y: f32,
+        button: crate::surface::PointerButton,
+        modifiers: crate::surface::Modifiers,
+    ) -> crate::surface::SurfaceResponse {
+        let screen_point = [screen_x, screen_y];
+        let canvas_point = self.renderer.camera.screen_to_canvas_point(screen_point);
+        let event = crate::surface::SurfaceEvent::PointerUp {
+            canvas_point,
+            screen_point,
+            button,
+            modifiers,
+        };
+        self.surface_dispatch(event)
+    }
+
+    // ---- Surface state accessors ----
+
+    /// Currently hovered node, if any.
+    pub fn surface_hovered_node(&self) -> Option<&crate::node::schema::NodeId> {
+        self.surface.hover.hovered()
+    }
+
+    /// Currently selected node IDs.
+    pub fn surface_selected_nodes(&self) -> &[crate::node::schema::NodeId] {
+        self.surface.selection.as_slice()
+    }
+
+    /// Current cursor icon.
+    pub fn surface_cursor(&self) -> crate::surface::CursorIcon {
+        self.surface.cursor
+    }
+
+    /// Restore selection state (e.g. from undo/redo).
+    pub fn surface_set_selection(&mut self, ids: Vec<crate::node::schema::NodeId>) {
+        self.surface.select_all(ids);
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            self.surface.prune_selection(&scene.graph);
+        }
+        self.queue();
+    }
+
+    /// Invalidate hover without hit-testing.
+    ///
+    /// Call during camera transforms (pan, zoom) to avoid wasting cycles.
+    pub fn surface_invalidate_hover(&mut self) {
+        let response = self.surface.invalidate_hover();
+        if response.needs_redraw {
+            self.queue();
+        }
     }
 
     pub fn clipboard_bytes(&self) -> Option<&[u8]> {
@@ -632,10 +876,15 @@ impl UnknownTargetApplication {
             frame_loop: FrameLoop::new(),
             id_mapping: std::collections::HashMap::new(),
             id_mapping_reverse: std::collections::HashMap::new(),
+            loaded_scenes: Vec::new(),
             running: true,
             auto_tick: false,
             text_edit: None,
             text_edit_decorations: None,
+            surface: crate::surface::SurfaceState::new(),
+            surface_overlay_config:
+                crate::devtools::surface_overlay::SurfaceOverlayConfig::default(),
+            ui_hit_regions: crate::surface::ui::HitRegions::new(),
         }
     }
 
@@ -717,12 +966,12 @@ impl UnknownTargetApplication {
     }
 
     /// Convert internal u64 ID to user string ID
-    fn internal_id_to_user(&self, internal_id: NodeId) -> Option<String> {
+    pub fn internal_id_to_user(&self, internal_id: NodeId) -> Option<String> {
         self.id_mapping_reverse.get(&internal_id).cloned()
     }
 
     /// Convert multiple internal IDs to user IDs
-    fn internal_ids_to_user(&self, internal_ids: Vec<NodeId>) -> Vec<String> {
+    pub fn internal_ids_to_user(&self, internal_ids: Vec<NodeId>) -> Vec<String> {
         internal_ids
             .into_iter()
             .filter_map(|id| self.internal_id_to_user(id))
@@ -1099,6 +1348,25 @@ impl UnknownTargetApplication {
                     self.renderer.get_cache(),
                 );
             }
+            // Surface interaction overlays (hover, selection, marquee)
+            surface_overlay::SurfaceOverlay::draw(
+                &canvas,
+                &self.surface,
+                &self.renderer.camera,
+                self.renderer.get_cache(),
+                &self.surface_overlay_config,
+            );
+            // Surface UI elements (size meter, frame titles, hit regions)
+            crate::surface::ui::SurfaceUI::draw(
+                &canvas,
+                &self.surface,
+                &self.renderer.camera,
+                self.renderer.get_cache(),
+                &self.surface_overlay_config,
+                &mut self.ui_hit_regions,
+                self.renderer.scene.as_ref().map(|s| &s.graph),
+                &self.renderer.fonts,
+            );
             if self.devtools_rendering_show_ruler {
                 ruler_overlay::Ruler::draw(&canvas, &self.renderer.camera);
             }

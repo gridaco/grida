@@ -5,12 +5,22 @@ import {
   type CreateImageResourceResult,
   type AddImageWithIdResult,
   type TextEditCommand,
+  type SurfaceResponse,
+  type SurfaceCursorIcon,
+  type SurfaceOverlayConfig,
+  encodeModifiers,
+  encodeButton,
 } from "./modules/canvas";
 export {
   type Scene,
   type CreateImageResourceResult,
   type AddImageWithIdResult,
   type TextEditCommand,
+  type SurfaceResponse,
+  type SurfaceCursorIcon,
+  type SurfaceOverlayConfig,
+  encodeModifiers,
+  encodeButton,
 };
 export const version = _version;
 
@@ -241,6 +251,10 @@ export class Canvas {
 
   loadScene(json: string) {
     this._scene.loadScene(json);
+  }
+
+  loadSceneGrida(data: Uint8Array) {
+    this._scene.loadSceneGrida(data);
   }
 
   /**

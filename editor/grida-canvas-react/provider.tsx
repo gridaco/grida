@@ -383,6 +383,11 @@ export function useBackendState() {
   return editor.backend;
 }
 
+export function useEditableState(): boolean {
+  const editor = useCurrentEditor();
+  return useEditorState(editor, (state) => state.editable);
+}
+
 export function useTransformState() {
   const editor = useCurrentEditor();
   const transform = useEditorState(editor, (state) => state.transform);

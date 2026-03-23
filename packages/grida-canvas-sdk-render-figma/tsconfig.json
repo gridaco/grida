@@ -4,7 +4,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["vitest/globals", "node"],
-    "lib": ["esnext"],
+    "lib": ["esnext", "dom", "dom.iterable"],
     "noImplicitAny": true,
     "strict": true,
     "esModuleInterop": true,

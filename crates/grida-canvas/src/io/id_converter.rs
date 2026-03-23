@@ -49,10 +49,15 @@ impl IdConverter {
     }
 
     /// Convert a JSONNode into a (NodeId, Node) pair
-    pub fn convert_node(&mut self, string_id: &str, json_node: JSONNode) -> (NodeId, Node) {
+    pub fn convert_node(
+        &mut self,
+        string_id: &str,
+        json_node: JSONNode,
+    ) -> (NodeId, Option<String>, Node) {
         let internal_id = self.get_or_create_internal_id(string_id);
+        let name = json_node.name().map(|s| s.to_string());
         let node = Self::convert_json_node(json_node);
-        (internal_id, node)
+        (internal_id, name, node)
     }
 
     /// Convert a complete JSON canvas file into a Scene
@@ -83,13 +88,24 @@ impl IdConverter {
             .and_then(|c| c.clone())
             .unwrap_or_default();
 
-        // Convert all nodes (skip scene nodes) - returns (NodeId, Node) pairs
-        let node_pairs: Vec<(NodeId, Node)> = file
+        // Convert all nodes (skip scene nodes) - returns (NodeId, name, Node) tuples
+        let converted: Vec<(NodeId, Option<String>, Node)> = file
             .document
             .nodes
             .into_iter()
             .filter(|(_, json_node)| !matches!(json_node, JSONNode::Scene(_)))
             .map(|(string_id, json_node)| self.convert_node(&string_id, json_node))
+            .collect();
+
+        let mut node_names: HashMap<NodeId, String> = HashMap::new();
+        let node_pairs: Vec<(NodeId, Node)> = converted
+            .into_iter()
+            .map(|(id, name, node)| {
+                if let Some(n) = name {
+                    node_names.insert(id, n);
+                }
+                (id, node)
+            })
             .collect();
 
         // Convert links from string IDs to internal IDs
@@ -122,8 +138,13 @@ impl IdConverter {
             .collect();
 
         // Build scene graph from snapshot with explicit ID pairs
-        let graph =
+        let mut graph =
             SceneGraph::new_from_snapshot(node_pairs, internal_links, scene_children_internal);
+
+        // Preserve node display names
+        for (id, name) in node_names {
+            graph.set_name(id, name);
+        }
 
         Ok(Scene {
             name: scene_name,

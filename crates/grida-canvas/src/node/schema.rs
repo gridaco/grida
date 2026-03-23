@@ -983,6 +983,27 @@ impl Node {
         }
     }
 
+    /// Returns a short human-readable type label for the node variant.
+    pub fn type_label(&self) -> &'static str {
+        match self {
+            Node::InitialContainer(_) => "Frame",
+            Node::Container(_) => "Frame",
+            Node::Error(_) => "Error",
+            Node::Group(_) => "Group",
+            Node::Rectangle(_) => "Rectangle",
+            Node::Ellipse(_) => "Ellipse",
+            Node::Polygon(_) => "Polygon",
+            Node::RegularPolygon(_) => "Polygon",
+            Node::RegularStarPolygon(_) => "Star",
+            Node::Line(_) => "Line",
+            Node::TextSpan(_) => "Text",
+            Node::Path(_) => "Path",
+            Node::Vector(_) => "Vector",
+            Node::BooleanOperation(_) => "Boolean",
+            Node::Image(_) => "Image",
+        }
+    }
+
     /// Returns the node's blend mode.
     /// `InitialContainer` and `Error` default to `PassThrough`.
     pub fn blend_mode(&self) -> LayerBlendMode {

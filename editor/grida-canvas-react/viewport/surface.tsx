@@ -17,6 +17,7 @@ import {
   useContentEditModeMinimalState,
   useCurrentSceneState,
   useDocumentState,
+  useEditableState,
   useEventTargetCSSCursor,
   useGestureState,
   useIsTransforming,
@@ -105,6 +106,7 @@ import { PaddingOverlay } from "./ui/surface-padding-overlay";
 import { AspectRatioGuide } from "./ui/aspect-ratio-guide";
 import cmath from "@grida/cmath";
 import { cn } from "@/components/lib/utils";
+import { useWasmSurface } from "./hooks/use-wasm-surface";
 
 const DRAG_THRESHOLD = 2;
 
@@ -169,6 +171,7 @@ export function EditorSurface() {
   const is_window_resizing = useIsWindowResizing();
   const is_transforming = useIsTransforming();
   const editor = useCurrentEditor();
+  const editable = useEditableState();
   const { transform } = useTransformState();
   const { is_node_transforming, is_node_translating } = useGestureState();
   const { hovered_node_id, selection } = useSelectionState();
@@ -176,12 +179,19 @@ export function EditorSurface() {
   const content_edit_mode = useContentEditModeMinimalState();
   const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
   const ruler = useEditorState(editor, (state) => state.ruler);
+  const canvas_ui_container_label = useEditorState(
+    editor,
+    (state) => state.canvas_ui.container_label
+  );
   const dropzone = useEditorState(editor, (state) => state.dropzone);
   const brush = useBrushState();
   const cursor = useEventTargetCSSCursor();
   const eventTargetRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
   const context = useContext(ViewportSurfaceContext);
+
+  // WASM native surface for readonly canvas mode
+  const { active: wasmSurfaceActive } = useWasmSurface(eventTargetRef);
 
   useEffect(() => {
     context?.setPortalRef?.(portalRef.current);
@@ -195,8 +205,10 @@ export function EditorSurface() {
   //
   // hook for pointer move event.
   // pointer move event should 'always-trigger', to make this easier and clear, we register the listener for pointer move to a window.
+  // Skipped when WASM surface is active (it handles pointer events directly).
   //
   useEffect(() => {
+    if (wasmSurfaceActive) return;
     if (!eventTargetRef.current) return;
     const et = eventTargetRef.current;
     const handlePointerMove = (event: PointerEvent) => {
@@ -265,6 +277,7 @@ export function EditorSurface() {
       },
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
+        if (!editable) return;
 
         // Double-click toggles content edit mode (enter or exit). Modes that must
         // not exit on double-click (e.g. text, for word select) consume the event
@@ -292,6 +305,7 @@ export function EditorSurface() {
       },
     },
     {
+      enabled: !wasmSurfaceActive,
       move: {
         threshold: 2,
       },
@@ -346,20 +360,25 @@ export function EditorSurface() {
 
   const selectiondata = useSelectionGroups(...selection);
 
+  // When WASM surface is active, skip JS gesture bindings and overlay rendering.
+  // The WASM engine renders overlays natively in the canvas.
+  const gestureBindProps = wasmSurfaceActive ? {} : bind();
+
   return (
     <SurfaceSelectionGroupProvider value={selectiondata}>
       <EdgeScrollingEffect />
       <div
         id="event-target"
         ref={eventTargetRef}
-        {...bind()}
+        {...gestureBindProps}
         tabIndex={0}
         className="absolute inset-0 pointer-events-auto will-change-transform z-50 select-none"
         style={{
           userSelect: "none",
           touchAction: "none",
           outline: "none",
-          cursor: cursor,
+          // WASM provider sets cursor directly via element.style.cursor
+          cursor: wasmSurfaceActive ? undefined : cursor,
           overflowX: "scroll",
           overflowY: "hidden",
           WebkitOverflowScrolling: "touch",
@@ -374,105 +393,123 @@ export function EditorSurface() {
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
-        {(tool?.type === "brush" || tool?.type === "eraser") && (
+        {editable && (tool?.type === "brush" || tool?.type === "eraser") && (
           <BrushCursor brush={brush} />
         )}
 
-        <div
-          style={{
-            position: "absolute",
-            pointerEvents: "none",
-          }}
-        >
-          {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
-          <RemoteCursorOverlay />
-          <MarqueeOverlay />
-          <LassoOverlay />
-        </div>
+        {/* Portal ref must always exist — ruler uses it for dimensions */}
         <div
           className="w-full h-full"
           id="canvas-overlay-portal"
           ref={portalRef}
         >
-          <MeasurementGuide />
-          {content_edit_mode?.type === "vector" && <VectorMeasurementGuide />}
-          <SnapGuide />
+          {/* When WASM surface is active, all overlays below are rendered natively */}
+          {!wasmSurfaceActive && (
+            <>
+              <div
+                style={{
+                  position: "absolute",
+                  pointerEvents: "none",
+                }}
+              >
+                {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
+                <RemoteCursorOverlay />
+                <MarqueeOverlay />
+                <LassoOverlay />
+              </div>
+              <div>
+                <MeasurementGuide />
+                {content_edit_mode?.type === "vector" && (
+                  <VectorMeasurementGuide />
+                )}
+                <SnapGuide />
 
-          <SurfaceGroup>
-            {content_edit_mode?.type === "text" && (
-              <SurfaceTextEditor
-                key="text-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-          </SurfaceGroup>
+                {editable && (
+                  <SurfaceGroup>
+                    {content_edit_mode?.type === "text" && (
+                      <SurfaceTextEditor
+                        key="text-editor"
+                        node_id={content_edit_mode.node_id}
+                      />
+                    )}
+                  </SurfaceGroup>
+                )}
 
-          {/* surfaces with performance considerations */}
-          <SurfaceGroup
-            hidden={
-              is_transforming ||
-              is_node_transforming ||
-              is_node_translating ||
-              is_window_resizing
-            }
-            dontRenderWhenHidden
-          >
-            {content_edit_mode?.type === "vector" && (
-              <SurfaceVectorEditor
-                key="vector-geometry-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-            {content_edit_mode?.type === "paint/gradient" && (
-              <SurfaceGradientEditor
-                key="gradient-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-          </SurfaceGroup>
+                {/* surfaces with performance considerations */}
+                {editable && (
+                  <SurfaceGroup
+                    hidden={
+                      is_transforming ||
+                      is_node_transforming ||
+                      is_node_translating ||
+                      is_window_resizing
+                    }
+                    dontRenderWhenHidden
+                  >
+                    {content_edit_mode?.type === "vector" && (
+                      <SurfaceVectorEditor
+                        key="vector-geometry-editor"
+                        node_id={content_edit_mode.node_id}
+                      />
+                    )}
+                    {content_edit_mode?.type === "paint/gradient" && (
+                      <SurfaceGradientEditor
+                        key="gradient-editor"
+                        node_id={content_edit_mode.node_id}
+                      />
+                    )}
+                  </SurfaceGroup>
+                )}
 
-          {/* surfaces relatively cheap */}
-          <SurfaceGroup hidden={is_window_resizing}>
-            {content_edit_mode?.type === "paint/image" && (
-              <SurfaceImageEditor
-                key="image-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-            {content_edit_mode?.type === "width" && (
-              <SurfaceVariableWidthEditor
-                key="varwidth-editor"
-                node_id={content_edit_mode.node_id}
-              />
-            )}
-          </SurfaceGroup>
+                {/* surfaces relatively cheap */}
+                {editable && (
+                  <SurfaceGroup hidden={is_window_resizing}>
+                    {content_edit_mode?.type === "paint/image" && (
+                      <SurfaceImageEditor
+                        key="image-editor"
+                        node_id={content_edit_mode.node_id}
+                      />
+                    )}
+                    {content_edit_mode?.type === "width" && (
+                      <SurfaceVariableWidthEditor
+                        key="varwidth-editor"
+                        node_id={content_edit_mode.node_id}
+                      />
+                    )}
+                  </SurfaceGroup>
+                )}
 
-          <SurfaceGroup
-            hidden={
-              is_transforming ||
-              is_window_resizing ||
-              content_edit_mode?.type === "vector"
-            }
-          >
-            <SelectionOverlay
-              selection={selection}
-              readonly={!!content_edit_mode}
-            />
-          </SurfaceGroup>
-          <SurfaceGroup
-            hidden={is_window_resizing || content_edit_mode?.type === "vector"}
-          >
-            <SurfaceGroup
-              hidden={tool.type !== "cursor" || is_node_transforming}
-            >
-              {hovered_node_id && (
-                // general hover
-                <NodeOverlay node_id={hovered_node_id} readonly />
-              )}
-            </SurfaceGroup>
-          </SurfaceGroup>
-          {dropzone && <DropzoneOverlay {...dropzone} />}
-          <RootFramesBarOverlay />
+                <SurfaceGroup
+                  hidden={
+                    is_transforming ||
+                    is_window_resizing ||
+                    content_edit_mode?.type === "vector"
+                  }
+                >
+                  <SelectionOverlay
+                    selection={selection}
+                    readonly={!editable || !!content_edit_mode}
+                  />
+                </SurfaceGroup>
+                <SurfaceGroup
+                  hidden={
+                    is_window_resizing || content_edit_mode?.type === "vector"
+                  }
+                >
+                  <SurfaceGroup
+                    hidden={tool.type !== "cursor" || is_node_transforming}
+                  >
+                    {hovered_node_id && (
+                      // general hover
+                      <NodeOverlay node_id={hovered_node_id} readonly />
+                    )}
+                  </SurfaceGroup>
+                </SurfaceGroup>
+                {editable && dropzone && <DropzoneOverlay {...dropzone} />}
+                {canvas_ui_container_label === "on" && <RootFramesBarOverlay />}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </SurfaceSelectionGroupProvider>

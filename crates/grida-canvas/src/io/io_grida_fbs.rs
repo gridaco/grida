@@ -39,6 +39,7 @@ use crate::cg::{
         Axis, BlendMode, BooleanPathOperation, CGPoint, ContainerClipFlag, CornerSmoothing,
         CrossAxisAlignment, DiamondGradientPaint, EdgeInsets, FontFeature, FontOpticalSizing,
         FontVariation, FontWeight, GradientStop, ImageFilters, ImagePaint, ImagePaintFit,
+        ImageRepeat, ImageTile,
         LayerBlendMode, LayerMaskType, LayoutGap, LayoutMode, LayoutPositioning, LayoutWrap,
         LinearGradientPaint, MainAxisAlignment, Paint, Paints, RadialGradientPaint,
         RectangularCornerRadius, ResourceRef, SolidPaint, StrokeAlign, StrokeCap, StrokeJoin,
@@ -55,7 +56,7 @@ use crate::node::{
         InitialContainerNodeRec, LayerEffects, LayoutChildStyle, LayoutContainerStyle,
         LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node, RectangleNodeRec,
         RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene, Size, StrokeStyle,
-        TextSpanNodeRec, VectorNodeRec,
+        PathNodeRec, TextSpanNodeRec, VectorNodeRec,
     },
 };
 use crate::vectornetwork::{
@@ -215,12 +216,9 @@ pub fn decode_all(bytes: &[u8]) -> Result<Vec<Scene>, FbsDecodeError> {
 }
 
 fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
-    let opts = flatbuffers::VerifierOptions {
-        max_tables: usize::MAX,
-        max_depth: 1024,
-        ..Default::default()
-    };
-    let grida_file = flatbuffers::root_with_opts::<fbs::GridaFile>(&opts, bytes)?;
+    // SAFETY: Skip verification to avoid stack overflow on large documents
+    // traversal of all tables exhausts the WASM stack (64 KB default).
+    let grida_file = unsafe { flatbuffers::root_unchecked::<fbs::GridaFile>(bytes) };
     let document = grida_file
         .document()
         .ok_or(FbsDecodeError::MissingDocument)?;
@@ -239,6 +237,7 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         id: String,
         parent: Option<(String, String)>, // (parent_id, fractional-index position)
         node: Node,
+        name: Option<String>,
     }
 
     struct SceneMeta {
@@ -261,10 +260,11 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                 let sys = typed.node();
                 let layer = typed.layer();
                 let id = sys.id().id().to_owned();
+                let name = sys.name().map(|s| s.to_owned());
                 let parent = decode_parent_ref(&layer);
                 let lc = decode_layer_common(&sys, &layer);
                 let node = $decode_fn(&lc, &layer, &typed);
-                node_entries.push(NodeEntry { id, parent, node });
+                node_entries.push(NodeEntry { id, parent, node, name });
             }
         };
     }
@@ -309,6 +309,9 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                 }
                 fbs::Node::VectorNode => {
                     decode_layer_node!(slot, node_as_vector_node, decode_vector_node);
+                }
+                fbs::Node::PathNode => {
+                    decode_layer_node!(slot, node_as_path_node, decode_path_node);
                 }
                 fbs::Node::LineNode => {
                     decode_layer_node!(slot, node_as_line_node, decode_line_node);
@@ -364,6 +367,15 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         .filter_map(|e| Some((get_id(&e.id)?, e.node.clone())))
         .collect();
 
+    let node_names: Vec<_> = node_entries
+        .iter()
+        .filter_map(|e| {
+            let id = get_id(&e.id)?;
+            let name = e.name.clone()?;
+            Some((id, name))
+        })
+        .collect();
+
     let internal_links: HashMap<_, Vec<_>> = children_by_parent
         .iter()
         .filter_map(|(parent_str, children)| {
@@ -403,11 +415,16 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
             .filter_map(|(child_str, _)| get_id(child_str))
             .collect();
 
-        let graph = SceneGraph::new_from_snapshot(
+        let mut graph = SceneGraph::new_from_snapshot(
             node_pairs.clone(),
             internal_links.clone(),
             roots_internal,
         );
+
+        // Preserve node display names
+        for (id, name) in &node_names {
+            graph.set_name(*id, name.clone());
+        }
 
         scenes.push(Scene {
             name,
@@ -680,7 +697,29 @@ fn decode_image_paint_fit(ip: &fbs::ImagePaint<'_>) -> ImagePaintFit {
                 .unwrap_or_default();
             ImagePaintFit::Transform(transform)
         }
+        fbs::ImagePaintFit::ImagePaintFitTile => {
+            let tile = ip
+                .fit_as_image_paint_fit_tile()
+                .and_then(|f| f.tile())
+                .map(|t| ImageTile {
+                    scale: t.scale(),
+                    repeat: decode_image_repeat(t.repeat()),
+                })
+                .unwrap_or(ImageTile {
+                    scale: 1.0,
+                    repeat: ImageRepeat::Repeat,
+                });
+            ImagePaintFit::Tile(tile)
+        }
         _ => ImagePaintFit::Fit(BoxFit::Cover),
+    }
+}
+
+fn decode_image_repeat(r: fbs::ImageRepeat) -> ImageRepeat {
+    match r {
+        fbs::ImageRepeat::RepeatX => ImageRepeat::RepeatX,
+        fbs::ImageRepeat::RepeatY => ImageRepeat::RepeatY,
+        _ => ImageRepeat::Repeat,
     }
 }
 
@@ -1563,6 +1602,31 @@ fn decode_vector_node(
     })
 }
 
+fn decode_path_node(
+    lc: &LayerCommon,
+    layer: &fbs::LayerTrait<'_>,
+    pn: &fbs::PathNode<'_>,
+) -> Node {
+    let sl = decode_shape_layout(layer, lc.rotation_cos_sin);
+    let (stroke_style, stroke_width_f32, _stroke_width_profile) =
+        decode_stroke_geometry_trait(pn.stroke_geometry());
+
+    Node::Path(PathNodeRec {
+        active: lc.active,
+        opacity: lc.opacity,
+        blend_mode: lc.blend_mode,
+        mask: lc.mask,
+        effects: lc.effects.clone(),
+        transform: sl.transform,
+        fills: decode_paints_vec(pn.fill_paints()),
+        data: pn.data().unwrap_or("").to_string(),
+        strokes: decode_paints_vec(pn.stroke_paints()),
+        stroke_style,
+        stroke_width: singular_stroke_width(stroke_width_f32),
+        layout_child: lc.layout_child.clone(),
+    })
+}
+
 fn decode_line_node(
     lc: &LayerCommon,
     layer: &fbs::LayerTrait<'_>,
@@ -2089,41 +2153,7 @@ fn encode_node<'a, A: flatbuffers::Allocator + 'a>(
         Node::BooleanOperation(r) => {
             encode_boolean_operation_node(fbb, r, node_id, parent_id, position)
         }
-        // Path nodes store raw SVG path data; convert to VectorNode for FBS
-        Node::Path(r) => {
-            if let Some(sk_path) = skia_safe::path::Path::from_svg(&r.data) {
-                let network = crate::vectornetwork::VectorNetwork::from(&sk_path);
-                let vn_rec = VectorNodeRec {
-                    active: r.active,
-                    opacity: r.opacity,
-                    blend_mode: r.blend_mode,
-                    mask: r.mask,
-                    transform: r.transform,
-                    layout_child: r.layout_child.clone(),
-                    fills: r.fills.clone(),
-                    strokes: r.strokes.clone(),
-                    stroke_width: r.stroke_width.value_or_zero(),
-                    stroke_width_profile: None,
-                    stroke_align: r.stroke_style.stroke_align,
-                    stroke_cap: r.stroke_style.stroke_cap,
-                    stroke_join: r.stroke_style.stroke_join,
-                    stroke_miter_limit: r.stroke_style.stroke_miter_limit,
-                    stroke_dash_array: r.stroke_style.stroke_dash_array.clone(),
-                    marker_start_shape: StrokeMarkerPreset::None,
-                    marker_end_shape: StrokeMarkerPreset::None,
-                    corner_radius: 0.0,
-                    effects: LayerEffects::default(),
-                    network,
-                };
-                encode_vector_node(fbb, &vn_rec, node_id, parent_id, position)
-            } else {
-                // Invalid path data — encode as unknown
-                let sys = encode_system_node_trait(fbb, node_id, "", true, false);
-                let un =
-                    fbs::UnknownNode::create(fbb, &fbs::UnknownNodeArgs { node: Some(sys) });
-                make_node_slot(fbb, fbs::Node::UnknownNode, un.as_union_value())
-            }
-        }
+        Node::Path(r) => encode_path_node(fbb, r, node_id, parent_id, position),
         // Fallback: encode as UnknownNode
         _ => {
             let sys = encode_system_node_trait(fbb, node_id, "", true, false);
@@ -3422,6 +3452,47 @@ fn encode_vector_node<'a, A: flatbuffers::Allocator + 'a>(
         ..Default::default()
     });
     make_node_slot(fbb, fbs::Node::VectorNode, vn_node.as_union_value())
+}
+
+fn encode_path_node<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    r: &crate::node::schema::PathNodeRec,
+    node_id: &str,
+    parent_id: &str,
+    position: &str,
+) -> flatbuffers::WIPOffset<fbs::NodeSlot<'a>> {
+    let x = r.transform.x();
+    let y = r.transform.y();
+    let plt = affine_to_rotation_transform(&r.transform);
+
+    let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
+    let layout = encode_shape_layout(fbb, x, y, None, None, &r.layout_child);
+    let layer = encode_layer_trait(fbb, &LayerTraitInput {
+        parent_id,
+        position,
+        opacity: r.opacity,
+        blend_mode: r.blend_mode,
+        mask: r.mask,
+        effects: &r.effects,
+        post_layout_transform: plt,
+        layout: Some(layout),
+    });
+
+    let sg = encode_stroke_geometry(fbb, &r.stroke_style, r.stroke_width.value_or_zero(), None);
+    let fill_offsets = encode_paints(fbb, &r.fills);
+    let stroke_offsets = encode_paints(fbb, &r.strokes);
+    let data_offset = fbb.create_string(&r.data);
+
+    let pn = fbs::PathNode::create(fbb, &fbs::PathNodeArgs {
+        node: Some(sys),
+        layer: Some(layer),
+        stroke_geometry: Some(sg),
+        fill_paints: fill_offsets,
+        stroke_paints: stroke_offsets,
+        data: Some(data_offset),
+        fill_rule: fbs::FillRule::NonZero,
+    });
+    make_node_slot(fbb, fbs::Node::PathNode, pn.as_union_value())
 }
 
 fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(

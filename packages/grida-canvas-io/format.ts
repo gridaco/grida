@@ -1655,6 +1655,50 @@ export namespace format {
             nodeType = fbs.Node.VectorNode;
             break;
           }
+          case "path": {
+            const pathNode = node as grida.program.nodes.PathNode;
+
+            const strokeGeometryOffset =
+              format.shape.encode.strokeGeometryTrait(builder, {
+                stroke_width: pathNode.stroke_width,
+                stroke_cap: pathNode.stroke_cap,
+                stroke_join: pathNode.stroke_join,
+              });
+            const fillPaintsFiltered = paints(pathNode, "fill");
+            const fillPaintsOffset = format.paint.encode.fillPaints(
+              builder,
+              fillPaintsFiltered,
+              fbs.PathNode.createFillPaintsVector
+            );
+            const strokePaintsFiltered = paints(pathNode, "stroke");
+            const strokePaintsOffset = format.paint.encode.strokePaints(
+              builder,
+              strokePaintsFiltered,
+              fbs.PathNode.createStrokePaintsVector
+            );
+            const dataOffset = pathNode.data
+              ? builder.createString(pathNode.data)
+              : undefined;
+
+            fbs.PathNode.startPathNode(builder);
+            fbs.PathNode.addNode(builder, systemNodeTraitOffset);
+            fbs.PathNode.addLayer(builder, layerOffset);
+            fbs.PathNode.addStrokeGeometry(builder, strokeGeometryOffset);
+            fbs.PathNode.addFillPaints(builder, fillPaintsOffset);
+            fbs.PathNode.addStrokePaints(builder, strokePaintsOffset);
+            if (dataOffset) {
+              fbs.PathNode.addData(builder, dataOffset);
+            }
+            fbs.PathNode.addFillRule(
+              builder,
+              pathNode.fill_rule === "evenodd"
+                ? fbs.FillRule.EvenOdd
+                : fbs.FillRule.NonZero
+            );
+            nodeOffset = fbs.PathNode.endPathNode(builder);
+            nodeType = fbs.Node.PathNode;
+            break;
+          }
           case "boolean": {
             const booleanNode =
               node as grida.program.nodes.BooleanPathOperationNode;
@@ -2362,6 +2406,8 @@ export namespace format {
 
           // Decode fit from ImagePaintFit union
           let fit: cg.BoxFit | "transform" | "tile" = "cover";
+          let transform: cg.AffineTransform | undefined;
+          let scale: number | undefined;
           const fitType = imagePaint.fitType();
           if (fitType === fbs.ImagePaintFit.ImagePaintFitFit) {
             const fitFit = imagePaint.fit(
@@ -2373,16 +2419,34 @@ export namespace format {
             }
           } else if (fitType === fbs.ImagePaintFit.ImagePaintFitTransform) {
             fit = "transform";
-            // TODO: decode transform if needed
+            const fitTransform = imagePaint.fit(
+              new fbs.ImagePaintFitTransform()
+            ) as fbs.ImagePaintFitTransform | null;
+            const t = fitTransform?.transform();
+            if (t) {
+              transform = [
+                [t.m00(), t.m01(), t.m02()],
+                [t.m10(), t.m11(), t.m12()],
+              ];
+            }
           } else if (fitType === fbs.ImagePaintFit.ImagePaintFitTile) {
             fit = "tile";
-            // TODO: decode tile scale if needed
+            const fitTile = imagePaint.fit(
+              new fbs.ImagePaintFitTile()
+            ) as fbs.ImagePaintFitTile | null;
+            const tile = fitTile?.tile();
+            if (tile) {
+              scale = tile.scale();
+            }
           }
 
           return {
             type: "image",
             src,
             fit,
+            ...(transform !== undefined && { transform }),
+            ...(scale !== undefined && { scale }),
+            quarter_turns: imagePaint.quarterTurns(),
             blend_mode: styling.decode.blendMode(imagePaint.blendMode()),
             opacity: imagePaint.opacity(),
             active: imagePaint.active(),
@@ -5353,6 +5417,68 @@ export namespace format {
         }
 
         /**
+         * Decodes PathNode (raw SVG path data).
+         */
+        export function path(
+          n: fbs.PathNode,
+          id: string,
+          systemNode: fbs.SystemNodeTrait,
+          layer: fbs.LayerTrait | null,
+          opacity: number,
+          layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
+          effects?: grida.program.nodes.i.IEffects
+        ): grida.program.nodes.PathNode {
+          const strokeGeometry = n.strokeGeometry();
+          const fillPaints = format.paint.decode.fillPaints(n);
+          const strokePaints = format.paint.decode.strokePaints(n);
+
+          const strokeGeometryProps = format.shape.decode.strokeGeometryTrait(
+            strokeGeometry ?? null
+          );
+
+          const width =
+            typeof layoutFields.layout_target_width === "number"
+              ? layoutFields.layout_target_width
+              : 0;
+          const height =
+            typeof layoutFields.layout_target_height === "number"
+              ? layoutFields.layout_target_height
+              : 0;
+
+          const baseName = systemNode.name() ?? "path";
+          const fillRule =
+            n.fillRule() === fbs.FillRule.EvenOdd
+              ? ("evenodd" as const)
+              : ("nonzero" as const);
+
+          return {
+            type: "path",
+            id,
+            name: baseName,
+            active: systemNode.active(),
+            locked: systemNode.locked(),
+            opacity,
+            z_index: 0,
+            ...(fillPaints ? { fill_paints: fillPaints } : {}),
+            ...(strokePaints ? { stroke_paints: strokePaints } : {}),
+            layout_positioning: layoutFields.layout_positioning ?? "absolute",
+            layout_inset_left: layoutFields.layout_inset_left,
+            layout_inset_top: layoutFields.layout_inset_top,
+            layout_inset_right: layoutFields.layout_inset_right,
+            layout_inset_bottom: layoutFields.layout_inset_bottom,
+            layout_target_width: width,
+            layout_target_height: height,
+            rotation: layoutFields.rotation ?? 0,
+            stroke_width: strokeGeometryProps.stroke_width,
+            stroke_cap: strokeGeometryProps.stroke_cap,
+            stroke_join: strokeGeometryProps.stroke_join,
+            data: n.data() ?? "",
+            fill_rule: fillRule,
+            ...(effects || {}),
+          } satisfies grida.program.nodes.PathNode;
+        }
+
+        /**
          * Decodes BooleanPathOperationNode.
          */
         export function boolean(
@@ -5566,8 +5692,13 @@ export namespace format {
             continue;
           }
 
+          // UnknownNode has no layer — skip it during deserialization
+          if (nodeType === fbs.Node.UnknownNode) {
+            continue;
+          }
+
           // Access node and layer fields from typed node (for all other node types)
-          // All node types except SceneNode and BasicShapeNode have node() and layer() methods
+          // All node types except SceneNode, BasicShapeNode, and UnknownNode have node() and layer() methods
           type NodeWithLayer =
             | fbs.ContainerNode
             | fbs.TextSpanNode
@@ -5647,6 +5778,17 @@ export namespace format {
             case fbs.Node.VectorNode:
               nodes[id] = nodeTypes.vector(
                 typedNode as fbs.VectorNode,
+                id,
+                systemNode,
+                layer,
+                opacity,
+                layoutFields,
+                decodedEffects
+              );
+              break;
+            case fbs.Node.PathNode:
+              nodes[id] = nodeTypes.path(
+                typedNode as fbs.PathNode,
                 id,
                 systemNode,
                 layer,

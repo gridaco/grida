@@ -1695,3 +1695,63 @@ fn gen_image_paint_transform_fit() {
     );
     assert_roundtrip_scene(&scene, "s1", "image_paint_transform_fit");
 }
+
+// ─── Path Node ──────────────────────────────────────────────────────────────
+
+#[test]
+fn gen_path_node() {
+    let path = Node::Path(PathNodeRec {
+        active: true,
+        opacity: 0.9,
+        blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+        mask: None,
+        effects: LayerEffects::default(),
+        transform: AffineTransform::from_box_center(10.0, 20.0, 100.0, 80.0, 0.0),
+        fills: Paints::new(vec![solid(255, 0, 0, 255)]),
+        data: "M0,0 L100,0 L100,80 L0,80 Z".to_string(),
+        strokes: Paints::new(vec![solid(0, 0, 0, 255)]),
+        stroke_style: StrokeStyle {
+            stroke_align: StrokeAlign::Center,
+            stroke_cap: StrokeCap::Round,
+            stroke_join: StrokeJoin::Round,
+            stroke_miter_limit: StrokeMiterLimit(4.0),
+            stroke_dash_array: None,
+        },
+        stroke_width: SingularStrokeWidth(Some(2.0)),
+        layout_child: None,
+    });
+
+    let scene = build_scene("Path", None, vec![(1, path)], HashMap::new(), vec![1]);
+    assert_roundtrip_scene(&scene, "s1", "path_node");
+}
+
+#[test]
+fn gen_path_node_complex() {
+    // A more complex SVG path with curves
+    let path = Node::Path(PathNodeRec {
+        active: true,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::PassThrough,
+        mask: None,
+        effects: LayerEffects::default(),
+        transform: AffineTransform::from_box_center(0.0, 0.0, 200.0, 200.0, 0.0),
+        fills: Paints::new(vec![
+            solid(100, 150, 200, 255),
+            solid(200, 100, 50, 128),
+        ]),
+        data: "M10,80 C40,10 65,10 95,80 S150,150 180,80".to_string(),
+        strokes: Paints::default(),
+        stroke_style: StrokeStyle::default(),
+        stroke_width: SingularStrokeWidth(None),
+        layout_child: None,
+    });
+
+    let scene = build_scene(
+        "PathComplex",
+        None,
+        vec![(1, path)],
+        HashMap::new(),
+        vec![1],
+    );
+    assert_roundtrip_scene(&scene, "s1", "path_node_complex");
+}

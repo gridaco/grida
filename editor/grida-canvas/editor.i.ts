@@ -16,7 +16,6 @@ import kolor from "@grida/color";
 import tree from "@grida/tree";
 import type { io } from "@grida/io";
 
-
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
 
@@ -985,6 +984,18 @@ export namespace editor.state {
   }
 
   /**
+   * React DOM overlays and other canvas-adjacent UI toggles.
+   *
+   * @volatile
+   */
+  export interface IEditorFeatureCanvasUiState {
+    canvas_ui: {
+      /** Root frame title bars (see `RootFramesBarOverlay` in the editor package). */
+      container_label: "on" | "off";
+    };
+  }
+
+  /**
    * @volatile
    */
   export interface IEditorFeatureOutlineModeState {
@@ -1529,6 +1540,7 @@ export namespace editor.state {
       editor.state.IEditorFeatureBrushState,
       editor.state.IEditorFeatureRulerState,
       editor.state.IEditorFeaturePixelGridState,
+      editor.state.IEditorFeatureCanvasUiState,
       editor.state.IEditorFeatureOutlineModeState,
       editor.state.IEditorFeaturePixelPreviewState,
       editor.state.IEditorFeatureRepeatableDuplicateState,
@@ -1713,6 +1725,9 @@ export namespace editor.state {
       gesture_modifiers: editor.config.DEFAULT_GESTURE_MODIFIERS,
       ruler: "on",
       pixelgrid: "on",
+      canvas_ui: {
+        container_label: "on",
+      },
       outline_mode: "off",
       outline_mode_ignores_clips: true,
       pixelpreview: "disabled",
@@ -2787,8 +2802,7 @@ export namespace editor.api {
     toVectorNetwork(node_id: string): vn.FlattenResult | null;
   }
 
-  export interface IDocumentSVGInterfaceActions
-    extends IDocumentSVGInterfaceProvider {}
+  export interface IDocumentSVGInterfaceActions extends IDocumentSVGInterfaceProvider {}
 
   export interface IDocumentMarkdownInterfaceActions {
     markdownToHtml(markdown: string): string | null;
@@ -4191,6 +4205,10 @@ export namespace editor.api {
     // pixel grid
     surfaceConfigurePixelGrid(state: "on" | "off"): void;
     surfaceTogglePixelGrid(): "on" | "off";
+    //
+    /** Root frame title bars (React overlay). */
+    surfaceConfigureCanvasUiContainerLabel(state: "on" | "off"): void;
+    surfaceToggleCanvasUiContainerLabel(): "on" | "off";
     //
     // ruler
     surfaceConfigureRuler(state: "on" | "off"): void;

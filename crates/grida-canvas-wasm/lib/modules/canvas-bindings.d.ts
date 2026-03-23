@@ -34,10 +34,30 @@ declare namespace canvas {
       height: number
     ): void;
     _redraw(state: GridaCanvasApplicationPtr): void;
-    _load_scene_json(
+    _load_scene_grida1(
       state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number
+    ): void;
+    _load_scene_grida(
+      state: GridaCanvasApplicationPtr,
+      ptr: number,
+      len: number
+    ): void;
+    _switch_scene(
+      state: GridaCanvasApplicationPtr,
+      ptr: number,
+      len: number
+    ): void;
+    _drain_missing_images(
+      state: GridaCanvasApplicationPtr
+    ): Ptr;
+    _resolve_image(
+      state: GridaCanvasApplicationPtr,
+      rid_ptr: number,
+      rid_len: number,
+      bytes_ptr: number,
+      bytes_len: number
     ): void;
     _apply_scene_transactions(
       state: GridaCanvasApplicationPtr,
@@ -146,6 +166,42 @@ declare namespace canvas {
       state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number
+    ): void;
+
+    // ====================================================================================================
+    // SURFACE INTERACTION
+    // ====================================================================================================
+    _surface_pointer_move(
+      state: GridaCanvasApplicationPtr,
+      x: number,
+      y: number
+    ): number;
+    _surface_pointer_down(
+      state: GridaCanvasApplicationPtr,
+      x: number,
+      y: number,
+      button: number,
+      modifiers: number
+    ): number;
+    _surface_pointer_up(
+      state: GridaCanvasApplicationPtr,
+      x: number,
+      y: number,
+      button: number,
+      modifiers: number
+    ): number;
+    _surface_get_cursor(state: GridaCanvasApplicationPtr): number;
+    _surface_get_hovered_node(state: GridaCanvasApplicationPtr): Ptr;
+    _surface_get_selected_nodes(state: GridaCanvasApplicationPtr): Ptr;
+    _surface_set_selection(
+      state: GridaCanvasApplicationPtr,
+      json_ptr: number,
+      json_len: number
+    ): void;
+    _set_surface_overlay_config(
+      state: GridaCanvasApplicationPtr,
+      json_ptr: number,
+      json_len: number
     ): void;
 
     _set_debug(state: GridaCanvasApplicationPtr, debug: boolean): void;

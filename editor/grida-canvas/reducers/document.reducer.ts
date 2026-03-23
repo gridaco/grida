@@ -100,7 +100,15 @@ export default function documentReducer<S extends editor.state.IEditorState>(
   action: DocumentAction,
   context: ReducerContext
 ): S {
-  if (!state.editable) return state;
+  if (!state.editable) {
+    switch (action.type) {
+      case "select":
+      case "blur":
+        break; // allow through — these only modify UI state, not document data
+      default:
+        return state;
+    }
+  }
 
   assert(state.scene_id, "scene_id is required for autolayout");
 
@@ -2022,6 +2030,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "surface/ruler":
     case "surface/guide/delete":
     case "surface/pixel-grid":
+    case "surface/canvas-ui-container-label":
     case "surface/outline-mode":
     case "surface/outline-mode-ignores-clips":
     case "surface/pixel-preview":
